@@ -2,12 +2,12 @@ import { apiLogger } from '@/lib/api/logger';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import {
   assertPublicUrl,
-  isNonEmptyString,
   parseBooleanString,
   parseNonNegativeInt,
   parsePositiveInt,
-  ValidationError,
+  parseRequestBody,
 } from '@/lib/api/validation';
+import { createDataModelRequestSchema } from '@/lib/api/request-schemas/data-model';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDataModel, listDataModels } from '@/lib/prisma/repositories';
 
@@ -199,38 +199,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: {
-    name?: string;
-    credentialType?: string;
-    version?: string;
-    schemaUrl?: string;
-    contextUrl?: string;
-    parentConfigId?: string;
-    websiteUrl?: string;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info('Validating input parameters');
-  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-
-  if (!isNonEmptyString(body.credentialType)) throw new ValidationError('credentialType is required');
-  const credentialType = body.credentialType;
-
-  if (!isNonEmptyString(body.version)) throw new ValidationError('version is required');
-  if (!isNonEmptyString(body.schemaUrl)) throw new ValidationError('schemaUrl is required');
-  if (!isNonEmptyString(body.contextUrl)) throw new ValidationError('contextUrl is required');
-  if (!isNonEmptyString(body.parentConfigId)) {
-    throw new ValidationError('parentConfigId is required');
-  }
-  if (body.websiteUrl !== undefined && !isNonEmptyString(body.websiteUrl)) {
-    throw new ValidationError('websiteUrl must be a non-empty string');
-  }
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createDataModelRequestSchema);
 
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
     logger.info('Validating URLs are not internal');
@@ -241,10 +211,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     }
   }
 
-  logger.info({ credentialType, name: body.name }, 'Creating data model extension');
+  logger.info({ credentialType: body.credentialType, name: body.name }, 'Creating data model extension');
   const dataModel = await createDataModel(tenantId, {
     name: body.name,
-    credentialType,
+    credentialType: body.credentialType,
     version: body.version,
     schemaUrl: body.schemaUrl,
     contextUrl: body.contextUrl,

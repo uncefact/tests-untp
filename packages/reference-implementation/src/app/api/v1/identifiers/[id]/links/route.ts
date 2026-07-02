@@ -1,34 +1,13 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { NotFoundError } from '@/lib/api/errors';
-import { assertPublicUrl, ValidationError, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { assertPublicUrl, parseRequestBody, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { publishLinksRequestSchema } from '@/lib/api/request-schemas/link';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, createManyLinkRegistrations, listLinkRegistrations } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 import type { Link } from '@uncefact/untp-ri-services';
-
-const linkSchema = z.object({
-  href: z.string().url(),
-  rel: z.string().min(1),
-  type: z.string().min(1),
-  title: z.string().optional(),
-  hreflang: z.array(z.string().min(1)).optional(),
-  context: z.string().optional(),
-  default: z.boolean().optional(),
-  method: z.enum(['GET', 'POST']).optional(),
-  encryptionMethod: z.string().optional(),
-  accessRole: z.array(z.string()).optional(),
-  additionalRels: z.array(z.string().min(1)).optional(),
-  public: z.boolean().optional(),
-});
-
-const publishLinksRequestSchema = z.object({
-  links: z.array(linkSchema).min(1),
-  qualifierPath: z.string().optional(),
-  description: z.string().optional(),
-});
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 
@@ -158,21 +137,8 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
-  logger.info({ identifierId }, 'Parsing request body');
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ identifierId }, 'Validating input parameters');
-  const parsed = publishLinksRequestSchema.safeParse(rawBody);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    throw new ValidationError(`${issue.path.join('.') || 'body'}: ${issue.message}`);
-  }
-  const body = parsed.data;
+  logger.info({ identifierId }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, publishLinksRequestSchema);
 
   // SSRF guard on each link's target URL.
   for (const link of body.links) {

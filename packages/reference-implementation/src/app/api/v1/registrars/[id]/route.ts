@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateRegistrarRequestSchema } from '@/lib/api/request-schemas/registrar';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getRegistrarById, updateRegistrar, deleteRegistrar } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
@@ -129,40 +130,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ registrarId: id }, 'Parsing request body');
+  logger.info({ registrarId: id }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateRegistrarRequestSchema);
 
-  let body: {
-    name?: string;
-    namespace?: string;
-    url?: string;
-    idrServiceInstanceId?: string | null;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  const hasName = isNonEmptyString(body.name);
-  const hasNamespace = isNonEmptyString(body.namespace);
-  const hasUrl = isNonEmptyString(body.url);
-  const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
-
-  if (!hasName && !hasNamespace && !hasUrl && !hasIdrServiceInstanceId) {
-    throw new ValidationError('At least one of name, namespace, url, or idrServiceInstanceId is required');
-  }
-
-  logger.info(
-    { registrarId: id, fields: { hasName, hasNamespace, hasUrl, hasIdrServiceInstanceId } },
-    'Updating registrar',
-  );
-  const updated = await updateRegistrar(id, tenantId, {
-    ...(hasName && { name: body.name }),
-    ...(hasNamespace && { namespace: body.namespace }),
-    ...(hasUrl && { url: body.url }),
-    ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
-  });
+  logger.info({ registrarId: id }, 'Updating registrar');
+  const updated = await updateRegistrar(id, tenantId, definedFields(body));
 
   logger.info({ registrarId: id }, 'Registrar updated');
   return NextResponse.json(updated);

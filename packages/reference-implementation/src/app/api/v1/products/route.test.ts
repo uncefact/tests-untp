@@ -95,7 +95,8 @@ describe('POST /api/v1/products', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('Request body must be an array');
+    expect(json.error).toMatch(/array/i);
+    expect(mockCreateProducts).not.toHaveBeenCalled();
   });
 
   it('returns 400 when body is an empty array', async () => {
@@ -104,7 +105,38 @@ describe('POST /api/v1/products', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('Request body must not be empty');
+    expect(json.error).toContain('must not be empty');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when body is not an array', async () => {
+    const req = createFakeRequest({ body: { name: 'Widget', level: 'MODEL' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('must be an array');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a null array item', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Widget', level: 'MODEL' }, null] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('1');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
   });
 
   it('returns 400 when name is missing', async () => {
@@ -113,7 +145,8 @@ describe('POST /api/v1/products', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required for all items');
+    expect(json.error).toContain('name');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
   });
 
   it('returns 400 when level is missing', async () => {
@@ -122,7 +155,8 @@ describe('POST /api/v1/products', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('level is required for all items');
+    expect(json.error).toContain('level');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
   });
 
   it('returns 400 when level is not a valid enum value', async () => {
@@ -131,7 +165,60 @@ describe('POST /api/v1/products', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('level must be one of: MODEL, BATCH, ITEM');
+    expect(json.error).toContain('level');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when parentId is not a string', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Widget A', level: 'MODEL', parentId: 42 }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('parentId');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when producedByOrganisationId is not a string', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Widget A', level: 'MODEL', producedByOrganisationId: 42 }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('producedByOrganisationId');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when manufacturingFacilityId is not a string', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Widget A', level: 'MODEL', manufacturingFacilityId: 42 }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('manufacturingFacilityId');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when primaryIdentifierId is not a string', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Widget A', level: 'MODEL', primaryIdentifierId: 42 }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('primaryIdentifierId');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when secondaryIdentifierIds is not an array', async () => {
+    const req = createFakeRequest({
+      body: [{ name: 'Widget A', level: 'MODEL', secondaryIdentifierIds: 'not-an-array' }],
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('secondaryIdentifierIds');
+    expect(mockCreateProducts).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {

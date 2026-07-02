@@ -1,22 +1,12 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateProductRequestSchema } from '@/lib/api/request-schemas/product';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getProductById, updateProduct, deleteProduct, UpdateProductInput } from '@/lib/prisma/repositories';
+import { getProductById, updateProduct, deleteProduct } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/products/[id]' });
-
-/** Fields that may be updated via PATCH. Level is immutable. */
-const UPDATABLE_FIELDS = [
-  'name',
-  'description',
-  'parentId',
-  'producedByOrganisationId',
-  'manufacturingFacilityId',
-  'primaryIdentifierId',
-  'secondaryIdentifierIds',
-] as const;
 
 /**
  * @swagger
@@ -102,16 +92,20 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 description: Updated product description
  *               parentId:
  *                 type: string
- *                 description: Updated parent product ID
+ *                 nullable: true
+ *                 description: Updated parent product ID (set to null to clear)
  *               producedByOrganisationId:
  *                 type: string
- *                 description: Updated producing organisation ID
+ *                 nullable: true
+ *                 description: Updated producing organisation ID (set to null to clear)
  *               manufacturingFacilityId:
  *                 type: string
- *                 description: Updated manufacturing facility ID
+ *                 nullable: true
+ *                 description: Updated manufacturing facility ID (set to null to clear)
  *               primaryIdentifierId:
  *                 type: string
- *                 description: Updated primary identifier ID
+ *                 nullable: true
+ *                 description: Updated primary identifier ID (set to null to clear)
  *               secondaryIdentifierIds:
  *                 type: array
  *                 items:
@@ -159,35 +153,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ productId: id }, 'Parsing request body');
-  let body: Record<string, unknown>;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ productId: id }, 'Validating update fields');
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
-  if (!hasUpdatableField) {
-    throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
-  }
-
-  if (body.name !== undefined && !isNonEmptyString(body.name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
-
-  // Pick only known updatable fields (level is immutable and silently excluded)
-  const updateData: Record<string, unknown> = {};
-  for (const field of UPDATABLE_FIELDS) {
-    if (field in body) {
-      updateData[field] = body[field];
-    }
-  }
+  logger.info({ productId: id }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateProductRequestSchema);
 
   logger.info({ productId: id }, 'Updating product');
-  const updated = await updateProduct(id, tenantId, updateData as UpdateProductInput);
+  const updated = await updateProduct(id, tenantId, definedFields(body));
 
   logger.info({ productId: id }, 'Product updated');
   return NextResponse.json(updated);

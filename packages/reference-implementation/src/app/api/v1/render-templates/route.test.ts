@@ -278,7 +278,8 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('storageUrl cannot be set directly');
+    expect(json.error).toContain('storageUrl');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects when digestMultibase is provided', async () => {
@@ -295,7 +296,8 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('digestMultibase cannot be set directly');
+    expect(json.error).toContain('digestMultibase');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects when legacy hash is provided', async () => {
@@ -312,7 +314,8 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('hash is no longer accepted');
+    expect(json.error).toContain('hash');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects when renderMethodType is missing', async () => {
@@ -327,7 +330,8 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('renderMethodType is required');
+    expect(json.error).toContain('renderMethodType');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects when renderMethodType is invalid', async () => {
@@ -343,7 +347,8 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('renderMethodType must be one of:');
+    expect(json.error).toContain('renderMethodType');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects when template is missing', async () => {
@@ -358,7 +363,8 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('template is required');
+    expect(json.error).toContain('template');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('returns 400 when name is missing', async () => {
@@ -373,7 +379,8 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required');
+    expect(json.error).toContain('name');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('returns 400 when dataModelId is missing', async () => {
@@ -388,7 +395,36 @@ describe('POST /api/v1/render-templates', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('dataModelId is required');
+    expect(json.error).toContain('dataModelId');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isDefault is not a boolean', async () => {
+    const req = createFakeRequest({
+      body: {
+        name: 'Template',
+        dataModelId: 'dm-1',
+        renderMethodType: 'RenderTemplate2024',
+        template: '<div>Hello</div>',
+        isDefault: 'true',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('isDefault');
+    expect(mockCreateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('passes storageOptions.serviceInstanceId to resolveStorageService', async () => {

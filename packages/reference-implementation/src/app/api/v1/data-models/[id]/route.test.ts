@@ -177,6 +177,17 @@ describe('PATCH /api/v1/data-models/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('At least one updatable field must be provided');
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when name is empty string', async () => {
@@ -185,7 +196,8 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
+    expect(json.error).toContain('name');
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when schemaUrl is empty string', async () => {
@@ -194,7 +206,8 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('schemaUrl must be a non-empty string');
+    expect(json.error).toContain('schemaUrl');
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when contextUrl is empty string', async () => {
@@ -203,7 +216,8 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('contextUrl must be a non-empty string');
+    expect(json.error).toContain('contextUrl');
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when websiteUrl is empty string', async () => {
@@ -212,7 +226,18 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('websiteUrl must be a non-empty string');
+    expect(json.error).toContain('websiteUrl');
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when schemaUrl is not a string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { schemaUrl: 42 } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('schemaUrl');
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {

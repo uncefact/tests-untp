@@ -5,6 +5,7 @@
  * Routes catch ValidationError and return 400.
  */
 
+import { z } from 'zod';
 import { validatePublicUrl } from '@uncefact/untp-ri-services/server';
 
 export class ValidationError extends Error {
@@ -12,6 +13,43 @@ export class ValidationError extends Error {
     super(message);
     this.name = 'ValidationError';
   }
+}
+
+/**
+ * Parse and validate a JSON request body against a Zod schema (ADR-037).
+ *
+ * Malformed JSON, a literal `null` body, and any shape mismatch throw
+ * ValidationError with the first issue rendered as `field.path: message`,
+ * which the route error mapper returns as a 400.
+ */
+export async function parseRequestBody<Schema extends z.ZodTypeAny>(
+  req: { json: () => Promise<unknown> },
+  schema: Schema,
+): Promise<z.infer<Schema>> {
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    throw new ValidationError('Invalid JSON body');
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new ValidationError(`${issue.path.join('.') || 'body'}: ${issue.message}`);
+  }
+  return parsed.data;
+}
+
+/**
+ * Returns a copy of the object containing only the keys whose value is not
+ * undefined, preserving optionality in the result type. Forwards a parsed
+ * PATCH body to a repository update input without per-field conditional
+ * spreads at every call site.
+ */
+export function definedFields<T extends object>(source: T): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(Object.entries(source).filter(([, value]) => value !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>;
+  };
 }
 
 /**

@@ -195,7 +195,19 @@ describe('POST /api/v1/dids', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('type must be');
+    expect(json.error).toContain('type');
+  });
+
+  it('returns 400 for the DEFAULT type (a real DidType that is not creatable)', async () => {
+    const req = createFakeRequest({
+      body: { type: 'DEFAULT', method: DidMethod.DID_WEB, alias: 'test' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('type');
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing type', async () => {
@@ -213,7 +225,7 @@ describe('POST /api/v1/dids', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('method must be');
+    expect(json.error).toContain('method');
   });
 
   it('returns 400 for missing method', async () => {
@@ -222,7 +234,7 @@ describe('POST /api/v1/dids', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('method is required');
+    expect(json.error).toContain('method');
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -232,6 +244,28 @@ describe('POST /api/v1/dids', () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toBe('Invalid JSON body');
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('body');
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isDefault is not a boolean', async () => {
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test', isDefault: 'yes' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('isDefault');
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
   it('returns 500 when DID service fails', async () => {

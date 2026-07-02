@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server';
-import {
-  ValidationError,
-  isNonEmptyString,
-  parsePositiveInt,
-  parseNonNegativeInt,
-  validateEnum,
-} from '@/lib/api/validation';
+import { parseRequestBody, parsePositiveInt, parseNonNegativeInt, validateEnum } from '@/lib/api/validation';
+import { createProductsRequestSchema } from '@/lib/api/request-schemas/product';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { createProducts, listProducts, CreateProductInput } from '@/lib/prisma/repositories';
+import { createProducts, listProducts } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
@@ -103,41 +98,11 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: Array<{
-    name?: string;
-    level?: string;
-    description?: string;
-    parentId?: string;
-  }>;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info('Validating input parameters');
-  if (!Array.isArray(body)) {
-    throw new ValidationError('Request body must be an array');
-  }
-
-  if (body.length === 0) {
-    throw new ValidationError('Request body must not be empty');
-  }
-
-  for (const item of body) {
-    if (!isNonEmptyString(item.name)) {
-      throw new ValidationError('name is required for all items');
-    }
-    if (!isNonEmptyString(item.level)) {
-      throw new ValidationError('level is required for all items');
-    }
-    validateEnum(item.level, PRODUCT_LEVELS, 'level');
-  }
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createProductsRequestSchema);
 
   logger.info({ count: body.length }, 'Creating products');
-  const products = await createProducts(tenantId, body as CreateProductInput[]);
+  const products = await createProducts(tenantId, body);
 
   logger.info({ count: products.length }, 'Products created');
   return NextResponse.json(products, { status: 201 });

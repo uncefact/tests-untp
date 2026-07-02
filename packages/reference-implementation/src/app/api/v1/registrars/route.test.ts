@@ -115,7 +115,8 @@ describe('POST /api/v1/registrars', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required');
+    expect(json.error).toContain('name');
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing namespace', async () => {
@@ -124,7 +125,28 @@ describe('POST /api/v1/registrars', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('namespace is required');
+    expect(json.error).toContain('namespace');
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-string name', async () => {
+    const req = createFakeRequest({ body: { name: 42, namespace: 'gs1', url: 'https://gs1.org' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('name');
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {

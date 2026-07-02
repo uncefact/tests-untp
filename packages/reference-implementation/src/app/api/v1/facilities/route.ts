@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { parseRequestBody, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { createFacilitiesRequestSchema } from '@/lib/api/request-schemas/facility';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createFacilities, listFacilities } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -87,29 +88,8 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: unknown;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info('Validating input parameters');
-  if (!Array.isArray(body)) {
-    throw new ValidationError('Request body must be an array');
-  }
-
-  if (body.length === 0) {
-    throw new ValidationError('Request body must not be empty');
-  }
-
-  for (const item of body) {
-    if (!isNonEmptyString(item.name)) {
-      throw new ValidationError('name is required for each facility');
-    }
-  }
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createFacilitiesRequestSchema);
 
   logger.info({ count: body.length }, 'Creating facilities');
   const facilities = await createFacilities(tenantId, body);

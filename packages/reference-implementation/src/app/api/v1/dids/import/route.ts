@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, validateEnum } from '@/lib/api/validation';
+import { parseRequestBody } from '@/lib/api/validation';
+import { importDidRequestSchema } from '@/lib/api/request-schemas/did';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { createDid } from '@/lib/prisma/repositories';
-import { DidMethod } from '@uncefact/untp-ri-services';
+import { ServiceInstanceNotFoundError } from '@/lib/api/errors';
+import { createDid, getInstanceByResolution } from '@/lib/prisma/repositories';
+import { ServiceType } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/dids/import' });
@@ -64,6 +66,12 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Service instance not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
  *         description: A DID record with this DID already exists
  *         content:
@@ -78,44 +86,24 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: {
-    did?: string;
-    method?: string;
-    keyId?: string;
-    name?: string;
-    description?: string;
-    serviceInstanceId?: string;
-  };
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, importDidRequestSchema);
 
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
+  // The imported record's serviceInstanceId is later used to resolve the
+  // signing service, so the instance must exist and be visible to this tenant
+  // (matching the resolution scoping POST /dids applies).
+  logger.info({ serviceInstanceId: body.serviceInstanceId }, 'Validating service instance reference');
+  const instance = await getInstanceByResolution(tenantId, ServiceType.VC, body.serviceInstanceId);
+  if (!instance) {
+    throw new ServiceInstanceNotFoundError(body.serviceInstanceId);
   }
 
-  logger.info({ did: body.did, method: body.method }, 'Validating import parameters');
-  if (!isNonEmptyString(body.did)) {
-    throw new ValidationError('did is required');
-  }
-  if (!isNonEmptyString(body.keyId)) {
-    throw new ValidationError('keyId is required');
-  }
-  if (!isNonEmptyString(body.serviceInstanceId)) {
-    throw new ValidationError('serviceInstanceId is required');
-  }
-
-  const method = validateEnum(body.method, Object.values(DidMethod), 'method');
-  if (!method) {
-    throw new ValidationError('method is required');
-  }
-
-  logger.info({ did: body.did, method }, 'Saving imported DID record');
+  logger.info({ did: body.did, method: body.method }, 'Saving imported DID record');
   const record = await createDid({
     tenantId,
     did: body.did,
     type: 'SELF_MANAGED',
-    method,
+    method: body.method,
     keyId: body.keyId,
     name: body.name ?? body.did,
     description: body.description,

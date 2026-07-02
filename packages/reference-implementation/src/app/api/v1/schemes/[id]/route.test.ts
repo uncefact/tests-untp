@@ -175,7 +175,7 @@ describe('PATCH /api/v1/schemes/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier key is required');
+    expect(json.error).toMatch(/qualifiers\.\d+\.key/);
   });
 
   it('returns 400 for invalid qualifier (missing validationPattern)', async () => {
@@ -187,7 +187,7 @@ describe('PATCH /api/v1/schemes/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier validationPattern is required');
+    expect(json.error).toMatch(/qualifiers\.\d+\.validationPattern/);
   });
 
   it('returns 400 for non-array qualifiers', async () => {
@@ -199,7 +199,7 @@ describe('PATCH /api/v1/schemes/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifiers must be an array');
+    expect(json.error).toContain('qualifiers');
   });
 
   it('returns 404 when scheme not found or access denied', async () => {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { parseRequestBody, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { createIdentifierRequestSchema } from '@/lib/api/request-schemas/identifier';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifier, listIdentifiers } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -70,21 +71,8 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: {
-    schemeId?: string;
-    value?: string;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ schemeId: body.schemeId }, 'Validating input parameters');
-  if (!isNonEmptyString(body.schemeId)) throw new ValidationError('schemeId is required');
-  if (!isNonEmptyString(body.value)) throw new ValidationError('value is required');
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createIdentifierRequestSchema);
 
   logger.info({ schemeId: body.schemeId }, 'Creating identifier');
   const identifier = await createIdentifier({

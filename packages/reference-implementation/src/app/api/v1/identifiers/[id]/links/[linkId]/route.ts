@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { assertPublicUrl, ValidationError } from '@/lib/api/validation';
+import { assertPublicUrl, parseRequestBody } from '@/lib/api/validation';
+import { updateLinkRequestSchema } from '@/lib/api/request-schemas/link';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import {
   getIdentifierById,
@@ -10,6 +11,7 @@ import {
 } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { IdrLinkNotFoundError } from '@uncefact/untp-ri-services';
+import type { Link } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links/[linkId]' });
@@ -228,15 +230,10 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
-  logger.info({ identifierId, linkId }, 'Parsing request body');
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
+  logger.info({ identifierId, linkId }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateLinkRequestSchema);
 
-  if (typeof body.href === 'string') await assertPublicUrl(body.href, 'href');
+  if (body.href !== undefined) await assertPublicUrl(body.href, 'href');
 
   logger.info({ identifierId, linkId }, 'Looking up identifier and local link record for update');
   const identifier = await getIdentifierById(identifierId, tenantId);
@@ -261,7 +258,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
   try {
     logger.info({ identifierId, linkId }, 'Updating link on upstream IDR');
-    const updatedLink = await idrService.updateLink(linkId, body);
+    const updatedLink = await idrService.updateLink(linkId, body as Partial<Link>);
 
     logger.info({ identifierId, linkId }, 'Syncing local record with upstream state');
     await updateLinkRegistration(linkId, identifierId, tenantId, {

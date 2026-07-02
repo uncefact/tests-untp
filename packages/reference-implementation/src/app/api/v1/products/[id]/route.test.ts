@@ -131,6 +131,17 @@ describe('PATCH /api/v1/products/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('At least one updatable field must be provided');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
   });
 
   it('returns 404 when product not found', async () => {
@@ -180,7 +191,69 @@ describe('PATCH /api/v1/products/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
+    expect(json.error).toContain('name');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when parentId is not a string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { parentId: 42 } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('parentId');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when producedByOrganisationId is not a string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { producedByOrganisationId: 42 } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('producedByOrganisationId');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when manufacturingFacilityId is not a string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { manufacturingFacilityId: 42 } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('manufacturingFacilityId');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when primaryIdentifierId is not a string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { primaryIdentifierId: 42 } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('primaryIdentifierId');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when secondaryIdentifierIds is not an array', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { secondaryIdentifierIds: 'not-an-array' } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('secondaryIdentifierIds');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it('allows clearing parentId with null', async () => {
+    const updated = { id: 'p-1', name: 'Widget A', level: 'MODEL', parentId: null };
+    mockUpdateProduct.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { parentId: null } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateProduct).toHaveBeenCalledWith('p-1', 'org-1', { parentId: null });
   });
 
   it('returns 500 on unexpected error', async () => {

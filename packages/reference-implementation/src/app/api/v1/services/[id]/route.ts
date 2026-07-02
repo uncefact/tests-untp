@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError, ConflictError } from '@/lib/api/errors';
-import { assertPublicUrl, ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { assertPublicUrl, ValidationError, parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateServiceInstanceRequestSchema } from '@/lib/api/request-schemas/service';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import {
@@ -147,33 +148,10 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ serviceInstanceId: id }, 'Parsing request body');
-  let body: { name?: string; description?: string; config?: Record<string, unknown>; isPrimary?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  const { name, description, config, isPrimary } = body;
-
-  logger.info({ serviceInstanceId: id }, 'Validating fields');
-  const hasName = name !== undefined;
-  const hasDescription = description !== undefined;
+  logger.info({ serviceInstanceId: id }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateServiceInstanceRequestSchema);
+  const { config, ...updateFields } = body;
   const hasConfig = config !== undefined;
-  const hasIsPrimary = isPrimary !== undefined;
-
-  if (!hasName && !hasDescription && !hasConfig && !hasIsPrimary) {
-    throw new ValidationError('At least one of name, description, config, or isPrimary is required');
-  }
-
-  if (hasName && !isNonEmptyString(name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
-
-  if (hasConfig && (typeof config !== 'object' || Array.isArray(config) || config === null)) {
-    throw new ValidationError('config must be an object');
-  }
 
   logger.info({ serviceInstanceId: id }, 'Looking up existing service instance');
   const existing = await getServiceInstanceById(id, tenantId);
@@ -228,16 +206,11 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     );
   }
 
-  logger.info(
-    { serviceInstanceId: id, fields: { hasName, hasDescription, hasConfig, hasIsPrimary } },
-    'Updating service instance',
-  );
+  logger.info({ serviceInstanceId: id }, 'Updating service instance');
 
   const updated = await updateServiceInstance(id, tenantId, {
-    ...(hasName && { name }),
-    ...(hasDescription && { description }),
+    ...definedFields(updateFields),
     ...(encryptedConfig !== undefined && { config: encryptedConfig }),
-    ...(hasIsPrimary && { isPrimary }),
   });
 
   logger.info({ serviceInstanceId: id }, 'Service instance updated successfully');

@@ -171,14 +171,21 @@ describe('POST /api/v1/credentials/verify', () => {
     const res = await POST(createFakeRequest({}));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('uri is required');
+    expect(json.error).toContain('uri');
   });
 
   it('returns 400 when uri is not a string', async () => {
     const res = await POST(createFakeRequest({ uri: 123 }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('uri is required');
+    expect(json.error).toContain('uri');
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const res = await POST(createFakeRequest(null as unknown as Record<string, unknown>));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('body');
   });
 
   it('returns 400 for invalid URI format', async () => {
@@ -199,14 +206,28 @@ describe('POST /api/v1/credentials/verify', () => {
     const res = await POST(createFakeRequest({ uri: VALID_URI, hash: 'abc123' }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('hash must be a 64-character hex string (SHA-256)');
+    expect(json.error).toContain('hash');
+    expect(json.error).toContain('64-character hex string (SHA-256)');
   });
 
   it('returns 400 for invalid decryptionKey format', async () => {
     const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: 'short' }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('decryptionKey must be a 64-character hex string');
+    expect(json.error).toContain('decryptionKey');
+    expect(json.error).toContain('64-character hex string');
+  });
+
+  it('returns 400 for an invalid digestMultibase encoding', async () => {
+    mockMultibaseDigestFromString.mockImplementationOnce(() => {
+      throw new Error('invalid multibase');
+    });
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI, digestMultibase: 'not-a-digest' }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('digestMultibase');
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   // ── SSRF Protection (400) ────────────────────────────────────────
@@ -319,6 +340,28 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.error).toBe('Response from storage URI is not valid JSON');
+    expect(json.code).toBe('INVALID_RESPONSE');
+  });
+
+  it('returns 422 when the fetched credential is JSON null', async () => {
+    mockFetch.mockResolvedValue(createFetchResponse('null'));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toBe('Credential content is not a JSON object');
+    expect(json.code).toBe('INVALID_RESPONSE');
+  });
+
+  it('returns 422 when the decrypted credential is JSON null', async () => {
+    mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
+    mockIsEncryptedEnvelope.mockReturnValue(true);
+    mockDecryptCredential.mockReturnValue('null');
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toBe('Credential content is not a JSON object');
     expect(json.code).toBe('INVALID_RESPONSE');
   });
 

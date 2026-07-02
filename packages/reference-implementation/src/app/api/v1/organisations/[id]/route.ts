@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateOrganisationRequestSchema } from '@/lib/api/request-schemas/organisation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import {
-  getOrganisationById,
-  updateOrganisation,
-  deleteOrganisation,
-  UpdateOrganisationInput,
-} from '@/lib/prisma/repositories';
+import { getOrganisationById, updateOrganisation, deleteOrganisation } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/organisations/[id]' });
-
-const UPDATABLE_FIELDS = ['name', 'description', 'location', 'primaryIdentifierId', 'secondaryIdentifierIds'] as const;
 
 /**
  * @swagger
@@ -99,7 +93,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 description: Updated UNTP location object
  *               primaryIdentifierId:
  *                 type: string
- *                 description: ID of the primary identifier
+ *                 nullable: true
+ *                 description: ID of the primary identifier (set to null to clear)
  *               secondaryIdentifierIds:
  *                 type: array
  *                 items:
@@ -147,34 +142,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ organisationId: id }, 'Parsing request body');
-  let body: Record<string, unknown>;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ organisationId: id }, 'Validating update fields');
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
-  if (!hasUpdatableField) {
-    throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
-  }
-
-  if (body.name !== undefined && !isNonEmptyString(body.name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
-
-  const updateData: Record<string, unknown> = {};
-  for (const field of UPDATABLE_FIELDS) {
-    if (field in body) {
-      updateData[field] = body[field];
-    }
-  }
+  logger.info({ organisationId: id }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateOrganisationRequestSchema);
 
   logger.info({ organisationId: id }, 'Updating organisation');
-  const updated = await updateOrganisation(id, tenantId, updateData as UpdateOrganisationInput);
+  const updated = await updateOrganisation(id, tenantId, definedFields(body));
 
   logger.info({ organisationId: id }, 'Organisation updated');
   return NextResponse.json(updated);

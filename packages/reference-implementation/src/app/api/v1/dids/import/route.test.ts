@@ -7,46 +7,39 @@ jest.mock('next/server', () => ({
   },
 }));
 
+// Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { ConflictError, NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
-
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
   return {
     withTenantAuth:
-      (handler: (req: unknown, ctx: unknown) => Promise<unknown>) => async (req: unknown, ctx: unknown) => {
+      (handler: (...args: unknown[]) => unknown) =>
+      async (...args: unknown[]) => {
         try {
-          return await handler(req, ctx);
-        } catch (e: unknown) {
-          if (e instanceof ValidationError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 400 });
-          }
-          if (e instanceof NotFoundError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 404 });
-          }
-          if (e instanceof ConflictError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 409 });
-          }
-          if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 500 });
-          }
-          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
+          return await handler(...args);
+        } catch (e) {
+          return handleRouteError(e);
         }
       },
   };
 });
 
 const mockCreateDid = jest.fn();
+const mockGetInstanceByResolution = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   createDid: (...args: unknown[]) => mockCreateDid(...args),
+  getInstanceByResolution: (...args: unknown[]) => mockGetInstanceByResolution(...args),
 }));
 
-jest.mock('@uncefact/untp-ri-services', () => ({
-  DidMethod: { DID_WEB: 'DID_WEB', DID_WEB_VH: 'DID_WEB_VH' },
-}));
+jest.mock('@uncefact/untp-ri-services', () => {
+  const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
+  return {
+    ServiceError,
+    DidMethod: { DID_WEB: 'DID_WEB', DID_WEB_VH: 'DID_WEB_VH' },
+    DidType: { MANAGED: 'MANAGED', SELF_MANAGED: 'SELF_MANAGED' },
+    CREATABLE_DID_TYPES: ['MANAGED', 'SELF_MANAGED'],
+    ServiceType: { IDR: 'IDR', STORAGE: 'STORAGE', VC: 'VC' },
+  };
+});
 
 import { POST } from './route';
 
@@ -86,6 +79,7 @@ describe('POST /api/v1/dids/import', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateDid.mockResolvedValue(MOCK_DID_RECORD);
+    mockGetInstanceByResolution.mockResolvedValue({ id: 'inst-1', serviceType: 'VC' });
   });
 
   it('imports a DID and returns 201', async () => {
@@ -146,7 +140,7 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('serviceInstanceId is required');
+    expect(body.error).toContain('serviceInstanceId');
   });
 
   it('returns 400 when serviceInstanceId is an empty string', async () => {
@@ -161,7 +155,47 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('serviceInstanceId is required');
+    expect(body.error).toContain('serviceInstanceId');
+  });
+
+  it('returns 404 when the service instance does not exist or belongs to another tenant', async () => {
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'someone-elses-instance',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body.error).toContain('Service instance not found');
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('scopes the service instance lookup to the tenant', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
+    });
+
+    await POST(req, createContext());
+
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-1', 'VC', 'inst-1');
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const res = await POST(createFakeRequest(null), createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('body');
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
   it('sets status to UNVERIFIED', async () => {
@@ -205,7 +239,7 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('did is required');
+    expect(body.error).toContain('did');
   });
 
   it('returns 400 when keyId is missing', async () => {
@@ -215,7 +249,7 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('keyId is required');
+    expect(body.error).toContain('keyId');
   });
 
   it('returns 400 when method is missing', async () => {
@@ -225,7 +259,7 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('method is required');
+    expect(body.error).toContain('method');
   });
 
   it('returns 400 for invalid method', async () => {
@@ -240,7 +274,7 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('method must be one of');
+    expect(body.error).toContain('method');
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -313,7 +347,7 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('did is required');
+    expect(body.error).toContain('did');
   });
 
   it('returns 400 when keyId is an empty string', async () => {
@@ -323,7 +357,7 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('keyId is required');
+    expect(body.error).toContain('keyId');
   });
 
   it('returns 400 when method is an empty string', async () => {

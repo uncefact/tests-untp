@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody } from '@/lib/api/validation';
+import { updateIdentifierRequestSchema } from '@/lib/api/request-schemas/identifier';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, updateIdentifier, deleteIdentifier } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
@@ -80,11 +81,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - value
  *             properties:
  *               value:
  *                 type: string
  *                 description: New value for the identifier (re-validated against scheme pattern)
- *             minProperties: 1
  *     responses:
  *       200:
  *         description: Identifier updated successfully
@@ -125,20 +127,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ identifierId: id }, 'Parsing request body');
-
-  let body: { value?: string };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ identifierId: id }, 'Validating update fields');
-  if (!isNonEmptyString(body.value)) {
-    throw new ValidationError('value is required');
-  }
+  logger.info({ identifierId: id }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateIdentifierRequestSchema);
 
   logger.info({ identifierId: id }, 'Updating identifier');
   const updated = await updateIdentifier(id, tenantId, {

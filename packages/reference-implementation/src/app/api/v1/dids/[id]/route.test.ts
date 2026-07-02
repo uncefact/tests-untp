@@ -136,6 +136,30 @@ describe('PATCH /api/v1/dids/:id', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty-string name instead of silently ignoring it', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '' } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isDefault is not a boolean', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { isDefault: 'yes' } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when DID not found or access denied', async () => {
     mockUpdateDid.mockRejectedValue(new NotFoundError('DID not found or access denied'));
 

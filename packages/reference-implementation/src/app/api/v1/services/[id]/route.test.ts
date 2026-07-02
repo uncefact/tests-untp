@@ -304,7 +304,7 @@ describe('PATCH /api/v1/services/:id', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/name must be a non-empty string/i);
+    expect(json.error).toMatch(/name/);
   });
 
   it('returns 400 when config is not an object', async () => {
@@ -313,7 +313,7 @@ describe('PATCH /api/v1/services/:id', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/config must be an object/i);
+    expect(json.error).toMatch(/config/);
   });
 
   it('returns 400 when config is an array', async () => {
@@ -322,7 +322,27 @@ describe('PATCH /api/v1/services/:id', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/config must be an object/i);
+    expect(json.error).toMatch(/config/);
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('body');
+    expect(mockUpdateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isPrimary is not a boolean', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { isPrimary: 'yes' } });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('isPrimary');
+    expect(mockUpdateServiceInstance).not.toHaveBeenCalled();
   });
 
   it('returns 400 when config schema validation fails after merge', async () => {

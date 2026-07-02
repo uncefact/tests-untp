@@ -205,7 +205,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('serviceType is required');
+    expect(json.error).toContain('serviceType');
   });
 
   it('returns 400 when adapterType is missing', async () => {
@@ -216,7 +216,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('adapterType is required');
+    expect(json.error).toContain('adapterType');
   });
 
   it('returns 400 when name is missing', async () => {
@@ -227,7 +227,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('name is required');
+    expect(json.error).toContain('name');
   });
 
   it('returns 400 when name is an empty string', async () => {
@@ -238,7 +238,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('name is required');
+    expect(json.error).toContain('name');
   });
 
   it('returns 400 when config is missing', async () => {
@@ -249,7 +249,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('config must be an object');
+    expect(json.error).toContain('config');
   });
 
   it('returns 400 when config is not an object', async () => {
@@ -260,7 +260,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('config must be an object');
+    expect(json.error).toContain('config');
   });
 
   it('returns 400 when config is an array', async () => {
@@ -271,7 +271,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('config must be an object');
+    expect(json.error).toContain('config');
   });
 
   it('returns 400 for invalid serviceType enum value', async () => {
@@ -282,7 +282,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('serviceType must be one of');
+    expect(json.error).toContain('serviceType');
   });
 
   it('returns 400 for invalid adapterType enum value', async () => {
@@ -293,7 +293,37 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('adapterType must be one of');
+    expect(json.error).toContain('adapterType');
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('body');
+    expect(mockCreateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isPrimary is not a boolean', async () => {
+    const req = createFakeRequest({ body: { ...VALID_BODY, isPrimary: 'yes' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('isPrimary');
+    expect(mockCreateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when description is not a string', async () => {
+    const req = createFakeRequest({ body: { ...VALID_BODY, description: 42 } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('description');
+    expect(mockCreateServiceInstance).not.toHaveBeenCalled();
   });
 
   it('returns 400 when adapter type does not match service type (registry lookup fails)', async () => {

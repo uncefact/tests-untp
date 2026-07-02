@@ -3,10 +3,11 @@ import {
   assertPublicUrl,
   ValidationError,
   validateEnum,
-  isNonEmptyString,
+  parseRequestBody,
   parsePositiveInt,
   parseNonNegativeInt,
 } from '@/lib/api/validation';
+import { createServiceInstanceRequestSchema } from '@/lib/api/request-schemas/service';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -94,42 +95,9 @@ const logger = apiLogger.child({ route: '/api/v1/services' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: {
-    serviceType?: string;
-    adapterType?: string;
-    name?: string;
-    description?: string;
-    config?: unknown;
-    isPrimary?: boolean;
-  };
-
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  // --- Field validation ---------------------------------------------------
-
-  logger.info(
-    { serviceType: body.serviceType, adapterType: body.adapterType, name: body.name },
-    'Validating input parameters',
-  );
-
-  const serviceType = validateEnum(body.serviceType, Object.values(ServiceType), 'serviceType');
-  if (!serviceType) throw new ValidationError('serviceType is required');
-
-  const adapterType = validateEnum(body.adapterType, Object.values(AdapterType), 'adapterType');
-  if (!adapterType) throw new ValidationError('adapterType is required');
-
-  if (!isNonEmptyString(body.name)) {
-    throw new ValidationError('name is required');
-  }
-
-  if (!body.config || typeof body.config !== 'object' || Array.isArray(body.config)) {
-    throw new ValidationError('config must be an object');
-  }
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createServiceInstanceRequestSchema);
+  const { serviceType, adapterType } = body;
 
   // --- Registry look-up & config schema validation ------------------------
 
@@ -156,10 +124,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // --- SSRF protection on config URLs --------------------------------------
 
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
-    const configObj = body.config as Record<string, unknown>;
-    if (typeof configObj.baseUrl === 'string') {
+    if (typeof body.config.baseUrl === 'string') {
       logger.info('Validating config baseUrl is not internal');
-      await assertPublicUrl(configObj.baseUrl, 'config.baseUrl');
+      await assertPublicUrl(body.config.baseUrl, 'config.baseUrl');
     }
   }
 

@@ -131,7 +131,7 @@ describe('POST /api/v1/identifiers', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('schemeId is required');
+    expect(json.error).toContain('schemeId');
   });
 
   it('returns 400 for missing value', async () => {
@@ -140,7 +140,16 @@ describe('POST /api/v1/identifiers', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('value is required');
+    expect(json.error).toContain('value');
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
   });
 
   it('returns 400 when value fails scheme validation', async () => {

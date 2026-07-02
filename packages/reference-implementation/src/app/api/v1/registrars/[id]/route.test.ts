@@ -151,6 +151,26 @@ describe('PATCH /api/v1/registrars/:id', () => {
     expect(json.error).toBe('Invalid JSON body');
   });
 
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty-string name instead of silently ignoring it', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '' } });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('name');
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when registrar not found or access denied', async () => {
     mockUpdateRegistrar.mockRejectedValue(new NotFoundError('Registrar not found or access denied'));
 
@@ -160,6 +180,16 @@ describe('PATCH /api/v1/registrars/:id', () => {
 
     expect(res.status).toBe(404);
     expect(json.error).toContain('Registrar not found');
+  });
+
+  it('returns 400 for an empty-string idrServiceInstanceId', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { idrServiceInstanceId: '' } });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('idrServiceInstanceId');
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
   it('allows clearing idrServiceInstanceId with null', async () => {

@@ -131,7 +131,7 @@ describe('PATCH /api/v1/facilities/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('At least one updatable field is required');
+    expect(json.error).toContain('At least one of');
   });
 
   it('returns 400 when name is empty string', async () => {
@@ -140,7 +140,59 @@ describe('PATCH /api/v1/facilities/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
+    expect(json.error).toContain('name');
+    expect(mockUpdateFacility).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when secondaryIdentifierIds is not an array', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { secondaryIdentifierIds: 'id-1' } });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('secondaryIdentifierIds');
+    expect(mockUpdateFacility).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when operatingOrganisationId is not a string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { operatingOrganisationId: 42 } });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('operatingOrganisationId');
+    expect(mockUpdateFacility).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when primaryIdentifierId is not a string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { primaryIdentifierId: 42 } });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('primaryIdentifierId');
+    expect(mockUpdateFacility).not.toHaveBeenCalled();
+  });
+
+  it('allows clearing primaryIdentifierId with null', async () => {
+    const updated = { id: 'fac-1', name: 'Warehouse Alpha', primaryIdentifierId: null };
+    mockUpdateFacility.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { primaryIdentifierId: null } });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateFacility).toHaveBeenCalledWith('fac-1', 'org-1', { primaryIdentifierId: null });
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockUpdateFacility).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -168,6 +220,17 @@ describe('PATCH /api/v1/facilities/:id', () => {
 
     expect(res.status).toBe(404);
     expect(json.error).toContain('Facility not found');
+  });
+
+  it('allows clearing operatingOrganisationId with null', async () => {
+    const updated = { id: 'fac-1', name: 'Warehouse Alpha', operatingOrganisationId: null };
+    mockUpdateFacility.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { operatingOrganisationId: null } });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateFacility).toHaveBeenCalledWith('fac-1', 'org-1', { operatingOrganisationId: null });
   });
 
   it('returns 500 on unexpected error', async () => {

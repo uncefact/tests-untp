@@ -231,7 +231,8 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
+    expect(json.error).toContain('name');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects storageUrl in body', async () => {
@@ -240,7 +241,18 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('storageUrl cannot be set directly');
+    expect(json.error).toContain('storageUrl');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('rejects hash in body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { hash: 'a'.repeat(64) } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('hash');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects digestMultibase in body', async () => {
@@ -249,7 +261,8 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('digestMultibase cannot be set directly');
+    expect(json.error).toContain('digestMultibase');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects renderMethodType in body', async () => {
@@ -258,7 +271,8 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('renderMethodType cannot be set directly');
+    expect(json.error).toContain('renderMethodType');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('returns 400 when no patchable field provided', async () => {
@@ -268,6 +282,60 @@ describe('PATCH /api/v1/render-templates/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('At least one updatable field must be provided');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when template is an empty string instead of silently skipping the re-upload', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { template: '' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('template');
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when template is null instead of silently skipping the re-upload', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { template: null } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('template');
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when template is a number instead of silently skipping the re-upload', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { template: 5 } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('template');
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isDefault is not a boolean', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { isDefault: 'true' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('isDefault');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {

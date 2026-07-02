@@ -269,6 +269,36 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(body.error).toBe('Invalid JSON body');
   });
 
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest(null);
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('body');
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-string href instead of forwarding it upstream', async () => {
+    const req = createFakeRequest({ href: 42 });
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('href');
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-array hreflang instead of forwarding it upstream', async () => {
+    const req = createFakeRequest({ hreflang: 'en' });
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('hreflang');
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
   it('forwards hreflang, additionalRels, and public to updateLink', async () => {
     const req = createFakeRequest({
       hreflang: ['en', 'de'],
@@ -282,6 +312,15 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
       hreflang: ['en', 'de'],
       additionalRels: ['gs1:certificationInfo'],
       public: true,
+    });
+  });
+
+  it('strips unknown fields before forwarding to updateLink', async () => {
+    const req = createFakeRequest({ href: 'https://updated.com/cred.json', unknownField: 'x' });
+    await PATCH(req, createContext());
+
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', {
+      href: 'https://updated.com/cred.json',
     });
   });
 

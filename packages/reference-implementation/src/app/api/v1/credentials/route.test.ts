@@ -275,7 +275,7 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(400);
-      expect(json.error).toContain('credentialPayload is required');
+      expect(json.error).toContain('credentialPayload');
     });
 
     it('returns 400 when credentialPayload is not an object', async () => {
@@ -284,7 +284,7 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(400);
-      expect(json.error).toContain('credentialPayload is required');
+      expect(json.error).toContain('credentialPayload');
     });
 
     it('returns 400 when credentialType is missing', async () => {
@@ -293,7 +293,34 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(400);
-      expect(json.error).toContain('credentialType is required');
+      expect(json.error).toContain('credentialType');
+    });
+
+    it('returns 400 for a JSON null body', async () => {
+      const req = createFakeRequest(null);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('body');
+    });
+
+    it('returns 400 when storageOptions.encrypt is not a boolean', async () => {
+      const req = createFakeRequest(validBody({ storageOptions: { encrypt: 'yes' as unknown as boolean } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('storageOptions.encrypt');
+    });
+
+    it('returns 400 when storageOptions.serviceInstanceId is not a string', async () => {
+      const req = createFakeRequest(validBody({ storageOptions: { serviceInstanceId: 42 as unknown as string } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('storageOptions.serviceInstanceId');
     });
 
     it('accepts any non-empty credentialType string', async () => {
@@ -309,7 +336,7 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(400);
-      expect(json.error).toContain('version is required');
+      expect(json.error).toContain('version');
     });
   });
 

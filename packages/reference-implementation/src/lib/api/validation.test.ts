@@ -3,6 +3,7 @@ jest.mock('@uncefact/untp-ri-services/server', () => ({
   validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
 }));
 
+import { z } from 'zod';
 import {
   ValidationError,
   isNonEmptyString,
@@ -11,7 +12,73 @@ import {
   parseNonNegativeInt,
   parseBooleanString,
   assertPublicUrl,
+  parseRequestBody,
+  definedFields,
 } from './validation';
+
+describe('definedFields', () => {
+  it('drops keys whose value is undefined', () => {
+    expect(definedFields({ a: 1, b: undefined, c: 'x' })).toEqual({ a: 1, c: 'x' });
+  });
+
+  it('keeps null values (null clears a field, it is not absence)', () => {
+    expect(definedFields({ a: null, b: undefined })).toEqual({ a: null });
+  });
+
+  it('keeps falsy defined values', () => {
+    expect(definedFields({ a: false, b: 0, c: '' })).toEqual({ a: false, b: 0, c: '' });
+  });
+
+  it('returns an empty object when every value is undefined', () => {
+    expect(definedFields({ a: undefined })).toEqual({});
+  });
+});
+
+describe('parseRequestBody', () => {
+  const schema = z.object({
+    name: z.string().min(1),
+    count: z.number().optional(),
+  });
+
+  function fakeRequest(body: unknown): { json: () => Promise<unknown> } {
+    return { json: async () => body };
+  }
+
+  it('returns the parsed body for valid input', async () => {
+    await expect(parseRequestBody(fakeRequest({ name: 'a', count: 2 }), schema)).resolves.toEqual({
+      name: 'a',
+      count: 2,
+    });
+  });
+
+  it('strips unknown keys', async () => {
+    await expect(parseRequestBody(fakeRequest({ name: 'a', extra: true }), schema)).resolves.toEqual({ name: 'a' });
+  });
+
+  it('throws ValidationError for malformed JSON', async () => {
+    const req = {
+      json: async () => {
+        throw new SyntaxError('Unexpected token');
+      },
+    };
+    await expect(parseRequestBody(req, schema)).rejects.toThrow(ValidationError);
+    await expect(parseRequestBody(req, schema)).rejects.toThrow('Invalid JSON body');
+  });
+
+  it('throws ValidationError naming the body for a JSON null body', async () => {
+    await expect(parseRequestBody(fakeRequest(null), schema)).rejects.toThrow(ValidationError);
+    await expect(parseRequestBody(fakeRequest(null), schema)).rejects.toThrow(/^body: /);
+  });
+
+  it('throws ValidationError naming the offending field', async () => {
+    await expect(parseRequestBody(fakeRequest({ name: 'a', count: 'two' }), schema)).rejects.toThrow(/^count: /);
+  });
+
+  it('renders nested paths with dots', async () => {
+    const nested = z.object({ items: z.array(z.object({ id: z.string() })) });
+    await expect(parseRequestBody(fakeRequest({ items: [{ id: 1 }] }), nested)).rejects.toThrow(/^items\.0\.id: /);
+  });
+});
 
 describe('isNonEmptyString', () => {
   it('returns true for a non-empty string', () => {

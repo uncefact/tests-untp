@@ -408,6 +408,16 @@ describe('POST /api/v1/data-models', () => {
     expect(mockCreateDataModel).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ isExtension: true }));
   });
 
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when name is missing', async () => {
     const req = createFakeRequest({
       body: {
@@ -422,7 +432,8 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required');
+    expect(json.error).toContain('name');
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when credentialType is missing', async () => {
@@ -439,7 +450,8 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('credentialType is required');
+    expect(json.error).toContain('credentialType');
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
   it('accepts a custom credentialType string', async () => {
@@ -492,7 +504,8 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('version is required');
+    expect(json.error).toContain('version');
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when schemaUrl is missing', async () => {
@@ -509,7 +522,8 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('schemaUrl is required');
+    expect(json.error).toContain('schemaUrl');
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when contextUrl is missing', async () => {
@@ -526,7 +540,8 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('contextUrl is required');
+    expect(json.error).toContain('contextUrl');
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when parentConfigId is missing', async () => {
@@ -543,7 +558,8 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('parentConfigId is required');
+    expect(json.error).toContain('parentConfigId');
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 when websiteUrl is empty string', async () => {
@@ -562,7 +578,8 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('websiteUrl must be a non-empty string');
+    expect(json.error).toContain('websiteUrl');
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {

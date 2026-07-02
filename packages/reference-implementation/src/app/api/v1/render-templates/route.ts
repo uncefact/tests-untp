@@ -1,16 +1,10 @@
 import { NextResponse } from 'next/server';
-import {
-  ValidationError,
-  isNonEmptyString,
-  validateEnum,
-  parsePositiveInt,
-  parseNonNegativeInt,
-} from '@/lib/api/validation';
+import { parseRequestBody, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { createRenderTemplateRequestSchema } from '@/lib/api/request-schemas/render-template';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { listRenderTemplates } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
-import { RenderMethodType } from '@/lib/prisma/generated';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { createRenderTemplate } from '@/lib/render-templates/create-render-template';
 
@@ -136,9 +130,11 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *                 description: Whether the template is inline (applicable to RenderTemplate2024)
  *               mediaType:
  *                 type: string
+ *                 nullable: true
  *                 description: Media type for the render method (applicable to RenderTemplate2024)
  *               mediaQuery:
  *                 type: string
+ *                 nullable: true
  *                 description: CSS media query for the render method (applicable to RenderTemplate2024)
  *               storageOptions:
  *                 type: object
@@ -179,50 +175,10 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: Record<string, unknown>;
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createRenderTemplateRequestSchema);
 
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  // Reject server-managed fields
-  if (body.storageUrl !== undefined) throw new ValidationError('storageUrl cannot be set directly');
-  if (body.digestMultibase !== undefined) throw new ValidationError('digestMultibase cannot be set directly');
-  // Legacy field name still rejected explicitly so callers built against the
-  // pre-migration API surface get a clear error rather than a silent drop.
-  if (body.hash !== undefined) throw new ValidationError('hash is no longer accepted; use digestMultibase');
-
-  // Validate required fields
-  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-  if (!isNonEmptyString(body.dataModelId)) throw new ValidationError('dataModelId is required');
-  if (!isNonEmptyString(body.renderMethodType)) throw new ValidationError('renderMethodType is required');
-  if (!isNonEmptyString(body.template)) throw new ValidationError('template is required');
-
-  // Validate optional field types
-  if (body.isDefault !== undefined && typeof body.isDefault !== 'boolean') {
-    throw new ValidationError('isDefault must be a boolean');
-  }
-  if (body.inline !== undefined && typeof body.inline !== 'boolean') {
-    throw new ValidationError('inline must be a boolean');
-  }
-  if (body.mediaType !== undefined && body.mediaType !== null && !isNonEmptyString(body.mediaType)) {
-    throw new ValidationError('mediaType must be a non-empty string');
-  }
-  if (body.mediaQuery !== undefined && body.mediaQuery !== null && !isNonEmptyString(body.mediaQuery)) {
-    throw new ValidationError('mediaQuery must be a non-empty string');
-  }
-
-  logger.info({ renderMethodType: body.renderMethodType }, 'Validating render method type');
-  const renderMethodType = validateEnum(
-    body.renderMethodType as string,
-    Object.values(RenderMethodType),
-    'renderMethodType',
-  )!;
-
-  const storageOptions = (body.storageOptions as { serviceInstanceId?: string } | undefined) ?? {};
+  const storageOptions = body.storageOptions ?? {};
 
   logger.info('Resolving storage service');
   const storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
@@ -230,15 +186,15 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info({ dataModelId: body.dataModelId, name: body.name }, 'Creating render template');
   const renderTemplate = await createRenderTemplate({
     tenantId,
-    name: body.name as string,
-    dataModelId: body.dataModelId as string,
-    renderMethodType,
-    template: body.template as string,
+    name: body.name,
+    dataModelId: body.dataModelId,
+    renderMethodType: body.renderMethodType,
+    template: body.template,
     storageService,
     isDefault: body.isDefault,
     inline: body.inline,
-    mediaType: body.mediaType as string | undefined,
-    mediaQuery: body.mediaQuery as string | undefined,
+    mediaType: body.mediaType,
+    mediaQuery: body.mediaQuery,
   });
 
   logger.info({ renderTemplateId: renderTemplate.id }, 'Render template created');

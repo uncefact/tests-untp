@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { parseRequestBody, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { createRegistrarRequestSchema } from '@/lib/api/request-schemas/registrar';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createRegistrar, listRegistrars } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -65,24 +66,8 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: {
-    name?: string;
-    namespace?: string;
-    url?: string;
-    idrServiceInstanceId?: string;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ name: body.name, namespace: body.namespace }, 'Validating input parameters');
-  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-  if (!isNonEmptyString(body.namespace)) throw new ValidationError('namespace is required');
-  if (!isNonEmptyString(body.url)) throw new ValidationError('url is required');
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createRegistrarRequestSchema);
 
   logger.info({ namespace: body.namespace }, 'Creating registrar');
   const registrar = await createRegistrar({

@@ -111,7 +111,36 @@ describe('POST /api/v1/organisations', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required for each organisation');
+    expect(json.error).toContain('name');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when an array item is null', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp' }, null] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when primaryIdentifierId is not a string', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', primaryIdentifierId: 42 }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('primaryIdentifierId');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when secondaryIdentifierIds is not an array', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', secondaryIdentifierIds: 'id-1' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('secondaryIdentifierIds');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {

@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import {
   ValidationError,
-  isNonEmptyString,
+  parseRequestBody,
   parsePositiveInt,
   parseNonNegativeInt,
   parseBooleanString,
   assertPublicUrl,
 } from '@/lib/api/validation';
+import { issueCredentialRequestSchema } from '@/lib/api/request-schemas/credential';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { errorMessage } from '@/lib/api/errors';
 import { apiLogger } from '@/lib/api/logger';
@@ -24,7 +25,6 @@ import { getDidByDid, findConformitySchemeByCanonicalId } from '@/lib/prisma/rep
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
 import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
-import { publishingOptionsSchema } from '@/lib/swagger/schemas';
 
 type CredentialWarning = {
   code: string;
@@ -93,59 +93,15 @@ const logger = apiLogger.child({ route: '/api/v1/credentials' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: {
-    credentialPayload?: CredentialPayload;
-    credentialType?: string;
-    version?: string;
-    storageOptions?: {
-      serviceInstanceId?: string;
-      encrypt?: boolean;
-    };
-    publishingOptions?: {
-      publish?: boolean;
-      linkType?: string;
-      linkTitle?: string;
-      qualifierPath?: string;
-      machineVerificationUrl?: string;
-      humanVerificationUrl?: string;
-      hreflang?: string[];
-      additionalRels?: string[];
-      public?: boolean;
-    };
-  };
+  // ── Step 1: Parse and validate request ──────────────────────────────────
 
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch (e) {
-    logger.warn({ err: e }, 'Failed to parse request body as JSON');
-    throw new ValidationError('Invalid JSON body');
-  }
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, issueCredentialRequestSchema);
 
-  // ── Step 1: Validate request ────────────────────────────────────────────
-
-  logger.info('Validating input parameters');
-  if (!body.credentialPayload || typeof body.credentialPayload !== 'object') {
-    throw new ValidationError('credentialPayload is required and must be an object');
-  }
-
-  if (!isNonEmptyString(body.credentialType)) {
-    throw new ValidationError('credentialType is required');
-  }
-
-  if (!isNonEmptyString(body.version)) {
-    throw new ValidationError('version is required');
-  }
-
-  const { credentialPayload, credentialType, version } = body;
+  const credentialPayload = body.credentialPayload as CredentialPayload;
+  const { credentialType, version } = body;
   const storageOptions = body.storageOptions ?? {};
-
-  const publishingOptionsParse = publishingOptionsSchema.safeParse(body.publishingOptions ?? {});
-  if (!publishingOptionsParse.success) {
-    const issue = publishingOptionsParse.error.issues[0];
-    throw new ValidationError(`publishingOptions.${issue.path.join('.') || ''}: ${issue.message}`);
-  }
-  const publishingOptions = publishingOptionsParse.data;
+  const publishingOptions = body.publishingOptions ?? {};
 
   // ── SSRF validation for URL fields ────────────────────────────────────
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {

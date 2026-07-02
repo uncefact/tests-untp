@@ -159,7 +159,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('registrarId is required');
+    expect(json.error).toContain('registrarId');
   });
 
   it('returns 400 for missing name', async () => {
@@ -170,7 +170,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required');
+    expect(json.error).toContain('name');
   });
 
   it('returns 400 for missing primaryKey', async () => {
@@ -181,7 +181,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('primaryKey is required');
+    expect(json.error).toContain('primaryKey');
   });
 
   it('returns 400 for missing validationPattern', async () => {
@@ -192,7 +192,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('validationPattern is required');
+    expect(json.error).toContain('validationPattern');
   });
 
   it('returns 400 for invalid qualifier (missing key)', async () => {
@@ -210,7 +210,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier key is required');
+    expect(json.error).toMatch(/qualifiers\.\d+\.key/);
   });
 
   it('returns 400 for invalid qualifier (missing description)', async () => {
@@ -228,7 +228,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier description is required');
+    expect(json.error).toMatch(/qualifiers\.\d+\.description/);
   });
 
   it('returns 400 for invalid qualifier (missing validationPattern)', async () => {
@@ -246,7 +246,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier validationPattern is required');
+    expect(json.error).toMatch(/qualifiers\.\d+\.validationPattern/);
   });
 
   it('returns 400 for non-array qualifiers', async () => {
@@ -264,7 +264,52 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifiers must be an array');
+    expect(json.error).toContain('qualifiers');
+  });
+
+  it('returns 400 for a non-integer qualifier order', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '.*', order: 1.5 }],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('order');
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+  });
+
+  it('returns 400 for a null qualifier item', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [null],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('qualifiers');
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -284,7 +329,7 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('linkTemplate is required');
+    expect(json.error).toContain('linkTemplate');
   });
 
   it('returns 404 when registrarId does not exist', async () => {

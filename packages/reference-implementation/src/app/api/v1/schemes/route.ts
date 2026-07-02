@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { parseRequestBody, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { createIdentifierSchemeRequestSchema } from '@/lib/api/request-schemas/identifier-scheme';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifierScheme, listIdentifierSchemes, getRegistrarById } from '@/lib/prisma/repositories';
 import { NotFoundError } from '@/lib/api/errors';
@@ -102,46 +103,8 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: {
-    registrarId?: string;
-    name?: string;
-    primaryKey?: string;
-    validationPattern?: string;
-    linkTemplate?: string;
-    idrServiceInstanceId?: string;
-    qualifiers?: Array<{
-      key: string;
-      description: string;
-      validationPattern: string;
-      order?: number;
-    }>;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ registrarId: body.registrarId, name: body.name }, 'Validating input parameters');
-  if (!isNonEmptyString(body.registrarId)) throw new ValidationError('registrarId is required');
-  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-  if (!isNonEmptyString(body.primaryKey)) throw new ValidationError('primaryKey is required');
-  if (!isNonEmptyString(body.validationPattern)) throw new ValidationError('validationPattern is required');
-  if (!isNonEmptyString(body.linkTemplate)) throw new ValidationError('linkTemplate is required');
-
-  // Validate qualifiers if provided
-  if (body.qualifiers !== undefined) {
-    if (!Array.isArray(body.qualifiers)) {
-      throw new ValidationError('qualifiers must be an array');
-    }
-    for (const q of body.qualifiers) {
-      if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
-      if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
-      if (!isNonEmptyString(q.validationPattern)) throw new ValidationError('qualifier validationPattern is required');
-    }
-  }
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createIdentifierSchemeRequestSchema);
 
   // Verify the registrar exists and belongs to this tenant
   const registrar = await getRegistrarById(body.registrarId, tenantId);

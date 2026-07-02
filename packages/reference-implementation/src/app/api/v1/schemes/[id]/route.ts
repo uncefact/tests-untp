@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateIdentifierSchemeRequestSchema } from '@/lib/api/request-schemas/identifier-scheme';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierSchemeById, updateIdentifierScheme, deleteIdentifierScheme } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
@@ -154,81 +155,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ schemeId: id }, 'Parsing request body');
+  logger.info({ schemeId: id }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateIdentifierSchemeRequestSchema);
 
-  let body: {
-    name?: string;
-    primaryKey?: string;
-    validationPattern?: string;
-    linkTemplate?: string;
-    idrServiceInstanceId?: string | null;
-    qualifiers?: Array<{
-      key: string;
-      description: string;
-      validationPattern: string;
-      order?: number;
-    }>;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  const hasName = isNonEmptyString(body.name);
-  const hasPrimaryKey = isNonEmptyString(body.primaryKey);
-  const hasValidationPattern = isNonEmptyString(body.validationPattern);
-  const hasLinkTemplate = isNonEmptyString(body.linkTemplate);
-  const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
-  const hasQualifiers = body.qualifiers !== undefined;
-
-  logger.info({ schemeId: id }, 'Validating update fields');
-  if (
-    !hasName &&
-    !hasPrimaryKey &&
-    !hasValidationPattern &&
-    !hasLinkTemplate &&
-    !hasIdrServiceInstanceId &&
-    !hasQualifiers
-  ) {
-    throw new ValidationError('At least one field is required');
-  }
-
-  // Validate qualifiers if provided
-  if (hasQualifiers) {
-    if (!Array.isArray(body.qualifiers)) {
-      throw new ValidationError('qualifiers must be an array');
-    }
-    for (const q of body.qualifiers!) {
-      if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
-      if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
-      if (!isNonEmptyString(q.validationPattern)) throw new ValidationError('qualifier validationPattern is required');
-    }
-  }
-
-  logger.info(
-    {
-      schemeId: id,
-      fields: {
-        hasName,
-        hasPrimaryKey,
-        hasValidationPattern,
-        hasLinkTemplate,
-        hasIdrServiceInstanceId,
-        hasQualifiers,
-      },
-    },
-    'Updating scheme',
-  );
-  const updated = await updateIdentifierScheme(id, tenantId, {
-    ...(hasName && { name: body.name }),
-    ...(hasPrimaryKey && { primaryKey: body.primaryKey }),
-    ...(hasValidationPattern && { validationPattern: body.validationPattern }),
-    ...(hasLinkTemplate && { linkTemplate: body.linkTemplate }),
-    ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
-    ...(hasQualifiers && { qualifiers: body.qualifiers }),
-  });
+  logger.info({ schemeId: id }, 'Updating scheme');
+  const updated = await updateIdentifierScheme(id, tenantId, definedFields(body));
 
   logger.info({ schemeId: id }, 'Scheme updated');
   return NextResponse.json(updated);

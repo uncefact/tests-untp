@@ -146,7 +146,7 @@ describe('PATCH /api/v1/identifiers/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('value is required');
+    expect(json.error).toContain('value');
   });
 
   it('returns 400 for invalid JSON body', async () => {

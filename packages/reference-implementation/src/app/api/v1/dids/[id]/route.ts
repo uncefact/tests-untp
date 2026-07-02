@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { ValidationError, parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateDidRequestSchema } from '@/lib/api/request-schemas/did';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDid, deleteDid } from '@/lib/prisma/repositories';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
@@ -129,29 +130,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ didId: id }, 'Parsing request body');
-  let body: { name?: string; description?: string; isDefault?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
+  logger.info({ didId: id }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateDidRequestSchema);
 
-  logger.info({ didId: id }, 'Validating update fields');
-  const hasName = isNonEmptyString(body.name);
-  const hasDescription = isNonEmptyString(body.description);
-  const hasIsDefault = typeof body.isDefault === 'boolean';
-
-  if (!hasName && !hasDescription && !hasIsDefault) {
-    throw new ValidationError('At least one of name, description, or isDefault is required');
-  }
-
-  logger.info({ didId: id, fields: { hasName, hasDescription, hasIsDefault } }, 'Updating DID record');
-  const updated = await updateDid(id, tenantId, {
-    ...(hasName && { name: body.name }),
-    ...(hasDescription && { description: body.description }),
-    ...(hasIsDefault && { isDefault: body.isDefault }),
-  });
+  logger.info({ didId: id }, 'Updating DID record');
+  const updated = await updateDid(id, tenantId, definedFields(body));
 
   logger.info({ didId: id }, 'DID updated');
   return NextResponse.json(updated);

@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
 import { errorMessage, ConflictError, ForbiddenError } from '@/lib/api/errors';
-import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import {
+  ValidationError,
+  validateEnum,
+  parseRequestBody,
+  parsePositiveInt,
+  parseNonNegativeInt,
+} from '@/lib/api/validation';
+import { createDidRequestSchema } from '@/lib/api/request-schemas/did';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, listDids, findDidByAliasAndService } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
-import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus, DidConflictError } from '@uncefact/untp-ri-services';
+import { DidType, DidMethod, DidStatus, DidConflictError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 
@@ -98,33 +105,9 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: {
-    type?: string;
-    method?: string;
-    alias?: string;
-    name?: string;
-    description?: string;
-    isDefault?: boolean;
-    serviceInstanceId?: string;
-  };
-
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ type: body.type, method: body.method, alias: body.alias }, 'Validating input parameters');
-  const type = validateEnum(body.type, CREATABLE_DID_TYPES, 'type');
-  if (!type) throw new ValidationError('type is required');
-
-  const method = validateEnum(body.method, Object.values(DidMethod), 'method');
-  if (!method) throw new ValidationError('method is required');
-
-  if (!body.alias || typeof body.alias !== 'string') {
-    throw new ValidationError('alias is required');
-  }
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, createDidRequestSchema);
+  const { type, method } = body;
 
   logger.info({ type, method, alias: body.alias }, 'Resolving DID service');
   const { service: didService, instanceId: serviceInstanceId } = await resolveDidService(

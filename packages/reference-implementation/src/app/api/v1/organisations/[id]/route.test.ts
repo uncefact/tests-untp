@@ -129,7 +129,7 @@ describe('PATCH /api/v1/organisations/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('At least one updatable field must be provided');
+    expect(json.error).toContain('At least one of');
   });
 
   it('returns 400 when name is empty string', async () => {
@@ -138,7 +138,49 @@ describe('PATCH /api/v1/organisations/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
+    expect(json.error).toContain('name');
+    expect(mockUpdateOrganisation).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when primaryIdentifierId is not a string', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { primaryIdentifierId: 42 } });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('primaryIdentifierId');
+    expect(mockUpdateOrganisation).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when secondaryIdentifierIds is not an array', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { secondaryIdentifierIds: 'id-1' } });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('secondaryIdentifierIds');
+    expect(mockUpdateOrganisation).not.toHaveBeenCalled();
+  });
+
+  it('accepts an empty secondaryIdentifierIds array to clear all secondary identifiers', async () => {
+    const updated = { id: 'org-ent-1', name: 'Acme', secondaryIdentifierIds: [] };
+    mockUpdateOrganisation.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { secondaryIdentifierIds: [] } });
+    const res = await PATCH(req, createContext('org-ent-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateOrganisation).toHaveBeenCalledWith('org-ent-1', 'org-1', { secondaryIdentifierIds: [] });
+  });
+
+  it('returns 400 for a JSON null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('body');
+    expect(mockUpdateOrganisation).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -166,6 +208,17 @@ describe('PATCH /api/v1/organisations/:id', () => {
 
     expect(res.status).toBe(404);
     expect(json.error).toContain('Organisation not found');
+  });
+
+  it('allows clearing primaryIdentifierId with null', async () => {
+    const updated = { id: 'org-a', name: 'Acme Corp', primaryIdentifierId: null };
+    mockUpdateOrganisation.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { primaryIdentifierId: null } });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateOrganisation).toHaveBeenCalledWith('org-a', 'org-1', { primaryIdentifierId: null });
   });
 
   it('returns 500 on unexpected error', async () => {

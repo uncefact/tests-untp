@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { apiLogger } from '@/lib/api/logger';
-import { ValidationError } from '@/lib/api/validation';
+import { ValidationError, parseRequestBody } from '@/lib/api/validation';
+import { verifyCredentialRequestSchema } from '@/lib/api/request-schemas/credential';
 import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
@@ -12,7 +13,6 @@ import { decodeJwt } from 'jose';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials/verify' });
 
-const HEX_64 = /^[a-f0-9]{64}$/i;
 const JWT_PREFIX = 'data:application/vc+jwt,';
 const DEFAULT_MAX_CREDENTIAL_SIZE = 10_485_760; // 10 MB
 
@@ -149,19 +149,11 @@ export const POST = withPublicRoute(async (req) => {
   // is fragile across serverless instances.
 
   // ── Step 1: Parse and validate input ────────────────────────────────
-  logger.info('Parsing request body');
-  let body: { uri?: string; digestMultibase?: string; hash?: string; decryptionKey?: string };
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ uri: body.uri }, 'Validating input parameters');
-
-  if (!body.uri || typeof body.uri !== 'string') {
-    throw new ValidationError('uri is required');
-  }
+  // The schema accepts the legacy `hash` field (hex SHA-256) for verify URLs
+  // already issued before the multibase migration; they're out in the wild on
+  // QR codes and can't be reissued. Prefer `digestMultibase` when both are set.
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, verifyCredentialRequestSchema);
 
   let parsedUri: URL;
   try {
@@ -172,31 +164,6 @@ export const POST = withPublicRoute(async (req) => {
 
   if (parsedUri.protocol !== 'http:' && parsedUri.protocol !== 'https:') {
     throw new ValidationError('uri must be a valid HTTP(S) URL');
-  }
-
-  if (body.digestMultibase !== undefined) {
-    if (typeof body.digestMultibase !== 'string') {
-      throw new ValidationError('digestMultibase must be a string');
-    }
-    try {
-      MultibaseDigest.fromString(body.digestMultibase);
-    } catch {
-      throw new ValidationError('digestMultibase must be a valid multibase-encoded multihash');
-    }
-  }
-
-  // Accept the legacy `hash` query parameter (hex SHA-256) for verify URLs
-  // already issued before the multibase migration; they're out in the wild on
-  // QR codes and can't be reissued. Prefer `digestMultibase` when both are set.
-  if (body.hash !== undefined && (typeof body.hash !== 'string' || !HEX_64.test(body.hash))) {
-    throw new ValidationError('hash must be a 64-character hex string (SHA-256)');
-  }
-
-  if (
-    body.decryptionKey !== undefined &&
-    (typeof body.decryptionKey !== 'string' || !HEX_64.test(body.decryptionKey))
-  ) {
-    throw new ValidationError('decryptionKey must be a 64-character hex string');
   }
 
   // ── SSRF protection: block private/reserved network addresses ──────
@@ -261,7 +228,7 @@ export const POST = withPublicRoute(async (req) => {
   // ── Step 3: Detect and handle encryption ───────────────────────────
   logger.info('Detecting credential encryption');
 
-  let credential: Record<string, unknown>;
+  let credentialData: unknown;
 
   if (isEncryptedEnvelope(fetchedData)) {
     if (!body.decryptionKey) {
@@ -281,14 +248,26 @@ export const POST = withPublicRoute(async (req) => {
         tag: fetchedData.tag,
         type: fetchedData.type,
       });
-      credential = JSON.parse(decryptedString);
+      credentialData = JSON.parse(decryptedString);
     } catch (e: unknown) {
       logger.warn({ uri: body.uri, err: e }, 'Credential decryption failed');
       return NextResponse.json({ error: 'Failed to decrypt credential', code: 'DECRYPTION_FAILED' }, { status: 422 });
     }
   } else {
-    credential = fetchedData as Record<string, unknown>;
+    credentialData = fetchedData;
   }
+
+  // A stored JSON scalar (including null) is not a credential; reject it
+  // before any property access.
+  if (credentialData === null || typeof credentialData !== 'object') {
+    logger.warn({ uri: body.uri }, 'Credential content is not a JSON object');
+    return NextResponse.json(
+      { error: 'Credential content is not a JSON object', code: 'INVALID_RESPONSE' },
+      { status: 422 },
+    );
+  }
+
+  const credential = credentialData as Record<string, unknown>;
 
   // ── Step 4: Digest verification ────────────────────────────────────
   // Prefer the multibase digest when provided; fall back to the legacy hex

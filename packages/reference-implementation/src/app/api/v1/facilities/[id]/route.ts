@@ -1,21 +1,12 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateFacilityRequestSchema } from '@/lib/api/request-schemas/facility';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getFacilityById, updateFacility, deleteFacility, UpdateFacilityInput } from '@/lib/prisma/repositories';
+import { getFacilityById, updateFacility, deleteFacility } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/facilities/[id]' });
-
-/** Fields that may be updated on a facility. */
-const UPDATABLE_FIELDS = [
-  'name',
-  'description',
-  'location',
-  'operatingOrganisationId',
-  'primaryIdentifierId',
-  'secondaryIdentifierIds',
-] as const;
 
 /**
  * @swagger
@@ -155,36 +146,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ facilityId: id }, 'Parsing request body');
-  let body: Record<string, unknown>;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ facilityId: id }, 'Validating update fields');
-  // Ensure at least one updatable field is present
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
-  if (!hasUpdatableField) {
-    throw new ValidationError(`At least one updatable field is required: ${UPDATABLE_FIELDS.join(', ')}`);
-  }
-
-  // Validate name if provided — must be a non-empty string
-  if ('name' in body && !isNonEmptyString(body.name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
-
-  const updateData: Record<string, unknown> = {};
-  for (const field of UPDATABLE_FIELDS) {
-    if (field in body) {
-      updateData[field] = body[field];
-    }
-  }
+  logger.info({ facilityId: id }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, updateFacilityRequestSchema);
 
   logger.info({ facilityId: id }, 'Updating facility');
-  const updated = await updateFacility(id, tenantId, updateData as UpdateFacilityInput);
+  const updated = await updateFacility(id, tenantId, definedFields(body));
 
   logger.info({ facilityId: id }, 'Facility updated');
   return NextResponse.json(updated);
