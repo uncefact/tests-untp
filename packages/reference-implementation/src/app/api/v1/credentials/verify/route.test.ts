@@ -353,6 +353,16 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('INVALID_RESPONSE');
   });
 
+  it('returns 422 when the fetched credential is a JSON array', async () => {
+    mockFetch.mockResolvedValue(createFetchResponse([{ type: 'EnvelopedVerifiableCredential' }]));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error).toBe('Credential content is not a JSON object');
+    expect(json.code).toBe('INVALID_RESPONSE');
+  });
+
   it('returns 422 when the decrypted credential is JSON null', async () => {
     mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
     mockIsEncryptedEnvelope.mockReturnValue(true);

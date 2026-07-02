@@ -257,9 +257,9 @@ export const POST = withPublicRoute(async (req) => {
     credentialData = fetchedData;
   }
 
-  // A stored JSON scalar (including null) is not a credential; reject it
-  // before any property access.
-  if (credentialData === null || typeof credentialData !== 'object') {
+  // A stored JSON scalar (including null) or array is not a credential;
+  // reject it before any property access.
+  if (credentialData === null || typeof credentialData !== 'object' || Array.isArray(credentialData)) {
     logger.warn({ uri: body.uri }, 'Credential content is not a JSON object');
     return NextResponse.json(
       { error: 'Credential content is not a JSON object', code: 'INVALID_RESPONSE' },
