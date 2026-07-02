@@ -5,7 +5,7 @@ import {
   SchemaValidationError,
   JsonLdValidationError,
 } from '@uncefact/untp-utils/validation';
-import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
+import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
 import { ValidationError } from '@/lib/api/validation';
 
 export async function validateCredentialPayload(

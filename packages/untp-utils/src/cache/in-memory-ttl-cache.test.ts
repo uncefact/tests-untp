@@ -1,15 +1,15 @@
 import { jest } from '@jest/globals';
-import { makeInMemoryTtlCache } from './in-memory-ttl-cache.js';
+import { createInMemoryTtlCache } from './in-memory-ttl-cache.js';
 
-describe('makeInMemoryTtlCache', () => {
+describe('createInMemoryTtlCache', () => {
   describe('hit / miss', () => {
     it('returns the fetcher result on a miss', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       await expect(cache.get('a', async () => 'fetched')).resolves.toBe('fetched');
     });
 
     it('returns the cached value on a subsequent hit within the TTL', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       const fetcher = jest.fn(async () => 'fetched');
       await cache.get('a', fetcher);
       await cache.get('a', fetcher);
@@ -21,7 +21,7 @@ describe('makeInMemoryTtlCache', () => {
       let now = 1000;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
       try {
-        const cache = makeInMemoryTtlCache<string>({ ttlMs: 100 });
+        const cache = createInMemoryTtlCache<string>({ ttlMs: 100 });
         const fetcher = jest.fn(async () => 'v');
         await cache.get('a', fetcher);
         now += 101;
@@ -37,7 +37,7 @@ describe('makeInMemoryTtlCache', () => {
       let now = 1000;
       jest.spyOn(Date, 'now').mockImplementation(() => now);
       try {
-        const cache = makeInMemoryTtlCache<string>({ ttlMs: 100 });
+        const cache = createInMemoryTtlCache<string>({ ttlMs: 100 });
         const fetcher = jest.fn(async (): Promise<string> => 'v');
         await cache.get('a', fetcher);
         now += 99;
@@ -52,7 +52,7 @@ describe('makeInMemoryTtlCache', () => {
     });
 
     it('treats ttlMs: 0 as a no-cache policy (always misses)', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 0 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 0 });
       const fetcher = jest.fn(async (): Promise<string> => 'v');
       await cache.get('a', fetcher);
       await cache.get('a', fetcher);
@@ -62,7 +62,7 @@ describe('makeInMemoryTtlCache', () => {
 
   describe('invalidate during inflight', () => {
     it('does not repopulate the cache when invalidate runs while a fetch is inflight', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 60_000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 60_000 });
       let resolveFetcher!: (v: string) => void;
       const fetcher = jest.fn(
         () =>
@@ -86,18 +86,18 @@ describe('makeInMemoryTtlCache', () => {
 
   describe('options', () => {
     it('rejects negative ttlMs', () => {
-      expect(() => makeInMemoryTtlCache({ ttlMs: -1 })).toThrow(RangeError);
+      expect(() => createInMemoryTtlCache({ ttlMs: -1 })).toThrow(RangeError);
     });
 
     it('rejects non-finite ttlMs', () => {
-      expect(() => makeInMemoryTtlCache({ ttlMs: NaN })).toThrow(RangeError);
-      expect(() => makeInMemoryTtlCache({ ttlMs: Infinity })).toThrow(RangeError);
+      expect(() => createInMemoryTtlCache({ ttlMs: NaN })).toThrow(RangeError);
+      expect(() => createInMemoryTtlCache({ ttlMs: Infinity })).toThrow(RangeError);
     });
   });
 
   describe('deduplication', () => {
     it('deduplicates concurrent fetches for the same key', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       let resolveFetcher!: (v: string) => void;
       const fetcher = jest.fn(
         () =>
@@ -114,7 +114,7 @@ describe('makeInMemoryTtlCache', () => {
     });
 
     it('runs fetcher independently for distinct keys', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       const fetcher = jest.fn(async (): Promise<string> => 'v');
       await cache.get('a', fetcher);
       await cache.get('b', fetcher);
@@ -124,7 +124,7 @@ describe('makeInMemoryTtlCache', () => {
 
   describe('errors', () => {
     it('propagates fetcher rejections without caching the failure', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       let attempt = 0;
       const fetcher = jest.fn(async () => {
         attempt += 1;
@@ -137,7 +137,7 @@ describe('makeInMemoryTtlCache', () => {
     });
 
     it('fans the same rejection out to every concurrent caller and retries on the next call', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       let rejectFetcher!: (err: Error) => void;
       const fetcher = jest.fn(
         () =>
@@ -165,7 +165,7 @@ describe('makeInMemoryTtlCache', () => {
     });
 
     it('clears inflight on rejection so subsequent callers retry', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       let resolveFetcher: ((v: string) => void) | undefined;
       let rejectFetcher: ((err: Error) => void) | undefined;
       const fetcher = jest.fn(
@@ -188,7 +188,7 @@ describe('makeInMemoryTtlCache', () => {
 
   describe('invalidate / clear', () => {
     it('invalidate removes a single key without touching others', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       const fetcher = jest.fn(async (): Promise<string> => 'v');
       await cache.get('a', fetcher);
       await cache.get('b', fetcher);
@@ -199,7 +199,7 @@ describe('makeInMemoryTtlCache', () => {
     });
 
     it('clear removes every cached value', async () => {
-      const cache = makeInMemoryTtlCache<string>({ ttlMs: 1000 });
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
       const fetcher = jest.fn(async (): Promise<string> => 'v');
       await cache.get('a', fetcher);
       await cache.get('b', fetcher);

@@ -1,7 +1,7 @@
 import { StructuredError } from '../structured-error.js';
 
 /**
- * Base for every diagnostic from `@uncefact/untp-utils/schema-loaders`.
+ * Base for every diagnostic from `@uncefact/untp-utils/loaders`.
  * Catch to handle any schema-loader failure generically; catch a concrete
  * subclass for specific handling.
  */

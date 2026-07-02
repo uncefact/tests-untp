@@ -9,15 +9,15 @@
  * No Docker, no database, no Next.js needed.
  */
 import { parseConformityCatalogue } from '@uncefact/untp-utils/conformity-vocabulary';
-import { makeSchemaLoader } from '@uncefact/untp-utils/schema-loaders';
-import { makeInMemoryTtlCache } from '@uncefact/untp-utils/cache';
+import { createSchemaLoader } from '@uncefact/untp-utils/loaders';
+import { createInMemoryTtlCache } from '@uncefact/untp-utils/cache';
 import { resolveAndParseConformityScheme } from '@uncefact/untp-ri-services/cvc';
 
 const REGISTER_URL = 'https://untp.unece.org/assets/files/register-aac7758c2e3fe71fa2309ca898d66d55.json';
 const SCHEMA_URL = 'https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json';
 
 async function main() {
-  const schemaLoader = makeSchemaLoader(makeInMemoryTtlCache<object>({ ttlMs: 60 * 60 * 1000 }));
+  const schemaLoader = createSchemaLoader(createInMemoryTtlCache<object>({ ttlMs: 60 * 60 * 1000 }));
 
   console.log(`Fetching register: ${REGISTER_URL}`);
   const registerResp = await fetch(REGISTER_URL, { headers: { Accept: 'application/json' } });

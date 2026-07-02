@@ -1,18 +1,18 @@
 import { jest } from '@jest/globals';
-import { makeInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
+import { createInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
 import {
   SchemaLoaderError,
   SchemaLoaderHttpError,
   SchemaLoaderInvalidJsonError,
   SchemaLoaderNetworkError,
 } from './errors.js';
-import { makeSchemaLoader } from './schema-loader.js';
+import { createSchemaLoader } from './schema-loader.js';
 
 const SCHEMA_URL = 'https://example.com/schema.json';
 
 type FetchFn = typeof globalThis.fetch;
 
-describe('makeSchemaLoader', () => {
+describe('createSchemaLoader', () => {
   const originalFetch = globalThis.fetch;
   let fetchMock: jest.Mock;
 
@@ -36,13 +36,13 @@ describe('makeSchemaLoader', () => {
   describe('uncached (no cache supplied)', () => {
     it('resolves with the parsed schema body', async () => {
       mockOk({ $schema: 'foo' });
-      const loader = makeSchemaLoader();
+      const loader = createSchemaLoader();
       await expect(loader.load(SCHEMA_URL)).resolves.toEqual({ $schema: 'foo' });
     });
 
     it('fetches afresh on every call', async () => {
       mockOk({ $schema: 'foo' });
-      const loader = makeSchemaLoader();
+      const loader = createSchemaLoader();
       await loader.load(SCHEMA_URL);
       await loader.load(SCHEMA_URL);
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -52,8 +52,8 @@ describe('makeSchemaLoader', () => {
   describe('cached (cache supplied)', () => {
     it('caches subsequent loads within the TTL', async () => {
       mockOk({ $schema: 'foo' });
-      const cache = makeInMemoryTtlCache<object>({ ttlMs: 60_000 });
-      const loader = makeSchemaLoader(cache);
+      const cache = createInMemoryTtlCache<object>({ ttlMs: 60_000 });
+      const loader = createSchemaLoader(cache);
 
       await loader.load(SCHEMA_URL);
       await loader.load(SCHEMA_URL);
@@ -68,8 +68,8 @@ describe('makeSchemaLoader', () => {
             resolveFetch = r;
           }) as never,
       );
-      const cache = makeInMemoryTtlCache<object>({ ttlMs: 60_000 });
-      const loader = makeSchemaLoader(cache);
+      const cache = createInMemoryTtlCache<object>({ ttlMs: 60_000 });
+      const loader = createSchemaLoader(cache);
 
       const a = loader.load(SCHEMA_URL);
       const b = loader.load(SCHEMA_URL);
@@ -81,8 +81,8 @@ describe('makeSchemaLoader', () => {
 
     it('two loaders with separate caches do not share state', async () => {
       mockOk({ $schema: 'foo' });
-      const a = makeSchemaLoader(makeInMemoryTtlCache<object>({ ttlMs: 60_000 }));
-      const b = makeSchemaLoader(makeInMemoryTtlCache<object>({ ttlMs: 60_000 }));
+      const a = createSchemaLoader(createInMemoryTtlCache<object>({ ttlMs: 60_000 }));
+      const b = createSchemaLoader(createInMemoryTtlCache<object>({ ttlMs: 60_000 }));
 
       await a.load(SCHEMA_URL);
       await b.load(SCHEMA_URL);
@@ -91,8 +91,8 @@ describe('makeSchemaLoader', () => {
 
     it('clearing the cache forces the next load to re-fetch', async () => {
       mockOk({ $schema: 'foo' });
-      const cache = makeInMemoryTtlCache<object>({ ttlMs: 60_000 });
-      const loader = makeSchemaLoader(cache);
+      const cache = createInMemoryTtlCache<object>({ ttlMs: 60_000 });
+      const loader = createSchemaLoader(cache);
 
       await loader.load(SCHEMA_URL);
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -105,7 +105,7 @@ describe('makeSchemaLoader', () => {
   describe('throws (applies to both cached and uncached paths)', () => {
     it('throws SchemaLoaderNetworkError when fetch rejects', async () => {
       fetchMock.mockRejectedValue(new Error('connection refused') as never);
-      const loader = makeSchemaLoader();
+      const loader = createSchemaLoader();
       const error = (await loader.load(SCHEMA_URL).catch((e: unknown) => e)) as SchemaLoaderNetworkError;
       expect(error).toBeInstanceOf(SchemaLoaderNetworkError);
       expect(error.received).toBe('connection refused');
@@ -114,7 +114,7 @@ describe('makeSchemaLoader', () => {
 
     it('throws SchemaLoaderHttpError on a non-2xx response with the status attached', async () => {
       fetchMock.mockResolvedValue({ ok: false, status: 503 } as never);
-      const loader = makeSchemaLoader();
+      const loader = createSchemaLoader();
       const error = (await loader.load(SCHEMA_URL).catch((e: unknown) => e)) as SchemaLoaderHttpError;
       expect(error).toBeInstanceOf(SchemaLoaderHttpError);
       expect(error.status).toBe(503);
@@ -128,15 +128,15 @@ describe('makeSchemaLoader', () => {
           throw new Error('Unexpected token');
         },
       } as never);
-      const loader = makeSchemaLoader();
+      const loader = createSchemaLoader();
       const error = (await loader.load(SCHEMA_URL).catch((e: unknown) => e)) as SchemaLoaderInvalidJsonError;
       expect(error).toBeInstanceOf(SchemaLoaderInvalidJsonError);
       expect(error.received).toBe('Unexpected token');
     });
 
     it('does not cache failed loads (retries on next call)', async () => {
-      const cache = makeInMemoryTtlCache<object>({ ttlMs: 60_000 });
-      const loader = makeSchemaLoader(cache);
+      const cache = createInMemoryTtlCache<object>({ ttlMs: 60_000 });
+      const loader = createSchemaLoader(cache);
       fetchMock.mockResolvedValueOnce({ ok: false, status: 503 } as never);
       await expect(loader.load(SCHEMA_URL)).rejects.toBeInstanceOf(SchemaLoaderHttpError);
       mockOk({ $schema: 'foo' });
@@ -145,7 +145,7 @@ describe('makeSchemaLoader', () => {
     });
 
     it('every concrete error extends SchemaLoaderError', async () => {
-      const loader = makeSchemaLoader();
+      const loader = createSchemaLoader();
       fetchMock.mockRejectedValueOnce(new Error('fail') as never);
       await expect(loader.load(SCHEMA_URL)).rejects.toBeInstanceOf(SchemaLoaderError);
 
