@@ -25,9 +25,9 @@
       "types": "./build/validation/index.d.ts",
       "default": "./build/validation/index.js"
     },
-    "./schema-loaders": {
-      "types": "./build/schema-loaders/index.d.ts",
-      "default": "./build/schema-loaders/index.js"
+    "./loaders": {
+      "types": "./build/loaders/index.d.ts",
+      "default": "./build/loaders/index.js"
     },
     "./node": {
       "types": "./build/node/index.d.ts",
@@ -57,8 +57,8 @@
       "validation": [
         "./build/validation/index.d.ts"
       ],
-      "schema-loaders": [
-        "./build/schema-loaders/index.d.ts"
+      "loaders": [
+        "./build/loaders/index.d.ts"
       ],
       "node": [
         "./build/node/index.d.ts"

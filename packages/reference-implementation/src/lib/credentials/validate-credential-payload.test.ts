@@ -4,7 +4,7 @@ import {
   SchemaFetchFailedError,
   JsonLdExpansionFailedError,
 } from '@uncefact/untp-utils/validation';
-import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
+import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
 
 const mockValidateAgainstSchemas = jest.fn();
 const mockValidateJsonLd = jest.fn();

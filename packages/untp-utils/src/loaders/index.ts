@@ -4,4 +4,4 @@ export {
   SchemaLoaderHttpError,
   SchemaLoaderInvalidJsonError,
 } from './errors.js';
-export { makeSchemaLoader, type SchemaLoader } from './schema-loader.js';
+export { createSchemaLoader, type SchemaLoader } from './schema-loader.js';

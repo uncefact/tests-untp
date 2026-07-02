@@ -28,7 +28,7 @@ const jestConfig = {
     '^@uncefact/untp-ri-services$': '<rootDir>/../services/build/index.js',
     '^@uncefact/untp-utils/multibase-digest$': '<rootDir>/src/__mocks__/uncefact/multibase-digest.ts',
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
-    '^@uncefact/untp-utils/schema-loaders$': '<rootDir>/../untp-utils/build/schema-loaders/index.js',
+    '^@uncefact/untp-utils/loaders$': '<rootDir>/../untp-utils/build/loaders/index.js',
     '^@uncefact/untp-utils/cache$': '<rootDir>/../untp-utils/build/cache/index.js',
     '^@uncefact/untp-utils/conformity-vocabulary$': '<rootDir>/../untp-utils/build/conformity-vocabulary/index.js',
     '^@uncefact/untp-utils$': '<rootDir>/../untp-utils/build/index.js',

@@ -1,5 +1,5 @@
 import type { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
+import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
 import type { ConformityScheme } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { ConformitySchemeResolveError } from './errors.js';
 

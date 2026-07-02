@@ -39,7 +39,7 @@ async function fetchSchema(url: string): Promise<object> {
  * @throws {SchemaLoaderError} on `load(url)` if the underlying fetch fails.
  *   The concrete subclass identifies which step failed.
  */
-export function makeSchemaLoader(cache?: TtlCache<object>): SchemaLoader {
+export function createSchemaLoader(cache?: TtlCache<object>): SchemaLoader {
   if (!cache) {
     return { load: (url) => fetchSchema(url) };
   }

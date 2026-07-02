@@ -1,6 +1,6 @@
 import type { TtlCache, TtlCacheOptions } from './ttl-cache.js';
 
-export function makeInMemoryTtlCache<T>(options: TtlCacheOptions): TtlCache<T> {
+export function createInMemoryTtlCache<T>(options: TtlCacheOptions): TtlCache<T> {
   const { ttlMs } = options;
   if (!Number.isFinite(ttlMs) || ttlMs < 0) {
     throw new RangeError(`ttlMs must be a non-negative finite number, got ${ttlMs}.`);

@@ -1,5 +1,5 @@
-import { makeInMemoryTtlCache } from '@uncefact/untp-utils/cache';
-import { makeSchemaLoader, type SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
+import { createInMemoryTtlCache } from '@uncefact/untp-utils/cache';
+import { createSchemaLoader, type SchemaLoader } from '@uncefact/untp-utils/loaders';
 import { apiLogger } from '../api/logger';
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
@@ -19,6 +19,6 @@ export function readSchemaCacheTtlMs(env: Record<string, string | undefined> = p
   return parsed;
 }
 
-export const schemaLoader: SchemaLoader = makeSchemaLoader(
-  makeInMemoryTtlCache<object>({ ttlMs: readSchemaCacheTtlMs() }),
+export const schemaLoader: SchemaLoader = createSchemaLoader(
+  createInMemoryTtlCache<object>({ ttlMs: readSchemaCacheTtlMs() }),
 );

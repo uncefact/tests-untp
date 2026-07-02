@@ -1,6 +1,6 @@
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
-import type { SchemaLoader } from '../schema-loaders/schema-loader.js';
+import type { SchemaLoader } from '../loaders/schema-loader.js';
 import type { ValidationFailure } from '../structured-error.js';
 import { SchemaCompilationFailedError, SchemaFetchFailedError, SchemaPayloadError } from './errors.js';
 

@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import { makeInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
-import { makeSchemaLoader, type SchemaLoader } from '../schema-loaders/schema-loader.js';
+import { createInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
+import { createSchemaLoader, type SchemaLoader } from '../loaders/schema-loader.js';
 import {
   SchemaCompilationFailedError,
   SchemaFetchFailedError,
@@ -36,7 +36,7 @@ describe('validateAgainstSchemas', () => {
   beforeEach(() => {
     fetchMock = jest.fn();
     globalThis.fetch = fetchMock as unknown as FetchFn;
-    loader = makeSchemaLoader(makeInMemoryTtlCache<object>({ ttlMs: 60_000 }));
+    loader = createSchemaLoader(createInMemoryTtlCache<object>({ ttlMs: 60_000 }));
   });
 
   afterEach(() => {

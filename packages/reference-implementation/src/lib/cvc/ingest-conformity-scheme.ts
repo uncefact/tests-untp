@@ -4,7 +4,7 @@ import {
   type PrefetchedDocument,
 } from '@uncefact/untp-ri-services/cvc';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
+import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
 import type {
   ConformityCriterion as ParsedCriterion,
   ConformityScheme as ParsedScheme,

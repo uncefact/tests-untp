@@ -1,5 +1,5 @@
 import { parseConformityCatalogue } from '@uncefact/untp-utils/conformity-vocabulary';
-import type { SchemaLoader } from '@uncefact/untp-utils/schema-loaders';
+import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
 import { apiLogger } from '../api/logger';
 import { ConformityFetchStatus, ConformitySchemeSource } from '../prisma/generated';
 import { prisma } from '../prisma/prisma';
