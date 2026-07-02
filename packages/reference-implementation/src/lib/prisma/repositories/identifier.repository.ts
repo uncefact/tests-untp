@@ -213,8 +213,12 @@ export async function deleteIdentifier(id: string, tenantId: string): Promise<Id
       throw new NotFoundError('Identifier not found or access denied');
     }
 
-    return tx.identifier.delete({
-      where: { id },
-    });
+    try {
+      return await tx.identifier.delete({
+        where: { id },
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Identifier not found or access denied' });
+    }
   });
 }

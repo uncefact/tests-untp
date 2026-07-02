@@ -45,7 +45,11 @@ export function isRecordNotFound(error: unknown): boolean {
 export function isDatabaseError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   if ('clientVersion' in error) return true;
-  return error instanceof Error && error.name.startsWith('PrismaClient');
+  return (
+    'name' in error &&
+    typeof (error as { name: unknown }).name === 'string' &&
+    (error as { name: string }).name.startsWith('PrismaClient')
+  );
 }
 
 /**

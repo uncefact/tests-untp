@@ -328,6 +328,16 @@ describe('identifier.repository', () => {
       expect(result).toEqual(IDENTIFIER_RECORD);
     });
 
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.identifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
+      const raceError = new Error('Record to delete does not exist.');
+      raceError.name = 'PrismaClientKnownRequestError';
+      Object.assign(raceError, { code: 'P2025', clientVersion: '6.0.0' });
+      mockTx.identifier.delete.mockRejectedValue(raceError);
+
+      await expect(deleteIdentifier('ident-1', TENANT_ID)).rejects.toThrow('Identifier not found or access denied');
+    });
+
     it('throws if identifier does not belong to the tenant', async () => {
       mockTx.identifier.findFirst.mockResolvedValue(null);
 

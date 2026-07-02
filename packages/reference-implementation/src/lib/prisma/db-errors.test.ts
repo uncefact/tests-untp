@@ -61,6 +61,12 @@ describe('isDatabaseError', () => {
     expect(isDatabaseError(new Error('boom'))).toBe(false);
     expect(isDatabaseError(undefined)).toBe(false);
   });
+
+  it('returns false without throwing when name is not a string', () => {
+    const mangled = new Error('boom');
+    Object.defineProperty(mangled, 'name', { value: undefined });
+    expect(isDatabaseError(mangled)).toBe(false);
+  });
 });
 
 describe('mapDatabaseError', () => {
