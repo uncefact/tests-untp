@@ -1,5 +1,11 @@
 import { jest } from '@jest/globals';
 import { ResolverHttpError, ResolverInvalidJsonError } from '../resolvers/errors.js';
+import {
+  SchemaCompilationFailedError,
+  SchemaFetchFailedError,
+  SchemaPayloadError,
+  SchemaValidationError,
+} from './errors.js';
 
 const resolveJsonDocument = jest.fn();
 
@@ -14,8 +20,6 @@ jest.unstable_mockModule('../resolvers/index.js', () => ({
 
 const { createInMemoryTtlCache } = await import('../cache/in-memory-ttl-cache.js');
 const { createSchemaLoader } = await import('../loaders/schema-loader.js');
-const { SchemaCompilationFailedError, SchemaFetchFailedError, SchemaPayloadError, SchemaValidationError } =
-  await import('./errors.js');
 const { validateAgainstSchemas } = await import('./validate-against-schemas.js');
 
 type SchemaLoader = Awaited<ReturnType<typeof createSchemaLoader>>;
@@ -82,7 +86,7 @@ describe('validateAgainstSchemas', () => {
         throw new Error('expected validateAgainstSchemas to throw');
       } catch (e) {
         expect(e).toBeInstanceOf(SchemaPayloadError);
-        expect((e as InstanceType<typeof SchemaPayloadError>).failures.length).toBeGreaterThanOrEqual(2);
+        expect((e as SchemaPayloadError).failures.length).toBeGreaterThanOrEqual(2);
       }
     });
 
@@ -94,7 +98,7 @@ describe('validateAgainstSchemas', () => {
         throw new Error('expected validateAgainstSchemas to throw');
       } catch (e) {
         expect(e).toBeInstanceOf(SchemaPayloadError);
-        expect((e as InstanceType<typeof SchemaPayloadError>).failures[0].pointer).toBe('/age');
+        expect((e as SchemaPayloadError).failures[0].pointer).toBe('/age');
       }
     });
 
@@ -106,7 +110,7 @@ describe('validateAgainstSchemas', () => {
         throw new Error('expected validateAgainstSchemas to throw');
       } catch (e) {
         expect(e).toBeInstanceOf(SchemaPayloadError);
-        const failure = (e as InstanceType<typeof SchemaPayloadError>).failures[0];
+        const failure = (e as SchemaPayloadError).failures[0];
         expect(failure.received).toBe(-1);
         expect(failure.expected).toEqual(expect.objectContaining({ comparison: '>=', limit: 0 }));
       }
@@ -144,7 +148,7 @@ describe('validateAgainstSchemas', () => {
 
       const error = await validateAgainstSchemas({}, [SCHEMA_URL_NAME], customLoader).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(SchemaFetchFailedError);
-      expect((error as InstanceType<typeof SchemaFetchFailedError>).cause).toBeInstanceOf(Error);
+      expect((error as SchemaFetchFailedError).cause).toBeInstanceOf(Error);
     });
 
     it('passes URLs to the supplied loader and validates the returned schema', async () => {
@@ -181,7 +185,7 @@ describe('validateAgainstSchemas', () => {
 
       const error = (await validateAgainstSchemas({ name: 'Alice' }, [SCHEMA_URL_NAME, badInline], loader).catch(
         (e: unknown) => e,
-      )) as InstanceType<typeof SchemaCompilationFailedError>;
+      )) as SchemaCompilationFailedError;
       expect(error).toBeInstanceOf(SchemaCompilationFailedError);
       expect(error.received).toMatch(/.+/);
       expect(error.message).toContain('<inline schema>');
