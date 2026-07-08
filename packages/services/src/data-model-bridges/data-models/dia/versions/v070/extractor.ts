@@ -23,9 +23,12 @@ export function extractDiaRefs(subject: CredentialSubject): ExtractedRefs {
   const ref = { id: dia.registeredId };
   const registerType = dia.registerType;
 
+  // The v0.7.0 registerType code list is lowercase, unlike v0.6.x's capitalised
+  // values. See the RegisteredIdentity definition in
+  // https://untp.unece.org/artefacts/schema/v0.7.0/dia/DigitalIdentityAnchor.json
   return {
-    organisations: registerType === 'Business' ? [ref] : [],
-    facilities: registerType === 'Facility' || registerType === 'Land' ? [ref] : [],
-    products: registerType === 'Product' ? [ref] : [],
+    organisations: registerType === 'business' ? [ref] : [],
+    facilities: registerType === 'facility' || registerType === 'land' ? [ref] : [],
+    products: registerType === 'product' ? [ref] : [],
   };
 }

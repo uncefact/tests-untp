@@ -36,40 +36,40 @@ describe('extractDiaRefs (v0.7.0)', () => {
   // ── registerType routing ───────────────────────────────────────────────────
 
   describe('registerType routing', () => {
-    it('places ref in organisations when registerType is Business', () => {
+    it('places ref in organisations when registerType is business', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: '9520123456788',
-        registerType: 'Business',
+        registerType: 'business',
       });
       expect(refs.organisations).toEqual([{ id: '9520123456788' }]);
       expect(refs.facilities).toEqual([]);
       expect(refs.products).toEqual([]);
     });
 
-    it('places ref in facilities when registerType is Facility', () => {
+    it('places ref in facilities when registerType is facility', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: '4012345000009',
-        registerType: 'Facility',
+        registerType: 'facility',
       });
       expect(refs.facilities).toEqual([{ id: '4012345000009' }]);
     });
 
-    it('places ref in products when registerType is Product', () => {
+    it('places ref in products when registerType is product', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: '9520123456788',
-        registerType: 'Product',
+        registerType: 'product',
       });
       expect(refs.products).toEqual([{ id: '9520123456788' }]);
     });
 
-    it('places ref in facilities when registerType is Land', () => {
+    it('places ref in facilities when registerType is land', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: 'LAND-001',
-        registerType: 'Land',
+        registerType: 'land',
       });
       expect(refs.facilities).toEqual([{ id: 'LAND-001' }]);
     });
@@ -84,11 +84,22 @@ describe('extractDiaRefs (v0.7.0)', () => {
       expect(refs.products).toEqual([]);
     });
 
-    it('returns empty arrays when registerType is Trademark', () => {
+    it('returns empty arrays when registerType is trademark', () => {
       const refs = bridge.extractRefs({
         type: ['RegisteredIdentity'],
         registeredId: 'TM-12345',
-        registerType: 'Trademark',
+        registerType: 'trademark',
+      });
+      expect(refs.organisations).toEqual([]);
+      expect(refs.facilities).toEqual([]);
+      expect(refs.products).toEqual([]);
+    });
+
+    it('returns empty arrays when registerType is accreditation', () => {
+      const refs = bridge.extractRefs({
+        type: ['RegisteredIdentity'],
+        registeredId: 'poc-001',
+        registerType: 'accreditation',
       });
       expect(refs.organisations).toEqual([]);
       expect(refs.facilities).toEqual([]);

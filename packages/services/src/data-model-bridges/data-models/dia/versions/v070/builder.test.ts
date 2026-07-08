@@ -104,23 +104,23 @@ describe('buildDiaSubject (v0.7.0)', () => {
   // ── registerType mapping ────────────────────────────────────────────────────
 
   describe('registerType mapping', () => {
-    it('sets registerType to Business when built from organisation', () => {
+    it('sets registerType to business when built from organisation', () => {
       const subject = bridge.buildSubject(createBridgeEntities());
-      expect(subject.registerType).toBe('Business');
+      expect(subject.registerType).toBe('business');
     });
 
-    it('sets registerType to Facility when built from facility', () => {
+    it('sets registerType to facility when built from facility', () => {
       const subject = bridge.buildSubject(
         createBridgeEntities({ organisation: undefined, facility: createFacility(), product: undefined }),
       );
-      expect(subject.registerType).toBe('Facility');
+      expect(subject.registerType).toBe('facility');
     });
 
-    it('sets registerType to Product when built from product', () => {
+    it('sets registerType to product when built from product', () => {
       const subject = bridge.buildSubject(
         createBridgeEntities({ organisation: undefined, facility: undefined, product: createProduct() }),
       );
-      expect(subject.registerType).toBe('Product');
+      expect(subject.registerType).toBe('product');
     });
 
     it('omits registerType when no entity is provided', () => {
