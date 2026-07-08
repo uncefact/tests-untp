@@ -8,12 +8,15 @@ export function buildDiaSubject(entities: BridgeEntities): CredentialSubject {
   // entities.conformity is silently ignored.
   const entity = entities.organisation ?? entities.facility ?? entities.product;
 
+  // The v0.7.0 registerType code list is lowercase, unlike v0.6.x's capitalised
+  // values. See the RegisteredIdentity definition in
+  // https://untp.unece.org/artefacts/schema/v0.7.0/dia/DigitalIdentityAnchor.json
   const registerType = entities.organisation
-    ? 'Business'
+    ? 'business'
     : entities.facility
-      ? 'Facility'
+      ? 'facility'
       : entities.product
-        ? 'Product'
+        ? 'product'
         : undefined;
 
   return {
