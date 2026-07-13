@@ -57,6 +57,141 @@ describe('validateConformityClaim', () => {
     expect(validateConformityClaim(claim, scheme())).toEqual([]);
   });
 
+  describe('assessment-topic-mismatch', () => {
+    it("accepts an assessment declaring a subset of its criteria's published topics", () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+        assessments: [{ criteria: [CRITERION_A, CRITERION_B], conformityTopics: [TOPIC_A1] }],
+      };
+      expect(validateConformityClaim(claim, scheme())).toEqual([]);
+    });
+
+    it('warns when an assessment declares a topic none of its criteria define', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+        assessments: [
+          { criteria: [CRITERION_A], conformityTopics: ['https://vocabulary.example.com/conformity-topics/other'] },
+        ],
+      };
+      const warnings = validateConformityClaim(claim, scheme());
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].code).toBe(ConformityWarningCode.AssessmentTopicMismatch);
+      expect(warnings[0].message).toContain(PROFILE_URI);
+      expect(warnings[0].received).toBe('https://vocabulary.example.com/conformity-topics/other');
+      expect(warnings[0].expected).toEqual([TOPIC_A1, TOPIC_A2]);
+      expect(warnings[0].pointer).toBe('/assessments/0/conformityTopics/0');
+    });
+
+    it("builds the union from the profile's published topics, not the claim's declared ones", () => {
+      // Criterion A's claim entry declares a topic the profile does not
+      // publish for it; the assessment declares that same unpublished topic.
+      // The assessment check must warn (the union comes from the profile),
+      // even though the claim's own criterion declarations contain the topic.
+      const unpublished = 'https://vocabulary.example.com/conformity-topics/unpublished';
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2, unpublished] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+        assessments: [{ criteria: [CRITERION_A], conformityTopics: [unpublished] }],
+      };
+      const assessmentWarnings = validateConformityClaim(claim, scheme()).filter(
+        (w) => w.code === ConformityWarningCode.AssessmentTopicMismatch,
+      );
+      expect(assessmentWarnings).toHaveLength(1);
+      expect(assessmentWarnings[0].received).toBe(unpublished);
+      expect(assessmentWarnings[0].expected).toEqual([TOPIC_A1, TOPIC_A2]);
+    });
+
+    it('fires for every mismatching assessment with per-assessment pointers (no short-circuit)', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+        assessments: [
+          { criteria: [CRITERION_A], conformityTopics: ['https://vocabulary.example.com/conformity-topics/x'] },
+          { criteria: [CRITERION_B], conformityTopics: ['https://vocabulary.example.com/conformity-topics/y'] },
+        ],
+      };
+      const warnings = validateConformityClaim(claim, scheme()).filter(
+        (w) => w.code === ConformityWarningCode.AssessmentTopicMismatch,
+      );
+      expect(warnings).toHaveLength(2);
+      expect(warnings[0].pointer).toBe('/assessments/0/conformityTopics/0');
+      expect(warnings[1].pointer).toBe('/assessments/1/conformityTopics/0');
+    });
+
+    it('passes over an assessment that references no criteria (parent-level topic is its only classification)', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+        ],
+        assessments: [{ criteria: [], conformityTopics: ['https://vocabulary.example.com/conformity-topics/other'] }],
+      };
+      expect(validateConformityClaim(claim, scheme())).toEqual([]);
+    });
+
+    it('passes over an assessment when any referenced criterion does not resolve in the profile', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [TOPIC_A1, TOPIC_A2] },
+          { criterion: CRITERION_B, conformityTopics: [] },
+          { criterion: 'https://example.com/criterion/unknown/1.0.0' },
+        ],
+        assessments: [
+          {
+            criteria: [CRITERION_A, 'https://example.com/criterion/unknown/1.0.0'],
+            conformityTopics: ['https://vocabulary.example.com/conformity-topics/other'],
+          },
+        ],
+      };
+      const warnings = validateConformityClaim(claim, scheme());
+      const codes = warnings.map((w) => w.code);
+      expect(codes).toContain(ConformityWarningCode.CriterionNotInProfile);
+      expect(codes).not.toContain(ConformityWarningCode.AssessmentTopicMismatch);
+    });
+  });
+
+  describe('profile absent on the claim', () => {
+    it('reports profile-not-specified and skips criterion checks when the scheme is known', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        criteria: [{ criterion: 'https://example.com/criterion/unknown/1.0.0', conformityTopics: [] }],
+      };
+      const warnings = validateConformityClaim(claim, scheme());
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].code).toBe(ConformityWarningCode.ProfileNotSpecified);
+      expect(warnings[0].pointer).toBe('/profile');
+    });
+
+    it('still reports scheme-not-found when the scheme is unknown', () => {
+      const claim: ConformityClaim = { scheme: 'https://example.com/other-scheme', criteria: [] };
+      const warnings = validateConformityClaim(claim, scheme());
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].code).toBe(ConformityWarningCode.SchemeNotFound);
+    });
+  });
+
   describe('scheme-not-found', () => {
     it('fires when the scheme is null', () => {
       const claim: ConformityClaim = { scheme: SCHEME_URI, profile: PROFILE_URI, criteria: [] };
@@ -136,6 +271,7 @@ describe('validateConformityClaim', () => {
       expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.CriterionNotInProfile,
+          message: expect.stringContaining(PROFILE_URI),
           received: 'https://example.com/criterion/unknown/1.0.0',
           expected: [CRITERION_A, CRITERION_B],
           pointer: '/criteria/2/criterion',
@@ -172,6 +308,7 @@ describe('validateConformityClaim', () => {
       expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.CriterionMissing,
+          message: expect.stringContaining(PROFILE_URI),
           expected: CRITERION_B,
           pointer: '/criteria',
         }),
@@ -200,6 +337,7 @@ describe('validateConformityClaim', () => {
       expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.CriterionTopicMismatch,
+          message: expect.stringContaining(PROFILE_URI),
           expected: TOPIC_A2,
           pointer: '/criteria/0/conformityTopics',
         }),
@@ -236,6 +374,7 @@ describe('validateConformityClaim', () => {
       expect(validateConformityClaim(claim, scheme())).toEqual([
         expect.objectContaining({
           code: ConformityWarningCode.CriterionTopicMismatch,
+          message: expect.stringContaining(PROFILE_URI),
           received: 'https://vocabulary.example.com/topics/wrong',
           expected: [TOPIC_A1, TOPIC_A2],
           pointer: '/criteria/0/conformityTopics/2',

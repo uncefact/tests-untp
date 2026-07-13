@@ -157,10 +157,16 @@ CVC validation is advisory only. It never blocks issuance. If the check fails or
 |------|---------|
 | `conformity-scheme.not-found` | A referenced conformity scheme URI is not in the locally known catalogue |
 | `conformity-profile.not-found` | A referenced profile URI is not found within the scheme |
+| `conformity-profile.not-specified` | The claim references no profile, so criterion and topic checks were not performed (criteria are published per versioned profile) |
 | `conformity-criterion.not-in-profile` | A claimed criterion is not one the referenced profile publishes |
 | `conformity-criterion.missing` | A criterion the profile defines is absent from the claim |
 | `conformity-criterion.topic-mismatch` | A criterion's declared conformity topics do not match those the criterion defines |
+| `conformity-assessment.topic-mismatch` | An assessment declares a conformity topic that none of its assessed criteria define |
 | `conformity-claim.validation-error` | Validation could not be performed (extraction or infrastructure failure) |
+
+Criterion and topic warnings name the versioned profile URI they were checked against in their message, since profile URIs carry a version segment and the same criterion can differ between profile versions.
+
+The assessment-level topic check runs only when the assessment references at least one criterion and every referenced criterion resolves in the profile. An assessment that references no criteria is not warned, because its own `conformityTopic` is then the claim's only classification (the intended modelling when, for example, a scheme publishes no digital vocabulary of criteria); an unresolved criterion is reported as `conformity-criterion.not-in-profile` instead of producing a topic verdict from incomplete evidence.
 
 #### Stage 4: Issuer DID Ownership Validation
 
