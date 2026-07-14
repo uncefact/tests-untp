@@ -161,7 +161,22 @@ describe('paginationQuerySchema', () => {
       expect(paginationQuerySchema.safeParse({ limit: raw })).toEqual({ success: true, data: { limit: expected } });
     });
 
-    const rejectedLimits = ['1abc', '5.5', '5.0', '1e3', '0x10', '0b101', '0o17', '', '   ', '0', '-1'];
+    // 9007199254740993 is 2^53 + 1, the first integer Number cannot represent exactly.
+    const rejectedLimits = [
+      '1abc',
+      '5.5',
+      '5.0',
+      '1e3',
+      '0x10',
+      '0b101',
+      '0o17',
+      '',
+      '   ',
+      '0',
+      '-1',
+      '9007199254740993',
+      '99999999999999999999',
+    ];
 
     it.each(rejectedLimits)('rejects limit %j', (raw) => {
       const result = paginationQuerySchema.safeParse({ limit: raw });
@@ -171,7 +186,20 @@ describe('paginationQuerySchema', () => {
       }
     });
 
-    const rejectedOffsets = ['1abc', '5.5', '5.0', '1e3', '0x10', '0b101', '0o17', '', '   ', '-1'];
+    const rejectedOffsets = [
+      '1abc',
+      '5.5',
+      '5.0',
+      '1e3',
+      '0x10',
+      '0b101',
+      '0o17',
+      '',
+      '   ',
+      '-1',
+      '9007199254740993',
+      '99999999999999999999',
+    ];
 
     it.each(rejectedOffsets)('rejects offset %j', (raw) => {
       const result = paginationQuerySchema.safeParse({ offset: raw });
@@ -179,6 +207,13 @@ describe('paginationQuerySchema', () => {
       if (!result.success) {
         expect(result.error.issues[0]).toMatchObject({ path: ['offset'], message: 'must be a non-negative integer' });
       }
+    });
+
+    it('rejects an all-digit value large enough to overflow Number to Infinity', () => {
+      const overflowing = '9'.repeat(400);
+      expect(Number(overflowing)).toBe(Infinity);
+      expect(paginationQuerySchema.safeParse({ limit: overflowing }).success).toBe(false);
+      expect(paginationQuerySchema.safeParse({ offset: overflowing }).success).toBe(false);
     });
 
     it('accepts a signed and whitespace-padded offset, at its numeric value', () => {
