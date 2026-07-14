@@ -1,0 +1,229 @@
+import { z } from 'zod';
+import {
+  idSchema,
+  locationSchema,
+  requireAtLeastOneField,
+  nonEmptyArraySchema,
+  paginationQuerySchema,
+  booleanQuerySchema,
+} from './shared';
+
+describe('idSchema', () => {
+  it('accepts a non-empty string', () => {
+    expect(idSchema.safeParse('id-123')).toEqual({ success: true, data: 'id-123' });
+  });
+
+  it('rejects an empty string', () => {
+    expect(idSchema.safeParse('').success).toBe(false);
+  });
+
+  it('rejects a non-string value', () => {
+    expect(idSchema.safeParse(123).success).toBe(false);
+  });
+});
+
+describe('locationSchema', () => {
+  it('accepts an arbitrary object', () => {
+    expect(locationSchema.safeParse({ lat: 1, lon: 2 })).toEqual({ success: true, data: { lat: 1, lon: 2 } });
+  });
+
+  it('accepts an empty object', () => {
+    expect(locationSchema.safeParse({})).toEqual({ success: true, data: {} });
+  });
+
+  it('rejects a non-object value', () => {
+    expect(locationSchema.safeParse('somewhere').success).toBe(false);
+  });
+
+  it('rejects an array', () => {
+    expect(locationSchema.safeParse(['somewhere']).success).toBe(false);
+  });
+});
+
+describe('requireAtLeastOneField', () => {
+  const updateSchema = requireAtLeastOneField(
+    z.object({ name: z.string().optional(), age: z.number().optional() }),
+    'At least one field must be provided',
+  );
+
+  it('accepts a body with one defined field', () => {
+    expect(updateSchema.safeParse({ name: 'Widget' })).toEqual({ success: true, data: { name: 'Widget' } });
+  });
+
+  it('accepts a body with every field defined', () => {
+    expect(updateSchema.safeParse({ name: 'Widget', age: 3 })).toEqual({
+      success: true,
+      data: { name: 'Widget', age: 3 },
+    });
+  });
+
+  it('rejects an empty body with the given message', () => {
+    const result = updateSchema.safeParse({});
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('At least one field must be provided');
+    }
+  });
+
+  it('rejects a body whose only keys are explicitly undefined', () => {
+    const result = updateSchema.safeParse({ name: undefined, age: undefined });
+    expect(result.success).toBe(false);
+  });
+
+  it('leaves a non-object body for the wrapped schema to report its own type error', () => {
+    const result = updateSchema.safeParse('not-an-object');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Expected object, received string');
+    }
+  });
+
+  describe('with a defaulted field', () => {
+    const updateSchemaWithDefault = requireAtLeastOneField(
+      z.object({ name: z.string().optional(), age: z.number().default(10) }),
+      'At least one field must be provided',
+    );
+
+    it('rejects an empty body even though a field carries a default', () => {
+      const result = updateSchemaWithDefault.safeParse({});
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('At least one field must be provided');
+      }
+    });
+
+    it('rejects a body whose only key is explicitly undefined, despite the default', () => {
+      const result = updateSchemaWithDefault.safeParse({ age: undefined });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts a body with a real field and fills the default for the rest', () => {
+      expect(updateSchemaWithDefault.safeParse({ name: 'Widget' })).toEqual({
+        success: true,
+        data: { name: 'Widget', age: 10 },
+      });
+    });
+  });
+});
+
+describe('nonEmptyArraySchema', () => {
+  const itemsSchema = nonEmptyArraySchema(z.string().min(1));
+
+  it('accepts a non-empty array of valid items', () => {
+    expect(itemsSchema.safeParse(['a', 'b'])).toEqual({ success: true, data: ['a', 'b'] });
+  });
+
+  it('rejects an empty array', () => {
+    const result = itemsSchema.safeParse([]);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Request body must not be empty');
+    }
+  });
+
+  it('rejects a non-array value', () => {
+    const result = itemsSchema.safeParse('not-an-array');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Request body must be an array');
+    }
+  });
+
+  it('rejects an array containing an invalid item', () => {
+    expect(itemsSchema.safeParse(['a', '']).success).toBe(false);
+  });
+});
+
+describe('paginationQuerySchema', () => {
+  it('accepts both limit and offset', () => {
+    expect(paginationQuerySchema.safeParse({ limit: '20', offset: '40' })).toEqual({
+      success: true,
+      data: { limit: 20, offset: 40 },
+    });
+  });
+
+  it('accepts neither parameter, leaving both undefined', () => {
+    expect(paginationQuerySchema.safeParse({})).toEqual({ success: true, data: {} });
+  });
+
+  it('accepts an offset of zero', () => {
+    expect(paginationQuerySchema.safeParse({ offset: '0' })).toEqual({ success: true, data: { offset: 0 } });
+  });
+
+  describe('strict decimal integer matrix', () => {
+    const acceptedLimits: Array<[string, number]> = [
+      ['5', 5],
+      ['+5', 5],
+      [' 5 ', 5],
+    ];
+
+    it.each(acceptedLimits)('accepts limit %j as the numeric value %d', (raw, expected) => {
+      expect(paginationQuerySchema.safeParse({ limit: raw })).toEqual({ success: true, data: { limit: expected } });
+    });
+
+    const rejectedLimits = ['1abc', '5.5', '5.0', '1e3', '0x10', '0b101', '0o17', '', '   ', '0', '-1'];
+
+    it.each(rejectedLimits)('rejects limit %j', (raw) => {
+      const result = paginationQuerySchema.safeParse({ limit: raw });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]).toMatchObject({ path: ['limit'], message: 'must be a positive integer' });
+      }
+    });
+
+    const rejectedOffsets = ['1abc', '5.5', '5.0', '1e3', '0x10', '0b101', '0o17', '', '   ', '-1'];
+
+    it.each(rejectedOffsets)('rejects offset %j', (raw) => {
+      const result = paginationQuerySchema.safeParse({ offset: raw });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]).toMatchObject({ path: ['offset'], message: 'must be a non-negative integer' });
+      }
+    });
+
+    it('accepts a signed and whitespace-padded offset, at its numeric value', () => {
+      expect(paginationQuerySchema.safeParse({ offset: ' +0 ' })).toEqual({ success: true, data: { offset: 0 } });
+    });
+  });
+
+  it('composes with a resource-specific filter via merge, pagination last', () => {
+    const resourceQuerySchema = z.object({ status: z.enum(['active', 'inactive']) }).merge(paginationQuerySchema);
+    expect(resourceQuerySchema.safeParse({ limit: '10', status: 'active' })).toEqual({
+      success: true,
+      data: { limit: 10, status: 'active' },
+    });
+  });
+
+  it('reports the resource-filter issue first when both the filter and pagination are invalid', () => {
+    const resourceQuerySchema = z.object({ status: z.enum(['active', 'inactive']) }).merge(paginationQuerySchema);
+    const result = resourceQuerySchema.safeParse({ status: 'bogus', limit: 'abc' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['status']);
+    }
+  });
+});
+
+describe('booleanQuerySchema', () => {
+  const schema = z.object({ active: booleanQuerySchema });
+
+  it('leaves the field undefined when absent', () => {
+    expect(schema.safeParse({})).toEqual({ success: true, data: {} });
+  });
+
+  it('parses "true" as true', () => {
+    expect(schema.safeParse({ active: 'true' })).toEqual({ success: true, data: { active: true } });
+  });
+
+  it('parses "false" as false', () => {
+    expect(schema.safeParse({ active: 'false' })).toEqual({ success: true, data: { active: false } });
+  });
+
+  it.each(['TRUE', '1', 'yes', ''])('rejects %j', (raw) => {
+    const result = schema.safeParse({ active: raw });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]).toMatchObject({ path: ['active'], message: 'must be "true" or "false"' });
+    }
+  });
+});

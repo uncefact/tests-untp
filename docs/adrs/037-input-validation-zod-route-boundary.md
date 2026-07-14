@@ -1,0 +1,50 @@
+# ADR-037: Input Validation with Zod Schemas at the Route Boundary
+
+- **Date:** 2026-07-14
+- **Status:** accepted
+
+## Context
+
+Reference implementation API routes validate their inbound inputs inconsistently. Write routes accept request bodies with little runtime shape validation: handlers check one or two fields with `isNonEmptyString` and pass the rest through unchecked type casts, so malformed input fails deep in the stack (a `TypeError` on property access, Prisma's client-side argument validation, or an upstream service call) instead of returning a documented 400. List routes parse query parameters with a scatter of ad-hoc helpers (`parsePositiveInt`, `parseNonNegativeInt`, `validateEnum`, `parseBooleanString`), each hand-called per parameter, so a resource's query contract is implicit and its 400 behaviour varies by route. The sanitised backstop from ADR-036 stops malformed-body responses leaking internals, but the status and message remain wrong: a client receives a generic 500 for what is a malformed request. An API-surface audit catalogued the body gaps route by route (#736): handlers that dereference a JSON `null` body, array fields never checked to be arrays, and a Zod schema that exists for documentation but is never applied.
+
+Separately, several schemas accept format-checkable fields as free strings: URL fields (`registrar.url`, `data-model.schemaUrl`/`contextUrl`/`websiteUrl`, credential verification URLs) typed as any non-empty string, and language-tag arrays (`hreflang`) with no BCP-47 shape. A malformed URL or tag is then accepted at the boundary and only fails, if at all, far downstream.
+
+One route already validates bodies properly: the identifier links publish route defines a Zod schema, parses with `safeParse`, and maps the first issue to a 400 naming the offending field. Zod is already a dependency ([zod.dev](https://zod.dev)), and `src/lib/swagger/schemas.ts` already uses it to generate OpenAPI component schemas. The open question was whether to extend that mechanism across the whole input surface (bodies and query parameters) or to keep growing the manual per-field helpers.
+
+## Decision
+
+Every route validates its inbound inputs with a Zod schema at the route boundary before calling repositories or upstream services: request bodies on write routes, query parameters on list routes. Schemas live in a shared per-resource module, and format-checkable fields are constrained rather than accepted as free strings.
+
+1. **Zod is the validation mechanism at the route boundary, for both bodies and query parameters.** A write route parses the raw body (`req.json()` guarded so malformed JSON and a literal `null` body become a 400) through a body schema with `safeParse`; a list route parses `URLSearchParams` through a query schema via a shared `parseQueryParams` helper that coerces and validates the declared parameters. Both paths throw `ValidationError` with the first issue rendered as `field.path: message`, which the central error mapper returns as a 400. This extends the pattern the links publish route established rather than introducing a new one, and it replaces the per-parameter `parsePositiveInt`/`validateEnum`/`parseBooleanString` calls so a resource's query contract is one declared schema.
+2. **Schemas live in a shared per-resource module** (`src/lib/api/request-schemas/`, one file per resource, holding that resource's create-body, update-body, and list-query schemas). A resource's POST, PATCH, and GET handlers sit in different route files but share field shapes; co-locating schemas in route files would duplicate those shapes and let them drift. Keeping a resource's schemas in one file also makes deriving one from another possible where shapes coincide (the link schemas do this via `.partial()`).
+3. **Consumers import the resource file directly** (`@/lib/api/request-schemas/<resource>`), never through a barrel index. A barrel makes every importer transitively load every schema file and its dependencies (`@uncefact/untp-ri-services`, `@uncefact/untp-utils`), which breaks route tests that mock those packages with partial module factories: a test starts failing when an unrelated resource's schema needs an export the mock does not provide.
+4. **Unknown keys are stripped, not rejected.** Zod's default object behaviour (strip unknown keys) is kept, matching the links route. Clients that have been sending extra fields keep working; the handler only ever sees validated, known fields.
+5. **Validation covers shape, type, and format, not existence or domain membership.** Referential checks (does this identifier exist, does it belong to this tenant) stay in repositories and services, where ADR-036 maps constraint violations. Format tightening applies only where the correct form is closed and checkable: URL fields validate as URLs, `hreflang` entries validate as BCP-47 language tags, and a scheme's `validationPattern` is checked to compile as a regex. Fields whose valid set is an open vocabulary or an undecided shape stay as validated non-empty strings or open objects, with the reason recorded at the field: `linkType` is an open GS1 link-relation vocabulary, and the UNTP-shaped `location` object is a separate deferred design tracked in #804 (it remains `z.record` here). The schema's job ends at "this is a well-formed request", never "this names a thing that exists".
+6. **A schema export is never annotated with a wide type such as `z.ZodTypeAny`.** That annotation silently erases `z.infer<Schema>` to `any` with no compiler signal that inference broke. A schema export's type is left inferred, or checked with `satisfies` where an explicit check is wanted.
+
+## Consequences
+
+- Easier: a malformed request body fails fast with a 400 naming the offending field, instead of a `TypeError`, a Prisma validation error, or a sanitised 500. Malformed query parameters already returned a named 400 through the ad-hoc helpers; folding them into one declared schema per resource makes that contract explicit and consistent rather than scattered across per-parameter calls. Both failure modes are documented and testable per schema rather than per code path.
+- Easier: handlers drop their unchecked `as` casts and their per-parameter parse calls; `parsed.data` is the typed input, so the compiler enforces that only validated fields are used.
+- Easier: a resource's create, update, and query schemas sit in one file, so a field added to one surface is visible next to the others.
+- Easier: a malformed URL or language tag is rejected at the boundary rather than accepted and carried downstream.
+- Harder: request shapes are declared twice, once in the request-schemas module and once in the hand-written Swagger annotations, which can drift; folding documentation generation onto the request schemas is a possible later step, out of scope here.
+- Harder: every new route carries a schema obligation, and schema tests join the test surface.
+
+## Alternatives Considered
+
+- **Manual per-field checks and per-parameter helpers.** Rejected: the audit showed this is exactly what left the body gaps, because per-field discipline does not hold across dozens of fields and routes, and the query-parameter helpers spread the same fragility across list routes (each parameter hand-parsed, nothing enforcing the set was checked). Helpers validate one input at a time, so `null` bodies, non-array arrays, and inconsistent query 400s recur.
+- **Validating bodies now and leaving query parameters on the ad-hoc helpers.** Rejected: it would leave two validation idioms at the same boundary for the same class of failure (malformed external input), so a route's total input contract could not be read from one place, and the query 400 inconsistency would persist. The parse mechanism is identical for both, so one decision covers both.
+- **Co-locating schemas in each route file.** Rejected: a resource's create, update, and query inputs share field shapes but live in different route files, so co-location duplicates the shapes and lets them drift.
+- **Extending `src/lib/swagger/schemas.ts` with the request schemas.** Rejected: that file generates OpenAPI component schemas describing responses; mixing request-validation schemas into it couples two concerns with different change cadences in one growing file. The request-schemas module can still be imported there later if documentation generation is unified.
+- **Rejecting unknown keys (`.strict()`).** Rejected: it turns previously accepted requests into 400s for clients that send extra fields, a behaviour break with no safety gain, since stripped fields never reach the handler.
+- **Validating inside repositories instead of routes.** Rejected: repositories receive typed inputs from many callers (routes, seeds, services) and are the wrong place to re-check shape on every call; the boundary where untyped external input enters the system is the route. This mirrors ADR-036: routes own request semantics, repositories own persistence semantics.
+- **Tightening open-vocabulary fields to enums (`linkType`) or designing the location schema now.** Rejected here: `linkType` draws from an open GS1 link-relation vocabulary with no single closed list to validate against, so an enum would reject valid values; the UNTP-shaped `location` object is a distinct design effort tracked separately. Constraining a field whose valid set is not closed trades false 400s for a false sense of rigour.
+
+## References
+
+- #736 (write-body validation, superseded by the input-validation epic that introduces this ADR), #379 (credentials-route validation, absorbed by #736), #463 (ReDoS protection for scheme validation patterns; the regex-compile check coordinates with it)
+- ADR-036 (database error translation; the sanitised backstop that currently catches malformed-body failures)
+- Existing pattern: `src/app/api/v1/identifiers/[id]/links/route.ts`
+- Zod: https://zod.dev
+- BCP 47 language tags: https://www.rfc-editor.org/info/bcp47
