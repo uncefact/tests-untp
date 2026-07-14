@@ -71,25 +71,33 @@ describe('getEncryptionService', () => {
   it('falls back to the deprecated SERVICE_ENCRYPTION_KEY with a warning', async () => {
     process.env.SERVICE_ENCRYPTION_KEY = VALID_KEY;
     const { getEncryptionService } = await import('./encryption');
-    const service = getEncryptionService();
-
-    expect(service).toBeDefined();
-    expect(mockWarn).toHaveBeenCalled();
-  });
-
-  it('prefers DATA_ENCRYPTION_KEY over the deprecated name', async () => {
-    process.env.DATA_ENCRYPTION_KEY = VALID_KEY;
-    process.env.SERVICE_ENCRYPTION_KEY = 'b'.repeat(64);
-    const { getEncryptionService } = await import('./encryption');
     const { AesGcmEncryptionAdapter, EncryptionAlgorithm } = await import('@uncefact/untp-ri-services/encryption');
 
     const envelope = getEncryptionService().encrypt('payload', EncryptionAlgorithm.AES_256_GCM);
 
-    // Decrypting with an independent adapter built from DATA_ENCRYPTION_KEY
-    // fails unless the service encrypted with that key, not the deprecated one.
+    // Decrypting with an independent adapter built from SERVICE_ENCRYPTION_KEY
+    // proves the fallback value is the key actually used for crypto, not just
+    // that a warning fired.
     const independent = new AesGcmEncryptionAdapter(VALID_KEY, mockLogger as never);
     expect(independent.decrypt(envelope)).toBe('payload');
-    expect(mockWarn).not.toHaveBeenCalled();
+    expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('deprecated'));
+  });
+
+  it('throws before constructing the adapter when both names are set with different values', async () => {
+    process.env.DATA_ENCRYPTION_KEY = VALID_KEY;
+    process.env.SERVICE_ENCRYPTION_KEY = 'b'.repeat(64);
+    const { getEncryptionService } = await import('./encryption');
+
+    expect(() => getEncryptionService()).toThrow('both set with different values');
+  });
+
+  it('warns to remove the deprecated name when both names carry the same value', async () => {
+    process.env.DATA_ENCRYPTION_KEY = VALID_KEY;
+    process.env.SERVICE_ENCRYPTION_KEY = VALID_KEY;
+    const { getEncryptionService } = await import('./encryption');
+
+    expect(getEncryptionService()).toBeDefined();
+    expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('remove the deprecated name'));
   });
 
   it('caches the instance across calls', async () => {
