@@ -1180,8 +1180,11 @@ describe('GET /api/v1/credentials', () => {
 
     const req = createFakeGetRequest();
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
 
     expect(res.status).toBe(500);
+    // The failing row is named so an operator can find it without trawling logs.
+    expect(json.error).toContain('cred-1');
   });
 
   it('reveals stored decryption keys in the listed credentials', async () => {
