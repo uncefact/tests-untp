@@ -2,6 +2,17 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { validateJsonLd } from './validate-jsonld.js';
 import { JsonLdExpansionFailedError } from './errors.js';
+import { UrlValidationError } from '../node/errors.js';
+
+/**
+ * Digs the guard's rejection out of an expansion failure. jsonld.js wraps a
+ * document loader's error in its own JsonLdError, which stores the original
+ * at the non-standard `details.cause` and never sets native `Error.cause`.
+ */
+function buriedLoaderError(error: unknown): unknown {
+  const jsonldError = (error as JsonLdExpansionFailedError).cause as { details?: { cause?: unknown } } | undefined;
+  return jsonldError?.details?.cause;
+}
 
 /**
  * End-to-end SSRF regression for JSON-LD expansion. Unlike `validate-jsonld.test.ts`,
@@ -43,9 +54,20 @@ describe('validateJsonLd SSRF guard (real jsonld + guarded loader)', () => {
   it('never contacts a private @context URL during expansion', async () => {
     const malicious = { '@context': `${baseUrl}/internal-context`, name: 'value' };
 
-    await expect(validateJsonLd(malicious)).rejects.toBeInstanceOf(JsonLdExpansionFailedError);
+    const error = await validateJsonLd(malicious).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonLdExpansionFailedError);
+    // The rejection came from the SSRF guard, not an unrelated expansion failure.
+    expect(buriedLoaderError(error)).toBeInstanceOf(UrlValidationError);
     // The security property: the loopback canary was never reached.
     expect(hits).toBe(0);
+  });
+
+  it('rejects a metadata-service @context literal before any connection', async () => {
+    const malicious = { '@context': 'http://169.254.169.254/latest/meta-data', name: 'value' };
+
+    const error = await validateJsonLd(malicious).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonLdExpansionFailedError);
+    expect(buriedLoaderError(error)).toBeInstanceOf(UrlValidationError);
   });
 
   it('expands a document with an inline @context without any network fetch', async () => {
