@@ -82,4 +82,4 @@ A verification link may include a digest of the credential. When present, the ve
 
 ## Decryption
 
-If the credential is encrypted, the decryption key is included in the verification link. The verify page uses this key to decrypt the credential before proceeding with verification. This allows private credentials to be shared via a single link without requiring the recipient to manage keys separately.
+If the credential is encrypted and the decryption key is included in the verification link, the verify page uses that key to decrypt the credential before proceeding with verification. This allows a private credential to be shared directly via a single link without requiring the recipient to manage keys separately. A link published to the Identity Resolver omits the key, which is shared out of band instead (see [IDR publishing](./api/credentials#stage-8-idr-publishing-optional)).

@@ -44,7 +44,12 @@ export const publishingOptionsSchema = z.object({
     .optional()
     .describe('Qualifier path for sub-identifiers (e.g. /10/LOT123/21/SER456). Defaults to /'),
   machineVerificationUrl: z.string().optional().describe('Machine verification URL'),
-  humanVerificationUrl: z.string().optional().describe('Human verification URL'),
+  humanVerificationUrl: z
+    .string()
+    .optional()
+    .describe(
+      'Human verification URL. When publishing without one, defaults to this RI verify page, ${RI_APP_URL}/verify',
+    ),
   hreflang: z
     .array(z.string().min(1))
     .optional()

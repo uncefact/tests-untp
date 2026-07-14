@@ -37,6 +37,56 @@ type CredentialWarning = {
 
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
 
+/**
+ * Builds the default human verification link base URL from `RI_APP_URL`.
+ *
+ * Used when a caller requests publishing without an explicit
+ * `publishingOptions.humanVerificationUrl`, so every published credential
+ * carries a link to this Reference Implementation's own verify page. `RI_APP_URL`
+ * is the RI's public base URL (the same variable that backs the OIDC
+ * post-logout redirect); the verify page lives at `/verify`.
+ *
+ * Throws a {@link ValidationError} when `RI_APP_URL` is missing, is not a valid
+ * http(s) URL, or carries userinfo (a `user:pass@` component, which would be
+ * published into a public link). A deployment that asked to publish but cannot
+ * build a safe link fails with an actionable message instead of publishing a
+ * broken or secret-bearing link. The caller can also remedy it per-request by
+ * supplying `publishingOptions.humanVerificationUrl`.
+ */
+function defaultHumanVerificationUrl(): string {
+  const base = process.env.RI_APP_URL;
+  if (!base) {
+    throw new ValidationError(
+      'Publishing requires a human verification URL. Set the RI_APP_URL environment variable, or pass publishingOptions.humanVerificationUrl.',
+    );
+  }
+
+  let url: URL | undefined;
+  try {
+    url = new URL(base);
+  } catch {
+    url = undefined;
+  }
+  if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+    throw new ValidationError(
+      'RI_APP_URL is not a valid http(s) URL. Set a valid RI_APP_URL, or pass publishingOptions.humanVerificationUrl.',
+    );
+  }
+  if (url.username || url.password) {
+    throw new ValidationError(
+      'RI_APP_URL must not contain a username or password; the verify link is published to a public directory. Remove the userinfo from RI_APP_URL, or pass publishingOptions.humanVerificationUrl.',
+    );
+  }
+
+  // Build from URL components so a query or fragment on RI_APP_URL cannot land
+  // ahead of the appended path segment (e.g. `https://ri/?x=1` must not become
+  // `https://ri/?x=1/verify`). Any base path is preserved.
+  url.search = '';
+  url.hash = '';
+  url.pathname = `${url.pathname.replace(/\/+$/, '')}/verify`;
+  return url.toString();
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/v1/credentials
 // ---------------------------------------------------------------------------
@@ -156,6 +206,17 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       await assertPublicUrl(publishingOptions.humanVerificationUrl, 'publishingOptions.humanVerificationUrl');
     }
   }
+
+  // ── Default the human verification link (see defaultHumanVerificationUrl) ─
+  // Resolved here, before issuance (Step 7), so a deployment that requested
+  // publishing but cannot build the link fails before any credential is signed
+  // or stored. The derived default is trusted operator config, so it is
+  // intentionally not SSRF-checked and a localhost RI_APP_URL is accepted in
+  // development.
+  const effectiveHumanVerificationUrl =
+    publishingOptions.publish === true && !publishingOptions.humanVerificationUrl
+      ? defaultHumanVerificationUrl()
+      : publishingOptions.humanVerificationUrl;
 
   // ── Step 2: Resolve data model ──────────────────────────────────────────
 
@@ -284,7 +345,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       const links = buildPublishLinks(storageResponse, linkTitle, {
         linkType: publishingOptions.linkType,
         machineVerificationUrl: publishingOptions.machineVerificationUrl,
-        humanVerificationUrl: publishingOptions.humanVerificationUrl,
+        humanVerificationUrl: effectiveHumanVerificationUrl,
         ...(publishingOptions.hreflang !== undefined ? { hreflang: publishingOptions.hreflang } : {}),
         ...(publishingOptions.additionalRels !== undefined ? { additionalRels: publishingOptions.additionalRels } : {}),
         ...(publishingOptions.public !== undefined ? { public: publishingOptions.public } : {}),
