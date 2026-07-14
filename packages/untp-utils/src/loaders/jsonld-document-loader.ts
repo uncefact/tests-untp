@@ -2,9 +2,11 @@ import type { ResolveDocumentOptions } from '../resolvers/index.js';
 import type { TtlCache } from '../cache/ttl-cache.js';
 
 /**
- * The subset of jsonld's `RemoteDocument` shape this loader returns. Matches
- * `@types/jsonld`'s `RemoteDocument` structurally so the loader can be passed
- * as the `documentLoader` for `jsonld.toRDF`.
+ * The subset of jsonld's `RemoteDocument` shape this loader returns. Carries
+ * the fields jsonld.js reads at runtime; it is deliberately not assignable to
+ * `@types/jsonld`'s `RemoteDocument` (whose `document: JsonLd` is narrower
+ * than the `unknown` a fetched body can be), which is one reason the `toRDF`
+ * call site casts its options (see `validateJsonLd`).
  */
 export interface LoadedRemoteDocument {
   contextUrl?: string;
@@ -21,7 +23,9 @@ export interface JsonLdDocumentLoaderOptions extends ResolveDocumentOptions {
    * supplied, a document fetched once is reused for the cache's TTL rather
    * than re-fetched on every expansion. Only successful fetches are cached
    * (the {@link TtlCache} contract does not cache rejected fetches), so a
-   * URL the guard rejects is re-checked every time.
+   * URL the guard rejects is re-checked every time. A successfully fetched
+   * and parsed document is cached even if downstream JSON-LD processing
+   * later rejects it.
    */
   cache?: TtlCache<LoadedRemoteDocument>;
 }

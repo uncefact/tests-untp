@@ -35,7 +35,7 @@ export interface ResolvedJsonDocument {
  * redirect hop passes `validatePublicUrl` and the connection is pinned to the
  * validated IP, so a crafted or redirected URL cannot reach a private address.
  *
- * @throws {import('../node/index.js').UrlValidationError} for URL / scheme / private-address rejections.
+ * @throws {UrlValidationError} for URL / scheme / private-address rejections.
  * @throws {ResolverNetworkError} when the fetch rejects before a response.
  * @throws {ResolverHttpError} on a non-2xx status (with `.status`).
  * @throws {ResolverTooLargeError} when the body exceeds the size cap.

@@ -11,7 +11,8 @@ export interface ValidateJsonLdOptions {
    * Supplying a shared cache avoids re-fetching the same contexts on every
    * validation (e.g. the credential context on the issuance/verification
    * hot path). Only successful fetches are cached, so a URL the SSRF guard
-   * rejects is re-checked every time.
+   * rejects is re-checked every time. A successfully fetched and parsed
+   * document is cached even if expansion later rejects it.
    */
   contextCache?: TtlCache<LoadedRemoteDocument>;
 }
@@ -25,7 +26,7 @@ export interface ValidateJsonLdOptions {
  * `validatePublicUrl` SSRF guard rather than jsonld.js's default unguarded
  * Node loader. See ADR-033 §7 and issue #707.
  *
- * @see https://www.w3.org/TR/json-ld11-api/#dfn-safe-mode JSON-LD safe mode.
+ * @see https://github.com/digitalbazaar/jsonld.js#safe-mode jsonld.js safe mode (a jsonld.js option, not a W3C-defined term).
  * @see ../../../../docs/adrs/033-cvc-architecture.md ADR-033 §7 (Security considerations).
  * @throws {JsonLdInvalidShapeError} if `document` is not a non-null object.
  * @throws {JsonLdExpansionFailedError} if `jsonld.toRDF` rejects (which
