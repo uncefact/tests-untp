@@ -11,6 +11,8 @@ import {
 } from './did.repository';
 import { DidStatus } from '../generated';
 import { SYSTEM_TENANT_ID } from '../constants';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
@@ -39,6 +41,11 @@ jest.mock('../prisma', () => ({
 
 // Import the mocked prisma after jest.mock
 import { prisma } from '../prisma';
+import {
+  prismaUniqueConstraintError,
+  prismaForeignKeyViolationError,
+  prismaRecordNotFoundError,
+} from '../db-errors.fixtures';
 
 const mockDid = prisma.did as unknown as {
   create: jest.Mock;
@@ -193,6 +200,82 @@ describe('did.repository', () => {
           serviceInstanceId: undefined,
         }),
       });
+    });
+
+    it('maps a unique-constraint violation to ConflictError on the plain path', async () => {
+      mockDid.create.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = createDid({
+        tenantId: ORG_ID,
+        did: 'did:web:example.com:org:123',
+        type: 'MANAGED',
+        keyId: 'key-1',
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow('A DID record with this DID already exists');
+    });
+
+    it('maps a unique-constraint violation to ConflictError on the isDefault transaction path', async () => {
+      mockTx.did.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.did.create.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = createDid({
+        tenantId: ORG_ID,
+        did: 'did:web:example.com:org:123',
+        type: 'MANAGED',
+        keyId: 'key-1',
+        isDefault: true,
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow('A DID record with this DID already exists');
+    });
+
+    it('maps a foreign-key violation to ValidationError on the plain path', async () => {
+      mockDid.create.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createDid({
+        tenantId: ORG_ID,
+        did: 'did:web:example.com:org:123',
+        type: 'MANAGED',
+        keyId: 'key-1',
+        serviceInstanceId: 'nonexistent',
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Service instance not found');
+    });
+
+    it('maps a foreign-key violation to ValidationError on the isDefault transaction path', async () => {
+      mockTx.did.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.did.create.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createDid({
+        tenantId: ORG_ID,
+        did: 'did:web:example.com:org:123',
+        type: 'MANAGED',
+        keyId: 'key-1',
+        isDefault: true,
+        serviceInstanceId: 'nonexistent',
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Service instance not found');
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      const dbError = new Error('connection lost');
+      mockDid.create.mockRejectedValue(dbError);
+
+      await expect(
+        createDid({
+          tenantId: ORG_ID,
+          did: 'did:web:example.com:org:123',
+          type: 'MANAGED',
+          keyId: 'key-1',
+        }),
+      ).rejects.toThrow(dbError);
     });
   });
 
@@ -458,6 +541,32 @@ describe('did.repository', () => {
         'DID not found or access denied',
       );
     });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.update.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = updateDid('did-record-1', ORG_ID, { name: 'New Name' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('DID not found or access denied');
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      const dbError = new Error('connection lost');
+      mockTx.did.update.mockRejectedValue(dbError);
+
+      await expect(updateDid('did-record-1', ORG_ID, { name: 'New Name' })).rejects.toBe(dbError);
+    });
+
+    it('rethrows a database error whose code the context does not cover', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      const dbError = prismaForeignKeyViolationError();
+      mockTx.did.update.mockRejectedValue(dbError);
+
+      await expect(updateDid('did-record-1', ORG_ID, { name: 'New Name' })).rejects.toBe(dbError);
+    });
   });
 
   describe('updateDidStatus', () => {
@@ -480,6 +589,32 @@ describe('did.repository', () => {
       await expect(updateDidStatus('did-record-1', 'other-org', 'VERIFIED' as DidStatus)).rejects.toThrow(
         'DID not found or access denied',
       );
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.update.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = updateDidStatus('did-record-1', ORG_ID, 'VERIFIED' as DidStatus);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('DID not found or access denied');
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      const dbError = new Error('connection lost');
+      mockTx.did.update.mockRejectedValue(dbError);
+
+      await expect(updateDidStatus('did-record-1', ORG_ID, 'VERIFIED' as DidStatus)).rejects.toBe(dbError);
+    });
+
+    it('rethrows a database error whose code the context does not cover', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      const dbError = prismaForeignKeyViolationError();
+      mockTx.did.update.mockRejectedValue(dbError);
+
+      await expect(updateDidStatus('did-record-1', ORG_ID, 'VERIFIED' as DidStatus)).rejects.toBe(dbError);
     });
   });
 
@@ -510,6 +645,32 @@ describe('did.repository', () => {
 
       await expect(deleteDid('did-record-1', 'other-org')).rejects.toThrow('DID not found or access denied');
       expect(mockTx.did.delete).not.toHaveBeenCalled();
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      mockTx.did.delete.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = deleteDid('did-record-1', ORG_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('DID not found or access denied');
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      const dbError = new Error('connection lost');
+      mockTx.did.delete.mockRejectedValue(dbError);
+
+      await expect(deleteDid('did-record-1', ORG_ID)).rejects.toBe(dbError);
+    });
+
+    it('rethrows a database error whose code the context does not cover', async () => {
+      mockTx.did.findFirst.mockResolvedValue(DID_RECORD);
+      const dbError = prismaForeignKeyViolationError();
+      mockTx.did.delete.mockRejectedValue(dbError);
+
+      await expect(deleteDid('did-record-1', ORG_ID)).rejects.toBe(dbError);
     });
   });
 

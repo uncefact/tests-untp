@@ -1,6 +1,7 @@
 import { Product, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -131,7 +132,8 @@ async function validateIdentifierOwnership(
 }
 
 /**
- * Validates that the primary identifier is not also listed as a secondary identifier.
+ * Validates that the primary identifier is not also listed as a secondary
+ * identifier, and that secondary identifiers contain no duplicates.
  */
 function validateNoPrimarySecondaryOverlap(
   primaryIdentifierId: string | undefined | null,
@@ -139,6 +141,9 @@ function validateNoPrimarySecondaryOverlap(
 ): void {
   if (primaryIdentifierId && secondaryIdentifierIds?.includes(primaryIdentifierId)) {
     throw new ValidationError('Primary identifier cannot also be a secondary identifier');
+  }
+  if (secondaryIdentifierIds && new Set(secondaryIdentifierIds).size !== secondaryIdentifierIds.length) {
+    throw new ValidationError('Secondary identifiers must not contain duplicates');
   }
 }
 
@@ -196,32 +201,44 @@ export async function createProducts(tenantId: string, inputs: CreateProductInpu
       validateNoPrimarySecondaryOverlap(input.primaryIdentifierId, input.secondaryIdentifierIds);
 
       // Create the product entity
-      const product = await tx.product.create({
-        data: {
-          tenantId,
-          name: input.name,
-          level: input.level,
-          ...(input.description !== undefined && { description: input.description }),
-          ...(input.parentId !== undefined && { parentId: input.parentId }),
-          ...(input.producedByOrganisationId !== undefined && {
-            producedByOrganisationId: input.producedByOrganisationId,
-          }),
-          ...(input.manufacturingFacilityId !== undefined && {
-            manufacturingFacilityId: input.manufacturingFacilityId,
-          }),
-          ...(input.primaryIdentifierId !== undefined && { primaryIdentifierId: input.primaryIdentifierId }),
-        },
-        include: PRODUCT_DETAIL_INCLUDE,
-      });
+      let product: ProductWithRelations;
+      try {
+        product = await tx.product.create({
+          data: {
+            tenantId,
+            name: input.name,
+            level: input.level,
+            ...(input.description !== undefined && { description: input.description }),
+            ...(input.parentId !== undefined && { parentId: input.parentId }),
+            ...(input.producedByOrganisationId !== undefined && {
+              producedByOrganisationId: input.producedByOrganisationId,
+            }),
+            ...(input.manufacturingFacilityId !== undefined && {
+              manufacturingFacilityId: input.manufacturingFacilityId,
+            }),
+            ...(input.primaryIdentifierId !== undefined && { primaryIdentifierId: input.primaryIdentifierId }),
+          },
+          include: PRODUCT_DETAIL_INCLUDE,
+        });
+      } catch (e) {
+        mapDatabaseError(e, {
+          conflict: 'An identifier in this request is already the primary identifier of another product',
+          invalidReference: 'One or more referenced resources no longer exist',
+        });
+      }
 
       // Create join rows for secondary identifiers
       if (input.secondaryIdentifierIds?.length) {
-        await tx.productSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds.map((identifierId: string) => ({
-            productId: product.id,
-            identifierId,
-          })),
-        });
+        try {
+          await tx.productSecondaryIdentifier.createMany({
+            data: input.secondaryIdentifierIds.map((identifierId: string) => ({
+              productId: product.id,
+              identifierId,
+            })),
+          });
+        } catch (e) {
+          mapDatabaseError(e, { invalidReference: 'One or more secondary identifiers no longer exist' });
+        }
 
         // Re-fetch to include the newly created secondary identifier relations
         const refetched = await tx.product.findUniqueOrThrow({
@@ -385,12 +402,19 @@ export async function updateProduct(
         where: { productId: id },
       });
       if (input.secondaryIdentifierIds.length > 0) {
-        await tx.productSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds.map((identifierId: string) => ({
-            productId: id,
-            identifierId,
-          })),
-        });
+        try {
+          await tx.productSecondaryIdentifier.createMany({
+            data: input.secondaryIdentifierIds.map((identifierId: string) => ({
+              productId: id,
+              identifierId,
+            })),
+          });
+        } catch (e) {
+          mapDatabaseError(e, {
+            conflict: 'One or more secondary identifiers were concurrently linked to this product; retry the request',
+            invalidReference: 'The product or one or more secondary identifiers no longer exist',
+          });
+        }
       }
     }
 
@@ -428,11 +452,18 @@ export async function updateProduct(
       data.primaryIdentifier = { connect: { id: input.primaryIdentifierId } };
     }
 
-    return tx.product.update({
-      where: { id },
-      data,
-      include: PRODUCT_DETAIL_INCLUDE,
-    });
+    try {
+      return await tx.product.update({
+        where: { id },
+        data,
+        include: PRODUCT_DETAIL_INCLUDE,
+      });
+    } catch (e) {
+      mapDatabaseError(e, {
+        conflict: 'The identifier is already the primary identifier of another product',
+        notFound: 'Product or a referenced resource not found',
+      });
+    }
   });
 }
 
@@ -473,6 +504,17 @@ export async function deleteProduct(id: string, tenantId: string): Promise<Produ
     if (items.length > 0) {
       await tx.product.updateMany({ where: { parentId: id, level: 'ITEM' }, data: { parentId: null } });
     }
-    return tx.product.delete({ where: { id } });
+    try {
+      return await tx.product.delete({ where: { id } });
+    } catch (e) {
+      // The restrict violation maps to a 400 (not a 409) to match the
+      // established contract of the BATCH-children pre-check above. Unlike the
+      // pre-check, the constraint fires for a child of any level, so the
+      // message stays level-neutral.
+      mapDatabaseError(e, {
+        notFound: 'Product not found or access denied',
+        invalidReference: 'Cannot delete: dependent products exist',
+      });
+    }
   });
 }

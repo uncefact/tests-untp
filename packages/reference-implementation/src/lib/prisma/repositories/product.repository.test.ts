@@ -1,7 +1,14 @@
 import { createProducts, getProductById, listProducts, updateProduct, deleteProduct } from './product.repository';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import {
+  prismaForeignKeyViolationError,
+  prismaRecordNotFoundError,
+  prismaUniqueConstraintError,
+} from '@/lib/prisma/db-errors.fixtures';
 
-// Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
+// Mock Prisma client. Use jest.fn() inside the factory to avoid hoisting issues.
 const mockTx = {
   product: {
     findFirst: jest.fn(),
@@ -272,6 +279,60 @@ describe('product.repository', () => {
         ]),
       ).rejects.toThrow('Primary identifier cannot also be a secondary identifier');
     });
+
+    it('maps a unique-constraint violation on create to ConflictError with a clean message', async () => {
+      mockTx.product.create.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = createProducts(TENANT_ID, [{ name: 'Test Product', level: 'MODEL' }]);
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'An identifier in this request is already the primary identifier of another product',
+      );
+    });
+
+    it('rejects duplicate secondary identifiers without hitting the database', async () => {
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+
+      const result = createProducts(TENANT_ID, [
+        { name: 'Product', level: 'MODEL', secondaryIdentifierIds: [SECONDARY_ID_1, SECONDARY_ID_1] },
+      ]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
+      expect(mockTx.product.create).not.toHaveBeenCalled();
+    });
+
+    it('maps a foreign-key violation on product creation to ValidationError', async () => {
+      mockTx.product.create.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createProducts(TENANT_ID, [{ name: 'Test Product', level: 'MODEL' }]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('One or more referenced resources no longer exist');
+    });
+
+    it('maps a foreign-key violation on secondary-identifier creation to ValidationError', async () => {
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+      mockTx.product.create.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.productSecondaryIdentifier.createMany.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createProducts(TENANT_ID, [
+        { name: 'Product', level: 'MODEL', secondaryIdentifierIds: [SECONDARY_ID_1] },
+      ]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('One or more secondary identifiers no longer exist');
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      const connectionError = new Error('connection lost');
+      mockTx.product.create.mockRejectedValue(connectionError);
+
+      await expect(createProducts(TENANT_ID, [{ name: 'Test Product', level: 'MODEL' }])).rejects.toThrow(
+        connectionError,
+      );
+    });
   });
 
   describe('getProductById', () => {
@@ -476,6 +537,19 @@ describe('product.repository', () => {
       expect(result.name).toBe('Updated Name');
     });
 
+    it('rejects duplicate secondary identifiers without hitting the database', async () => {
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, {
+        secondaryIdentifierIds: [SECONDARY_ID_1, SECONDARY_ID_1],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
+      expect(mockTx.product.update).not.toHaveBeenCalled();
+    });
+
     it('validates producedByOrganisationId FK on update', async () => {
       mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
       mockTx.organisationEntity.findFirst.mockResolvedValue(null);
@@ -515,6 +589,38 @@ describe('product.repository', () => {
         data: [{ productId: PRODUCT_ID, identifierId: SECONDARY_ID_1 }],
       });
       expect(result.secondaryIdentifiers).toHaveLength(1);
+    });
+
+    it('maps a foreign-key violation on secondary-identifier replacement to ValidationError', async () => {
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+      mockTx.productSecondaryIdentifier.deleteMany.mockResolvedValue({ count: 0 });
+      mockTx.productSecondaryIdentifier.createMany.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, {
+        secondaryIdentifierIds: [SECONDARY_ID_1],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The product or one or more secondary identifiers no longer exist');
+      expect(mockTx.product.update).not.toHaveBeenCalled();
+    });
+
+    it('maps a unique-constraint violation on secondary-identifier replacement to ConflictError', async () => {
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+      mockTx.productSecondaryIdentifier.deleteMany.mockResolvedValue({ count: 0 });
+      mockTx.productSecondaryIdentifier.createMany.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, {
+        secondaryIdentifierIds: [SECONDARY_ID_1],
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'One or more secondary identifiers were concurrently linked to this product; retry the request',
+      );
+      expect(mockTx.product.update).not.toHaveBeenCalled();
     });
 
     it('clears secondary identifiers with empty array', async () => {
@@ -580,6 +686,26 @@ describe('product.repository', () => {
         'Product not found or access denied',
       );
     });
+
+    it('maps a unique-constraint violation on update to ConflictError with a clean message', async () => {
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.product.update.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, { name: 'Updated Name' });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow('The identifier is already the primary identifier of another product');
+    });
+
+    it('maps a record-not-found race on update to NotFoundError', async () => {
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.product.update.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, { name: 'Updated Name' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Product or a referenced resource not found');
+    });
   });
 
   describe('deleteProduct', () => {
@@ -644,6 +770,28 @@ describe('product.repository', () => {
       mockTx.product.findFirst.mockResolvedValue(null);
 
       await expect(deleteProduct(PRODUCT_ID, 'other-tenant')).rejects.toThrow('Product not found or access denied');
+    });
+
+    it('maps a record-not-found race on delete to NotFoundError', async () => {
+      mockTx.product.findFirst.mockResolvedValue(MODEL_PRODUCT);
+      mockTx.product.findMany.mockResolvedValue([]);
+      mockTx.product.delete.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = deleteProduct(PARENT_ID, TENANT_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Product not found or access denied');
+    });
+
+    it('maps a foreign-key violation on delete to ValidationError', async () => {
+      mockTx.product.findFirst.mockResolvedValue(MODEL_PRODUCT);
+      mockTx.product.findMany.mockResolvedValue([]);
+      mockTx.product.delete.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = deleteProduct(PARENT_ID, TENANT_ID);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Cannot delete: dependent products exist');
     });
   });
 });

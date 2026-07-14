@@ -185,6 +185,12 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: A data model with this name already exists for the credential type and version
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
  *         content:

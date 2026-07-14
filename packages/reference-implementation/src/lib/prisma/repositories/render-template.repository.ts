@@ -2,6 +2,7 @@ import { Prisma, RenderMethodType } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { isForeignKeyViolation, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
@@ -107,25 +108,35 @@ export async function createRenderTemplate(
       });
     }
 
-    return tx.renderTemplate.create({
-      data: {
-        tenantId,
-        name: input.name,
-        dataModelId: input.dataModelId,
-        renderMethodType: input.renderMethodType,
-        storageUrl: input.storageUrl,
-        digestMultibase: input.digestMultibase,
-        isDefault: input.isDefault ?? false,
-        storageServiceInstanceId: input.storageServiceInstanceId,
-        storageExternalId: input.storageExternalId,
-        storageBucket: input.storageBucket,
-        storageContentType: input.storageContentType,
-        inline: input.inline,
-        mediaType: input.mediaType,
-        mediaQuery: input.mediaQuery,
-      },
-      include: RENDER_TEMPLATE_INCLUDE,
-    });
+    try {
+      return await tx.renderTemplate.create({
+        data: {
+          tenantId,
+          name: input.name,
+          dataModelId: input.dataModelId,
+          renderMethodType: input.renderMethodType,
+          storageUrl: input.storageUrl,
+          digestMultibase: input.digestMultibase,
+          isDefault: input.isDefault ?? false,
+          storageServiceInstanceId: input.storageServiceInstanceId,
+          storageExternalId: input.storageExternalId,
+          storageBucket: input.storageBucket,
+          storageContentType: input.storageContentType,
+          inline: input.inline,
+          mediaType: input.mediaType,
+          mediaQuery: input.mediaQuery,
+        },
+        include: RENDER_TEMPLATE_INCLUDE,
+      });
+    } catch (e) {
+      // The caller pre-checks the data model, so a foreign-key violation here
+      // means it was deleted between that check and this insert. Surface the
+      // same 404 the pre-check would have produced, not a bad-request error.
+      if (isForeignKeyViolation(e)) {
+        throw new NotFoundError('Data model not found');
+      }
+      throw e;
+    }
   });
 }
 
@@ -223,25 +234,29 @@ export async function updateRenderTemplate(
       });
     }
 
-    return tx.renderTemplate.update({
-      where: { id },
-      data: {
-        ...(input.name !== undefined && { name: input.name }),
-        ...(input.storageUrl !== undefined && { storageUrl: input.storageUrl }),
-        ...(input.digestMultibase !== undefined && { digestMultibase: input.digestMultibase }),
-        ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
-        ...(input.storageServiceInstanceId !== undefined && {
-          storageServiceInstanceId: input.storageServiceInstanceId,
-        }),
-        ...(input.storageExternalId !== undefined && { storageExternalId: input.storageExternalId }),
-        ...(input.storageBucket !== undefined && { storageBucket: input.storageBucket }),
-        ...(input.storageContentType !== undefined && { storageContentType: input.storageContentType }),
-        ...(input.inline !== undefined && { inline: input.inline }),
-        ...(input.mediaType !== undefined && { mediaType: input.mediaType }),
-        ...(input.mediaQuery !== undefined && { mediaQuery: input.mediaQuery }),
-      },
-      include: RENDER_TEMPLATE_INCLUDE,
-    });
+    try {
+      return await tx.renderTemplate.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.storageUrl !== undefined && { storageUrl: input.storageUrl }),
+          ...(input.digestMultibase !== undefined && { digestMultibase: input.digestMultibase }),
+          ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
+          ...(input.storageServiceInstanceId !== undefined && {
+            storageServiceInstanceId: input.storageServiceInstanceId,
+          }),
+          ...(input.storageExternalId !== undefined && { storageExternalId: input.storageExternalId }),
+          ...(input.storageBucket !== undefined && { storageBucket: input.storageBucket }),
+          ...(input.storageContentType !== undefined && { storageContentType: input.storageContentType }),
+          ...(input.inline !== undefined && { inline: input.inline }),
+          ...(input.mediaType !== undefined && { mediaType: input.mediaType }),
+          ...(input.mediaQuery !== undefined && { mediaQuery: input.mediaQuery }),
+        },
+        include: RENDER_TEMPLATE_INCLUDE,
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Render template not found or access denied' });
+    }
   });
 }
 
@@ -258,10 +273,14 @@ export async function deleteRenderTemplate(id: string, tenantId: string): Promis
       throw new NotFoundError('Render template not found or access denied');
     }
 
-    return tx.renderTemplate.delete({
-      where: { id },
-      include: RENDER_TEMPLATE_INCLUDE,
-    });
+    try {
+      return await tx.renderTemplate.delete({
+        where: { id },
+        include: RENDER_TEMPLATE_INCLUDE,
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Render template not found or access denied' });
+    }
   });
 }
 

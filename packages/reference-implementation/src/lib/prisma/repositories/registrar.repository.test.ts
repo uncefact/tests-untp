@@ -5,6 +5,8 @@ import {
   updateRegistrar,
   deleteRegistrar,
 } from './registrar.repository';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { SYSTEM_TENANT_ID } from '../constants';
 
@@ -39,6 +41,22 @@ const mockRegistrar = prisma.registrar as unknown as {
   findMany: jest.Mock;
   count: jest.Mock;
 };
+
+function prismaRecordNotFoundError(): Error {
+  const error = new Error(
+    'An operation failed because it depends on one or more records that were required but not found.',
+  );
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2025', clientVersion: '6.0.0' });
+  return error;
+}
+
+function prismaForeignKeyViolationError(): Error {
+  const error = new Error('Foreign key constraint failed on the field: `idrServiceInstanceId`');
+  error.name = 'PrismaClientKnownRequestError';
+  Object.assign(error, { code: 'P2003', clientVersion: '6.0.0' });
+  return error;
+}
 
 describe('registrar.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -95,6 +113,29 @@ describe('registrar.repository', () => {
           idrServiceInstanceId: 'si-1',
         }),
       });
+    });
+
+    it('maps a foreign-key violation to ValidationError', async () => {
+      mockRegistrar.create.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createRegistrar({
+        tenantId: TENANT_ID,
+        name: 'GS1',
+        namespace: 'gs1',
+        idrServiceInstanceId: 'nonexistent-si',
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The referenced IDR service instance does not exist');
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      const connectionError = new Error('connection lost');
+      mockRegistrar.create.mockRejectedValue(connectionError);
+
+      await expect(createRegistrar({ tenantId: TENANT_ID, name: 'GS1', namespace: 'gs1' })).rejects.toThrow(
+        connectionError,
+      );
     });
   });
 
@@ -225,6 +266,26 @@ describe('registrar.repository', () => {
         'Registrar not found or access denied',
       );
     });
+
+    it('maps a foreign-key violation to ValidationError', async () => {
+      mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
+      mockTx.registrar.update.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = updateRegistrar('reg-1', TENANT_ID, { idrServiceInstanceId: 'nonexistent-si' });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The referenced IDR service instance does not exist');
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
+      mockTx.registrar.update.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = updateRegistrar('reg-1', TENANT_ID, { name: 'GS1 Updated' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Registrar not found or access denied');
+    });
   });
 
   describe('deleteRegistrar', () => {
@@ -247,6 +308,26 @@ describe('registrar.repository', () => {
       mockTx.registrar.findFirst.mockResolvedValue(null);
 
       await expect(deleteRegistrar('reg-1', 'other-tenant')).rejects.toThrow('Registrar not found or access denied');
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
+      mockTx.registrar.delete.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = deleteRegistrar('reg-1', TENANT_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Registrar not found or access denied');
+    });
+
+    it('maps a foreign-key violation to ConflictError when schemes still have identifiers', async () => {
+      mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
+      mockTx.registrar.delete.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = deleteRegistrar('reg-1', TENANT_ID);
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow('The registrar has schemes with identifiers and cannot be deleted');
     });
   });
 });

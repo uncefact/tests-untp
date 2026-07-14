@@ -5,9 +5,16 @@ import {
   updateFacility,
   deleteFacility,
 } from './facility.repository';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import {
+  prismaForeignKeyViolationError,
+  prismaRecordNotFoundError,
+  prismaUniqueConstraintError,
+} from '@/lib/prisma/db-errors.fixtures';
 
-// Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
+// Mock Prisma client. Use jest.fn() inside the factory to avoid hoisting issues.
 const mockTx = {
   identifier: {
     findFirst: jest.fn(),
@@ -18,6 +25,7 @@ const mockTx = {
   facility: {
     create: jest.fn(),
     findFirst: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   },
@@ -135,6 +143,41 @@ describe('facility.repository', () => {
       );
     });
 
+    it('creates a facility with primary and secondary identifiers', async () => {
+      mockTx.organisationEntity.findFirst.mockResolvedValue({ id: ORG_ID, tenantId: TENANT_ID });
+      mockTx.identifier.findFirst
+        .mockResolvedValueOnce({ id: PRIMARY_ID, tenantId: TENANT_ID }) // primary
+        .mockResolvedValueOnce({ id: SECONDARY_ID_A, tenantId: TENANT_ID }); // secondary
+
+      const createdFacility = { ...FACILITY_RECORD, secondaryIdentifiers: [] };
+      mockTx.facility.create.mockResolvedValue(createdFacility);
+      mockTx.facilitySecondaryIdentifier.createMany.mockResolvedValue({ count: 1 });
+      mockTx.facility.findUniqueOrThrow.mockResolvedValue(FACILITY_RECORD);
+
+      const result = await createFacilities(TENANT_ID, [
+        {
+          name: 'Main Warehouse',
+          operatingOrganisationId: ORG_ID,
+          primaryIdentifierId: PRIMARY_ID,
+          secondaryIdentifierIds: [SECONDARY_ID_A],
+        },
+      ]);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(FACILITY_RECORD);
+      expect(mockTx.facilitySecondaryIdentifier.createMany).toHaveBeenCalledWith({
+        data: [{ facilityId: 'facility-1', identifierId: SECONDARY_ID_A }],
+      });
+      expect(mockTx.facility.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 'facility-1' },
+        include: {
+          primaryIdentifier: { include: { scheme: { include: { registrar: true } } } },
+          secondaryIdentifiers: { include: { identifier: { include: { scheme: { include: { registrar: true } } } } } },
+          operatingOrganisation: true,
+        },
+      });
+    });
+
     it('creates multiple facilities', async () => {
       mockTx.facility.create.mockResolvedValue(FACILITY_RECORD);
 
@@ -189,6 +232,53 @@ describe('facility.repository', () => {
           },
         ]),
       ).rejects.toThrow('Primary identifier must not also appear in secondary identifiers');
+    });
+
+    it('rejects duplicate secondary identifiers', async () => {
+      const result = createFacilities(TENANT_ID, [
+        { name: 'Warehouse', secondaryIdentifierIds: [SECONDARY_ID_A, SECONDARY_ID_A] },
+      ]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
+    });
+
+    it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
+      mockTx.facility.create.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = createFacilities(TENANT_ID, [{ name: 'Warehouse' }]);
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'An identifier in this request is already the primary identifier of another facility',
+      );
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      const nonDatabaseError = new Error('connection lost');
+      mockTx.facility.create.mockRejectedValue(nonDatabaseError);
+
+      await expect(createFacilities(TENANT_ID, [{ name: 'Warehouse' }])).rejects.toThrow(nonDatabaseError);
+    });
+
+    it('maps a foreign-key violation on facility creation to ValidationError', async () => {
+      mockTx.facility.create.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createFacilities(TENANT_ID, [{ name: 'Warehouse' }]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The referenced organisation or identifier no longer exists');
+    });
+
+    it('maps a foreign-key violation on secondary-identifier join creation to ValidationError', async () => {
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_A, tenantId: TENANT_ID });
+      mockTx.facility.create.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facilitySecondaryIdentifier.createMany.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createFacilities(TENANT_ID, [{ name: 'Warehouse', secondaryIdentifierIds: [SECONDARY_ID_A] }]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('One or more secondary identifiers no longer exist');
     });
   });
 
@@ -378,6 +468,42 @@ describe('facility.repository', () => {
       });
     });
 
+    it('maps a foreign-key violation on secondary-identifier replacement to ValidationError', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.identifier.findFirst
+        .mockResolvedValueOnce({ id: SECONDARY_ID_A, tenantId: TENANT_ID })
+        .mockResolvedValueOnce({ id: SECONDARY_ID_B, tenantId: TENANT_ID });
+      mockTx.facilitySecondaryIdentifier.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.facilitySecondaryIdentifier.createMany.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = updateFacility('facility-1', TENANT_ID, {
+        secondaryIdentifierIds: [SECONDARY_ID_A, SECONDARY_ID_B],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The facility or one or more secondary identifiers no longer exist');
+      expect(mockTx.facility.update).not.toHaveBeenCalled();
+    });
+
+    it('maps a unique-constraint violation on secondary-identifier replacement to ConflictError', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.identifier.findFirst
+        .mockResolvedValueOnce({ id: SECONDARY_ID_A, tenantId: TENANT_ID })
+        .mockResolvedValueOnce({ id: SECONDARY_ID_B, tenantId: TENANT_ID });
+      mockTx.facilitySecondaryIdentifier.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.facilitySecondaryIdentifier.createMany.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = updateFacility('facility-1', TENANT_ID, {
+        secondaryIdentifierIds: [SECONDARY_ID_A, SECONDARY_ID_B],
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'One or more secondary identifiers were concurrently linked to this facility; retry the request',
+      );
+      expect(mockTx.facility.update).not.toHaveBeenCalled();
+    });
+
     it('clears secondary identifiers with empty array', async () => {
       mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
       mockTx.facilitySecondaryIdentifier.deleteMany.mockResolvedValue({ count: 1 });
@@ -397,6 +523,37 @@ describe('facility.repository', () => {
       await expect(updateFacility('facility-1', OTHER_TENANT, { name: 'Nope' })).rejects.toThrow(
         'Facility not found or access denied',
       );
+    });
+
+    it('rejects duplicate secondary identifiers', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+
+      const result = updateFacility('facility-1', TENANT_ID, {
+        secondaryIdentifierIds: [SECONDARY_ID_A, SECONDARY_ID_A],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
+    });
+
+    it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facility.update.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = updateFacility('facility-1', TENANT_ID, { name: 'Renamed Warehouse' });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow('The identifier is already the primary identifier of another facility');
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facility.update.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = updateFacility('facility-1', TENANT_ID, { name: 'Renamed Warehouse' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Facility or a referenced resource not found');
     });
   });
 
@@ -420,6 +577,16 @@ describe('facility.repository', () => {
       mockTx.facility.findFirst.mockResolvedValue(null);
 
       await expect(deleteFacility('facility-1', OTHER_TENANT)).rejects.toThrow('Facility not found or access denied');
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facility.delete.mockRejectedValue(prismaRecordNotFoundError());
+
+      const result = deleteFacility('facility-1', TENANT_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Facility not found or access denied');
     });
   });
 });

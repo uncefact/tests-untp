@@ -7,6 +7,16 @@ jest.mock('next/server', () => ({
   },
 }));
 
+const mockLogger = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+};
+jest.mock('@/lib/api/logger', () => ({
+  apiLogger: { child: () => mockLogger },
+}));
+
 import {
   NotFoundError,
   ForbiddenError,
@@ -28,6 +38,8 @@ interface MockResponse {
 
 beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
+  mockLogger.warn.mockClear();
+  mockLogger.error.mockClear();
 });
 
 afterEach(() => {
@@ -130,11 +142,13 @@ describe('handleRouteError', () => {
   // --- Generic / unknown errors ---
 
   it('maps a generic Error to 500', async () => {
-    const res = handleRouteError(new Error('kaboom'));
+    const error = new Error('kaboom');
+    const res = handleRouteError(error);
 
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ error: 'kaboom' });
+    expect(mockLogger.error).toHaveBeenCalledWith({ err: error }, 'Unexpected error');
   });
 
   it('maps a non-Error value to 500 with fallback message', async () => {
@@ -157,6 +171,7 @@ describe('handleRouteError', () => {
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(mockLogger.error).toHaveBeenCalledWith({ err: dbError }, 'Unhandled database error');
   });
 
   it('sanitises a Prisma client validation error to a generic 500', async () => {
@@ -168,5 +183,6 @@ describe('handleRouteError', () => {
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(mockLogger.error).toHaveBeenCalledWith({ err: dbError }, 'Unhandled database error');
   });
 });

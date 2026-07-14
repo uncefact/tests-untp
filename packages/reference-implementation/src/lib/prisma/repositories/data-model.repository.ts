@@ -2,6 +2,7 @@ import { Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -104,20 +105,26 @@ export async function createDataModel(tenantId: string, input: CreateDataModelIn
       }
     }
 
-    return tx.dataModel.create({
-      data: {
-        tenantId,
-        name: input.name,
-        credentialType: input.credentialType,
-        version: input.version,
-        schemaUrl: input.schemaUrl,
-        contextUrl: input.contextUrl,
-        isExtension,
-        ...(input.websiteUrl !== undefined && { websiteUrl: input.websiteUrl }),
-        ...(input.parentConfigId !== undefined && { parentConfigId: input.parentConfigId }),
-      },
-      include: DATA_MODEL_DETAIL_INCLUDE,
-    });
+    try {
+      return await tx.dataModel.create({
+        data: {
+          tenantId,
+          name: input.name,
+          credentialType: input.credentialType,
+          version: input.version,
+          schemaUrl: input.schemaUrl,
+          contextUrl: input.contextUrl,
+          isExtension,
+          ...(input.websiteUrl !== undefined && { websiteUrl: input.websiteUrl }),
+          ...(input.parentConfigId !== undefined && { parentConfigId: input.parentConfigId }),
+        },
+        include: DATA_MODEL_DETAIL_INCLUDE,
+      });
+    } catch (e) {
+      mapDatabaseError(e, {
+        conflict: 'A data model with this name already exists for the credential type and version',
+      });
+    }
   });
 }
 
@@ -195,16 +202,23 @@ export async function updateDataModel(
       throw new NotFoundError('Data model not found or access denied');
     }
 
-    return tx.dataModel.update({
-      where: { id },
-      data: {
-        ...(input.name !== undefined && { name: input.name }),
-        ...(input.schemaUrl !== undefined && { schemaUrl: input.schemaUrl }),
-        ...(input.contextUrl !== undefined && { contextUrl: input.contextUrl }),
-        ...(input.websiteUrl !== undefined && { websiteUrl: input.websiteUrl }),
-      },
-      include: DATA_MODEL_DETAIL_INCLUDE,
-    });
+    try {
+      return await tx.dataModel.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.schemaUrl !== undefined && { schemaUrl: input.schemaUrl }),
+          ...(input.contextUrl !== undefined && { contextUrl: input.contextUrl }),
+          ...(input.websiteUrl !== undefined && { websiteUrl: input.websiteUrl }),
+        },
+        include: DATA_MODEL_DETAIL_INCLUDE,
+      });
+    } catch (e) {
+      mapDatabaseError(e, {
+        conflict: 'A data model with this name already exists for the credential type and version',
+        notFound: 'Data model not found or access denied',
+      });
+    }
   });
 }
 
@@ -223,6 +237,10 @@ export async function deleteDataModel(id: string, tenantId: string): Promise<voi
       throw new NotFoundError('Data model not found or access denied');
     }
 
-    await tx.dataModel.delete({ where: { id } });
+    try {
+      await tx.dataModel.delete({ where: { id } });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Data model not found or access denied' });
+    }
   });
 }

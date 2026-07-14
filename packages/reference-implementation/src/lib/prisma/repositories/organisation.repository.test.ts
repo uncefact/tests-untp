@@ -5,9 +5,16 @@ import {
   updateOrganisation,
   deleteOrganisation,
 } from './organisation.repository';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import {
+  prismaForeignKeyViolationError,
+  prismaRecordNotFoundError,
+  prismaUniqueConstraintError,
+} from '@/lib/prisma/db-errors.fixtures';
 
-// Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
+// Mock Prisma client. Use jest.fn() inside the factory to avoid hoisting issues.
 jest.mock('../prisma', () => ({
   prisma: {
     organisationEntity: {
@@ -266,7 +273,7 @@ describe('organisation.repository', () => {
 
       // First org succeeds
       mockTx.organisationEntity.create.mockResolvedValueOnce(ORG_RECORD);
-      // Second org fails validation — primary identifier not found
+      // Second org fails validation because the primary identifier is not found
       mockTx.identifier.findFirst.mockResolvedValue(null);
 
       mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
@@ -281,6 +288,102 @@ describe('organisation.repository', () => {
       // The transaction callback threw, so Prisma would roll back.
       // First org was created inside the transaction but will be rolled back.
       expect(mockTx.organisationEntity.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects duplicate secondary identifiers', async () => {
+      const mockTx = {
+        identifier: { findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2) },
+        organisationEntity: {
+          create: jest.fn(),
+          findUniqueOrThrow: jest.fn(),
+        },
+        organisationSecondaryIdentifier: { createMany: jest.fn() },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = createOrganisations(TENANT_ID, [
+        { name: 'Acme Corp', secondaryIdentifierIds: [IDENTIFIER_RECORD_2.id, IDENTIFIER_RECORD_2.id] },
+      ]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
+    });
+
+    it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
+      const mockTx = {
+        identifier: { findFirst: jest.fn() },
+        organisationEntity: {
+          create: jest.fn().mockRejectedValue(prismaUniqueConstraintError()),
+          findUniqueOrThrow: jest.fn(),
+        },
+        organisationSecondaryIdentifier: { createMany: jest.fn() },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = createOrganisations(TENANT_ID, [{ name: 'Acme Corp' }]);
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'An identifier in this request is already the primary identifier of another organisation',
+      );
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      const nonDatabaseError = new Error('connection lost');
+      const mockTx = {
+        identifier: { findFirst: jest.fn() },
+        organisationEntity: {
+          create: jest.fn().mockRejectedValue(nonDatabaseError),
+          findUniqueOrThrow: jest.fn(),
+        },
+        organisationSecondaryIdentifier: { createMany: jest.fn() },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      await expect(createOrganisations(TENANT_ID, [{ name: 'Acme Corp' }])).rejects.toThrow(nonDatabaseError);
+    });
+
+    it('maps a foreign-key violation on primary identifier creation to ValidationError', async () => {
+      const mockTx = {
+        identifier: { findFirst: jest.fn() },
+        organisationEntity: {
+          create: jest.fn().mockRejectedValue(prismaForeignKeyViolationError()),
+          findUniqueOrThrow: jest.fn(),
+        },
+        organisationSecondaryIdentifier: { createMany: jest.fn() },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = createOrganisations(TENANT_ID, [{ name: 'Acme Corp' }]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The referenced primary identifier no longer exists');
+    });
+
+    it('maps a foreign-key violation on secondary-identifier creation to ValidationError', async () => {
+      const mockTx = {
+        identifier: { findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2) },
+        organisationEntity: {
+          create: jest.fn().mockResolvedValue(ORG_RECORD),
+          findUniqueOrThrow: jest.fn(),
+        },
+        organisationSecondaryIdentifier: {
+          createMany: jest.fn().mockRejectedValue(prismaForeignKeyViolationError()),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = createOrganisations(TENANT_ID, [
+        { name: 'Acme Corp', secondaryIdentifierIds: [IDENTIFIER_RECORD_2.id] },
+      ]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('One or more secondary identifiers no longer exist');
     });
   });
 
@@ -446,6 +549,27 @@ describe('organisation.repository', () => {
       expect(result.name).toBe('Acme Industries');
     });
 
+    it('rejects duplicate secondary identifiers', async () => {
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn(),
+        },
+        identifier: { findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2) },
+        organisationSecondaryIdentifier: { deleteMany: jest.fn(), createMany: jest.fn() },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = updateOrganisation('org-1', TENANT_ID, {
+        secondaryIdentifierIds: [IDENTIFIER_RECORD_2.id, IDENTIFIER_RECORD_2.id],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
+      expect(mockTx.organisationEntity.update).not.toHaveBeenCalled();
+    });
+
     it('replaces secondary identifiers via deleteMany + createMany in transaction', async () => {
       const updatedOrg = {
         ...ORG_RECORD,
@@ -480,6 +604,60 @@ describe('organisation.repository', () => {
       });
       expect(mockTx.organisationEntity.update).toHaveBeenCalled();
       expect(result.secondaryIdentifiers).toHaveLength(1);
+    });
+
+    it('maps a foreign-key violation on secondary-identifier replacement to ValidationError', async () => {
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn(),
+        },
+        identifier: {
+          findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2),
+        },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+          createMany: jest.fn().mockRejectedValue(prismaForeignKeyViolationError()),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = updateOrganisation('org-1', TENANT_ID, {
+        secondaryIdentifierIds: ['ident-2'],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The organisation or one or more secondary identifiers no longer exist');
+      expect(mockTx.organisationEntity.update).not.toHaveBeenCalled();
+    });
+
+    it('maps a unique-constraint violation on secondary-identifier replacement to ConflictError', async () => {
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn(),
+        },
+        identifier: {
+          findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2),
+        },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+          createMany: jest.fn().mockRejectedValue(prismaUniqueConstraintError()),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = updateOrganisation('org-1', TENANT_ID, {
+        secondaryIdentifierIds: ['ident-2'],
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'One or more secondary identifiers were concurrently linked to this organisation; retry the request',
+      );
+      expect(mockTx.organisationEntity.update).not.toHaveBeenCalled();
     });
 
     it('clears all secondary identifiers with empty array', async () => {
@@ -532,6 +710,48 @@ describe('organisation.repository', () => {
         'Organisation not found or access denied',
       );
     });
+
+    it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn().mockRejectedValue(prismaUniqueConstraintError()),
+        },
+        identifier: { findFirst: jest.fn() },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn(),
+          createMany: jest.fn(),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = updateOrganisation('org-1', TENANT_ID, { name: 'Acme Industries' });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow('The identifier is already the primary identifier of another organisation');
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn().mockRejectedValue(prismaRecordNotFoundError()),
+        },
+        identifier: { findFirst: jest.fn() },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn(),
+          createMany: jest.fn(),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = updateOrganisation('org-1', TENANT_ID, { name: 'Acme Industries' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Organisation or a referenced resource not found');
+    });
   });
 
   describe('deleteOrganisation', () => {
@@ -573,6 +793,22 @@ describe('organisation.repository', () => {
       await expect(deleteOrganisation('org-1', OTHER_TENANT_ID)).rejects.toThrow(
         'Organisation not found or access denied',
       );
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          delete: jest.fn().mockRejectedValue(prismaRecordNotFoundError()),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = deleteOrganisation('org-1', TENANT_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Organisation not found or access denied');
     });
   });
 });

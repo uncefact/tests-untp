@@ -1,6 +1,7 @@
 import { Facility, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { UntpLocation } from '@/lib/types';
@@ -93,6 +94,22 @@ async function validateIdentifierOwnership(
 }
 
 /**
+ * Validates that the primary identifier is not also listed as a secondary
+ * identifier, and that secondary identifiers contain no duplicates.
+ */
+function validateNoPrimarySecondaryOverlap(
+  primaryIdentifierId: string | undefined | null,
+  secondaryIdentifierIds: string[],
+): void {
+  if (primaryIdentifierId && secondaryIdentifierIds.includes(primaryIdentifierId)) {
+    throw new ValidationError('Primary identifier must not also appear in secondary identifiers');
+  }
+  if (new Set(secondaryIdentifierIds).size !== secondaryIdentifierIds.length) {
+    throw new ValidationError('Secondary identifiers must not contain duplicates');
+  }
+}
+
+/**
  * Creates one or more facilities within a transaction.
  * Validates identifier ownership, organisation FK, and primary/secondary overlap.
  * Returns the created facilities with all includes.
@@ -125,35 +142,55 @@ export async function createFacilities(
 
       // Validate secondary identifier ownership and check for overlap with primary
       if (secondaryIdentifierIds?.length) {
-        if (primaryIdentifierId && secondaryIdentifierIds.includes(primaryIdentifierId)) {
-          throw new ValidationError('Primary identifier must not also appear in secondary identifiers');
-        }
+        validateNoPrimarySecondaryOverlap(primaryIdentifierId, secondaryIdentifierIds);
         for (const secId of secondaryIdentifierIds) {
           await validateIdentifierOwnership(tx, secId, tenantId, 'Secondary identifier');
         }
       }
 
       // Create the facility entity
-      const facility = await tx.facility.create({
-        data: {
-          tenantId,
-          name,
-          description,
-          location: location ? (location as Prisma.InputJsonValue) : undefined,
-          operatingOrganisationId,
-          primaryIdentifierId,
-          ...(secondaryIdentifierIds?.length && {
-            secondaryIdentifiers: {
-              createMany: {
-                data: secondaryIdentifierIds.map((identifierId: string) => ({ identifierId })),
-              },
-            },
-          }),
-        },
-        include: FACILITY_DETAIL_INCLUDE,
-      });
+      let facility: FacilityWithRelations;
+      try {
+        facility = await tx.facility.create({
+          data: {
+            tenantId,
+            name,
+            description,
+            location: location ? (location as Prisma.InputJsonValue) : undefined,
+            operatingOrganisationId,
+            primaryIdentifierId,
+          },
+          include: FACILITY_DETAIL_INCLUDE,
+        });
+      } catch (e) {
+        mapDatabaseError(e, {
+          conflict: 'An identifier in this request is already the primary identifier of another facility',
+          invalidReference: 'The referenced organisation or identifier no longer exists',
+        });
+      }
 
-      results.push(facility);
+      // Create join rows for secondary identifiers
+      if (secondaryIdentifierIds?.length) {
+        try {
+          await tx.facilitySecondaryIdentifier.createMany({
+            data: secondaryIdentifierIds.map((identifierId: string) => ({
+              facilityId: facility.id,
+              identifierId,
+            })),
+          });
+        } catch (e) {
+          mapDatabaseError(e, { invalidReference: 'One or more secondary identifiers no longer exist' });
+        }
+
+        // Re-fetch to include the newly created secondary identifier relations
+        const refetched = await tx.facility.findUniqueOrThrow({
+          where: { id: facility.id },
+          include: FACILITY_DETAIL_INCLUDE,
+        });
+        results.push(refetched);
+      } else {
+        results.push(facility);
+      }
     }
 
     return results;
@@ -260,9 +297,7 @@ export async function updateFacility(
     // Validate secondary identifiers and check for overlap with primary
     if (secondaryIdentifierIds !== undefined) {
       const effectivePrimaryId = primaryIdentifierId === undefined ? existing.primaryIdentifierId : primaryIdentifierId;
-      if (effectivePrimaryId && secondaryIdentifierIds.includes(effectivePrimaryId)) {
-        throw new ValidationError('Primary identifier must not also appear in secondary identifiers');
-      }
+      validateNoPrimarySecondaryOverlap(effectivePrimaryId, secondaryIdentifierIds);
       for (const secId of secondaryIdentifierIds) {
         await validateIdentifierOwnership(tx, secId, tenantId, 'Secondary identifier');
       }
@@ -272,12 +307,19 @@ export async function updateFacility(
         where: { facilityId: id },
       });
       if (secondaryIdentifierIds.length > 0) {
-        await tx.facilitySecondaryIdentifier.createMany({
-          data: secondaryIdentifierIds.map((identifierId: string) => ({
-            facilityId: id,
-            identifierId,
-          })),
-        });
+        try {
+          await tx.facilitySecondaryIdentifier.createMany({
+            data: secondaryIdentifierIds.map((identifierId: string) => ({
+              facilityId: id,
+              identifierId,
+            })),
+          });
+        } catch (e) {
+          mapDatabaseError(e, {
+            conflict: 'One or more secondary identifiers were concurrently linked to this facility; retry the request',
+            invalidReference: 'The facility or one or more secondary identifiers no longer exist',
+          });
+        }
       }
     }
 
@@ -301,11 +343,18 @@ export async function updateFacility(
       data.primaryIdentifier = { connect: { id: primaryIdentifierId } };
     }
 
-    return tx.facility.update({
-      where: { id },
-      data,
-      include: FACILITY_DETAIL_INCLUDE,
-    });
+    try {
+      return await tx.facility.update({
+        where: { id },
+        data,
+        include: FACILITY_DETAIL_INCLUDE,
+      });
+    } catch (e) {
+      mapDatabaseError(e, {
+        conflict: 'The identifier is already the primary identifier of another facility',
+        notFound: 'Facility or a referenced resource not found',
+      });
+    }
   });
 }
 
@@ -339,8 +388,12 @@ export async function deleteFacility(id: string, tenantId: string): Promise<Faci
       throw new NotFoundError('Facility not found or access denied');
     }
 
-    return tx.facility.delete({
-      where: { id },
-    });
+    try {
+      return await tx.facility.delete({
+        where: { id },
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Facility not found or access denied' });
+    }
   });
 }

@@ -1,6 +1,7 @@
 import { Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { UntpLocation } from '@/lib/types';
@@ -80,7 +81,8 @@ async function validateIdentifierOwnership(
 }
 
 /**
- * Validates that the primary identifier is not also listed as a secondary identifier.
+ * Validates that the primary identifier is not also listed as a secondary
+ * identifier, and that secondary identifiers contain no duplicates.
  */
 function validateNoPrimarySecondaryOverlap(
   primaryIdentifierId: string | undefined | null,
@@ -88,6 +90,9 @@ function validateNoPrimarySecondaryOverlap(
 ): void {
   if (primaryIdentifierId && secondaryIdentifierIds?.includes(primaryIdentifierId)) {
     throw new ValidationError('Primary identifier cannot also be a secondary identifier');
+  }
+  if (secondaryIdentifierIds && new Set(secondaryIdentifierIds).size !== secondaryIdentifierIds.length) {
+    throw new ValidationError('Secondary identifiers must not contain duplicates');
   }
 }
 
@@ -119,25 +124,37 @@ export async function createOrganisations(
       validateNoPrimarySecondaryOverlap(input.primaryIdentifierId, input.secondaryIdentifierIds);
 
       // Create the organisation entity
-      const organisation = await tx.organisationEntity.create({
-        data: {
-          tenantId,
-          name: input.name,
-          ...(input.description !== undefined && { description: input.description }),
-          ...(input.location !== undefined && { location: input.location as Prisma.InputJsonValue }),
-          ...(input.primaryIdentifierId !== undefined && { primaryIdentifierId: input.primaryIdentifierId }),
-        },
-        include: ORGANISATION_DETAIL_INCLUDE,
-      });
+      let organisation: OrganisationEntityWithRelations;
+      try {
+        organisation = await tx.organisationEntity.create({
+          data: {
+            tenantId,
+            name: input.name,
+            ...(input.description !== undefined && { description: input.description }),
+            ...(input.location !== undefined && { location: input.location as Prisma.InputJsonValue }),
+            ...(input.primaryIdentifierId !== undefined && { primaryIdentifierId: input.primaryIdentifierId }),
+          },
+          include: ORGANISATION_DETAIL_INCLUDE,
+        });
+      } catch (e) {
+        mapDatabaseError(e, {
+          conflict: 'An identifier in this request is already the primary identifier of another organisation',
+          invalidReference: 'The referenced primary identifier no longer exists',
+        });
+      }
 
       // Create join rows for secondary identifiers
       if (input.secondaryIdentifierIds?.length) {
-        await tx.organisationSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds.map((identifierId: string) => ({
-            organisationId: organisation.id,
-            identifierId,
-          })),
-        });
+        try {
+          await tx.organisationSecondaryIdentifier.createMany({
+            data: input.secondaryIdentifierIds.map((identifierId: string) => ({
+              organisationId: organisation.id,
+              identifierId,
+            })),
+          });
+        } catch (e) {
+          mapDatabaseError(e, { invalidReference: 'One or more secondary identifiers no longer exist' });
+        }
 
         // Re-fetch to include the newly created secondary identifier relations
         const refetched = await tx.organisationEntity.findUniqueOrThrow({
@@ -255,12 +272,20 @@ export async function updateOrganisation(
         where: { organisationId: id },
       });
       if (input.secondaryIdentifierIds.length > 0) {
-        await tx.organisationSecondaryIdentifier.createMany({
-          data: input.secondaryIdentifierIds.map((identifierId: string) => ({
-            organisationId: id,
-            identifierId,
-          })),
-        });
+        try {
+          await tx.organisationSecondaryIdentifier.createMany({
+            data: input.secondaryIdentifierIds.map((identifierId: string) => ({
+              organisationId: id,
+              identifierId,
+            })),
+          });
+        } catch (e) {
+          mapDatabaseError(e, {
+            conflict:
+              'One or more secondary identifiers were concurrently linked to this organisation; retry the request',
+            invalidReference: 'The organisation or one or more secondary identifiers no longer exist',
+          });
+        }
       }
     }
 
@@ -278,11 +303,18 @@ export async function updateOrganisation(
       data.primaryIdentifier = { connect: { id: input.primaryIdentifierId } };
     }
 
-    return tx.organisationEntity.update({
-      where: { id },
-      data,
-      include: ORGANISATION_DETAIL_INCLUDE,
-    });
+    try {
+      return await tx.organisationEntity.update({
+        where: { id },
+        data,
+        include: ORGANISATION_DETAIL_INCLUDE,
+      });
+    } catch (e) {
+      mapDatabaseError(e, {
+        conflict: 'The identifier is already the primary identifier of another organisation',
+        notFound: 'Organisation or a referenced resource not found',
+      });
+    }
   });
 }
 
@@ -317,9 +349,13 @@ export async function deleteOrganisation(id: string, tenantId: string): Promise<
       throw new NotFoundError('Organisation not found or access denied');
     }
 
-    return tx.organisationEntity.delete({
-      where: { id },
-      include: ORGANISATION_DETAIL_INCLUDE,
-    });
+    try {
+      return await tx.organisationEntity.delete({
+        where: { id },
+        include: ORGANISATION_DETAIL_INCLUDE,
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Organisation not found or access denied' });
+    }
   });
 }

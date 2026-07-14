@@ -17,6 +17,7 @@ const mockPrisma: any = {
 jest.mock('@/lib/prisma/prisma', () => ({ prisma: mockPrisma }));
 
 import { resolveClosedModeTenant } from './resolve-closed-mode-tenant';
+import { prismaError } from '@/lib/prisma/db-errors.fixtures';
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -93,7 +94,7 @@ describe('resolveClosedModeTenant', () => {
   // P2002 retry
   it('retries full resolution on P2002 unique constraint violation', async () => {
     // First attempt: transaction throws P2002
-    mockPrisma.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+    mockPrisma.$transaction.mockRejectedValueOnce({ code: 'P2002', clientVersion: '6.0.0' });
     // Second attempt (retry): succeeds
     mockPrisma.$transaction.mockImplementationOnce((cb: (tx: unknown) => Promise<unknown>) => cb(mockPrisma));
     mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-1' });
@@ -109,5 +110,15 @@ describe('resolveClosedModeTenant', () => {
 
     const result = await resolveClosedModeTenant('/acme', 'sub-1');
     expect(result).toBeNull();
+  });
+
+  // Non-P2002 database error — must not be treated as the retry-worthy conflict
+  it('does not retry a database error that is not a unique-constraint violation', async () => {
+    mockPrisma.$transaction.mockRejectedValue(prismaError('P2025'));
+
+    const result = await resolveClosedModeTenant('/acme', 'sub-1');
+
+    expect(result).toBeNull();
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });

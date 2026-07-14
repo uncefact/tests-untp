@@ -1,7 +1,9 @@
 import { IdentifierScheme, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
-import { NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { isForeignKeyViolation, mapDatabaseError } from '@/lib/prisma/db-errors';
+import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
@@ -52,34 +54,56 @@ export type ListIdentifierSchemesOptions = {
 };
 
 /**
+ * Rejects duplicate qualifier keys within a single request. Duplicates in the
+ * request array are deterministic input, so they are validated up front rather
+ * than surfaced through the (schemeId, key) unique constraint.
+ */
+function validateQualifierKeys(qualifiers: QualifierInput[] | undefined): void {
+  if (!qualifiers) return;
+  const keys = qualifiers.map((q: QualifierInput) => q.key);
+  if (new Set(keys).size !== keys.length) {
+    throw new ValidationError('Qualifier keys must be unique');
+  }
+}
+
+/**
  * Creates a new identifier scheme with optional nested qualifiers.
  */
 export async function createIdentifierScheme(input: CreateIdentifierSchemeInput): Promise<IdentifierScheme> {
-  return prisma.identifierScheme.create({
-    data: {
-      tenantId: input.tenantId,
-      registrarId: input.registrarId,
-      name: input.name,
-      primaryKey: input.primaryKey,
-      validationPattern: input.validationPattern,
-      linkTemplate: input.linkTemplate,
-      idrServiceInstanceId: input.idrServiceInstanceId,
-      ...(input.qualifiers && {
-        qualifiers: {
-          create: input.qualifiers.map((q: QualifierInput) => ({
-            key: q.key,
-            description: q.description,
-            validationPattern: q.validationPattern,
-            ...(q.order !== undefined && { order: q.order }),
-          })),
-        },
-      }),
-    },
-    include: {
-      qualifiers: true,
-      registrar: true,
-    },
-  });
+  validateQualifierKeys(input.qualifiers);
+
+  try {
+    return await prisma.identifierScheme.create({
+      data: {
+        tenantId: input.tenantId,
+        registrarId: input.registrarId,
+        name: input.name,
+        primaryKey: input.primaryKey,
+        validationPattern: input.validationPattern,
+        linkTemplate: input.linkTemplate,
+        idrServiceInstanceId: input.idrServiceInstanceId,
+        ...(input.qualifiers && {
+          qualifiers: {
+            create: input.qualifiers.map((q: QualifierInput) => ({
+              key: q.key,
+              description: q.description,
+              validationPattern: q.validationPattern,
+              ...(q.order !== undefined && { order: q.order }),
+            })),
+          },
+        }),
+      },
+      include: {
+        qualifiers: true,
+        registrar: true,
+      },
+    });
+  } catch (e) {
+    mapDatabaseError(e, {
+      conflict: 'An identifier scheme with this primary key already exists for the registrar',
+      invalidReference: 'The referenced registrar or IDR service instance does not exist',
+    });
+  }
 }
 
 /**
@@ -153,39 +177,57 @@ export async function updateIdentifierScheme(
       throw new NotFoundError('Identifier scheme not found or access denied');
     }
 
-    // If qualifiers are provided, delete existing and recreate
+    validateQualifierKeys(input.qualifiers);
+
+    // If qualifiers are provided, delete existing and recreate. The recreate
+    // is guarded separately from the scheme update so a unique-constraint
+    // violation on (schemeId, key), such as a concurrent update racing this
+    // one, reports the qualifier conflict rather than a primary-key conflict.
     if (input.qualifiers !== undefined) {
       await tx.schemeQualifier.deleteMany({
         where: { schemeId: id },
       });
-    }
-
-    return tx.identifierScheme.update({
-      where: { id },
-      data: {
-        ...(input.name !== undefined && { name: input.name }),
-        ...(input.primaryKey !== undefined && { primaryKey: input.primaryKey }),
-        ...(input.validationPattern !== undefined && { validationPattern: input.validationPattern }),
-        ...(input.linkTemplate !== undefined && { linkTemplate: input.linkTemplate }),
-        ...(input.idrServiceInstanceId !== undefined && {
-          idrServiceInstanceId: input.idrServiceInstanceId,
-        }),
-        ...(input.qualifiers !== undefined && {
-          qualifiers: {
-            create: input.qualifiers.map((q: QualifierInput) => ({
+      if (input.qualifiers.length > 0) {
+        try {
+          await tx.schemeQualifier.createMany({
+            data: input.qualifiers.map((q: QualifierInput) => ({
+              schemeId: id,
               key: q.key,
               description: q.description,
               validationPattern: q.validationPattern,
               ...(q.order !== undefined && { order: q.order }),
             })),
-          },
-        }),
-      },
-      include: {
-        qualifiers: true,
-        registrar: true,
-      },
-    });
+          });
+        } catch (e) {
+          mapDatabaseError(e, { conflict: 'A qualifier with this key already exists for the scheme' });
+        }
+      }
+    }
+
+    try {
+      return await tx.identifierScheme.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.primaryKey !== undefined && { primaryKey: input.primaryKey }),
+          ...(input.validationPattern !== undefined && { validationPattern: input.validationPattern }),
+          ...(input.linkTemplate !== undefined && { linkTemplate: input.linkTemplate }),
+          ...(input.idrServiceInstanceId !== undefined && {
+            idrServiceInstanceId: input.idrServiceInstanceId,
+          }),
+        },
+        include: {
+          qualifiers: true,
+          registrar: true,
+        },
+      });
+    } catch (e) {
+      mapDatabaseError(e, {
+        conflict: 'An identifier scheme with this primary key already exists for the registrar',
+        notFound: 'Identifier scheme not found or access denied',
+        invalidReference: 'The referenced IDR service instance does not exist',
+      });
+    }
   });
 }
 
@@ -203,8 +245,18 @@ export async function deleteIdentifierScheme(id: string, tenantId: string): Prom
       throw new NotFoundError('Identifier scheme not found or access denied');
     }
 
-    return tx.identifierScheme.delete({
-      where: { id },
-    });
+    try {
+      return await tx.identifierScheme.delete({
+        where: { id },
+      });
+    } catch (e) {
+      // Identifier.scheme is declared with onDelete: Restrict, so the
+      // foreign-key violation here means dependants block the delete (a
+      // conflict), not that a referenced record is missing (a bad request).
+      if (isForeignKeyViolation(e)) {
+        throw new ConflictError('The identifier scheme has identifiers and cannot be deleted');
+      }
+      mapDatabaseError(e, { notFound: 'Identifier scheme not found or access denied' });
+    }
   });
 }
