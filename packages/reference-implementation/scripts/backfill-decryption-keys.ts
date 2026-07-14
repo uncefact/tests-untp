@@ -6,12 +6,19 @@
  * values in encrypted envelopes in place; rows already holding an envelope
  * are left untouched, so re-running converges to no changes.
  *
- * Usage (from packages/reference-implementation):
- *   pnpm backfill:decryption-keys
+ * Usage (from packages/reference-implementation, source checkout):
+ *   pnpm backfill:decryption-keys [-- --force]
  *
- * Requires the RI_POSTGRES_* variables (or a pre-set RI_DATABASE_URL) and
- * DATA_ENCRYPTION_KEY matching the key the application runs with. The run
- * aborts before writing if an existing envelope cannot be decrypted with it.
+ * Usage (inside the published Docker image, which ships no pnpm):
+ *   docker compose exec -w /app ri node_modules/.bin/tsx scripts/backfill-decryption-keys.ts [--force]
+ *
+ * Requires DATA_ENCRYPTION_KEY matching the key the application runs with,
+ * and a database target: a pre-set RI_DATABASE_URL is honoured as given, and
+ * the RI_POSTGRES_* variables are used to construct one only when it is
+ * absent. Before writing anything, the run decrypts every existing envelope
+ * (credential keys and service instance configurations) and aborts on any
+ * failure; when no envelope exists to check against, it refuses to write
+ * unless --force is passed.
  */
 import dotenv from 'dotenv';
 import path from 'path';
@@ -20,26 +27,69 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-// Construct RI_DATABASE_URL from individual env vars (same as prisma.config.ts)
-const { RI_POSTGRES_USER, RI_POSTGRES_PASSWORD, RI_POSTGRES_DB, RI_POSTGRES_HOST, RI_POSTGRES_PORT } = process.env;
-if (RI_POSTGRES_USER && RI_POSTGRES_PASSWORD && RI_POSTGRES_DB && RI_POSTGRES_HOST && RI_POSTGRES_PORT) {
-  process.env.RI_DATABASE_URL = `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${RI_POSTGRES_HOST}:${RI_POSTGRES_PORT}/${RI_POSTGRES_DB}?schema=public`;
+const DOCS_URL =
+  'https://uncefact.github.io/tests-untp/docs/next/reference-implementation/api/credentials#encryption-and-privacy';
+
+const force = process.argv.includes('--force');
+
+// Honour a pre-set RI_DATABASE_URL; construct from parts only when absent
+// (same rule as docker-entrypoint.sh). Guarded assignment: process.env
+// coerces undefined to the string "undefined", which would later read as a
+// configured (nonsense) connection target.
+const { databaseUrlFromEnvParts } = await import('../src/lib/prisma/database-url.js');
+const constructedDatabaseUrl = databaseUrlFromEnvParts();
+if (!process.env.RI_DATABASE_URL && constructedDatabaseUrl) {
+  process.env.RI_DATABASE_URL = constructedDatabaseUrl;
 }
 
 const { prisma } = await import('../src/lib/prisma/prisma.js');
-const { backfillDecryptionKeys } = await import('../src/lib/credentials/backfill-decryption-keys.js');
+const { backfillDecryptionKeys, KeyUnverifiedError } = await import(
+  '../src/lib/credentials/backfill-decryption-keys.js'
+);
+
+if (force) {
+  console.warn(
+    'Warning: --force supplied. If no existing envelope proves DATA_ENCRYPTION_KEY, plaintext keys ' +
+      'will be wrapped without verification, which is unrecoverable under a wrong key. Ensure a ' +
+      'database backup exists and the key has been verified out of band before relying on this run.',
+  );
+}
 
 try {
-  const result = await backfillDecryptionKeys(prisma);
+  const result = await backfillDecryptionKeys(prisma, { force });
   if (!result.keyVerified) {
     console.warn(
-      'Warning: no existing encrypted key was available to validate DATA_ENCRYPTION_KEY against; ' +
-        'ensure it matches the key the application runs with before relying on the wrapped values.',
+      'Warning: no existing encrypted value was available to validate DATA_ENCRYPTION_KEY against; ' +
+        'verify a wrapped key decrypts correctly (for example via GET /api/v1/credentials/{id}) before ' +
+        'relying on the wrapped values.',
     );
   }
-  console.log(`Backfill complete: ${result.wrapped} wrapped, ${result.alreadyProtected} already protected.`);
+  if (result.suspectRowIds.length > 0) {
+    console.error(
+      `Skipped ${result.suspectRowIds.length} row(s) whose stored value resembles a corrupted encrypted ` +
+        `envelope and cannot be treated as a legacy plaintext key: ${result.suspectRowIds.join(', ')}. ` +
+        `Inspect these rows manually. See ${DOCS_URL}`,
+    );
+    process.exitCode = 1;
+  }
+  if (result.deletedRowIds.length > 0) {
+    console.warn(
+      `${result.deletedRowIds.length} row(s) were deleted while the backfill ran and were skipped: ` +
+        `${result.deletedRowIds.join(', ')}.`,
+    );
+  }
+  const counts = `${result.wrapped} wrapped, ${result.alreadyProtected} already protected`;
+  if (result.suspectRowIds.length > 0) {
+    console.log(`Backfill finished with skipped suspect rows: ${counts}, ${result.suspectRowIds.length} skipped.`);
+  } else {
+    console.log(`Backfill complete: ${counts}.`);
+  }
 } catch (error) {
-  console.error('Backfill failed:', error);
+  if (error instanceof KeyUnverifiedError) {
+    console.error(`${error.message}\nSee ${DOCS_URL}`);
+  } else {
+    console.error('Backfill failed:', error);
+  }
   process.exitCode = 1;
 } finally {
   await prisma.$disconnect();
