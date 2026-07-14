@@ -3,3 +3,7 @@ build
 coverage
 .next
 **/prisma/generated
+
+# Published spec sample checked in verbatim as a test anchor; must stay
+# byte-identical to the upstream artefact, so formatting must not touch it.
+packages/services/src/data-model-bridges/data-models/dcc/versions/v070/__fixtures__/ConformityCredential_instance.json

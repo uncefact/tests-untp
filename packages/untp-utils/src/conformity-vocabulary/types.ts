@@ -134,14 +134,59 @@ export interface ConformityClaimCriterion {
 }
 
 /**
+ * A single assessment entry on a credential's conformity claim: the criteria
+ * the assessment references and the topics it declares for itself. The
+ * declared topics are validated against the deduplicated union of the
+ * published topics of the assessment's criteria, in one direction only: a
+ * declared topic outside the union warns, while a union topic the assessment
+ * does not declare is acceptable, because the assessment's topics are a
+ * categorisation rather than an exhaustive enumeration.
+ */
+export interface ConformityClaimAssessment {
+  /**
+   * Criterion URIs the assessment references. Extractors must also emit every
+   * entry here as a {@link ConformityClaimCriterion} in the claim's `criteria`
+   * list: the validator's assessment check skips unresolved criteria on the
+   * assumption that `conformity-criterion.not-in-profile` has already surfaced
+   * them from `criteria`, so an entry present only here would silently escape
+   * both checks.
+   */
+  criteria: string[];
+  /** Topic URIs the assessment declares for itself. */
+  conformityTopics: string[];
+}
+
+/**
  * A conformity claim extracted from a Digital Conformity Credential, in the
  * minimal shape the validator needs.
+ *
+ * This type is the version-neutral interlingua between the version-specific
+ * data model bridge extractors and {@link validateConformityClaim}. Its fields
+ * are optional capabilities keyed on presence, not on spec version: an
+ * extractor populates a field only when its data model carries the concept,
+ * and the validator runs a rule only when the data is present. Never repurpose
+ * a field with changed semantics for a new spec version; add a new field, or
+ * fork the validation rules into versioned modules (the delta pattern the
+ * `parsers/` directory already uses) the first time a rule genuinely differs
+ * between versions. A version conditional inside the shared validator is the
+ * signal to fork, not a fix. See ADR-033 (update of 2026-07-13).
  */
 export interface ConformityClaim {
   /** Scheme URI the claim references. */
   scheme: string;
-  /** Profile URI the claim references. */
-  profile: string;
+  /**
+   * Profile URI the claim references. Optional because not every data model
+   * requires a profile reference. When absent, the validator checks the scheme
+   * reference only and emits a `conformity-profile.not-specified` advisory,
+   * since criteria are published per versioned profile.
+   */
+  profile?: string;
   /** Criteria the claim addresses. */
   criteria: ConformityClaimCriterion[];
+  /**
+   * Assessment-level topic declarations. Optional and version-specific: an
+   * extractor populates it only when its data model classifies assessments by
+   * topic.
+   */
+  assessments?: ConformityClaimAssessment[];
 }
