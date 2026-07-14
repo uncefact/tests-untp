@@ -61,7 +61,7 @@ See [Tenant Modes](./tenant-modes) for how service accounts are associated with 
 | `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE` | Expected audience claim in service account tokens — must match the audience mapper configured on the service account client | Yes | `ri-api` |
 | `AUTH_SECRET` | Secret used to encrypt sessions (generate with `openssl rand -base64 32`) | Yes | — |
 | `AUTH_TRUST_HOST` | Set to `true` when the Reference Implementation runs behind a reverse proxy or in a containerised environment where the host header may differ from the actual origin | No | — |
-| `RI_APP_URL` | Base URL of the Reference Implementation (used for post-logout redirect) | Yes | `http://localhost:3003` |
+| `RI_APP_URL` | Public base URL of the Reference Implementation. Backs the OIDC post-logout redirect and the default human verification link when publishing credentials | Yes | `http://localhost:3003` |
 
 `AUTH_OIDC_AUTHORIZATION_URL` is needed when Keycloak's issuer URL is only reachable from within Docker (e.g., `http://keycloak:8080/...`) but the browser needs a different URL (e.g., `http://localhost:8080/...`). If the issuer URL is reachable from both the server and the browser, this variable is not needed.
 
@@ -128,7 +128,7 @@ The Docker Compose configuration includes two service accounts assigned to separ
 | `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE` | Zitadel project resource ID — required for service account token validation | Yes | — |
 | `AUTH_SECRET` | Secret used to encrypt sessions (generate with `openssl rand -base64 32`) | Yes | — |
 | `AUTH_TRUST_HOST` | Set to `true` when the Reference Implementation runs behind a reverse proxy or in a containerised environment where the host header may differ from the actual origin | No | — |
-| `RI_APP_URL` | Base URL of the Reference Implementation (used for post-logout redirect) | Yes | `http://localhost:3003` |
+| `RI_APP_URL` | Public base URL of the Reference Implementation. Backs the OIDC post-logout redirect and the default human verification link when publishing credentials | Yes | `http://localhost:3003` |
 
 ### IDP Configuration
 

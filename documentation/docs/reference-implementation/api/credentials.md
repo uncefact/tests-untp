@@ -208,6 +208,12 @@ If any of these are missing, publishing is silently skipped and a `PUBLISH_SKIPP
 
 The IDR entry's `description` field is taken from the primary entity's `description`, falling back to the entity's `name` if no description is set.
 
+**Human verification link**: When publishing without an explicit `humanVerificationUrl`, the published link set includes a link to this Reference Implementation's own verify page. The base is derived from the `RI_APP_URL` environment variable, which is parsed as a URL with `/verify` appended to its path (any query or fragment is dropped, a base path is preserved, and a trailing slash is trimmed); for the default `http://localhost:3003` the link is `http://localhost:3003/verify`. `RI_APP_URL` is configured in the RI's environment (the shipped `.env.example` and Docker Compose files default it to `http://localhost:3003`) and is the same base URL that backs the OIDC post-logout redirect (see [Identity provider requirements](../authentication/idp-requirements)). Supplying `humanVerificationUrl` overrides the default, for deployments that host verification elsewhere.
+
+The published link does **not** carry the credential's decryption key. The key is not registered on the Identity Resolver; it is shared out of band, so access to an encrypted credential does not travel with its discovery link (regardless of whether a given resolver is publicly readable). A credential stored encrypted (the storage default) therefore needs its decryption key supplied out of band to verify, and the published link alone verifies a credential stored unencrypted. The issuing tenant can retrieve that decryption key from the credential's [Get a Credential](#get-a-credential) response and share it through a channel of its choosing. This differs from a link shared directly as a single-link capability, which may embed the key (see [the verify page](../verify-page#decryption)).
+
+If `RI_APP_URL` is unset, is not a valid `http(s)` URL, or carries userinfo when the default is needed, the request is rejected (`400`) up front, before the credential is issued, so a misconfigured deployment fails at request time rather than publishing a broken or secret-bearing link. Set `RI_APP_URL`, or pass `humanVerificationUrl`, to resolve it.
+
 | Publishing Option | Type | Description |
 |-------------------|------|-------------|
 | `publish` | boolean | Whether to publish to the identity resolver |
@@ -215,7 +221,7 @@ The IDR entry's `description` field is taken from the primary entity's `descript
 | `linkTitle` | string | Human-readable title for the link (defaults to the data model name) |
 | `qualifierPath` | string | Qualifier path for sub-identifiers, e.g., `/10/LOT123/21/SER456` (defaults to `/`) |
 | `machineVerificationUrl` | string | URL for machine-readable verification of the credential |
-| `humanVerificationUrl` | string | URL for human-readable verification of the credential |
+| `humanVerificationUrl` | string | URL for human-readable verification of the credential (defaults to `${RI_APP_URL}/verify`, this RI's verify page, when publishing) |
 | `hreflang` | string[] | BCP 47 language tags for the link's target content |
 | `additionalRels` | string[] | Additional link relation types to attach beyond `linkType` |
 | `public` | boolean | Whether the published link is publicly resolvable |
@@ -244,7 +250,7 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 | `publishingOptions.linkTitle` | string | No | Link title (defaults to data model name) |
 | `publishingOptions.qualifierPath` | string | No | Qualifier path (default: `/`) |
 | `publishingOptions.machineVerificationUrl` | string | No | Machine verification URL |
-| `publishingOptions.humanVerificationUrl` | string | No | Human verification URL |
+| `publishingOptions.humanVerificationUrl` | string | No | Human verification URL (defaults to `${RI_APP_URL}/verify` when publishing) |
 | `publishingOptions.hreflang` | string[] | No | BCP 47 language tags for the link's target content |
 | `publishingOptions.additionalRels` | string[] | No | Additional link relation types beyond `linkType` |
 | `publishingOptions.public` | boolean | No | Whether the published link is publicly resolvable |

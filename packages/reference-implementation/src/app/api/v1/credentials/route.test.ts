@@ -254,6 +254,7 @@ describe('POST /api/v1/credentials', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.RI_APP_URL = 'http://localhost:3003';
     setupHappyPath();
   });
 
@@ -762,10 +763,12 @@ describe('POST /api/v1/credentials', () => {
       // resolveIdrService called with scheme IDR only
       expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1');
 
-      // buildPublishLinks called with storage response, link title, and options
+      // buildPublishLinks called with storage response, link title, and options.
+      // humanVerificationUrl defaults to `${RI_APP_URL}/verify` (RI_APP_URL is
+      // set to http://localhost:3003 in beforeEach) since none was supplied.
       expect(mockBuildPublishLinks).toHaveBeenCalledWith(STORAGE_RESPONSE, 'Digital Product Passport', {
         machineVerificationUrl: undefined,
-        humanVerificationUrl: undefined,
+        humanVerificationUrl: 'http://localhost:3003/verify',
       });
 
       // idrService.publishLinks called
@@ -837,6 +840,187 @@ describe('POST /api/v1/credentials', () => {
       expect(mockBuildPublishLinks).toHaveBeenCalledWith(STORAGE_RESPONSE, 'Digital Product Passport', {
         machineVerificationUrl: 'https://verify.example.com/api',
         humanVerificationUrl: 'https://verify.example.com/ui',
+      });
+    });
+
+    // ── humanVerificationUrl default (issue #491) ──────────────────────
+
+    describe('human verification URL default', () => {
+      it('defaults humanVerificationUrl to `${RI_APP_URL}/verify` when publishing without one', async () => {
+        setupPublishingHappyPath();
+        process.env.RI_APP_URL = 'https://ri.example.com';
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+        expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+          STORAGE_RESPONSE,
+          'Digital Product Passport',
+          expect.objectContaining({ humanVerificationUrl: 'https://ri.example.com/verify' }),
+        );
+      });
+
+      it('preserves a base path on RI_APP_URL and trims its trailing slash', async () => {
+        setupPublishingHappyPath();
+        process.env.RI_APP_URL = 'https://ri.example.com/app/';
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+        expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+          STORAGE_RESPONSE,
+          'Digital Product Passport',
+          expect.objectContaining({ humanVerificationUrl: 'https://ri.example.com/app/verify' }),
+        );
+      });
+
+      it('drops a query string on RI_APP_URL rather than appending after it', async () => {
+        setupPublishingHappyPath();
+        process.env.RI_APP_URL = 'https://ri.example.com?tenant=1';
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+        expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+          STORAGE_RESPONSE,
+          'Digital Product Passport',
+          expect.objectContaining({ humanVerificationUrl: 'https://ri.example.com/verify' }),
+        );
+      });
+
+      it('drops a fragment on RI_APP_URL rather than appending after it', async () => {
+        setupPublishingHappyPath();
+        process.env.RI_APP_URL = 'https://ri.example.com#section';
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+        expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+          STORAGE_RESPONSE,
+          'Digital Product Passport',
+          expect.objectContaining({ humanVerificationUrl: 'https://ri.example.com/verify' }),
+        );
+      });
+
+      it('preserves an explicit humanVerificationUrl over the RI_APP_URL default', async () => {
+        setupPublishingHappyPath();
+        process.env.RI_APP_URL = 'https://ri.example.com';
+
+        const req = createFakeRequest(
+          validBody({
+            publishingOptions: { publish: true, humanVerificationUrl: 'https://verify.example.com/ui' },
+          }),
+        );
+        await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+        expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+          STORAGE_RESPONSE,
+          'Digital Product Passport',
+          expect.objectContaining({ humanVerificationUrl: 'https://verify.example.com/ui' }),
+        );
+      });
+
+      it('does not SSRF-check the derived localhost default', async () => {
+        setupPublishingHappyPath();
+        delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+        process.env.RI_APP_URL = 'http://localhost:3003';
+        mockAssertPublicUrl.mockResolvedValue(undefined);
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+        expect(res.status).toBe(201);
+        // No explicit URL was supplied, and the trusted default is not guarded.
+        expect(mockAssertPublicUrl).not.toHaveBeenCalled();
+        expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+          STORAGE_RESPONSE,
+          'Digital Product Passport',
+          expect.objectContaining({ humanVerificationUrl: 'http://localhost:3003/verify' }),
+        );
+      });
+
+      it('fails with 400 before issuance when RI_APP_URL is unset and no humanVerificationUrl is given', async () => {
+        setupPublishingHappyPath();
+        delete process.env.RI_APP_URL;
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+        const json = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(json.error).toContain('RI_APP_URL');
+        // Failure is early: nothing is signed, stored, or published.
+        expect(mockIssueCredential).not.toHaveBeenCalled();
+        expect(mockPublishLinks).not.toHaveBeenCalled();
+      });
+
+      it('fails with 400 when RI_APP_URL is syntactically not a URL', async () => {
+        setupPublishingHappyPath();
+        process.env.RI_APP_URL = 'not a url';
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+        const json = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(json.error).toContain('RI_APP_URL');
+        expect(mockIssueCredential).not.toHaveBeenCalled();
+      });
+
+      it('fails with 400 when RI_APP_URL parses but is not an http(s) URL', async () => {
+        setupPublishingHappyPath();
+        process.env.RI_APP_URL = 'ftp://ri.example.com';
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+        const json = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(json.error).toContain('RI_APP_URL');
+        expect(mockIssueCredential).not.toHaveBeenCalled();
+      });
+
+      it('fails with 400 when RI_APP_URL carries userinfo, rather than publishing the secret', async () => {
+        setupPublishingHappyPath();
+        process.env.RI_APP_URL = 'https://user:pass@ri.example.com';
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+        const json = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(json.error).toContain('RI_APP_URL');
+        expect(mockIssueCredential).not.toHaveBeenCalled();
+      });
+
+      it('uses an explicit humanVerificationUrl even when RI_APP_URL is unset', async () => {
+        setupPublishingHappyPath();
+        delete process.env.RI_APP_URL;
+
+        const req = createFakeRequest(
+          validBody({
+            publishingOptions: { publish: true, humanVerificationUrl: 'https://verify.example.com/ui' },
+          }),
+        );
+        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+        expect(res.status).toBe(201);
+        expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+          STORAGE_RESPONSE,
+          'Digital Product Passport',
+          expect.objectContaining({ humanVerificationUrl: 'https://verify.example.com/ui' }),
+        );
+      });
+
+      it('does not require RI_APP_URL when publish is false', async () => {
+        setupPublishingHappyPath();
+        delete process.env.RI_APP_URL;
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: false } }));
+        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+        expect(res.status).toBe(201);
+        expect(mockBuildPublishLinks).not.toHaveBeenCalled();
       });
     });
 
