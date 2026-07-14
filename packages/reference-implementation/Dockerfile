@@ -154,6 +154,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/api/logger.ts ./src/lib/api/logger.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/schema-loader.ts ./src/lib/credentials/schema-loader.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/cvc ./src/lib/cvc
+# Modules required by prisma/seed.ts and scripts/backfill-decryption-keys.ts
+# (encryption-key resolution and decryption-key protection; relative imports)
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/encryption ./src/lib/encryption
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/prisma/database-url.ts ./src/lib/prisma/database-url.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/decryption-key-protection.ts ./src/lib/credentials/decryption-key-protection.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/backfill-decryption-keys.ts ./src/lib/credentials/backfill-decryption-keys.ts
+# Operator-run maintenance scripts (run via node_modules/.bin/tsx; see each
+# script's header for the in-image invocation)
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/scripts ./scripts
 # Render templates used by prisma/seed.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/templates ./src/templates
 
