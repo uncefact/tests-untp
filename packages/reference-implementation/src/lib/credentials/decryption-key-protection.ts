@@ -1,7 +1,9 @@
 import { EncryptionAlgorithm, isEncryptedEnvelope } from '@uncefact/untp-ri-services/encryption';
 import type { EncryptedEnvelope } from '@uncefact/untp-ri-services/encryption';
-import { getEncryptionService } from '@/lib/encryption/encryption';
-import { apiLogger } from '@/lib/api/logger';
+// Relative imports (not the @/ alias): this module runs inside the Docker
+// image via tsx, where no tsconfig.json exists to resolve path aliases.
+import { getEncryptionService } from '../encryption/encryption';
+import { apiLogger } from '../api/logger';
 
 const logger = apiLogger.child({ module: 'decryption-key-protection' });
 
@@ -46,8 +48,13 @@ export function revealDecryptionKey(stored: string | null): string | null {
     return stored;
   }
 
+  // Resolved outside the decrypt try/catch so a missing or malformed
+  // DATA_ENCRYPTION_KEY surfaces its own precise error rather than the
+  // key-mismatch message below.
+  const encryptionService = getEncryptionService();
+
   try {
-    return getEncryptionService().decrypt(envelope);
+    return encryptionService.decrypt(envelope);
   } catch (error) {
     logger.error({ err: error }, 'Failed to decrypt stored credential decryption key');
     throw new Error(
@@ -56,6 +63,16 @@ export function revealDecryptionKey(stored: string | null): string | null {
       { cause: error },
     );
   }
+}
+
+/**
+ * Whether a stored value resembles an encrypted envelope without being one
+ * (for example a truncated or corrupted envelope). Such values are neither
+ * decryptable nor plausible legacy plaintext, so writers must not re-encrypt
+ * them as if they were legitimate keys.
+ */
+export function looksEnvelopeLikeButInvalid(stored: string): boolean {
+  return stored.startsWith('{') && parseEnvelope(stored) === null;
 }
 
 function parseEnvelope(stored: string): EncryptedEnvelope | null {

@@ -66,6 +66,21 @@ describe('isProtectedDecryptionKey', () => {
   });
 });
 
+describe('looksEnvelopeLikeButInvalid', () => {
+  it('flags truncated or corrupted envelope-like values', async () => {
+    const { looksEnvelopeLikeButInvalid } = await import('./decryption-key-protection');
+    expect(looksEnvelopeLikeButInvalid('{"cipherText":"q1w2')).toBe(true);
+    expect(looksEnvelopeLikeButInvalid('{"foo":"bar"}')).toBe(true);
+  });
+
+  it('accepts genuine envelopes and plausible legacy plaintext', async () => {
+    const { looksEnvelopeLikeButInvalid, protectDecryptionKey } = await import('./decryption-key-protection');
+    expect(looksEnvelopeLikeButInvalid(protectDecryptionKey(PLAINTEXT_KEY))).toBe(false);
+    expect(looksEnvelopeLikeButInvalid(PLAINTEXT_KEY)).toBe(false);
+    expect(looksEnvelopeLikeButInvalid('1'.repeat(64))).toBe(false);
+  });
+});
+
 describe('revealDecryptionKey', () => {
   it('returns null when no key is stored', async () => {
     const { revealDecryptionKey } = await import('./decryption-key-protection');
@@ -102,6 +117,17 @@ describe('revealDecryptionKey', () => {
     const allDigitKey = '1'.repeat(64);
 
     expect(revealDecryptionKey(allDigitKey)).toBe(allDigitKey);
+  });
+
+  it('surfaces the missing-key error, not the mismatch message, when no key is configured', async () => {
+    const { protectDecryptionKey } = await import('./decryption-key-protection');
+    const stored = protectDecryptionKey(PLAINTEXT_KEY) as string;
+
+    jest.resetModules();
+    delete process.env.DATA_ENCRYPTION_KEY;
+    const { revealDecryptionKey } = await import('./decryption-key-protection');
+
+    expect(() => revealDecryptionKey(stored)).toThrow('Missing required DATA_ENCRYPTION_KEY');
   });
 
   it('throws a key-mismatch error and logs when the stored envelope cannot be decrypted', async () => {
