@@ -70,6 +70,11 @@ export function nonEmptyArraySchema<Item extends z.ZodTypeAny>(itemSchema: Item)
  * 10 parses only a value's leading digits, so it silently accepted
  * malformed input such as "1abc" (as 1) and "0x10" (as 0, itself wrongly
  * valid as a non-negative offset).
+ *
+ * A digit string too large for an exact double is rejected: the safe-integer
+ * check catches both a value that overflows to Infinity (which passes a bare
+ * range check) and a value above Number.MAX_SAFE_INTEGER that Number would
+ * round to a different integer than the client sent.
  */
 function strictIntQueryParam(message: string, isInRange: (value: number) => boolean) {
   return z
@@ -77,7 +82,7 @@ function strictIntQueryParam(message: string, isInRange: (value: number) => bool
     .trim()
     .regex(/^[+-]?\d+$/, message)
     .transform((value) => Number(value))
-    .refine(isInRange, message)
+    .refine((value) => Number.isSafeInteger(value) && isInRange(value), message)
     .optional();
 }
 
