@@ -18,6 +18,37 @@ export interface ValidateJsonLdOptions {
 }
 
 /**
+ * jsonld.js's own `JsonLdError` wraps a document loader's rejection in the
+ * proprietary `details.cause` and never sets native `Error.cause`
+ * (jsonld@8.3.3 `lib/JsonLdError.js`, loader wrap in
+ * `lib/ContextResolver.js`), so a plain `.cause` walk over a caught
+ * expansion failure dead-ends one hop early: the SSRF guard's rejection
+ * (see `createJsonLdDocumentLoader`) is reachable only via the non-standard
+ * `error.details.cause`, unlike the schema-fetch path (`schema-loader.ts`),
+ * which surfaces the same class of rejection on the native chain.
+ *
+ * Rehydrates the buried error onto `error.cause` so a plain `.cause` walk
+ * reaches it on both paths. Mutates and returns the same object jsonld.js
+ * just threw for this call (safe: nothing else holds a reference to it), and
+ * only when there is something buried and jsonld.js has not already set a
+ * `cause` itself, so a malformed `@context` (which never reaches the
+ * document loader, and so has nothing at `details.cause`) does not gain a
+ * spurious one.
+ *
+ * @see https://github.com/uncefact/tests-untp/issues/773
+ */
+function rehydrateJsonLdCause(error: unknown): unknown {
+  if (!(error instanceof Error) || error.cause !== undefined) {
+    return error;
+  }
+  const buried = (error as Error & { details?: { cause?: unknown } }).details?.cause;
+  if (buried !== undefined) {
+    error.cause = buried;
+  }
+  return error;
+}
+
+/**
  * Catches malformed contexts, undefined terms, and structurally invalid
  * linked data by expanding to RDF in safe mode (unless explicitly disabled).
  *
@@ -30,7 +61,9 @@ export interface ValidateJsonLdOptions {
  * @see ../../../../docs/adrs/033-cvc-architecture.md ADR-033 §7 (Security considerations).
  * @throws {JsonLdInvalidShapeError} if `document` is not a non-null object.
  * @throws {JsonLdExpansionFailedError} if `jsonld.toRDF` rejects (which
- *   includes a remote `@context` failing the SSRF guard).
+ *   includes a remote `@context` failing the SSRF guard; the guard's
+ *   rejection is reachable via native `.cause` hops off the thrown error,
+ *   see {@link rehydrateJsonLdCause}).
  */
 export async function validateJsonLd(document: unknown, options?: ValidateJsonLdOptions): Promise<void> {
   if (typeof document !== 'object' || document === null) {
@@ -56,6 +89,6 @@ export async function validateJsonLd(document: unknown, options?: ValidateJsonLd
       { safe: options?.safe ?? true, documentLoader } as Parameters<typeof jsonld.toRDF>[1],
     );
   } catch (cause) {
-    throw new JsonLdExpansionFailedError(cause);
+    throw new JsonLdExpansionFailedError(rehydrateJsonLdCause(cause));
   }
 }

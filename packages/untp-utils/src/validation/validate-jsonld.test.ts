@@ -54,6 +54,62 @@ describe('validateJsonLd', () => {
     await expect(validateJsonLd({})).rejects.toMatchObject({ cause });
   });
 
+  describe('rehydrating a buried jsonld.js loader error', () => {
+    // jsonld.js's own JsonLdError stores a document loader's rejection at
+    // the proprietary `details.cause` and never sets native `Error.cause`
+    // (jsonld@8.3.3 `lib/JsonLdError.js`, loader wrap in
+    // `lib/ContextResolver.js`). `validateJsonLd` rehydrates it onto the
+    // caught error's native `cause` so a plain `.cause` walk reaches it,
+    // matching the schema-fetch path (see `validate-jsonld.ssrf.test.ts`).
+
+    it('rehydrates the buried loader error onto the native cause chain', async () => {
+      const buried = new Error('SSRF rejected');
+      const jsonldError = Object.assign(new Error('Dereferencing a URL did not result in a valid JSON-LD object.'), {
+        name: 'jsonld.InvalidUrl',
+        details: { code: 'loading remote context failed', url: 'https://internal.example', cause: buried },
+      });
+      toRDF.mockRejectedValue(jsonldError as never);
+
+      const error = await validateJsonLd({}).catch((e: unknown) => e);
+
+      expect((error as JsonLdExpansionFailedError).cause).toBe(jsonldError);
+      // Without the rehydration, jsonldError.cause stays unset (jsonld.js
+      // never sets it), so this hop would be absent.
+      expect(jsonldError.cause).toBe(buried);
+    });
+
+    it('does not add a spurious cause when the jsonld error has no buried loader error', async () => {
+      // A malformed @context never reaches the document loader, so jsonld.js's
+      // details carry no `cause` to rehydrate.
+      const jsonldError = Object.assign(new Error('Invalid JSON-LD syntax; @context must be an object.'), {
+        name: 'jsonld.SyntaxError',
+        details: { code: 'invalid @context' },
+      });
+      toRDF.mockRejectedValue(jsonldError as never);
+
+      await validateJsonLd({}).catch(() => undefined);
+
+      // Asserts absence, not merely `undefined`: an implementation that sets
+      // `error.cause = undefined` unconditionally would pass a `toBeUndefined()`
+      // check but still fabricate a `cause` property that was never there.
+      expect('cause' in jsonldError).toBe(false);
+    });
+
+    it('does not clobber an existing native cause on the jsonld error', async () => {
+      const existingCause = new Error('existing, legitimate native cause');
+      const buried = new Error('buried loader error, must not overwrite the existing cause');
+      const jsonldError = Object.assign(new Error('wrapped', { cause: existingCause }), {
+        name: 'jsonld.InvalidUrl',
+        details: { cause: buried },
+      });
+      toRDF.mockRejectedValue(jsonldError as never);
+
+      await validateJsonLd({}).catch(() => undefined);
+
+      expect(jsonldError.cause).toBe(existingCause);
+    });
+  });
+
   it('throws JsonLdInvalidShapeError when the document is not an object', async () => {
     await expect(validateJsonLd('not-an-object')).rejects.toMatchObject({
       name: 'JsonLdInvalidShapeError',
