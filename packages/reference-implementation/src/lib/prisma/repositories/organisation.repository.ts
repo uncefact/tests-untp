@@ -139,6 +139,7 @@ export async function createOrganisations(
       } catch (e) {
         mapDatabaseError(e, {
           conflict: 'An identifier in this request is already the primary identifier of another organisation',
+          invalidReference: 'The referenced primary identifier no longer exists',
         });
       }
 
@@ -279,7 +280,11 @@ export async function updateOrganisation(
             })),
           });
         } catch (e) {
-          mapDatabaseError(e, { invalidReference: 'One or more secondary identifiers no longer exist' });
+          mapDatabaseError(e, {
+            conflict:
+              'One or more secondary identifiers were concurrently linked to this organisation; retry the request',
+            invalidReference: 'The organisation or one or more secondary identifiers no longer exist',
+          });
         }
       }
     }
@@ -307,7 +312,7 @@ export async function updateOrganisation(
     } catch (e) {
       mapDatabaseError(e, {
         conflict: 'The identifier is already the primary identifier of another organisation',
-        notFound: 'Organisation not found or access denied',
+        notFound: 'Organisation or a referenced resource not found',
       });
     }
   });

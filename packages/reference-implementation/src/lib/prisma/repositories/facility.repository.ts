@@ -149,31 +149,47 @@ export async function createFacilities(
       }
 
       // Create the facility entity
+      let facility: FacilityWithRelations;
       try {
-        results.push(
-          await tx.facility.create({
-            data: {
-              tenantId,
-              name,
-              description,
-              location: location ? (location as Prisma.InputJsonValue) : undefined,
-              operatingOrganisationId,
-              primaryIdentifierId,
-              ...(secondaryIdentifierIds?.length && {
-                secondaryIdentifiers: {
-                  createMany: {
-                    data: secondaryIdentifierIds.map((identifierId: string) => ({ identifierId })),
-                  },
-                },
-              }),
-            },
-            include: FACILITY_DETAIL_INCLUDE,
-          }),
-        );
+        facility = await tx.facility.create({
+          data: {
+            tenantId,
+            name,
+            description,
+            location: location ? (location as Prisma.InputJsonValue) : undefined,
+            operatingOrganisationId,
+            primaryIdentifierId,
+          },
+          include: FACILITY_DETAIL_INCLUDE,
+        });
       } catch (e) {
         mapDatabaseError(e, {
           conflict: 'An identifier in this request is already the primary identifier of another facility',
+          invalidReference: 'The referenced organisation or identifier no longer exists',
         });
+      }
+
+      // Create join rows for secondary identifiers
+      if (secondaryIdentifierIds?.length) {
+        try {
+          await tx.facilitySecondaryIdentifier.createMany({
+            data: secondaryIdentifierIds.map((identifierId: string) => ({
+              facilityId: facility.id,
+              identifierId,
+            })),
+          });
+        } catch (e) {
+          mapDatabaseError(e, { invalidReference: 'One or more secondary identifiers no longer exist' });
+        }
+
+        // Re-fetch to include the newly created secondary identifier relations
+        const refetched = await tx.facility.findUniqueOrThrow({
+          where: { id: facility.id },
+          include: FACILITY_DETAIL_INCLUDE,
+        });
+        results.push(refetched);
+      } else {
+        results.push(facility);
       }
     }
 
@@ -299,7 +315,10 @@ export async function updateFacility(
             })),
           });
         } catch (e) {
-          mapDatabaseError(e, { invalidReference: 'One or more secondary identifiers no longer exist' });
+          mapDatabaseError(e, {
+            conflict: 'One or more secondary identifiers were concurrently linked to this facility; retry the request',
+            invalidReference: 'The facility or one or more secondary identifiers no longer exist',
+          });
         }
       }
     }
@@ -333,7 +352,7 @@ export async function updateFacility(
     } catch (e) {
       mapDatabaseError(e, {
         conflict: 'The identifier is already the primary identifier of another facility',
-        notFound: 'Facility not found or access denied',
+        notFound: 'Facility or a referenced resource not found',
       });
     }
   });

@@ -79,7 +79,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
- *         description: A DID with this alias already exists on the service instance
+ *         description: A DID with this alias already exists on the service instance, or a DID record with this DID already exists
  *         content:
  *           application/json:
  *             schema:

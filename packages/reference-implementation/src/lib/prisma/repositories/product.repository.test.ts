@@ -2,8 +2,13 @@ import { createProducts, getProductById, listProducts, updateProduct, deleteProd
 import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import {
+  prismaForeignKeyViolationError,
+  prismaRecordNotFoundError,
+  prismaUniqueConstraintError,
+} from '@/lib/prisma/db-errors.fixtures';
 
-// Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
+// Mock Prisma client. Use jest.fn() inside the factory to avoid hoisting issues.
 const mockTx = {
   product: {
     findFirst: jest.fn(),
@@ -63,29 +68,6 @@ const mockProduct = prisma.product as unknown as {
   findMany: jest.Mock;
   count: jest.Mock;
 };
-
-function prismaUniqueConstraintError(): Error {
-  const error = new Error('Unique constraint failed on the fields: (`primaryIdentifierId`)');
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2002', clientVersion: '6.0.0' });
-  return error;
-}
-
-function prismaRecordNotFoundError(): Error {
-  const error = new Error(
-    'An operation failed because it depends on one or more records that were required but not found.',
-  );
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2025', clientVersion: '6.0.0' });
-  return error;
-}
-
-function prismaForeignKeyViolationError(): Error {
-  const error = new Error('Foreign key constraint failed on the field: `parentId`');
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2003', clientVersion: '6.0.0' });
-  return error;
-}
 
 describe('product.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -319,6 +301,15 @@ describe('product.repository', () => {
       await expect(result).rejects.toThrow(ValidationError);
       await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
       expect(mockTx.product.create).not.toHaveBeenCalled();
+    });
+
+    it('maps a foreign-key violation on product creation to ValidationError', async () => {
+      mockTx.product.create.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = createProducts(TENANT_ID, [{ name: 'Test Product', level: 'MODEL' }]);
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('One or more referenced resources no longer exist');
     });
 
     it('maps a foreign-key violation on secondary-identifier creation to ValidationError', async () => {
@@ -611,7 +602,25 @@ describe('product.repository', () => {
       });
 
       await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('One or more secondary identifiers no longer exist');
+      await expect(result).rejects.toThrow('The product or one or more secondary identifiers no longer exist');
+      expect(mockTx.product.update).not.toHaveBeenCalled();
+    });
+
+    it('maps a unique-constraint violation on secondary-identifier replacement to ConflictError', async () => {
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+      mockTx.productSecondaryIdentifier.deleteMany.mockResolvedValue({ count: 0 });
+      mockTx.productSecondaryIdentifier.createMany.mockRejectedValue(prismaUniqueConstraintError());
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, {
+        secondaryIdentifierIds: [SECONDARY_ID_1],
+      });
+
+      await expect(result).rejects.toThrow(ConflictError);
+      await expect(result).rejects.toThrow(
+        'One or more secondary identifiers were concurrently linked to this product; retry the request',
+      );
+      expect(mockTx.product.update).not.toHaveBeenCalled();
     });
 
     it('clears secondary identifiers with empty array', async () => {
@@ -695,7 +704,7 @@ describe('product.repository', () => {
       const result = updateProduct(PRODUCT_ID, TENANT_ID, { name: 'Updated Name' });
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Product not found or access denied');
+      await expect(result).rejects.toThrow('Product or a referenced resource not found');
     });
   });
 
@@ -782,7 +791,7 @@ describe('product.repository', () => {
       const result = deleteProduct(PARENT_ID, TENANT_ID);
 
       await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('Cannot delete: BATCH product(s) depend on this MODEL');
+      await expect(result).rejects.toThrow('Cannot delete: dependent products exist');
     });
   });
 });

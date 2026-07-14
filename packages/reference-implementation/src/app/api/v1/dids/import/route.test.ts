@@ -8,7 +8,7 @@ jest.mock('next/server', () => ({
 }));
 
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
+  const { ConflictError, NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
   const { ValidationError } = jest.requireActual('@/lib/api/validation');
 
   function jsonResponse(body: unknown, init?: { status?: number }) {
@@ -26,6 +26,9 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
           }
           if (e instanceof NotFoundError) {
             return jsonResponse({ error: (e as Error).message }, { status: 404 });
+          }
+          if (e instanceof ConflictError) {
+            return jsonResponse({ error: (e as Error).message }, { status: 409 });
           }
           if (e instanceof ServiceRegistryError) {
             return jsonResponse({ error: (e as Error).message }, { status: 500 });
@@ -268,12 +271,9 @@ describe('POST /api/v1/dids/import', () => {
     expect(mockCreateDid).toHaveBeenCalledTimes(1);
   });
 
-  it('returns 500 when createDid throws a unique constraint error (duplicate DID)', async () => {
-    mockCreateDid.mockRejectedValueOnce(
-      Object.assign(new Error('Unique constraint failed on the fields: (`did`)'), {
-        code: 'P2002',
-      }),
-    );
+  it('returns 409 when createDid rejects with the duplicate-DID conflict', async () => {
+    const { ConflictError } = jest.requireActual('@/lib/api/errors');
+    mockCreateDid.mockRejectedValueOnce(new ConflictError('A DID record with this DID already exists'));
 
     const req = createFakeRequest({
       did: 'did:web:example.com',
@@ -285,8 +285,8 @@ describe('POST /api/v1/dids/import', () => {
     const res = await POST(req, createContext());
     const body = await res.json();
 
-    expect(res.status).toBe(500);
-    expect(body.error).toBeDefined();
+    expect(res.status).toBe(409);
+    expect(body.error).toBe('A DID record with this DID already exists');
   });
 
   it('returns 500 when createDid rejects with a generic error', async () => {

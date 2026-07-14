@@ -223,6 +223,7 @@ export async function createProducts(tenantId: string, inputs: CreateProductInpu
       } catch (e) {
         mapDatabaseError(e, {
           conflict: 'An identifier in this request is already the primary identifier of another product',
+          invalidReference: 'One or more referenced resources no longer exist',
         });
       }
 
@@ -409,7 +410,10 @@ export async function updateProduct(
             })),
           });
         } catch (e) {
-          mapDatabaseError(e, { invalidReference: 'One or more secondary identifiers no longer exist' });
+          mapDatabaseError(e, {
+            conflict: 'One or more secondary identifiers were concurrently linked to this product; retry the request',
+            invalidReference: 'The product or one or more secondary identifiers no longer exist',
+          });
         }
       }
     }
@@ -457,7 +461,7 @@ export async function updateProduct(
     } catch (e) {
       mapDatabaseError(e, {
         conflict: 'The identifier is already the primary identifier of another product',
-        notFound: 'Product not found or access denied',
+        notFound: 'Product or a referenced resource not found',
       });
     }
   });
@@ -504,10 +508,12 @@ export async function deleteProduct(id: string, tenantId: string): Promise<Produ
       return await tx.product.delete({ where: { id } });
     } catch (e) {
       // The restrict violation maps to a 400 (not a 409) to match the
-      // established contract of the BATCH-children pre-check above.
+      // established contract of the BATCH-children pre-check above. Unlike the
+      // pre-check, the constraint fires for a child of any level, so the
+      // message stays level-neutral.
       mapDatabaseError(e, {
         notFound: 'Product not found or access denied',
-        invalidReference: 'Cannot delete: BATCH product(s) depend on this MODEL',
+        invalidReference: 'Cannot delete: dependent products exist',
       });
     }
   });

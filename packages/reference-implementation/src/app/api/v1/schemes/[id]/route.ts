@@ -140,7 +140,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
- *         description: An identifier scheme with this primary key already exists for the registrar
+ *         description: An identifier scheme with this primary key already exists for the registrar, or a qualifier with this key already exists for the scheme
  *         content:
  *           application/json:
  *             schema:
