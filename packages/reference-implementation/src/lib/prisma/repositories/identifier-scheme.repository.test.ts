@@ -38,6 +38,11 @@ jest.mock('../prisma', () => ({
 
 // Import the mocked prisma after jest.mock
 import { prisma } from '../prisma';
+import {
+  prismaUniqueConstraintError,
+  prismaForeignKeyViolationError,
+  prismaRecordNotFoundError,
+} from '../db-errors.fixtures';
 
 const mockIdentifierScheme = prisma.identifierScheme as unknown as {
   create: jest.Mock;
@@ -45,29 +50,6 @@ const mockIdentifierScheme = prisma.identifierScheme as unknown as {
   findMany: jest.Mock;
   count: jest.Mock;
 };
-
-function prismaUniqueConstraintError(): Error {
-  const error = new Error('Unique constraint failed on the fields: (`registrarId`,`primaryKey`)');
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2002', clientVersion: '6.0.0' });
-  return error;
-}
-
-function prismaRecordNotFoundError(): Error {
-  const error = new Error(
-    'An operation failed because it depends on one or more records that were required but not found.',
-  );
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2025', clientVersion: '6.0.0' });
-  return error;
-}
-
-function prismaForeignKeyViolationError(): Error {
-  const error = new Error('Foreign key constraint failed on the field: `registrarId`');
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2003', clientVersion: '6.0.0' });
-  return error;
-}
 
 describe('identifier-scheme.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -540,6 +522,22 @@ describe('identifier-scheme.repository', () => {
 
       await expect(result).rejects.toThrow(NotFoundError);
       await expect(result).rejects.toThrow('Identifier scheme not found or access denied');
+    });
+
+    it('rejects a unique-constraint violation with the original error (uncovered code)', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      const dbError = prismaUniqueConstraintError();
+      mockTx.identifierScheme.delete.mockRejectedValue(dbError);
+
+      await expect(deleteIdentifierScheme('scheme-1', TENANT_ID)).rejects.toBe(dbError);
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      const dbError = new Error('connection lost');
+      mockTx.identifierScheme.delete.mockRejectedValue(dbError);
+
+      await expect(deleteIdentifierScheme('scheme-1', TENANT_ID)).rejects.toBe(dbError);
     });
   });
 });

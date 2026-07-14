@@ -40,6 +40,11 @@ jest.mock('../prisma', () => ({
 // Import the mocked prisma after jest.mock
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
+import {
+  prismaForeignKeyViolationError,
+  prismaRecordNotFoundError,
+  prismaUniqueConstraintError,
+} from '../db-errors.fixtures';
 
 const mockDataModel = prisma.dataModel as unknown as {
   create: jest.Mock;
@@ -57,22 +62,6 @@ const DETAIL_INCLUDE_SHAPE = {
 const LIST_INCLUDE_SHAPE = {
   parentConfig: true,
 };
-
-function prismaUniqueConstraintError(): Error {
-  const error = new Error('Unique constraint failed on the fields: (`tenantId`,`name`,`credentialType`,`version`)');
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2002', clientVersion: '6.0.0' });
-  return error;
-}
-
-function prismaRecordNotFoundError(): Error {
-  const error = new Error(
-    'An operation failed because it depends on one or more records that were required but not found.',
-  );
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2025', clientVersion: '6.0.0' });
-  return error;
-}
 
 describe('data-model.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -452,6 +441,22 @@ describe('data-model.repository', () => {
       await expect(result).rejects.toThrow(NotFoundError);
       await expect(result).rejects.toThrow('Data model not found or access denied');
     });
+
+    it('rethrows a non-database error unchanged', async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      const dbError = new Error('connection lost');
+      mockTx.dataModel.update.mockRejectedValue(dbError);
+
+      await expect(updateDataModel('config-ext-1', TENANT_ID, { name: 'Updated Name' })).rejects.toBe(dbError);
+    });
+
+    it('rethrows a database error whose code the context does not cover', async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      const dbError = prismaForeignKeyViolationError();
+      mockTx.dataModel.update.mockRejectedValue(dbError);
+
+      await expect(updateDataModel('config-ext-1', TENANT_ID, { name: 'Updated Name' })).rejects.toBe(dbError);
+    });
   });
 
   describe('deleteDataModel', () => {
@@ -485,6 +490,22 @@ describe('data-model.repository', () => {
 
       await expect(result).rejects.toThrow(NotFoundError);
       await expect(result).rejects.toThrow('Data model not found or access denied');
+    });
+
+    it('rethrows a non-database error unchanged', async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      const dbError = new Error('connection lost');
+      mockTx.dataModel.delete.mockRejectedValue(dbError);
+
+      await expect(deleteDataModel('config-ext-1', TENANT_ID)).rejects.toBe(dbError);
+    });
+
+    it('rethrows a database error whose code the context does not cover', async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue(EXTENSION_RECORD);
+      const dbError = prismaForeignKeyViolationError();
+      mockTx.dataModel.delete.mockRejectedValue(dbError);
+
+      await expect(deleteDataModel('config-ext-1', TENANT_ID)).rejects.toBe(dbError);
     });
   });
 });

@@ -40,6 +40,7 @@ jest.mock('../prisma', () => ({
 
 // Import the mocked prisma after jest.mock
 import { prisma } from '../prisma';
+import { prismaForeignKeyViolationError, prismaRecordNotFoundError } from '../db-errors.fixtures';
 
 const mockRenderTemplate = prisma.renderTemplate as unknown as {
   create: jest.Mock;
@@ -52,22 +53,6 @@ const mockRenderTemplate = prisma.renderTemplate as unknown as {
 };
 
 const INCLUDE_SHAPE = {};
-
-function prismaRecordNotFoundError(): Error {
-  const error = new Error(
-    'An operation failed because it depends on one or more records that were required but not found.',
-  );
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2025', clientVersion: '6.0.0' });
-  return error;
-}
-
-function prismaForeignKeyViolationError(): Error {
-  const error = new Error('Foreign key constraint failed on the field: `dataModelId`');
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2003', clientVersion: '6.0.0' });
-  return error;
-}
 
 describe('render-template.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -206,7 +191,7 @@ describe('render-template.repository', () => {
           storageUrl: 'https://storage.example.com/templates/dpp-default.html',
           digestMultibase: 'zTESTabc123',
         }),
-      ).rejects.toThrow(connectionError);
+      ).rejects.toBe(connectionError);
     });
   });
 

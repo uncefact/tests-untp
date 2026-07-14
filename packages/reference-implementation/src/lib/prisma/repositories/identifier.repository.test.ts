@@ -5,9 +5,10 @@ import {
   updateIdentifier,
   deleteIdentifier,
 } from './identifier.repository';
-import { ConflictError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { SYSTEM_TENANT_ID } from '../constants';
+import { prismaUniqueConstraintError, prismaRecordNotFoundError } from '../db-errors.fixtures';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -42,13 +43,6 @@ const mockIdentifier = prisma.identifier as unknown as {
   findMany: jest.Mock;
   count: jest.Mock;
 };
-
-function prismaUniqueConstraintError(): Error {
-  const error = new Error('Unique constraint failed on the fields: (`schemeId`,`value`,`tenantId`)');
-  error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2002', clientVersion: '6.0.0' });
-  return error;
-}
 
 describe('identifier.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -274,24 +268,21 @@ describe('identifier.repository', () => {
       mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
       mockTx.identifier.update.mockRejectedValue(prismaUniqueConstraintError());
 
-      await expect(updateIdentifier('ident-1', TENANT_ID, { value: '1234567890123' })).rejects.toThrow(
-        'An identifier with this value already exists for the scheme',
-      );
+      const result = updateIdentifier('ident-1', TENANT_ID, { value: '1234567890123' });
+
+      await expect(result).rejects.toBeInstanceOf(ConflictError);
+      await expect(result).rejects.toThrow('An identifier with this value already exists for the scheme');
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {
       mockTx.identifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
       mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
-      const raceError = new Error(
-        'An operation failed because it depends on one or more records that were required but not found.',
-      );
-      raceError.name = 'PrismaClientKnownRequestError';
-      Object.assign(raceError, { code: 'P2025', clientVersion: '6.0.0' });
-      mockTx.identifier.update.mockRejectedValue(raceError);
+      mockTx.identifier.update.mockRejectedValue(prismaRecordNotFoundError());
 
-      await expect(updateIdentifier('ident-1', TENANT_ID, { value: '1234567890123' })).rejects.toThrow(
-        'Identifier not found or access denied',
-      );
+      const result = updateIdentifier('ident-1', TENANT_ID, { value: '1234567890123' });
+
+      await expect(result).rejects.toBeInstanceOf(NotFoundError);
+      await expect(result).rejects.toThrow('Identifier not found or access denied');
     });
 
     it('throws ValidationError if the new value does not match the pattern', async () => {
@@ -330,12 +321,12 @@ describe('identifier.repository', () => {
 
     it('maps a record-not-found race to NotFoundError', async () => {
       mockTx.identifier.findFirst.mockResolvedValue(IDENTIFIER_RECORD);
-      const raceError = new Error('Record to delete does not exist.');
-      raceError.name = 'PrismaClientKnownRequestError';
-      Object.assign(raceError, { code: 'P2025', clientVersion: '6.0.0' });
-      mockTx.identifier.delete.mockRejectedValue(raceError);
+      mockTx.identifier.delete.mockRejectedValue(prismaRecordNotFoundError());
 
-      await expect(deleteIdentifier('ident-1', TENANT_ID)).rejects.toThrow('Identifier not found or access denied');
+      const result = deleteIdentifier('ident-1', TENANT_ID);
+
+      await expect(result).rejects.toBeInstanceOf(NotFoundError);
+      await expect(result).rejects.toThrow('Identifier not found or access denied');
     });
 
     it('throws if identifier does not belong to the tenant', async () => {
