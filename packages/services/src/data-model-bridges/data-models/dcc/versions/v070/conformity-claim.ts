@@ -18,10 +18,17 @@ type DccConformitySubject = {
   conformityAssessment?: DccAssessment[];
 };
 
-/** Collects topic URIs from a `conformityTopic` value, tolerating any shape. */
+/**
+ * Collects topic URIs from a `conformityTopic` value, accepting either a single
+ * topic object or an array of them. The specification classifies a criterion by
+ * "a conformityTopic" (singular) and the published schema puts no shape
+ * constraint on the criterion-level field, so a lone topic authored as a bare
+ * object is captured rather than discarded. A present-but-shapeless value (a
+ * string, or an object without an `id`) yields no ids.
+ */
 function topicIds(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
+  const topics = Array.isArray(value) ? value : [value];
+  return topics
     .map((topic) => (topic as DccTopic | null)?.id)
     .filter((id): id is string => typeof id === 'string' && id.length > 0);
 }
@@ -65,11 +72,12 @@ export function extractDccConformityClaim(subject: CredentialSubject): Conformit
       assessmentCriteriaIds.push(criterion.id);
       // `!= null` distinguishes absent-or-null (the credential does not
       // classify the criterion, so the topic check is skipped per ADR-038)
-      // from non-null: a non-null but malformed (non-array) declaration
-      // extracts as an empty declaration rather than collapsing into absent,
-      // so the validator still runs against it. A JSON `null` counts as
-      // absent because JSON-LD 1.1 drops null-valued entries at expansion,
-      // making null the idiom for "no declaration".
+      // from a present declaration. `topicIds` captures a single topic object
+      // or an array of them; a present-but-shapeless value (a string, or an
+      // object without an `id`) extracts as an empty declaration rather than
+      // collapsing into absent, so the validator still runs against it. A JSON
+      // `null` counts as absent because JSON-LD 1.1 drops null-valued entries
+      // at expansion, making null the idiom for "no declaration".
       criteria.push({
         criterion: criterion.id,
         ...(criterion.conformityTopic != null && { conformityTopics: topicIds(criterion.conformityTopic) }),

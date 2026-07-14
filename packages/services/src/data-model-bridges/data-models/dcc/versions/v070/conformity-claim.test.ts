@@ -58,11 +58,13 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
   });
 
   it('validates the published sample instance clean end to end against its scheme', () => {
-    // The fix's acceptance criterion: extraction and validation composed over
-    // the spec owners' sample must produce zero warnings against a scheme
-    // projection publishing the profile the sample references. A regression
-    // split across the extractor and the validator cannot hide behind either
-    // suite passing alone.
+    // Extraction and validation composed over the spec owners' sample must
+    // produce zero warnings against a scheme projection publishing the profile
+    // the sample references. This pins the happy path; the assessment
+    // projection is asserted populated below so a regressed extractor that
+    // stopped emitting assessments fails here rather than passing on an empty
+    // result. The split-regression negative (the assessment check never
+    // running) is pinned separately by the composition-negative test below.
     const criterion = (id: string, name: string, topic: string) => ({
       canonicalId: `https://coppermark.org/rra/v3.0/criterion/${id}`,
       name,
@@ -94,6 +96,7 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
 
     const claim = extractDccConformityClaim(officialSample.credentialSubject);
     expect(claim).not.toBeNull();
+    expect(claim!.assessments).toHaveLength(3);
     expect(validateConformityClaim(claim!, coppermark)).toEqual([]);
   });
 
@@ -239,6 +242,50 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
     });
   });
 
+  it('emits conformity-profile.not-specified through extraction and validation composed', () => {
+    // Symmetric with the assessment-topic-mismatch composition negative: the
+    // profile-absent advisory must fire through both layers, not just leave the
+    // extractor result profile-less. The scheme resolves; the claim names no
+    // profile, so criterion and topic checks are deliberately not performed.
+    const subject = {
+      referenceScheme: { id: 'https://example.com/scheme' },
+      conformityAssessment: [{ assessmentCriteria: [{ id: 'https://example.com/scheme/c/1.0.0' }] }],
+    };
+    const scheme: ConformityScheme = {
+      canonicalId: 'https://example.com/scheme',
+      sourceUrl: 'https://example.com/scheme',
+      specVersion: '0.7.0',
+      name: 'Scheme',
+      profiles: [],
+    };
+    const claim = extractDccConformityClaim(subject);
+    const warnings = validateConformityClaim(claim!, scheme);
+    expect(warnings.map((w) => w.code)).toEqual(['conformity-profile.not-specified']);
+  });
+
+  it('captures a criterion topic authored as a single bare object rather than an array', () => {
+    // The published schema puts no shape constraint on the criterion-level
+    // conformityTopic, and the spec classifies a criterion by "a" topic
+    // (singular), so a lone topic authored as a bare object is a conformant
+    // declaration and must be captured, not dropped to an empty list (which
+    // would trip a false-positive omission warning against a profile that
+    // publishes that topic).
+    const subject = {
+      referenceScheme: { id: 'https://example.com/s' },
+      referenceProfile: { id: 'https://example.com/s/p/1.0.0' },
+      conformityAssessment: [
+        {
+          assessmentCriteria: [
+            { id: 'https://example.com/s/c/1.0.0', conformityTopic: { id: 'https://vocabulary.example.com/t/1.0.0' } },
+          ],
+        },
+      ],
+    };
+    expect(extractDccConformityClaim(subject)?.criteria).toEqual([
+      { criterion: 'https://example.com/s/c/1.0.0', conformityTopics: ['https://vocabulary.example.com/t/1.0.0'] },
+    ]);
+  });
+
   it('extracts a malformed non-array conformityTopic as an empty declaration without throwing', () => {
     const subject = {
       referenceScheme: { id: 'https://example.com/s' },
@@ -257,6 +304,52 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
     const claim = extractDccConformityClaim(subject);
     expect(claim?.criteria).toEqual([{ criterion: 'https://example.com/s/c/1.0.0', conformityTopics: [] }]);
     expect(claim?.assessments).toEqual([{ criteria: ['https://example.com/s/c/1.0.0'], conformityTopics: [] }]);
+  });
+
+  it('surfaces no assessment warning for a malformed assessment-level topic (documented lenient gap)', () => {
+    // A malformed (non-array, non-topic) assessment-level conformityTopic
+    // extracts to an empty list, and the one-directional assessment check never
+    // fires on an empty declaration, so a malformed assessment topic is
+    // silently indistinguishable from a clean omission, unlike the criterion
+    // level. Pinned so this ADR-038 tradeoff is visible and any change to it is
+    // deliberate rather than incidental.
+    const subject = {
+      referenceScheme: { id: 'https://example.com/scheme' },
+      referenceProfile: { id: 'https://example.com/scheme/p/1.0.0' },
+      conformityAssessment: [
+        {
+          conformityTopic: 'not-an-array',
+          assessmentCriteria: [{ id: 'https://example.com/scheme/c/1.0.0' }],
+        },
+      ],
+    };
+    const scheme: ConformityScheme = {
+      canonicalId: 'https://example.com/scheme',
+      sourceUrl: 'https://example.com/scheme',
+      specVersion: '0.7.0',
+      name: 'Scheme',
+      profiles: [
+        {
+          canonicalId: 'https://example.com/scheme/p/1.0.0',
+          name: 'Profile',
+          version: '1.0.0',
+          status: 'active',
+          criteria: [
+            {
+              canonicalId: 'https://example.com/scheme/c/1.0.0',
+              name: 'Criterion',
+              version: '1.0.0',
+              status: 'active',
+              topics: [{ canonicalId: 'https://vocabulary.example.com/t/right' }],
+              tags: [],
+            },
+          ],
+        },
+      ],
+    };
+    const claim = extractDccConformityClaim(subject);
+    const warnings = validateConformityClaim(claim!, scheme);
+    expect(warnings.some((w) => w.code === 'conformity-assessment.topic-mismatch')).toBe(false);
   });
 
   it('omits assessments when no assessment carries criteria or topics', () => {

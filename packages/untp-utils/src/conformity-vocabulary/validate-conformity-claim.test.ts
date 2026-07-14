@@ -170,6 +170,66 @@ describe('validateConformityClaim', () => {
       expect(codes).toContain(ConformityWarningCode.CriterionNotInProfile);
       expect(codes).not.toContain(ConformityWarningCode.AssessmentTopicMismatch);
     });
+
+    it('deduplicates a topic two referenced criteria both publish in the reported union', () => {
+      // Two criteria publishing an overlapping topic must contribute it once to
+      // the `expected` union, so the diagnostic is not polluted with duplicates.
+      const SHARED = 'https://vocabulary.example.com/conformity-topics/shared';
+      const ONLY_A = 'https://vocabulary.example.com/conformity-topics/only-a';
+      const ONLY_C = 'https://vocabulary.example.com/conformity-topics/only-c';
+      const CRITERION_C = 'https://example.com/criterion/c/1.0.0';
+      const dedupScheme: ConformityScheme = {
+        canonicalId: SCHEME_URI,
+        sourceUrl: SCHEME_URI,
+        specVersion: '0.7.0',
+        name: 'Test Scheme',
+        profiles: [
+          {
+            canonicalId: PROFILE_URI,
+            name: 'Full',
+            version: '1.0.0',
+            status: 'active',
+            criteria: [
+              {
+                canonicalId: CRITERION_A,
+                name: 'A',
+                version: '1.0.0',
+                status: 'active',
+                topics: [{ canonicalId: SHARED }, { canonicalId: ONLY_A }],
+                tags: [],
+              },
+              {
+                canonicalId: CRITERION_C,
+                name: 'C',
+                version: '1.0.0',
+                status: 'active',
+                topics: [{ canonicalId: SHARED }, { canonicalId: ONLY_C }],
+                tags: [],
+              },
+            ],
+          },
+        ],
+      };
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [
+          { criterion: CRITERION_A, conformityTopics: [SHARED, ONLY_A] },
+          { criterion: CRITERION_C, conformityTopics: [SHARED, ONLY_C] },
+        ],
+        assessments: [
+          {
+            criteria: [CRITERION_A, CRITERION_C],
+            conformityTopics: ['https://vocabulary.example.com/conformity-topics/outside'],
+          },
+        ],
+      };
+      const warnings = validateConformityClaim(claim, dedupScheme).filter(
+        (w) => w.code === ConformityWarningCode.AssessmentTopicMismatch,
+      );
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].expected).toEqual([SHARED, ONLY_A, ONLY_C]);
+    });
   });
 
   describe('profile absent on the claim', () => {

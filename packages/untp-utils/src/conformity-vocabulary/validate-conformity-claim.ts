@@ -146,8 +146,7 @@ export function validateConformityClaim(
   // carry. The check runs only when the assessment references at least one
   // criterion and every referenced criterion resolves in the profile. With no
   // referenced criteria the parent-level topic is the only classification the
-  // claim carries, a case the upstream spec-untp discussion on parent-level
-  // topics (issue 618) treats as legitimate for claims without criteria. An
+  // claim carries, so there is no criteria union to check it against. An
   // unresolved criterion could itself carry the declared topic, so warning
   // against a partial union would be unfounded, and unresolved criteria are
   // already surfaced by criterion-not-in-profile.
