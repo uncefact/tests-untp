@@ -6,6 +6,7 @@ export {
   ResolverTooManyRedirectsError,
   ResolverTimedOutError,
   ResolverRedirectMissingLocationError,
+  ResolverInvalidJsonError,
 } from './errors.js';
 export {
   resolveDocument,
@@ -13,6 +14,11 @@ export {
   type LoadResult,
   type ResolveDocumentOptions,
 } from './resolve-document.js';
+export {
+  resolveJsonDocument,
+  type ResolveJsonDocumentOptions,
+  type ResolvedJsonDocument,
+} from './resolve-json-document.js';
 export {
   resolveDocumentIfChanged,
   type CachedResource,

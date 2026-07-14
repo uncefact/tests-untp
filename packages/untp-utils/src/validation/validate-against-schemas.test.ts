@@ -1,13 +1,28 @@
 import { jest } from '@jest/globals';
-import { createInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
-import { createSchemaLoader, type SchemaLoader } from '../loaders/schema-loader.js';
+import { ResolverHttpError, ResolverInvalidJsonError } from '../resolvers/errors.js';
 import {
   SchemaCompilationFailedError,
   SchemaFetchFailedError,
   SchemaPayloadError,
   SchemaValidationError,
 } from './errors.js';
-import { validateAgainstSchemas } from './validate-against-schemas.js';
+
+const resolveJsonDocument = jest.fn();
+
+// The real schema loader fetches through the guarded resolver; mock that
+// boundary (keeping the real error classes) so this suite exercises the real
+// loader + cache + Ajv without touching the network.
+jest.unstable_mockModule('../resolvers/index.js', () => ({
+  resolveJsonDocument,
+  ResolverHttpError,
+  ResolverInvalidJsonError,
+}));
+
+const { createInMemoryTtlCache } = await import('../cache/in-memory-ttl-cache.js');
+const { createSchemaLoader } = await import('../loaders/schema-loader.js');
+const { validateAgainstSchemas } = await import('./validate-against-schemas.js');
+
+type SchemaLoader = Awaited<ReturnType<typeof createSchemaLoader>>;
 
 const SCHEMA_URL_NAME = 'https://example.com/name-schema.json';
 const SCHEMA_URL_AGE = 'https://example.com/age-schema.json';
@@ -26,30 +41,21 @@ const AGE_SCHEMA = {
   required: ['age'],
 };
 
-type FetchFn = typeof globalThis.fetch;
-
 describe('validateAgainstSchemas', () => {
-  const originalFetch = globalThis.fetch;
-  let fetchMock: jest.Mock;
   let loader: SchemaLoader;
 
   beforeEach(() => {
-    fetchMock = jest.fn();
-    globalThis.fetch = fetchMock as unknown as FetchFn;
+    resolveJsonDocument.mockReset();
     loader = createSchemaLoader(createInMemoryTtlCache<object>({ ttlMs: 60_000 }));
   });
 
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
   function mockSchemaResponses(map: Record<string, object>): void {
-    fetchMock.mockImplementation((async (url: string) => {
+    resolveJsonDocument.mockImplementation((async (url: string) => {
       const schema = map[url];
       if (!schema) {
-        return { ok: false, status: 404 } as Response;
+        throw new ResolverHttpError(url, 404);
       }
-      return { ok: true, status: 200, json: async () => schema } as unknown as Response;
+      return { json: schema, finalUrl: url };
     }) as never);
   }
 
@@ -113,7 +119,7 @@ describe('validateAgainstSchemas', () => {
 
   describe('fetch failures (fail-fast)', () => {
     it('throws SchemaFetchFailedError when a schema cannot be loaded', async () => {
-      fetchMock.mockResolvedValue({ ok: false, status: 404 } as never);
+      resolveJsonDocument.mockRejectedValue(new ResolverHttpError(SCHEMA_URL_NAME, 404) as never);
 
       await expect(validateAgainstSchemas({}, [SCHEMA_URL_NAME], loader)).rejects.toBeInstanceOf(
         SchemaFetchFailedError,
@@ -121,12 +127,7 @@ describe('validateAgainstSchemas', () => {
     });
 
     it('aborts on the first fetch failure without checking subsequent schemas', async () => {
-      fetchMock.mockImplementation((async (url: string) => {
-        if (url === SCHEMA_URL_NAME) {
-          return { ok: false, status: 404 } as Response;
-        }
-        return { ok: true, status: 200, json: async () => AGE_SCHEMA } as unknown as Response;
-      }) as never);
+      mockSchemaResponses({ [SCHEMA_URL_AGE]: AGE_SCHEMA });
 
       await expect(
         validateAgainstSchemas({ age: 30 }, [SCHEMA_URL_NAME, SCHEMA_URL_AGE], loader),
@@ -134,7 +135,7 @@ describe('validateAgainstSchemas', () => {
         name: 'SchemaFetchFailedError',
         received: SCHEMA_URL_NAME,
       });
-      const fetchedUrls = fetchMock.mock.calls.map((args) => args[0]);
+      const fetchedUrls = resolveJsonDocument.mock.calls.map((args) => args[0]);
       expect(fetchedUrls).toContain(SCHEMA_URL_NAME);
       expect(fetchedUrls).not.toContain(SCHEMA_URL_AGE);
     });
@@ -156,17 +157,13 @@ describe('validateAgainstSchemas', () => {
 
       await expect(validateAgainstSchemas({ name: 'Alice' }, [SCHEMA_URL_NAME], customLoader)).resolves.toBeUndefined();
       expect(load).toHaveBeenCalledWith(SCHEMA_URL_NAME);
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(resolveJsonDocument).not.toHaveBeenCalled();
     });
   });
 
   describe('compilation failures (fail-fast)', () => {
     it('throws SchemaCompilationFailedError when the fetched schema is invalid', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({ type: 'not-a-real-type' }),
-      } as never);
+      mockSchemaResponses({ [SCHEMA_URL_NAME]: { type: 'not-a-real-type' } });
 
       await expect(validateAgainstSchemas({}, [SCHEMA_URL_NAME], loader)).rejects.toBeInstanceOf(
         SchemaCompilationFailedError,
@@ -179,7 +176,7 @@ describe('validateAgainstSchemas', () => {
       await expect(validateAgainstSchemas({}, [badSchema], loader)).rejects.toBeInstanceOf(
         SchemaCompilationFailedError,
       );
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(resolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('attributes inline-schema compilation failure to <inline schema>', async () => {
@@ -198,12 +195,12 @@ describe('validateAgainstSchemas', () => {
   describe('inline schema references', () => {
     it('validates against an inline schema without invoking the loader', async () => {
       await expect(validateAgainstSchemas({ name: 'Alice' }, [NAME_SCHEMA], loader)).resolves.toBeUndefined();
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(resolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('throws SchemaPayloadError from an inline schema when the payload fails', async () => {
       await expect(validateAgainstSchemas({}, [NAME_SCHEMA], loader)).rejects.toBeInstanceOf(SchemaPayloadError);
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(resolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('mixes URL and inline schema references in a single call', async () => {
@@ -212,13 +209,13 @@ describe('validateAgainstSchemas', () => {
       await expect(
         validateAgainstSchemas({ name: 'Alice', age: 30 }, [SCHEMA_URL_NAME, AGE_SCHEMA], loader),
       ).resolves.toBeUndefined();
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(resolveJsonDocument).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('hierarchy', () => {
     it('every concrete error extends SchemaValidationError', async () => {
-      fetchMock.mockResolvedValue({ ok: false, status: 404 } as never);
+      resolveJsonDocument.mockRejectedValue(new ResolverHttpError(SCHEMA_URL_NAME, 404) as never);
       await expect(validateAgainstSchemas({}, [SCHEMA_URL_NAME], loader)).rejects.toBeInstanceOf(SchemaValidationError);
 
       await expect(validateAgainstSchemas({}, [{ type: 'not-a-real-type' }], loader)).rejects.toBeInstanceOf(
