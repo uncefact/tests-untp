@@ -103,8 +103,14 @@ services:
       TENANT_MODE: ${TENANT_MODE:-open}
       TENANT_CLAIM_NAME: ${TENANT_CLAIM_NAME:-groups}
       TENANT_CLAIM_FORMAT: ${TENANT_CLAIM_FORMAT:-array_first}
-      # Encryption at rest (service instance configs and credential decryption keys)
-      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-${SERVICE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}}
+      # Encryption at rest (service instance configs and credential decryption keys).
+      # Both names pass through unchanged so the application sees exactly what the
+      # host set: the deprecated-name fallback and the divergent-values hard fail
+      # happen in one place (resolve-data-encryption-key.ts), not in compose
+      # interpolation. The local-development value comes from .env (see
+      # .env.example), which the quick start copies.
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-}
+      SERVICE_ENCRYPTION_KEY: ${SERVICE_ENCRYPTION_KEY:-}
       # Verification URLs
       DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003/verify
       DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential

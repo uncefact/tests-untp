@@ -29,6 +29,10 @@ import {
 } from '@uncefact/untp-ri-services';
 import { getDidConfig } from '../src/lib/config/did.config.js';
 import {
+  resolveDataEncryptionKey,
+  warnIfDeprecatedEncryptionKeyName,
+} from '../src/lib/encryption/resolve-data-encryption-key.js';
+import {
   SYSTEM_TENANT_ID,
   SYSTEM_IDR_SERVICE_ID,
   SYSTEM_STORAGE_SERVICE_ID,
@@ -50,6 +54,12 @@ if (RI_POSTGRES_USER && RI_POSTGRES_PASSWORD && RI_POSTGRES_DB && RI_POSTGRES_HO
 }
 
 const prisma = new PrismaClient();
+
+// Resolved before any write: divergent DATA_ENCRYPTION_KEY and
+// SERVICE_ENCRYPTION_KEY values throw here, so the seed cannot re-encrypt
+// service instance configurations under a key that splits the database.
+const resolvedEncryptionKey = resolveDataEncryptionKey();
+warnIfDeprecatedEncryptionKeyName(resolvedEncryptionKey, logger);
 
 async function main() {
   // Upsert the system tenant (used for system-wide defaults)
@@ -75,7 +85,7 @@ async function main() {
 
   // ── Seed service instances (requires DATA_ENCRYPTION_KEY) ───────────────────
 
-  const ENCRYPTION_KEY = process.env.DATA_ENCRYPTION_KEY || process.env.SERVICE_ENCRYPTION_KEY;
+  const ENCRYPTION_KEY = resolvedEncryptionKey.key;
   let encryptionService: AesGcmEncryptionAdapter | null = null;
   if (ENCRYPTION_KEY) {
     encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
