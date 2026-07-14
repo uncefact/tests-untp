@@ -140,13 +140,34 @@ describe('PATCH /api/v1/identifiers/:id', () => {
     expect(json.value).toBe('09520123456799');
   });
 
-  it('returns 400 when no value provided', async () => {
+  it('returns 400 when no value provided and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: {} });
     const res = await PATCH(req, createContext('id-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('value is required');
+    expect(json.error).toMatch(/^value:/);
+    expect(mockUpdateIdentifier).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty value and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { value: '' } });
+    const res = await PATCH(req, createContext('id-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^value:/);
+    expect(mockUpdateIdentifier).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-string value and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { value: 123 } });
+    const res = await PATCH(req, createContext('id-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^value:/);
+    expect(mockUpdateIdentifier).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {
