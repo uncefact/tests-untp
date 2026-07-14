@@ -336,6 +336,19 @@ describe('PinoLoggerAdapter redaction', () => {
     expect(result.credential.decryptionKey).toBe('leaks-at-depth-three');
   });
 
+  it('writes to the destination sink instead of the pretty transport when both are configured', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', pretty: true, destination: capture.destination });
+
+    logger.info({ decryptionKey: 'a'.repeat(64) }, 'destination wins over pretty');
+
+    // The pino-pretty worker-thread transport would bypass the sink entirely;
+    // receiving parseable JSON here proves the destination guard held.
+    const [entry] = capture.entries();
+    expect(entry.msg).toBe('destination wins over pretty');
+    expect(entry.decryptionKey).toBe('[REDACTED]');
+  });
+
   it('leaves non-sensitive fields intact', () => {
     const capture = createCapture();
     const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
