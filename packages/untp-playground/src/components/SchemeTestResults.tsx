@@ -1,6 +1,5 @@
 'use client';
 
-import { SectionHeader } from '@/components/SectionHeader';
 import { SourceCaption } from '@/components/SourceCaption';
 import { StatusIcon } from '@/components/StatusIcon';
 import { Card } from '@/components/ui/card';
@@ -68,7 +67,6 @@ export function SchemeTestResults({ schemes, testResults, setTestResults }: Sche
 
   return (
     <section className='space-y-4' data-testid='scheme-results'>
-      <SectionHeader title='Conformity Schemes' />
       {(Object.values(SchemeType) as SchemeType[]).map((type) => (
         <SchemeCard key={type} type={type} scheme={schemes[type]} steps={testResults[type] ?? []} />
       ))}

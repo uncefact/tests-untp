@@ -1,16 +1,18 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import {
   decodeEnvelopedCredential,
   isEnvelopedProof,
   detectCredentialType,
   detectVersion,
+  detectArtefact,
 } from '@/lib/credentialService';
 import { detectExtension, validateCredentialSchema } from '@/lib/schemaValidation';
 import { ArtefactUploader } from '@/components/ArtefactUploader';
 import Home from '@/app/page';
 import { mockCredential } from '../mocks/vc';
-import { permittedCredentialTypes } from '../../constants';
+import { ArtefactKind, permittedCredentialTypes } from '../../constants';
 
 // Mock the dependencies
 jest.mock('sonner', () => ({
@@ -78,6 +80,14 @@ jest.mock('@/components/DownloadCredential', () => ({
   DownloadCredential: () => <div data-testid='mock-download'>Download</div>,
 }));
 
+jest.mock('@/components/GenerateReportDialog', () => ({
+  GenerateReportDialog: () => <div data-testid='mock-generate-report'>Generate Report</div>,
+}));
+
+jest.mock('@/components/DownloadReport', () => ({
+  DownloadReport: () => <div data-testid='mock-download-report'>Download Report</div>,
+}));
+
 describe('Home Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -88,7 +98,8 @@ describe('Home Component', () => {
 
     expect(screen.getByTestId('mock-header')).toBeInTheDocument();
     expect(screen.getByTestId('mock-footer')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-test-results')).toBeInTheDocument();
+    // Credentials start empty, so the placeholder shows in place of the results.
+    expect(screen.getByText('No credentials yet')).toBeInTheDocument();
     expect(screen.getByTestId('mock-uploader')).toBeInTheDocument();
     expect(screen.getByTestId('mock-download')).toBeInTheDocument();
   });
@@ -212,5 +223,95 @@ describe('Home Component', () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Failed to process artefact');
     });
+  });
+});
+
+describe('Tabbed artefact surface (#809)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('renders a tab for each artefact family', () => {
+    render(<Home />);
+
+    expect(screen.getByRole('tab', { name: /Credentials/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Conformity Schemes/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Link Sets/ })).toBeInTheDocument();
+  });
+
+  it('renders the Test artefacts page header above the tab bar', () => {
+    render(<Home />);
+
+    const heading = screen.getByRole('heading', { name: 'Test artefacts' });
+    const tablist = screen.getByRole('tablist');
+    // The header sits above the tab bar. This checks the tablist follows the heading in document order.
+    expect(heading.compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('renders the report actions once, above the tab bar (shared across families)', () => {
+    render(<Home />);
+
+    expect(screen.getAllByTestId('mock-generate-report')).toHaveLength(1);
+    expect(screen.getAllByTestId('mock-download-report')).toHaveLength(1);
+
+    const action = screen.getByTestId('mock-generate-report');
+    const tablist = screen.getByRole('tablist');
+    expect(action.compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows no instance counter on any tab while empty', () => {
+    render(<Home />);
+
+    // Exact-name matches: a stray "0" badge would change the accessible name and fail these.
+    expect(screen.getByRole('tab', { name: 'Credentials' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Conformity Schemes' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Link Sets' })).toBeInTheDocument();
+  });
+
+  it('mounts all three family panels so validation is not tied to the active tab', () => {
+    render(<Home />);
+
+    // Force-mounted panels: every family's content is in the DOM regardless of the active tab,
+    // so a family keeps validating even when its tab is not selected.
+    expect(screen.getByText('No credentials yet')).toBeInTheDocument();
+    expect(screen.getByText('No conformity schemes yet')).toBeInTheDocument();
+    expect(screen.getByText('No link sets yet')).toBeInTheDocument();
+  });
+
+  it('renders a single shared uploader, not one per tab', () => {
+    render(<Home />);
+
+    // One hoisted sidebar; force-mounting the panels must not multiply the uploader.
+    expect(screen.getAllByTestId('mock-uploader')).toHaveLength(1);
+  });
+
+  it('replaces a family empty state with its results once an artefact loads', async () => {
+    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
+    render(<Home />);
+
+    expect(screen.getByText('No conformity schemes yet')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('mock-uploader'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('No conformity schemes yet')).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('mock-scheme-test-results')).toBeInTheDocument();
+  });
+
+  it('shows the credentials empty state when no credential is loaded', () => {
+    render(<Home />);
+
+    expect(screen.getByText('No credentials yet')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-test-results')).not.toBeInTheDocument();
+  });
+
+  it('shows the schemes empty state on the Conformity Schemes tab', async () => {
+    render(<Home />);
+
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
+
+    expect(screen.getByText('No conformity schemes yet')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-scheme-test-results')).not.toBeInTheDocument();
   });
 });
