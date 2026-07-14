@@ -125,9 +125,7 @@ export default function Home() {
       </div>
       {shouldDisplayUploadDetailBtn && (
         <div>
-          <h2 className='text-sm font-semibold hover:cursor-pointer'>
-            <Button onClick={() => setIsDetailsOpen(true)}>View Upload Detail</Button>
-          </h2>
+          <Button onClick={() => setIsDetailsOpen(true)}>View Upload Detail</Button>
         </div>
       )}
       <div>
