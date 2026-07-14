@@ -8,6 +8,7 @@ import {
   assertPublicUrl,
 } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
+import { errorMessage } from '@/lib/api/errors';
 import { apiLogger } from '@/lib/api/logger';
 import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
@@ -436,9 +437,13 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   });
 
   logger.info({ count: data.length }, 'Credentials listed');
-  const credentials = data.map((credential) => ({
-    ...credential,
-    decryptionKey: revealDecryptionKey(credential.decryptionKey),
-  }));
+  const credentials = data.map((credential) => {
+    try {
+      return { ...credential, decryptionKey: revealDecryptionKey(credential.decryptionKey) };
+    } catch (error) {
+      logger.error({ err: error, credentialId: credential.id }, 'Failed to reveal a stored decryption key');
+      throw new Error(`${errorMessage(error)} (credential ${credential.id})`, { cause: error });
+    }
+  });
   return NextResponse.json(buildPaginatedResponse(credentials, total, limit, offset));
 });
