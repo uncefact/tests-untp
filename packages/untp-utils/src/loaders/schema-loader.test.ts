@@ -1,6 +1,11 @@
 import { jest } from '@jest/globals';
 import { createInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
-import { ResolverHttpError, ResolverInvalidJsonError, ResolverNetworkError } from '../resolvers/errors.js';
+import {
+  ResolverHttpError,
+  ResolverInvalidJsonError,
+  ResolverNetworkError,
+  ResolverTimedOutError,
+} from '../resolvers/errors.js';
 import { PrivateHostnameError } from '../node/errors.js';
 import {
   SchemaLoaderError,
@@ -43,7 +48,10 @@ describe('createSchemaLoader', () => {
       await createSchemaLoader().load(SCHEMA_URL);
       expect(resolveJsonDocument).toHaveBeenCalledWith(
         SCHEMA_URL,
-        expect.objectContaining({ accept: expect.stringContaining('application/schema+json') }),
+        expect.objectContaining({
+          accept: expect.stringContaining('application/schema+json'),
+          totalTimeoutMs: 10_000,
+        }),
       );
     });
 
@@ -127,13 +135,30 @@ describe('createSchemaLoader', () => {
       expect(error.status).toBe(503);
     });
 
-    it('maps a resolver invalid-JSON error to SchemaLoaderInvalidJsonError', async () => {
-      resolveJsonDocument.mockRejectedValue(new ResolverInvalidJsonError(SCHEMA_URL, new Error('bad')) as never);
-      await expect(createSchemaLoader().load(SCHEMA_URL)).rejects.toBeInstanceOf(SchemaLoaderInvalidJsonError);
+    it('maps a resolver invalid-JSON error to SchemaLoaderInvalidJsonError with the parser diagnostic', async () => {
+      const parserError = new Error('Unexpected token < in JSON at position 0');
+      resolveJsonDocument.mockRejectedValue(new ResolverInvalidJsonError(SCHEMA_URL, parserError) as never);
+      const error = (await createSchemaLoader()
+        .load(SCHEMA_URL)
+        .catch((e: unknown) => e)) as SchemaLoaderInvalidJsonError;
+      expect(error).toBeInstanceOf(SchemaLoaderInvalidJsonError);
+      expect(error.received).toBe('Unexpected token < in JSON at position 0');
+      expect(error.cause).toBe(parserError);
     });
 
-    it('maps a network error to SchemaLoaderNetworkError, preserving the cause', async () => {
-      const cause = new ResolverNetworkError(SCHEMA_URL, new Error('connection refused'));
+    it('maps a resolver network error to SchemaLoaderNetworkError with the transport diagnostic', async () => {
+      const transportError = new Error('connection refused');
+      resolveJsonDocument.mockRejectedValue(new ResolverNetworkError(SCHEMA_URL, transportError) as never);
+      const error = (await createSchemaLoader()
+        .load(SCHEMA_URL)
+        .catch((e: unknown) => e)) as SchemaLoaderNetworkError;
+      expect(error).toBeInstanceOf(SchemaLoaderNetworkError);
+      expect(error.received).toBe('connection refused');
+      expect(error.cause).toBe(transportError);
+    });
+
+    it('keeps the typed resolver error as the cause for new failure modes (timeout)', async () => {
+      const cause = new ResolverTimedOutError(SCHEMA_URL, 10_000, new Error('aborted'));
       resolveJsonDocument.mockRejectedValue(cause as never);
       const error = (await createSchemaLoader()
         .load(SCHEMA_URL)
