@@ -153,6 +153,35 @@ export function parseBooleanString(raw: string | null | undefined, paramName: st
 }
 
 /**
+ * Assert that a string is a well-formed, absolute http(s) URL that carries no
+ * userinfo, returning the parsed {@link URL}. Throws a {@link ValidationError}
+ * otherwise.
+ *
+ * This is the scheme and well-formedness check, independent of the SSRF
+ * private-address check in {@link assertPublicUrl}. It is applied to
+ * caller-supplied URLs regardless of `VERIFY_ALLOW_PRIVATE_URLS`, since that
+ * flag relaxes the private-network check for local development, not the
+ * requirement that a published URL be a usable, safe http(s) address. Userinfo
+ * (a `user:pass@` component) is rejected because such a URL may be published to
+ * a public directory, which would leak the embedded credential.
+ */
+export function assertHttpUrl(url: string, paramName: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new ValidationError(`${paramName} must be a valid absolute http(s) URL`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new ValidationError(`${paramName} must be an http(s) URL`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new ValidationError(`${paramName} must not contain a username or password`);
+  }
+  return parsed;
+}
+
+/**
  * Validate that a URL string is well-formed and does not point to a private
  * or reserved network address (SSRF protection).
  */
