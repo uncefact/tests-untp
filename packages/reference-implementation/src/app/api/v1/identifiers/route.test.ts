@@ -59,7 +59,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -125,22 +125,64 @@ describe('POST /api/v1/identifiers', () => {
     });
   });
 
-  it('returns 400 for missing schemeId', async () => {
+  it('returns 400 for missing schemeId and does not call the repository', async () => {
     const req = createFakeRequest({ body: { value: '09520123456788' } });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('schemeId is required');
+    expect(json.error).toMatch(/^schemeId:/);
+    expect(mockCreateIdentifier).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for missing value', async () => {
+  it('returns 400 for missing value and does not call the repository', async () => {
     const req = createFakeRequest({ body: { schemeId: 'sch-1' } });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('value is required');
+    expect(json.error).toMatch(/^value:/);
+    expect(mockCreateIdentifier).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-string schemeId and does not call the repository', async () => {
+    const req = createFakeRequest({ body: { schemeId: 123, value: '09520123456788' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^schemeId:/);
+    expect(mockCreateIdentifier).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-string value and does not call the repository', async () => {
+    const req = createFakeRequest({ body: { schemeId: 'sch-1', value: 123 } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^value:/);
+    expect(mockCreateIdentifier).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty schemeId and does not call the repository', async () => {
+    const req = createFakeRequest({ body: { schemeId: '', value: '09520123456788' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^schemeId:/);
+    expect(mockCreateIdentifier).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty value and does not call the repository', async () => {
+    const req = createFakeRequest({ body: { schemeId: 'sch-1', value: '' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^value:/);
+    expect(mockCreateIdentifier).not.toHaveBeenCalled();
   });
 
   it('returns 400 when value fails scheme validation', async () => {
@@ -243,6 +285,18 @@ describe('GET /api/v1/identifiers', () => {
     });
   });
 
+  it('clamps limit to MAX_PAGE_LIMIT', async () => {
+    mockListIdentifiers.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/identifiers?limit=500',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListIdentifiers).toHaveBeenCalledWith('org-1', expect.objectContaining({ limit: MAX_PAGE_LIMIT }));
+  });
+
   it('handles no query parameters', async () => {
     mockListIdentifiers.mockResolvedValue({ data: [], total: 0 });
 
@@ -265,7 +319,7 @@ describe('GET /api/v1/identifiers', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('limit must be a positive integer');
+    expect(json.error).toContain('limit: must be a positive integer');
   });
 
   it('returns 400 for negative offset', async () => {
@@ -277,7 +331,33 @@ describe('GET /api/v1/identifiers', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('offset must be a non-negative integer');
+    expect(json.error).toContain('offset: must be a non-negative integer');
+  });
+
+  it('returns 400 for a repeated query key', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/identifiers?limit=10&limit=20',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('repeated query parameter');
+    expect(mockListIdentifiers).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty schemeId filter', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/identifiers?schemeId=',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^schemeId:/);
+    expect(mockListIdentifiers).not.toHaveBeenCalled();
   });
 
   it('returns 500 when listIdentifiers throws', async () => {

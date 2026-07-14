@@ -1,4 +1,30 @@
-import { buildPaginatedResponse, paginateInMemory, paginationMetaSchema, DEFAULT_PAGE_LIMIT } from './pagination';
+import {
+  buildPaginatedResponse,
+  clampLimit,
+  paginateInMemory,
+  paginationMetaSchema,
+  DEFAULT_PAGE_LIMIT,
+  MAX_PAGE_LIMIT,
+} from './pagination';
+
+describe('clampLimit', () => {
+  it('leaves an absent limit undefined so the repository applies its own default', () => {
+    expect(clampLimit(undefined)).toBeUndefined();
+  });
+
+  it('passes a limit below the cap through unchanged', () => {
+    expect(clampLimit(50)).toBe(50);
+  });
+
+  it('passes the cap value through unchanged', () => {
+    expect(clampLimit(MAX_PAGE_LIMIT)).toBe(MAX_PAGE_LIMIT);
+  });
+
+  it('caps a limit above the maximum at MAX_PAGE_LIMIT', () => {
+    expect(clampLimit(MAX_PAGE_LIMIT + 1)).toBe(MAX_PAGE_LIMIT);
+    expect(clampLimit(100000)).toBe(MAX_PAGE_LIMIT);
+  });
+});
 
 describe('buildPaginatedResponse', () => {
   it('returns correct pagination metadata with explicit limit and offset', () => {

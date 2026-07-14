@@ -43,6 +43,13 @@ export function withTenantAuth(handler: RouteHandler) {
       const start = Date.now();
       const tenantConfig = getTenantConfig();
 
+      // Carry the request method and path in the request context so every
+      // downstream log entry, including a centrally-handled error, is
+      // attributable to its route without each handler restating them. The
+      // `request`-prefixed keys avoid colliding with per-log `method` fields
+      // that some handlers already use for a domain concept (e.g. a DID method).
+      updateRequestContext({ requestMethod: method, requestPath: path });
+
       apiLogger.info({ method, path }, 'Request received');
 
       if (tenantConfig.mode === 'closed') {

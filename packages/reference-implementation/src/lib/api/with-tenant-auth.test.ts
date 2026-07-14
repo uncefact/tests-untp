@@ -625,6 +625,17 @@ describe('withTenantAuth — request context propagation', () => {
     expect(mockUpdateRequestContext).toHaveBeenCalledWith({ userId: 'user-1', tenantId: 'org-1' });
   });
 
+  it('sets the request method and path on the request context under collision-resistant keys so every log entry is attributable to its route', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest('POST'), emptyRouteContext);
+
+    expect(mockUpdateRequestContext).toHaveBeenCalledWith({ requestMethod: 'POST', requestPath: '/api/v1/test' });
+  });
+
   it('sets userId and tenantId on request context for open mode service account path', async () => {
     mockGetSessionUserId.mockResolvedValue(null);
     mockResolveServiceAccountUser.mockResolvedValue({ userId: 'sa-user-1', tenantId: 'sa-org-1' });
@@ -677,7 +688,10 @@ describe('withTenantAuth — request context propagation', () => {
     const wrapped = withTenantAuth(handler);
     await wrapped(fakeRequest(), emptyRouteContext);
 
-    expect(mockUpdateRequestContext).not.toHaveBeenCalled();
+    expect(mockUpdateRequestContext).not.toHaveBeenCalledWith(expect.objectContaining({ userId: expect.anything() }));
+    expect(mockUpdateRequestContext).not.toHaveBeenCalledWith(expect.objectContaining({ tenantId: expect.anything() }));
+    // Route attribution is still established before auth so the denial log is attributable.
+    expect(mockUpdateRequestContext).toHaveBeenCalledWith({ requestMethod: 'GET', requestPath: '/api/v1/test' });
   });
 
   it('does not set userId or tenantId on open mode 403 path', async () => {
@@ -688,7 +702,8 @@ describe('withTenantAuth — request context propagation', () => {
     const wrapped = withTenantAuth(handler);
     await wrapped(fakeRequest(), emptyRouteContext);
 
-    expect(mockUpdateRequestContext).not.toHaveBeenCalled();
+    expect(mockUpdateRequestContext).not.toHaveBeenCalledWith(expect.objectContaining({ userId: expect.anything() }));
+    expect(mockUpdateRequestContext).not.toHaveBeenCalledWith(expect.objectContaining({ tenantId: expect.anything() }));
   });
 
   it('does not set userId or tenantId on closed mode 401 path', async () => {
@@ -700,7 +715,8 @@ describe('withTenantAuth — request context propagation', () => {
     const wrapped = withTenantAuth(handler);
     await wrapped(fakeRequest(), emptyRouteContext);
 
-    expect(mockUpdateRequestContext).not.toHaveBeenCalled();
+    expect(mockUpdateRequestContext).not.toHaveBeenCalledWith(expect.objectContaining({ userId: expect.anything() }));
+    expect(mockUpdateRequestContext).not.toHaveBeenCalledWith(expect.objectContaining({ tenantId: expect.anything() }));
   });
 
   it('does not set userId or tenantId on closed mode 403 path', async () => {
@@ -715,7 +731,8 @@ describe('withTenantAuth — request context propagation', () => {
     const wrapped = withTenantAuth(handler);
     await wrapped(fakeRequest(), emptyRouteContext);
 
-    expect(mockUpdateRequestContext).not.toHaveBeenCalled();
+    expect(mockUpdateRequestContext).not.toHaveBeenCalledWith(expect.objectContaining({ userId: expect.anything() }));
+    expect(mockUpdateRequestContext).not.toHaveBeenCalledWith(expect.objectContaining({ tenantId: expect.anything() }));
   });
 });
 

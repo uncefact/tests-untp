@@ -12,6 +12,15 @@ export type PaginationMeta = z.infer<typeof paginationMetaSchema>;
 export const DEFAULT_PAGE_LIMIT = 20;
 export const MAX_PAGE_LIMIT = 100;
 
+/**
+ * Caps a validated `limit` at MAX_PAGE_LIMIT, leaving an absent limit
+ * undefined so the repository applies its own default. Used by every list
+ * route after parsing the query so a client cannot request an unbounded page.
+ */
+export function clampLimit(limit?: number): number | undefined {
+  return limit !== undefined ? Math.min(limit, MAX_PAGE_LIMIT) : undefined;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   pagination: PaginationMeta;

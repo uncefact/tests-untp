@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { parseRequestBody, parseQueryParams } from '@/lib/api/validation';
+import { createIdentifierRequestSchema, listIdentifiersQuerySchema } from '@/lib/api/request-schemas/identifier';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifier, listIdentifiers } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse, clampLimit } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers' });
@@ -27,9 +28,11 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers' });
  *             properties:
  *               schemeId:
  *                 type: string
+ *                 minLength: 1
  *                 description: ID of the identifier scheme
  *               value:
  *                 type: string
+ *                 minLength: 1
  *                 description: The identifier value (validated against scheme pattern)
  *     responses:
  *       201:
@@ -70,21 +73,8 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: {
-    schemeId?: string;
-    value?: string;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ schemeId: body.schemeId }, 'Validating input parameters');
-  if (!isNonEmptyString(body.schemeId)) throw new ValidationError('schemeId is required');
-  if (!isNonEmptyString(body.value)) throw new ValidationError('value is required');
+  logger.info('Validating request body');
+  const body = await parseRequestBody(req, createIdentifierRequestSchema);
 
   logger.info({ schemeId: body.schemeId }, 'Creating identifier');
   const identifier = await createIdentifier({
@@ -110,6 +100,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: schemeId
  *         schema:
  *           type: string
+ *           minLength: 1
  *         description: Filter by identifier scheme ID
  *       - in: query
  *         name: limit
@@ -158,11 +149,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Parsing query parameters');
-  const url = new URL(req.url);
-  const schemeId = url.searchParams.get('schemeId') ?? undefined;
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const query = parseQueryParams(new URL(req.url), listIdentifiersQuerySchema);
+  const { schemeId } = query;
+  const limit = clampLimit(query.limit);
+  const offset = query.offset;
 
   logger.info({ schemeId, limit, offset }, 'Listing identifiers');
   const { data, total } = await listIdentifiers(tenantId, { schemeId, limit, offset });
