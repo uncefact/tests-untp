@@ -3,6 +3,7 @@ import { createLogger } from '@uncefact/untp-ri-services/logging';
 import { getTenantConfig } from '@/lib/auth/tenant-config';
 import { extractGroupClaim } from '@/lib/auth/group-claim';
 import { decodeAccessToken } from '@/lib/auth/oidc-token';
+import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
 
 const logger = createLogger().child({ module: 'handle-sign-in' });
 
@@ -176,8 +177,4 @@ async function handleOpenModeSignIn(
   }
 
   logger.info({ userId }, 'User onboarding completed successfully');
-}
-
-function isUniqueConstraintViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === 'P2002';
 }

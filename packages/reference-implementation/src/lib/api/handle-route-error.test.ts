@@ -10,6 +10,7 @@ jest.mock('next/server', () => ({
 import {
   NotFoundError,
   ForbiddenError,
+  ConflictError,
   UnprocessableError,
   ServiceRegistryError,
   ServiceInstanceNotFoundError,
@@ -56,6 +57,14 @@ describe('handleRouteError', () => {
     expect(res.status).toBe(404);
     const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ error: 'missing' });
+  });
+
+  it('maps ConflictError to 409', async () => {
+    const res = handleRouteError(new ConflictError('already exists'));
+
+    expect(res.status).toBe(409);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'already exists' });
   });
 
   it('maps UnprocessableError to 422', async () => {
@@ -130,6 +139,31 @@ describe('handleRouteError', () => {
 
   it('maps a non-Error value to 500 with fallback message', async () => {
     const res = handleRouteError('string error');
+
+    expect(res.status).toBe(500);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+  });
+
+  // --- Database errors (sanitised backstop) ---
+
+  it('sanitises an unhandled Prisma known request error to a generic 500', async () => {
+    const dbError = new Error('Unique constraint failed on the fields: (`schemeId`,`value`,`tenantId`)');
+    dbError.name = 'PrismaClientKnownRequestError';
+    Object.assign(dbError, { code: 'P2002', clientVersion: '6.0.0' });
+
+    const res = handleRouteError(dbError);
+
+    expect(res.status).toBe(500);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+  });
+
+  it('sanitises a Prisma client validation error to a generic 500', async () => {
+    const dbError = new Error('Argument `id`: Invalid value provided. Expected StringFilter or String, provided Int.');
+    dbError.name = 'PrismaClientValidationError';
+
+    const res = handleRouteError(dbError);
 
     expect(res.status).toBe(500);
     const body = await (res as unknown as MockResponse).json();

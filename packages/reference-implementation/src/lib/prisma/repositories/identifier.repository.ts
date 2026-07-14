@@ -2,6 +2,7 @@ import { Identifier, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -86,16 +87,20 @@ export async function createIdentifier(input: CreateIdentifierInput): Promise<Id
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await validateIdentifierValue(tx, input.schemeId, input.value, input.tenantId);
 
-    return tx.identifier.create({
-      data: {
-        tenantId: input.tenantId,
-        schemeId: input.schemeId,
-        value: input.value,
-      },
-      include: {
-        scheme: true,
-      },
-    });
+    try {
+      return await tx.identifier.create({
+        data: {
+          tenantId: input.tenantId,
+          schemeId: input.schemeId,
+          value: input.value,
+        },
+        include: {
+          scheme: true,
+        },
+      });
+    } catch (e) {
+      mapDatabaseError(e, { conflict: 'An identifier with this value already exists for the scheme' });
+    }
   });
 }
 
@@ -175,15 +180,22 @@ export async function updateIdentifier(
       await validateIdentifierValue(tx, existing.schemeId, input.value, tenantId);
     }
 
-    return tx.identifier.update({
-      where: { id },
-      data: {
-        ...(input.value !== undefined && { value: input.value }),
-      },
-      include: {
-        scheme: true,
-      },
-    });
+    try {
+      return await tx.identifier.update({
+        where: { id },
+        data: {
+          ...(input.value !== undefined && { value: input.value }),
+        },
+        include: {
+          scheme: true,
+        },
+      });
+    } catch (e) {
+      mapDatabaseError(e, {
+        conflict: 'An identifier with this value already exists for the scheme',
+        notFound: 'Identifier not found or access denied',
+      });
+    }
   });
 }
 
@@ -201,8 +213,12 @@ export async function deleteIdentifier(id: string, tenantId: string): Promise<Id
       throw new NotFoundError('Identifier not found or access denied');
     }
 
-    return tx.identifier.delete({
-      where: { id },
-    });
+    try {
+      return await tx.identifier.delete({
+        where: { id },
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Identifier not found or access denied' });
+    }
   });
 }
