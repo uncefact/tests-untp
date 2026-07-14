@@ -314,4 +314,12 @@ describe('Tabbed artefact surface (#809)', () => {
     expect(screen.getByText('No conformity schemes yet')).toBeInTheDocument();
     expect(screen.queryByTestId('mock-scheme-test-results')).not.toBeInTheDocument();
   });
+
+  it('shows the link sets empty state on the Link Sets tab', async () => {
+    render(<Home />);
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+
+    expect(screen.getByText('No link sets yet')).toBeInTheDocument();
+  });
 });
