@@ -376,7 +376,7 @@ describe('POST /api/v1/credentials', () => {
       expect(json.error).toContain('private or reserved');
     });
 
-    it('skips SSRF validation when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+    it('skips the private-address SSRF check when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
       process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
 
       const req = createFakeRequest(
@@ -390,6 +390,86 @@ describe('POST /api/v1/credentials', () => {
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
       expect(mockAssertPublicUrl).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-http(s) humanVerificationUrl even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, humanVerificationUrl: 'ftp://verify.example.com/ui' } }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toMatch(/http\(s\)/);
+      // The well-formedness/scheme check runs regardless of the SSRF flag, and
+      // the private-address check is still skipped; nothing is issued.
+      expect(mockAssertPublicUrl).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed humanVerificationUrl even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, humanVerificationUrl: 'not a url' } }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(400);
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-http(s) machineVerificationUrl even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, machineVerificationUrl: 'ftp://verify.example.com/api' } }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toMatch(/http\(s\)/);
+      expect(mockAssertPublicUrl).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed machineVerificationUrl even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, machineVerificationUrl: 'not a url' } }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(400);
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('rejects a verification URL carrying userinfo, rather than publishing the credential in the link', async () => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+
+      const human = createFakeRequest(
+        validBody({
+          publishingOptions: { publish: true, humanVerificationUrl: 'https://user:pass@verify.example.com/ui' },
+        }),
+      );
+      const humanRes = await POST(human, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const humanJson = await humanRes.json();
+      expect(humanRes.status).toBe(400);
+      expect(humanJson.error).toMatch(/username or password/);
+
+      const machine = createFakeRequest(
+        validBody({
+          publishingOptions: { publish: true, machineVerificationUrl: 'https://user:pass@verify.example.com/api' },
+        }),
+      );
+      const machineRes = await POST(machine, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(machineRes.status).toBe(400);
+
+      expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
     it('returns 400 when publishingOptions.hreflang is a string rather than an array', async () => {
@@ -841,6 +921,42 @@ describe('POST /api/v1/credentials', () => {
         machineVerificationUrl: 'https://verify.example.com/api',
         humanVerificationUrl: 'https://verify.example.com/ui',
       });
+    });
+
+    it('publishes the canonical machine verification URL, not the raw ambiguous caller string', async () => {
+      setupPublishingHappyPath();
+
+      // `https://1.1.1.1\@127.0.0.1/` parses (WHATWG) as host 1.1.1.1, but a
+      // different parser reads the raw string as host 127.0.0.1. Publishing the
+      // canonical href keeps validation and publication on the same host.
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, machineVerificationUrl: 'https://1.1.1.1\\@127.0.0.1/' } }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+        STORAGE_RESPONSE,
+        'Digital Product Passport',
+        expect.objectContaining({ machineVerificationUrl: 'https://1.1.1.1/@127.0.0.1/' }),
+      );
+    });
+
+    it('SSRF-checks the canonical machine URL, not the raw string, when protection is enabled', async () => {
+      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      setupPublishingHappyPath();
+      mockAssertPublicUrl.mockResolvedValue(undefined);
+
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, machineVerificationUrl: 'https://1.1.1.1\\@127.0.0.1/' } }),
+      );
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      // The private-address check sees the same canonical host that is published,
+      // so it cannot be fooled by a raw string a different parser reads as 127.0.0.1.
+      expect(mockAssertPublicUrl).toHaveBeenCalledWith(
+        'https://1.1.1.1/@127.0.0.1/',
+        'publishingOptions.machineVerificationUrl',
+      );
     });
 
     // ── humanVerificationUrl default (issue #491) ──────────────────────

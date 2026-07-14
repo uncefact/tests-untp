@@ -6,6 +6,7 @@ import {
   parseNonNegativeInt,
   parseBooleanString,
   assertPublicUrl,
+  assertHttpUrl,
 } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { errorMessage } from '@/lib/api/errors';
@@ -197,13 +198,31 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   }
   const publishingOptions = publishingOptionsParse.data;
 
-  // ── SSRF validation for URL fields ────────────────────────────────────
+  // ── Verification URL validation ───────────────────────────────────────
+  // Caller-supplied verification URLs are always validated as well-formed,
+  // absolute, userinfo-free http(s) URLs before issuance, so a malformed,
+  // non-http(s), or credential-bearing value is rejected up front rather than
+  // published or failing later during link construction. assertHttpUrl returns
+  // the WHATWG-canonical URL, and the canonical `href` (not the raw caller
+  // string) is what is SSRF-checked and published downstream. Validating and
+  // publishing the same canonical form closes a parser-differential SSRF gap:
+  // a value like `https://1.1.1.1\@127.0.0.1/` that this parser reads as host
+  // `1.1.1.1` cannot be re-read as `127.0.0.1` by a different parser once the
+  // canonical `href` (`https://1.1.1.1/@127.0.0.1/`) is what leaves the route.
+  // The private-address / DNS SSRF check is additionally applied unless
+  // VERIFY_ALLOW_PRIVATE_URLS relaxes it for local development.
+  const machineVerificationUrl = publishingOptions.machineVerificationUrl
+    ? assertHttpUrl(publishingOptions.machineVerificationUrl, 'publishingOptions.machineVerificationUrl').href
+    : undefined;
+  const humanVerificationUrl = publishingOptions.humanVerificationUrl
+    ? assertHttpUrl(publishingOptions.humanVerificationUrl, 'publishingOptions.humanVerificationUrl').href
+    : undefined;
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
-    if (publishingOptions.machineVerificationUrl) {
-      await assertPublicUrl(publishingOptions.machineVerificationUrl, 'publishingOptions.machineVerificationUrl');
+    if (machineVerificationUrl) {
+      await assertPublicUrl(machineVerificationUrl, 'publishingOptions.machineVerificationUrl');
     }
-    if (publishingOptions.humanVerificationUrl) {
-      await assertPublicUrl(publishingOptions.humanVerificationUrl, 'publishingOptions.humanVerificationUrl');
+    if (humanVerificationUrl) {
+      await assertPublicUrl(humanVerificationUrl, 'publishingOptions.humanVerificationUrl');
     }
   }
 
@@ -214,9 +233,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // intentionally not SSRF-checked and a localhost RI_APP_URL is accepted in
   // development.
   const effectiveHumanVerificationUrl =
-    publishingOptions.publish === true && !publishingOptions.humanVerificationUrl
-      ? defaultHumanVerificationUrl()
-      : publishingOptions.humanVerificationUrl;
+    publishingOptions.publish === true && !humanVerificationUrl ? defaultHumanVerificationUrl() : humanVerificationUrl;
 
   // ── Step 2: Resolve data model ──────────────────────────────────────────
 
@@ -344,7 +361,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       const linkTitle = publishingOptions.linkTitle || dataModel.name;
       const links = buildPublishLinks(storageResponse, linkTitle, {
         linkType: publishingOptions.linkType,
-        machineVerificationUrl: publishingOptions.machineVerificationUrl,
+        machineVerificationUrl,
         humanVerificationUrl: effectiveHumanVerificationUrl,
         ...(publishingOptions.hreflang !== undefined ? { hreflang: publishingOptions.hreflang } : {}),
         ...(publishingOptions.additionalRels !== undefined ? { additionalRels: publishingOptions.additionalRels } : {}),

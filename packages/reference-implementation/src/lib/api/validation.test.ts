@@ -12,6 +12,7 @@ import {
   parseNonNegativeInt,
   parseBooleanString,
   assertPublicUrl,
+  assertHttpUrl,
   parseRequestBody,
   parseQueryParams,
   definedFields,
@@ -139,6 +140,52 @@ describe('parseBooleanString', () => {
 
   it('throws for empty string', () => {
     expect(() => parseBooleanString('', 'active')).toThrow(ValidationError);
+  });
+});
+
+describe('assertHttpUrl', () => {
+  it('returns the parsed URL for an http URL', () => {
+    const url = assertHttpUrl('http://example.com/verify', 'humanVerificationUrl');
+    expect(url).toBeInstanceOf(URL);
+    expect(url.protocol).toBe('http:');
+  });
+
+  it('returns the parsed URL for an https URL', () => {
+    const url = assertHttpUrl('https://example.com/verify', 'humanVerificationUrl');
+    expect(url.protocol).toBe('https:');
+  });
+
+  it('throws ValidationError for a malformed URL', () => {
+    expect(() => assertHttpUrl('not a url', 'humanVerificationUrl')).toThrow(ValidationError);
+    expect(() => assertHttpUrl('not a url', 'humanVerificationUrl')).toThrow(/must be a valid absolute http\(s\) URL/);
+  });
+
+  it('throws ValidationError for a relative URL', () => {
+    expect(() => assertHttpUrl('/verify', 'humanVerificationUrl')).toThrow(/must be a valid absolute http\(s\) URL/);
+  });
+
+  it('throws ValidationError for a non-http(s) scheme', () => {
+    expect(() => assertHttpUrl('ftp://example.com/verify', 'humanVerificationUrl')).toThrow(ValidationError);
+    expect(() => assertHttpUrl('ftp://example.com/verify', 'humanVerificationUrl')).toThrow(/must be an http\(s\) URL/);
+    expect(() => assertHttpUrl('file:///etc/passwd', 'humanVerificationUrl')).toThrow(/must be an http\(s\) URL/);
+  });
+
+  it('accepts an uppercase scheme (normalised by the URL parser)', () => {
+    const url = assertHttpUrl('HTTPS://example.com/verify', 'humanVerificationUrl');
+    expect(url.protocol).toBe('https:');
+  });
+
+  it('throws ValidationError for a URL carrying userinfo', () => {
+    expect(() => assertHttpUrl('https://user:pass@example.com/verify', 'humanVerificationUrl')).toThrow(
+      ValidationError,
+    );
+    expect(() => assertHttpUrl('https://user:pass@example.com/verify', 'humanVerificationUrl')).toThrow(
+      /must not contain a username or password/,
+    );
+    // A username with no password is rejected too.
+    expect(() => assertHttpUrl('https://user@example.com/verify', 'humanVerificationUrl')).toThrow(
+      /must not contain a username or password/,
+    );
   });
 });
 
