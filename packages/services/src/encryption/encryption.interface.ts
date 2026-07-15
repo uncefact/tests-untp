@@ -21,7 +21,11 @@ export interface EncryptedEnvelope {
   type: EncryptionAlgorithm;
 }
 
-const permittedAlgorithms = new Set<string>(Object.values(EncryptionAlgorithm));
+// Exported so isEncryptedEnvelope can check `type` against the same
+// allow-list assertPermittedAlgorithm enforces at decrypt time, rather than
+// duplicating it — a second, drifting copy is how a shape check and the
+// actual algorithm gate quietly disagree.
+export const permittedAlgorithms = new Set<string>(Object.values(EncryptionAlgorithm));
 
 export function assertPermittedAlgorithm(algorithm: string): asserts algorithm is EncryptionAlgorithm {
   if (!permittedAlgorithms.has(algorithm)) {

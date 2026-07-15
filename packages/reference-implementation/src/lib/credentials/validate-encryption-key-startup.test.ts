@@ -158,6 +158,32 @@ describe('validateEncryptionKeyAtStartup', () => {
     await expect(validateEncryptionKeyAtStartup(client, encryptionService)).rejects.toThrow('w-wrongkey');
   });
 
+  it('warn-skips a service instance candidate with an unsupported algorithm, instead of throwing it as a key mismatch', async () => {
+    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
+    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
+
+    // Has every required key (cipherText/iv/tag/type), so a presence-only
+    // envelope check would call this genuine and attempt to decrypt it,
+    // which throws "Unsupported algorithm: des-ede3-cbc" — a corruption
+    // problem, not a DATA_ENCRYPTION_KEY mismatch. It must be classified as
+    // shape-invalid up front and skipped like any other corrupted
+    // candidate, falling through to a later valid one instead.
+    const unsupportedAlgorithm = '{"cipherText":"a","iv":"b","tag":"c","type":"des-ede3-cbc"}';
+    const client = createFakeClient([
+      { id: 'a-unsupported-algo', config: unsupportedAlgorithm },
+      { id: 'z-valid', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') },
+    ]);
+
+    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+
+    // Resolving to a valid result (rather than rejecting with
+    // EncryptionKeyValidationError) is itself the proof that the
+    // unsupported-algorithm candidate was skipped, not decrypted-and-failed.
+    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'z-valid' });
+    expect(mockWarn).toHaveBeenCalled();
+    expect(mockError).not.toHaveBeenCalled();
+  });
+
   it('falls through to a credential when every service instance candidate is corrupted', async () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);

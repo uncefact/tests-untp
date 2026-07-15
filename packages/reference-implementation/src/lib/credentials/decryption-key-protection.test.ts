@@ -64,6 +64,15 @@ describe('isProtectedDecryptionKey', () => {
     expect(isProtectedDecryptionKey('1'.repeat(64))).toBe(false);
     expect(isProtectedDecryptionKey('{"foo":"bar"}')).toBe(false);
   });
+
+  it('returns false for a value with the right keys but null fields or an unsupported algorithm', async () => {
+    const { isProtectedDecryptionKey } = await import('./decryption-key-protection');
+    // Has every required key (so a presence-only check would wrongly call
+    // this "protected"), but none of the values are usable — corruption,
+    // not a genuine envelope.
+    expect(isProtectedDecryptionKey('{"cipherText":null,"iv":null,"tag":null,"type":null}')).toBe(false);
+    expect(isProtectedDecryptionKey('{"cipherText":"a","iv":"b","tag":"c","type":"des-ede3-cbc"}')).toBe(false);
+  });
 });
 
 describe('looksEnvelopeLikeButInvalid', () => {
@@ -71,6 +80,12 @@ describe('looksEnvelopeLikeButInvalid', () => {
     const { looksEnvelopeLikeButInvalid } = await import('./decryption-key-protection');
     expect(looksEnvelopeLikeButInvalid('{"cipherText":"q1w2')).toBe(true);
     expect(looksEnvelopeLikeButInvalid('{"foo":"bar"}')).toBe(true);
+  });
+
+  it('flags a value with every required key but null fields or an unsupported algorithm', async () => {
+    const { looksEnvelopeLikeButInvalid } = await import('./decryption-key-protection');
+    expect(looksEnvelopeLikeButInvalid('{"cipherText":null,"iv":null,"tag":null,"type":null}')).toBe(true);
+    expect(looksEnvelopeLikeButInvalid('{"cipherText":"a","iv":"b","tag":"c","type":"des-ede3-cbc"}')).toBe(true);
   });
 
   it('accepts genuine envelopes and plausible legacy plaintext', async () => {
@@ -109,6 +124,20 @@ describe('revealDecryptionKey', () => {
 
     expect(revealDecryptionKey(truncatedEnvelope)).toBe(truncatedEnvelope);
     expect(mockWarn).toHaveBeenCalled();
+  });
+
+  it('warns and returns unchanged for a value with every required key but null fields, rather than misreporting it as a key mismatch', async () => {
+    const { revealDecryptionKey } = await import('./decryption-key-protection');
+
+    // Every field present (so the old, presence-only predicate treated this
+    // as a genuine envelope), but the values are null. Decrypting this
+    // would throw "Unsupported algorithm: null" — a corruption problem,
+    // not a DATA_ENCRYPTION_KEY mismatch, so it must not surface as one.
+    const corrupted = '{"cipherText":null,"iv":null,"tag":null,"type":null}';
+
+    expect(revealDecryptionKey(corrupted)).toBe(corrupted);
+    expect(mockWarn).toHaveBeenCalled();
+    expect(mockError).not.toHaveBeenCalled();
   });
 
   it('returns a legacy all-digit key unchanged', async () => {
