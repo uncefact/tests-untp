@@ -150,6 +150,21 @@ describe('paginationQuerySchema', () => {
     expect(paginationQuerySchema.safeParse({ offset: '0' })).toEqual({ success: true, data: { offset: 0 } });
   });
 
+  it('accepts a limit at the maximum', () => {
+    expect(paginationQuerySchema.safeParse({ limit: '100' })).toEqual({ success: true, data: { limit: 100 } });
+  });
+
+  it('rejects a limit above the maximum, naming the bound', () => {
+    const result = paginationQuerySchema.safeParse({ limit: '101' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]).toMatchObject({
+        path: ['limit'],
+        message: 'must not exceed the maximum of 100',
+      });
+    }
+  });
+
   describe('strict decimal integer matrix', () => {
     const acceptedLimits: Array<[string, number]> = [
       ['5', 5],

@@ -243,7 +243,7 @@ Returns identifiers for the authenticated tenant with optional filtering. Result
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `schemeId` | string | — | Filter by identifier scheme ID |
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | `20` | Maximum results per page. A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---

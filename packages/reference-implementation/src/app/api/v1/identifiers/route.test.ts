@@ -59,7 +59,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 
 import { NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
-import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -285,16 +285,20 @@ describe('GET /api/v1/identifiers', () => {
     });
   });
 
-  it('clamps limit to MAX_PAGE_LIMIT', async () => {
+  it('rejects a limit above the maximum with a 400 and does not query', async () => {
     mockListIdentifiers.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
       url: 'http://localhost/api/v1/identifiers?limit=500',
     });
-    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
 
-    expect(mockListIdentifiers).toHaveBeenCalledWith('org-1', expect.objectContaining({ limit: MAX_PAGE_LIMIT }));
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^limit:/);
+    expect(json.error).toContain('maximum');
+    expect(mockListIdentifiers).not.toHaveBeenCalled();
   });
 
   it('handles no query parameters', async () => {
