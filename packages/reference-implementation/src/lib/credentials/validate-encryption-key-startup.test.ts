@@ -218,6 +218,28 @@ describe('validateEncryptionKeyAtStartup', () => {
     });
   });
 
+  it('finds a valid service instance candidate on the second page, proving cursor traversal past the first batch', async () => {
+    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
+    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
+
+    // The scan fetches 100 rows per batch; the first 100 (page 1) are all
+    // corrupted, and only the 101st (page 2) is a genuine, valid envelope.
+    // If cursor pagination stopped after the first batch, this candidate
+    // would never be reached and the check would wrongly conclude nothing
+    // encrypted exists.
+    const serviceInstances: ServiceInstanceRow[] = Array.from({ length: 100 }, (_, index) => ({
+      id: `svc-${String(index).padStart(3, '0')}`,
+      config: '{"cipherText":"truncated',
+    }));
+    serviceInstances.push({ id: 'svc-100', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') });
+    const client = createFakeClient(serviceInstances);
+
+    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+
+    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'svc-100' });
+    expect(client.serviceInstance.findMany).toHaveBeenCalledTimes(2);
+  });
+
   it('falls back to a protected credential decryption key when no service instance exists', async () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
@@ -333,6 +355,27 @@ describe('validateEncryptionKeyAtStartup', () => {
       orderBy: { id: 'asc' },
       take: 100,
     });
+  });
+
+  it('finds a valid credential candidate on the second page, proving cursor traversal past the first batch', async () => {
+    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
+    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
+
+    // Same shape as the service instance pagination test: the first 100
+    // candidates (page 1) are all corrupted, and only the 101st (page 2)
+    // genuinely validates. If cursor pagination stopped after the first
+    // batch, the check would wrongly conclude nothing encrypted exists.
+    const credentials: CredentialRow[] = Array.from({ length: 100 }, (_, index) => ({
+      id: `cred-${String(index).padStart(3, '0')}`,
+      decryptionKey: '{"cipherText":"truncated',
+    }));
+    credentials.push({ id: 'cred-100', decryptionKey: await encryptUnder(ACTIVE_KEY, 'b'.repeat(64)) });
+    const client = createFakeClient([], credentials);
+
+    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+
+    expect(result).toEqual({ validated: true, source: 'credential', id: 'cred-100' });
+    expect(client.credential.findMany).toHaveBeenCalledTimes(2);
   });
 
   it('prefers a valid service instance over a credential when both exist', async () => {
