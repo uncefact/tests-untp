@@ -72,7 +72,7 @@ The seed creates the following defaults. Each category is independent — if a r
 
 For example, if `DATA_ENCRYPTION_KEY` is not set, the service instances, default DID, and render templates are all skipped — but the system tenant, registrars, identifier schemes, and data models are still created. The skipped items must be configured before the system can issue, store, or resolve credentials — ensure all required environment variables are set.
 
-When `DATA_ENCRYPTION_KEY` is set, the seed validates it against any existing encrypted data before writing anything: see [Encryption Key Validation](#encryption-key-validation) below for what this checks and how it fails.
+When `DATA_ENCRYPTION_KEY` is set, the seed validates it against any existing encrypted data before it writes any service instance configuration (the system tenant and other non-encrypted records may already exist by that point): see [Encryption Key Validation](#encryption-key-validation) below for what this checks and how it fails.
 
 ### Customising seed data
 
@@ -90,7 +90,7 @@ Once migrations and seeding are complete, the application starts and begins acce
 
 ### Encryption Key Validation
 
-Before the application accepts its first request, it validates the active `DATA_ENCRYPTION_KEY` by decrypting one existing encrypted value — a service instance configuration, or (if none exists yet) a protected credential decryption key. This runs once per process start, using the same check the [seed](#step-2-database-seed) already runs before it writes.
+Before the application accepts its first request, it validates the active `DATA_ENCRYPTION_KEY` by decrypting one existing encrypted value — a service instance configuration, or (when no service instance has a usable one, whether because none exists yet or because every existing configuration is corrupted) a protected credential decryption key. This runs once per process start, using the same check the [seed](#step-2-database-seed) already runs before it writes.
 
 | Situation | Result |
 |-----------|--------|
