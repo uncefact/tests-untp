@@ -43,28 +43,6 @@ export class EncryptionKeyValidationError extends Error {
 }
 
 /**
- * Thrown when the sample value startup picked to validate against is not a
- * well-formed encrypted envelope — it failed to parse as JSON, or parsed
- * but does not have the envelope shape. This is corruption, not a key
- * problem: unlike a credential's decryption key (which can legitimately
- * hold a pre-#697 plaintext value), a service instance configuration has no
- * legacy unencrypted form, so every writer already guarantees it is a valid
- * envelope. Distinct from {@link EncryptionKeyValidationError} so an
- * operator is not sent chasing DATA_ENCRYPTION_KEY for a problem that
- * changing the key cannot fix.
- */
-export class CorruptedEnvelopeError extends Error {
-  constructor(source: 'service instance configuration', id: string) {
-    super(
-      `Existing ${source} ("${id}") is not a valid encrypted envelope: it failed to parse as JSON, or does not ` +
-        'have the shape of one. This is data corruption, not a DATA_ENCRYPTION_KEY mismatch — changing the key ' +
-        `will not fix it. Investigate the row directly. See ${DOCS_URL}`,
-    );
-    this.name = 'CorruptedEnvelopeError';
-  }
-}
-
-/**
  * Refuses the DATA_ENCRYPTION_KEY placeholder published in .env.example
  * outside local development; warns and proceeds within it. "Local
  * development" is read from DEPLOYMENT_ENVIRONMENT, the same signal already
@@ -102,16 +80,24 @@ const CANDIDATE_BATCH_SIZE = 100;
 
 /**
  * The subset of the Prisma client this check needs; structural so tests can
- * supply an in-memory fake (same approach as BackfillClient). Credentials
- * are fetched via cursor-paginated `findMany`, not `findFirst`: the
- * `startsWith` filter only narrows to envelope-*shaped* candidates (a
- * truncated/corrupted value can also start with "{"), and the first
- * candidate is not necessarily a valid one, so the caller must be able to
- * keep scanning past it.
+ * supply an in-memory fake (same approach as BackfillClient). Both resource
+ * types are fetched via cursor-paginated `findMany`, in id order, never
+ * `findFirst`: a single unordered sample is not safe to trust as "the"
+ * validation candidate. A row can be envelope-*shaped* without being a
+ * genuine envelope (a truncated/corrupted value can also start with "{",
+ * and a service instance config can be corrupted the same way), so the
+ * caller must be able to skip a bad candidate and keep scanning rather than
+ * either crashing on it or reporting "nothing encrypted" on the strength of
+ * one bad row.
  */
 export type EncryptionKeyValidationClient = {
   serviceInstance: {
-    findFirst(args: { select: { id: true; config: true } }): Promise<ServiceInstanceRow | null>;
+    findMany(args: {
+      where?: { id: { gt: string } };
+      select: { id: true; config: true };
+      orderBy: { id: 'asc' };
+      take: number;
+    }): Promise<ServiceInstanceRow[]>;
   };
   credential: {
     findMany(args: {
@@ -137,30 +123,37 @@ export type EncryptionKeyValidationResult =
  * process boot, not as a one-off migration, so it favours a cheap, bounded
  * check over exhaustively verifying every row.
  *
- * Prefers a service instance configuration: every writer encrypts it before
- * persistence, so any row is a valid sample, and a row that fails to parse
- * as an envelope is corruption (see {@link CorruptedEnvelopeError}), not a
- * legacy-plaintext possibility. Falls back to a credential's decryption key
- * only when no service instance exists yet — credentials predating #697
- * can legitimately hold plaintext, so candidates are scanned in
- * deterministic (id) order until one actually parses as an envelope,
- * skipping corrupted-but-envelope-shaped rows along the way rather than
- * treating the first candidate's shape failure as "nothing encrypted": a
- * corrupted row must never mask a genuinely wrong key sitting in a later
- * row. Returns `{ validated: false }` (not an error) only once every
- * candidate is exhausted with nothing to validate against, so a deployment
- * with nothing encrypted yet starts normally.
+ * Prefers service instance configurations, scanned in id order: every
+ * writer encrypts one before persistence, so any row is a valid sample.
+ * Falls back to scanning credential decryption keys only once every service
+ * instance candidate is exhausted — credentials predating #697 can
+ * legitimately hold plaintext, so those candidates are narrowed to
+ * envelope-shaped values before scanning.
+ *
+ * In both scans, a candidate that does not actually parse as an envelope
+ * (corrupted or otherwise malformed) is logged and skipped rather than
+ * treated as proof the key is wrong or that nothing is encrypted: a single
+ * damaged row must never crash startup, or mask a genuinely wrong key
+ * sitting in a later row, when other valid envelopes exist. Only a
+ * genuine envelope that fails to *decrypt* is a key mismatch, and that
+ * throws {@link EncryptionKeyValidationError} immediately. Returns
+ * `{ validated: false }` (not an error) once every candidate across both
+ * scans is exhausted with nothing to validate against, so a deployment
+ * with nothing encrypted yet — or, in the pathological case, nothing but
+ * corrupted rows — starts normally rather than crash-looping.
  */
 export async function validateEncryptionKeyAtStartup(
   client: EncryptionKeyValidationClient,
   encryptionService: Pick<IEncryptionService, 'decrypt'>,
 ): Promise<EncryptionKeyValidationResult> {
-  const instance = await client.serviceInstance.findFirst({ select: { id: true, config: true } });
-  if (instance) {
+  for await (const instance of eachCandidateServiceInstance(client)) {
     const envelope = parseEnvelope(instance.config);
     if (envelope === null) {
-      logger.error({ instanceId: instance.id }, 'Service instance configuration is not a valid encrypted envelope');
-      throw new CorruptedEnvelopeError('service instance configuration', instance.id);
+      logger.warn(
+        { instanceId: instance.id },
+        'Service instance configuration is not a valid encrypted envelope; skipping it as a validation sample',
+      );
+      continue;
     }
     decryptOrThrow(() => encryptionService.decrypt(envelope), 'service instance configuration', instance.id);
     return { validated: true, source: 'service-instance', id: instance.id };
@@ -169,10 +162,10 @@ export async function validateEncryptionKeyAtStartup(
   for await (const row of eachCandidateCredential(client)) {
     const envelope = parseEnvelope(row.decryptionKey);
     if (envelope === null) {
-      // Envelope-shaped (starts with "{") but not a genuine envelope:
-      // corruption or a coincidental legacy value. Neither proves anything
-      // about the key, so keep scanning rather than reporting "nothing
-      // encrypted" on the strength of one bad row.
+      logger.warn(
+        { credentialId: row.id },
+        'Credential decryption key is not a valid encrypted envelope; skipping it as a validation sample',
+      );
       continue;
     }
     decryptOrThrow(() => encryptionService.decrypt(envelope), 'credential decryption key', row.id);
@@ -180,6 +173,31 @@ export async function validateEncryptionKeyAtStartup(
   }
 
   return { validated: false };
+}
+
+/**
+ * Iterates every service instance row in id order via cursor pagination —
+ * same approach as the backfill script's `eachServiceInstanceRow`, so a row
+ * deleted mid-scan cannot skip a surviving one. No content filter: every
+ * service instance config is written encrypted, so any row is a candidate.
+ */
+async function* eachCandidateServiceInstance(
+  client: EncryptionKeyValidationClient,
+): AsyncGenerator<ServiceInstanceRow> {
+  let cursor: string | undefined;
+  for (;;) {
+    const rows = await client.serviceInstance.findMany({
+      ...(cursor !== undefined && { where: { id: { gt: cursor } } }),
+      select: { id: true, config: true },
+      orderBy: { id: 'asc' },
+      take: CANDIDATE_BATCH_SIZE,
+    });
+    if (rows.length === 0) {
+      return;
+    }
+    cursor = rows[rows.length - 1].id;
+    yield* rows;
+  }
 }
 
 /**
