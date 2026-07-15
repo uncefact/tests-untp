@@ -1,3 +1,4 @@
+export * from './artefact';
 export * from './credential';
 export * from './report';
 export * from './test';
