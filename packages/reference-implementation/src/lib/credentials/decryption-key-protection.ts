@@ -75,7 +75,14 @@ export function looksEnvelopeLikeButInvalid(stored: string): boolean {
   return stored.startsWith('{') && parseEnvelope(stored) === null;
 }
 
-function parseEnvelope(stored: string): EncryptedEnvelope | null {
+/**
+ * Parses a stored value as an encrypted envelope, returning `null` when it
+ * is not valid JSON or does not have the envelope shape. Exported so other
+ * modules that need the same "is this a genuine envelope" check (rather
+ * than just decrypting) do not re-implement the JSON.parse-plus-shape-check
+ * pairing — see validate-encryption-key-startup.ts.
+ */
+export function parseEnvelope(stored: string): EncryptedEnvelope | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stored);
