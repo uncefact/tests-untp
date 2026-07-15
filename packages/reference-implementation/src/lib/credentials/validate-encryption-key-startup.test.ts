@@ -184,6 +184,65 @@ describe('validateEncryptionKeyAtStartup', () => {
     expect(mockError).not.toHaveBeenCalled();
   });
 
+  it('warn-skips a service instance candidate whose cipherText/iv/tag decode to 0 bytes, instead of crash-looping', async () => {
+    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
+    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
+
+    // Exact reported repro: single-character fields decode leniently to 0
+    // bytes via Node's Buffer.from(str, 'base64') instead of throwing, so a
+    // shape-and-type-only check waved this through. That reached decrypt(),
+    // which threw "Invalid initialization vector" — a structural error
+    // decryptOrThrow used to mislabel as EncryptionKeyValidationError and
+    // crash-loop the whole process.
+    const zeroByteFields = '{"cipherText":"a","iv":"b","tag":"c","type":"aes-256-gcm"}';
+    const client = createFakeClient([
+      { id: 'a-zero-byte-fields', config: zeroByteFields },
+      { id: 'z-valid', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') },
+    ]);
+
+    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+
+    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'z-valid' });
+    expect(mockWarn).toHaveBeenCalled();
+    expect(mockError).not.toHaveBeenCalled();
+  });
+
+  it('degrades to validated: false, not a crash, when the only candidate has zero-byte fields', async () => {
+    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
+    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
+
+    const zeroByteFields = '{"cipherText":"a","iv":"b","tag":"c","type":"aes-256-gcm"}';
+    const client = createFakeClient([{ id: 'a-zero-byte-fields', config: zeroByteFields }]);
+
+    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+
+    expect(result).toEqual({ validated: false });
+  });
+
+  it('warn-skips a service instance candidate whose IV is valid Base64 but the wrong decoded length', async () => {
+    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
+    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
+
+    // Distinct from the 0-byte case: this IV is properly-formatted,
+    // non-empty Base64 that decodes to 8 bytes instead of the 12
+    // AES-256-GCM requires. Node does not reject this at construction, and
+    // the eventual failure throws the identical error a genuinely wrong key
+    // produces, so this can only be caught by checking the decoded length
+    // before decrypting.
+    const goodEnvelope = JSON.parse(await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}'));
+    const wrongLengthIv = { ...goodEnvelope, iv: Buffer.from('12345678').toString('base64') };
+    const client = createFakeClient([
+      { id: 'a-wrong-iv-length', config: JSON.stringify(wrongLengthIv) },
+      { id: 'z-valid', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') },
+    ]);
+
+    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+
+    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'z-valid' });
+    expect(mockWarn).toHaveBeenCalled();
+    expect(mockError).not.toHaveBeenCalled();
+  });
+
   it('falls through to a credential when every service instance candidate is corrupted', async () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
@@ -339,6 +398,32 @@ describe('validateEncryptionKeyAtStartup', () => {
     const result = await validateEncryptionKeyAtStartup(client, encryptionService);
 
     expect(result).toEqual({ validated: true, source: 'credential', id: 'z-valid' });
+  });
+
+  it('warn-skips a credential candidate whose IV is valid Base64 but the wrong decoded length', async () => {
+    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
+    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
+
+    // Same class as the service instance case: valid, non-empty Base64
+    // that decodes to the wrong byte count. Node does not reject this
+    // until decrypt's final auth check, with the identical error a
+    // genuinely wrong key produces, so this can only be caught
+    // structurally, before decrypt.
+    const goodEnvelope = JSON.parse(await encryptUnder(ACTIVE_KEY, 'b'.repeat(64)));
+    const wrongLengthIv = { ...goodEnvelope, iv: Buffer.from('12345678').toString('base64') };
+    const client = createFakeClient(
+      [],
+      [
+        { id: 'a-wrong-iv-length', decryptionKey: JSON.stringify(wrongLengthIv) },
+        { id: 'z-valid', decryptionKey: await encryptUnder(ACTIVE_KEY, 'b'.repeat(64)) },
+      ],
+    );
+
+    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+
+    expect(result).toEqual({ validated: true, source: 'credential', id: 'z-valid' });
+    expect(mockWarn).toHaveBeenCalled();
+    expect(mockError).not.toHaveBeenCalled();
   });
 
   it('queries credential candidates with the expected filter, selection, and ordering', async () => {

@@ -1,4 +1,8 @@
-import { EncryptionAlgorithm, isEncryptedEnvelope } from '@uncefact/untp-ri-services/encryption';
+import {
+  EncryptionAlgorithm,
+  isEncryptedEnvelope,
+  hasValidEnvelopeStructure,
+} from '@uncefact/untp-ri-services/encryption';
 import type { EncryptedEnvelope } from '@uncefact/untp-ri-services/encryption';
 // Relative imports (not the @/ alias): this module runs inside the Docker
 // image via tsx, where no tsconfig.json exists to resolve path aliases.
@@ -77,10 +81,15 @@ export function looksEnvelopeLikeButInvalid(stored: string): boolean {
 
 /**
  * Parses a stored value as an encrypted envelope, returning `null` when it
- * is not valid JSON or does not have the envelope shape. Exported so other
- * modules that need the same "is this a genuine envelope" check (rather
- * than just decrypting) do not re-implement the JSON.parse-plus-shape-check
- * pairing — see validate-encryption-key-startup.ts.
+ * is not valid JSON, does not have the envelope shape, or is envelope-shaped
+ * with fields that decode to the wrong byte length for its algorithm (a
+ * genuine IV/tag length problem, not a `DATA_ENCRYPTION_KEY` mismatch — see
+ * `hasValidEnvelopeStructure`'s own doc comment for why this must be
+ * checked before decrypting rather than inferred from decrypt's error).
+ * Exported so other modules that need the same "is this a genuine,
+ * decrypt-safe envelope" check (rather than just decrypting) do not
+ * re-implement the parse-shape-structure pipeline — see
+ * validate-encryption-key-startup.ts.
  */
 export function parseEnvelope(stored: string): EncryptedEnvelope | null {
   let parsed: unknown;
@@ -89,7 +98,10 @@ export function parseEnvelope(stored: string): EncryptedEnvelope | null {
   } catch {
     return null;
   }
-  return isEncryptedEnvelope(parsed) ? parsed : null;
+  if (!isEncryptedEnvelope(parsed)) {
+    return null;
+  }
+  return hasValidEnvelopeStructure(parsed) ? parsed : null;
 }
 
 function warnIfEnvelopeLike(stored: string): void {

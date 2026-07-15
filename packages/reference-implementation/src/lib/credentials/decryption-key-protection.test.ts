@@ -73,6 +73,20 @@ describe('isProtectedDecryptionKey', () => {
     expect(isProtectedDecryptionKey('{"cipherText":null,"iv":null,"tag":null,"type":null}')).toBe(false);
     expect(isProtectedDecryptionKey('{"cipherText":"a","iv":"b","tag":"c","type":"des-ede3-cbc"}')).toBe(false);
   });
+
+  it('returns false for a genuinely well-formed-JSON envelope whose IV decodes to the wrong byte length', async () => {
+    const { protectDecryptionKey, isProtectedDecryptionKey } = await import('./decryption-key-protection');
+
+    // Valid Base64, right shape, right algorithm — but the IV is 8 decoded
+    // bytes, not the 12 AES-256-GCM requires. Node does not reject this
+    // until decrypt's final auth check, with the same error a wrong key
+    // produces, so this can only be caught structurally, before decrypt.
+    const stored = protectDecryptionKey('b'.repeat(64)) as string;
+    const tampered = JSON.parse(stored);
+    tampered.iv = Buffer.from('12345678').toString('base64');
+
+    expect(isProtectedDecryptionKey(JSON.stringify(tampered))).toBe(false);
+  });
 });
 
 describe('looksEnvelopeLikeButInvalid', () => {
@@ -86,6 +100,16 @@ describe('looksEnvelopeLikeButInvalid', () => {
     const { looksEnvelopeLikeButInvalid } = await import('./decryption-key-protection');
     expect(looksEnvelopeLikeButInvalid('{"cipherText":null,"iv":null,"tag":null,"type":null}')).toBe(true);
     expect(looksEnvelopeLikeButInvalid('{"cipherText":"a","iv":"b","tag":"c","type":"des-ede3-cbc"}')).toBe(true);
+  });
+
+  it('flags a well-formed-JSON envelope whose tag decodes to the wrong byte length', async () => {
+    const { protectDecryptionKey, looksEnvelopeLikeButInvalid } = await import('./decryption-key-protection');
+
+    const stored = protectDecryptionKey('b'.repeat(64)) as string;
+    const tampered = JSON.parse(stored);
+    tampered.tag = Buffer.from('too-short').toString('base64');
+
+    expect(looksEnvelopeLikeButInvalid(JSON.stringify(tampered))).toBe(true);
   });
 
   it('accepts genuine envelopes and plausible legacy plaintext', async () => {
@@ -134,6 +158,19 @@ describe('revealDecryptionKey', () => {
     // would throw "Unsupported algorithm: null" — a corruption problem,
     // not a DATA_ENCRYPTION_KEY mismatch, so it must not surface as one.
     const corrupted = '{"cipherText":null,"iv":null,"tag":null,"type":null}';
+
+    expect(revealDecryptionKey(corrupted)).toBe(corrupted);
+    expect(mockWarn).toHaveBeenCalled();
+    expect(mockError).not.toHaveBeenCalled();
+  });
+
+  it('warns and returns unchanged for a well-formed-JSON envelope whose IV decodes to the wrong byte length, rather than misreporting it as a key mismatch', async () => {
+    const { protectDecryptionKey, revealDecryptionKey } = await import('./decryption-key-protection');
+
+    const stored = protectDecryptionKey('b'.repeat(64)) as string;
+    const tampered = JSON.parse(stored);
+    tampered.iv = Buffer.from('12345678').toString('base64');
+    const corrupted = JSON.stringify(tampered);
 
     expect(revealDecryptionKey(corrupted)).toBe(corrupted);
     expect(mockWarn).toHaveBeenCalled();
