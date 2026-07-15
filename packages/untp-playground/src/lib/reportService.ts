@@ -2,8 +2,8 @@ import { detectVersion } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
 import { detectSchemeVersion } from '@/lib/schemeValidation';
 import {
+  SchemeReportInput,
   StoredCredential,
-  StoredScheme,
   TestReport,
   TestReportResult,
   TestReportSchemeResult,
@@ -17,8 +17,7 @@ interface GenerateReportParams {
   implementationName: string;
   credentials: Partial<Record<CredentialType, StoredCredential>>;
   testResults: Partial<Record<CredentialType, TestStep[]>>;
-  schemes?: Partial<Record<SchemeType, StoredScheme>>;
-  schemeTestResults?: Partial<Record<SchemeType, TestStep[]>>;
+  schemeInstances?: SchemeReportInput[];
   passStatuses: TestCaseStatus[];
 }
 
@@ -26,13 +25,30 @@ export const generateReport = async ({
   implementationName,
   credentials,
   testResults,
-  schemes,
-  schemeTestResults,
+  schemeInstances,
   passStatuses,
 }: GenerateReportParams): Promise<TestReport> => {
+  // Defence in depth for the ADR-041 report-readiness gate: every loaded artefact must be terminal
+  // (a non-empty result whose steps have all settled). Refuse rather than record a mid-pipeline
+  // artefact as a spurious pass or failure; the UI gate should already prevent reaching here.
+  const settledStatuses = [TestCaseStatus.SUCCESS, TestCaseStatus.FAILURE, TestCaseStatus.WARNING];
+  const isTerminal = (steps: TestStep[]) =>
+    steps.length > 0 && steps.every((step) => settledStatuses.includes(step.status));
+
   const validCredentials = Object.entries(credentials).map(
     ([type, cred]) => [type, cred] as [CredentialType, NonNullable<typeof cred>],
   );
+
+  for (const [type] of validCredentials) {
+    if (!isTerminal(testResults[type] ?? [])) {
+      throw new Error('Cannot generate a report while a credential is still validating.');
+    }
+  }
+  for (const { steps } of schemeInstances ?? []) {
+    if (!isTerminal(steps)) {
+      throw new Error('Cannot generate a report while a scheme is still validating.');
+    }
+  }
 
   const results: TestReportResult[] = validCredentials.map(([type, credential]) => {
     const steps = testResults[type] || [];
@@ -42,9 +58,10 @@ export const generateReport = async ({
     const coreSteps = steps.filter((step) => step.id !== TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
     const extensionStep = steps.find((step) => step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
 
-    const status = steps.every((step) => passStatuses.includes(step.status))
-      ? TestCaseStatus.SUCCESS
-      : TestCaseStatus.FAILURE;
+    const status =
+      steps.length > 0 && steps.every((step) => passStatuses.includes(step.status))
+        ? TestCaseStatus.SUCCESS
+        : TestCaseStatus.FAILURE;
     const result: TestReportResult = {
       status,
       overallStatus: status,
@@ -68,24 +85,21 @@ export const generateReport = async ({
     return result;
   });
 
-  const validSchemes = Object.entries(schemes ?? {}).map(
-    ([type, scheme]) => [type, scheme] as [SchemeType, NonNullable<typeof scheme>],
-  );
-
-  const conformitySchemeResults: TestReportSchemeResult[] = validSchemes.map(([type, scheme]) => {
-    const steps = schemeTestResults?.[type] ?? [];
+  const conformitySchemeResults: TestReportSchemeResult[] = (schemeInstances ?? []).map(({ scheme, steps }) => {
     const decoded = scheme.decoded;
     const version = detectSchemeVersion(decoded) ?? 'unknown';
     const name = typeof decoded?.name === 'string' ? decoded.name : undefined;
     const id = typeof decoded?.id === 'string' ? decoded.id : undefined;
 
-    const status = steps.every((step) => passStatuses.includes(step.status))
-      ? TestCaseStatus.SUCCESS
-      : TestCaseStatus.FAILURE;
+    // An instance with no steps is not a clean pass: require at least one settled step.
+    const status =
+      steps.length > 0 && steps.every((step) => passStatuses.includes(step.status))
+        ? TestCaseStatus.SUCCESS
+        : TestCaseStatus.FAILURE;
     return {
       status,
       overallStatus: status,
-      type,
+      type: SchemeType.CONFORMITY_SCHEME,
       version,
       ...(name && { name }),
       ...(id && { id }),

@@ -36,7 +36,7 @@ export function GenerateReportDialog() {
     report !== null
       ? 'A report has already been generated'
       : !canGenerateReport
-        ? 'Upload and validate a credential to generate a conformance report'
+        ? 'Upload and validate a credential or conformity scheme to generate a conformance report'
         : 'Generate UNTP conformance report';
 
   return (

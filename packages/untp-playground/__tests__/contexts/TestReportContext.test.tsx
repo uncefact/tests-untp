@@ -27,6 +27,21 @@ const mockTestResults: Partial<Record<CredentialType, TestStep[]>> = {
   ],
 };
 
+const schemeDoc = {
+  '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+  type: ['ConformityScheme'],
+};
+const terminalSchemeInstance = {
+  scheme: { original: schemeDoc, decoded: schemeDoc },
+  steps: [{ id: TestCaseStepId.SCHEME_VERSION_DETECTION, status: TestCaseStatus.SUCCESS, name: 'Version Detection' }],
+};
+const pendingSchemeInstance = {
+  scheme: { original: schemeDoc, decoded: schemeDoc },
+  steps: [
+    { id: TestCaseStepId.SCHEME_VERSION_DETECTION, status: TestCaseStatus.IN_PROGRESS, name: 'Version Detection' },
+  ],
+};
+
 const mockReport: TestReport = {
   implementation: { name: 'Test Implementation' },
   reportName: 'UNTP',
@@ -88,6 +103,65 @@ describe('TestReportContext', () => {
     expect(result.current.canGenerateReport).toBeFalsy();
   });
 
+  it('does not allow generation while a scheme instance is still validating', () => {
+    const { result } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => (
+        <TestReportProvider testResults={{}} credentials={{}} schemeInstances={[pendingSchemeInstance]}>
+          {children}
+        </TestReportProvider>
+      ),
+    });
+    expect(result.current.canGenerateReport).toBeFalsy();
+  });
+
+  it('allows generation when every loaded scheme instance is terminal', () => {
+    const { result } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => (
+        <TestReportProvider testResults={{}} credentials={{}} schemeInstances={[terminalSchemeInstance]}>
+          {children}
+        </TestReportProvider>
+      ),
+    });
+    expect(result.current.canGenerateReport).toBeTruthy();
+  });
+
+  it('does not let a ready credential unlock generation while a scheme is still validating', () => {
+    const { result } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => (
+        <TestReportProvider
+          testResults={mockTestResults}
+          credentials={mockCredentials}
+          schemeInstances={[pendingSchemeInstance]}
+        >
+          {children}
+        </TestReportProvider>
+      ),
+    });
+    expect(result.current.canGenerateReport).toBeFalsy();
+  });
+
+  it('invalidates a generated report when the last artefact is removed', async () => {
+    let schemes = [terminalSchemeInstance];
+    const { result, rerender } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => (
+        <TestReportProvider testResults={{}} credentials={{}} schemeInstances={schemes}>
+          {children}
+        </TestReportProvider>
+      ),
+    });
+
+    await act(async () => {
+      await result.current.generateReport('Test Implementation');
+    });
+    expect(result.current.report).toEqual(mockReport);
+
+    schemes = [];
+    rerender();
+
+    expect(result.current.report).toBeNull();
+    expect(result.current.canDownloadReport).toBe(false);
+  });
+
   const runGenerateReportTest = async (expectedReport: any) => {
     (generateReport as jest.Mock).mockResolvedValue(expectedReport);
 
@@ -101,6 +175,7 @@ describe('TestReportContext', () => {
       implementationName: 'Test Implementation',
       credentials: mockCredentials,
       testResults: mockTestResults,
+      schemeInstances: [],
       passStatuses: [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING],
     });
     expect(toast.success).toHaveBeenCalledWith('Report generated successfully');

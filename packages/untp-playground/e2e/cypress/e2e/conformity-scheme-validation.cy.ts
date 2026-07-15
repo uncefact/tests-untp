@@ -13,7 +13,7 @@ import { CONFORMITY_SCHEME_E2E_VERSIONS } from '../fixtures/conformity-schemes-e
  * not need to change.
  */
 
-const SCHEME_GROUP_HEADER = 'ConformityScheme-group-header';
+const SCHEME_GROUP_HEADER = 'scheme-group-header';
 
 // Scheme results render in the Conformity Schemes tab panel, which is hidden while the default
 // Credentials tab is active. Switch to that tab before interacting with the scheme results.

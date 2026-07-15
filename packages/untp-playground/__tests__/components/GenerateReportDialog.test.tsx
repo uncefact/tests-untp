@@ -50,7 +50,9 @@ describe('GenerateReportDialog', () => {
       () => {
         const tooltipContent = screen.getByTestId('generate-report-button-tooltip-content');
         expect(tooltipContent).toBeInTheDocument();
-        expect(tooltipContent).toHaveTextContent('Upload and validate a credential to generate a conformance report');
+        expect(tooltipContent).toHaveTextContent(
+          'Upload and validate a credential or conformity scheme to generate a conformance report',
+        );
       },
       { timeout: 2000 },
     );

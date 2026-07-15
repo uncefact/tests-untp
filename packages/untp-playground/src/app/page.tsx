@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ArtefactUploader, type ArtefactSource } from '@/components/ArtefactUploader';
@@ -13,6 +13,10 @@ import { SchemeTestResults } from '@/components/SchemeTestResults';
 import { SectionHeader } from '@/components/SectionHeader';
 import { TestResults } from '@/components/TestResults';
 import { TestReportProvider } from '@/contexts/TestReportContext';
+import { useArtefactCollection } from '@/hooks/useArtefactCollection';
+import { upsert } from '@/lib/artefactCollection';
+import { newId } from '@/lib/id';
+import { schemeContentHash, schemeTitle } from '@/lib/schemeCollection';
 import {
   decodeEnvelopedCredential,
   detectArtefact,
@@ -26,21 +30,16 @@ import { useError } from '@/contexts/ErrorContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Link2, Server } from 'lucide-react';
-import { ArtefactKind, permittedCredentialTypes, SchemeType } from '../../constants';
+import { ArtefactKind, permittedCredentialTypes } from '../../constants';
 
 export default function Home() {
   const [credentials, setCredentials] = useState<{
     [key in PermittedCredentialType]?: StoredCredential;
   }>({});
-  const [schemes, setSchemes] = useState<{
-    [key in SchemeType]?: StoredScheme;
-  }>({});
   const [testResults, setTestResults] = useState<{
     [key in PermittedCredentialType]?: TestStep[];
   }>({});
-  const [schemeTestResults, setSchemeTestResults] = useState<{
-    [key in SchemeType]?: TestStep[];
-  }>({});
+  const scheme = useArtefactCollection<StoredScheme, TestStep[]>();
   const [fileCount, setFileCount] = useState(0);
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
@@ -51,22 +50,28 @@ export default function Home() {
   // tab has no count). linkSetsCount drives only the Link Sets tab count; its empty state stays
   // unconditional until #811 adds real data.
   const credentialsCount = Object.keys(credentials).length;
-  const schemesCount = Object.keys(schemes).length;
+  const schemesCount = scheme.state.items.length;
   const linkSetsCount = 0; // Link Sets family lands in #811.
+
+  // Recomputed only when the scheme instances change (add, replace, remove, or a result commit), so
+  // an unrelated re-render does not create a fresh array and re-run the report-reset effect.
+  const schemeInstances = useMemo(
+    () => scheme.state.items.map((item) => ({ scheme: item.payload, steps: item.result ?? [] })),
+    [scheme.state.items],
+  );
 
   const handleArtefactUpload = async (rawArtefact: any, source?: ArtefactSource) => {
     try {
       const detected = detectArtefact(rawArtefact?.verifiableCredential ?? rawArtefact);
 
       if (detected?.kind === ArtefactKind.SCHEME) {
-        setSchemes((prev) => ({
-          ...prev,
-          [detected.type]: {
-            original: rawArtefact,
-            decoded: rawArtefact,
-            source,
-          },
-        }));
+        const stored: StoredScheme = { original: rawArtefact, decoded: rawArtefact, source };
+        const { outcome } = scheme.dispatch((state) =>
+          upsert(state, { payload: stored, contentHash: schemeContentHash(stored.decoded), mintInstanceId: newId }),
+        );
+        if (outcome.kind === 'replaced') {
+          toast.success(`Replaced ${schemeTitle(stored)}`);
+        }
         return;
       }
 
@@ -139,12 +144,7 @@ export default function Home() {
     <div className='min-h-screen flex flex-col'>
       <Header />
       <main className='container mx-auto p-8 max-w-7xl flex-1'>
-        <TestReportProvider
-          testResults={testResults}
-          credentials={credentials}
-          schemes={schemes}
-          schemeTestResults={schemeTestResults}
-        >
+        <TestReportProvider testResults={testResults} credentials={credentials} schemeInstances={schemeInstances}>
           <SectionHeader title='Test artefacts'>
             <ReportActions />
           </SectionHeader>
@@ -188,11 +188,7 @@ export default function Home() {
                       guidance='Add a scheme from the panel on the right. Drop a JSON-LD file or paste a URL. Each scheme you add appears here and in the generated report.'
                     />
                   ) : (
-                    <SchemeTestResults
-                      schemes={schemes}
-                      testResults={schemeTestResults}
-                      setTestResults={setSchemeTestResults}
-                    />
+                    <SchemeTestResults collection={scheme.state} dispatch={scheme.dispatch} />
                   )}
                 </TabsContent>
 
