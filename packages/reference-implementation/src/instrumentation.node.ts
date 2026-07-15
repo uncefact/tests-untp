@@ -13,6 +13,8 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
 import { buildResource } from './lib/observability/resource';
+import { apiLogger } from './lib/api/logger';
+import { warnOnRejectedMaxPageLimitOverride } from './lib/api/pagination';
 
 const sdk = new NodeSDK({
   resource: buildResource(),
@@ -23,6 +25,9 @@ const sdk = new NodeSDK({
 });
 
 sdk.start();
+
+// Surface an unusable API_MAX_PAGE_LIMIT to the operator once at startup (issue #834).
+warnOnRejectedMaxPageLimitOverride(apiLogger);
 
 const shutdown = () => {
   sdk.shutdown().catch((err: unknown) => {

@@ -3,7 +3,7 @@ import { parseRequestBody, parseQueryParams } from '@/lib/api/validation';
 import { createIdentifierRequestSchema, listIdentifiersQuerySchema } from '@/lib/api/request-schemas/identifier';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifier, listIdentifiers } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse, clampLimit } from '@/lib/api/pagination';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers' });
@@ -107,7 +107,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of identifiers to return
+ *         description: Number of identifiers to return per page. Defaults to 20. A larger value is rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
@@ -150,9 +150,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Parsing query parameters');
   const query = parseQueryParams(new URL(req.url), listIdentifiersQuerySchema);
-  const { schemeId } = query;
-  const limit = clampLimit(query.limit);
-  const offset = query.offset;
+  const { schemeId, limit, offset } = query;
 
   logger.info({ schemeId, limit, offset }, 'Listing identifiers');
   const { data, total } = await listIdentifiers(tenantId, { schemeId, limit, offset });

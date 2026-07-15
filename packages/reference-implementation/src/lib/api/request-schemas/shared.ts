@@ -17,6 +17,8 @@
 
 import { z } from 'zod';
 
+import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+
 /** A database identifier reference (non-empty string). */
 export const idSchema = z.string().min(1);
 
@@ -89,6 +91,10 @@ function strictIntQueryParam(message: string, isInRange: (value: number) => bool
 /**
  * Shared `limit`/`offset` query fragment for list routes (ADR-037).
  *
+ * `limit` above MAX_PAGE_LIMIT is rejected rather than clamped, so a client
+ * that asks for more than the maximum is told the bound rather than handed a
+ * quietly smaller page (issue #834).
+ *
  * A resource merges this onto its own filter schema, pagination last, so a
  * resource's own filter issue is reported before a pagination issue when
  * both are invalid (parseQueryParams renders only the first issue, and
@@ -98,7 +104,10 @@ function strictIntQueryParam(message: string, isInRange: (value: number) => bool
  *   const query = parseQueryParams(new URL(req.url), resourceQuerySchema);
  */
 export const paginationQuerySchema = z.object({
-  limit: strictIntQueryParam('must be a positive integer', (value) => value >= 1),
+  limit: strictIntQueryParam('must be a positive integer', (value) => value >= 1).refine(
+    (value) => value === undefined || value <= MAX_PAGE_LIMIT,
+    `must not exceed the maximum of ${MAX_PAGE_LIMIT}`,
+  ),
   offset: strictIntQueryParam('must be a non-negative integer', (value) => value >= 0),
 });
 
