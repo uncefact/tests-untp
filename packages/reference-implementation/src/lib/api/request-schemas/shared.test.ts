@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   idSchema,
+  int32Schema,
   locationSchema,
   requireAtLeastOneField,
   nonEmptyArraySchema,
@@ -19,6 +20,37 @@ describe('idSchema', () => {
 
   it('rejects a non-string value', () => {
     expect(idSchema.safeParse(123).success).toBe(false);
+  });
+});
+
+describe('int32Schema', () => {
+  it('accepts zero', () => {
+    expect(int32Schema.safeParse(0)).toEqual({ success: true, data: 0 });
+  });
+
+  it('accepts a negative value', () => {
+    expect(int32Schema.safeParse(-5)).toEqual({ success: true, data: -5 });
+  });
+
+  it('accepts the int32 boundaries', () => {
+    expect(int32Schema.safeParse(-2147483648).success).toBe(true);
+    expect(int32Schema.safeParse(2147483647).success).toBe(true);
+  });
+
+  it('rejects a value above the int32 maximum', () => {
+    expect(int32Schema.safeParse(2147483648).success).toBe(false);
+  });
+
+  it('rejects a value below the int32 minimum', () => {
+    expect(int32Schema.safeParse(-2147483649).success).toBe(false);
+  });
+
+  it('rejects a non-integer number', () => {
+    expect(int32Schema.safeParse(1.5).success).toBe(false);
+  });
+
+  it('rejects a non-numeric value', () => {
+    expect(int32Schema.safeParse('5').success).toBe(false);
   });
 });
 
@@ -68,6 +100,17 @@ describe('requireAtLeastOneField', () => {
   it('rejects a body whose only keys are explicitly undefined', () => {
     const result = updateSchema.safeParse({ name: undefined, age: undefined });
     expect(result.success).toBe(false);
+  });
+
+  it('rejects a body whose only key is unrecognised, exactly like an empty body', () => {
+    // A typo'd field name (e.g. `neme` instead of `name`) must not satisfy the
+    // precondition: it is not one of the schema's own keys, so the wrapped
+    // schema would otherwise strip it to `{}` and silently no-op.
+    const result = updateSchema.safeParse({ neme: 'Widget' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('At least one field must be provided');
+    }
   });
 
   it('leaves a non-object body for the wrapped schema to report its own type error', () => {

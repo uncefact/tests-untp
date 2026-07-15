@@ -27,13 +27,23 @@ export const schemeQualifierSchema = z.object({
   key: z.string().describe('Qualifier key / application identifier code'),
   description: z.string().describe('Human-readable description'),
   validationPattern: z.string().describe('Regex for validating qualifier values'),
-  order: z.number().int().describe('Qualifier precedence in URI ordering (ascending)'),
+  // Non-negative, bounded at the top by the int4 range of the underlying
+  // Postgres column. Mirrors the non-negative int32 bound used for the
+  // request `order` (int32Schema.min(0) in the RI package's
+  // request-schemas/shared.ts; not importable here as this package does not
+  // depend on the RI package), so keep the two in sync.
+  order: z.number().int().min(0).max(2147483647).describe('Qualifier precedence in URI ordering (ascending)'),
   createdAt: z.string().datetime().describe('Timestamp when created'),
   updatedAt: z.string().datetime().describe('Timestamp when last updated'),
 });
 
 /**
- * Identifier scheme record as returned by the REST API.
+ * Identifier scheme record as returned by the REST API. The create, get-by-id,
+ * update, and list handlers all include `qualifiers`; create, get-by-id, and
+ * update also include `registrar`, but list does not, so `registrar` is
+ * marked optional here to match that asymmetry rather than overstating what
+ * the list endpoint returns. (The delete handler returns 204 with no body,
+ * so it has no bearing on this schema.)
  */
 export const identifierSchemeSchema = z.object({
   id: z.string().describe('Database ID'),
@@ -44,6 +54,8 @@ export const identifierSchemeSchema = z.object({
   validationPattern: z.string().describe('Regex for validating identifier values'),
   linkTemplate: z.string().describe('ISO 18975 link template for URI construction'),
   idrServiceInstanceId: z.string().nullable().describe('Associated IDR service instance'),
+  qualifiers: z.array(schemeQualifierSchema).describe('Qualifier definitions attached to this scheme'),
+  registrar: registrarSchema.optional().describe('Parent registrar (omitted on list items)'),
   createdAt: z.string().datetime().describe('Timestamp when created'),
   updatedAt: z.string().datetime().describe('Timestamp when last updated'),
 });

@@ -37,7 +37,7 @@ A scheme can optionally define **qualifiers** — sub-identifier dimensions that
 | `key` | Machine-readable key (e.g. `"lot"`, `"ser"`) |
 | `description` | Human-readable label |
 | `validationPattern` | Regex for validating qualifier values |
-| `order` | Optional sort order for display |
+| `order` | Optional non-negative precedence for URI resolution, ascending |
 
 When updating a scheme's qualifiers, the entire qualifier set is replaced — existing qualifiers are deleted and the new list is created in their place.
 
@@ -98,13 +98,13 @@ Creates a new identifier scheme with optional nested qualifiers. The scheme is a
 | `registrarId` | ID of the parent registrar |
 | `name` | Human-readable scheme name |
 | `primaryKey` | Key identifier used in URI construction (e.g. `"gtin"`) |
-| `validationPattern` | Regex for validating identifier values |
+| `validationPattern` | Regex for validating identifier values. Rejected with a 400 if it does not compile as a regular expression |
 | `linkTemplate` | ISO 18975 link template for URI construction |
 
 | Optional Field | Description |
 |----------------|-------------|
 | `idrServiceInstanceId` | Override IDR service instance for this scheme |
-| `qualifiers` | Array of qualifier definitions (each requires `key`, `description`, `validationPattern`) |
+| `qualifiers` | Array of qualifier definitions (each requires `key`, `description`, `validationPattern`; `order` is optional, a non-negative 32-bit integer, defaults to 0) |
 
 ```mermaid
 sequenceDiagram
@@ -131,12 +131,12 @@ sequenceDiagram
 GET /api/v1/schemes
 ```
 
-Returns identifier schemes for the authenticated tenant (including system defaults) with optional filtering. Results are paginated.
+Returns identifier schemes for the authenticated tenant (including system defaults) with optional filtering. Results are paginated. Each list item includes its qualifiers but omits the parent registrar object (unlike the single-record, create, and update responses, which include it).
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `registrarId` | string | — | Filter by registrar ID |
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | Defaults to 20, or the configured maximum when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---
@@ -163,10 +163,10 @@ Updates one or more fields of an existing identifier scheme. At least one updata
 |-----------------|-------------|
 | `name` | Scheme name (must be non-empty if provided) |
 | `primaryKey` | Primary key identifier |
-| `validationPattern` | Regex validation pattern |
+| `validationPattern` | Regex validation pattern. Rejected with a 400 if it does not compile as a regular expression |
 | `linkTemplate` | ISO 18975 link template |
 | `idrServiceInstanceId` | IDR service instance ID (set to `null` to clear) |
-| `qualifiers` | Replacement qualifier array (replaces all existing qualifiers) |
+| `qualifiers` | Replacement qualifier array (each item requires `key`, `description`, `validationPattern`; `order` is optional, a non-negative 32-bit integer, defaults to 0). Replaces all existing qualifiers |
 
 ---
 

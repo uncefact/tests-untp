@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { parseRequestBody, parseQueryParams } from '@/lib/api/validation';
+import { createSchemeRequestSchema, listSchemesQuerySchema } from '@/lib/api/request-schemas/scheme';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createIdentifierScheme, listIdentifierSchemes, getRegistrarById } from '@/lib/prisma/repositories';
 import { NotFoundError } from '@/lib/api/errors';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/schemes' });
@@ -31,21 +32,27 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *             properties:
  *               registrarId:
  *                 type: string
+ *                 minLength: 1
  *                 description: ID of the parent registrar
  *               name:
  *                 type: string
+ *                 minLength: 1
  *                 description: Human-readable name for the scheme
  *               primaryKey:
  *                 type: string
+ *                 minLength: 1
  *                 description: Primary key identifier (e.g. "gtin", "sscc")
  *               validationPattern:
  *                 type: string
- *                 description: Regular expression pattern for validating identifier values
+ *                 minLength: 1
+ *                 description: Regular expression pattern for validating identifier values. Rejected with a 400 if it does not compile as a regular expression.
  *               linkTemplate:
  *                 type: string
+ *                 minLength: 1
  *                 description: ISO 18975 link template for URI construction (e.g. "/{primaryKey}/{value}")
  *               idrServiceInstanceId:
  *                 type: string
+ *                 minLength: 1
  *                 description: Optional IDR service instance ID
  *               qualifiers:
  *                 type: array
@@ -59,10 +66,20 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *                   properties:
  *                     key:
  *                       type: string
+ *                       minLength: 1
  *                     description:
  *                       type: string
+ *                       minLength: 1
  *                     validationPattern:
  *                       type: string
+ *                       minLength: 1
+ *                       description: Rejected with a 400 if it does not compile as a regular expression.
+ *                     order:
+ *                       type: integer
+ *                       format: int32
+ *                       minimum: 0
+ *                       maximum: 2147483647
+ *                       description: Qualifier precedence in URI ordering (ascending). Defaults to 0.
  *     responses:
  *       201:
  *         description: Scheme created successfully
@@ -71,13 +88,19 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *             schema:
  *               $ref: '#/components/schemas/IdentifierScheme'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. missing required field, a validationPattern that does not compile as a regular expression, a duplicate qualifier key, an idrServiceInstanceId that does not reference an existing service instance)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -102,46 +125,8 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: {
-    registrarId?: string;
-    name?: string;
-    primaryKey?: string;
-    validationPattern?: string;
-    linkTemplate?: string;
-    idrServiceInstanceId?: string;
-    qualifiers?: Array<{
-      key: string;
-      description: string;
-      validationPattern: string;
-      order?: number;
-    }>;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ registrarId: body.registrarId, name: body.name }, 'Validating input parameters');
-  if (!isNonEmptyString(body.registrarId)) throw new ValidationError('registrarId is required');
-  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-  if (!isNonEmptyString(body.primaryKey)) throw new ValidationError('primaryKey is required');
-  if (!isNonEmptyString(body.validationPattern)) throw new ValidationError('validationPattern is required');
-  if (!isNonEmptyString(body.linkTemplate)) throw new ValidationError('linkTemplate is required');
-
-  // Validate qualifiers if provided
-  if (body.qualifiers !== undefined) {
-    if (!Array.isArray(body.qualifiers)) {
-      throw new ValidationError('qualifiers must be an array');
-    }
-    for (const q of body.qualifiers) {
-      if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
-      if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
-      if (!isNonEmptyString(q.validationPattern)) throw new ValidationError('qualifier validationPattern is required');
-    }
-  }
+  logger.info('Validating request body');
+  const body = await parseRequestBody(req, createSchemeRequestSchema);
 
   // Verify the registrar exists and belongs to this tenant
   const registrar = await getRegistrarById(body.registrarId, tenantId);
@@ -185,13 +170,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: registrarId
  *         schema:
  *           type: string
+ *           minLength: 1
  *         description: Filter by registrar ID
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of schemes to return
+ *         description: Number of schemes to return per page. Defaults to 20, or the configured maximum when it is lower. A larger value is rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
@@ -213,13 +199,19 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. a limit above the maximum, a repeated query parameter, an empty registrarId filter)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -233,11 +225,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Parsing query parameters');
-  const url = new URL(req.url);
-  const registrarId = url.searchParams.get('registrarId') ?? undefined;
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const query = parseQueryParams(new URL(req.url), listSchemesQuerySchema);
+  const { registrarId, limit, offset } = query;
 
   logger.info({ registrarId, limit, offset }, 'Listing schemes');
   const { data, total } = await listIdentifierSchemes(tenantId, { registrarId, limit, offset });

@@ -2,6 +2,7 @@
 
 - **Date:** 2026-07-14
 - **Status:** accepted
+- **Update (2026-07-15):** The per-resource rollout (pilot #791) pairs this posture with an API-contract congruence pass on each migrated route, establishing conventions the remaining domains follow. A shared `int32Schema` validates Prisma `Int` body fields to the signed int4 range, so an out-of-range value is a 400 at the boundary rather than a 500 from the database. A `requireAtLeastOneField` PATCH request body is represented in OpenAPI as an `anyOf` of its updatable fields, so the published schema matches the runtime recognised-key rule (unknown keys stay allowed, matching the strip). The `403` that `withTenantAuth` returns is documented on every wrapped route, and a route's response `$ref` matches the repository's Prisma includes (a nested object is required only where every path that uses the `$ref` includes it, optional for list-versus-detail asymmetry). #791 also fixed a `requireAtLeastOneField` bug where an all-unknown-key body satisfied the precondition and became a silent no-op update.
 
 ## Context
 
