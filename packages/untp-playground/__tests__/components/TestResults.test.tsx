@@ -1,5 +1,4 @@
 import { TestResults, confettiConfig } from '@/components/TestResults';
-import { useTestReport } from '@/contexts/TestReportContext';
 import { validateContext } from '@/lib/contextValidation';
 import { detectExtension, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
@@ -7,7 +6,6 @@ import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
 import { Credential } from '@/types/credential';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import confetti from 'canvas-confetti';
 import { CredentialType, TestCaseStatus, TestCaseStepId, VCDMVersion, VCDM_CONTEXT_URLS } from '../../constants';
 
@@ -22,7 +20,6 @@ jest.mock('jsonld', () => ({
   expand: jest.fn(),
   compact: jest.fn(),
 }));
-jest.mock('@/contexts/TestReportContext');
 jest.mock('sonner', () => ({
   toast: {
     error: jest.fn(),
@@ -56,13 +53,6 @@ describe('TestResults Component', () => {
     (validateVcdmRules as jest.Mock).mockResolvedValue({ valid: true });
     (validateContext as jest.Mock).mockResolvedValue({ valid: true, data: {} });
     (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
-    (useTestReport as jest.Mock).mockReturnValue({
-      canGenerateReport: false,
-      generateReport: jest.fn(),
-      report: null,
-      canDownloadReport: false,
-      downloadReport: jest.fn(),
-    });
   });
 
   it('renders empty state correctly', () => {
@@ -301,108 +291,6 @@ describe('TestResults Component', () => {
       });
 
       expect(confetti).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Report Functionality', () => {
-    it('renders report buttons in correct initial state', async () => {
-      (useTestReport as jest.Mock).mockReturnValue({
-        canGenerateReport: false,
-        generateReport: jest.fn(),
-        report: null,
-        canDownloadReport: false,
-        downloadReport: jest.fn(),
-      });
-
-      render(<TestResults credentials={{}} testResults={mockTestResults} setTestResults={mockSetTestResults} />);
-
-      expect(screen.getByText('Generate Report')).toBeDisabled();
-
-      const generateReportButton = screen.getByTestId('generate-report-button-tooltip-trigger');
-      userEvent.hover(generateReportButton);
-
-      await waitFor(() => {
-        const tooltipContent = screen.getByTestId('generate-report-button-tooltip-content');
-        expect(tooltipContent).toBeInTheDocument();
-        expect(tooltipContent).toHaveTextContent('Upload and validate a credential to generate a conformance report');
-      });
-
-      const button = screen.getByRole('combobox');
-      expect(button).toBeDisabled();
-
-      const downloadReportButton = screen.getByTestId('download-report-button-tooltip-trigger');
-      userEvent.hover(downloadReportButton);
-
-      await waitFor(() => {
-        const tooltipContent = screen.getByTestId('download-report-button-tooltip-content');
-        expect(tooltipContent).toBeInTheDocument();
-        expect(tooltipContent).toHaveTextContent('Generate a conformance report first to enable download');
-      });
-    });
-
-    it('enables generate report button when report can be generated', () => {
-      (useTestReport as jest.Mock).mockReturnValue({
-        canGenerateReport: true,
-        generateReport: jest.fn(),
-        report: null,
-        canDownloadReport: false,
-        downloadReport: jest.fn(),
-      });
-
-      render(<TestResults credentials={{}} testResults={mockTestResults} setTestResults={mockSetTestResults} />);
-      expect(screen.getByText('Generate Report')).toBeEnabled();
-    });
-
-    it('enables download button when report is available', async () => {
-      (useTestReport as jest.Mock).mockReturnValue({
-        canGenerateReport: true,
-        generateReport: jest.fn(),
-        report: { some: 'data' },
-        canDownloadReport: true,
-        downloadReport: jest.fn(),
-      });
-
-      render(<TestResults credentials={{}} testResults={mockTestResults} setTestResults={mockSetTestResults} />);
-      expect(screen.getByText('Download Report')).toBeEnabled();
-
-      const downloadReportButton = screen.getByTestId('download-report-button-tooltip-trigger');
-      userEvent.hover(downloadReportButton);
-
-      await waitFor(() => {
-        const tooltipContent = screen.getByTestId('download-report-button-tooltip-content');
-        expect(tooltipContent).toBeInTheDocument();
-        expect(tooltipContent).toHaveTextContent('Download the generated conformance report');
-      });
-    });
-
-    it('disables generate button when report exists', () => {
-      (useTestReport as jest.Mock).mockReturnValue({
-        canGenerateReport: false,
-        generateReport: jest.fn(),
-        report: { some: 'data' },
-        canDownloadReport: true,
-        downloadReport: jest.fn(),
-      });
-
-      render(<TestResults credentials={{}} testResults={mockTestResults} setTestResults={mockSetTestResults} />);
-      expect(screen.getByText('Generate Report')).toBeDisabled();
-    });
-
-    it('calls downloadReport when download button is clicked', async () => {
-      const mockDownloadReport = jest.fn();
-      (useTestReport as jest.Mock).mockReturnValue({
-        canGenerateReport: true,
-        generateReport: jest.fn(),
-        report: { some: 'data' },
-        canDownloadReport: true,
-        downloadReport: mockDownloadReport,
-      });
-
-      render(<TestResults credentials={{}} testResults={mockTestResults} setTestResults={mockSetTestResults} />);
-
-      fireEvent.click(screen.getByRole('combobox'));
-      fireEvent.click(screen.getByText('JSON'));
-      expect(mockDownloadReport).toHaveBeenCalled();
     });
   });
 });

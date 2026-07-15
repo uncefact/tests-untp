@@ -1,10 +1,8 @@
 'use client';
 
 import { StatusIcon } from '@/components/StatusIcon';
-import { TooltipWrapper } from '@/components/TooltipWrapper';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useTestReport } from '@/contexts/TestReportContext';
 import { validateContext } from '@/lib/contextValidation';
 import { detectVersion, isEnvelopedProof } from '@/lib/credentialService';
 import { detectExtension, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
@@ -27,9 +25,6 @@ import {
   VCDMVersion,
   VCProofType,
 } from '../../constants';
-import { GenerateReportDialog } from './GenerateReportDialog';
-import { SectionHeader } from './SectionHeader';
-import { DownloadReport } from './DownloadReport';
 import ValidationDetailsSheet from './ValidationDetailsSheet';
 
 // Add this type to help with tracking previous credentials
@@ -188,7 +183,6 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
   const previousCredentialsRef = useRef<
     Partial<Record<PermittedCredentialType, { original: any; decoded: Credential }>>
   >({});
-  const { canDownloadReport, downloadReport } = useTestReport();
 
   const initializeTestSteps = (credential?: { original: any; decoded: Credential }) => {
     if (!credential) {
@@ -557,19 +551,6 @@ export function TestResults({ credentials, testResults, setTestResults }: TestRe
 
   return (
     <div className='space-y-4'>
-      <SectionHeader title='Verifiable Credentials'>
-        <GenerateReportDialog />
-        <TooltipWrapper
-          content={
-            !canDownloadReport
-              ? 'Generate a conformance report first to enable download'
-              : 'Download the generated conformance report'
-          }
-          dataTestId='download-report-button'
-        >
-          <DownloadReport />
-        </TooltipWrapper>
-      </SectionHeader>
       {permittedCredentialTypes.map((type) => {
         const credential = credentials[type];
         const steps = testResults[type] || [];
