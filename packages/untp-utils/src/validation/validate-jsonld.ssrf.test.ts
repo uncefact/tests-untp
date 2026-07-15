@@ -99,4 +99,26 @@ describe('validateJsonLd SSRF guard (real jsonld + guarded loader)', () => {
     // into jsonld.js's proprietary `details.cause`.
     expect((error.cause as Error).cause).toBeInstanceOf(UrlValidationError);
   });
+
+  it('never contacts a private scoped (term-level) @context URL during expansion', async () => {
+    // A term can declare its own remote @context (JSON-LD 1.1 scoped contexts).
+    // jsonld.js resolves it through the same guarded loader as a top-level
+    // @context, so it must be rejected the same way.
+    const malicious = {
+      '@context': { myTerm: { '@id': 'http://schema.org/myTerm', '@context': `${baseUrl}/internal-scoped-context` } },
+      myTerm: 'value',
+    };
+
+    const error = await validateJsonLd(malicious).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonLdExpansionFailedError);
+    // The rejection came from the SSRF guard, reachable by plain .cause hops.
+    // jsonld.js's scoped-context branch (lib/context.js) discards the loader
+    // failure entirely and throws a fresh 'invalid scoped context' JsonLdError
+    // with no `details.cause` of its own, so this can only pass if
+    // validateJsonLd recovers the guard's rejection some other way (tracking
+    // it at the document-loader call, see `validate-jsonld.ts`).
+    expect(nativeCauseChain(error)).toContainEqual(expect.any(UrlValidationError));
+    // The security property: the loopback canary was never reached.
+    expect(hits).toBe(0);
+  });
 });

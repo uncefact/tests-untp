@@ -27,23 +27,38 @@ export interface ValidateJsonLdOptions {
  * `error.details.cause`, unlike the schema-fetch path (`schema-loader.ts`),
  * which surfaces the same class of rejection on the native chain.
  *
- * Rehydrates the buried error onto `error.cause` so a plain `.cause` walk
- * reaches it on both paths. Mutates and returns the same object jsonld.js
- * just threw for this call (safe: nothing else holds a reference to it), and
- * only when there is something buried and jsonld.js has not already set a
- * `cause` itself, so a malformed `@context` (which never reaches the
- * document loader, and so has nothing at `details.cause`) does not gain a
- * spurious one.
+ * A term's own remote `@context` (a JSON-LD 1.1 "scoped context") loses even
+ * that: jsonld.js resolves it through the same loader, but on failure its
+ * scoped-context branch (`lib/context.js`) discards the loader's error
+ * entirely and throws a fresh `JsonLdError` whose `details` carry no `cause`
+ * at all. `fallback` recovers the guard's rejection in that case: `toRDF`'s
+ * `documentLoader` is wrapped ({@link validateJsonLd}) to record the last
+ * error it threw during the call, and that call-scoped record is passed here
+ * as `fallback`. Because jsonld.js resolves `@context` documents one at a
+ * time and any loader throw immediately aborts the whole call (no later,
+ * unrelated loader call can follow one that failed), a recorded loader error
+ * is always the proximate cause of whatever expansion failure this function
+ * is asked to rehydrate, whether or not jsonld.js chose to keep its own
+ * reference to it.
+ *
+ * Rehydrates the recovered error (preferring `details.cause` when jsonld.js
+ * kept it) onto `error.cause` so a plain `.cause` walk reaches it. Mutates
+ * and returns the same object jsonld.js just threw for this call (safe:
+ * nothing else holds a reference to it), and only when there is something to
+ * recover and jsonld.js has not already set a `cause` itself, so a malformed
+ * `@context` that never reached the document loader (and so has nothing
+ * buried and no fallback recorded) does not gain a spurious one.
  *
  * @see https://github.com/uncefact/tests-untp/issues/773
  */
-function rehydrateJsonLdCause(error: unknown): unknown {
+function rehydrateJsonLdCause(error: unknown, fallback?: unknown): unknown {
   if (!(error instanceof Error) || error.cause !== undefined) {
     return error;
   }
   const buried = (error as Error & { details?: { cause?: unknown } }).details?.cause;
-  if (buried !== undefined) {
-    error.cause = buried;
+  const recovered = buried !== undefined ? buried : fallback;
+  if (recovered !== undefined) {
+    error.cause = recovered;
   }
   return error;
 }
@@ -80,15 +95,27 @@ export async function validateJsonLd(document: unknown, options?: ValidateJsonLd
   const { createJsonLdDocumentLoader } = await import('../loaders/jsonld-document-loader.js');
   const documentLoader = createJsonLdDocumentLoader({ cache: options?.contextCache });
 
+  // Recorded for rehydrateJsonLdCause's fallback: the last error the loader
+  // threw during this call (undefined if every fetch it made succeeded).
+  let lastLoaderError: unknown;
+  const trackedDocumentLoader = async (url: string): Promise<LoadedRemoteDocument> => {
+    try {
+      return await documentLoader(url);
+    } catch (loaderError) {
+      lastLoaderError = loaderError;
+      throw loaderError;
+    }
+  };
+
   try {
     // The options cast bridges @types/jsonld, which types documentLoader with
     // a legacy callback signature; jsonld.js itself accepts the
     // single-argument promise-returning loader used here.
     await jsonld.toRDF(
       document as JsonLdDocument,
-      { safe: options?.safe ?? true, documentLoader } as Parameters<typeof jsonld.toRDF>[1],
+      { safe: options?.safe ?? true, documentLoader: trackedDocumentLoader } as Parameters<typeof jsonld.toRDF>[1],
     );
   } catch (cause) {
-    throw new JsonLdExpansionFailedError(rehydrateJsonLdCause(cause));
+    throw new JsonLdExpansionFailedError(rehydrateJsonLdCause(cause, lastLoaderError));
   }
 }

@@ -24,6 +24,7 @@ const { validateJsonLd } = await import('./validate-jsonld.js');
 describe('validateJsonLd', () => {
   beforeEach(() => {
     toRDF.mockReset();
+    documentLoader.mockReset();
     createJsonLdDocumentLoader.mockClear();
   });
 
@@ -108,6 +109,71 @@ describe('validateJsonLd', () => {
 
       expect(jsonldError.cause).toBe(existingCause);
     });
+
+    // A term's own remote @context (a JSON-LD 1.1 "scoped context") is
+    // resolved through the same document loader, but on failure jsonld.js's
+    // scoped-context branch (lib/context.js) discards the loader's error
+    // entirely and throws a fresh JsonLdError with no `details.cause` at
+    // all (see validate-jsonld.ssrf.test.ts for the real-jsonld
+    // reproduction). validateJsonLd recovers it by tracking the last error
+    // the document loader threw during the call and using that as a
+    // fallback cause.
+    describe('recovering via the tracked-loader fallback', () => {
+      /** Simulates toRDF calling the documentLoader it was given, then rejecting as jsonld.js would. */
+      function rejectAfterCallingLoader(url: string, rejection: unknown) {
+        toRDF.mockImplementation(async (...args: unknown[]) => {
+          const opts = args[1] as { documentLoader: (u: string) => Promise<unknown> };
+          await opts.documentLoader(url).catch(() => undefined);
+          throw rejection;
+        });
+      }
+
+      it('recovers the tracked loader error when the jsonld error has no buried cause of its own', async () => {
+        const loaderError = new Error('SSRF rejected, recorded from the tracked loader');
+        documentLoader.mockRejectedValue(loaderError as never);
+        const scopedContextError = Object.assign(new Error('Invalid JSON-LD syntax; invalid scoped context.'), {
+          name: 'jsonld.SyntaxError',
+          details: { code: 'invalid scoped context', context: 'https://internal.example', term: 'myTerm' },
+        });
+        rejectAfterCallingLoader('https://internal.example', scopedContextError);
+
+        await validateJsonLd({}).catch(() => undefined);
+
+        // Without the fallback, this jsonld error's details carry no `cause`
+        // at all, so scopedContextError.cause would stay unset.
+        expect(scopedContextError.cause).toBe(loaderError);
+      });
+
+      it('prefers the buried details.cause over the fallback when jsonld.js kept both', async () => {
+        const buried = new Error('buried on details.cause, should win');
+        const fallbackLoaderError = new Error('recorded from the tracked loader, should lose');
+        documentLoader.mockRejectedValue(fallbackLoaderError as never);
+        const jsonldError = Object.assign(new Error('wrapped'), {
+          name: 'jsonld.InvalidUrl',
+          details: { cause: buried },
+        });
+        rejectAfterCallingLoader('https://example.com', jsonldError);
+
+        await validateJsonLd({}).catch(() => undefined);
+
+        expect(jsonldError.cause).toBe(buried);
+      });
+
+      it('does not fabricate a cause when the loader never threw during the call', async () => {
+        // The loader succeeds (or is never called); the eventual rejection
+        // is for an unrelated reason, so there is nothing to fall back to.
+        documentLoader.mockResolvedValue({ documentUrl: 'https://example.com', document: {} } as never);
+        const unrelatedError = Object.assign(new Error('Invalid JSON-LD syntax; @context must be an object.'), {
+          name: 'jsonld.SyntaxError',
+          details: { code: 'invalid @context' },
+        });
+        rejectAfterCallingLoader('https://example.com', unrelatedError);
+
+        await validateJsonLd({}).catch(() => undefined);
+
+        expect('cause' in unrelatedError).toBe(false);
+      });
+    });
   });
 
   it('throws JsonLdInvalidShapeError when the document is not an object', async () => {
@@ -158,13 +224,20 @@ describe('validateJsonLd', () => {
     expect(createJsonLdDocumentLoader).toHaveBeenCalledWith({ cache: contextCache });
   });
 
-  it('passes the created document loader to toRDF', async () => {
+  it('passes toRDF a loader that delegates to the one createJsonLdDocumentLoader created', async () => {
     toRDF.mockResolvedValue([] as never);
+    const remoteDoc = { documentUrl: 'https://example.com', document: {} };
+    documentLoader.mockResolvedValue(remoteDoc as never);
 
     await validateJsonLd({ '@context': 'https://example.com' });
 
     expect(createJsonLdDocumentLoader).toHaveBeenCalledWith({ cache: undefined });
-    expect(toRDF).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ documentLoader }));
+    // validateJsonLd wraps the created loader (to record failures for
+    // rehydrateJsonLdCause's fallback, see validate-jsonld.ts), so toRDF
+    // receives a different function reference; assert delegation instead.
+    const passedOptions = toRDF.mock.calls[0]?.[1] as { documentLoader: (url: string) => Promise<unknown> };
+    await expect(passedOptions.documentLoader('https://example.com')).resolves.toBe(remoteDoc);
+    expect(documentLoader).toHaveBeenCalledWith('https://example.com');
   });
 
   it('handles non-Error thrown values', async () => {
