@@ -33,6 +33,10 @@ import {
   warnIfDeprecatedEncryptionKeyName,
 } from '../src/lib/encryption/resolve-data-encryption-key.js';
 import {
+  assertNotPlaceholderEncryptionKey,
+  validateEncryptionKeyAtStartup,
+} from '../src/lib/credentials/validate-encryption-key-startup.js';
+import {
   SYSTEM_TENANT_ID,
   SYSTEM_IDR_SERVICE_ID,
   SYSTEM_STORAGE_SERVICE_ID,
@@ -88,7 +92,15 @@ async function main() {
   const ENCRYPTION_KEY = resolvedEncryptionKey.key;
   let encryptionService: AesGcmEncryptionAdapter | null = null;
   if (ENCRYPTION_KEY) {
+    // Refuse (or warn, in local development) the .env.example placeholder
+    // before touching any existing envelope, then confirm the key can
+    // actually decrypt what is already stored — same preflight the
+    // backfill:decryption-keys script runs, so a wrong key is caught here
+    // rather than after this seed re-encrypts the system service instances
+    // under it.
+    assertNotPlaceholderEncryptionKey(ENCRYPTION_KEY, { deploymentEnvironment: process.env.DEPLOYMENT_ENVIRONMENT });
     encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
+    await validateEncryptionKeyAtStartup(prisma, encryptionService);
   } else {
     logger.warn(
       'DATA_ENCRYPTION_KEY not set; skipping service instance seeds (IDR, storage, VC). ' +
