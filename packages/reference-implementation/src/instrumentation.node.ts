@@ -19,7 +19,7 @@ const sdk = new NodeSDK({
   traceExporter: new OTLPTraceExporter({
     url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://localhost:4317',
   }),
-  instrumentations: [buildInstrumentations()],
+  instrumentations: buildInstrumentations(),
 });
 
 sdk.start();
