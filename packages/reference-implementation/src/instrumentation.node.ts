@@ -9,9 +9,9 @@
  * @see ../../../docs/observability.md
  */
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
+import { buildInstrumentations } from './lib/observability/instrumentations';
 import { buildResource } from './lib/observability/resource';
 
 const sdk = new NodeSDK({
@@ -19,7 +19,7 @@ const sdk = new NodeSDK({
   traceExporter: new OTLPTraceExporter({
     url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://localhost:4317',
   }),
-  instrumentations: [getNodeAutoInstrumentations()],
+  instrumentations: buildInstrumentations(),
 });
 
 sdk.start();
