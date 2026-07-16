@@ -202,6 +202,46 @@ describe('backfillDecryptionKeys', () => {
     expect(rows[0].decryptionKey).toBe('b'.repeat(64));
   });
 
+  it('aborts on a service instance configuration with every required key but null fields, not a confusing crypto error', async () => {
+    const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
+
+    // Has cipherText/iv/tag/type — a presence-only envelope check would
+    // wrongly call this protected, attempt to decrypt it, and abort with a
+    // crypto error ("Unsupported algorithm: null") that reads as a key
+    // problem. It must instead be classified as "not a valid envelope" up
+    // front, hitting the backfill's existing, accurate abort message.
+    const rows: Row[] = [{ id: 'cred-1', decryptionKey: 'b'.repeat(64) }];
+    const serviceInstances: ServiceInstanceRow[] = [
+      { id: 'svc-1', config: '{"cipherText":null,"iv":null,"tag":null,"type":null}' },
+    ];
+    const client = createFakeClient(rows, serviceInstances);
+
+    await expect(backfillDecryptionKeys(client)).rejects.toThrow(
+      'Service instance svc-1 holds a configuration that is not a valid encrypted envelope',
+    );
+    expect(client.credential.update).not.toHaveBeenCalled();
+  });
+
+  it('aborts on a service instance configuration whose IV is valid Base64 but the wrong decoded length', async () => {
+    const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
+    const { protectDecryptionKey } = await import('./decryption-key-protection');
+
+    // Valid Base64, right shape, right algorithm — but the IV is 8 decoded
+    // bytes, not the 12 AES-256-GCM requires. Node does not reject this at
+    // construction, and the eventual failure throws the exact same error a
+    // genuinely wrong key produces, so this can only be caught structurally.
+    const rows: Row[] = [{ id: 'cred-1', decryptionKey: 'b'.repeat(64) }];
+    const tampered = JSON.parse(protectDecryptionKey('{"apiUrl":"x"}') as string);
+    tampered.iv = Buffer.from('12345678').toString('base64');
+    const serviceInstances: ServiceInstanceRow[] = [{ id: 'svc-1', config: JSON.stringify(tampered) }];
+    const client = createFakeClient(rows, serviceInstances);
+
+    await expect(backfillDecryptionKeys(client)).rejects.toThrow(
+      'Service instance svc-1 holds a configuration that is not a valid encrypted envelope',
+    );
+    expect(client.credential.update).not.toHaveBeenCalled();
+  });
+
   it('aborts before writing when a service instance configuration cannot be decrypted', async () => {
     const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
 
@@ -261,6 +301,46 @@ describe('backfillDecryptionKeys', () => {
     expect(result.wrapped).toBe(1);
     expect(rows[1].decryptionKey).toBe(suspect);
     expect(isProtectedDecryptionKey(rows[2].decryptionKey as string)).toBe(true);
+  });
+
+  it('skips a credential row with every required key but null fields or an unsupported algorithm, as a suspect row', async () => {
+    const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
+    const { protectDecryptionKey } = await import('./decryption-key-protection');
+
+    // Has cipherText/iv/tag/type — a presence-only envelope check would
+    // wrongly count this as already-protected and skip it silently. It
+    // must instead be flagged as a suspect row for the operator to
+    // investigate, same as any other corrupted envelope-shaped value.
+    const nullFields = '{"cipherText":null,"iv":null,"tag":null,"type":null}';
+    const rows: Row[] = [
+      { id: 'cred-1', decryptionKey: protectDecryptionKey('b'.repeat(64)) },
+      { id: 'cred-2', decryptionKey: nullFields },
+    ];
+    const client = createFakeClient(rows);
+
+    const result = await backfillDecryptionKeys(client);
+
+    expect(result.suspectRowIds).toEqual(['cred-2']);
+    expect(rows[1].decryptionKey).toBe(nullFields);
+  });
+
+  it('flags a credential row whose tag is valid Base64 but the wrong decoded length, as a suspect row', async () => {
+    const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
+    const { protectDecryptionKey } = await import('./decryption-key-protection');
+
+    const tampered = JSON.parse(protectDecryptionKey('c'.repeat(64)) as string);
+    tampered.tag = Buffer.from('too-short').toString('base64');
+    const wrongLengthTag = JSON.stringify(tampered);
+    const rows: Row[] = [
+      { id: 'cred-1', decryptionKey: protectDecryptionKey('b'.repeat(64)) },
+      { id: 'cred-2', decryptionKey: wrongLengthTag },
+    ];
+    const client = createFakeClient(rows);
+
+    const result = await backfillDecryptionKeys(client);
+
+    expect(result.suspectRowIds).toEqual(['cred-2']);
+    expect(rows[1].decryptionKey).toBe(wrongLengthTag);
   });
 
   it('continues past rows deleted between fetch and update, counting them', async () => {

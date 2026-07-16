@@ -72,6 +72,8 @@ The seed creates the following defaults. Each category is independent — if a r
 
 For example, if `DATA_ENCRYPTION_KEY` is not set, the service instances, default DID, and render templates are all skipped — but the system tenant, registrars, identifier schemes, and data models are still created. The skipped items must be configured before the system can issue, store, or resolve credentials — ensure all required environment variables are set.
 
+When `DATA_ENCRYPTION_KEY` is set, the seed validates it against any existing encrypted data before it writes any service instance configuration (the system tenant and other non-encrypted records may already exist by that point): see [Encryption Key Validation](#encryption-key-validation) below for what this checks and how it fails.
+
 ### Customising seed data
 
 The seed script is located at `packages/reference-implementation/prisma/seed.ts` in the [repository](https://github.com/uncefact/tests-untp). Organisations that need to modify what gets seeded — for example, adding custom identifier schemes or registrars — can edit this file directly.
@@ -85,3 +87,18 @@ A mechanism for supplying custom seed data (such as render templates) via Docker
 ## Step 3: Application Start
 
 Once migrations and seeding are complete, the application starts and begins accepting requests on port 3003.
+
+### Encryption Key Validation
+
+Before the application accepts its first request, it validates the active `DATA_ENCRYPTION_KEY` by decrypting one existing encrypted value — a service instance configuration, or (when no service instance has a usable one, whether because none exists yet or because every existing configuration is corrupted) a protected credential decryption key. This runs once per process start, using the same check the [seed](#step-2-database-seed) already runs before it writes.
+
+| Situation | Result |
+|-----------|--------|
+| The key decrypts the sample value | Startup proceeds normally |
+| Nothing is encrypted yet (fresh deployment, `DATA_ENCRYPTION_KEY` not yet configured) | Startup proceeds normally — there is nothing to validate against |
+| The key cannot decrypt the sample value | Startup fails with a named error identifying the row that failed to decrypt |
+| `DATA_ENCRYPTION_KEY` is still the placeholder value from `.env.example` | Startup fails outside local development (`DEPLOYMENT_ENVIRONMENT` unset or `local` is treated as local development); a warning is logged and startup proceeds within it |
+
+Without this check, a `DATA_ENCRYPTION_KEY` that does not match the key data was encrypted under only surfaces once a real request tries to decrypt something — for example a `ConfigDecryptionError` when a service instance resolves. Validating at startup turns that into an immediate, loud failure instead of an intermittent one discovered by end users.
+
+If startup fails this check, verify `DATA_ENCRYPTION_KEY` matches the key the application was previously running with. Key rotation is not supported (tracked in [#720](https://github.com/uncefact/tests-untp/issues/720)), so a changed key is not recoverable — restore the previous key rather than trying to move data onto a new one.

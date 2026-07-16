@@ -5,4 +5,4 @@ export { EncryptionAlgorithm, assertPermittedAlgorithm } from './encryption.inte
 export type { EncryptedEnvelope, IEncryptionService } from './encryption.interface.js';
 export { decryptCredential } from './decrypt-credential.js';
 export type { DecryptionParams } from './decrypt-credential.js';
-export { isEncryptedEnvelope } from './is-encrypted-envelope.js';
+export { isEncryptedEnvelope, hasValidEnvelopeStructure } from './is-encrypted-envelope.js';
