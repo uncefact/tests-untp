@@ -5,13 +5,22 @@ import { JsonLdExpansionFailedError } from './errors.js';
 import { UrlValidationError } from '../node/errors.js';
 
 /**
- * Digs the guard's rejection out of an expansion failure. jsonld.js wraps a
- * document loader's error in its own JsonLdError, which stores the original
- * at the non-standard `details.cause` and never sets native `Error.cause`.
+ * Walks the native `Error.cause` chain from `error`, collecting every link.
+ * jsonld.js's own `JsonLdError` buries a document loader's rejection at the
+ * non-standard `details.cause` and never sets native `Error.cause`;
+ * `validateJsonLd` rehydrates it onto `error.cause` when wrapping an
+ * expansion failure (see `validate-jsonld.ts`), so a plain `.cause` walk
+ * reaches the SSRF guard's rejection the same way it does on the
+ * schema-fetch path (`schema-loader.ssrf.test.ts`).
  */
-function buriedLoaderError(error: unknown): unknown {
-  const jsonldError = (error as JsonLdExpansionFailedError).cause as { details?: { cause?: unknown } } | undefined;
-  return jsonldError?.details?.cause;
+function nativeCauseChain(error: unknown): unknown[] {
+  const chain: unknown[] = [];
+  let current: unknown = error;
+  while (current instanceof Error && current.cause !== undefined) {
+    chain.push(current.cause);
+    current = current.cause;
+  }
+  return chain;
 }
 
 /**
@@ -57,7 +66,7 @@ describe('validateJsonLd SSRF guard (real jsonld + guarded loader)', () => {
     const error = await validateJsonLd(malicious).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(JsonLdExpansionFailedError);
     // The rejection came from the SSRF guard, not an unrelated expansion failure.
-    expect(buriedLoaderError(error)).toBeInstanceOf(UrlValidationError);
+    expect(nativeCauseChain(error)).toContainEqual(expect.any(UrlValidationError));
     // The security property: the loopback canary was never reached.
     expect(hits).toBe(0);
   });
@@ -67,13 +76,49 @@ describe('validateJsonLd SSRF guard (real jsonld + guarded loader)', () => {
 
     const error = await validateJsonLd(malicious).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(JsonLdExpansionFailedError);
-    expect(buriedLoaderError(error)).toBeInstanceOf(UrlValidationError);
+    expect(nativeCauseChain(error)).toContainEqual(expect.any(UrlValidationError));
   });
 
   it('expands a document with an inline @context without any network fetch', async () => {
     const document = { '@context': { name: 'http://schema.org/name' }, name: 'Acme' };
 
     await expect(validateJsonLd(document)).resolves.toBeUndefined();
+    expect(hits).toBe(0);
+  });
+
+  it('reaches the UrlValidationError by plain .cause hops, matching the schema-fetch path shape', async () => {
+    const malicious = { '@context': `${baseUrl}/internal-context`, name: 'value' };
+
+    const error = (await validateJsonLd(malicious).catch((e: unknown) => e)) as JsonLdExpansionFailedError;
+
+    // First hop: jsonld.js's own JsonLdError (still carries `.details` for
+    // callers that want the raw jsonld diagnostic).
+    expect(error.cause).toBeInstanceOf(Error);
+    expect((error.cause as Error).name).toBe('jsonld.InvalidUrl');
+    // Second hop: the guard's rejection itself, reachable without digging
+    // into jsonld.js's proprietary `details.cause`.
+    expect((error.cause as Error).cause).toBeInstanceOf(UrlValidationError);
+  });
+
+  it('never contacts a private scoped (term-level) @context URL during expansion', async () => {
+    // A term can declare its own remote @context (JSON-LD 1.1 scoped contexts).
+    // jsonld.js resolves it through the same guarded loader as a top-level
+    // @context, so it must be rejected the same way.
+    const malicious = {
+      '@context': { myTerm: { '@id': 'http://schema.org/myTerm', '@context': `${baseUrl}/internal-scoped-context` } },
+      myTerm: 'value',
+    };
+
+    const error = await validateJsonLd(malicious).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonLdExpansionFailedError);
+    // The rejection came from the SSRF guard, reachable by plain .cause hops.
+    // jsonld.js's scoped-context branch (lib/context.js) discards the loader
+    // failure entirely and throws a fresh 'invalid scoped context' JsonLdError
+    // with no `details.cause` of its own, so this can only pass if
+    // validateJsonLd recovers the guard's rejection some other way (tracking
+    // it at the document-loader call, see `validate-jsonld.ts`).
+    expect(nativeCauseChain(error)).toContainEqual(expect.any(UrlValidationError));
+    // The security property: the loopback canary was never reached.
     expect(hits).toBe(0);
   });
 });
