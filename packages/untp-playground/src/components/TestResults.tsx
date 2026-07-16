@@ -329,19 +329,40 @@ async function runCredentialPipeline(
       toast.error('Failed to fetch schema. Please try again.');
     }
 
-    const validateContextResult = await validateContext(stored.decoded);
-    if (
-      !setStep(TestCaseStepId.CONTEXT_VALIDATION, {
-        status: validateContextResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-        details: validateContextResult.valid
-          ? validateContextResult.data
-          : { errors: validateContextResult.error ? [validateContextResult.error] : [] },
-      })
-    ) {
-      return;
-    }
-    if (!validateContextResult.valid) {
-      toast.error('Validation of the JSON-LD context failed. Please check the View Details for more information.');
+    try {
+      const validateContextResult = await validateContext(stored.decoded);
+      if (
+        !setStep(TestCaseStepId.CONTEXT_VALIDATION, {
+          status: validateContextResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+          details: validateContextResult.valid
+            ? validateContextResult.data
+            : { errors: validateContextResult.error ? [validateContextResult.error] : [] },
+        })
+      ) {
+        return;
+      }
+      if (!validateContextResult.valid) {
+        toast.error('Validation of the JSON-LD context failed. Please check the View Details for more information.');
+      }
+    } catch (error) {
+      console.log('Context validation error:', error);
+      if (
+        !setStep(TestCaseStepId.CONTEXT_VALIDATION, {
+          status: TestCaseStatus.FAILURE,
+          details: {
+            errors: [
+              {
+                keyword: 'context',
+                message: error instanceof Error ? error.message : 'Failed to validate the JSON-LD context',
+                instancePath: '',
+              },
+            ],
+          },
+        })
+      ) {
+        return;
+      }
+      toast.error('Validation of the JSON-LD context failed. Please try again.');
     }
 
     if (extension) {

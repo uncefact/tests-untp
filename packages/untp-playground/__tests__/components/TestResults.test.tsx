@@ -263,6 +263,30 @@ describe('Credential verification throw regression (#810)', () => {
       description: 'Could not reach the verification service. Please try again.',
     });
   });
+
+  it('fails the context step, settles every other step, and allows removal when validateContext throws', async () => {
+    (validateContext as jest.Mock).mockRejectedValue(new Error('jsonld expansion failed'));
+    const { toast } = require('sonner');
+
+    render(
+      <Harness credentials={[makeStored({ id: 'context-throw' }, { kind: 'file', filename: 'dpp-context.json' })]} />,
+    );
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('context-status-icon-failure')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove dpp-context.json' })).toBeInTheDocument();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Validation of the JSON-LD context failed. Please try again.');
+  });
 });
 
 describe('Credential replace-in-place through the collection (#810)', () => {
