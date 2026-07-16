@@ -328,7 +328,7 @@ Before importing, the tenant must have registered the verifiable credential serv
 
 Note that unlike the [create endpoint](#create-a-did), the import endpoint does **not** call the upstream VC service. It only verifies the service instance and creates a local database record.
 
-Importing a `did:webvh` identifier is rejected: `method` is restricted to `DID_WEB` until did:webvh support lands, so a webvh DID cannot be imported ahead of that even though the `did` string itself is otherwise accepted without format validation.
+Importing a `did:webvh` identifier is rejected because `method` is restricted to `DID_WEB` until did:webvh support lands.
 
 | Required Field | Description |
 |-----------------|-------------|
