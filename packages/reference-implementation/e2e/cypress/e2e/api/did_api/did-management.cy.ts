@@ -547,7 +547,7 @@ describe('DID API', { testIsolation: false }, () => {
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
-        expect(response.body.error).to.include('default');
+        expect(response.body.error).to.include('isDefault');
       });
     });
 
