@@ -25,6 +25,12 @@ describe('schemeContentHash', () => {
     expect(schemeContentHash(doc)).toBe(schemeContentHash({ ...doc }));
   });
 
+  it('is invariant to key order, so a re-serialised document is still one instance', () => {
+    expect(schemeContentHash({ id: 'x', name: 'S', meta: { a: 1, b: 2 } })).toBe(
+      schemeContentHash({ meta: { b: 2, a: 1 }, name: 'S', id: 'x' }),
+    );
+  });
+
   it('differs for different content', () => {
     expect(schemeContentHash({ id: 'a' })).not.toBe(schemeContentHash({ id: 'b' }));
   });

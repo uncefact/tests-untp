@@ -5,8 +5,29 @@
  * documents with different content (even the same filename) as separate instances. Collision
  * probability across a handful of loaded artefacts is negligible.
  */
+
+/**
+ * Deterministic JSON with recursively key-sorted objects, so the same document hashes identically
+ * regardless of the key order a parser or exporter happened to produce. `undefined` members are
+ * omitted, matching `JSON.stringify`.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value) ?? '';
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+  const record = value as Record<string, unknown>;
+  const members = Object.keys(record)
+    .sort()
+    .map((key) => (record[key] === undefined ? '' : `${JSON.stringify(key)}:${stableStringify(record[key])}`))
+    .filter((member) => member.length > 0);
+  return `{${members.join(',')}}`;
+}
+
 export function hashContent(value: unknown): string {
-  const input = JSON.stringify(value) ?? '';
+  const input = stableStringify(value);
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
   for (let i = 0; i < input.length; i++) {

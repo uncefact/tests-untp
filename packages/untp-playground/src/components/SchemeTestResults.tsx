@@ -298,7 +298,10 @@ function SchemeCard({ item, onRemove }: { item: SchemeSlot; onRemove: () => void
       <button
         type='button'
         aria-label={`Remove ${title}`}
-        onClick={onRemove}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
         // Revealed only when the pointer is over the delete region itself (the right edge), or when
         // the control is keyboard-focused, rather than on hover of the whole card.
         className='absolute bottom-0 right-0 top-0 flex w-12 items-center justify-center bg-red-400 text-white opacity-0 transition-opacity hover:bg-red-500 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100'
