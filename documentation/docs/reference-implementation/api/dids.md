@@ -13,6 +13,8 @@ For background on how DIDs relate to the verifiable credential service, see [Ver
 The Reference Implementation includes a Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) with full request/response schemas you can try directly from the browser. The endpoint descriptions below focus on behaviour and internal logic — refer to Swagger for exact payload shapes. All endpoints require authentication — see [Authentication](../authentication#obtaining-a-token) for how to obtain a Bearer token.
 :::
 
+Optional request fields across these endpoints (`name`, `description`, `isDefault`, `serviceInstanceId`) are left unset by omitting them, not by sending an explicit `null` — a `null` value is rejected with a 400.
+
 ## Concepts
 
 ### DID Types
@@ -117,6 +119,19 @@ For **managed** DIDs, the VC service generates a new key pair, creates the DID, 
 
 For **self-managed** DIDs created via this endpoint, the VC service still generates the key pair and creates the DID — the difference is that the tenant is responsible for hosting the DID document at the location the DID identifier resolves to (see [Self-Managed DID type](#self_managed) for details). The DID starts as `UNVERIFIED` and should be confirmed via the [verify endpoint](#verify-a-did) once the DID document is hosted.
 
+| Required Field | Description |
+|-----------------|-------------|
+| `type` | `MANAGED` or `SELF_MANAGED` (`DEFAULT` is system-managed and cannot be created via this endpoint) |
+| `method` | DID method. Rejected with a 400 if the resolved DID service does not support it |
+| `alias` | Alias for the DID (e.g. domain for did:web) |
+
+| Optional Field | Description |
+|-----------------|-------------|
+| `name` | Human-readable name (must be non-empty if provided) |
+| `description` | Description of the DID's purpose (must be non-empty if provided) |
+| `isDefault` | Whether this DID should be the tenant's default |
+| `serviceInstanceId` | Verifiable credential service instance to use for creation |
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -151,6 +166,14 @@ GET /api/v1/dids
 
 Returns DIDs for the authenticated tenant with optional filtering. Results are paginated.
 
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `type` | string | — | Filter by DID type (the full set, including `DEFAULT`) |
+| `status` | string | — | Filter by DID status |
+| `serviceInstanceId` | string | — | Filter by service instance ID |
+| `limit` | integer | Defaults to 20, or the configured maximum when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
+| `offset` | integer | `0` | Number of results to skip |
+
 ---
 
 ### Get a DID
@@ -169,7 +192,13 @@ Retrieves a specific DID by its database ID.
 PATCH /api/v1/dids/{id}
 ```
 
-Updates the metadata of a DID. Only `name`, `description`, and `isDefault` can be changed — the DID identifier, type, method, and key material are immutable.
+Updates the metadata of a DID. Only `name`, `description`, and `isDefault` can be changed — the DID identifier, type, method, and key material are immutable. At least one updatable field must be provided.
+
+| Updatable Field | Description |
+|-----------------|-------------|
+| `name` | New name (must be non-empty if provided) |
+| `description` | New description (must be non-empty if provided) |
+| `isDefault` | Whether to set this DID as the tenant default. Cannot be changed on system default DIDs |
 
 ---
 
@@ -248,7 +277,7 @@ The VC service resolves the DID by fetching the DID document from wherever it is
 POST /api/v1/dids/{id}/verify
 ```
 
-Verifies that a DID can be resolved and that its DID document is valid. The DID's status is updated based on the result — `VERIFIED` if all checks pass, `VERIFICATION_FAILED` otherwise.
+Verifies that a DID can be resolved and that its DID document is valid. When verification runs to completion, the DID's status is updated based on the result — `VERIFIED` if all checks pass, `VERIFICATION_FAILED` otherwise. A pre-verification failure leaves the current status unchanged: the DEFAULT-type guard below, or a stored DID string that does not parse as `did:method:identifier` or names an unsupported method (reachable because [import](#import-a-did) accepts the `did` string without format validation) — both return a 400 without touching the record.
 
 This endpoint is used for **self-managed** DIDs — both those [created via the API](#create-a-did) and those [imported](#import-a-did) — which start with status `UNVERIFIED`. It confirms that the DID document is publicly resolvable and structurally valid.
 
@@ -298,6 +327,18 @@ Use this endpoint when you have a DID that was created outside the Reference Imp
 Before importing, the tenant must have registered the verifiable credential service instance that holds the DID via the [Services API](./services#create-a-service-instance). The `serviceInstanceId` is required — this is how the Reference Implementation knows which VC service to use when signing credentials with this DID.
 
 Note that unlike the [create endpoint](#create-a-did), the import endpoint does **not** call the upstream VC service. It only creates a local database record.
+
+| Required Field | Description |
+|-----------------|-------------|
+| `did` | The DID identifier to import (e.g. `did:web:example.com`) |
+| `method` | DID method |
+| `keyId` | Key identifier associated with the DID |
+| `serviceInstanceId` | Verifiable credential service instance that holds the key material for this DID |
+
+| Optional Field | Description |
+|-----------------|-------------|
+| `name` | Human-readable name (must be non-empty if provided) |
+| `description` | Description of the DID's purpose (must be non-empty if provided) |
 
 ```mermaid
 sequenceDiagram

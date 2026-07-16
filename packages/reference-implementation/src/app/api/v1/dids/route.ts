@@ -1,15 +1,31 @@
 import { NextResponse } from 'next/server';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
 import { errorMessage, ConflictError, ForbiddenError } from '@/lib/api/errors';
-import { ValidationError, validateEnum, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { ValidationError, parseRequestBody, parseQueryParams } from '@/lib/api/validation';
+import { createDidRequestSchema, listDidsQuerySchema } from '@/lib/api/request-schemas/did';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, listDids, findDidByAliasAndService } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
-import { CREATABLE_DID_TYPES, DidType, DidMethod, DidStatus, DidConflictError } from '@uncefact/untp-ri-services';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { DidType, DidMethod, DidStatus, DidConflictError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 
 const logger = apiLogger.child({ route: '/api/v1/dids' });
+
+/**
+ * Asserts that the resolved DID service's actual capabilities (queried at
+ * request time, since they vary by adapter) include the given value,
+ * rendering a `field: message` 400 to match the Zod-boundary shape. A local
+ * check rather than the shared `validateEnum` helper: that helper renders
+ * `field must be one of ...`, a different shape to the boundary's
+ * `field: message` convention, and the shared helper is not to be edited for
+ * one route's message format.
+ */
+function assertSupported<T extends string>(field: string, value: T, supported: readonly T[]): void {
+  if (!supported.includes(value)) {
+    throw new ValidationError(`${field}: must be one of ${supported.join(', ')}`);
+  }
+}
 
 /**
  * @swagger
@@ -33,25 +49,29 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *               type:
  *                 type: string
  *                 enum: [MANAGED, SELF_MANAGED]
- *                 description: Type of DID to create
+ *                 description: Type of DID to create (DEFAULT is system-managed and cannot be created via this endpoint)
  *               method:
  *                 type: string
- *                 enum: [DID_WEB]
+ *                 enum: [DID_WEB, DID_WEB_VH]
  *                 description: DID method to use
  *               alias:
  *                 type: string
+ *                 minLength: 1
  *                 description: Alias for the DID (e.g., domain for did:web)
  *               name:
  *                 type: string
+ *                 minLength: 1
  *                 description: Human-readable name for the DID
  *               description:
  *                 type: string
+ *                 minLength: 1
  *                 description: Description of the DID's purpose
  *               isDefault:
  *                 type: boolean
  *                 description: Whether this DID should be the tenant's default
  *               serviceInstanceId:
  *                 type: string
+ *                 minLength: 1
  *                 description: Optional service instance ID to use for DID creation
  *     responses:
  *       201:
@@ -61,7 +81,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *             schema:
  *               $ref: '#/components/schemas/Did'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. missing or invalid type/method/alias, a type or method the resolved DID service does not support, an alias that fails normalisation)
  *         content:
  *           application/json:
  *             schema:
@@ -73,7 +93,10 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
- *         description: Forbidden - cannot create a root DID for the system VC service domain
+ *         description: |
+ *           Forbidden. Either of:
+ *           - Cannot create a root DID for the system VC service domain
+ *           - Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -96,52 +119,37 @@ const logger = apiLogger.child({ route: '/api/v1/dids' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       502:
+ *         description: |
+ *           Upstream failure, one of:
+ *           - DID_CREATE_FAILED: the resolved VC service rejected or could not complete the create call.
+ *           - DID_DOCUMENT_FETCH_FAILED: the create call succeeded upstream but the immediate document fetch that follows it failed. The DID exists on the upstream provider but no Reference Implementation record was saved; retrying the request may then hit an upstream duplicate. Reconcile by fetching the DID by alias from the VC service before retrying, or importing it via POST /dids/import once its details are known.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: {
-    type?: string;
-    method?: string;
-    alias?: string;
-    name?: string;
-    description?: string;
-    isDefault?: boolean;
-    serviceInstanceId?: string;
-  };
+  logger.info('Validating request body');
+  const body = await parseRequestBody(req, createDidRequestSchema);
+  const { type, method, alias } = body;
 
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ type: body.type, method: body.method, alias: body.alias }, 'Validating input parameters');
-  const type = validateEnum(body.type, CREATABLE_DID_TYPES, 'type');
-  if (!type) throw new ValidationError('type is required');
-
-  const method = validateEnum(body.method, Object.values(DidMethod), 'method');
-  if (!method) throw new ValidationError('method is required');
-
-  if (!body.alias || typeof body.alias !== 'string') {
-    throw new ValidationError('alias is required');
-  }
-
-  logger.info({ type, method, alias: body.alias }, 'Resolving DID service');
+  logger.info({ type, method, alias }, 'Resolving DID service');
   const { service: didService, instanceId: serviceInstanceId } = await resolveDidService(
     tenantId,
     body.serviceInstanceId,
   );
 
   logger.info({ serviceInstanceId }, 'Validating parameters against service capabilities');
-  validateEnum(type, didService.getSupportedTypes(), 'type');
-  validateEnum(method, didService.getSupportedMethods(), 'method');
+  assertSupported('type', type, didService.getSupportedTypes());
+  assertSupported('method', method, didService.getSupportedMethods());
 
-  logger.info({ alias: body.alias, method }, 'Normalising alias');
+  logger.info({ alias, method }, 'Normalising alias');
   let normalisedAlias: string;
   try {
-    normalisedAlias = didService.normaliseAlias(body.alias, method, type);
+    normalisedAlias = didService.normaliseAlias(alias, method, type);
   } catch (aliasErr) {
-    throw new ValidationError(errorMessage(aliasErr, 'Invalid alias'));
+    throw new ValidationError(`alias: ${errorMessage(aliasErr, 'invalid alias')}`);
   }
 
   // Prevent non-system tenants from creating self-managed root DIDs that match
@@ -245,13 +253,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         name: serviceInstanceId
  *         schema:
  *           type: string
+ *           minLength: 1
  *         description: Filter by service instance ID
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of DIDs to return
+ *         description: Number of DIDs to return per page. Defaults to 20 unless the deployment maximum is lower. Values above the deployment maximum are rejected with a 400.
  *       - in: query
  *         name: offset
  *         schema:
@@ -273,13 +282,19 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. an invalid type or status, a limit above the deployment maximum, a negative offset, a repeated query parameter)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -292,15 +307,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  const url = new URL(req.url);
-
   logger.info('Parsing query filters');
-  const type = validateEnum(url.searchParams.get('type') ?? undefined, Object.values(DidType), 'type');
-  const status = validateEnum(url.searchParams.get('status') ?? undefined, Object.values(DidStatus), 'status');
-  const serviceInstanceId = url.searchParams.get('serviceInstanceId') ?? undefined;
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const { type, status, serviceInstanceId, limit, offset } = parseQueryParams(new URL(req.url), listDidsQuerySchema);
 
   logger.info({ filters: { type, status, serviceInstanceId, limit, offset } }, 'Querying DIDs from database');
   const { data, total } = await listDids(tenantId, {

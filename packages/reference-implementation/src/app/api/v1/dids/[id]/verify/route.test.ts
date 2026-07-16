@@ -8,39 +8,18 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth to mirror handleRouteError behaviour
+// Mock withTenantAuth — skips auth but delegates error mapping to the real
+// handleRouteError, so this suite is checked against production's actual
+// status/code mapping rather than a hand-rolled duplicate that can drift.
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-  const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
-
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
   return {
     withTenantAuth:
       (handler: (req: unknown, ctx: unknown) => Promise<unknown>) => async (req: unknown, ctx: unknown) => {
         try {
           return await handler(req, ctx);
-        } catch (e: unknown) {
-          if (e instanceof ValidationError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 400 });
-          }
-          if (e instanceof NotFoundError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 404 });
-          }
-          if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 500 });
-          }
-          if (e instanceof ServiceError) {
-            const serviceErr = e as Error & { code?: string; statusCode?: number };
-            return jsonResponse(
-              { error: serviceErr.message, code: serviceErr.code },
-              { status: serviceErr.statusCode },
-            );
-          }
-          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
+        } catch (e) {
+          return handleRouteError(e);
         }
       },
   };
@@ -71,6 +50,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 }));
 
 import { ServiceResolutionError } from '@/lib/api/errors';
+import { DidParseError, DidMethodNotSupportedError } from '@uncefact/untp-ri-services';
 import { POST } from './route';
 
 function createContext(id: string) {
@@ -193,5 +173,31 @@ describe('POST /api/v1/dids/:id/verify', () => {
     expect(res.status).toBe(500);
     const json = await res.json();
     expect(json.error).toContain('No service instance available');
+  });
+
+  it('returns 400 with code DID_PARSE_FAILED when the stored DID string does not parse', async () => {
+    // Reachable because import (POST /dids/import) accepts the did string without format
+    // validation, so a malformed DID can reach parseDidMethod on its first verify attempt.
+    mockGetDidById.mockResolvedValue({ id: 'did-1', did: 'not-a-did' });
+    mockDidService.verify.mockRejectedValue(new DidParseError('not-a-did', 'invalid format'));
+
+    const res = await POST(createFakeRequest(), createContext('did-1') as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.code).toBe('DID_PARSE_FAILED');
+    expect(mockUpdateDidStatus).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 with code DID_METHOD_NOT_SUPPORTED when the stored DID names an unsupported method', async () => {
+    mockGetDidById.mockResolvedValue({ id: 'did-1', did: 'did:example:123' });
+    mockDidService.verify.mockRejectedValue(new DidMethodNotSupportedError('example'));
+
+    const res = await POST(createFakeRequest(), createContext('did-1') as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.code).toBe('DID_METHOD_NOT_SUPPORTED');
+    expect(mockUpdateDidStatus).not.toHaveBeenCalled();
   });
 });
