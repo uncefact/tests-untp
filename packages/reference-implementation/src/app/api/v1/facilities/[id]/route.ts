@@ -1,28 +1,19 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateFacilityRequestSchema } from '@/lib/api/request-schemas/facility';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getFacilityById, updateFacility, deleteFacility, UpdateFacilityInput } from '@/lib/prisma/repositories';
+import { getFacilityById, updateFacility, deleteFacility } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/facilities/[id]' });
-
-/** Fields that may be updated on a facility. */
-const UPDATABLE_FIELDS = [
-  'name',
-  'description',
-  'location',
-  'operatingOrganisationId',
-  'primaryIdentifierId',
-  'secondaryIdentifierIds',
-] as const;
 
 /**
  * @swagger
  * /facilities/{id}:
  *   get:
  *     summary: Get a facility by ID
- *     description: Retrieves a specific facility by its database ID
+ *     description: Retrieves a specific facility by its database ID, including its primary identifier (with scheme and registrar), secondary identifiers, and operating organisation
  *     tags:
  *       - Facilities
  *     parameters:
@@ -41,6 +32,12 @@ const UPDATABLE_FIELDS = [
  *               $ref: '#/components/schemas/Facility'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -86,6 +83,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the facility
  *     requestBody:
  *       required: true
+ *       description: At least one recognised field is required; unknown keys are ignored.
  *       content:
  *         application/json:
  *           schema:
@@ -93,27 +91,39 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             properties:
  *               name:
  *                 type: string
+ *                 minLength: 1
  *                 description: Updated facility name
  *               description:
  *                 type: string
- *                 description: Updated description
+ *                 minLength: 1
+ *                 nullable: true
+ *                 description: Updated description (set to null to clear)
  *               location:
  *                 type: object
- *                 description: Updated UNTP location object
+ *                 description: Updated UNTP location object. Rejected with a 400 if provided as null; there is no clear mechanism for this field yet
  *               operatingOrganisationId:
  *                 type: string
+ *                 minLength: 1
  *                 nullable: true
- *                 description: ID of the operating organisation (null to clear)
+ *                 description: ID of the operating organisation (set to null to clear)
  *               primaryIdentifierId:
  *                 type: string
+ *                 minLength: 1
  *                 nullable: true
- *                 description: ID of the primary identifier (null to clear)
+ *                 description: ID of the primary identifier (set to null to clear)
  *               secondaryIdentifierIds:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: IDs of secondary identifiers (replaces existing)
- *             minProperties: 1
+ *                   minLength: 1
+ *                 description: IDs of secondary identifiers (an empty array clears them, replaces existing otherwise)
+ *             anyOf:
+ *               - required: [name]
+ *               - required: [description]
+ *               - required: [location]
+ *               - required: [operatingOrganisationId]
+ *               - required: [primaryIdentifierId]
+ *               - required: [secondaryIdentifierIds]
  *     responses:
  *       200:
  *         description: Facility updated successfully
@@ -122,7 +132,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/Facility'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. no updatable field provided, a non-array secondaryIdentifierIds, an overlapping primary/secondary identifier, a referenced record that no longer exists)
  *         content:
  *           application/json:
  *             schema:
@@ -133,8 +143,14 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Facility not found
+ *         description: Facility not found, or a referenced organisation or identifier not found
  *         content:
  *           application/json:
  *             schema:
@@ -155,36 +171,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ facilityId: id }, 'Parsing request body');
-  let body: Record<string, unknown>;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
   logger.info({ facilityId: id }, 'Validating update fields');
-  // Ensure at least one updatable field is present
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
-  if (!hasUpdatableField) {
-    throw new ValidationError(`At least one updatable field is required: ${UPDATABLE_FIELDS.join(', ')}`);
-  }
+  const body = await parseRequestBody(req, updateFacilityRequestSchema);
+  const fields = definedFields(body);
 
-  // Validate name if provided — must be a non-empty string
-  if ('name' in body && !isNonEmptyString(body.name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
-
-  const updateData: Record<string, unknown> = {};
-  for (const field of UPDATABLE_FIELDS) {
-    if (field in body) {
-      updateData[field] = body[field];
-    }
-  }
-
-  logger.info({ facilityId: id }, 'Updating facility');
-  const updated = await updateFacility(id, tenantId, updateData as UpdateFacilityInput);
+  logger.info({ facilityId: id, fields: Object.keys(fields) }, 'Updating facility');
+  const updated = await updateFacility(id, tenantId, fields);
 
   logger.info({ facilityId: id }, 'Facility updated');
   return NextResponse.json(updated);
@@ -210,6 +202,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *         description: Facility deleted successfully
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:

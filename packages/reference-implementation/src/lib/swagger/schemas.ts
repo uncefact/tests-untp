@@ -264,18 +264,98 @@ function buildOrganisationSchema() {
   });
 }
 
-export const facilitySchema = z.object({
-  id: z.string(),
-  tenantId: z.string(),
-  name: z.string(),
-  description: z.string().nullable(),
-  location: z.record(z.unknown()).nullable().describe('UNTP location object'),
-  operatingOrganisationId: z.string().nullable(),
-  primaryIdentifierId: z.string().nullable(),
-  secondaryIdentifierIds: z.array(z.string()).describe('IDs of secondary identifiers'),
-  createdAt: z.string().describe('ISO 8601 timestamp'),
-  updatedAt: z.string().describe('ISO 8601 timestamp'),
-});
+/**
+ * Builds the Facility response schema. This must stay lazy (called only from
+ * generateOpenAPISchemas, never derived at module top level): a test suite
+ * that partially mocks '@uncefact/untp-ri-services' (e.g. mocking only one
+ * export) leaves this module's other imports from that package undefined at
+ * module-evaluation time, and a top-level `.omit()`/`.extend()` chained off
+ * an undefined import throws before any test in that suite runs.
+ */
+function buildFacilitySchema() {
+  /**
+   * Identifier scheme as embedded in a facility's identifier relations.
+   * FACILITY_DETAIL_INCLUDE's `scheme` include fetches `registrar` but not
+   * `qualifiers`, unlike the identifier scheme endpoints; `qualifiers` is
+   * therefore omitted (never returned via this path) and `registrar` is
+   * required (always returned via this path), narrowing identifierSchemeSchema
+   * to match.
+   */
+  const facilityIdentifierSchemeSchema = identifierSchemeSchema.omit({ qualifiers: true }).extend({
+    registrar: registrarSchema,
+  });
+
+  /**
+   * Identifier as embedded in a facility's `primaryIdentifier` and secondary
+   * identifier relations, which eagerly load the owning scheme and its
+   * registrar (needed to construct ISO 18975 resolver URIs); mirrors
+   * FACILITY_DETAIL_INCLUDE in facility.repository.ts.
+   */
+  const facilityIdentifierWithSchemeSchema = identifierSchema.extend({
+    scheme: facilityIdentifierSchemeSchema,
+  });
+
+  /**
+   * A facility's secondary-identifier join record, as returned by the detail
+   * endpoints (GET /facilities/{id}, POST, PATCH); mirrors
+   * FACILITY_DETAIL_INCLUDE's `secondaryIdentifiers` include.
+   */
+  const facilitySecondaryIdentifierLinkSchema = z.object({
+    facilityId: z.string(),
+    identifierId: z.string(),
+    identifier: facilityIdentifierWithSchemeSchema,
+  });
+
+  /**
+   * A facility's operating organisation as embedded via `operatingOrganisation:
+   * true` in FACILITY_DETAIL_INCLUDE: the organisation's own columns only, not
+   * its identifier relations.
+   */
+  const facilityOperatingOrganisationSchema = z.object({
+    id: z.string(),
+    tenantId: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    location: z.record(z.unknown()).nullable().describe('UNTP location object'),
+    primaryIdentifierId: z.string().nullable(),
+    createdAt: z.string().describe('ISO 8601 timestamp'),
+    updatedAt: z.string().describe('ISO 8601 timestamp'),
+  });
+
+  // Facility record as returned by the REST API. GET /facilities/{id}, POST,
+  // and PATCH all include `primaryIdentifier`, `secondaryIdentifiers`, and
+  // `operatingOrganisation` (FACILITY_DETAIL_INCLUDE); GET /facilities (list)
+  // includes none of those but flattens secondary identifiers to
+  // `secondaryIdentifierIds` instead (FACILITY_LIST_INCLUDE). Both groups are
+  // marked optional here to match that list-versus-detail asymmetry.
+  return z.object({
+    id: z.string(),
+    tenantId: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    location: z.record(z.unknown()).nullable().describe('UNTP location object'),
+    operatingOrganisationId: z.string().nullable(),
+    primaryIdentifierId: z.string().nullable(),
+    createdAt: z.string().describe('ISO 8601 timestamp'),
+    updatedAt: z.string().describe('ISO 8601 timestamp'),
+    secondaryIdentifierIds: z
+      .array(z.string())
+      .optional()
+      .describe('IDs of secondary identifiers (list responses only)'),
+    primaryIdentifier: facilityIdentifierWithSchemeSchema
+      .nullable()
+      .optional()
+      .describe('Primary identifier with its scheme and registrar (detail responses only)'),
+    secondaryIdentifiers: z
+      .array(facilitySecondaryIdentifierLinkSchema)
+      .optional()
+      .describe('Secondary identifier links, each with its identifier, scheme, and registrar (detail responses only)'),
+    operatingOrganisation: facilityOperatingOrganisationSchema
+      .nullable()
+      .optional()
+      .describe('Operating organisation (detail responses only)'),
+  });
+}
 
 // ============================================================================
 // Re-export imported schemas so existing consumers continue to work
@@ -332,7 +412,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     RenderTemplate: renderTemplateSchema,
     Product: productSchema,
     Organisation: buildOrganisationSchema(),
-    Facility: facilitySchema,
+    Facility: buildFacilitySchema(),
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};

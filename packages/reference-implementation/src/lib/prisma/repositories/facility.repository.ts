@@ -4,7 +4,6 @@ import { NotFoundError } from '@/lib/api/errors';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
-import { UntpLocation } from '@/lib/types';
 
 /**
  * Include shape for facility detail queries — eagerly loads primary and secondary
@@ -47,7 +46,9 @@ export type FacilityListItem = Omit<FacilityListRow, 'secondaryIdentifiers'> & {
 export type CreateFacilityInput = {
   name: string;
   description?: string;
-  location?: UntpLocation;
+  // An open object pending the UNTP-shaped location schema design (#804);
+  // tighten back to UntpLocation once that lands.
+  location?: Record<string, unknown>;
   operatingOrganisationId?: string;
   primaryIdentifierId?: string;
   secondaryIdentifierIds?: string[];
@@ -58,8 +59,12 @@ export type CreateFacilityInput = {
  */
 export type UpdateFacilityInput = {
   name?: string;
-  description?: string;
-  location?: UntpLocation;
+  // A nullable Prisma scalar column; explicit null clears it (see the
+  // `description !== undefined` forwarding below), unlike `location`.
+  description?: string | null;
+  // An open object pending the UNTP-shaped location schema design (#804);
+  // tighten back to UntpLocation once that lands.
+  location?: Record<string, unknown>;
   operatingOrganisationId?: string | null;
   primaryIdentifierId?: string | null;
   secondaryIdentifierIds?: string[];
@@ -292,6 +297,22 @@ export async function updateFacility(
     // Validate primary identifier ownership if provided and not clearing
     if (primaryIdentifierId !== undefined && primaryIdentifierId !== null) {
       await validateIdentifierOwnership(tx, primaryIdentifierId, tenantId, 'Primary identifier');
+
+      // A primary-only update (secondaryIdentifierIds not provided in this request)
+      // must still be checked against the facility's CURRENTLY STORED secondary
+      // identifiers: the overlap check below only runs when secondaryIdentifierIds
+      // is provided, which otherwise let a primary-only update silently persist the
+      // forbidden primary-also-secondary state (no database constraint catches it).
+      if (secondaryIdentifierIds === undefined) {
+        const storedSecondaries = await tx.facilitySecondaryIdentifier.findMany({
+          where: { facilityId: id },
+          select: { identifierId: true },
+        });
+        validateNoPrimarySecondaryOverlap(
+          primaryIdentifierId,
+          storedSecondaries.map((row: { identifierId: string }) => row.identifierId),
+        );
+      }
     }
 
     // Validate secondary identifiers and check for overlap with primary
@@ -353,6 +374,7 @@ export async function updateFacility(
       mapDatabaseError(e, {
         conflict: 'The identifier is already the primary identifier of another facility',
         notFound: 'Facility or a referenced resource not found',
+        invalidReference: 'The referenced organisation or identifier no longer exists',
       });
     }
   });

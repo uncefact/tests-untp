@@ -30,6 +30,7 @@ const mockTx = {
     delete: jest.fn(),
   },
   facilitySecondaryIdentifier: {
+    findMany: jest.fn(),
     deleteMany: jest.fn(),
     createMany: jest.fn(),
   },
@@ -444,6 +445,38 @@ describe('facility.repository', () => {
       );
     });
 
+    it('forwards an explicit description: null straight through to the update data', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facility.update.mockResolvedValue({ ...FACILITY_RECORD, description: null });
+
+      await updateFacility('facility-1', TENANT_ID, { description: null });
+
+      expect(mockTx.facility.update).toHaveBeenCalledWith(expect.objectContaining({ data: { description: null } }));
+    });
+
+    it('forwards operatingOrganisationId: null and primaryIdentifierId: null as disconnect payloads', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facility.update.mockResolvedValue({
+        ...FACILITY_RECORD,
+        operatingOrganisationId: null,
+        primaryIdentifierId: null,
+      });
+
+      await updateFacility('facility-1', TENANT_ID, {
+        operatingOrganisationId: null,
+        primaryIdentifierId: null,
+      });
+
+      expect(mockTx.facility.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            operatingOrganisation: { disconnect: true },
+            primaryIdentifier: { disconnect: true },
+          },
+        }),
+      );
+    });
+
     it('replaces secondary identifiers', async () => {
       mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
       mockTx.identifier.findFirst
@@ -532,6 +565,88 @@ describe('facility.repository', () => {
 
       await expect(result).rejects.toThrow(ValidationError);
       await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
+    });
+
+    it('rejects a primary-only update whose new primary matches an existing stored secondary identifier', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_A, tenantId: TENANT_ID });
+      mockTx.facilitySecondaryIdentifier.findMany.mockResolvedValue([{ identifierId: SECONDARY_ID_A }]);
+
+      const result = updateFacility('facility-1', TENANT_ID, { primaryIdentifierId: SECONDARY_ID_A });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Primary identifier must not also appear in secondary identifiers');
+      expect(mockTx.facilitySecondaryIdentifier.findMany).toHaveBeenCalledWith({
+        where: { facilityId: 'facility-1' },
+        select: { identifierId: true },
+      });
+      expect(mockTx.facility.update).not.toHaveBeenCalled();
+    });
+
+    it('allows a primary-only-looking update when secondaryIdentifierIds in the same request no longer includes the new primary', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_A, tenantId: TENANT_ID });
+      mockTx.facilitySecondaryIdentifier.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.facilitySecondaryIdentifier.createMany.mockResolvedValue({ count: 1 });
+      mockTx.facility.update.mockResolvedValue(FACILITY_RECORD);
+
+      // SECONDARY_ID_A becomes the new primary, and the incoming secondaryIdentifierIds
+      // (SECONDARY_ID_B only) no longer lists it: the effective post-update state has no
+      // overlap, so this must succeed even though SECONDARY_ID_A is currently stored as
+      // a secondary identifier.
+      await updateFacility('facility-1', TENANT_ID, {
+        primaryIdentifierId: SECONDARY_ID_A,
+        secondaryIdentifierIds: [SECONDARY_ID_B],
+      });
+
+      expect(mockTx.facilitySecondaryIdentifier.findMany).not.toHaveBeenCalled();
+      // The join rows are actually rewritten to the new set (SECONDARY_ID_B only) --
+      // a regression that skipped the rewrite when both fields are supplied would
+      // otherwise leave SECONDARY_ID_A stored, silently reintroducing the overlap
+      // this test's success is supposed to depend on.
+      expect(mockTx.facilitySecondaryIdentifier.deleteMany).toHaveBeenCalledWith({
+        where: { facilityId: 'facility-1' },
+      });
+      expect(mockTx.facilitySecondaryIdentifier.createMany).toHaveBeenCalledWith({
+        data: [{ facilityId: 'facility-1', identifierId: SECONDARY_ID_B }],
+      });
+      expect(mockTx.facility.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ primaryIdentifier: { connect: { id: SECONDARY_ID_A } } }),
+        }),
+      );
+    });
+
+    it('allows a primary-only update whose new primary is not among the stored secondary identifiers', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_B, tenantId: TENANT_ID });
+      mockTx.facilitySecondaryIdentifier.findMany.mockResolvedValue([{ identifierId: SECONDARY_ID_A }]);
+      mockTx.facility.update.mockResolvedValue(FACILITY_RECORD);
+
+      // Genuine non-overlapping case: SECONDARY_ID_B is neither the current primary nor
+      // a stored secondary, so the stored-secondaries lookup this fix introduced must
+      // still let a legitimately clean primary-only update through.
+      await updateFacility('facility-1', TENANT_ID, { primaryIdentifierId: SECONDARY_ID_B });
+
+      expect(mockTx.facilitySecondaryIdentifier.findMany).toHaveBeenCalledWith({
+        where: { facilityId: 'facility-1' },
+        select: { identifierId: true },
+      });
+      expect(mockTx.facility.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ primaryIdentifier: { connect: { id: SECONDARY_ID_B } } }),
+        }),
+      );
+    });
+
+    it('maps a foreign-key violation on the main update to ValidationError', async () => {
+      mockTx.facility.findFirst.mockResolvedValue(FACILITY_RECORD);
+      mockTx.facility.update.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = updateFacility('facility-1', TENANT_ID, { name: 'Renamed Warehouse' });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The referenced organisation or identifier no longer exists');
     });
 
     it('maps a unique-constraint violation to ConflictError with a clean message', async () => {
