@@ -34,9 +34,13 @@ Cypress.Commands.add('uploadCredential', (credential: object | string) => {
   }
 });
 
-// Command to expand a validation group (defaults to 'DigitalProductPassport-group-header')
-Cypress.Commands.add('expandGroup', (groupTestId: string = 'DigitalProductPassport-group-header') => {
-  cy.get(`[data-testid="${groupTestId}"]`).click();
+// Command to reveal a credential's pipeline steps. Since #810, a credential type group
+// (CredentialTypeGroup) is expanded by default once a credential is uploaded, so its instance row
+// (CredentialInstanceRow) is already visible; the click needed to reveal that instance's own
+// pipeline steps is on the instance row itself. This targets the single instance row rendered for
+// an E2E spec's single-credential-per-type upload.
+Cypress.Commands.add('expandGroup', () => {
+  cy.get('[data-testid="credential-instance-header"]').click();
 });
 
 // Command to validate that a specific step shows the expected status icon
@@ -69,18 +73,6 @@ Cypress.Commands.add('validateConfetti', () => {
     .and('include', 'position: fixed')
     .and('include', 'pointer-events: none')
     .and('include', 'z-index: 100');
-});
-
-// Command to check VCDM version badge color
-Cypress.Commands.add('checkVCDMVersionColor', (credentialType: string, expectedColor: 'green' | 'red') => {
-  const colorClasses = {
-    green: ['bg-green-100', 'text-green-800'],
-    red: ['bg-red-100', 'text-red-800'],
-  };
-
-  cy.get(`[data-testid="${credentialType}-vcdm-version"]`)
-    .should('have.class', colorClasses[expectedColor][0])
-    .and('have.class', colorClasses[expectedColor][1]);
 });
 
 // Command to open validation details

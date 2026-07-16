@@ -6,9 +6,10 @@ interface PlaygroundChainable {
   uploadCredential(credential: object | string): Cypress.Chainable<void>;
 
   /**
-   * Expands a validation group. Defaults to the DigitalProductPassport group.
+   * Reveals a credential's pipeline steps by expanding its (single) instance row. The type group
+   * itself is expanded by default once a credential is uploaded (#810).
    */
-  expandGroup(groupTestId?: string): Cypress.Chainable<void>;
+  expandGroup(): Cypress.Chainable<void>;
 
   /**
    * Checks that the validation status icon for a given step is visible.
@@ -33,11 +34,6 @@ interface PlaygroundChainable {
    * Validates that the confetti is visible.
    */
   validateConfetti(): Cypress.Chainable<void>;
-
-  /**
-   * Checks the color of the VCDM version badge.
-   */
-  checkVCDMVersionColor(credentialType: string, expectedColor: 'green' | 'red'): Cypress.Chainable<void>;
 
   /**
    * Opens the validation details.

@@ -1,24 +1,43 @@
 'use client';
 
+import { SourceCaption } from '@/components/SourceCaption';
 import { StatusIcon } from '@/components/StatusIcon';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
 import { validateContext } from '@/lib/contextValidation';
-import { detectVersion, isEnvelopedProof } from '@/lib/credentialService';
+import {
+  credentialGroupLabel,
+  credentialGroupType,
+  credentialIsTerminal,
+  credentialSubtitle,
+  credentialTitle,
+  instanceStatus,
+  worstStatus,
+} from '@/lib/credentialCollection';
+import { isEnvelopedProof } from '@/lib/credentialService';
+import { newId } from '@/lib/id';
 import { detectExtension, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
-import { ArtefactSource, Credential, PermittedCredentialType, StoredCredential, TestStep } from '@/types';
-import { SourceCaption } from '@/components/SourceCaption';
+import type { ArtefactSlot, CollectionState, InstanceId, RunId } from '@/types/artefact';
+import type { StoredCredential, TestStep } from '@/types';
 import confetti from 'canvas-confetti';
-import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   allowedContextValue,
   allowedExtensionValue,
-  CredentialType,
   permittedCredentialTypes,
   TestCaseStatus,
   TestCaseStepId,
@@ -27,30 +46,15 @@ import {
 } from '../../constants';
 import ValidationDetailsSheet from './ValidationDetailsSheet';
 
-// Add this type to help with tracking previous credentials
-type CredentialCache = Record<
-  PermittedCredentialType,
-  {
-    credential: {
-      original: any;
-      decoded: Credential;
-    };
-    validated: boolean;
-    confettiShown?: boolean;
-  }
->;
+type CredentialCollection = CollectionState<StoredCredential, TestStep[]>;
+type CredentialDispatch = <Res extends { state: CredentialCollection }>(
+  transition: (current: CredentialCollection) => Res,
+) => Res;
+type CredentialSlot = ArtefactSlot<StoredCredential, TestStep[]>;
 
-interface TestGroupProps {
-  credentialType: string;
-  version: string;
-  steps: TestStep[];
-  vcdmVersion: VCDMVersion | undefined;
-  hasCredential: boolean;
-  extensionCredentialType?: string;
-  extensionVersion?: string;
-  isExpanded: boolean;
-  onToggle: () => void;
-  source?: ArtefactSource;
+interface TestResultsProps {
+  collection: CredentialCollection;
+  dispatch: CredentialDispatch;
 }
 
 export const confettiConfig = {
@@ -59,75 +63,425 @@ export const confettiConfig = {
   origin: { y: 0.7 },
 };
 
-const TestGroup = ({
-  credentialType,
-  version,
-  extensionCredentialType,
-  extensionVersion,
-  steps,
-  isExpanded,
-  onToggle,
-  hasCredential,
-  vcdmVersion,
-  source,
-}: TestGroupProps) => {
-  const isLoading = steps.some((step) => step.status === 'in-progress');
+/**
+ * The credential pipeline's starting step list. Proof type and VCDM version are detected
+ * synchronously from the stored document, so they carry their final status immediately; every
+ * other step (and the extension step, only when an extension is detected) starts pending and is
+ * settled by `runCredentialPipeline`.
+ */
+function initialSteps(stored: StoredCredential): TestStep[] {
+  const vcdmVersion = detectVcdmVersion(stored.decoded);
+  const isUnsupportedVCDMVersion = vcdmVersion === VCDMVersion.UNKNOWN;
 
-  const overallStatus = useMemo(() => {
-    if (!hasCredential) return TestCaseStatus.PENDING;
-    if (version === VCDMVersion.UNKNOWN) return TestCaseStatus.FAILURE;
-    if (isLoading || steps.some((step) => step.status === TestCaseStatus.PENDING)) return TestCaseStatus.IN_PROGRESS;
-    return steps.every((step) => step.status === TestCaseStatus.SUCCESS)
-      ? TestCaseStatus.SUCCESS
-      : TestCaseStatus.FAILURE;
-  }, [steps, isLoading, hasCredential, version]);
+  const steps: TestStep[] = [
+    {
+      id: TestCaseStepId.PROOF_TYPE,
+      name: 'Proof Type Detection',
+      status: TestCaseStatus.SUCCESS,
+      details: { type: isEnvelopedProof(stored.original) ? VCProofType.ENVELOPING : VCProofType.EMBEDDED },
+    },
+    {
+      id: TestCaseStepId.VCDM_VERSION,
+      name: 'VCDM Version Detection',
+      status: isUnsupportedVCDMVersion ? TestCaseStatus.FAILURE : TestCaseStatus.SUCCESS,
+      details: { version: vcdmVersion },
+    },
+    { id: TestCaseStepId.VCDM_SCHEMA_VALIDATION, name: 'VCDM Schema Validation', status: TestCaseStatus.PENDING },
+    { id: TestCaseStepId.VERIFICATION, name: 'Credential Verification', status: TestCaseStatus.PENDING },
+    { id: TestCaseStepId.UNTP_SCHEMA_VALIDATION, name: 'UNTP Schema Validation', status: TestCaseStatus.PENDING },
+    {
+      id: TestCaseStepId.CONTEXT_VALIDATION,
+      name: 'JSON-LD Document Expansion and Context Validation',
+      status: TestCaseStatus.PENDING,
+    },
+  ];
+
+  if (detectExtension(stored.decoded)) {
+    steps.push({
+      id: TestCaseStepId.EXTENSION_SCHEMA_VALIDATION,
+      name: 'Extension Schema Validation',
+      status: TestCaseStatus.PENDING,
+    });
+  }
+
+  return steps;
+}
+
+export function TestResults({ collection, dispatch }: TestResultsProps) {
+  // Confetti fires once per (instance, run) so it does not re-fire on unrelated re-renders.
+  const confettiShownRef = useRef<Set<string>>(new Set());
+  const [pendingRemoval, setPendingRemoval] = useState<CredentialSlot | null>(null);
+
+  // Start the pipeline for any instance that has no live run and no result yet (freshly added or
+  // replaced). beginRun no-ops on an already-running slot, so a repeated effect cannot double-start.
+  useEffect(() => {
+    for (const item of collection.items) {
+      if (item.runId === null && item.result === undefined) {
+        const { runId } = dispatch((state) => beginRun(state, item.instanceId, initialSteps(item.payload), newId));
+        if (runId) void runCredentialPipeline(item.instanceId, runId, item.payload, dispatch);
+      }
+    }
+  }, [collection.items, dispatch]);
+
+  useEffect(() => {
+    for (const item of collection.items) {
+      const steps = item.result;
+      if (!steps || item.runId === null) continue;
+      const key = `${item.instanceId}:${item.runId}`;
+      if (confettiShownRef.current.has(key)) continue;
+      if (steps.length > 0 && steps.every((step) => step.status === TestCaseStatus.SUCCESS)) {
+        confettiShownRef.current.add(key);
+        confetti(confettiConfig);
+      }
+    }
+  }, [collection.items]);
+
+  const confirmRemoval = () => {
+    if (!pendingRemoval) return;
+    dispatch((state) => remove(state, pendingRemoval.instanceId));
+    setPendingRemoval(null);
+  };
+
+  // Group instances by detected credential type, in the fixed checklist order, and keep a group
+  // only for a type that has at least one instance (#845): no empty type cards, no n / 5
+  // denominator.
+  const groups = useMemo(
+    () =>
+      permittedCredentialTypes
+        .map((type) => ({
+          type,
+          instances: collection.items.filter((item) => credentialGroupType(item.payload.decoded) === type),
+        }))
+        .filter((group) => group.instances.length > 0),
+    [collection.items],
+  );
+
+  return (
+    <section className='space-y-4' data-testid='credential-results'>
+      {groups.map((group) => (
+        <CredentialTypeGroup
+          key={group.type}
+          type={group.type}
+          instances={group.instances}
+          onRemove={(item) => setPendingRemoval(item)}
+        />
+      ))}
+
+      <Dialog open={pendingRemoval !== null} onOpenChange={(open) => !open && setPendingRemoval(null)}>
+        <DialogContent className='sm:max-w-[425px]'>
+          <DialogHeader>
+            <DialogTitle>Remove {pendingRemoval ? credentialTitle(pendingRemoval.payload) : 'credential'}?</DialogTitle>
+            <DialogDescription>
+              This removes the credential and its validation results from this session. You can add it again by
+              uploading it.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setPendingRemoval(null)}>
+              Cancel
+            </Button>
+            <Button variant='destructive' onClick={confirmRemoval}>
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
+/**
+ * Runs the credential validation pipeline (proof type and VCDM version are pre-computed in
+ * `initialSteps`; this settles VCDM schema, verification, UNTP schema, JSON-LD context and, when
+ * detected, the extension schema) and commits the whole step list through the run-guarded
+ * `commitResult` after each stage, like `runSchemePipeline`. Step statuses and detail shapes follow
+ * the pre-#810 implementation; the write path moved onto the shared per-instance model (ADR-041),
+ * and each async step (verification included) fails its own step and honours the run guard before
+ * toasting, so a service error settles the instance rather than leaving it stuck.
+ */
+async function runCredentialPipeline(
+  instanceId: InstanceId,
+  runId: RunId,
+  stored: StoredCredential,
+  dispatch: CredentialDispatch,
+): Promise<void> {
+  const steps = initialSteps(stored);
+
+  // The only write path: commit the whole step list through the run guard. Returns false once the
+  // run has been superseded (replaced or removed), so a stale run stops writing.
+  const setSteps = (patches: Array<[TestCaseStepId, Partial<TestStep>]>): boolean => {
+    for (const [stepId, patch] of patches) {
+      const index = steps.findIndex((step) => step.id === stepId);
+      if (index !== -1) steps[index] = { ...steps[index], ...patch };
+    }
+    const { applied } = dispatch((state) =>
+      commitResult(state, { instanceId, runId, result: steps.map((step) => ({ ...step })) }),
+    );
+    return applied;
+  };
+  const setStep = (stepId: TestCaseStepId, patch: Partial<TestStep>): boolean => setSteps([[stepId, patch]]);
+
+  try {
+    // Mark the four asynchronous steps in progress together, mirroring the original single-pass
+    // update rather than one commit per step.
+    if (
+      !setSteps([
+        [TestCaseStepId.VERIFICATION, { status: TestCaseStatus.IN_PROGRESS }],
+        [TestCaseStepId.UNTP_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS }],
+        [TestCaseStepId.VCDM_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS }],
+        [TestCaseStepId.CONTEXT_VALIDATION, { status: TestCaseStatus.IN_PROGRESS }],
+      ])
+    ) {
+      return;
+    }
+
+    // A verification-service error (unconfigured service, downstream 5xx, network) must fail the
+    // verification step visibly and let the remaining steps settle. Without this catch the throw
+    // reaches the outer handler and leaves the instance stuck IN_PROGRESS: non-terminal, so
+    // non-removable and blocking report generation for the whole session.
+    try {
+      const verificationResult = await verifyCredential(stored.original);
+      if (
+        !setStep(TestCaseStepId.VERIFICATION, {
+          status: verificationResult.verified ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+          details: {
+            verified: verificationResult.verified,
+            ...(verificationResult.error && { error: verificationResult.error }),
+          },
+        })
+      ) {
+        return;
+      }
+
+      if (!verificationResult.verified) {
+        const errorMessage =
+          typeof verificationResult.error === 'object'
+            ? verificationResult.error.message || 'The credential could not be verified'
+            : verificationResult.error || 'The credential could not be verified';
+
+        toast.error('Credential verification failed', { description: errorMessage });
+      }
+    } catch {
+      const description = 'Could not reach the verification service. Please try again.';
+      // Commit the failure through the run guard first; a superseded run stops here and stays silent.
+      if (
+        !setStep(TestCaseStepId.VERIFICATION, {
+          status: TestCaseStatus.FAILURE,
+          details: { verified: false, error: description },
+        })
+      ) {
+        return;
+      }
+      toast.error('Credential verification failed', { description });
+    }
+
+    const extension = detectExtension(stored.decoded);
+
+    try {
+      const vcdmValidationResult = await validateVcdmRules(stored.decoded);
+      if (
+        !setStep(TestCaseStepId.VCDM_SCHEMA_VALIDATION, {
+          status: vcdmValidationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+          details: vcdmValidationResult,
+        })
+      ) {
+        return;
+      }
+    } catch {
+      if (!setStep(TestCaseStepId.VCDM_SCHEMA_VALIDATION, { status: TestCaseStatus.FAILURE })) return;
+      toast.error('Failed to fetch the VCDM schema. Please contact support.');
+    }
+
+    try {
+      const validationResult = await validateCredentialSchema(stored.decoded);
+      if (
+        !setStep(TestCaseStepId.UNTP_SCHEMA_VALIDATION, {
+          status: validationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+          details: validationResult,
+        })
+      ) {
+        return;
+      }
+    } catch (error) {
+      console.log('Schema validation error:', error);
+      if (
+        !setStep(TestCaseStepId.UNTP_SCHEMA_VALIDATION, {
+          status: TestCaseStatus.FAILURE,
+          details: {
+            errors: [
+              {
+                keyword: 'schema',
+                message: 'Failed to fetch schema',
+                instancePath: '',
+                params: {
+                  missingValue: 'The schema could not be loaded due to missing UNTP context IRIs.',
+                  solution: "Ensure the credential includes the required UNTP context IRIs in the '@context' field.",
+                  allowedValue: allowedContextValue,
+                  receivedValue: stored,
+                },
+              },
+            ],
+          },
+        })
+      ) {
+        return;
+      }
+      toast.error('Failed to fetch schema. Please try again.');
+    }
+
+    const validateContextResult = await validateContext(stored.decoded);
+    if (
+      !setStep(TestCaseStepId.CONTEXT_VALIDATION, {
+        status: validateContextResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+        details: validateContextResult.valid
+          ? validateContextResult.data
+          : { errors: validateContextResult.error ? [validateContextResult.error] : [] },
+      })
+    ) {
+      return;
+    }
+    if (!validateContextResult.valid) {
+      toast.error('Validation of the JSON-LD context failed. Please check the View Details for more information.');
+    }
+
+    if (extension) {
+      try {
+        const extensionValidationResult = await validateExtension(stored.decoded);
+        if (
+          !setStep(TestCaseStepId.EXTENSION_SCHEMA_VALIDATION, {
+            status: extensionValidationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+            details: extensionValidationResult,
+          })
+        ) {
+          return;
+        }
+      } catch (error) {
+        console.log('Extension schema validation error:', error);
+        if (
+          !setStep(TestCaseStepId.EXTENSION_SCHEMA_VALIDATION, {
+            status: TestCaseStatus.FAILURE,
+            details: {
+              errors: [
+                {
+                  keyword: 'schema',
+                  message: 'Failed to fetch extension schema',
+                  instancePath: '',
+                  params: {
+                    missingValue: 'The schema could not be loaded due to missing extension context IRIs.',
+                    solution:
+                      "Ensure the credential includes the required extension context IRIs in the '@context' field.",
+                    allowedValue: allowedExtensionValue,
+                    receivedValue: stored,
+                  },
+                },
+              ],
+            },
+          })
+        ) {
+          return;
+        }
+        toast.error('Failed to fetch extension schema. Please try again.');
+      }
+    }
+  } catch (error) {
+    console.log('Error processing credential:', error);
+  }
+}
+
+function CredentialTypeGroup({
+  type,
+  instances,
+  onRemove,
+}: {
+  type: string;
+  instances: CredentialSlot[];
+  onRemove: (item: CredentialSlot) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const rollup = useMemo(() => worstStatus(instances.map((item) => instanceStatus(item.result))), [instances]);
 
   return (
     <Card className='p-4'>
       <div
         className='flex flex-wrap items-center justify-between gap-2 cursor-pointer'
-        onClick={onToggle}
-        data-testid={`${credentialType}-group-header`}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        data-testid={`${type}-group-header`}
       >
         <div className='flex items-center gap-2'>
           {isExpanded ? <ChevronDown className='h-4 w-4' /> : <ChevronRight className='h-4 w-4' />}
-          <h3 className='font-semibold'>
-            {credentialType}
-            {hasCredential && ` (${version === VCDMVersion.UNKNOWN ? version + ' version' : 'v' + version})`}
-          </h3>
-          {extensionCredentialType && (
-            <h4 className='text-sm text-gray-500'>
-              {extensionCredentialType}
-              {extensionVersion === VCDMVersion.UNKNOWN ? 'unknown' : ` (v${extensionVersion})`}
-            </h4>
-          )}
+          <h3 className='font-semibold'>{credentialGroupLabel(type, instances.length)}</h3>
+          <span className='text-xs tabular-nums text-muted-foreground'>{instances.length}</span>
         </div>
-        <div className='flex items-center gap-4'>
-          {hasCredential && vcdmVersion && (
-            <span
-              className={`text-xs px-2 py-1 rounded-full ${
-                vcdmVersion === VCDMVersion.V2 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-              }`}
-              data-testid={`${credentialType}-vcdm-version`}
-            >
-              {vcdmVersion === VCDMVersion.UNKNOWN ? 'Unsupported VCDM version' : `VCDM ${vcdmVersion}`}
-            </span>
-          )}
-          <StatusIcon status={overallStatus} testId={`${credentialType}`} />
-        </div>
+        {/* The rollup summarises the group only while it is collapsed; once expanded, each instance
+            row shows its own status, so the group-level icon would be redundant. */}
+        {!isExpanded && <StatusIcon status={rollup} testId={type} />}
       </div>
       {isExpanded && (
-        <div className='mt-4 pl-6 space-y-2'>
-          {source && <SourceCaption source={source} />}
-          {steps.map((step) => (
-            <TestStepItem key={step.id} step={step} />
+        <div className='mt-4 space-y-2 pl-6'>
+          {instances.map((item) => (
+            <CredentialInstanceRow key={item.instanceId} item={item} onRemove={() => onRemove(item)} />
           ))}
-          {!hasCredential && <p className='text-sm text-gray-500 italic'>Upload a credential to begin validation</p>}
         </div>
       )}
     </Card>
   );
-};
+}
+
+function CredentialInstanceRow({ item, onRemove }: { item: CredentialSlot; onRemove: () => void }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const stored = item.payload;
+  const steps = item.result ?? [];
+  const title = credentialTitle(stored);
+  const status = instanceStatus(item.result);
+  // A queued or mid-pipeline instance offers no remove control until its pipeline settles (#810 AC).
+  // Removability tracks a terminal result, not the run token, so a freshly queued slot is not
+  // briefly removable in the render before its run begins.
+  const removable = credentialIsTerminal(steps);
+
+  return (
+    <div className='group relative overflow-hidden rounded-md border'>
+      <div
+        className='flex flex-wrap items-center justify-between gap-2 p-3 cursor-pointer'
+        onClick={() => setIsExpanded((prev) => !prev)}
+        data-testid='credential-instance-header'
+        data-instance-id={item.instanceId}
+      >
+        <div className='flex min-w-0 items-center gap-2'>
+          {isExpanded ? <ChevronDown className='h-4 w-4 shrink-0' /> : <ChevronRight className='h-4 w-4 shrink-0' />}
+          <div className='flex min-w-0 flex-col'>
+            <h4 className='truncate font-medium'>{title}</h4>
+            <span className='truncate text-xs text-gray-500'>{credentialSubtitle(stored)}</span>
+          </div>
+        </div>
+        <StatusIcon status={status} testId={item.instanceId} />
+      </div>
+      {isExpanded && (
+        <div className='space-y-2 px-3 pb-3 pl-9'>
+          {stored.source && <SourceCaption source={stored.source} />}
+          {steps.map((step) => (
+            <TestStepItem key={step.id} step={step} />
+          ))}
+        </div>
+      )}
+      {removable && (
+        <button
+          type='button'
+          aria-label={`Remove ${title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          // Revealed only when the pointer is over the delete region itself (the right edge), or when
+          // the control is keyboard-focused, rather than on hover of the whole row.
+          className='absolute bottom-0 right-0 top-0 flex w-12 items-center justify-center bg-red-400 text-white opacity-0 transition-opacity hover:bg-red-500 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100'
+        >
+          <Trash2 className='h-4 w-4' />
+        </button>
+      )}
+    </div>
+  );
+}
 
 const TestStepItem = ({ step }: { step: TestStep }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -170,415 +524,3 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
     </div>
   );
 };
-
-interface TestResultsProps {
-  credentials: Partial<Record<PermittedCredentialType, StoredCredential>>;
-  testResults: Partial<Record<PermittedCredentialType, TestStep[]>>;
-  setTestResults: React.Dispatch<React.SetStateAction<Partial<Record<PermittedCredentialType, TestStep[]>>>>;
-}
-
-export function TestResults({ credentials, testResults, setTestResults }: TestResultsProps) {
-  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
-  const validatedCredentialsRef = useRef<CredentialCache | Record<string, never>>({});
-  const previousCredentialsRef = useRef<
-    Partial<Record<PermittedCredentialType, { original: any; decoded: Credential }>>
-  >({});
-
-  const initializeTestSteps = (credential?: { original: any; decoded: Credential }) => {
-    if (!credential) {
-      return [
-        {
-          id: TestCaseStepId.PROOF_TYPE,
-          name: 'Proof Type Detection',
-          status: TestCaseStatus.PENDING,
-        },
-        {
-          id: TestCaseStepId.VCDM_VERSION,
-          name: 'VCDM Version Detection',
-          status: TestCaseStatus.PENDING,
-        },
-        {
-          id: TestCaseStepId.VCDM_SCHEMA_VALIDATION,
-          name: 'VCDM Schema Validation',
-          status: TestCaseStatus.PENDING,
-        },
-        {
-          id: TestCaseStepId.VERIFICATION,
-          name: 'Credential Verification',
-          status: TestCaseStatus.PENDING,
-        },
-        {
-          id: TestCaseStepId.UNTP_SCHEMA_VALIDATION,
-          name: 'UNTP Schema Validation',
-          status: TestCaseStatus.PENDING,
-        },
-        {
-          id: TestCaseStepId.CONTEXT_VALIDATION,
-          name: 'JSON-LD Document Expansion and Context Validation',
-          status: TestCaseStatus.PENDING,
-        },
-      ];
-    }
-
-    const vcdmVersion = detectVcdmVersion(credential.decoded);
-    const isUnsupportedVCDMVersion = vcdmVersion === VCDMVersion.UNKNOWN;
-
-    const steps = [
-      {
-        id: TestCaseStepId.PROOF_TYPE,
-        name: 'Proof Type Detection',
-        status: 'success',
-        details: {
-          type: isEnvelopedProof(credential.original) ? VCProofType.ENVELOPING : VCProofType.EMBEDDED,
-        },
-      },
-      {
-        id: TestCaseStepId.VCDM_VERSION,
-        name: 'VCDM Version Detection',
-        status: isUnsupportedVCDMVersion ? TestCaseStatus.FAILURE : TestCaseStatus.SUCCESS,
-        details: {
-          version: vcdmVersion,
-        },
-      },
-      {
-        id: TestCaseStepId.VCDM_SCHEMA_VALIDATION,
-        name: 'VCDM Schema Validation',
-        status: TestCaseStatus.PENDING,
-      },
-      {
-        id: TestCaseStepId.VERIFICATION,
-        name: 'Credential Verification',
-        status: TestCaseStatus.PENDING,
-      },
-      {
-        id: TestCaseStepId.UNTP_SCHEMA_VALIDATION,
-        name: 'UNTP Schema Validation',
-        status: TestCaseStatus.PENDING,
-      },
-      {
-        id: TestCaseStepId.CONTEXT_VALIDATION,
-        name: 'JSON-LD Document Expansion and Context Validation',
-        status: TestCaseStatus.PENDING,
-      },
-    ];
-
-    const extension = detectExtension(credential.decoded);
-
-    if (extension) {
-      steps.push({
-        id: TestCaseStepId.EXTENSION_SCHEMA_VALIDATION,
-        name: 'Extension Schema Validation',
-        status: TestCaseStatus.PENDING,
-      });
-    }
-    return steps;
-  };
-
-  // First useEffect for initializing test steps
-  useEffect(() => {
-    permittedCredentialTypes.forEach((type) => {
-      const credential = credentials[type];
-      const previousCredential = previousCredentialsRef.current[type];
-
-      // Only initialize or update if the credential has changed
-      if (credential !== previousCredential) {
-        setTestResults((prev) => ({
-          ...prev,
-          [type]: initializeTestSteps(credential),
-        }));
-      }
-    });
-
-    previousCredentialsRef.current = credentials;
-  }, [credentials, setTestResults]);
-
-  // Validation useEffect
-  useEffect(() => {
-    Object.entries(credentials).forEach(([type, credential]) => {
-      const credentialType = type as PermittedCredentialType;
-      const cached = validatedCredentialsRef.current[credentialType];
-
-      // Skip if this credential has already been validated
-      if (cached?.credential.original === credential.original) {
-        return;
-      }
-
-      const verifyAndValidate = async () => {
-        try {
-          // Set in-progress state
-          setTestResults((prev) => ({
-            ...prev,
-            [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
-              step.id === TestCaseStepId.VERIFICATION ||
-              step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION ||
-              step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION ||
-              step.id === TestCaseStepId.CONTEXT_VALIDATION
-                ? { ...step, status: TestCaseStatus.IN_PROGRESS }
-                : step,
-            ),
-          }));
-
-          // Verification
-          const verificationResult = await verifyCredential(credential.original);
-          setTestResults((prev) => ({
-            ...prev,
-            [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
-              step.id === TestCaseStepId.VERIFICATION
-                ? {
-                    ...step,
-                    status: verificationResult.verified ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-                    details: {
-                      verified: verificationResult.verified,
-                      ...(verificationResult.error && { error: verificationResult.error }),
-                    },
-                  }
-                : step,
-            ),
-          }));
-
-          if (!verificationResult.verified) {
-            const errorMessage =
-              typeof verificationResult.error === 'object'
-                ? verificationResult.error.message || 'The credential could not be verified'
-                : verificationResult.error || 'The credential could not be verified';
-
-            toast.error('Credential verification failed', {
-              description: errorMessage,
-            });
-          }
-
-          // Store reference to validated credential
-          validatedCredentialsRef.current[credentialType] = {
-            credential: {
-              original: credential.original,
-              decoded: credential.decoded,
-            },
-            validated: true,
-          };
-
-          let allChecksPass = verificationResult.verified;
-          const extension = detectExtension(credential.decoded);
-
-          // VCDM schema validation
-          try {
-            const vcdmValidationResult = await validateVcdmRules(credential.decoded);
-
-            allChecksPass = allChecksPass && vcdmValidationResult.valid;
-
-            setTestResults((prev) => ({
-              ...prev,
-              [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
-                step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION
-                  ? {
-                      ...step,
-                      status: vcdmValidationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-                      details: vcdmValidationResult,
-                    }
-                  : step,
-              ),
-            }));
-          } catch (error) {
-            toast.error('Failed to fetch the VCDM schema. Please contact support.');
-
-            allChecksPass = false;
-
-            setTestResults((prev) => ({
-              ...prev,
-              [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
-                step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION
-                  ? {
-                      ...step,
-                      status: TestCaseStatus.FAILURE,
-                    }
-                  : step,
-              ),
-            }));
-          }
-
-          // Schema validation
-          try {
-            const validationResult = await validateCredentialSchema(credential.decoded);
-            allChecksPass = allChecksPass && validationResult.valid;
-
-            setTestResults((prev) => ({
-              ...prev,
-              [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
-                step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION
-                  ? {
-                      ...step,
-                      status: validationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-                      details: validationResult,
-                    }
-                  : step,
-              ),
-            }));
-          } catch (error) {
-            allChecksPass = false;
-            console.log('Schema validation error:', error);
-            toast.error('Failed to fetch schema. Please try again.');
-
-            // Only update the schema validation step
-            setTestResults((prev) => ({
-              ...prev,
-              [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
-                step.id === TestCaseStepId.UNTP_SCHEMA_VALIDATION
-                  ? {
-                      ...step,
-                      status: TestCaseStatus.FAILURE,
-                      details: {
-                        errors: [
-                          {
-                            keyword: 'schema',
-                            message: 'Failed to fetch schema',
-                            instancePath: '',
-                            params: {
-                              missingValue: 'The schema could not be loaded due to missing UNTP context IRIs.',
-                              solution:
-                                "Ensure the credential includes the required UNTP context IRIs in the '@context' field.",
-                              allowedValue: allowedContextValue,
-                              receivedValue: credential,
-                            },
-                          },
-                        ],
-                      },
-                    }
-                  : step,
-              ),
-            }));
-          }
-
-          // JSON-LD Document Expansion and Context Validation
-          const validateContextResult = await validateContext(credential.decoded);
-          const contextTestResult = { status: TestCaseStatus.SUCCESS, details: validateContextResult.data };
-
-          if (!validateContextResult.valid) {
-            allChecksPass = false;
-            toast.error(
-              'Validation of the JSON-LD context failed. Please check the View Details for more information.',
-            );
-            contextTestResult.status = TestCaseStatus.FAILURE;
-            contextTestResult.details = { errors: [validateContextResult.error] };
-          }
-
-          setTestResults((prev) => ({
-            ...prev,
-            [type as CredentialType]: prev[type as CredentialType]?.map((step) =>
-              step.id === TestCaseStepId.CONTEXT_VALIDATION
-                ? {
-                    ...step,
-                    status: contextTestResult.status,
-                    details: contextTestResult.details,
-                  }
-                : step,
-            ),
-          }));
-
-          // Extension schema validation
-          if (extension) {
-            try {
-              const extensionValidationResult = await validateExtension(credential.decoded);
-              allChecksPass = allChecksPass && extensionValidationResult.valid;
-
-              setTestResults((prev) => ({
-                ...prev,
-                [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
-                  step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION
-                    ? {
-                        ...step,
-                        status: extensionValidationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-                        details: extensionValidationResult,
-                      }
-                    : step,
-                ),
-              }));
-            } catch (error) {
-              allChecksPass = false;
-              console.log('Extension schema validation error:', error);
-              toast.error('Failed to fetch extension schema. Please try again.');
-
-              // Only update the schema validation step
-              setTestResults((prev) => ({
-                ...prev,
-                [type as PermittedCredentialType]: prev[type as PermittedCredentialType]?.map((step) =>
-                  step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION
-                    ? {
-                        ...step,
-                        status: TestCaseStatus.FAILURE,
-                        details: {
-                          errors: [
-                            {
-                              keyword: 'schema',
-                              message: 'Failed to fetch extension schema',
-                              instancePath: '',
-                              params: {
-                                missingValue: 'The schema could not be loaded due to missing extension context IRIs.',
-                                solution:
-                                  "Ensure the credential includes the required extension context IRIs in the '@context' field.",
-                                allowedValue: allowedExtensionValue,
-                                receivedValue: credential,
-                              },
-                            },
-                          ],
-                        },
-                      }
-                    : step,
-                ),
-              }));
-            }
-          }
-
-          // Trigger confetti only if all checks pass
-          if (allChecksPass && !validatedCredentialsRef.current[credentialType]?.confettiShown) {
-            confetti(confettiConfig);
-
-            validatedCredentialsRef.current[credentialType] = {
-              ...validatedCredentialsRef.current[credentialType]!,
-              confettiShown: true,
-            };
-          }
-        } catch (error) {
-          console.log('Error processing credential:', error);
-        }
-      };
-
-      verifyAndValidate();
-    });
-  }, [credentials, setTestResults]);
-
-  const toggleGroup = (groupId: string) => {
-    setExpandedGroups((prev) => (prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]));
-  };
-
-  return (
-    <div className='space-y-4'>
-      {permittedCredentialTypes.map((type) => {
-        const credential = credentials[type];
-        const steps = testResults[type] || [];
-        const hasCredential = !!credential;
-        const extension = hasCredential ? detectExtension(credential.decoded) : null;
-        const version = hasCredential
-          ? extension?.core?.version || detectVersion(credential.decoded)
-          : VCDMVersion.UNKNOWN;
-        const extensionCredentialType = extension?.extension?.type;
-        const extensionVersion = extension?.extension?.version;
-        const vcdmVersion = hasCredential ? detectVcdmVersion(credential.decoded) : undefined;
-
-        return (
-          <TestGroup
-            key={type}
-            credentialType={type}
-            version={version}
-            vcdmVersion={vcdmVersion}
-            extensionCredentialType={extensionCredentialType}
-            extensionVersion={extensionVersion}
-            steps={steps}
-            isExpanded={expandedGroups.includes(type)}
-            onToggle={() => toggleGroup(type)}
-            hasCredential={hasCredential}
-            source={credential?.source}
-          />
-        );
-      })}
-    </div>
-  );
-}

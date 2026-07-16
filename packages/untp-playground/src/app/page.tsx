@@ -15,15 +15,10 @@ import { TestResults } from '@/components/TestResults';
 import { TestReportProvider } from '@/contexts/TestReportContext';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
 import { upsert } from '@/lib/artefactCollection';
+import { credentialContentHash, credentialGroupType, credentialTitle } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { schemeContentHash, schemeTitle } from '@/lib/schemeCollection';
-import {
-  decodeEnvelopedCredential,
-  detectArtefact,
-  detectCredentialType,
-  isEnvelopedProof,
-} from '@/lib/credentialService';
-import { detectExtension } from '@/lib/schemaValidation';
+import { decodeEnvelopedCredential, detectArtefact, isEnvelopedProof } from '@/lib/credentialService';
 import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, StoredScheme, TestStep } from '@/types';
 import { useError } from '@/contexts/ErrorContext';
@@ -33,28 +28,26 @@ import { FileText, Link2, Server } from 'lucide-react';
 import { ArtefactKind, permittedCredentialTypes } from '../../constants';
 
 export default function Home() {
-  const [credentials, setCredentials] = useState<{
-    [key in PermittedCredentialType]?: StoredCredential;
-  }>({});
-  const [testResults, setTestResults] = useState<{
-    [key in PermittedCredentialType]?: TestStep[];
-  }>({});
+  const credential = useArtefactCollection<StoredCredential, TestStep[]>();
   const scheme = useArtefactCollection<StoredScheme, TestStep[]>();
   const [fileCount, setFileCount] = useState(0);
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
   const shouldDisplayUploadDetailBtn = errors && errors.length > 0;
 
-  // Whether each family has instances loaded. schemesCount drives both the Conformity Schemes
-  // empty state and its tab count. credentialsCount drives only the Credentials empty state (that
-  // tab has no count). linkSetsCount drives only the Link Sets tab count; its empty state stays
-  // unconditional until #811 adds real data.
-  const credentialsCount = Object.keys(credentials).length;
+  // Whether each family has instances loaded. Both credentialsCount and schemesCount drive their
+  // family's empty state and tab count, consistently (#845). linkSetsCount drives only the Link
+  // Sets tab count; its empty state stays unconditional until #811 adds real data.
+  const credentialsCount = credential.state.items.length;
   const schemesCount = scheme.state.items.length;
   const linkSetsCount = 0; // Link Sets family lands in #811.
 
-  // Recomputed only when the scheme instances change (add, replace, remove, or a result commit), so
-  // an unrelated re-render does not create a fresh array and re-run the report-reset effect.
+  // Recomputed only when the instances change (add, replace, remove, or a result commit), so an
+  // unrelated re-render does not create a fresh array and re-run the report-reset effect.
+  const credentialInstances = useMemo(
+    () => credential.state.items.map((item) => ({ credential: item.payload, steps: item.result ?? [] })),
+    [credential.state.items],
+  );
   const schemeInstances = useMemo(
     () => scheme.state.items.map((item) => ({ scheme: item.payload, steps: item.result ?? [] })),
     [scheme.state.items],
@@ -86,8 +79,7 @@ export default function Home() {
       const isEnveloped = isEnvelopedProof(normalizedCredential);
       const decodedCredential = isEnveloped ? decodeEnvelopedCredential(normalizedCredential) : normalizedCredential;
 
-      const extension = detectExtension(decodedCredential);
-      let credentialType = extension ? extension.core.type : detectCredentialType(decodedCredential);
+      const credentialType = credentialGroupType(decodedCredential);
 
       if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
         dispatchError([
@@ -106,14 +98,13 @@ export default function Home() {
         return;
       }
 
-      setCredentials((prev) => ({
-        ...prev,
-        [credentialType]: {
-          original: normalizedCredential,
-          decoded: decodedCredential,
-          source,
-        },
-      }));
+      const stored: StoredCredential = { original: normalizedCredential, decoded: decodedCredential, source };
+      const { outcome } = credential.dispatch((state) =>
+        upsert(state, { payload: stored, contentHash: credentialContentHash(stored.decoded), mintInstanceId: newId }),
+      );
+      if (outcome.kind === 'replaced') {
+        toast.success(`Replaced ${credentialTitle(stored)}`);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Failed to process artefact');
@@ -144,14 +135,19 @@ export default function Home() {
     <div className='min-h-screen flex flex-col'>
       <Header />
       <main className='container mx-auto p-8 max-w-7xl flex-1'>
-        <TestReportProvider testResults={testResults} credentials={credentials} schemeInstances={schemeInstances}>
+        <TestReportProvider credentialInstances={credentialInstances} schemeInstances={schemeInstances}>
           <SectionHeader title='Test artefacts'>
             <ReportActions />
           </SectionHeader>
 
           <Tabs defaultValue='credentials'>
             <TabsList>
-              <TabsTrigger value='credentials'>Credentials</TabsTrigger>
+              <TabsTrigger value='credentials'>
+                Credentials
+                {credentialsCount > 0 && (
+                  <span className='text-xs tabular-nums text-muted-foreground'>{credentialsCount}</span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value='schemes'>
                 Conformity Schemes
                 {schemesCount > 0 && <span className='text-xs tabular-nums text-muted-foreground'>{schemesCount}</span>}
@@ -176,7 +172,7 @@ export default function Home() {
                       guidance='Add a credential from the panel on the right. Drop a JSON / JWT file or paste a URL. Each credential you add appears here and in the generated report.'
                     />
                   ) : (
-                    <TestResults credentials={credentials} testResults={testResults} setTestResults={setTestResults} />
+                    <TestResults collection={credential.state} dispatch={credential.dispatch} />
                   )}
                 </TabsContent>
 

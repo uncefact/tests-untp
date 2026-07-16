@@ -1,9 +1,11 @@
 import { detectVersion } from '@/lib/credentialService';
+import { credentialGroupType } from '@/lib/credentialCollection';
 import { detectExtension } from '@/lib/schemaValidation';
 import { detectSchemeVersion } from '@/lib/schemeValidation';
 import {
+  CredentialReportInput,
+  PermittedCredentialType,
   SchemeReportInput,
-  StoredCredential,
   TestReport,
   TestReportResult,
   TestReportSchemeResult,
@@ -11,36 +13,29 @@ import {
   TestStep,
 } from '@/types';
 import { reportName, testSuiteRunner, testSuiteUrl, testSuiteVersion } from '../../config';
-import { CredentialType, SchemeType, TestCaseStatus, TestCaseStepId } from '../../constants';
+import { SchemeType, TERMINAL_STATUSES, TestCaseStatus, TestCaseStepId } from '../../constants';
 
 interface GenerateReportParams {
   implementationName: string;
-  credentials: Partial<Record<CredentialType, StoredCredential>>;
-  testResults: Partial<Record<CredentialType, TestStep[]>>;
+  credentialInstances?: CredentialReportInput[];
   schemeInstances?: SchemeReportInput[];
   passStatuses: TestCaseStatus[];
 }
 
 export const generateReport = async ({
   implementationName,
-  credentials,
-  testResults,
+  credentialInstances,
   schemeInstances,
   passStatuses,
 }: GenerateReportParams): Promise<TestReport> => {
   // Defence in depth for the ADR-041 report-readiness gate: every loaded artefact must be terminal
   // (a non-empty result whose steps have all settled). Refuse rather than record a mid-pipeline
   // artefact as a spurious pass or failure; the UI gate should already prevent reaching here.
-  const settledStatuses = [TestCaseStatus.SUCCESS, TestCaseStatus.FAILURE, TestCaseStatus.WARNING];
   const isTerminal = (steps: TestStep[]) =>
-    steps.length > 0 && steps.every((step) => settledStatuses.includes(step.status));
+    steps.length > 0 && steps.every((step) => TERMINAL_STATUSES.includes(step.status));
 
-  const validCredentials = Object.entries(credentials).map(
-    ([type, cred]) => [type, cred] as [CredentialType, NonNullable<typeof cred>],
-  );
-
-  for (const [type] of validCredentials) {
-    if (!isTerminal(testResults[type] ?? [])) {
+  for (const { steps } of credentialInstances ?? []) {
+    if (!isTerminal(steps)) {
       throw new Error('Cannot generate a report while a credential is still validating.');
     }
   }
@@ -50,8 +45,8 @@ export const generateReport = async ({
     }
   }
 
-  const results: TestReportResult[] = validCredentials.map(([type, credential]) => {
-    const steps = testResults[type] || [];
+  const results: TestReportResult[] = (credentialInstances ?? []).map(({ credential, steps }) => {
+    const type = credentialGroupType(credential.decoded) as PermittedCredentialType;
     const extension = detectExtension(credential.decoded);
     const version = extension ? extension.core.version : detectVersion(credential.decoded);
 
