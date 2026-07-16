@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateOrganisationRequestSchema } from '@/lib/api/request-schemas/organisation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import {
-  getOrganisationById,
-  updateOrganisation,
-  deleteOrganisation,
-  UpdateOrganisationInput,
-} from '@/lib/prisma/repositories';
+import { getOrganisationById, updateOrganisation, deleteOrganisation } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/organisations/[id]' });
-
-const UPDATABLE_FIELDS = ['name', 'description', 'location', 'primaryIdentifierId', 'secondaryIdentifierIds'] as const;
 
 /**
  * @swagger
@@ -38,6 +32,12 @@ const UPDATABLE_FIELDS = ['name', 'description', 'location', 'primaryIdentifierI
  *               $ref: '#/components/schemas/Organisation'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -83,6 +83,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the organisation
  *     requestBody:
  *       required: true
+ *       description: At least one recognised field is required; unknown keys are ignored.
  *       content:
  *         application/json:
  *           schema:
@@ -90,22 +91,33 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             properties:
  *               name:
  *                 type: string
+ *                 minLength: 1
  *                 description: Updated name of the organisation
  *               description:
  *                 type: string
- *                 description: Updated description
+ *                 minLength: 1
+ *                 nullable: true
+ *                 description: Updated description (set to null to clear)
  *               location:
  *                 type: object
- *                 description: Updated UNTP location object
+ *                 description: Updated location object. Any JSON object is accepted; the UNTP location field shapes described in the master data documentation are not currently validated.
  *               primaryIdentifierId:
  *                 type: string
- *                 description: ID of the primary identifier
+ *                 minLength: 1
+ *                 nullable: true
+ *                 description: ID of the primary identifier (set to null to clear)
  *               secondaryIdentifierIds:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: IDs of secondary identifiers
- *             minProperties: 1
+ *                   minLength: 1
+ *                 description: IDs of secondary identifiers (replaces the existing set; an empty array clears all secondary identifiers)
+ *             anyOf:
+ *               - required: [name]
+ *               - required: [description]
+ *               - required: [location]
+ *               - required: [primaryIdentifierId]
+ *               - required: [secondaryIdentifierIds]
  *     responses:
  *       200:
  *         description: Organisation updated successfully
@@ -114,7 +126,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/Organisation'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. no updatable field provided, a mistyped field, a non-array secondaryIdentifierIds, or a referenced primary identifier that no longer exists by the time the update is written)
  *         content:
  *           application/json:
  *             schema:
@@ -125,8 +137,14 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Organisation not found
+ *         description: Organisation not found, or a referenced primary or secondary identifier does not exist
  *         content:
  *           application/json:
  *             schema:
@@ -146,35 +164,13 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-
-  logger.info({ organisationId: id }, 'Parsing request body');
-  let body: Record<string, unknown>;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
   logger.info({ organisationId: id }, 'Validating update fields');
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
-  if (!hasUpdatableField) {
-    throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
-  }
 
-  if (body.name !== undefined && !isNonEmptyString(body.name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
+  const body = await parseRequestBody(req, updateOrganisationRequestSchema);
+  const fields = definedFields(body);
 
-  const updateData: Record<string, unknown> = {};
-  for (const field of UPDATABLE_FIELDS) {
-    if (field in body) {
-      updateData[field] = body[field];
-    }
-  }
-
-  logger.info({ organisationId: id }, 'Updating organisation');
-  const updated = await updateOrganisation(id, tenantId, updateData as UpdateOrganisationInput);
+  logger.info({ organisationId: id, fields: Object.keys(fields) }, 'Updating organisation');
+  const updated = await updateOrganisation(id, tenantId, fields);
 
   logger.info({ organisationId: id }, 'Organisation updated');
   return NextResponse.json(updated);
@@ -200,6 +196,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *         description: Organisation deleted successfully
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:

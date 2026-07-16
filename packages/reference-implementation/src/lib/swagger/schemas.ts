@@ -171,17 +171,88 @@ export const productSchema = z.object({
   updatedAt: z.string().describe('ISO 8601 timestamp'),
 });
 
-export const organisationSchema = z.object({
-  id: z.string(),
-  tenantId: z.string(),
-  name: z.string(),
-  description: z.string().nullable(),
-  location: z.record(z.unknown()).nullable().describe('UNTP location object'),
-  primaryIdentifierId: z.string().nullable(),
-  secondaryIdentifierIds: z.array(z.string()).describe('IDs of secondary identifiers'),
-  createdAt: z.string().describe('ISO 8601 timestamp'),
-  updatedAt: z.string().describe('ISO 8601 timestamp'),
-});
+/**
+ * Builds the Organisation response schema, including its nested
+ * primary/secondary identifier sub-schemas.
+ *
+ * Built lazily (called only from generateOpenAPISchemas, never at
+ * module-evaluation time): every nested schema here derives from
+ * identifierSchemeSchema/identifierSchema via `.omit()`/`.required()`/
+ * `.extend()`, all imported from `@uncefact/untp-ri-services`. A consumer
+ * that imports anything else from this module under a partial mock of that
+ * package (e.g. credentials/route.test.ts, which mocks only
+ * `buildPublishLinks`) would see those two schemas as `undefined` and throw
+ * at import time if this derivation ran at the top level, before the test
+ * ever reaches the code it means to exercise.
+ */
+function buildOrganisationSchema() {
+  /**
+   * Identifier scheme nested under an organisation's identifier fields.
+   * Omits `qualifiers`: the repository's include
+   * (`scheme: { include: { registrar: true } }`) does not request the
+   * qualifiers relation, so it is never present on this nested view (unlike
+   * the standalone IdentifierScheme resource, which always includes it).
+   * `registrar` is made required here (it is optional on the standalone
+   * resource to match its own list-versus-detail asymmetry) because this
+   * nested view's include always requests it.
+   */
+  const organisationIdentifierSchemeSchema = identifierSchemeSchema.omit({ qualifiers: true }).required({
+    registrar: true,
+  });
+
+  /**
+   * Identifier record nested under an organisation's primary/secondary
+   * identifier fields, including its parent scheme (and that scheme's
+   * registrar), matching the repository's ORGANISATION_DETAIL_INCLUDE
+   * (`scheme: { include: { registrar: true } }`).
+   */
+  const organisationIdentifierSchema = identifierSchema.extend({
+    scheme: organisationIdentifierSchemeSchema.describe('Parent identifier scheme, including its registrar'),
+  });
+
+  /**
+   * Secondary identifier join record as returned nested under an
+   * organisation's detail response, matching
+   * ORGANISATION_DETAIL_INCLUDE.secondaryIdentifiers.
+   */
+  const organisationSecondaryIdentifierSchema = z.object({
+    organisationId: z.string(),
+    identifierId: z.string(),
+    identifier: organisationIdentifierSchema,
+  });
+
+  // The create, get-by-id, and update handlers all include the full
+  // `primaryIdentifier` and `secondaryIdentifiers` relations
+  // (ORGANISATION_DETAIL_INCLUDE); the list handler instead returns the
+  // lighter-weight `secondaryIdentifierIds` and omits both nested relations
+  // (ORGANISATION_LIST_INCLUDE), so the relation fields and
+  // `secondaryIdentifierIds` are each marked optional to match that
+  // asymmetry rather than overstating what every endpoint returns.
+  return z.object({
+    id: z.string(),
+    tenantId: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    location: z
+      .record(z.unknown())
+      .nullable()
+      .describe(
+        'Location object. Any JSON object is accepted; the UNTP location field shapes described in the master data documentation are not currently validated.',
+      ),
+    primaryIdentifierId: z.string().nullable(),
+    primaryIdentifier: organisationIdentifierSchema
+      .nullable()
+      .optional()
+      .describe('Full primary identifier record (omitted on list items)'),
+    secondaryIdentifierIds: z.array(z.string()).optional().describe('IDs of secondary identifiers (list items only)'),
+    secondaryIdentifiers: z
+      .array(organisationSecondaryIdentifierSchema)
+      .optional()
+      .describe('Full secondary identifier records (omitted on list items)'),
+    createdAt: z.string().describe('ISO 8601 timestamp'),
+    updatedAt: z.string().describe('ISO 8601 timestamp'),
+  });
+}
 
 export const facilitySchema = z.object({
   id: z.string(),
@@ -250,7 +321,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     DataModel: dataModelSchema,
     RenderTemplate: renderTemplateSchema,
     Product: productSchema,
-    Organisation: organisationSchema,
+    Organisation: buildOrganisationSchema(),
     Facility: facilitySchema,
   };
 
