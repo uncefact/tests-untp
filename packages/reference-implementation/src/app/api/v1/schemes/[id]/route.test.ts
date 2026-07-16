@@ -35,8 +35,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   deleteIdentifierScheme: (id: string, tenantId: string) => mockDeleteIdentifierScheme(id, tenantId),
 }));
 
-import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError } from '@/lib/api/validation';
+import { NotFoundError, ConflictError } from '@/lib/api/errors';
 import { GET, PATCH, DELETE } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -141,6 +140,108 @@ describe('PATCH /api/v1/schemes/:id', () => {
     );
   });
 
+  it('updates with a qualifier order and forwards it to the repository', async () => {
+    const updated = {
+      id: 'sch-1',
+      qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 2 }],
+    };
+    mockUpdateIdentifierScheme.mockResolvedValue(updated);
+
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: {
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 2 }],
+      },
+    });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateIdentifierScheme).toHaveBeenCalledWith(
+      'sch-1',
+      'org-1',
+      expect.objectContaining({
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 2 }],
+      }),
+    );
+  });
+
+  it.each([
+    ['zero', 0],
+    ['the int32 maximum', 2147483647],
+  ])('accepts a qualifier order of %s and forwards it to the repository', async (_label, order) => {
+    const updated = {
+      id: 'sch-1',
+      qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order }],
+    };
+    mockUpdateIdentifierScheme.mockResolvedValue(updated);
+
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: {
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order }],
+      },
+    });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateIdentifierScheme).toHaveBeenCalledWith(
+      'sch-1',
+      'org-1',
+      expect.objectContaining({
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order }],
+      }),
+    );
+  });
+
+  it('returns 400 for a negative qualifier order and does not call the repository', async () => {
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: {
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: -5 }],
+      },
+    });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^qualifiers\.0\.order:/);
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-integer qualifier order and does not call the repository', async () => {
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: {
+        qualifiers: [
+          { key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 'first' },
+        ],
+      },
+    });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^qualifiers\.0\.order:/);
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an out-of-range qualifier order and does not call the repository', async () => {
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: {
+        qualifiers: [
+          { key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 3000000000 },
+        ],
+      },
+    });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^qualifiers\.0\.order:/);
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when no fields provided', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: {} });
     const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -148,6 +249,17 @@ describe('PATCH /api/v1/schemes/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('At least one field is required');
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the body only has an unrecognised (typo) field name', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { neme: 'Updated GTIN' } });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('At least one field is required');
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -169,13 +281,14 @@ describe('PATCH /api/v1/schemes/:id', () => {
   it('returns 400 for invalid qualifier (missing key)', async () => {
     const req = createFakeRequest({
       method: 'PATCH',
-      body: { qualifiers: [{ description: 'Lot number' }] },
+      body: { qualifiers: [{ description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }] },
     });
     const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier key is required');
+    expect(json.error).toMatch(/^qualifiers\.0\.key:/);
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid qualifier (missing validationPattern)', async () => {
@@ -187,7 +300,8 @@ describe('PATCH /api/v1/schemes/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier validationPattern is required');
+    expect(json.error).toMatch(/^qualifiers\.0\.validationPattern:/);
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
   });
 
   it('returns 400 for non-array qualifiers', async () => {
@@ -199,7 +313,31 @@ describe('PATCH /api/v1/schemes/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifiers must be an array');
+    expect(json.error).toMatch(/^qualifiers:/);
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a validationPattern that does not compile as a regular expression', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { validationPattern: '[invalid' } });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('validationPattern: must be a valid regular expression');
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a qualifier validationPattern that does not compile as a regular expression', async () => {
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '[invalid' }] },
+    });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('qualifiers.0.validationPattern: must be a valid regular expression');
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
   });
 
   it('returns 404 when scheme not found or access denied', async () => {
@@ -224,15 +362,20 @@ describe('PATCH /api/v1/schemes/:id', () => {
     expect(mockUpdateIdentifierScheme).toHaveBeenCalledWith('sch-1', 'org-1', { idrServiceInstanceId: null });
   });
 
-  it('returns 400 when repository throws ValidationError', async () => {
-    mockUpdateIdentifierScheme.mockRejectedValue(new ValidationError('Invalid pattern'));
+  it('returns 409 when repository reports a qualifier key conflict', async () => {
+    mockUpdateIdentifierScheme.mockRejectedValue(
+      new ConflictError('A qualifier with this key already exists for the scheme'),
+    );
 
-    const req = createFakeRequest({ method: 'PATCH', body: { validationPattern: '[invalid' } });
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }] },
+    });
     const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('Invalid pattern');
+    expect(res.status).toBe(409);
+    expect(json.error).toContain('A qualifier with this key already exists for the scheme');
   });
 });
 

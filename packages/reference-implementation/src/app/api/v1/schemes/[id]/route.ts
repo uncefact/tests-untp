@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateSchemeRequestSchema } from '@/lib/api/request-schemas/scheme';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierSchemeById, updateIdentifierScheme, deleteIdentifierScheme } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
@@ -31,6 +32,12 @@ const logger = apiLogger.child({ route: '/api/v1/schemes/[id]' });
  *               $ref: '#/components/schemas/IdentifierScheme'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -76,6 +83,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the scheme
  *     requestBody:
  *       required: true
+ *       description: At least one recognised field is required; unknown keys are ignored.
  *       content:
  *         application/json:
  *           schema:
@@ -83,18 +91,23 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             properties:
  *               name:
  *                 type: string
+ *                 minLength: 1
  *                 description: New name for the scheme
  *               primaryKey:
  *                 type: string
+ *                 minLength: 1
  *                 description: New primary key identifier
  *               validationPattern:
  *                 type: string
- *                 description: New validation pattern
+ *                 minLength: 1
+ *                 description: New validation pattern. Rejected with a 400 if it does not compile as a regular expression.
  *               linkTemplate:
  *                 type: string
+ *                 minLength: 1
  *                 description: New ISO 18975 link template for URI construction
  *               idrServiceInstanceId:
  *                 type: string
+ *                 minLength: 1
  *                 nullable: true
  *                 description: New IDR service instance ID (set to null to clear)
  *               qualifiers:
@@ -109,11 +122,27 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                   properties:
  *                     key:
  *                       type: string
+ *                       minLength: 1
  *                     description:
  *                       type: string
+ *                       minLength: 1
  *                     validationPattern:
  *                       type: string
- *             minProperties: 1
+ *                       minLength: 1
+ *                       description: Rejected with a 400 if it does not compile as a regular expression.
+ *                     order:
+ *                       type: integer
+ *                       format: int32
+ *                       minimum: 0
+ *                       maximum: 2147483647
+ *                       description: Qualifier precedence in URI ordering (ascending). Defaults to 0.
+ *             anyOf:
+ *               - required: [name]
+ *               - required: [primaryKey]
+ *               - required: [validationPattern]
+ *               - required: [linkTemplate]
+ *               - required: [idrServiceInstanceId]
+ *               - required: [qualifiers]
  *     responses:
  *       200:
  *         description: Scheme updated successfully
@@ -122,13 +151,19 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/IdentifierScheme'
  *       400:
- *         description: Validation error - at least one field required
+ *         description: Validation error (e.g. no fields provided, a validationPattern that does not compile as a regular expression, a duplicate qualifier key, an idrServiceInstanceId that does not reference an existing service instance)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -154,81 +189,13 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ schemeId: id }, 'Parsing request body');
-
-  let body: {
-    name?: string;
-    primaryKey?: string;
-    validationPattern?: string;
-    linkTemplate?: string;
-    idrServiceInstanceId?: string | null;
-    qualifiers?: Array<{
-      key: string;
-      description: string;
-      validationPattern: string;
-      order?: number;
-    }>;
-  };
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  const hasName = isNonEmptyString(body.name);
-  const hasPrimaryKey = isNonEmptyString(body.primaryKey);
-  const hasValidationPattern = isNonEmptyString(body.validationPattern);
-  const hasLinkTemplate = isNonEmptyString(body.linkTemplate);
-  const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
-  const hasQualifiers = body.qualifiers !== undefined;
-
   logger.info({ schemeId: id }, 'Validating update fields');
-  if (
-    !hasName &&
-    !hasPrimaryKey &&
-    !hasValidationPattern &&
-    !hasLinkTemplate &&
-    !hasIdrServiceInstanceId &&
-    !hasQualifiers
-  ) {
-    throw new ValidationError('At least one field is required');
-  }
 
-  // Validate qualifiers if provided
-  if (hasQualifiers) {
-    if (!Array.isArray(body.qualifiers)) {
-      throw new ValidationError('qualifiers must be an array');
-    }
-    for (const q of body.qualifiers!) {
-      if (!isNonEmptyString(q.key)) throw new ValidationError('qualifier key is required');
-      if (!isNonEmptyString(q.description)) throw new ValidationError('qualifier description is required');
-      if (!isNonEmptyString(q.validationPattern)) throw new ValidationError('qualifier validationPattern is required');
-    }
-  }
+  const body = await parseRequestBody(req, updateSchemeRequestSchema);
+  const fields = definedFields(body);
 
-  logger.info(
-    {
-      schemeId: id,
-      fields: {
-        hasName,
-        hasPrimaryKey,
-        hasValidationPattern,
-        hasLinkTemplate,
-        hasIdrServiceInstanceId,
-        hasQualifiers,
-      },
-    },
-    'Updating scheme',
-  );
-  const updated = await updateIdentifierScheme(id, tenantId, {
-    ...(hasName && { name: body.name }),
-    ...(hasPrimaryKey && { primaryKey: body.primaryKey }),
-    ...(hasValidationPattern && { validationPattern: body.validationPattern }),
-    ...(hasLinkTemplate && { linkTemplate: body.linkTemplate }),
-    ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
-    ...(hasQualifiers && { qualifiers: body.qualifiers }),
-  });
+  logger.info({ schemeId: id, fields: Object.keys(fields) }, 'Updating scheme');
+  const updated = await updateIdentifierScheme(id, tenantId, fields);
 
   logger.info({ schemeId: id }, 'Scheme updated');
   return NextResponse.json(updated);
@@ -254,6 +221,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *         description: Scheme deleted successfully
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:

@@ -34,7 +34,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   getRegistrarById: (id: string, tenantId: string) => mockGetRegistrarById(id, tenantId),
 }));
 
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -129,6 +129,122 @@ describe('POST /api/v1/schemes', () => {
     );
   });
 
+  it('creates a scheme with a qualifier order and forwards it to the repository', async () => {
+    const scheme = {
+      id: 'sch-1',
+      name: 'GTIN',
+      qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 2 }],
+    };
+    mockCreateIdentifierScheme.mockResolvedValue(scheme);
+
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 2 }],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(201);
+    expect(mockCreateIdentifierScheme).toHaveBeenCalledWith(
+      expect.objectContaining({
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 2 }],
+      }),
+    );
+  });
+
+  it.each([
+    ['zero', 0],
+    ['the int32 maximum', 2147483647],
+  ])('accepts a qualifier order of %s and forwards it to the repository', async (_label, order) => {
+    mockCreateIdentifierScheme.mockResolvedValue({ id: 'sch-1' });
+
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order }],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(201);
+    expect(mockCreateIdentifierScheme).toHaveBeenCalledWith(
+      expect.objectContaining({
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order }],
+      }),
+    );
+  });
+
+  it('returns 400 for a negative qualifier order and does not call the repository', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: -5 }],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^qualifiers\.0\.order:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-integer qualifier order and does not call the repository', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 1.5 }],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^qualifiers\.0\.order:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an out-of-range qualifier order and does not call the repository', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [
+          { key: 'lot', description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$', order: 3000000000 },
+        ],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^qualifiers\.0\.order:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
+  });
+
   it('creates a scheme with optional fields', async () => {
     mockCreateIdentifierScheme.mockResolvedValue({ id: 'sch-1' });
 
@@ -153,46 +269,83 @@ describe('POST /api/v1/schemes', () => {
 
   it('returns 400 for missing registrarId', async () => {
     const req = createFakeRequest({
-      body: { name: 'GTIN', primaryKey: 'gtin', validationPattern: '^\\d{14}$' },
+      body: { name: 'GTIN', primaryKey: 'gtin', validationPattern: '^\\d{14}$', linkTemplate: '/{primaryKey}/{value}' },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('registrarId is required');
+    expect(json.error).toMatch(/^registrarId:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing name', async () => {
     const req = createFakeRequest({
-      body: { registrarId: 'reg-1', primaryKey: 'gtin', validationPattern: '^\\d{14}$' },
+      body: {
+        registrarId: 'reg-1',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required');
+    expect(json.error).toMatch(/^name:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing primaryKey', async () => {
     const req = createFakeRequest({
-      body: { registrarId: 'reg-1', name: 'GTIN', validationPattern: '^\\d{14}$' },
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('primaryKey is required');
+    expect(json.error).toMatch(/^primaryKey:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing validationPattern', async () => {
     const req = createFakeRequest({
-      body: { registrarId: 'reg-1', name: 'GTIN', primaryKey: 'gtin' },
+      body: { registrarId: 'reg-1', name: 'GTIN', primaryKey: 'gtin', linkTemplate: '/{primaryKey}/{value}' },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('validationPattern is required');
+    expect(json.error).toMatch(/^validationPattern:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a validationPattern that does not compile as a regular expression', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '[invalid',
+        linkTemplate: '/{primaryKey}/{value}',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('validationPattern: must be a valid regular expression');
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid qualifier (missing key)', async () => {
@@ -203,14 +356,16 @@ describe('POST /api/v1/schemes', () => {
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
         linkTemplate: '/{primaryKey}/{value}',
-        qualifiers: [{ description: 'Lot number' }],
+        qualifiers: [{ description: 'Lot number', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier key is required');
+    expect(json.error).toMatch(/^qualifiers\.0\.key:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid qualifier (missing description)', async () => {
@@ -221,14 +376,16 @@ describe('POST /api/v1/schemes', () => {
         primaryKey: 'gtin',
         validationPattern: '^\\d{14}$',
         linkTemplate: '/{primaryKey}/{value}',
-        qualifiers: [{ key: 'lot' }],
+        qualifiers: [{ key: 'lot', validationPattern: '^[A-Za-z0-9]{1,20}$' }],
       },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier description is required');
+    expect(json.error).toMatch(/^qualifiers\.0\.description:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid qualifier (missing validationPattern)', async () => {
@@ -246,7 +403,29 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifier validationPattern is required');
+    expect(json.error).toMatch(/^qualifiers\.0\.validationPattern:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a qualifier validationPattern that does not compile as a regular expression', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [{ key: 'lot', description: 'Lot number', validationPattern: '[invalid' }],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('qualifiers.0.validationPattern: must be a valid regular expression');
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for non-array qualifiers', async () => {
@@ -264,7 +443,9 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('qualifiers must be an array');
+    expect(json.error).toMatch(/^qualifiers:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -274,6 +455,8 @@ describe('POST /api/v1/schemes', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toBe('Invalid JSON body');
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing linkTemplate', async () => {
@@ -284,7 +467,9 @@ describe('POST /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('linkTemplate is required');
+    expect(json.error).toMatch(/^linkTemplate:/);
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+    expect(mockGetRegistrarById).not.toHaveBeenCalled();
   });
 
   it('returns 404 when registrarId does not exist', async () => {
@@ -399,7 +584,7 @@ describe('GET /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('limit must be a positive integer');
+    expect(json.error).toContain('limit: must be a positive integer');
   });
 
   it('returns 400 for negative offset', async () => {
@@ -411,7 +596,48 @@ describe('GET /api/v1/schemes', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('offset must be a non-negative integer');
+    expect(json.error).toContain('offset: must be a non-negative integer');
+  });
+
+  it('rejects a limit above the maximum with a 400 and does not query', async () => {
+    mockListIdentifierSchemes.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: `http://localhost/api/v1/schemes?limit=${MAX_PAGE_LIMIT + 1}`,
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^limit:/);
+    expect(mockListIdentifierSchemes).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an empty registrarId filter', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/schemes?registrarId=',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^registrarId:/);
+    expect(mockListIdentifierSchemes).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a repeated query key', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/schemes?limit=10&limit=20',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('repeated query parameter');
+    expect(mockListIdentifierSchemes).not.toHaveBeenCalled();
   });
 
   it('returns 500 when listIdentifierSchemes throws', async () => {

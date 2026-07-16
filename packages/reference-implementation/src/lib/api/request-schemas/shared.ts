@@ -23,6 +23,19 @@ import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 export const idSchema = z.string().min(1);
 
 /**
+ * A signed 32-bit integer, matching a Prisma `Int`/Postgres int4 column, so
+ * an out-of-range value is a 400 at the boundary rather than a 500 from the
+ * database. A consumer narrows this further where the column has its own
+ * constraint (e.g. the scheme qualifier `order` field applies `.min(0)` on
+ * top of this, since a qualifier's position cannot be negative). The
+ * services package cannot import this schema (it does not depend on this
+ * package), so its response schema for the same column
+ * (`schemeQualifierSchema.order` in identity-resolver/schemas.ts) inlines the
+ * same (narrowed) bounds; keep the two in sync if either range ever changes.
+ */
+export const int32Schema = z.number().int().min(-2147483648).max(2147483647);
+
+/**
  * UNTP location object, accepted as an open JSON object. No field-level
  * validation is applied anywhere today; a UNTP-shaped location schema is
  * tracked in #804.
@@ -37,13 +50,23 @@ export const locationSchema = z.record(z.unknown());
  * checking the parsed output instead would let a default mask an empty
  * body. A non-object raw body is left untouched so the wrapped schema's own
  * type check produces its usual "Expected object, received X" message.
+ *
+ * Checks only the schema's own recognised keys, not every key present on the
+ * raw body: a body whose only key is unrecognised (e.g. a typo'd field name)
+ * would otherwise satisfy this precondition, get stripped to `{}` by the
+ * wrapped schema's default unknown-key behaviour, and return a silent no-op
+ * 200 instead of a 400.
  */
 export function requireAtLeastOneField<Schema extends z.SomeZodObject>(schema: Schema, message: string) {
   return z.preprocess((raw, ctx) => {
     const isPlainObject = raw !== null && typeof raw === 'object' && !Array.isArray(raw);
-    if (isPlainObject && !Object.values(raw as object).some((value) => value !== undefined)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
-      return z.NEVER;
+    if (isPlainObject) {
+      const record = raw as Record<string, unknown>;
+      const hasRecognisedField = Object.keys(schema.shape).some((key) => record[key] !== undefined);
+      if (!hasRecognisedField) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+        return z.NEVER;
+      }
     }
     return raw;
   }, schema);
