@@ -8,7 +8,7 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth — skips auth but delegates error mapping to the real
+// Mock withTenantAuth to skip auth while delegating error mapping to the real
 // handleRouteError, so this suite is checked against production's actual
 // status/code mapping rather than a hand-rolled duplicate that can drift.
 jest.mock('@/lib/api/with-tenant-auth', () => {

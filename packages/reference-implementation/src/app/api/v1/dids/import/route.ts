@@ -51,7 +51,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *               serviceInstanceId:
  *                 type: string
  *                 minLength: 1
- *                 description: Service instance ID — the verifiable credential service that holds the key material for this DID
+ *                 description: Service instance ID (the verifiable credential service that holds the key material for this DID)
  *     responses:
  *       201:
  *         description: DID imported successfully

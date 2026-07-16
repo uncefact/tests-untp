@@ -153,7 +153,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   }
 
   // Prevent non-system tenants from creating self-managed root DIDs that match
-  // the system VCKit domain. A root did:web is one with no path segments — just
+  // the system VCKit domain. A root did:web is one with no path segments, just
   // the domain (e.g. did:web:vckit.example.com). This stops tenants from
   // hijacking the VCKit instance's root DID.
   if (type === DidType.SELF_MANAGED && method === DidMethod.DID_WEB && tenantId !== SYSTEM_TENANT_ID) {
@@ -178,7 +178,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         }
       } catch (e) {
         if (e instanceof ForbiddenError) throw e;
-        logger.warn({ vcBaseUrl, err: e }, 'SYSTEM_VC_BASE_URL is not a valid URL — root DID domain guard is disabled');
+        logger.warn(
+          { vcBaseUrl, err: e },
+          'SYSTEM_VC_BASE_URL is not a valid URL, so the root DID domain guard is disabled',
+        );
       }
     }
   }
@@ -201,7 +204,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     });
   } catch (err) {
     // The upstream provider may report "already exists" even when the RI database has no record
-    // — e.g. after a DB reset without resetting the provider.
+    // for example after a DB reset without resetting the provider.
     if (err instanceof DidConflictError) {
       throw new ConflictError(err.message);
     }
