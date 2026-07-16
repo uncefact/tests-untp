@@ -46,7 +46,7 @@ Facilities are scoped to the authenticated tenant. Each tenant manages its own s
 POST /api/v1/facilities
 ```
 
-Creates one or more facilities in bulk. The request body must be a non-empty array of facility objects — each must include a non-empty `name`. Optional fields include `description` (non-empty if provided), `location`, `operatingOrganisationId`, `primaryIdentifierId`, and `secondaryIdentifierIds` (rejected with a 400 if provided but not an array). Unrecognised fields on each item are ignored.
+Creates one or more facilities in bulk. The request body must be a non-empty array of facility objects — each must include a non-empty `name`. Optional fields include `description` (non-empty if provided), `location`, `operatingOrganisationId`, `primaryIdentifierId`, and `secondaryIdentifierIds` (each ID unique within the array; rejected with a 400 if provided but not an array, or if it contains a duplicate). Unrecognised fields on each item are ignored.
 
 **Optional fields must be omitted to skip them — do not send them as a JSON `null`.** There is no clear-on-create semantics (nothing yet exists to clear), so an explicit `null` on any optional field is now rejected with a 400 for the whole request, the same as any other malformed value. This is a real behaviour change for `location`: it was previously accepted silently, with no different effect than omitting the field (the write skipped the column either way, leaving it unset) — that silent equivalence is gone, and `location: null` is now a 400.
 
@@ -113,7 +113,7 @@ Updates one or more fields of an existing facility. At least one recognised fiel
 | `location` | UNTP location object. Rejected with a 400 if provided as `null` — there is no clear mechanism for this field yet |
 | `operatingOrganisationId` | ID of the operating organisation (non-empty if provided; set to `null` to clear) |
 | `primaryIdentifierId` | ID of the primary identifier (non-empty if provided; set to `null` to clear) |
-| `secondaryIdentifierIds` | Array of secondary identifier IDs, each non-empty — an empty array clears them, otherwise replaces the existing set. Rejected with a 400 if provided but not an array |
+| `secondaryIdentifierIds` | Array of secondary identifier IDs, each non-empty and unique within the array — an empty array clears them, otherwise replaces the existing set. Rejected with a 400 if provided but not an array, or if it contains a duplicate ID |
 
 ---
 

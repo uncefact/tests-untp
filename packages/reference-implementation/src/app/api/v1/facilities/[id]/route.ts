@@ -116,7 +116,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 items:
  *                   type: string
  *                   minLength: 1
- *                 description: IDs of secondary identifiers (an empty array clears them, replaces existing otherwise)
+ *                 description: IDs of secondary identifiers, each unique within the array (an empty array clears them, replaces existing otherwise)
  *             anyOf:
  *               - required: [name]
  *               - required: [description]
@@ -132,7 +132,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/Facility'
  *       400:
- *         description: Validation error (e.g. no updatable field provided, a non-array secondaryIdentifierIds, an overlapping primary/secondary identifier, a referenced record that no longer exists)
+ *         description: Validation error (e.g. no updatable field provided, a non-array or duplicated secondaryIdentifierIds, an overlapping primary/secondary identifier, a referenced record that no longer exists)
  *         content:
  *           application/json:
  *             schema:

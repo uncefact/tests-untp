@@ -262,6 +262,20 @@ describe('PATCH /api/v1/facilities/:id', () => {
     expect(mockUpdateFacility).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when secondaryIdentifierIds contains a duplicate and does not call the repository', async () => {
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { secondaryIdentifierIds: ['ident-1', 'ident-1'] },
+    });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^secondaryIdentifierIds:/);
+    expect(json.error).toContain('must not contain duplicate identifiers');
+    expect(mockUpdateFacility).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when location is not an object and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: { location: 'somewhere' } });
     const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);

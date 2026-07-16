@@ -53,7 +53,7 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *                   items:
  *                     type: string
  *                     minLength: 1
- *                   description: IDs of secondary identifiers. Omit to skip; null is rejected with a 400
+ *                   description: IDs of secondary identifiers, each unique within the array. Omit to skip; null is rejected with a 400
  *     responses:
  *       201:
  *         description: Facilities created successfully
@@ -64,7 +64,7 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *               items:
  *                 $ref: '#/components/schemas/Facility'
  *       400:
- *         description: Validation error (e.g. a body that is not a non-empty array, a missing or empty name, a non-array secondaryIdentifierIds, an overlapping primary/secondary identifier, a referenced record that no longer exists)
+ *         description: Validation error (e.g. a body that is not a non-empty array, a missing or empty name, a non-array or duplicated secondaryIdentifierIds, an overlapping primary/secondary identifier, a referenced record that no longer exists)
  *         content:
  *           application/json:
  *             schema:

@@ -24,7 +24,17 @@ const facilityItemSchema = z.object({
   location: locationSchema.optional(),
   operatingOrganisationId: idSchema.optional(),
   primaryIdentifierId: idSchema.optional(),
-  secondaryIdentifierIds: z.array(idSchema).optional(),
+  // Rejects an in-array duplicate id as a well-formedness issue (boundary
+  // self-consistency, shape-level, no lookup required). Distinct from the
+  // primary/secondary overlap and cross-request checks, which need existing
+  // data and stay in the repository (ADR-036/037). Without this, a duplicate
+  // in the same request reaches facilitySecondaryIdentifier.createMany (no
+  // skipDuplicates), hits the composite primary key, and surfaces as a
+  // misleading 409 "concurrently linked" conflict for what is a client typo.
+  secondaryIdentifierIds: z
+    .array(idSchema)
+    .refine((val) => new Set(val).size === val.length, { message: 'must not contain duplicate identifiers' })
+    .optional(),
 });
 
 /** Request body for POST /facilities: a non-empty array of facility items. */
@@ -45,7 +55,13 @@ export const updateFacilityRequestSchema = requireAtLeastOneField(
     location: locationSchema.optional(),
     operatingOrganisationId: idSchema.nullable().optional(),
     primaryIdentifierId: idSchema.nullable().optional(),
-    secondaryIdentifierIds: z.array(idSchema).optional(),
+    // See facilityItemSchema's secondaryIdentifierIds comment: boundary
+    // self-consistency only, no lookup; the cross-field/existing-data checks
+    // stay in the repository.
+    secondaryIdentifierIds: z
+      .array(idSchema)
+      .refine((val) => new Set(val).size === val.length, { message: 'must not contain duplicate identifiers' })
+      .optional(),
   }),
   'At least one updatable field is required: name, description, location, operatingOrganisationId, primaryIdentifierId, secondaryIdentifierIds',
 );

@@ -209,6 +209,22 @@ describe('POST /api/v1/facilities', () => {
     expect(mockCreateFacilities).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when secondaryIdentifierIds contains a duplicate and does not call the repository', async () => {
+    // Boundary self-consistency (shape-level): without this, the duplicate would
+    // reach facilitySecondaryIdentifier.createMany, hit the composite primary key,
+    // and surface as a misleading 409 "concurrently linked" conflict for a typo.
+    const req = createFakeRequest({
+      body: [{ name: 'Warehouse Alpha', secondaryIdentifierIds: ['ident-1', 'ident-1'] }],
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.secondaryIdentifierIds:/);
+    expect(json.error).toContain('must not contain duplicate identifiers');
+    expect(mockCreateFacilities).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when location is not an object and does not call the repository', async () => {
     const req = createFakeRequest({ body: [{ name: 'Warehouse Alpha', location: 'somewhere' }] });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
