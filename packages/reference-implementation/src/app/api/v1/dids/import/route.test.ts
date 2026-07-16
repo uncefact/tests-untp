@@ -185,6 +185,35 @@ describe('POST /api/v1/dids/import', () => {
     expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
+  it('returns 400 with code DID_PARSE_FAILED when did is not a well-formed DID, and does not call the repository', async () => {
+    const req = createFakeRequest({ did: 'not-a-did', method: 'DID_WEB', keyId: 'key-1', serviceInstanceId: 'inst-1' });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe('DID_PARSE_FAILED');
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 with code DID_METHOD_NOT_SUPPORTED when the did names an unrecognised method, and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:key:z6Mk',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe('DID_METHOD_NOT_SUPPORTED');
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when keyId is a boolean, and does not call the repository', async () => {
     const req = createFakeRequest({
       did: 'did:web:example.com',

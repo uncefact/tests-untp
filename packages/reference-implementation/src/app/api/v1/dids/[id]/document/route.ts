@@ -54,7 +54,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/document' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       502:
- *         description: Upstream DID document fetch failed (DID_DOCUMENT_FETCH_FAILED) - the resolved VC service could not resolve the DID document
+ *         description: Upstream DID document fetch failed (DID_DOCUMENT_FETCH_FAILED). The verifiable credential service resolves the DID but could not retrieve its document from where the DID is hosted, which for a self-managed DID is the tenant's own hosting location.
  *         content:
  *           application/json:
  *             schema:

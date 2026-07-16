@@ -4,7 +4,7 @@ import { importDidRequestSchema } from '@/lib/api/request-schemas/did';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDid, getInstanceByResolution } from '@/lib/prisma/repositories';
 import { ServiceInstanceNotFoundError } from '@/lib/api/errors';
-import { ServiceType } from '@uncefact/untp-ri-services';
+import { ServiceType, parseDidMethod } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/dids/import' });
@@ -60,7 +60,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *             schema:
  *               $ref: '#/components/schemas/Did'
  *       400:
- *         description: Validation error (e.g. a missing or non-string did/keyId/serviceInstanceId, an invalid method). A serviceInstanceId deleted in the rare window between resolution and the write can also surface here as a generic validation error.
+ *         description: Validation error. Causes include a missing or non-string did/keyId/serviceInstanceId, an invalid method, a did that is not a well-formed DID (code DID_PARSE_FAILED) or whose method is not recognised (code DID_METHOD_NOT_SUPPORTED), and a serviceInstanceId deleted in the rare window between resolution and the write.
  *         content:
  *           application/json:
  *             schema:
@@ -99,6 +99,11 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
 export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Validating request body');
   const body = await parseRequestBody(req, importDidRequestSchema);
+
+  // Validate the DID string with the same parser the verify path uses, so a malformed DID
+  // (or one whose method is not recognised) is rejected here with the same DID_PARSE_FAILED /
+  // DID_METHOD_NOT_SUPPORTED 400 rather than being stored and only failing on its first verify.
+  parseDidMethod(body.did);
 
   // Import never resolves a working adapter (it stores the reference without calling the
   // upstream VC service), so it uses the tenant-scoped existence lookup resolveDidService

@@ -332,7 +332,7 @@ Importing a `did:webvh` identifier is rejected because `method` is restricted to
 
 | Required Field | Description |
 |-----------------|-------------|
-| `did` | The DID identifier to import (e.g. `did:web:example.com`) |
+| `did` | The DID identifier to import (e.g. `did:web:example.com`). Must be a well-formed DID of the form `did:<method>:<identifier>` with a recognised method; a malformed DID is rejected with a 400 |
 | `method` | `DID_WEB` (the supported method today; `DID_WEB_VH` is planned but not yet implemented and is rejected with a 400) |
 | `keyId` | The identifier of the specific key to use for signing with this DID. A DID can control more than one key, so the key is named explicitly rather than inferred |
 | `serviceInstanceId` | Verifiable credential service instance that holds the key material for this DID. Must belong to the authenticated tenant or be the system default verifiable credential service; otherwise rejected with a 404 |

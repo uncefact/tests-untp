@@ -176,8 +176,9 @@ describe('POST /api/v1/dids/:id/verify', () => {
   });
 
   it('returns 400 with code DID_PARSE_FAILED when the stored DID string does not parse', async () => {
-    // Reachable because import (POST /dids/import) accepts the did string without format
-    // validation, so a malformed DID can reach parseDidMethod on its first verify attempt.
+    // Defensive: import validates the DID string with parseDidMethod, so a malformed DID
+    // should not normally be stored. The verify path still guards against one slipping
+    // through (e.g. legacy data predating that validation) rather than crashing.
     mockGetDidById.mockResolvedValue({ id: 'did-1', did: 'not-a-did' });
     mockDidService.verify.mockRejectedValue(new DidParseError('not-a-did', 'invalid format'));
 
