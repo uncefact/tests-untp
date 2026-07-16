@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { parseRequestBody, parseQueryParams, assertHttpUrl, assertPublicUrl } from '@/lib/api/validation';
+import { createRegistrarRequestSchema, listRegistrarsQuerySchema } from '@/lib/api/request-schemas/registrar';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createRegistrar, listRegistrars } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/registrars' });
@@ -28,15 +29,19 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *             properties:
  *               name:
  *                 type: string
+ *                 minLength: 1
  *                 description: Human-readable name for the registrar
  *               namespace:
  *                 type: string
+ *                 minLength: 1
  *                 description: Namespace for the registrar (e.g. "gs1")
  *               url:
  *                 type: string
- *                 description: URL for the registrar
+ *                 format: uri
+ *                 description: A valid public http(s) URL for the registrar's website. Rejected with a 400 if it is not a valid, public http(s) URL.
  *               idrServiceInstanceId:
  *                 type: string
+ *                 minLength: 1
  *                 description: Optional IDR service instance ID
  *     responses:
  *       201:
@@ -46,13 +51,19 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *             schema:
  *               $ref: '#/components/schemas/Registrar'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. missing required field, a url that is not a valid public http(s) URL, an idrServiceInstanceId that does not reference an existing service instance)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -65,25 +76,32 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: {
-    name?: string;
-    namespace?: string;
-    url?: string;
-    idrServiceInstanceId?: string;
-  };
+  logger.info('Validating request body');
+  const body = await parseRequestBody(req, createRegistrarRequestSchema);
 
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
+  // The schema's `.url()` above is WHATWG `new URL` parsing (format only, not
+  // RFC 3986 validation), so it does not require http(s), reject userinfo, or
+  // check the address is public. assertHttpUrl further requires an absolute
+  // http(s) scheme and rejects embedded userinfo; assertPublicUrl (unless
+  // VERIFY_ALLOW_PRIVATE_URLS relaxes it for local development) rejects a
+  // private or unresolvable address. Mirrors the stored-URL validation layer
+  // credentials/route.ts applies to its own URL fields (ADR-037);
+  // data-models/route.ts applies only the env-gated assertPublicUrl today.
+  assertHttpUrl(body.url, 'url');
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    logger.info('Validating registrar URL is not internal');
+    await assertPublicUrl(body.url, 'url');
   }
 
-  logger.info({ name: body.name, namespace: body.namespace }, 'Validating input parameters');
-  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-  if (!isNonEmptyString(body.namespace)) throw new ValidationError('namespace is required');
-  if (!isNonEmptyString(body.url)) throw new ValidationError('url is required');
-
+  // Stores the submitted url verbatim rather than assertHttpUrl's canonical
+  // `.href`: both checks above already share one WHATWG parser (no
+  // parser-differential gap to close), and nothing in this repo dereferences
+  // registrar.url server-side, so there is no SSRF benefit to canonicalising
+  // here. Canonicalising would also mutate stored data (e.g. `new
+  // URL('https://gs1.org').href` adds a trailing slash), which the
+  // valid-inputs-unchanged behaviour this ticket promises does not cover.
+  // Revisit this (switch to storing the canonical `.href`) before any
+  // server-side dereference of registrar.url is introduced.
   logger.info({ namespace: body.namespace }, 'Creating registrar');
   const registrar = await createRegistrar({
     tenantId,
@@ -111,7 +129,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of registrars to return
+ *         description: Number of registrars to return per page. Defaults to 20, or the configured maximum when it is lower. A larger value is rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
@@ -133,13 +151,19 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. a limit above the maximum, a repeated query parameter)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -153,10 +177,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Parsing query parameters');
-  const url = new URL(req.url);
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const { limit, offset } = parseQueryParams(new URL(req.url), listRegistrarsQuerySchema);
 
   logger.info({ limit, offset }, 'Listing registrars');
   const { data, total } = await listRegistrars(tenantId, { limit, offset });

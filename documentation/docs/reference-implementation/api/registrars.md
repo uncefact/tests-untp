@@ -54,7 +54,7 @@ Creates a new registrar for the authenticated tenant. The request body must incl
 |-------|------|----------|-------------|
 | `name` | string | Yes | Human-readable name (e.g. "GS1") |
 | `namespace` | string | Yes | Grouping key for IDR publishing (e.g. "gs1") |
-| `url` | string | Yes | URL of the registrar's website |
+| `url` | string | Yes | A valid public http(s) URL for the registrar's website. Rejected with a 400 if it is not a valid, public http(s) URL |
 | `idrServiceInstanceId` | string | No | ID of an IDR service instance to link |
 
 ```mermaid
@@ -85,7 +85,7 @@ Returns registrars for the authenticated tenant, **including system defaults**. 
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | Defaults to 20, or the configured maximum when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ```mermaid
@@ -125,7 +125,7 @@ Updates one or more fields of an existing registrar. At least one updatable fiel
 |-----------------|-------------|
 | `name` | Registrar name (must be non-empty if provided) |
 | `namespace` | Namespace grouping key (must be non-empty if provided) |
-| `url` | Registrar URL (must be non-empty if provided) |
+| `url` | A valid public http(s) URL for the registrar's website. Rejected with a 400 if provided and not a valid, public http(s) URL |
 | `idrServiceInstanceId` | IDR service instance ID (set to `null` to clear the linkage) |
 
 ```mermaid
@@ -156,7 +156,7 @@ sequenceDiagram
 DELETE /api/v1/registrars/{id}
 ```
 
-Permanently deletes a registrar and all of its associated identifier schemes and qualifier definitions (cascade). Only tenant-owned registrars can be deleted — system defaults are protected.
+Permanently deletes a registrar and all of its associated identifier schemes and qualifier definitions (cascade). Only tenant-owned registrars can be deleted — system defaults are protected. If any of the registrar's schemes has identifiers attached, the identifier-to-scheme relationship is `onDelete: Restrict`, so that constraint blocks the whole cascade: the delete fails as a 409 and nothing is removed (not the registrar, not its schemes, not the identifiers).
 
 ```mermaid
 sequenceDiagram
@@ -170,6 +170,10 @@ sequenceDiagram
         RI-->>Client: 404 Not Found
     end
     RI->>DB: Delete registrar (cascades to schemes)
+    alt a scheme has identifiers (onDelete: Restrict blocks the cascade)
+        DB-->>RI: Foreign key violation
+        RI-->>Client: 409 Conflict (nothing deleted)
+    end
     DB-->>RI: Deleted
     RI-->>Client: 204 No Content
 ```
