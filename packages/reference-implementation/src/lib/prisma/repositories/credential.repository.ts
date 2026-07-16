@@ -1,5 +1,6 @@
 import { Credential, Prisma } from '../generated';
 import { prisma } from '../prisma';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * Input for creating a new credential record
@@ -76,7 +77,7 @@ export async function listCredentials(options: ListCredentialsOptions): Promise<
   const [data, total] = await Promise.all([
     prisma.credential.findMany({
       where,
-      take: limit,
+      take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
       orderBy: { createdAt: 'desc' },
     }),
