@@ -84,6 +84,13 @@ export enum TestCaseStatus {
   FAILURE = 'failure',
 }
 
+/**
+ * The statuses that count as settled: a step (and so an instance) has finished running. Removal
+ * availability and report readiness both key off this, so they must agree on whether WARNING is
+ * terminal; keeping the set in one place stops those checks from drifting apart.
+ */
+export const TERMINAL_STATUSES = [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING, TestCaseStatus.FAILURE];
+
 export enum TestCaseStepId {
   PROOF_TYPE = 'proof-type',
   VCDM_VERSION = 'vcdm-version',

@@ -18,6 +18,7 @@ import { ArtefactKind, permittedCredentialTypes } from '../../constants';
 jest.mock('sonner', () => ({
   toast: {
     error: jest.fn(),
+    success: jest.fn(),
   },
 }));
 
@@ -343,6 +344,124 @@ describe('Tabbed artefact surface (#809)', () => {
     fireEvent.click(uploader);
 
     expect(await screen.findByRole('tab', { name: /Conformity Schemes\s*1/ })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Replaced'));
+    });
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to process artefact');
+  });
+
+  it('loads two distinct credentials as separate instances instead of overwriting (#810)', async () => {
+    // detectArtefact is left unset here (undefined => not a scheme), but earlier tests in this
+    // block set it to the SCHEME kind and jest.clearAllMocks() does not reset a mockReturnValue,
+    // so it is reset explicitly to route this upload to the credential branch.
+    (detectArtefact as jest.Mock).mockReturnValue(undefined);
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
+
+    // Identity is the content hash, so each upload must carry distinct content to be a new instance.
+    let marker = 0;
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any) => void }) => (
+        <button
+          data-testid='mock-uploader'
+          onClick={() =>
+            onArtefactUpload({
+              verifiableCredential: { type: ['VerifiableCredential', 'DigitalProductPassport'], marker: marker++ },
+            })
+          }
+        >
+          Upload
+        </button>
+      ),
+    );
+    render(<Home />);
+
+    const uploader = screen.getByTestId('mock-uploader');
+    fireEvent.click(uploader);
+    fireEvent.click(uploader);
+
+    // The Credentials tab count reflects the number of loaded instances, matching the Conformity
+    // Schemes tab (#845).
+    expect(await screen.findByRole('tab', { name: /Credentials\s*2/ })).toBeInTheDocument();
+  });
+
+  it('replaces in place when the same credential content is uploaded twice (#810)', async () => {
+    (detectArtefact as jest.Mock).mockReturnValue(undefined);
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
+
+    // Identical content each click -> same content hash -> the second upload replaces the first.
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any) => void }) => (
+        <button
+          data-testid='mock-uploader'
+          onClick={() =>
+            onArtefactUpload({
+              verifiableCredential: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+            })
+          }
+        >
+          Upload
+        </button>
+      ),
+    );
+    render(<Home />);
+
+    const uploader = screen.getByTestId('mock-uploader');
+    fireEvent.click(uploader);
+    fireEvent.click(uploader);
+
+    expect(await screen.findByRole('tab', { name: /Credentials\s*1/ })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Replaced'));
+    });
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to process artefact');
+  });
+
+  it('collapses two differently-enveloped credentials into one instance when their decoded content is identical (#810)', async () => {
+    // Identity keys on `credentialContentHash(stored.decoded)`, the decoded document, never the
+    // enveloping JWT (ADR-041). The mocked decoder always resolves to the same document below, so
+    // two uploads with distinct envelopes must still collapse to one instance.
+    const decodedCredential = { type: ['VerifiableCredential', 'DigitalProductPassport'], id: 'shared-content' };
+
+    (detectArtefact as jest.Mock).mockReturnValue(undefined);
+    (isEnvelopedProof as jest.Mock).mockReturnValue(true);
+    (decodeEnvelopedCredential as jest.Mock).mockReturnValue(decodedCredential);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
+
+    // Two distinct envelope shapes, so the pre-decode raw artefact differs on each upload; only the
+    // decoded document (mocked to be identical every time) should determine identity.
+    let envelopeMarker = 0;
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any) => void }) => (
+        <button
+          data-testid='mock-uploader'
+          onClick={() => onArtefactUpload({ verifiableCredential: { envelope: `jwt-${envelopeMarker++}` } })}
+        >
+          Upload
+        </button>
+      ),
+    );
+    render(<Home />);
+
+    const uploader = screen.getByTestId('mock-uploader');
+    fireEvent.click(uploader);
+    fireEvent.click(uploader);
+
+    // One instance, and the second upload was a replace rather than an append.
+    expect(await screen.findByRole('tab', { name: /Credentials\s*1/ })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Replaced'));
+    });
   });
 
   it('shows the credentials empty state when no credential is loaded', () => {

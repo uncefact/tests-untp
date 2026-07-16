@@ -1,19 +1,24 @@
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useEffect, useRef } from 'react';
 import { TestResults, confettiConfig } from '@/components/TestResults';
+import { useArtefactCollection } from '@/hooks/useArtefactCollection';
+import { upsert } from '@/lib/artefactCollection';
+import { credentialContentHash } from '@/lib/credentialCollection';
+import { newId } from '@/lib/id';
 import { validateContext } from '@/lib/contextValidation';
 import { detectExtension, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
-import { Credential } from '@/types/credential';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { StoredCredential, TestStep } from '@/types';
 import confetti from 'canvas-confetti';
-import { CredentialType, TestCaseStatus, TestCaseStepId, VCDMVersion, VCDM_CONTEXT_URLS } from '../../constants';
+import { VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
 jest.mock('@/lib/verificationService');
 jest.mock('@/lib/schemaValidation');
 jest.mock('@/lib/vcdm-validation');
 jest.mock('@/lib/utils');
-jest.mock('@/lib/credentialService');
 jest.mock('@/lib/contextValidation');
 jest.mock('canvas-confetti');
 jest.mock('jsonld', () => ({
@@ -26,271 +31,482 @@ jest.mock('sonner', () => ({
   },
 }));
 
-// Mock sample credentials
-const mockBasicCredential = {
-  DigitalProductPassport: {
-    original: {
-      proof: { type: 'Ed25519Signature2020' },
-    },
+// Real detectCredentialType/detectVersion/isEnvelopedProof from '@/lib/credentialService' are left
+// unmocked, so grouping by detected type (#810) exercises the real detection over realistic fixtures.
+
+const untpContext = (version: string) => `https://vocabulary.uncefact.org/untp/dpp/${version}/context.jsonld`;
+
+function makeStored(
+  overrides: { id?: string; type?: string[]; version?: string; issuer?: any } = {},
+  source?: StoredCredential['source'],
+): StoredCredential {
+  const version = overrides.version ?? '0.6.0';
+  return {
+    original: { proof: { type: 'Ed25519Signature2020' } },
     decoded: {
-      '@context': [VCDM_CONTEXT_URLS.v2, 'https://vocabulary.uncefact.org/2.0.0/context.jsonld'],
-      type: ['VerifiableCredential', 'DigitalProductPassport'],
-    } as Credential,
-  },
-};
+      '@context': [VCDM_CONTEXT_URLS.v2, untpContext(version)],
+      type: overrides.type ?? ['VerifiableCredential', 'DigitalProductPassport'],
+      issuer: overrides.issuer ?? { id: 'did:web:acme.example' },
+      ...(overrides.id !== undefined && { id: overrides.id }),
+    },
+    source,
+  };
+}
 
-const mockSetTestResults = jest.fn();
-const mockTestResults = {};
+// Harness: drives the real collection hook so the pipeline runs and the cards re-render on commit.
+function Harness({ credentials }: { credentials: StoredCredential[] }) {
+  const collection = useArtefactCollection<StoredCredential, TestStep[]>();
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    for (const c of credentials) {
+      collection.dispatch((state) =>
+        upsert(state, { payload: c, contentHash: credentialContentHash(c.decoded), mintInstanceId: newId }),
+      );
+    }
+  }, [credentials, collection]);
+  return <TestResults collection={collection.state} dispatch={collection.dispatch} />;
+}
 
-describe('TestResults Component', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    jest.resetAllMocks();
-    // Setup default mock implementations
-    (verifyCredential as jest.Mock).mockResolvedValue({ verified: true });
-    (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: true });
-    (validateExtension as jest.Mock).mockResolvedValue({ valid: true });
-    (validateVcdmRules as jest.Mock).mockResolvedValue({ valid: true });
-    (validateContext as jest.Mock).mockResolvedValue({ valid: true, data: {} });
-    (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
+const expandInstance = () => userEvent.click(screen.getByTestId('credential-instance-header'));
+
+// The group rollup icon is shown only while the group is collapsed (expanded groups show each
+// instance's own status), so a test that asserts the rollup collapses the group first.
+const collapseGroup = async (type = 'DigitalProductPassport') =>
+  userEvent.click(await screen.findByTestId(`${type}-group-header`));
+
+// Harness for a replace-in-place sequence: seeds one credential on mount, then upserts a second
+// credential (identical or distinct content, chosen by the caller) on a button click, exactly the
+// way page.tsx's handleArtefactUpload dispatches each upload through the same collection.
+function ReplaceHarness({ first, second }: { first: StoredCredential; second: StoredCredential }) {
+  const collection = useArtefactCollection<StoredCredential, TestStep[]>();
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    collection.dispatch((state) =>
+      upsert(state, { payload: first, contentHash: credentialContentHash(first.decoded), mintInstanceId: newId }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const uploadSecond = () => {
+    collection.dispatch((state) =>
+      upsert(state, { payload: second, contentHash: credentialContentHash(second.decoded), mintInstanceId: newId }),
+    );
+  };
+
+  return (
+    <>
+      <button onClick={uploadSecond}>Upload second</button>
+      <TestResults collection={collection.state} dispatch={collection.dispatch} />
+    </>
+  );
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  (verifyCredential as jest.Mock).mockResolvedValue({ verified: true });
+  (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: true });
+  (validateExtension as jest.Mock).mockResolvedValue({ valid: true });
+  (validateVcdmRules as jest.Mock).mockResolvedValue({ valid: true });
+  (validateContext as jest.Mock).mockResolvedValue({ valid: true, data: {} });
+  (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V2);
+  (detectExtension as jest.Mock).mockReturnValue(undefined);
+});
+
+describe('TestResults grouping (#810, #845)', () => {
+  it('renders a group only for a credential type that has an uploaded instance', async () => {
+    render(<Harness credentials={[makeStored({ id: 'a' })]} />);
+
+    expect(await screen.findByRole('heading', { level: 3, name: 'Digital Product Passport' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 3, name: 'Digital Conformity Credential' })).not.toBeInTheDocument();
   });
 
-  it('renders empty state correctly', () => {
-    render(<TestResults credentials={{}} testResults={mockTestResults} setTestResults={mockSetTestResults} />);
-    expect(screen.getByText('DigitalProductPassport')).toBeInTheDocument();
-    expect(screen.getByText('DigitalConformityCredential')).toBeInTheDocument();
-    expect(screen.getByText('DigitalFacilityRecord')).toBeInTheDocument();
-    expect(screen.getByText('DigitalIdentityAnchor')).toBeInTheDocument();
-    expect(screen.getByText('DigitalTraceabilityEvent')).toBeInTheDocument();
-  });
-
-  it('renders credential section with correct type, version and VCDM version', async () => {
-    (detectExtension as jest.Mock).mockReturnValue({
-      core: { type: 'DigitalProductPassport', version: '2.0.0' },
-      extension: { type: 'DigitalProductPassport', version: '2.0.0' },
-    });
-    (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
-
+  it('groups multiple instances of the same type under one header with an instance count', async () => {
     render(
-      <TestResults
-        credentials={mockBasicCredential}
-        testResults={mockTestResults}
-        setTestResults={mockSetTestResults}
+      <Harness
+        credentials={[
+          makeStored({ id: 'a' }, { kind: 'file', filename: 'dpp-a.json' }),
+          makeStored({ id: 'b' }, { kind: 'file', filename: 'dpp-b.json' }),
+        ]}
       />,
     );
 
-    // Check for the credential type heading and version
-    const credentialSection = screen.getByRole('heading', {
-      level: 3,
-      name: /DigitalProductPassport.*v2\.0\.0/,
-    });
-    expect(credentialSection).toBeInTheDocument();
-
-    // Check for VCDM version badge
-    expect(screen.getByText('VCDM v1')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 3, name: 'Digital Product Passports' })).toBeInTheDocument();
+    expect(screen.getByTestId('DigitalProductPassport-group-header')).toHaveTextContent('2');
+    expect(await screen.findByText('dpp-a.json')).toBeInTheDocument();
+    expect(await screen.findByText('dpp-b.json')).toBeInTheDocument();
   });
 
-  it('shows unsupported VCDM version badge when version is unknown', async () => {
+  it('rolls the group status up to the worst instance: any failing instance fails the whole group', async () => {
+    (validateCredentialSchema as jest.Mock).mockImplementation(async (decoded: any) => ({
+      valid: decoded.id !== 'fail',
+    }));
+
+    render(
+      <Harness
+        credentials={[
+          makeStored({ id: 'pass' }, { kind: 'file', filename: 'dpp-pass.json' }),
+          makeStored({ id: 'fail' }, { kind: 'file', filename: 'dpp-fail.json' }),
+        ]}
+      />,
+    );
+
+    await screen.findByText('dpp-pass.json');
+    await collapseGroup();
+    await waitFor(() => {
+      expect(screen.getByTestId('DigitalProductPassport-status-icon-failure')).toBeInTheDocument();
+    });
+  });
+
+  it('shows a success rollup once every instance in the group has passed', async () => {
+    render(
+      <Harness
+        credentials={[
+          makeStored({ id: 'a' }, { kind: 'file', filename: 'dpp-a.json' }),
+          makeStored({ id: 'b' }, { kind: 'file', filename: 'dpp-b.json' }),
+        ]}
+      />,
+    );
+
+    await collapseGroup();
+    await waitFor(() => {
+      expect(screen.getByTestId('DigitalProductPassport-status-icon-success')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('TestResults removal (#810)', () => {
+  it('removes an instance only after the confirmation dialog is confirmed, and the group disappears once its last instance is removed', async () => {
+    render(<Harness credentials={[makeStored({ id: 'only' }, { kind: 'file', filename: 'dpp-only.json' })]} />);
+
+    await screen.findByText('dpp-only.json');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove dpp-only.json' })).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove dpp-only.json' }));
+    expect(await screen.findByText('Remove dpp-only.json?')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { level: 3, name: 'Digital Product Passport' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps the instance when the removal is cancelled', async () => {
+    render(<Harness credentials={[makeStored({ id: 'keep' }, { kind: 'file', filename: 'dpp-keep.json' })]} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove dpp-keep.json' })).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove dpp-keep.json' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByText('dpp-keep.json')).toBeInTheDocument();
+  });
+
+  it('does not offer a remove control while an instance is mid-pipeline', async () => {
+    let resolveVerify: (value: { verified: boolean }) => void = () => {};
+    (verifyCredential as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveVerify = resolve;
+        }),
+    );
+
+    render(<Harness credentials={[makeStored({ id: 'pending' }, { kind: 'file', filename: 'dpp-pending.json' })]} />);
+
+    await screen.findByText('dpp-pending.json');
+    expect(screen.queryByRole('button', { name: 'Remove dpp-pending.json' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveVerify({ verified: true });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove dpp-pending.json' })).toBeInTheDocument();
+    });
+  });
+});
+
+describe('Credential verification throw regression (#810)', () => {
+  it('fails the verification step, settles every other step, and allows removal when verifyCredential throws', async () => {
+    (verifyCredential as jest.Mock).mockRejectedValue(new Error('Service unavailable'));
+    const { toast } = require('sonner');
+
+    render(
+      <Harness credentials={[makeStored({ id: 'verify-throw' }, { kind: 'file', filename: 'dpp-throw.json' })]} />,
+    );
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('verification-status-icon-failure')).toBeInTheDocument();
+    });
+
+    // No step is left pending or in progress: a thrown verification error settles the whole
+    // pipeline rather than leaving the instance stuck mid-run.
+    await waitFor(() => {
+      expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
+    });
+
+    // A settled pipeline (success or failure on every step) makes the instance removable.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove dpp-throw.json' })).toBeInTheDocument();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Credential verification failed', {
+      description: 'Could not reach the verification service. Please try again.',
+    });
+  });
+
+  it('fails the context step, settles every other step, and allows removal when validateContext throws', async () => {
+    (validateContext as jest.Mock).mockRejectedValue(new Error('jsonld expansion failed'));
+    const { toast } = require('sonner');
+
+    render(
+      <Harness credentials={[makeStored({ id: 'context-throw' }, { kind: 'file', filename: 'dpp-context.json' })]} />,
+    );
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('context-status-icon-failure')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove dpp-context.json' })).toBeInTheDocument();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Validation of the JSON-LD context failed. Please try again.');
+  });
+});
+
+describe('Credential replace-in-place through the collection (#810)', () => {
+  it('replaces the same content in place and reruns its pipeline for the replacement', async () => {
+    const first = makeStored({ id: 'replace-me' }, { kind: 'file', filename: 'dpp-replace.json' });
+    // Same decoded content as `first` (same id, type, issuer, context), so its content hash matches
+    // and the upsert replaces the existing instance rather than appending a second one.
+    const second = makeStored({ id: 'replace-me' }, { kind: 'file', filename: 'dpp-replace.json' });
+
+    render(<ReplaceHarness first={first} second={second} />);
+
+    await screen.findByText('dpp-replace.json');
+    await waitFor(() => {
+      expect(screen.getByTestId('DigitalProductPassport-group-header')).toHaveTextContent('1');
+    });
+    await waitFor(() => {
+      expect(validateVcdmRules).toHaveBeenCalledTimes(1);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Upload second' }));
+
+    // Still exactly one instance row for the group: the upload replaced rather than appended.
+    await waitFor(() => {
+      expect(screen.getByTestId('DigitalProductPassport-group-header')).toHaveTextContent('1');
+    });
+    expect(screen.getAllByTestId('credential-instance-header')).toHaveLength(1);
+
+    // The pipeline reran for the replacement: the validators were invoked a second time and the
+    // row reaches a settled status again rather than keeping the pre-replacement result.
+    await waitFor(() => {
+      expect(validateVcdmRules).toHaveBeenCalledTimes(2);
+    });
+    await collapseGroup();
+    await waitFor(() => {
+      expect(screen.getByTestId('DigitalProductPassport-status-icon-success')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('Credential validation pipeline (preserved verbatim from pre-#810)', () => {
+  it('shows unsupported VCDM version as a failed step', async () => {
     (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.UNKNOWN);
 
-    render(
-      <TestResults
-        credentials={mockBasicCredential}
-        testResults={mockTestResults}
-        setTestResults={mockSetTestResults}
-      />,
-    );
-    expect(screen.getByText('Unsupported VCDM version')).toBeInTheDocument();
-  });
+    render(<Harness credentials={[makeStored({ id: 'unknown-vcdm' })]} />);
+    await expandInstance();
 
-  describe('VCDM Validation', () => {
-    it('shows success for valid VCDM schema validation', async () => {
-      (validateVcdmRules as jest.Mock).mockResolvedValue({ valid: true });
-      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
-
-      const mockTestSteps = {
-        [CredentialType.DIGITAL_PRODUCT_PASSPORT]: [
-          {
-            id: TestCaseStepId.VCDM_SCHEMA_VALIDATION,
-            status: TestCaseStatus.SUCCESS,
-            name: 'VCDM Schema Validation',
-            details: 'Valid VCDM schema',
-          },
-        ],
-      };
-
-      await act(async () => {
-        render(
-          <TestResults
-            credentials={mockBasicCredential}
-            testResults={mockTestSteps}
-            setTestResults={mockSetTestResults}
-          />,
-        );
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('DigitalProductPassport-status-icon-success')).toBeInTheDocument();
-      });
-
-      await act(async () => {
-        const groupHeader = screen.getByTestId('DigitalProductPassport-group-header');
-        expect(groupHeader).toBeInTheDocument();
-        fireEvent.click(groupHeader!);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText(/vcdm schema validation/i)).toBeInTheDocument();
-      });
-
-      await waitFor(() => {
-        expect(validateVcdmRules).toHaveBeenCalledWith(mockBasicCredential.DigitalProductPassport.decoded);
-      });
-    });
-
-    it('shows failure for invalid VCDM schema validation', async () => {
-      const mockTestSteps = {
-        [CredentialType.DIGITAL_PRODUCT_PASSPORT]: [
-          {
-            id: TestCaseStepId.VCDM_SCHEMA_VALIDATION,
-            name: 'VCDM Schema Validation',
-            status: TestCaseStatus.FAILURE,
-            details: 'Invalid VCDM schema',
-          },
-        ],
-      };
-
-      render(
-        <TestResults
-          credentials={mockBasicCredential}
-          testResults={mockTestSteps}
-          setTestResults={mockSetTestResults}
-        />,
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('DigitalProductPassport-status-icon-failure')).toBeInTheDocument();
-      });
-    });
-
-    it('handles VCDM schema fetch errors', async () => {
-      const mockToast = jest.spyOn(require('sonner').toast, 'error');
-      (validateVcdmRules as jest.Mock).mockRejectedValue(new Error('Failed to fetch schema'));
-
-      await act(async () => {
-        render(
-          <TestResults
-            credentials={mockBasicCredential}
-            testResults={mockTestResults}
-            setTestResults={mockSetTestResults}
-          />,
-        );
-      });
-
-      await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith('Failed to fetch the VCDM schema. Please contact support.');
-      });
+    await waitFor(() => {
+      expect(screen.getByTestId('vcdm-version-status-icon-failure')).toBeInTheDocument();
     });
   });
 
-  describe('Confetti Behavior', () => {
-    beforeEach(() => {
-      jest.clearAllMocks();
+  it('shows success for valid VCDM schema validation', async () => {
+    render(<Harness credentials={[makeStored({ id: 'vcdm-ok' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('vcdm-schema-validation-status-icon-success')).toBeInTheDocument();
+    });
+    expect(validateVcdmRules).toHaveBeenCalledWith(expect.objectContaining({ id: 'vcdm-ok' }));
+  });
+
+  it('shows failure for invalid VCDM schema validation', async () => {
+    (validateVcdmRules as jest.Mock).mockResolvedValue({ valid: false, errors: [{ message: 'bad vcdm' }] });
+
+    render(<Harness credentials={[makeStored({ id: 'vcdm-bad' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('vcdm-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+  });
+
+  it('handles VCDM schema fetch errors', async () => {
+    (validateVcdmRules as jest.Mock).mockRejectedValue(new Error('network down'));
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'vcdm-fetch-error' })]} />);
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to fetch the VCDM schema. Please contact support.');
+    });
+    await expandInstance();
+    await waitFor(() => {
+      expect(screen.getByTestId('vcdm-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+  });
+
+  it('shows the UNTP schema fetch error with the exact preserved copy and params', async () => {
+    (validateCredentialSchema as jest.Mock).mockRejectedValue(new Error('fetch failed'));
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'untp-fetch-error' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to fetch schema. Please try again.');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
 
-    it('shows confetti when all validations pass', async () => {
-      (verifyCredential as jest.Mock).mockResolvedValue({ verified: true });
-      (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: true });
-      (validateVcdmRules as jest.Mock).mockResolvedValue({ valid: true });
-      (detectExtension as jest.Mock).mockReturnValue(undefined);
-      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
+    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
+    await userEvent.click(await screen.findByText('Fix validation error'));
+    expect(
+      await screen.findByText("Ensure the credential includes the required UNTP context IRIs in the '@context' field."),
+    ).toBeInTheDocument();
+  });
 
-      render(
-        <TestResults
-          credentials={mockBasicCredential}
-          testResults={mockTestResults}
-          setTestResults={mockSetTestResults}
-        />,
+  it('validates against context and reports failure with the preserved toast copy', async () => {
+    (validateContext as jest.Mock).mockResolvedValue({
+      valid: false,
+      error: { keyword: 'unknown', message: 'bad context', instancePath: '' },
+    });
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'context-fail' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Validation of the JSON-LD context failed. Please check the View Details for more information.',
       );
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('context-status-icon-failure')).toBeInTheDocument();
+    });
+  });
 
-      await waitFor(() => {
-        expect(confetti).toHaveBeenCalledTimes(1);
-        expect(confetti).toHaveBeenCalledWith(expect.objectContaining(confettiConfig));
+  it('shows a verification failure toast with the underlying error description', async () => {
+    (verifyCredential as jest.Mock).mockResolvedValue({ verified: false, error: 'signature mismatch' });
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'verify-fail' })]} />);
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Credential verification failed', {
+        description: 'signature mismatch',
       });
     });
+  });
 
-    it('does not show confetti when VCDM validation fails', async () => {
-      (verifyCredential as jest.Mock).mockResolvedValue({ verified: true });
-      (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: true });
-      (validateVcdmRules as jest.Mock).mockResolvedValue({ valid: false });
-      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V1);
-
-      await act(async () => {
-        render(
-          <TestResults
-            credentials={mockBasicCredential}
-            testResults={mockTestResults}
-            setTestResults={mockSetTestResults}
-          />,
-        );
-      });
-
-      expect(confetti).not.toHaveBeenCalled();
+  it('runs the extension schema validation step only when an extension is detected', async () => {
+    (detectExtension as jest.Mock).mockReturnValue({
+      core: { type: 'DigitalProductPassport', version: '0.5.0' },
+      extension: { type: 'DigitalLivestockPassport', version: '0.4.0' },
     });
 
-    it('does not show confetti when schema validation fails', async () => {
-      (verifyCredential as jest.Mock).mockResolvedValue({ verified: true });
-      (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: false });
-      (detectExtension as jest.Mock).mockReturnValue(undefined);
+    render(<Harness credentials={[makeStored({ id: 'extension' })]} />);
+    await expandInstance();
 
-      await act(async () => {
-        render(
-          <TestResults
-            credentials={mockBasicCredential}
-            testResults={mockTestResults}
-            setTestResults={mockSetTestResults}
-          />,
-        );
-      });
-
-      expect(confetti).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByTestId('extension-schema-validation-status-icon-success')).toBeInTheDocument();
     });
+  });
 
-    it('does not show confetti when extension validation fails', async () => {
-      (verifyCredential as jest.Mock).mockResolvedValue({ verified: true });
-      (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: true });
-      (detectExtension as jest.Mock).mockReturnValue('someExtension');
-      (validateExtension as jest.Mock).mockResolvedValue({ valid: false });
-
-      await act(async () => {
-        render(
-          <TestResults
-            credentials={mockBasicCredential}
-            testResults={mockTestResults}
-            setTestResults={mockSetTestResults}
-          />,
-        );
-      });
-
-      expect(confetti).not.toHaveBeenCalled();
+  it('handles extension schema fetch errors with the preserved copy and params', async () => {
+    (detectExtension as jest.Mock).mockReturnValue({
+      core: { type: 'DigitalProductPassport', version: '0.5.0' },
+      extension: { type: 'DigitalLivestockPassport', version: '0.4.0' },
     });
+    (validateExtension as jest.Mock).mockRejectedValue(new Error('fetch failed'));
+    const { toast } = require('sonner');
 
-    it('does not show confetti when verification fails', async () => {
-      (verifyCredential as jest.Mock).mockResolvedValue({ verified: false });
-      (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: true });
-      (detectExtension as jest.Mock).mockReturnValue(undefined);
+    render(<Harness credentials={[makeStored({ id: 'extension-fetch-error' })]} />);
+    await expandInstance();
 
-      await act(async () => {
-        render(
-          <TestResults
-            credentials={mockBasicCredential}
-            testResults={mockTestResults}
-            setTestResults={mockSetTestResults}
-          />,
-        );
-      });
-
-      expect(confetti).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to fetch extension schema. Please try again.');
     });
+    await waitFor(() => {
+      expect(screen.getByTestId('extension-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('Confetti behaviour, gated per (instanceId, runId)', () => {
+  it('shows confetti when all validations pass', async () => {
+    render(<Harness credentials={[makeStored({ id: 'confetti-pass' })]} />);
+
+    await waitFor(() => {
+      expect(confetti).toHaveBeenCalledTimes(1);
+      expect(confetti).toHaveBeenCalledWith(expect.objectContaining(confettiConfig));
+    });
+  });
+
+  it('does not show confetti when VCDM validation fails', async () => {
+    (validateVcdmRules as jest.Mock).mockResolvedValue({ valid: false });
+
+    render(<Harness credentials={[makeStored({ id: 'confetti-vcdm-fail' })]} />);
+
+    // Collapse the group so its rollup icon (a known testid) reflects the single instance's settled
+    // worst status; the rollup shows only while collapsed.
+    await collapseGroup();
+    await waitFor(() => {
+      expect(screen.getByTestId('DigitalProductPassport-status-icon-failure')).toBeInTheDocument();
+    });
+    expect(confetti).not.toHaveBeenCalled();
+  });
+
+  it('does not show confetti when schema validation fails', async () => {
+    (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: false });
+
+    render(<Harness credentials={[makeStored({ id: 'confetti-schema-fail' })]} />);
+
+    await collapseGroup();
+    await waitFor(() => {
+      expect(screen.getByTestId('DigitalProductPassport-status-icon-failure')).toBeInTheDocument();
+    });
+    expect(confetti).not.toHaveBeenCalled();
+  });
+
+  it('does not show confetti when verification fails', async () => {
+    (verifyCredential as jest.Mock).mockResolvedValue({ verified: false });
+
+    render(<Harness credentials={[makeStored({ id: 'confetti-verify-fail' })]} />);
+
+    await collapseGroup();
+    await waitFor(() => {
+      expect(screen.getByTestId('DigitalProductPassport-status-icon-failure')).toBeInTheDocument();
+    });
+    expect(confetti).not.toHaveBeenCalled();
   });
 });

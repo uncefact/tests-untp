@@ -35,11 +35,12 @@ describe('VCDM Schema Validation', () => {
     issuer: 'did:example:123',
   };
 
+  // The coloured VCDM-version pill is gone (#810): VCDM v2 is the only supported version, and the
+  // VCDM Version Detection checklist step already carries this signal, so every case below asserts
+  // it directly instead of the removed pill text/colour.
+
   it('should validate a VCDM v2` credential successfully', () => {
     cy.uploadCredential(validCredential);
-
-    cy.contains('VCDM v2').should('be.visible');
-    cy.checkVCDMVersionColor('DigitalProductPassport', 'green');
 
     cy.expandGroup();
     cy.checkValidationStatus('VCDM Version Detection', 'success');
@@ -49,9 +50,6 @@ describe('VCDM Schema Validation', () => {
   it('should show error for v1 VCDM version', () => {
     cy.uploadCredential(v1VcdmCredential);
 
-    cy.contains('VCDM v1').should('be.visible');
-    cy.checkVCDMVersionColor('DigitalProductPassport', 'red');
-
     cy.expandGroup();
     cy.checkValidationStatus('VCDM Version Detection', 'success');
     cy.checkValidationStatus('VCDM Schema Validation', 'failure');
@@ -60,9 +58,6 @@ describe('VCDM Schema Validation', () => {
   it('should show error for unsupported VCDM version', () => {
     cy.uploadCredential(invalidVcdmVersionCredential);
 
-    cy.contains('Unsupported VCDM version').should('be.visible');
-    cy.checkVCDMVersionColor('DigitalProductPassport', 'red');
-
     cy.expandGroup();
     cy.checkValidationStatus('VCDM Version Detection', 'failure');
   });
@@ -70,10 +65,8 @@ describe('VCDM Schema Validation', () => {
   it('should show validation errors for missing @context', () => {
     cy.uploadCredential(missingContextCredential);
 
-    cy.contains('Unsupported VCDM version').should('be.visible');
-    cy.checkVCDMVersionColor('DigitalProductPassport', 'red');
-
     cy.expandGroup();
+    cy.checkValidationStatus('VCDM Version Detection', 'failure');
     cy.checkValidationStatus('VCDM Schema Validation', 'failure');
 
     cy.openErrorDetails();
@@ -90,10 +83,8 @@ describe('VCDM Schema Validation', () => {
 
     cy.uploadCredential(invalidCredential);
 
-    cy.contains('VCDM v2').should('be.visible');
-    cy.checkVCDMVersionColor('DigitalProductPassport', 'green');
-
     cy.expandGroup();
+    cy.checkValidationStatus('VCDM Version Detection', 'success');
     cy.checkValidationStatus('VCDM Schema Validation', 'failure');
 
     cy.openErrorDetails();
@@ -110,8 +101,8 @@ describe('VCDM Schema Validation', () => {
 
     cy.uploadCredential(validCredential);
 
-    cy.contains('VCDM v2').should('be.visible');
-    cy.checkVCDMVersionColor('DigitalProductPassport', 'green');
+    cy.expandGroup();
+    cy.checkValidationStatus('VCDM Version Detection', 'success');
 
     cy.wait('@schemaFetch');
     cy.get('[data-sonner-toast]').contains('Failed to fetch the VCDM schema').should('exist');
@@ -120,10 +111,8 @@ describe('VCDM Schema Validation', () => {
   it('should show confetti for fully valid credential', () => {
     cy.uploadCredential('cypress/fixtures/credentials-e2e/valid-v2-enveloped-dpp.json');
 
-    cy.contains('VCDM v2').should('be.visible');
-    cy.checkVCDMVersionColor('DigitalProductPassport', 'green');
-
     cy.expandGroup();
+    cy.checkValidationStatus('VCDM Version Detection', 'success');
     cy.checkValidationStatus('VCDM Schema Validation', 'success');
     cy.validateConfetti();
   });

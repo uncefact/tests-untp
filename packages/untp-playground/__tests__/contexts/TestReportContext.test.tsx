@@ -1,30 +1,30 @@
 import { TestReportProvider, useTestReport } from '@/contexts/TestReportContext';
 import { generateReport } from '@/lib/reportService';
 import { downloadJson, downloadHtml } from '@/lib/utils';
-import { Credential, DownloadReportFormat, StoredCredential, TestReport, TestStep } from '@/types';
+import { CredentialReportInput, DownloadReportFormat, TestReport } from '@/types';
 import { act, renderHook } from '@testing-library/react';
 import { toast } from 'sonner';
-import { CredentialType, TestCaseStatus, TestCaseStepId, VCDM_CONTEXT_URLS } from '../../constants';
+import { TestCaseStatus, TestCaseStepId, VCDM_CONTEXT_URLS } from '../../constants';
 
 jest.mock('@/lib/reportService');
 jest.mock('@/lib/utils');
 jest.mock('sonner');
 
-const mockCredentials: Partial<Record<CredentialType, StoredCredential>> = {
-  DigitalProductPassport: {
-    original: {},
-    decoded: {
-      '@context': [VCDM_CONTEXT_URLS.v2],
-      type: ['VerifiableCredential'],
-    } as Credential,
-  },
+const credentialDoc = {
+  '@context': [VCDM_CONTEXT_URLS.v2],
+  type: ['VerifiableCredential', 'DigitalProductPassport'],
 };
 
-const mockTestResults: Partial<Record<CredentialType, TestStep[]>> = {
-  DigitalProductPassport: [
+const terminalCredentialInstance: CredentialReportInput = {
+  credential: { original: credentialDoc, decoded: credentialDoc },
+  steps: [
     { id: TestCaseStepId.PROOF_TYPE, status: TestCaseStatus.SUCCESS, name: 'Test 1' },
     { id: TestCaseStepId.VERIFICATION, status: TestCaseStatus.SUCCESS, name: 'Test 2' },
   ],
+};
+const pendingCredentialInstance: CredentialReportInput = {
+  credential: { original: credentialDoc, decoded: credentialDoc },
+  steps: [{ id: TestCaseStepId.PROOF_TYPE, status: TestCaseStatus.PENDING, name: 'Test 1' }],
 };
 
 const schemeDoc = {
@@ -45,7 +45,7 @@ const pendingSchemeInstance = {
 const mockReport: TestReport = {
   implementation: { name: 'Test Implementation' },
   reportName: 'UNTP',
-  results: [],
+  verifiableCredentials: [],
   date: new Date().toISOString(),
   testSuite: {
     runner: 'UNTP Playground',
@@ -68,9 +68,7 @@ describe('TestReportContext', () => {
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <TestReportProvider testResults={mockTestResults} credentials={mockCredentials}>
-      {children}
-    </TestReportProvider>
+    <TestReportProvider credentialInstances={[terminalCredentialInstance]}>{children}</TestReportProvider>
   );
 
   it('provides initial context values', () => {
@@ -82,21 +80,15 @@ describe('TestReportContext', () => {
     expect(typeof result.current.downloadReport).toBe('function');
   });
 
-  it('allows report generation when all test results are valid', () => {
+  it('allows report generation when every credential instance is terminal', () => {
     const { result } = renderHook(() => useTestReport(), { wrapper });
     expect(result.current.canGenerateReport).toBeTruthy();
   });
 
-  it('prevents report generation when tests are pending', () => {
-    const pendingResults: Partial<Record<CredentialType, TestStep[]>> = {
-      DigitalProductPassport: [{ id: TestCaseStepId.PROOF_TYPE, status: TestCaseStatus.PENDING, name: 'Test 1' }],
-    };
-
+  it('prevents report generation when a credential instance is still pending', () => {
     const { result } = renderHook(() => useTestReport(), {
       wrapper: ({ children }) => (
-        <TestReportProvider testResults={pendingResults} credentials={mockCredentials}>
-          {children}
-        </TestReportProvider>
+        <TestReportProvider credentialInstances={[pendingCredentialInstance]}>{children}</TestReportProvider>
       ),
     });
 
@@ -106,9 +98,7 @@ describe('TestReportContext', () => {
   it('does not allow generation while a scheme instance is still validating', () => {
     const { result } = renderHook(() => useTestReport(), {
       wrapper: ({ children }) => (
-        <TestReportProvider testResults={{}} credentials={{}} schemeInstances={[pendingSchemeInstance]}>
-          {children}
-        </TestReportProvider>
+        <TestReportProvider schemeInstances={[pendingSchemeInstance]}>{children}</TestReportProvider>
       ),
     });
     expect(result.current.canGenerateReport).toBeFalsy();
@@ -117,9 +107,7 @@ describe('TestReportContext', () => {
   it('allows generation when every loaded scheme instance is terminal', () => {
     const { result } = renderHook(() => useTestReport(), {
       wrapper: ({ children }) => (
-        <TestReportProvider testResults={{}} credentials={{}} schemeInstances={[terminalSchemeInstance]}>
-          {children}
-        </TestReportProvider>
+        <TestReportProvider schemeInstances={[terminalSchemeInstance]}>{children}</TestReportProvider>
       ),
     });
     expect(result.current.canGenerateReport).toBeTruthy();
@@ -129,8 +117,7 @@ describe('TestReportContext', () => {
     const { result } = renderHook(() => useTestReport(), {
       wrapper: ({ children }) => (
         <TestReportProvider
-          testResults={mockTestResults}
-          credentials={mockCredentials}
+          credentialInstances={[terminalCredentialInstance]}
           schemeInstances={[pendingSchemeInstance]}
         >
           {children}
@@ -140,14 +127,17 @@ describe('TestReportContext', () => {
     expect(result.current.canGenerateReport).toBeFalsy();
   });
 
+  it('prevents report generation when there are no loaded credentials or schemes', () => {
+    const { result } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => <TestReportProvider>{children}</TestReportProvider>,
+    });
+    expect(result.current.canGenerateReport).toBeFalsy();
+  });
+
   it('invalidates a generated report when the last artefact is removed', async () => {
     let schemes = [terminalSchemeInstance];
     const { result, rerender } = renderHook(() => useTestReport(), {
-      wrapper: ({ children }) => (
-        <TestReportProvider testResults={{}} credentials={{}} schemeInstances={schemes}>
-          {children}
-        </TestReportProvider>
-      ),
+      wrapper: ({ children }) => <TestReportProvider schemeInstances={schemes}>{children}</TestReportProvider>,
     });
 
     await act(async () => {
@@ -173,8 +163,7 @@ describe('TestReportContext', () => {
 
     expect(generateReport).toHaveBeenCalledWith({
       implementationName: 'Test Implementation',
-      credentials: mockCredentials,
-      testResults: mockTestResults,
+      credentialInstances: [terminalCredentialInstance],
       schemeInstances: [],
       passStatuses: [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING],
     });
@@ -268,38 +257,43 @@ describe('TestReportContext', () => {
     expect(downloadJson).not.toHaveBeenCalled();
   });
 
-  it('resets report when credentials change', async () => {
-    const { result, unmount } = renderHook(() => useTestReport(), { wrapper });
+  it('resets report when the loaded credential instances change', async () => {
+    // Rerenders the SAME provider instance with a changed `credentialInstances` prop (mirroring
+    // the scheme-removal test above), so this exercises the reset effect's dependency array
+    // directly: mounting a fresh provider with different instances would pass regardless of
+    // whether `credentialInstances` is actually a dependency of the effect.
+    let credentials = [terminalCredentialInstance];
+    const { result, rerender } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => <TestReportProvider credentialInstances={credentials}>{children}</TestReportProvider>,
+    });
 
     await act(async () => {
       await result.current.generateReport('Test Implementation');
     });
-
     expect(result.current.report).toEqual(mockReport);
 
-    // Unmount to cleanup
-    unmount();
-
-    const newCredentials: Partial<Record<CredentialType, StoredCredential>> = {
-      DigitalProductPassport: {
-        original: { new: true },
-        decoded: {
-          '@context': [VCDM_CONTEXT_URLS.v2],
-          type: ['VerifiableCredential'],
-        } as Credential,
-      },
+    const newCredentialInstance: CredentialReportInput = {
+      credential: { original: { ...credentialDoc, new: true }, decoded: { ...credentialDoc, new: true } },
+      steps: terminalCredentialInstance.steps,
     };
+    credentials = [newCredentialInstance];
+    rerender();
 
-    // Render with new credentials
-    const { result: newResult } = renderHook(() => useTestReport(), {
+    expect(result.current.report).toBeNull();
+  });
+
+  it('prevents report generation for a credential instance with no steps at all', () => {
+    const emptyStepsInstance: CredentialReportInput = {
+      credential: { original: credentialDoc, decoded: credentialDoc },
+      steps: [],
+    };
+    const { result } = renderHook(() => useTestReport(), {
       wrapper: ({ children }) => (
-        <TestReportProvider testResults={mockTestResults} credentials={newCredentials}>
-          {children}
-        </TestReportProvider>
+        <TestReportProvider credentialInstances={[emptyStepsInstance]}>{children}</TestReportProvider>
       ),
     });
 
-    expect(newResult.current.report).toBeNull();
+    expect(result.current.canGenerateReport).toBeFalsy();
   });
 
   it('shows error toast when unsupported report format is selected', async () => {

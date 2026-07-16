@@ -1,9 +1,9 @@
-import { detectVersion } from '@/lib/credentialService';
+import { detectCredentialType, detectVersion } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
-import { StoredCredential, TestStep } from '@/types';
+import { CredentialReportInput } from '@/types';
 import { reportName } from '../../config';
 import { generateReport } from '@/lib/reportService';
-import { CredentialType, TestCaseStatus, TestCaseStepId } from '../../constants';
+import { TestCaseStatus } from '../../constants';
 
 jest.mock('@/lib/credentialService');
 jest.mock('@/lib/schemaValidation');
@@ -14,65 +14,51 @@ jest.mock('../../config', () => ({
 
 describe('generateReport', () => {
   const mockImplementationName = 'Test Implementation';
-  const mockCredentials = {
-    DigitalProductPassport: {
-      original: {
-        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
-        type: 'EnvelopedVerifiableCredential',
-        id: 'data:application/vc+jwt,eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvbnMvY3JlZGVudGlhbHMvdjIiLCJodHRwczovL3d3dy53My5vcmcvbnMvY3JlZGVudGlhbHMvZXhhbXBsZXMvdjIiXSwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIkRpZ2l0YWxQcm9kdWN0UGFzc3BvcnQiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsibXlTdWJqZWN0UHJvcGVydHkiOiJteVN1YmplY3RWYWx1ZSJ9fQ',
-      },
-      decoded: {
-        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
-        type: ['VerifiableCredential', 'DigitalProductPassport'],
-        credentialSubject: {
-          mySubjectProperty: 'mySubjectValue',
-        },
-      },
+
+  const envelopedCredential = {
+    '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+    type: 'EnvelopedVerifiableCredential',
+    id: 'data:application/vc+jwt,eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvbnMvY3JlZGVudGlhbHMvdjIiLCJodHRwczovL3d3dy53My5vcmcvbnMvY3JlZGVudGlhbHMvZXhhbXBsZXMvdjIiXSwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIkRpZ2l0YWxQcm9kdWN0UGFzc3BvcnQiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsibXlTdWJqZWN0UHJvcGVydHkiOiJteVN1YmplY3RWYWx1ZSJ9fQ',
+  };
+  const decodedCredential = {
+    '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
+    type: ['VerifiableCredential', 'DigitalProductPassport'],
+    credentialSubject: {
+      mySubjectProperty: 'mySubjectValue',
     },
   };
-  const mockTestResults: any = {
-    DigitalProductPassport: [
+  const mockCredentialInstance: CredentialReportInput = {
+    credential: { original: envelopedCredential, decoded: decodedCredential },
+    steps: [
       {
-        id: 'proof-type',
+        id: 'proof-type' as any,
         name: 'Proof Type Detection',
-        status: 'success',
-        details: {
-          type: 'enveloping',
-        },
+        status: TestCaseStatus.SUCCESS,
+        details: { type: 'enveloping' },
       },
       {
-        id: 'vcdm-version',
+        id: 'vcdm-version' as any,
         name: 'VCDM Version Detection',
-        status: 'success',
-        details: {
-          version: 'v2',
-        },
+        status: TestCaseStatus.SUCCESS,
+        details: { version: 'v2' },
       },
       {
-        id: 'vcdm-schema-validation',
+        id: 'vcdm-schema-validation' as any,
         name: 'VCDM Schema Validation',
-        status: 'success',
-        details: {
-          valid: true,
-          errors: [],
-        },
+        status: TestCaseStatus.SUCCESS,
+        details: { valid: true, errors: [] },
       },
       {
-        id: 'verification',
+        id: 'verification' as any,
         name: 'Credential Verification',
-        status: 'success',
-        details: {
-          verified: true,
-        },
+        status: TestCaseStatus.SUCCESS,
+        details: { verified: true },
       },
       {
-        id: 'untp-schema-validation',
+        id: 'untp-schema-validation' as any,
         name: 'UNTP Schema Validation',
-        status: 'success',
-        details: {
-          valid: true,
-          errors: [],
-        },
+        status: TestCaseStatus.SUCCESS,
+        details: { valid: true, errors: [] },
       },
     ],
   };
@@ -80,21 +66,20 @@ describe('generateReport', () => {
 
   beforeEach(() => {
     (detectVersion as jest.Mock).mockReturnValue('1.0.0');
-    (detectExtension as jest.Mock).mockReturnValue({
-      core: { version: '1.0.0' },
-      extension: { type: 'extensionType', version: '1.0.0' },
-    });
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    // credentialGroupType (used by generateReport to derive the report's core.type) falls back to
+    // detectCredentialType when there is no extension; credentialService is wholesale-mocked here.
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should generate a report with valid credentials and test results', async () => {
+  it('should generate a report with valid credential instances', async () => {
     const report = await generateReport({
       implementationName: mockImplementationName,
-      credentials: mockCredentials,
-      testResults: mockTestResults,
+      credentialInstances: [mockCredentialInstance],
       passStatuses: mockPassStatuses,
     });
 
@@ -114,70 +99,22 @@ describe('generateReport', () => {
         {
           status: 'success',
           overallStatus: 'success',
-          credential: {
-            '@context': ['https://www.w3.org/ns/credentials/v2', 'https://www.w3.org/ns/credentials/examples/v2'],
-            type: 'EnvelopedVerifiableCredential',
-            id: 'data:application/vc+jwt,eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvbnMvY3JlZGVudGlhbHMvdjIiLCJodHRwczovL3d3dy53My5vcmcvbnMvY3JlZGVudGlhbHMvZXhhbXBsZXMvdjIiXSwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIkRpZ2l0YWxQcm9kdWN0UGFzc3BvcnQiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsibXlTdWJqZWN0UHJvcGVydHkiOiJteVN1YmplY3RWYWx1ZSJ9fQ',
-          },
+          credential: envelopedCredential,
           core: {
             type: 'DigitalProductPassport',
             version: '1.0.0',
-            steps: [
-              {
-                id: 'proof-type',
-                name: 'Proof Type Detection',
-                status: 'success',
-                details: {
-                  type: 'enveloping',
-                },
-              },
-              {
-                id: 'vcdm-version',
-                name: 'VCDM Version Detection',
-                status: 'success',
-                details: {
-                  version: 'v2',
-                },
-              },
-              {
-                id: 'vcdm-schema-validation',
-                name: 'VCDM Schema Validation',
-                status: 'success',
-                details: {
-                  valid: true,
-                  errors: [],
-                },
-              },
-              {
-                id: 'verification',
-                name: 'Credential Verification',
-                status: 'success',
-                details: {
-                  verified: true,
-                },
-              },
-              {
-                id: 'untp-schema-validation',
-                name: 'UNTP Schema Validation',
-                status: 'success',
-                details: {
-                  valid: true,
-                  errors: [],
-                },
-              },
-            ],
+            steps: mockCredentialInstance.steps,
           },
         },
       ],
     });
   });
 
-  it('should throw an error if no valid credentials are provided', async () => {
+  it('should throw an error if no valid credential or scheme instances are provided', async () => {
     await expect(
       generateReport({
         implementationName: mockImplementationName,
-        credentials: {},
-        testResults: {},
+        credentialInstances: [],
         passStatuses: mockPassStatuses,
       }),
     ).rejects.toThrow('No valid credentials or schemes to generate report');
@@ -185,36 +122,32 @@ describe('generateReport', () => {
 
   it('should generate a report with the extension', async () => {
     (detectExtension as jest.Mock).mockReturnValue({
-      core: { version: '1.0.0' },
+      core: { type: 'DigitalProductPassport', version: '1.0.0' },
       extension: { type: 'extensionType', version: '1.0.0' },
     });
 
     const mockConfig = require('../../config');
     mockConfig.reportName = 'AATP';
 
-    const testResults: any = {
-      DigitalProductPassport: [
+    const instance: CredentialReportInput = {
+      credential: { original: envelopedCredential, decoded: decodedCredential },
+      steps: [
         {
-          id: 'extension-schema-validation',
+          id: 'extension-schema-validation' as any,
           name: 'Extension Schema Validation',
-          status: 'success',
-          details: {
-            valid: true,
-            errors: [],
-          },
+          status: TestCaseStatus.SUCCESS,
+          details: { valid: true, errors: [] },
         },
         {
-          id: 'context',
+          id: 'context' as any,
           name: 'JSON-LD Document Expansion and Context Validation',
-          status: 'failure',
+          status: TestCaseStatus.FAILURE,
           details: {
             errors: [
               {
                 keyword: 'const',
-                message:
-                  'Properties "credentialSubject/productImage/linkURL, credentialSubject/productImage/linkName, credentialSubject/producedByParty, credentialSubject/dimensions/weight, credentialSubject/dimensions/length, credentialSubject/dimensions/width, credentialSubject/dimensions/height, credentialSubject/dimensions/volume, credentialSubject/characteristic, credentialSubject/dueDiligenceDeclaration/linkURL, credentialSubject/dueDiligenceDeclaration/linkName, credentialSubject/circularityScorecard/recyclableContent, credentialSubject/circularityScorecard/recycledContent, credentialSubject/circularityScorecard/utilityFactor, credentialSubject/circularityScorecard/materialCircularityIndicator, credentialSubject/circularityScorecard/recyclingInformation, credentialSubject/circularityScorecard/repairInformation, credentialSubject/emissionsScorecard/carbonFootprint, credentialSubject/emissionsScorecard/declaredUnit, credentialSubject/emissionsScorecard/operationalScope, credentialSubject/emissionsScorecard/primarySourcedRatio, credentialSubject/emissionsScorecard/reportingStandard, render" are defined in the credential but missing from the context.',
-                instancePath:
-                  'credentialSubject/productImage/linkURL, credentialSubject/productImage/linkName, credentialSubject/producedByParty, credentialSubject/dimensions/weight, credentialSubject/dimensions/length, credentialSubject/dimensions/width, credentialSubject/dimensions/height, credentialSubject/dimensions/volume, credentialSubject/characteristic, credentialSubject/dueDiligenceDeclaration/linkURL, credentialSubject/dueDiligenceDeclaration/linkName, credentialSubject/circularityScorecard/recyclableContent, credentialSubject/circularityScorecard/recycledContent, credentialSubject/circularityScorecard/utilityFactor, credentialSubject/circularityScorecard/materialCircularityIndicator, credentialSubject/circularityScorecard/recyclingInformation, credentialSubject/circularityScorecard/repairInformation, credentialSubject/emissionsScorecard/carbonFootprint, credentialSubject/emissionsScorecard/declaredUnit, credentialSubject/emissionsScorecard/operationalScope, credentialSubject/emissionsScorecard/primarySourcedRatio, credentialSubject/emissionsScorecard/reportingStandard, render',
+                message: 'Properties are defined in the credential but missing from the context.',
+                instancePath: 'credentialSubject',
               },
             ],
           },
@@ -224,12 +157,16 @@ describe('generateReport', () => {
 
     const report = await generateReport({
       implementationName: mockImplementationName,
-      credentials: mockCredentials,
-      testResults: testResults,
+      credentialInstances: [instance],
       passStatuses: mockPassStatuses,
     });
 
     expect(report.reportName).toBe('AATP');
+    expect(report.verifiableCredentials[0].core.type).toBe('DigitalProductPassport');
+    // The context step failed, so the credential's overall status (and report-level pass flag via
+    // it) must be failure, matching the equivalent assertion on the scheme path below.
+    expect(report.verifiableCredentials[0].status).toBe(TestCaseStatus.FAILURE);
+    expect(report.verifiableCredentials[0].overallStatus).toBe(TestCaseStatus.FAILURE);
     expect(report.verifiableCredentials[0].extension).toEqual({
       type: 'extensionType',
       version: '1.0.0',
@@ -261,17 +198,16 @@ describe('generateReport', () => {
           source: { kind: 'url' as const, url: 'https://example.com/scheme/1.json' },
         },
         steps: [
-          { id: 'scheme-version-detection', name: 'Version Detection', status: TestCaseStatus.SUCCESS },
-          { id: 'scheme-schema-validation', name: 'Schema Validation', status: TestCaseStatus.SUCCESS },
-          { id: 'context', name: 'Context Validation', status: TestCaseStatus.SUCCESS },
+          { id: 'scheme-version-detection' as any, name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+          { id: 'scheme-schema-validation' as any, name: 'Schema Validation', status: TestCaseStatus.SUCCESS },
+          { id: 'context' as any, name: 'Context Validation', status: TestCaseStatus.SUCCESS },
         ],
       },
     ];
 
     const report = await generateReport({
       implementationName: mockImplementationName,
-      credentials: {},
-      testResults: {},
+      credentialInstances: [],
       schemeInstances,
       passStatuses: mockPassStatuses,
     });
@@ -300,17 +236,16 @@ describe('generateReport', () => {
           },
         },
         steps: [
-          { id: 'scheme-version-detection', name: 'Version Detection', status: TestCaseStatus.SUCCESS },
-          { id: 'scheme-schema-validation', name: 'Schema Validation', status: TestCaseStatus.FAILURE },
-          { id: 'context', name: 'Context Validation', status: TestCaseStatus.SUCCESS },
+          { id: 'scheme-version-detection' as any, name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+          { id: 'scheme-schema-validation' as any, name: 'Schema Validation', status: TestCaseStatus.FAILURE },
+          { id: 'context' as any, name: 'Context Validation', status: TestCaseStatus.SUCCESS },
         ],
       },
     ];
 
     const report = await generateReport({
       implementationName: mockImplementationName,
-      credentials: {},
-      testResults: {},
+      credentialInstances: [],
       schemeInstances,
       passStatuses: mockPassStatuses,
     });
@@ -323,8 +258,7 @@ describe('generateReport', () => {
     await expect(
       generateReport({
         implementationName: mockImplementationName,
-        credentials: {},
-        testResults: {},
+        credentialInstances: [],
         schemeInstances: [
           {
             scheme: {
@@ -342,20 +276,47 @@ describe('generateReport', () => {
     ).rejects.toThrow('Cannot generate a report while a scheme is still validating.');
   });
 
-  it('refuses to generate a report while a credential is still validating', async () => {
+  it('refuses to generate a report while a credential instance is still validating', async () => {
     await expect(
       generateReport({
         implementationName: mockImplementationName,
-        credentials: {
-          DigitalProductPassport: {
-            original: {},
-            decoded: { '@context': ['https://www.w3.org/ns/credentials/v2'], type: ['VerifiableCredential'] },
+        credentialInstances: [
+          {
+            credential: {
+              original: {},
+              decoded: { '@context': ['https://www.w3.org/ns/credentials/v2'], type: ['VerifiableCredential'] },
+            },
+            steps: [], // credential loaded but no results yet
           },
-        },
-        testResults: {}, // credential loaded but no results yet
+        ],
         schemeInstances: [],
         passStatuses: mockPassStatuses,
       }),
     ).rejects.toThrow('Cannot generate a report while a credential is still validating.');
+  });
+
+  it('keeps two terminal instances of the same core type as two separate report entries', async () => {
+    const instanceA: CredentialReportInput = {
+      credential: { original: { ...envelopedCredential, id: 'a' }, decoded: { ...decodedCredential, id: 'a' } },
+      steps: mockCredentialInstance.steps,
+    };
+    const instanceB: CredentialReportInput = {
+      credential: { original: { ...envelopedCredential, id: 'b' }, decoded: { ...decodedCredential, id: 'b' } },
+      steps: mockCredentialInstance.steps,
+    };
+
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      credentialInstances: [instanceA, instanceB],
+      passStatuses: mockPassStatuses,
+    });
+
+    // Multi-instance cardinality: two loaded instances of the same core type must produce two
+    // report entries. A regression to a type-keyed structure would collapse them to one.
+    expect(report.verifiableCredentials).toHaveLength(2);
+    expect(report.verifiableCredentials[0].core.type).toBe('DigitalProductPassport');
+    expect(report.verifiableCredentials[1].core.type).toBe('DigitalProductPassport');
+    expect(report.verifiableCredentials[0].credential).toEqual({ ...envelopedCredential, id: 'a' });
+    expect(report.verifiableCredentials[1].credential).toEqual({ ...envelopedCredential, id: 'b' });
   });
 });

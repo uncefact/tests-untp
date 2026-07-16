@@ -2,10 +2,10 @@
 
 import { generateReport } from '@/lib/reportService';
 import { downloadHtml, downloadJson } from '@/lib/utils';
-import { DownloadReportFormat, SchemeReportInput, StoredCredential, TestReport, TestStep } from '@/types';
+import { CredentialReportInput, DownloadReportFormat, SchemeReportInput, TestReport, TestStep } from '@/types';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CredentialType, TestCaseStatus } from '../../constants';
+import { TERMINAL_STATUSES, TestCaseStatus } from '../../constants';
 
 interface TestReportContextType {
   canGenerateReport: boolean;
@@ -17,47 +17,42 @@ interface TestReportContextType {
 
 const TestReportContext = createContext<TestReportContextType | undefined>(undefined);
 
-// A stable empty default so a consumer with no schemes does not churn the report-reset effect.
+// Stable empty defaults so a consumer with no credentials or schemes does not churn the
+// report-reset effect.
+const NO_CREDENTIAL_INSTANCES: CredentialReportInput[] = [];
 const NO_SCHEME_INSTANCES: SchemeReportInput[] = [];
 
 interface TestReportProviderProps {
   children: React.ReactNode;
-  testResults: Partial<Record<CredentialType, TestStep[]>>;
-  credentials: Partial<Record<CredentialType, StoredCredential>>;
+  credentialInstances?: CredentialReportInput[];
   schemeInstances?: SchemeReportInput[];
 }
 
 export function TestReportProvider({
   children,
-  testResults,
-  credentials,
+  credentialInstances = NO_CREDENTIAL_INSTANCES,
   schemeInstances = NO_SCHEME_INSTANCES,
 }: TestReportProviderProps) {
   const [report, setReport] = useState<TestReport | null>(null);
 
-  const allowedStatuses = [TestCaseStatus.SUCCESS, TestCaseStatus.FAILURE, TestCaseStatus.WARNING];
   const passStatuses = [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING];
 
   // Invalidate any generated report whenever the loaded artefacts change, including when the last
   // one is removed, so a stale report cannot be downloaded for artefacts no longer loaded.
   useEffect(() => {
     setReport(null);
-  }, [credentials, schemeInstances]);
+  }, [credentialInstances, schemeInstances]);
 
   // A report needs at least one loaded family, and every loaded family must be fully terminal (a
   // non-empty result whose steps have all settled). A still-validating credential or scheme holds
   // generation rather than being recorded as a spurious pass or failure (ADR-041).
   const isTerminal = (steps: TestStep[] | undefined) =>
-    steps !== undefined && steps.length > 0 && steps.every((step) => allowedStatuses.includes(step.status));
+    steps !== undefined && steps.length > 0 && steps.every((step) => TERMINAL_STATUSES.includes(step.status));
 
-  const hasCredentials = Object.values(credentials).some((cred) => cred && cred.decoded);
+  const hasCredentials = credentialInstances.length > 0;
   const hasSchemes = schemeInstances.length > 0;
 
-  const allCredentialsTerminal = (Object.keys(credentials) as CredentialType[]).every((type) => {
-    const credential = credentials[type];
-    if (!credential || !credential.decoded) return true;
-    return isTerminal(testResults[type]);
-  });
+  const allCredentialsTerminal = credentialInstances.every(({ steps }) => isTerminal(steps));
   const allSchemesTerminal = schemeInstances.every(({ steps }) => isTerminal(steps));
 
   const canGenerateReport =
@@ -71,8 +66,7 @@ export function TestReportProvider({
     try {
       const newReport = await generateReport({
         implementationName,
-        credentials,
-        testResults,
+        credentialInstances,
         schemeInstances,
         passStatuses,
       });
