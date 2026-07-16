@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CREATABLE_DID_TYPES, DidMethod, DidStatus, DidType } from '@uncefact/untp-ri-services';
+import { CREATABLE_DID_TYPES, SUPPORTED_DID_METHODS, DidStatus, DidType } from '@uncefact/untp-ri-services';
 import { idSchema, paginationQuerySchema, requireAtLeastOneField } from './shared';
 
 /**
@@ -10,6 +10,17 @@ import { idSchema, paginationQuerySchema, requireAtLeastOneField } from './share
  * filter by any type including DEFAULT.
  */
 const creatableDidTypeSchema = z.enum(CREATABLE_DID_TYPES);
+
+/**
+ * DID methods this boundary accepts, both for creating a new DID and for
+ * importing an existing one. The full DidMethod enum includes DID_WEB_VH, a
+ * planned member the platform does not implement yet (see SUPPORTED_DID_METHODS'
+ * own doc comment); accepting it here would let an unimplemented method be
+ * stored via import (which has no capability-check call site) even though the
+ * create route's capability check would reject it. Mirrors SUPPORTED_DID_METHODS
+ * from the did-manager service so the code list stays single-source.
+ */
+const supportedDidMethodSchema = z.enum(SUPPORTED_DID_METHODS);
 
 /**
  * Request body for POST /dids. Domain-membership checks against the
@@ -26,7 +37,7 @@ const creatableDidTypeSchema = z.enum(CREATABLE_DID_TYPES);
  */
 export const createDidRequestSchema = z.object({
   type: creatableDidTypeSchema,
-  method: z.nativeEnum(DidMethod),
+  method: supportedDidMethodSchema,
   alias: z.string().min(1),
   name: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
@@ -44,7 +55,7 @@ export const createDidRequestSchema = z.object({
  */
 export const importDidRequestSchema = z.object({
   did: z.string().min(1),
-  method: z.nativeEnum(DidMethod),
+  method: supportedDidMethodSchema,
   keyId: z.string().min(1),
   name: z.string().min(1).optional(),
   description: z.string().min(1).optional(),

@@ -514,17 +514,34 @@ describe('POST /api/v1/dids', () => {
     expect(json.error).toContain('already exists');
   });
 
-  it('returns 400 when service does not support the requested method', async () => {
-    mockDidService.getSupportedMethods.mockReturnValue(['DID_WEB']);
+  it('returns 400 when the resolved service does not support the requested method', async () => {
+    // DID_WEB is the only Zod-valid method (supportedDidMethodSchema), so this exercises the
+    // route's own capability check (assertSupported) against a service whose capabilities
+    // narrow further than the schema-level set, not the Zod boundary itself.
+    mockDidService.getSupportedMethods.mockReturnValue([]);
 
     const req = createFakeRequest({
-      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB_VH, alias: 'test' },
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test' },
     });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('method: must be one of DID_WEB');
+    expect(json.error).toMatch(/^method: must be one of/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for method DID_WEB_VH (planned but not yet implemented)', async () => {
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: 'DID_WEB_VH', alias: 'test' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^method:/);
+    expect(mockResolveDidService).not.toHaveBeenCalled();
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
   it('resolves the DID service with the organisation ID', async () => {

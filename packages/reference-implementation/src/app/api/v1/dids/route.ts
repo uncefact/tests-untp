@@ -52,8 +52,8 @@ function assertSupported<T extends string>(field: string, value: T, supported: r
  *                 description: Type of DID to create (DEFAULT is system-managed and cannot be created via this endpoint)
  *               method:
  *                 type: string
- *                 enum: [DID_WEB, DID_WEB_VH]
- *                 description: DID method to use
+ *                 enum: [DID_WEB]
+ *                 description: DID method to use. did:web is the supported method today; did:webvh is planned but not yet implemented and is rejected.
  *               alias:
  *                 type: string
  *                 minLength: 1

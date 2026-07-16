@@ -25,8 +25,10 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 });
 
 const mockCreateDid = jest.fn();
+const mockGetInstanceByResolution = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   createDid: (...args: unknown[]) => mockCreateDid(...args),
+  getInstanceByResolution: (...args: unknown[]) => mockGetInstanceByResolution(...args),
 }));
 
 // The request schema (request-schemas/did.ts) imports the full set of DID
@@ -72,6 +74,7 @@ describe('POST /api/v1/dids/import', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateDid.mockResolvedValue(MOCK_DID_RECORD);
+    mockGetInstanceByResolution.mockResolvedValue({ id: 'inst-1', tenantId: 'tenant-1' });
   });
 
   it('imports a DID and returns 201', async () => {
@@ -89,6 +92,9 @@ describe('POST /api/v1/dids/import', () => {
 
     expect(res.status).toBe(201);
     expect(body).toEqual(MOCK_DID_RECORD);
+
+    // Verifies the tenant-scoped existence check runs before the write
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-1', 'VC', 'inst-1');
 
     // Verify createDid was called with correct params -- NOT calling adapter
     expect(mockCreateDid).toHaveBeenCalledWith({
@@ -211,10 +217,52 @@ describe('POST /api/v1/dids/import', () => {
     expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when serviceInstanceId does not reference an existing service instance (P2003 mapping)', async () => {
-    // Import has no upfront resolveDidService step, so an invalid FK surfaces via the
-    // repository's P2003 mapping (ValidationError, 400) rather than the 404 that POST
-    // /dids would raise for the same condition (documented asymmetry, ADR-037).
+  it('returns 404 when serviceInstanceId does not resolve for this tenant, and does not call the repository', async () => {
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'nonexistent',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body.error).toContain('nonexistent');
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-1', 'VC', 'nonexistent');
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when serviceInstanceId belongs to a different tenant, checked against the authenticated tenant not a caller-supplied one', async () => {
+    // getInstanceByResolution itself scopes the lookup to the tenantId it is called with (see
+    // service-instance.repository.test.ts's "returns null for explicit ID not accessible"), so
+    // resolving null here for tenant-2 stands in for "the instance exists but belongs to
+    // tenant-1". This asserts the route passes the AUTHENTICATED tenantId from context, since a
+    // route that read a tenantId from the request body instead would defeat the check entirely.
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'inst-owned-by-tenant-1',
+    });
+
+    const res = await POST(req, createContext({ tenantId: 'tenant-2' }));
+
+    expect(res.status).toBe(404);
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-2', 'VC', 'inst-owned-by-tenant-1');
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when serviceInstanceId is deleted in the race window between resolution and the write (P2003 backstop)', async () => {
+    // getInstanceByResolution finds the instance (it existed at check time), but createDid
+    // still rejects via the repository's P2003 mapping, simulating deletion in the narrow
+    // window between the check and the write. The 404 path above covers the common case;
+    // this is the rare backstop the repository mapping exists for.
     const { ValidationError } = jest.requireActual('@/lib/api/validation');
     mockCreateDid.mockRejectedValueOnce(new ValidationError('serviceInstanceId: Service instance not found'));
 
@@ -222,7 +270,7 @@ describe('POST /api/v1/dids/import', () => {
       did: 'did:web:example.com',
       method: 'DID_WEB',
       keyId: 'key-1',
-      serviceInstanceId: 'nonexistent',
+      serviceInstanceId: 'inst-1',
     });
 
     const res = await POST(req, createContext());
@@ -304,6 +352,22 @@ describe('POST /api/v1/dids/import', () => {
       did: 'did:web:example.com',
       keyId: 'key-1',
       method: 'INVALID',
+      serviceInstanceId: 'inst-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^method:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for method DID_WEB_VH (planned but not yet implemented), and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:webvh:example.com',
+      keyId: 'key-1',
+      method: 'DID_WEB_VH',
       serviceInstanceId: 'inst-1',
     });
 

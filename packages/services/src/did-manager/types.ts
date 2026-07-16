@@ -47,6 +47,14 @@ export enum DidStatus {
 /** DID types that can be created via the API (excludes DEFAULT, which is system-managed). */
 export const CREATABLE_DID_TYPES = [DidType.MANAGED, DidType.SELF_MANAGED] as const;
 
+/**
+ * DID methods this platform actually implements today. DID_WEB_VH is a planned
+ * member of DidMethod (see the enum's own doc comment) and joins this list once
+ * did:webvh support lands; until then it must stay excluded here so it is never
+ * accepted or advertised as a supported method.
+ */
+export const SUPPORTED_DID_METHODS = [DidMethod.DID_WEB] as const;
+
 /** DID statuses that are eligible for credential issuance. */
 export const ISSUABLE_DID_STATUSES = [DidStatus.ACTIVE, DidStatus.VERIFIED] as const;
 

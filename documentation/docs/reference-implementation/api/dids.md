@@ -122,7 +122,7 @@ For **self-managed** DIDs created via this endpoint, the VC service still genera
 | Required Field | Description |
 |-----------------|-------------|
 | `type` | `MANAGED` or `SELF_MANAGED` (`DEFAULT` is system-managed and cannot be created via this endpoint) |
-| `method` | DID method. Rejected with a 400 if the resolved DID service does not support it |
+| `method` | `DID_WEB` (the supported method today; `DID_WEB_VH` is planned but not yet implemented and is rejected with a 400) |
 | `alias` | Alias for the DID (e.g. domain for did:web) |
 
 | Optional Field | Description |
@@ -324,16 +324,18 @@ Registers an existing, externally managed DID in the Reference Implementation wi
 
 Use this endpoint when you have a DID that was created outside the Reference Implementation (e.g., in a separate verifiable credential service instance) and you want to use it for credential signing within the Reference Implementation. After importing, use the [verify endpoint](#verify-a-did) to confirm that the DID document is resolvable.
 
-Before importing, the tenant must have registered the verifiable credential service instance that holds the DID via the [Services API](./services#create-a-service-instance). The `serviceInstanceId` is required — this is how the Reference Implementation knows which VC service to use when signing credentials with this DID.
+Before importing, the tenant must have registered the verifiable credential service instance that holds the DID via the [Services API](./services#create-a-service-instance). The `serviceInstanceId` is required — this is how the Reference Implementation knows which VC service to use when signing credentials with this DID. It is verified to belong to the authenticated tenant (or be a system default) before the record is saved; a nonexistent id, or one belonging to another tenant, is rejected with a 404.
 
-Note that unlike the [create endpoint](#create-a-did), the import endpoint does **not** call the upstream VC service. It only creates a local database record.
+Note that unlike the [create endpoint](#create-a-did), the import endpoint does **not** call the upstream VC service. It only verifies the service instance and creates a local database record.
+
+Importing a `did:webvh` identifier is rejected: `method` is restricted to `DID_WEB` until did:webvh support lands, so a webvh DID cannot be imported ahead of that even though the `did` string itself is otherwise accepted without format validation.
 
 | Required Field | Description |
 |-----------------|-------------|
 | `did` | The DID identifier to import (e.g. `did:web:example.com`) |
-| `method` | DID method |
+| `method` | `DID_WEB` (the supported method today; `DID_WEB_VH` is planned but not yet implemented and is rejected with a 400) |
 | `keyId` | Key identifier associated with the DID |
-| `serviceInstanceId` | Verifiable credential service instance that holds the key material for this DID |
+| `serviceInstanceId` | Verifiable credential service instance that holds the key material for this DID. Must belong to the authenticated tenant or be a system default; otherwise rejected with a 404 |
 
 | Optional Field | Description |
 |-----------------|-------------|
@@ -348,6 +350,10 @@ sequenceDiagram
 
     Client->>RI: POST /api/v1/dids/import { did, method, keyId, serviceInstanceId }
     RI->>RI: Validate did, method, keyId, serviceInstanceId
+    RI->>DB: Verify serviceInstanceId belongs to this tenant (or is a system default)
+    alt not found or belongs to another tenant
+        RI-->>Client: 404 Not Found
+    end
     RI->>DB: Save DID record (type: SELF_MANAGED, status: UNVERIFIED)
     DB-->>RI: Created record
     RI-->>Client: 201 Created (DID)
