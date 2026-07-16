@@ -299,6 +299,52 @@ describe('Tabbed artefact surface (#809)', () => {
     expect(screen.getByTestId('mock-scheme-test-results')).toBeInTheDocument();
   });
 
+  it('loads two distinct schemes as separate instances instead of overwriting', async () => {
+    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
+    // Identity is the content hash, so each upload must carry distinct content to be a new instance.
+    let marker = 0;
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any) => void }) => (
+        <button
+          data-testid='mock-uploader'
+          onClick={() => onArtefactUpload({ verifiableCredential: { type: ['ConformityScheme'], marker: marker++ } })}
+        >
+          Upload
+        </button>
+      ),
+    );
+    render(<Home />);
+
+    const uploader = screen.getByTestId('mock-uploader');
+    fireEvent.click(uploader);
+    fireEvent.click(uploader);
+
+    // The Conformity Schemes tab count reflects the number of loaded instances, not a single slot.
+    expect(await screen.findByRole('tab', { name: /Conformity Schemes\s*2/ })).toBeInTheDocument();
+  });
+
+  it('replaces in place when the same scheme content is uploaded twice', async () => {
+    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
+    // Identical content each click -> same content hash -> the second upload replaces the first.
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any) => void }) => (
+        <button
+          data-testid='mock-uploader'
+          onClick={() => onArtefactUpload({ verifiableCredential: { type: ['ConformityScheme'] } })}
+        >
+          Upload
+        </button>
+      ),
+    );
+    render(<Home />);
+
+    const uploader = screen.getByTestId('mock-uploader');
+    fireEvent.click(uploader);
+    fireEvent.click(uploader);
+
+    expect(await screen.findByRole('tab', { name: /Conformity Schemes\s*1/ })).toBeInTheDocument();
+  });
+
   it('shows the credentials empty state when no credential is loaded', () => {
     render(<Home />);
 

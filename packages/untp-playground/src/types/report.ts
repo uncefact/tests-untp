@@ -1,8 +1,14 @@
 import { SchemeType, TestCaseStatus } from '../../constants';
 import { EXTENSION_VERSIONS } from '../lib/schemaValidation';
-import { ArtefactSource, Credential } from './credential';
+import { ArtefactSource, Credential, StoredScheme } from './credential';
 import { TestStep } from './test';
 import { PermittedCredentialType } from './untp';
+
+/** One loaded scheme instance and its pipeline result, as the report consumes it (ADR-041). */
+export interface SchemeReportInput {
+  scheme: StoredScheme;
+  steps: TestStep[];
+}
 
 export interface TestReport {
   date: string;

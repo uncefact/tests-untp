@@ -2,10 +2,10 @@
 
 import { generateReport } from '@/lib/reportService';
 import { downloadHtml, downloadJson } from '@/lib/utils';
-import { DownloadReportFormat, StoredCredential, StoredScheme, TestReport, TestStep } from '@/types';
+import { DownloadReportFormat, SchemeReportInput, StoredCredential, TestReport, TestStep } from '@/types';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CredentialType, SchemeType, TestCaseStatus } from '../../constants';
+import { CredentialType, TestCaseStatus } from '../../constants';
 
 interface TestReportContextType {
   canGenerateReport: boolean;
@@ -17,62 +17,53 @@ interface TestReportContextType {
 
 const TestReportContext = createContext<TestReportContextType | undefined>(undefined);
 
+// A stable empty default so a consumer with no schemes does not churn the report-reset effect.
+const NO_SCHEME_INSTANCES: SchemeReportInput[] = [];
+
 interface TestReportProviderProps {
   children: React.ReactNode;
   testResults: Partial<Record<CredentialType, TestStep[]>>;
   credentials: Partial<Record<CredentialType, StoredCredential>>;
-  schemes?: Partial<Record<SchemeType, StoredScheme>>;
-  schemeTestResults?: Partial<Record<SchemeType, TestStep[]>>;
+  schemeInstances?: SchemeReportInput[];
 }
 
 export function TestReportProvider({
   children,
   testResults,
   credentials,
-  schemes,
-  schemeTestResults,
+  schemeInstances = NO_SCHEME_INSTANCES,
 }: TestReportProviderProps) {
   const [report, setReport] = useState<TestReport | null>(null);
 
   const allowedStatuses = [TestCaseStatus.SUCCESS, TestCaseStatus.FAILURE, TestCaseStatus.WARNING];
   const passStatuses = [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING];
 
-  // Reset report when the uploaded artefacts change
+  // Invalidate any generated report whenever the loaded artefacts change, including when the last
+  // one is removed, so a stale report cannot be downloaded for artefacts no longer loaded.
   useEffect(() => {
-    const hasAnyCredential = Object.values(credentials).some((cred) => cred && cred.decoded);
-    const hasAnyScheme = Object.values(schemes ?? {}).some((scheme) => scheme && scheme.decoded);
-    if (hasAnyCredential || hasAnyScheme) {
-      setReport(null);
-    }
-  }, [credentials, schemes]);
+    setReport(null);
+  }, [credentials, schemeInstances]);
 
-  const credentialReportable =
-    Object.entries(testResults).every(([type, steps]) => {
-      if (!steps) return true;
-      const credential = credentials[type as CredentialType];
-      if (!credential || !credential.decoded) return true;
-      return steps.every((step) => allowedStatuses.includes(step.status));
-    }) &&
-    Object.entries(testResults).some(([type, steps]) => {
-      const credential = credentials[type as CredentialType];
-      return credential && credential.decoded && steps && steps.every((step) => allowedStatuses.includes(step.status));
-    });
+  // A report needs at least one loaded family, and every loaded family must be fully terminal (a
+  // non-empty result whose steps have all settled). A still-validating credential or scheme holds
+  // generation rather than being recorded as a spurious pass or failure (ADR-041).
+  const isTerminal = (steps: TestStep[] | undefined) =>
+    steps !== undefined && steps.length > 0 && steps.every((step) => allowedStatuses.includes(step.status));
 
-  const schemeReportable =
-    schemes !== undefined &&
-    schemeTestResults !== undefined &&
-    Object.entries(schemeTestResults).every(([type, steps]) => {
-      if (!steps) return true;
-      const scheme = schemes[type as SchemeType];
-      if (!scheme || !scheme.decoded) return true;
-      return steps.every((step) => allowedStatuses.includes(step.status));
-    }) &&
-    Object.entries(schemeTestResults).some(([type, steps]) => {
-      const scheme = schemes[type as SchemeType];
-      return scheme && scheme.decoded && steps && steps.every((step) => allowedStatuses.includes(step.status));
-    });
+  const hasCredentials = Object.values(credentials).some((cred) => cred && cred.decoded);
+  const hasSchemes = schemeInstances.length > 0;
 
-  const canGenerateReport = credentialReportable || schemeReportable;
+  const allCredentialsTerminal = (Object.keys(credentials) as CredentialType[]).every((type) => {
+    const credential = credentials[type];
+    if (!credential || !credential.decoded) return true;
+    return isTerminal(testResults[type]);
+  });
+  const allSchemesTerminal = schemeInstances.every(({ steps }) => isTerminal(steps));
+
+  const canGenerateReport =
+    (hasCredentials || hasSchemes) &&
+    (!hasCredentials || allCredentialsTerminal) &&
+    (!hasSchemes || allSchemesTerminal);
 
   const canDownloadReport = report !== null;
 
@@ -82,8 +73,7 @@ export function TestReportProvider({
         implementationName,
         credentials,
         testResults,
-        schemes,
-        schemeTestResults,
+        schemeInstances,
         passStatuses,
       });
 

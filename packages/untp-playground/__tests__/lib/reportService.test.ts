@@ -248,32 +248,31 @@ describe('generateReport', () => {
   });
 
   it('includes scheme results, top-level metadata, and source when a scheme is provided', async () => {
-    const schemes = {
-      ConformityScheme: {
-        original: {},
-        decoded: {
-          '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
-          type: ['ConformityScheme'],
-          id: 'https://example.com/scheme/1',
-          name: 'Sample Scheme',
+    const schemeInstances = [
+      {
+        scheme: {
+          original: {},
+          decoded: {
+            '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+            type: ['ConformityScheme'],
+            id: 'https://example.com/scheme/1',
+            name: 'Sample Scheme',
+          },
+          source: { kind: 'url' as const, url: 'https://example.com/scheme/1.json' },
         },
-        source: { kind: 'url' as const, url: 'https://example.com/scheme/1.json' },
+        steps: [
+          { id: 'scheme-version-detection', name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+          { id: 'scheme-schema-validation', name: 'Schema Validation', status: TestCaseStatus.SUCCESS },
+          { id: 'context', name: 'Context Validation', status: TestCaseStatus.SUCCESS },
+        ],
       },
-    };
-    const schemeTestResults = {
-      ConformityScheme: [
-        { id: 'scheme-version-detection', name: 'Version Detection', status: TestCaseStatus.SUCCESS },
-        { id: 'scheme-schema-validation', name: 'Schema Validation', status: TestCaseStatus.SUCCESS },
-        { id: 'context', name: 'Context Validation', status: TestCaseStatus.SUCCESS },
-      ],
-    };
+    ];
 
     const report = await generateReport({
       implementationName: mockImplementationName,
       credentials: {},
       testResults: {},
-      schemes,
-      schemeTestResults,
+      schemeInstances,
       passStatuses: mockPassStatuses,
     });
 
@@ -291,33 +290,72 @@ describe('generateReport', () => {
   });
 
   it('marks the report as failed when any scheme step fails', async () => {
-    const schemes = {
-      ConformityScheme: {
-        original: {},
-        decoded: {
-          '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
-          type: ['ConformityScheme'],
+    const schemeInstances = [
+      {
+        scheme: {
+          original: {},
+          decoded: {
+            '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+            type: ['ConformityScheme'],
+          },
         },
+        steps: [
+          { id: 'scheme-version-detection', name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+          { id: 'scheme-schema-validation', name: 'Schema Validation', status: TestCaseStatus.FAILURE },
+          { id: 'context', name: 'Context Validation', status: TestCaseStatus.SUCCESS },
+        ],
       },
-    };
-    const schemeTestResults = {
-      ConformityScheme: [
-        { id: 'scheme-version-detection', name: 'Version Detection', status: TestCaseStatus.SUCCESS },
-        { id: 'scheme-schema-validation', name: 'Schema Validation', status: TestCaseStatus.FAILURE },
-        { id: 'context', name: 'Context Validation', status: TestCaseStatus.SUCCESS },
-      ],
-    };
+    ];
 
     const report = await generateReport({
       implementationName: mockImplementationName,
       credentials: {},
       testResults: {},
-      schemes,
-      schemeTestResults,
+      schemeInstances,
       passStatuses: mockPassStatuses,
     });
 
     expect(report.pass).toBe(false);
     expect(report.conformitySchemeResults?.[0].status).toBe(TestCaseStatus.FAILURE);
+  });
+
+  it('refuses to generate a report while a scheme instance is still validating', async () => {
+    await expect(
+      generateReport({
+        implementationName: mockImplementationName,
+        credentials: {},
+        testResults: {},
+        schemeInstances: [
+          {
+            scheme: {
+              original: {},
+              decoded: {
+                '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+                type: ['ConformityScheme'],
+              },
+            },
+            steps: [], // no settled steps yet
+          },
+        ],
+        passStatuses: mockPassStatuses,
+      }),
+    ).rejects.toThrow('Cannot generate a report while a scheme is still validating.');
+  });
+
+  it('refuses to generate a report while a credential is still validating', async () => {
+    await expect(
+      generateReport({
+        implementationName: mockImplementationName,
+        credentials: {
+          DigitalProductPassport: {
+            original: {},
+            decoded: { '@context': ['https://www.w3.org/ns/credentials/v2'], type: ['VerifiableCredential'] },
+          },
+        },
+        testResults: {}, // credential loaded but no results yet
+        schemeInstances: [],
+        passStatuses: mockPassStatuses,
+      }),
+    ).rejects.toThrow('Cannot generate a report while a credential is still validating.');
   });
 });
