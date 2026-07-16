@@ -19,7 +19,7 @@ Optional request fields (`name`, `description`, `isDefault`, `serviceInstanceId`
 
 ### DID Types
 
-Every DID has a **type** that determines how it was created, who manages its key material, and who hosts its DID document. The types represent an [adoption ramp](../overview#incremental-adoption): tenants can issue UNTP-compliant credentials from day one using the system default, and progressively take on more control as they become more technically sophisticated.
+Every DID has a **type** that determines how it was created, who manages its key material, and who hosts its DID document. The types represent an [adoption ramp](../overview#incremental-adoption): tenants can issue UNTP-compliant credentials from day one using the system default DID, and progressively take on more control as they become more technically sophisticated.
 
 #### `DEFAULT`
 
@@ -97,7 +97,7 @@ DIDs exist at two levels: the **system default DID** (created during [startup](.
 
 ### Service Instance Association
 
-When creating a DID, you can specify which [verifiable credential service instance](./services) to use via `serviceInstanceId`. If omitted, the service instance is resolved using the same [resolution chain](../services/service-architecture#system-services-vs-tenant-services) as other operations: the tenant's [primary](./services#primary-instances) VC service instance if one is set, otherwise the system default.
+When creating a DID, you can specify which [verifiable credential service instance](./services) to use via `serviceInstanceId`. If omitted, the service instance is resolved using the same [resolution chain](../services/service-architecture#system-services-vs-tenant-services) as other operations: the tenant's [primary](./services#primary-instances) VC service instance if one is set, otherwise the system default verifiable credential service.
 
 The service instance is the upstream provider that holds the cryptographic key material and performs signing operations. In most cases a DID is bound to the verifiable credential service instance that holds its key material, a binding fixed when the DID is created or imported. That binding can be lost if the service instance is later [force-deleted](./services#delete-a-service-instance), which leaves the DID without an associated service instance.
 
@@ -324,7 +324,7 @@ Registers an existing, externally managed DID in the Reference Implementation wi
 
 Use this endpoint when you have a DID that was created outside the Reference Implementation (e.g., in a separate verifiable credential service instance) and you want to use it for credential signing within the Reference Implementation. After importing, use the [verify endpoint](#verify-a-did) to confirm that the DID document is resolvable.
 
-Before importing, the tenant must have registered the verifiable credential service instance that holds the DID via the [Services API](./services#create-a-service-instance). The `serviceInstanceId` is required; this is how the Reference Implementation knows which VC service to use when signing credentials with this DID. It is verified to belong to the authenticated tenant (or be a system default) before the record is saved; a nonexistent id, or one belonging to another tenant, is rejected with a 404.
+Before importing, the tenant must have registered the verifiable credential service instance that holds the DID via the [Services API](./services#create-a-service-instance). The `serviceInstanceId` is required; this is how the Reference Implementation knows which VC service to use when signing credentials with this DID. It is verified to belong to the authenticated tenant (or be the system default verifiable credential service) before the record is saved; a nonexistent id, or one belonging to another tenant, is rejected with a 404.
 
 Note that unlike the [create endpoint](#create-a-did), the import endpoint does **not** call the upstream VC service. It only verifies the service instance and creates a local database record.
 
@@ -334,8 +334,8 @@ Importing a `did:webvh` identifier is rejected because `method` is restricted to
 |-----------------|-------------|
 | `did` | The DID identifier to import (e.g. `did:web:example.com`) |
 | `method` | `DID_WEB` (the supported method today; `DID_WEB_VH` is planned but not yet implemented and is rejected with a 400) |
-| `keyId` | Key identifier associated with the DID |
-| `serviceInstanceId` | Verifiable credential service instance that holds the key material for this DID. Must belong to the authenticated tenant or be a system default; otherwise rejected with a 404 |
+| `keyId` | The identifier of the specific key to use for signing with this DID. A DID can control more than one key, so the key is named explicitly rather than inferred |
+| `serviceInstanceId` | Verifiable credential service instance that holds the key material for this DID. Must belong to the authenticated tenant or be the system default verifiable credential service; otherwise rejected with a 404 |
 
 | Optional Field | Description |
 |-----------------|-------------|
@@ -350,7 +350,7 @@ sequenceDiagram
 
     Client->>RI: POST /api/v1/dids/import { did, method, keyId, serviceInstanceId }
     RI->>RI: Validate did, method, keyId, serviceInstanceId
-    RI->>DB: Verify serviceInstanceId belongs to this tenant (or is a system default)
+    RI->>DB: Verify serviceInstanceId belongs to this tenant (or is the system default verifiable credential service)
     alt not found or belongs to another tenant
         RI-->>Client: 404 Not Found
     end
