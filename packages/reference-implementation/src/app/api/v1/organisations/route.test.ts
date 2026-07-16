@@ -268,6 +268,23 @@ describe('POST /api/v1/organisations', () => {
     expect(mockCreateOrganisations).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when secondaryIdentifierIds contains a duplicate in-request identifier and does not call the repository', async () => {
+    // organisationSecondaryIdentifier.createMany runs without skipDuplicates,
+    // so an in-request duplicate hits the composite primary key and surfaces
+    // as the concurrent-link 409, a misleading response for what is a client
+    // typo; catching it here (shape-level, boundary self-consistency) keeps
+    // it a 400 naming the field instead.
+    const req = createFakeRequest({
+      body: [{ name: 'Acme Corp', secondaryIdentifierIds: ['ident-1', 'ident-1'] }],
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('0.secondaryIdentifierIds: must not contain duplicate identifiers');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for invalid JSON body and does not call the repository', async () => {
     const req = createBadJsonRequest();
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);

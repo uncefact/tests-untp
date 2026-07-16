@@ -49,7 +49,7 @@ const logger = apiLogger.child({ route: '/api/v1/organisations' });
  *                   items:
  *                     type: string
  *                     minLength: 1
- *                   description: IDs of secondary identifiers
+ *                   description: IDs of secondary identifiers. Must not contain duplicates.
  *     responses:
  *       201:
  *         description: Organisations created successfully

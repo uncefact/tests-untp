@@ -42,7 +42,7 @@ Organisations are scoped to the authenticated tenant. Each tenant manages its ow
 POST /api/v1/organisations
 ```
 
-Creates one or more organisations in bulk. The request body must be a non-empty array of organisation objects — each must include a non-empty `name`. Optional fields include `description` (non-empty if provided), `location`, `primaryIdentifierId`, and `secondaryIdentifierIds` (each entry must be a non-empty identifier ID). Unknown keys on any item are ignored.
+Creates one or more organisations in bulk. The request body must be a non-empty array of organisation objects — each must include a non-empty `name`. Optional fields include `description` (non-empty if provided), `location`, `primaryIdentifierId`, and `secondaryIdentifierIds` (each entry must be a non-empty identifier ID, and the array must not contain duplicates). Unknown keys on any item are ignored.
 
 ```mermaid
 sequenceDiagram
@@ -105,7 +105,7 @@ Updates one or more fields of an existing organisation. At least one recognised 
 | `description` | Free-text description (must be non-empty if provided; set to `null` to clear) |
 | `location` | Any JSON object is accepted; the UNTP location field shapes (see [Location](../master-data/#location)) are not currently validated |
 | `primaryIdentifierId` | ID of the primary identifier (set to `null` to clear) |
-| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing; an empty array clears all secondary identifiers) |
+| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing; an empty array clears all secondary identifiers; the array must not contain duplicates) |
 
 ---
 

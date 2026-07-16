@@ -281,6 +281,23 @@ describe('PATCH /api/v1/organisations/:id', () => {
     expect(mockUpdateOrganisation).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when secondaryIdentifierIds contains a duplicate in-request identifier and does not call the repository', async () => {
+    // Same boundary self-consistency check as the create route: an
+    // in-request duplicate would otherwise reach
+    // organisationSecondaryIdentifier.createMany (no skipDuplicates) and
+    // surface as the misleading concurrent-link 409 for a client typo.
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { secondaryIdentifierIds: ['ident-1', 'ident-1'] },
+    });
+    const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('secondaryIdentifierIds: must not contain duplicate identifiers');
+    expect(mockUpdateOrganisation).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for a literal null body and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: null });
     const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);

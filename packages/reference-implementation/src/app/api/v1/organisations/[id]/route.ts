@@ -111,7 +111,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 items:
  *                   type: string
  *                   minLength: 1
- *                 description: IDs of secondary identifiers (replaces the existing set; an empty array clears all secondary identifiers)
+ *                 description: IDs of secondary identifiers (replaces the existing set; an empty array clears all secondary identifiers). Must not contain duplicates.
  *             anyOf:
  *               - required: [name]
  *               - required: [description]

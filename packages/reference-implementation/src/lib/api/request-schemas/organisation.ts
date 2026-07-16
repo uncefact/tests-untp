@@ -10,18 +10,20 @@ import { idSchema, locationSchema, nonEmptyArraySchema, paginationQuerySchema, r
  *
  * `location` is an open JSON object (a UNTP-shaped location schema is a
  * separate deferred design tracked in #804) but is not nullable: the
- * generated Prisma client types every create/update `location` argument as
- * `NullableJsonNullValueInput | InputJsonValue`, which excludes a plain
- * `null` (clearing a Json column requires the `Prisma.DbNull`/`Prisma.JsonNull`
- * sentinels), so a literal `null` here would reach Prisma's runtime argument
- * validation and surface as a 500 rather than a 400.
+ * generated Prisma client's input types exclude a plain `null` for Json
+ * writes (the `Prisma.DbNull`/`Prisma.JsonNull` sentinels are the supported
+ * null writes), and location's clear mechanism is deliberately deferred to
+ * #804, so a literal `null` here is a 400.
  */
 const organisationItemSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1).optional(),
   location: locationSchema.optional(),
   primaryIdentifierId: idSchema.optional(),
-  secondaryIdentifierIds: z.array(idSchema).optional(),
+  secondaryIdentifierIds: z
+    .array(idSchema)
+    .refine((val) => new Set(val).size === val.length, { message: 'must not contain duplicate identifiers' })
+    .optional(),
 });
 
 /** Request body for POST /organisations: a non-empty array of organisation items. */
@@ -41,7 +43,10 @@ export const updateOrganisationRequestSchema = requireAtLeastOneField(
     description: z.string().min(1).nullable().optional(),
     location: locationSchema.optional(),
     primaryIdentifierId: idSchema.nullable().optional(),
-    secondaryIdentifierIds: z.array(idSchema).optional(),
+    secondaryIdentifierIds: z
+      .array(idSchema)
+      .refine((val) => new Set(val).size === val.length, { message: 'must not contain duplicate identifiers' })
+      .optional(),
   }),
   'At least one updatable field must be provided',
 );
