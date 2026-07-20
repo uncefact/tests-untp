@@ -129,7 +129,7 @@ The version.json file serves as a central metadata file to define the versioning
    - Special Case: For cherry-picking specific commits, create the branch from the last release commit on `next` and cherry-pick the required commits from `next`.
 3. Update version numbers in package.json and version.json as per Versioning Strategy.
 4. Run tests (unit, integration, and end-to-end) and ensure they all pass.
-5. Build the Docker image of every service that declares a `build:` section from a cold cache and ensure every build completes:
+5. Build the Docker images for all services that declare a `build:` section from a cold cache and ensure every build completes:
    ```bash
    docker compose build --pull --no-cache
    ```
