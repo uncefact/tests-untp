@@ -1,5 +1,5 @@
 # Setup the environment
-FROM node:22-alpine
+FROM node:22.22.2-alpine
 RUN corepack enable
 
 WORKDIR /app
