@@ -129,17 +129,22 @@ The version.json file serves as a central metadata file to define the versioning
    - Special Case: For cherry-picking specific commits, create the branch from the last release commit on `next` and cherry-pick the required commits from `next`.
 3. Update version numbers in package.json and version.json as per Versioning Strategy.
 4. Run tests (unit, integration, and end-to-end) and ensure they all pass.
-5. Update documentation (e.g., Swagger, README, or user guides).
-6. Generate the version mapping documentation:
+5. Build the Docker image of every service that declares a `build:` section from a cold cache and ensure every build completes:
+   ```bash
+   docker compose build --pull --no-cache
+   ```
+   Cached layers and change-triggered CI cannot surface drift in floating build inputs (base image tags, toolchain defaults), so a fresh build is the only check that exercises them.
+6. Update documentation (e.g., Swagger, README, or user guides).
+7. Generate the version mapping documentation:
    ```bash
    pnpm generate-version-mapping
    ```
-7. Generate the documentation for the new version using the release script:
+8. Generate the documentation for the new version using the release script:
    ```bash
    # Run the release script
    pnpm release:doc
    ```
-8. Update the affected packages' CHANGELOG.md (and RELEASE_NOTES.md where applicable) manually before tagging.
+9. Update the affected packages' CHANGELOG.md (and RELEASE_NOTES.md where applicable) manually before tagging.
 
 **2. Release Steps**
 
