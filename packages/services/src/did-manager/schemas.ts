@@ -14,23 +14,32 @@
 
 import { z } from 'zod';
 
+import { DidMethod, DidStatus, DidType } from './types.js';
+
 // ============================================================================
 // API response schemas (Swagger / OpenAPI)
 // ============================================================================
 
 /**
  * DID record as returned by the REST API.
+ *
+ * The enum-valued fields derive from the DidType / DidMethod / DidStatus
+ * enums rather than restating their members as string literals, so a member
+ * added to one of those enums cannot leave this published contract behind.
+ *
+ * `method` is deliberately the full DidMethod enum and not the narrower
+ * SUPPORTED_DID_METHODS the write boundary accepts: the stored column is the
+ * database's own DidMethod enum, so a record written before a method left the
+ * supported set still reads back, and the response contract has to admit it.
  */
 export const didResponseSchema = z.object({
   id: z.string().describe('Database ID of the DID record'),
   did: z.string().describe('The DID identifier (e.g., did:web:example.com)'),
-  type: z.enum(['DEFAULT', 'MANAGED', 'SELF_MANAGED']).describe('Type of DID'),
-  method: z.enum(['DID_WEB', 'DID_WEB_VH']).describe('DID method'),
+  type: z.nativeEnum(DidType).describe('Type of DID'),
+  method: z.nativeEnum(DidMethod).describe('DID method'),
   name: z.string().describe('Human-readable name'),
   description: z.string().nullable().describe('Description of the DID'),
-  status: z
-    .enum(['ACTIVE', 'INACTIVE', 'VERIFIED', 'UNVERIFIED', 'VERIFICATION_FAILED'])
-    .describe('Current status of the DID'),
+  status: z.nativeEnum(DidStatus).describe('Current status of the DID'),
   keyId: z.string().describe('Key identifier associated with the DID'),
   tenantId: z.string().describe('ID of the owning tenant'),
   serviceInstanceId: z.string().nullable().describe('ID of the service instance used to manage this DID'),
