@@ -22,7 +22,13 @@ const jestConfig = {
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
     '^@uncefact/untp-utils/conformity-vocabulary$': '<rootDir>/../untp-utils/build/conformity-vocabulary/index.js',
     '^@uncefact/untp-utils$': '<rootDir>/../untp-utils/build/index.js',
-    '(.+)\\.js': '$1',
+    // Strips the `.js` extension this package's ESM-style relative imports
+    // use (e.g. `./utils/validate-public-url.js`) so Jest's CJS resolver
+    // finds the `.ts` source. Anchored to relative-path specifiers only: an
+    // unanchored pattern also matches bare package specifiers that happen to
+    // end in `.js` (e.g. the `ipaddr.js` npm package), mangling them into an
+    // unresolvable module name.
+    '^(\\.{1,2}/.+)\\.js$': '$1',
   },
   extensionsToTreatAsEsm: ['.ts'],
 };
