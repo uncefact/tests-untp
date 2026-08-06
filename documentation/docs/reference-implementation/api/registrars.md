@@ -95,7 +95,7 @@ Returns registrars for the authenticated tenant, **including system defaults**. 
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | integer | Defaults to 20, or the configured maximum when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ```mermaid
@@ -135,7 +135,7 @@ Updates one or more fields of an existing registrar. At least one updatable fiel
 |-----------------|-------------|
 | `name` | Registrar name (non-empty and not only whitespace if provided; an explicit `null` is rejected with a 400) |
 | `namespace` | Namespace grouping key (non-empty and not only whitespace if provided; an explicit `null` is rejected with a 400) |
-| `url` | A valid public http(s) URL for the registrar's website. Rejected with a 400 if provided and not a valid, public http(s) URL, if it carries leading or trailing whitespace, or if it is an explicit `null` (`url` has no clear semantic) |
+| `url` | A valid public http(s) URL for the registrar's website. Rejected with a 400 if provided and not a valid, public http(s) URL, if it carries leading or trailing whitespace, or if it is an explicit `null` (unlike `idrServiceInstanceId`, `url` cannot be cleared through this API) |
 | `idrServiceInstanceId` | IDR service instance ID (set to `null` to clear the linkage). A new ID must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404 |
 
 ```mermaid
