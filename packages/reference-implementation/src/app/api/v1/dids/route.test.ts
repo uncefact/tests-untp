@@ -27,6 +27,15 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   };
 });
 
+// The route's logger is bound once at module scope, so `warn` is held in a
+// hoisted mock rather than created fresh per child() call: the root-DID guard's
+// disabled-by-bad-config path has no response-visible effect, and this warning
+// is the only place that behaviour surfaces.
+const mockLoggerWarn = jest.fn();
+jest.mock('@/lib/api/logger', () => ({
+  apiLogger: { child: () => ({ info: jest.fn(), warn: mockLoggerWarn, error: jest.fn() }) },
+}));
+
 const mockResolveDidService = jest.fn();
 const mockCreateDid = jest.fn();
 const mockListDids = jest.fn();
@@ -80,13 +89,21 @@ const AUTH_CONTEXT = { tenantId: 'org-1', params: Promise.resolve({}) };
 describe('POST /api/v1/dids', () => {
   const mockDidService = {
     create: jest.fn(),
-    normaliseAlias: jest.fn().mockImplementation((alias: string) => alias),
-    getSupportedTypes: jest.fn().mockReturnValue(['MANAGED', 'SELF_MANAGED']),
-    getSupportedMethods: jest.fn().mockReturnValue(['DID_WEB']),
+    normaliseAlias: jest.fn(),
+    getSupportedTypes: jest.fn(),
+    getSupportedMethods: jest.fn(),
   };
 
+  // The service-capability defaults are re-applied per test rather than set once
+  // where mockDidService is declared: jest.clearAllMocks() clears recorded calls
+  // but leaves implementations in place, so a test that narrows one (the
+  // unsupported-type test) or makes one throw (the alias-normalisation test)
+  // would otherwise keep that behaviour for every test declared after it.
   beforeEach(() => {
     jest.clearAllMocks();
+    mockDidService.normaliseAlias.mockImplementation((alias: string) => alias);
+    mockDidService.getSupportedTypes.mockReturnValue(['MANAGED', 'SELF_MANAGED']);
+    mockDidService.getSupportedMethods.mockReturnValue(['DID_WEB']);
     mockResolveDidService.mockResolvedValue({ service: mockDidService, instanceId: 'inst-1' });
     mockFindDidByAliasAndService.mockResolvedValue(false);
   });
@@ -112,6 +129,9 @@ describe('POST /api/v1/dids', () => {
 
     expect(res.status).toBe(201);
     expect(json.did).toBe('did:web:example.com:org:123');
+    // Pins the MANAGED side of the status ternary. Its SELF_MANAGED side is
+    // covered by the next test, so flipping either branch fails a test.
+    expect(mockCreateDid).toHaveBeenCalledWith(expect.objectContaining({ status: DidStatus.ACTIVE }));
   });
 
   it('creates a self-managed DID with UNVERIFIED status and serviceInstanceId', async () => {
@@ -640,6 +660,27 @@ describe('POST /api/v1/dids', () => {
       });
       const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
       expect(res.status).toBe(201);
+    });
+
+    // An unparseable SYSTEM_VC_BASE_URL disables the guard entirely, so the
+    // alias that the two 403 tests above prove is reserved becomes creatable.
+    // Asserted here so the disabling is a deliberate, visible behaviour rather
+    // than a silent consequence of the catch that also catches ForbiddenError.
+    it('creates the DID and warns the operator when SYSTEM_VC_BASE_URL cannot be parsed', async () => {
+      process.env.SYSTEM_VC_BASE_URL = 'not-a-url';
+      mockDidService.create.mockResolvedValue({ did: 'did:web:vckit.example.com', keyId: 'key-5' });
+      mockCreateDid.mockResolvedValue({ id: 'record-5' });
+
+      const req = createFakeRequest({
+        body: { type: DidType.SELF_MANAGED, method: DidMethod.DID_WEB, alias: 'vckit.example.com' },
+      });
+      const res = await POST(req, TENANT_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(201);
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        expect.objectContaining({ vcBaseUrl: 'not-a-url' }),
+        expect.stringContaining('root DID domain guard is disabled'),
+      );
     });
   });
 });

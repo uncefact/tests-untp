@@ -164,7 +164,11 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  * /dids/{id}:
  *   delete:
  *     summary: Delete a DID
- *     description: Deletes a DID. If the DID is managed (has a serviceInstanceId), it is also removed from the upstream provider.
+ *     description: |
+ *       Deletes a DID record. If the DID is managed (has a serviceInstanceId), removal from the upstream
+ *       provider is also attempted, on a best-effort basis: the record is already deleted by that point, so
+ *       a provider that is unreachable or rejects the removal leaves an orphaned upstream DID and the
+ *       request still returns 204.
  *     tags:
  *       - DIDs
  *     parameters:
@@ -235,9 +239,9 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
       const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId);
       await didService.delete(did.did);
     } catch (err) {
-      logger.error(
-        { didId: id, did: did.did, error: err },
-        'Best-effort upstream DID deletion failed; orphaned upstream DID is harmless',
+      logger.warn(
+        { didId: id, did: did.did, serviceInstanceId: did.serviceInstanceId, error: err },
+        'Failed to delete DID from upstream provider; upstream DID may be orphaned',
       );
     }
   }

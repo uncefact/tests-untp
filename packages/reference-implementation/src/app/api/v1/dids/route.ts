@@ -102,7 +102,11 @@ function assertSupported<T extends string>(field: string, value: T, supported: r
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
- *         description: A DID with this alias already exists on the service instance, or a DID record with this DID already exists
+ *         description: |
+ *           Conflict. Any of:
+ *           - A DID with this alias already exists on the service instance
+ *           - A DID record with this DID already exists
+ *           - The upstream provider reports the alias as already in use, which happens when the provider holds a DID this deployment's database has no record of
  *         content:
  *           application/json:
  *             schema:

@@ -346,4 +346,23 @@ describe('DELETE /api/v1/dids/:id', () => {
     expect(mockResolveDidService).toHaveBeenCalledWith('org-1', 'inst-1');
     expect(mockDidService.delete).not.toHaveBeenCalled();
   });
+
+  // The two tests above prove failures AFTER the record is deleted are
+  // swallowed. This one holds the opposite line: the record deletion itself is
+  // not best-effort, so its failure must surface rather than return 204, and
+  // the upstream removal must not run for a record that is still there.
+  it('surfaces the error and skips upstream removal when deleteDid throws', async () => {
+    mockGetDidById.mockResolvedValue({
+      id: 'did-1',
+      did: 'did:web:example.com',
+      serviceInstanceId: 'inst-1',
+    });
+    mockDeleteDid.mockRejectedValue(new Error('Database unavailable'));
+
+    const req = createFakeRequest({ method: 'DELETE' });
+    const res = await DELETE(req, createContext('did-1') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(500);
+    expect(mockDidService.delete).not.toHaveBeenCalled();
+  });
 });

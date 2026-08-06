@@ -46,7 +46,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *         description: |
  *           Either of:
  *           - System default DIDs cannot be verified through this endpoint.
- *           - DID_PARSE_FAILED or DID_METHOD_NOT_SUPPORTED: the stored DID string does not parse as `did:method:identifier`, or names a method this deployment does not support. Reachable because import (POST /dids/import) accepts the did string as-is without format validation, so a malformed or unsupported-method DID can reach this check on its first verification attempt.
+ *           - DID_PARSE_FAILED or DID_METHOD_NOT_SUPPORTED: the stored DID string does not parse as `did:method:identifier`, or names a method this deployment does not support. Import (POST /dids/import) now rejects both at the boundary, so this check catches records stored before that validation was in place, and any record whose method stopped being supported after it was stored.
  *         content:
  *           application/json:
  *             schema:

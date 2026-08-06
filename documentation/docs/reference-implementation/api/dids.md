@@ -86,7 +86,7 @@ The [verify endpoint](#verify-a-did) runs the following checks in order. All che
 | **HTTPS** | Confirms the DID document was served over HTTPS. Checks the final URL after any redirects; if a redirect lands on an insecure connection, this check fails. |
 | **Structure** | Validates the retrieved DID document against the [DID Document](https://www.w3.org/TR/did-core/) schema. Fails if required fields are missing or malformed. |
 | **Identity match** | Confirms that the `id` field in the DID document matches the DID identifier. Fails if they differ (e.g., the document was served from the wrong location). |
-| **Key material** | Fetches the key IDs from the VC service instance associated with the DID and confirms they correspond to the key IDs listed in the DID document's `verificationMethod` entries. This ensures the DID document points to the same keys that the VC service actually holds for signing. Fails if none of the VC service's keys appear in the document. |
+| **Key material** | Fetches the key IDs from the VC service instance associated with the DID and confirms they correspond to the key IDs listed in the DID document's `verificationMethod` entries. This ensures the DID document points to the same keys that the VC service actually holds for signing. Fails if the VC service holds keys for this DID and none of them appear in the document. When the VC service reports no keys at all, there is nothing to compare and the check passes with the message "No provider keys to compare". |
 | **JSON-LD validity** | Validates that the DID document is valid JSON-LD. Currently skipped; disabled to avoid SSRF risks from untrusted `@context` URLs in DID documents. |
 
 ### System DIDs vs Tenant DIDs
@@ -132,6 +132,8 @@ For **self-managed** DIDs created via this endpoint, the VC service still genera
 | `isDefault` | Whether this DID becomes the tenant's default signing identity, used when a credential is issued without naming an explicit issuer DID |
 | `serviceInstanceId` | Verifiable credential service instance to use for creation |
 
+A tenant cannot claim the instance's own root DID. A self-managed `did:web` whose alias is exactly the hostname of the system VC service (with or without its port, so both `vckit.example.com` and `vckit.example.com:3332`) is rejected with a 403, because that DID identifies the VC service instance itself rather than anything the tenant owns. Only the alias on its own is reserved: a DID with a path under that host, such as `did:web:vckit.example.com:tenant-a`, is allowed.
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -145,6 +147,9 @@ sequenceDiagram
     DB-->>RI: Service instance config (encrypted)
     RI->>RI: Decrypt service config
     RI->>RI: Normalise alias for DID method
+    alt self-managed did:web claiming the system VC service host
+        RI-->>Client: 403 Forbidden
+    end
     RI->>DB: Check for duplicate alias on service instance
     alt duplicate exists
         RI-->>Client: 409 Conflict

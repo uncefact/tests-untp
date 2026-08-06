@@ -480,7 +480,10 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(500);
-    expect(body.error).toBeDefined();
+    // Pins handleRouteError's final fallthrough, which echoes a non-database
+    // error's own message. A toBeDefined() check here would pass just as
+    // happily if the response carried the wrong error entirely.
+    expect(body.error).toBe('Database connection lost');
   });
 
   it('returns 400 when did is an empty string, and does not call the repository', async () => {
