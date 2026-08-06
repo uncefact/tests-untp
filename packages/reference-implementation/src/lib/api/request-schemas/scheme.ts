@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { idSchema, int32Schema, paginationQuerySchema, requireAtLeastOneField } from './shared';
+import { idSchema, int32Schema, nonBlankString, paginationQuerySchema, requireAtLeastOneField } from './shared';
 
 /**
  * A scheme or qualifier validation pattern, checked to compile as a regular
@@ -32,8 +32,8 @@ const validationPatternSchema = z
  * database.
  */
 const schemeQualifierInputSchema = z.object({
-  key: z.string().min(1),
-  description: z.string().min(1),
+  key: nonBlankString,
+  description: nonBlankString,
   validationPattern: validationPatternSchema,
   order: int32Schema.min(0).optional(),
 });
@@ -41,11 +41,14 @@ const schemeQualifierInputSchema = z.object({
 /** Request body for POST /schemes. */
 export const createSchemeRequestSchema = z.object({
   registrarId: idSchema,
-  name: z.string().min(1),
-  primaryKey: z.string().min(1),
+  name: nonBlankString,
+  primaryKey: nonBlankString,
+  // validationPattern keeps its own schema rather than nonBlankString: a
+  // whitespace-only pattern is a well-formed regular expression, and the
+  // regex-compile refinement is the contract for this field.
   validationPattern: validationPatternSchema,
   // Not a URL: an ISO 18975 link template such as "/{primaryKey}/{value}".
-  linkTemplate: z.string().min(1),
+  linkTemplate: nonBlankString,
   idrServiceInstanceId: idSchema.optional(),
   qualifiers: z.array(schemeQualifierInputSchema).optional(),
 });
@@ -53,10 +56,10 @@ export const createSchemeRequestSchema = z.object({
 /** Request body for PATCH /schemes/{id}. Replaces the qualifiers array wholesale when provided. */
 export const updateSchemeRequestSchema = requireAtLeastOneField(
   z.object({
-    name: z.string().min(1).optional(),
-    primaryKey: z.string().min(1).optional(),
+    name: nonBlankString.optional(),
+    primaryKey: nonBlankString.optional(),
     validationPattern: validationPatternSchema.optional(),
-    linkTemplate: z.string().min(1).optional(),
+    linkTemplate: nonBlankString.optional(),
     idrServiceInstanceId: idSchema.nullable().optional(),
     qualifiers: z.array(schemeQualifierInputSchema).optional(),
   }),

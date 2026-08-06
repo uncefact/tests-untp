@@ -18,6 +18,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers' });
  *       - Identifiers
  *     requestBody:
  *       required: true
+ *       description: The identifier value must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
  *       content:
  *         application/json:
  *           schema:

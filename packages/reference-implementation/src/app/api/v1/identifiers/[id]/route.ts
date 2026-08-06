@@ -77,6 +77,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the identifier
  *     requestBody:
  *       required: true
+ *       description: The new value must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
  *       content:
  *         application/json:
  *           schema:

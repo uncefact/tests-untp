@@ -224,7 +224,7 @@ export async function countServiceInstanceReferences(
 
 /**
  * Implements the instance resolution chain:
- * 1. Explicit instance ID - verify ownership or system default
+ * 1. Explicit instance ID - verify service type, and ownership or system default
  * 2. Tenant primary (isPrimary for org + serviceType)
  * 3. System default (tenantId === SYSTEM_TENANT_ID)
  * 4. Returns null if nothing found
@@ -234,11 +234,15 @@ export async function getInstanceByResolution(
   serviceType: string,
   instanceId?: string,
 ): Promise<ServiceInstance | null> {
-  // Step 1: Explicit instance ID
+  // Step 1: Explicit instance ID. Filtered by serviceType like the other
+  // steps: an explicit id of a different service type (e.g. a VC instance
+  // where an IDR one is required) must resolve to null here, not pass the
+  // boundary and fail later at adapter lookup with an internal config error.
   if (instanceId) {
     return prisma.serviceInstance.findFirst({
       where: {
         id: instanceId,
+        serviceType: serviceType as ServiceType,
         OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
       },
     });

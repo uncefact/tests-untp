@@ -3,6 +3,7 @@ import {
   idSchema,
   int32Schema,
   locationSchema,
+  nonBlankString,
   requireAtLeastOneField,
   nonEmptyArraySchema,
   paginationQuerySchema,
@@ -20,6 +21,31 @@ describe('idSchema', () => {
 
   it('rejects a non-string value', () => {
     expect(idSchema.safeParse(123).success).toBe(false);
+  });
+});
+
+describe('nonBlankString', () => {
+  it('accepts a value with real content, keeping any padding verbatim', () => {
+    expect(nonBlankString.safeParse('GS1')).toEqual({ success: true, data: 'GS1' });
+    expect(nonBlankString.safeParse('  GS1  ')).toEqual({ success: true, data: '  GS1  ' });
+  });
+
+  it('rejects an empty string', () => {
+    expect(nonBlankString.safeParse('').success).toBe(false);
+  });
+
+  it('rejects whitespace-only values with the dedicated message', () => {
+    for (const value of [' ', '   ', '\t', ' \t\n ']) {
+      const result = nonBlankString.safeParse(value);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('must not be only whitespace');
+      }
+    }
+  });
+
+  it('rejects a non-string value', () => {
+    expect(nonBlankString.safeParse(123).success).toBe(false);
   });
 });
 

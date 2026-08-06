@@ -160,6 +160,16 @@ describe('PATCH /api/v1/identifiers/:id', () => {
     expect(mockUpdateIdentifier).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for a whitespace-only value and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { value: ' \t ' } });
+    const res = await PATCH(req, createContext('id-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('value: must not be only whitespace');
+    expect(mockUpdateIdentifier).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for a non-string value and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: { value: 123 } });
     const res = await PATCH(req, createContext('id-1') as unknown as Parameters<typeof PATCH>[1]);

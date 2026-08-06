@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
+import { ServiceType } from '@uncefact/untp-ri-services';
 import { parseRequestBody, parseQueryParams } from '@/lib/api/validation';
 import { createSchemeRequestSchema, listSchemesQuerySchema } from '@/lib/api/request-schemas/scheme';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { createIdentifierScheme, listIdentifierSchemes, getRegistrarById } from '@/lib/prisma/repositories';
-import { NotFoundError } from '@/lib/api/errors';
+import {
+  createIdentifierScheme,
+  getInstanceByResolution,
+  getRegistrarById,
+  listIdentifierSchemes,
+} from '@/lib/prisma/repositories';
+import { NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
@@ -19,6 +25,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *       - Schemes
  *     requestBody:
  *       required: true
+ *       description: Required text fields must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
  *       content:
  *         application/json:
  *           schema:
@@ -53,7 +60,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *               idrServiceInstanceId:
  *                 type: string
  *                 minLength: 1
- *                 description: Optional IDR service instance ID
+ *                 description: Optional IDR service instance ID. Must reference a service instance the tenant can use (its own, or a system default); otherwise the request is rejected with a 404.
  *               qualifiers:
  *                 type: array
  *                 description: Optional list of qualifier definitions
@@ -88,7 +95,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *             schema:
  *               $ref: '#/components/schemas/IdentifierScheme'
  *       400:
- *         description: Validation error (e.g. missing required field, a validationPattern that does not compile as a regular expression, a duplicate qualifier key, an idrServiceInstanceId that does not reference an existing service instance)
+ *         description: Validation error (e.g. a missing or blank required field, a validationPattern that does not compile as a regular expression, a duplicate qualifier key)
  *         content:
  *           application/json:
  *             schema:
@@ -106,7 +113,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Registrar not found
+ *         description: Registrar not found, or the referenced IDR service instance does not exist or is not accessible to this tenant
  *         content:
  *           application/json:
  *             schema:
@@ -132,6 +139,21 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   const registrar = await getRegistrarById(body.registrarId, tenantId);
   if (!registrar) {
     throw new NotFoundError('Registrar not found');
+  }
+
+  // Same boundary check as the registrars routes: the scheme row's foreign
+  // key on idrServiceInstanceId proves only that the instance exists
+  // globally, so a tenant-scoped, type-filtered lookup is needed to keep
+  // another tenant's (or a non-IDR) instance id from being stored.
+  if (body.idrServiceInstanceId !== undefined) {
+    logger.info(
+      { idrServiceInstanceId: body.idrServiceInstanceId },
+      'Verifying IDR service instance is accessible to this tenant',
+    );
+    const instance = await getInstanceByResolution(tenantId, ServiceType.IDR, body.idrServiceInstanceId);
+    if (!instance) {
+      throw new ServiceInstanceNotFoundError(body.idrServiceInstanceId);
+    }
   }
 
   logger.info(
