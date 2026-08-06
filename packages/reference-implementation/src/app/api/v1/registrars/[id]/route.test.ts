@@ -27,11 +27,13 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 const mockGetRegistrarById = jest.fn();
 const mockUpdateRegistrar = jest.fn();
 const mockDeleteRegistrar = jest.fn();
+const mockGetInstanceByResolution = jest.fn();
 
 jest.mock('@/lib/prisma/repositories', () => ({
   getRegistrarById: (id: string, tenantId: string) => mockGetRegistrarById(id, tenantId),
   updateRegistrar: (id: string, tenantId: string, input: unknown) => mockUpdateRegistrar(id, tenantId, input),
   deleteRegistrar: (id: string, tenantId: string) => mockDeleteRegistrar(id, tenantId),
+  getInstanceByResolution: (...args: unknown[]) => mockGetInstanceByResolution(...args),
 }));
 
 // Mock only assertPublicUrl (the SSRF/private-address check), keeping the
@@ -114,6 +116,7 @@ describe('GET /api/v1/registrars/:id', () => {
 describe('PATCH /api/v1/registrars/:id', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetInstanceByResolution.mockResolvedValue({ id: 'inst-1', tenantId: 'org-1' });
   });
 
   it('updates registrar fields', async () => {
@@ -158,17 +161,20 @@ describe('PATCH /api/v1/registrars/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('At least one field is required');
+    expect(json.error).toContain('At least one of name, namespace, url, or idrServiceInstanceId is required');
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
   it('returns 400 when the body only has an unrecognised (typo) field name and does not call the repository', async () => {
+    // The message enumerates the recognised fields so a caller whose only key
+    // was a typo can spot the misspelling rather than being told nothing was
+    // sent.
     const req = createFakeRequest({ method: 'PATCH', body: { neme: 'Updated GS1' } });
     const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('At least one field is required');
+    expect(json.error).toContain('At least one of name, namespace, url, or idrServiceInstanceId is required');
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
@@ -192,6 +198,16 @@ describe('PATCH /api/v1/registrars/:id', () => {
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for a whitespace-only name and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '   ' } });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('name: must not be only whitespace');
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for a non-string namespace and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: { namespace: 42 } });
     const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -209,6 +225,16 @@ describe('PATCH /api/v1/registrars/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toMatch(/^namespace:/);
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a whitespace-only namespace and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { namespace: ' \t ' } });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('namespace: must not be only whitespace');
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
@@ -239,6 +265,16 @@ describe('PATCH /api/v1/registrars/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toMatch(/^url:/);
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a url with leading or trailing whitespace and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { url: ' https://gs1.org/new ' } });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('url: must not have leading or trailing whitespace');
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
@@ -346,6 +382,44 @@ describe('PATCH /api/v1/registrars/:id', () => {
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for an empty string idrServiceInstanceId and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { idrServiceInstanceId: '' } });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^idrServiceInstanceId:/);
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it('verifies the instance is accessible to the tenant before updating idrServiceInstanceId', async () => {
+    const updated = { id: 'reg-1', name: 'GS1', idrServiceInstanceId: 'inst-1' };
+    mockUpdateRegistrar.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { idrServiceInstanceId: 'inst-1' } });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'IDR', 'inst-1');
+    expect(mockUpdateRegistrar).toHaveBeenCalledWith('reg-1', 'org-1', { idrServiceInstanceId: 'inst-1' });
+  });
+
+  it('returns 404 when idrServiceInstanceId is not accessible to the tenant, and does not call the repository', async () => {
+    // Covers both a nonexistent instance id and one belonging to a different
+    // tenant: the tenant-scoped lookup returns null for either, so neither is
+    // ever stored on the registrar.
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { idrServiceInstanceId: 'other-tenant-inst' } });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Service instance not found');
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for an explicit null name and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: { name: null } });
     const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -398,6 +472,20 @@ describe('PATCH /api/v1/registrars/:id', () => {
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['array', [{ name: 'GS1' }], 'array'],
+    ['string', 'GS1', 'string'],
+    ['number', 42, 'number'],
+  ])('returns 400 for a top-level %s body and does not call the repository', async (_kind, body, received) => {
+    const req = createFakeRequest({ method: 'PATCH', body });
+    const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain(`Expected object, received ${received}`);
+    expect(mockUpdateRegistrar).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when registrar not found or access denied', async () => {
     mockUpdateRegistrar.mockRejectedValue(new NotFoundError('Registrar not found or access denied'));
 
@@ -409,7 +497,7 @@ describe('PATCH /api/v1/registrars/:id', () => {
     expect(json.error).toContain('Registrar not found');
   });
 
-  it('allows clearing idrServiceInstanceId with null', async () => {
+  it('allows clearing idrServiceInstanceId with null, without an instance lookup', async () => {
     const updated = { id: 'reg-1', name: 'GS1', idrServiceInstanceId: null };
     mockUpdateRegistrar.mockResolvedValue(updated);
 
@@ -417,6 +505,9 @@ describe('PATCH /api/v1/registrars/:id', () => {
     const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
 
     expect(res.status).toBe(200);
+    // A null clears the linkage rather than referencing an instance, so there
+    // is nothing to verify.
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
     expect(mockUpdateRegistrar).toHaveBeenCalledWith('reg-1', 'org-1', { idrServiceInstanceId: null });
   });
 });

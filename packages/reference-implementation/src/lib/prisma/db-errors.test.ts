@@ -4,6 +4,7 @@ import { ValidationError } from '@/lib/api/validation';
 import {
   isUniqueConstraintViolation,
   isForeignKeyViolation,
+  isForeignKeyViolationOn,
   isRecordNotFound,
   isDatabaseError,
   mapDatabaseError,
@@ -58,6 +59,40 @@ describe('isForeignKeyViolation', () => {
   it('rejects a non-Prisma error carrying a matching code property', () => {
     const impostor = Object.assign(new Error('not from the ORM'), { code: 'P2003' });
     expect(isForeignKeyViolation(impostor)).toBe(false);
+  });
+});
+
+describe('isForeignKeyViolationOn', () => {
+  it('matches when the documented message form names the column', () => {
+    const error = prismaForeignKeyViolationError('Foreign key constraint failed on the field: `idrServiceInstanceId`');
+    expect(isForeignKeyViolationOn(error, 'idrServiceInstanceId')).toBe(true);
+  });
+
+  it('matches when meta carries the constraint name containing the column', () => {
+    const error = Object.assign(prismaForeignKeyViolationError(), {
+      meta: { field_name: 'Registrar_idrServiceInstanceId_fkey (index)' },
+    });
+    expect(isForeignKeyViolationOn(error, 'idrServiceInstanceId')).toBe(true);
+  });
+
+  it('does not match a violation on a different column', () => {
+    const error = Object.assign(
+      prismaForeignKeyViolationError('Foreign key constraint failed on the field: `tenantId`'),
+      { meta: { field_name: 'Registrar_tenantId_fkey (index)' } },
+    );
+    expect(isForeignKeyViolationOn(error, 'idrServiceInstanceId')).toBe(false);
+  });
+
+  it('makes no claim when neither message nor meta names any column', () => {
+    // A shape drift in the engine's message/meta must degrade to "no match"
+    // (caller rethrows) rather than a misattributed mapping.
+    const error = prismaForeignKeyViolationError('Foreign key constraint violated');
+    expect(isForeignKeyViolationOn(error, 'idrServiceInstanceId')).toBe(false);
+  });
+
+  it('rejects a non-P2003 error even when its message names the column', () => {
+    const error = prismaUniqueConstraintError('duplicate on idrServiceInstanceId');
+    expect(isForeignKeyViolationOn(error, 'idrServiceInstanceId')).toBe(false);
   });
 });
 

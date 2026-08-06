@@ -1,0 +1,165 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Database ID"
+    },
+    "tenantId": {
+      "type": "string",
+      "description": "Owning tenant ID"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable registrar name"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace identifier for IDR resolution"
+    },
+    "url": {
+      "type": "string",
+      "nullable": true,
+      "description": "Registrar website URL"
+    },
+    "idrServiceInstanceId": {
+      "type": "string",
+      "nullable": true,
+      "description": "Associated IDR service instance"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when last updated"
+    },
+    "schemes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Database ID"
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Owning tenant ID"
+          },
+          "registrarId": {
+            "type": "string",
+            "description": "Parent registrar ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable scheme name"
+          },
+          "primaryKey": {
+            "type": "string",
+            "description": "Primary identifier key per ISO 18975"
+          },
+          "validationPattern": {
+            "type": "string",
+            "description": "Regex for validating identifier values"
+          },
+          "linkTemplate": {
+            "type": "string",
+            "description": "ISO 18975 link template for URI construction"
+          },
+          "idrServiceInstanceId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Associated IDR service instance"
+          },
+          "qualifiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Database ID"
+                },
+                "schemeId": {
+                  "type": "string",
+                  "description": "Parent identifier scheme ID"
+                },
+                "key": {
+                  "type": "string",
+                  "description": "Qualifier key / application identifier code"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Human-readable description"
+                },
+                "validationPattern": {
+                  "type": "string",
+                  "description": "Regex for validating qualifier values"
+                },
+                "order": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647,
+                  "description": "Qualifier precedence in URI ordering (ascending)"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Timestamp when created"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Timestamp when last updated"
+                }
+              },
+              "required": [
+                "id",
+                "schemeId",
+                "key",
+                "description",
+                "validationPattern",
+                "order",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Qualifier definitions attached to this scheme"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when created"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when last updated"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "registrarId",
+          "name",
+          "primaryKey",
+          "validationPattern",
+          "linkTemplate",
+          "idrServiceInstanceId",
+          "qualifiers",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Schemes registered under this registrar (present on detail reads, omitted on list/create/update)"
+    }
+  },
+  "required": ["id", "tenantId", "name", "namespace", "url", "idrServiceInstanceId", "createdAt", "updatedAt"],
+  "additionalProperties": false
+}

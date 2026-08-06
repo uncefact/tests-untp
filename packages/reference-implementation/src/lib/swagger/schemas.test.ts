@@ -1,5 +1,6 @@
 import { generateOpenAPISchemas } from './schemas';
 import identifierSchemeFixture from './__fixtures__/identifier-scheme.pre-792.json';
+import registrarFixture from './__fixtures__/registrar.792.json';
 
 /**
  * Congruence checks for the registrar <-> scheme OpenAPI projection (#792
@@ -9,13 +10,15 @@ import identifierSchemeFixture from './__fixtures__/identifier-scheme.pre-792.js
  * assertions guard the shape that composition is meant to produce, and
  * would fail if either side's projection regressed back towards a cycle.
  *
- * The byte-identity assertion below pins `IdentifierScheme`'s entire
- * generated shape, not just the registrar/scheme fields it was added to
- * guard. A deliberate, intentional change to `identifierSchemeSchema` (a
- * new field, a changed description, a reordered property) is expected to
- * fail this test; the fix is to regenerate
- * `__fixtures__/identifier-scheme.pre-792.json` from the new output, not to
- * treat the failure itself as a regression.
+ * The byte-identity assertions below pin the entire generated shape of both
+ * components, not just the registrar/scheme fields they were added to guard:
+ * `IdentifierScheme` against its pre-#792 fixture (its shape predates this
+ * change and must not move), and `Registrar` against the shape #792
+ * establishes (scalars, required list, and the new `schemes` projection). A
+ * deliberate, intentional change to either zod schema (a new field, a
+ * changed description, a reordered property) is expected to fail its test;
+ * the fix is to regenerate the corresponding `__fixtures__/*.json` from the
+ * new output, not to treat the failure itself as a regression.
  */
 describe('generateOpenAPISchemas — registrar/scheme projection congruence', () => {
   it('does not log a recursive-reference warning while generating', () => {
@@ -86,5 +89,15 @@ describe('generateOpenAPISchemas — registrar/scheme projection congruence', ()
     const schemas = generateOpenAPISchemas();
 
     expect(JSON.stringify(schemas.IdentifierScheme)).toBe(JSON.stringify(identifierSchemeFixture));
+  });
+
+  it('keeps the Registrar component byte-identical to the #792 fixture, including property order', () => {
+    // Locks the component's own scalars and required list, not only the
+    // schemes projection the assertions above cover: without this, an
+    // accidental field removal or description change on registrarCoreSchema
+    // would ship silently.
+    const schemas = generateOpenAPISchemas();
+
+    expect(JSON.stringify(schemas.Registrar)).toBe(JSON.stringify(registrarFixture));
   });
 });

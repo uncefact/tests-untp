@@ -26,10 +26,12 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 
 const mockCreateRegistrar = jest.fn();
 const mockListRegistrars = jest.fn();
+const mockGetInstanceByResolution = jest.fn();
 
 jest.mock('@/lib/prisma/repositories', () => ({
   createRegistrar: (input: unknown) => mockCreateRegistrar(input),
   listRegistrars: (tenantId: string, opts: unknown) => mockListRegistrars(tenantId, opts),
+  getInstanceByResolution: (...args: unknown[]) => mockGetInstanceByResolution(...args),
 }));
 
 // Mock only assertPublicUrl (the SSRF/private-address check), keeping the
@@ -90,6 +92,7 @@ const AUTH_CONTEXT = { tenantId: 'org-1', params: Promise.resolve({}) };
 describe('POST /api/v1/registrars', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetInstanceByResolution.mockResolvedValue({ id: 'inst-1', tenantId: 'org-1' });
   });
 
   it('creates a registrar and returns 201', async () => {
@@ -125,6 +128,8 @@ describe('POST /api/v1/registrars', () => {
 
     expect(res.status).toBe(201);
     expect(json.url).toBe('https://gs1.org');
+    // Verifies the tenant-scoped accessibility check runs before the write
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'IDR', 'inst-1');
     expect(mockCreateRegistrar).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 'org-1',
@@ -134,6 +139,34 @@ describe('POST /api/v1/registrars', () => {
         idrServiceInstanceId: 'inst-1',
       }),
     );
+  });
+
+  it('skips the instance lookup when idrServiceInstanceId is omitted', async () => {
+    mockCreateRegistrar.mockResolvedValue({ id: 'reg-1', name: 'GS1', namespace: 'gs1', url: 'https://gs1.org' });
+
+    const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1', url: 'https://gs1.org' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(201);
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when idrServiceInstanceId is not accessible to the tenant, and does not call the repository', async () => {
+    // The row's foreign key would accept any globally-existing instance, so
+    // the handler's tenant-scoped lookup is what keeps another tenant's
+    // instance id from being stored; a null lookup result covers both a
+    // nonexistent id and one belonging to a different tenant.
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({
+      body: { name: 'GS1', namespace: 'gs1', url: 'https://gs1.org', idrServiceInstanceId: 'other-tenant-inst' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Service instance not found');
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing name and does not call the repository', async () => {
@@ -163,6 +196,18 @@ describe('POST /api/v1/registrars', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toMatch(/^name:/);
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a whitespace-only name and does not call the repository', async () => {
+    // min(1) counts characters, so without the non-blank refinement a single
+    // space would create a registrar with a blank name.
+    const req = createFakeRequest({ body: { name: '   ', namespace: 'gs1', url: 'https://gs1.org' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('name: must not be only whitespace');
     expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 
@@ -196,6 +241,16 @@ describe('POST /api/v1/registrars', () => {
     expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for a whitespace-only namespace and does not call the repository', async () => {
+    const req = createFakeRequest({ body: { name: 'GS1', namespace: ' \t ', url: 'https://gs1.org' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('namespace: must not be only whitespace');
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for missing url and does not call the repository', async () => {
     const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1' } });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -223,6 +278,20 @@ describe('POST /api/v1/registrars', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toBe('url: must be a valid URL');
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a url with leading or trailing whitespace and does not call the repository', async () => {
+    // WHATWG URL parsing strips surrounding whitespace, so without the
+    // schema's trim refinement a padded url would pass every URL check yet
+    // be stored verbatim with the padding intact.
+    const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1', url: ' https://gs1.org ' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('url: must not have leading or trailing whitespace');
+    expect(mockAssertPublicUrl).not.toHaveBeenCalled();
     expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 
@@ -336,6 +405,19 @@ describe('POST /api/v1/registrars', () => {
     expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for an empty string idrServiceInstanceId and does not call the repository', async () => {
+    const req = createFakeRequest({
+      body: { name: 'GS1', namespace: 'gs1', url: 'https://gs1.org', idrServiceInstanceId: '' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^idrServiceInstanceId:/);
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for an explicit null idrServiceInstanceId and does not call the repository', async () => {
     // Unlike PATCH, the create schema's idrServiceInstanceId has no
     // nullable "clear" semantic (there is nothing to clear on create), so a
@@ -368,6 +450,20 @@ describe('POST /api/v1/registrars', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('Expected object, received null');
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['array', [{ name: 'GS1' }], 'array'],
+    ['string', 'GS1', 'string'],
+    ['number', 42, 'number'],
+  ])('returns 400 for a top-level %s body and does not call the repository', async (_kind, body, received) => {
+    const req = createFakeRequest({ body });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain(`Expected object, received ${received}`);
     expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 

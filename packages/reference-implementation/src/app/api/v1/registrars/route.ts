@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { ServiceType } from '@uncefact/untp-ri-services';
+import { ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { parseRequestBody, parseQueryParams, assertHttpUrl, assertPublicUrl } from '@/lib/api/validation';
 import { createRegistrarRequestSchema, listRegistrarsQuerySchema } from '@/lib/api/request-schemas/registrar';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { createRegistrar, listRegistrars } from '@/lib/prisma/repositories';
+import { createRegistrar, getInstanceByResolution, listRegistrars } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
@@ -18,6 +20,7 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *       - Registrars
  *     requestBody:
  *       required: true
+ *       description: Unknown keys are ignored.
  *       content:
  *         application/json:
  *           schema:
@@ -30,19 +33,19 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *               name:
  *                 type: string
  *                 minLength: 1
- *                 description: Human-readable name for the registrar
+ *                 description: Human-readable name for the registrar. Must contain at least one non-whitespace character.
  *               namespace:
  *                 type: string
  *                 minLength: 1
- *                 description: Namespace for the registrar (e.g. "gs1")
+ *                 description: Namespace for the registrar (e.g. "gs1"). Must contain at least one non-whitespace character.
  *               url:
  *                 type: string
  *                 format: uri
- *                 description: A valid public http(s) URL for the registrar's website. Rejected with a 400 if it is not a valid, public http(s) URL.
+ *                 description: A valid public http(s) URL for the registrar's website. Rejected with a 400 if it is not a valid, public http(s) URL, or if it carries leading or trailing whitespace.
  *               idrServiceInstanceId:
  *                 type: string
  *                 minLength: 1
- *                 description: Optional IDR service instance ID
+ *                 description: Optional IDR service instance ID. Must reference a service instance the tenant can use (its own, or a system default); otherwise the request is rejected with a 404.
  *     responses:
  *       201:
  *         description: Registrar created successfully
@@ -51,7 +54,7 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *             schema:
  *               $ref: '#/components/schemas/Registrar'
  *       400:
- *         description: Validation error (e.g. missing required field, a url that is not a valid public http(s) URL, an idrServiceInstanceId that does not reference an existing service instance)
+ *         description: Validation error (e.g. a missing or blank required field, a url that is not a valid public http(s) URL)
  *         content:
  *           application/json:
  *             schema:
@@ -64,6 +67,12 @@ const logger = apiLogger.child({ route: '/api/v1/registrars' });
  *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: Forbidden - authenticated principal has no resolvable tenant assignment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: The referenced IDR service instance does not exist, or is not accessible to this tenant
  *         content:
  *           application/json:
  *             schema:
@@ -102,6 +111,24 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // valid-inputs-unchanged behaviour this ticket promises does not cover.
   // Revisit this (switch to storing the canonical `.href`) before any
   // server-side dereference of registrar.url is introduced.
+
+  // The registrar row's foreign key on idrServiceInstanceId checks only that
+  // the instance exists globally, so without this tenant-scoped lookup another
+  // tenant's instance id would be accepted and stored, and the bad reference
+  // would only surface later, when identifier links are published through it.
+  // Mirrors the boundary check the DID import route applies to its
+  // serviceInstanceId (dids/import/route.ts).
+  if (body.idrServiceInstanceId !== undefined) {
+    logger.info(
+      { idrServiceInstanceId: body.idrServiceInstanceId },
+      'Verifying IDR service instance is accessible to this tenant',
+    );
+    const instance = await getInstanceByResolution(tenantId, ServiceType.IDR, body.idrServiceInstanceId);
+    if (!instance) {
+      throw new ServiceInstanceNotFoundError(body.idrServiceInstanceId);
+    }
+  }
+
   logger.info({ namespace: body.namespace }, 'Creating registrar');
   const registrar = await createRegistrar({
     tenantId,

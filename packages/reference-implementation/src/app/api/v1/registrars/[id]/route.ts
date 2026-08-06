@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError } from '@/lib/api/errors';
+import { ServiceType } from '@uncefact/untp-ri-services';
+import { NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { parseRequestBody, definedFields, assertHttpUrl, assertPublicUrl } from '@/lib/api/validation';
 import { updateRegistrarRequestSchema } from '@/lib/api/request-schemas/registrar';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getRegistrarById, updateRegistrar, deleteRegistrar } from '@/lib/prisma/repositories';
+import { getInstanceByResolution, getRegistrarById, updateRegistrar, deleteRegistrar } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/registrars/[id]' });
@@ -92,20 +93,20 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *               name:
  *                 type: string
  *                 minLength: 1
- *                 description: New name for the registrar
+ *                 description: New name for the registrar. Must contain at least one non-whitespace character; an explicit null is rejected with a 400.
  *               namespace:
  *                 type: string
  *                 minLength: 1
- *                 description: New namespace for the registrar
+ *                 description: New namespace for the registrar. Must contain at least one non-whitespace character; an explicit null is rejected with a 400.
  *               url:
  *                 type: string
  *                 format: uri
- *                 description: A valid public http(s) URL for the registrar's website. Rejected with a 400 if it is not a valid, public http(s) URL.
+ *                 description: A valid public http(s) URL for the registrar's website. Rejected with a 400 if it is not a valid, public http(s) URL, if it carries leading or trailing whitespace, or if it is an explicit null.
  *               idrServiceInstanceId:
  *                 type: string
  *                 minLength: 1
  *                 nullable: true
- *                 description: New IDR service instance ID (set to null to clear)
+ *                 description: New IDR service instance ID (set to null to clear). Must reference a service instance the tenant can use (its own, or a system default); otherwise the request is rejected with a 404.
  *             anyOf:
  *               - required: [name]
  *               - required: [namespace]
@@ -119,7 +120,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/Registrar'
  *       400:
- *         description: Validation error (e.g. no fields provided, a url that is not a valid public http(s) URL, an idrServiceInstanceId that does not reference an existing service instance)
+ *         description: Validation error (e.g. no recognised fields provided, a blank name or namespace, a url that is not a valid public http(s) URL)
  *         content:
  *           application/json:
  *             schema:
@@ -137,7 +138,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Registrar not found
+ *         description: Registrar not found, or the referenced IDR service instance does not exist or is not accessible to this tenant
  *         content:
  *           application/json:
  *             schema:
@@ -169,6 +170,21 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
       logger.info({ registrarId: id }, 'Validating registrar URL is not internal');
       await assertPublicUrl(fields.url, 'url');
+    }
+  }
+
+  // Same boundary check as POST (see route.ts): the row's foreign key only
+  // proves the instance exists globally, so a tenant-scoped lookup is needed
+  // to keep another tenant's instance id from being stored. A null skips the
+  // check because it clears the linkage rather than referencing anything.
+  if (typeof fields.idrServiceInstanceId === 'string') {
+    logger.info(
+      { registrarId: id, idrServiceInstanceId: fields.idrServiceInstanceId },
+      'Verifying IDR service instance is accessible to this tenant',
+    );
+    const instance = await getInstanceByResolution(tenantId, ServiceType.IDR, fields.idrServiceInstanceId);
+    if (!instance) {
+      throw new ServiceInstanceNotFoundError(fields.idrServiceInstanceId);
     }
   }
 
