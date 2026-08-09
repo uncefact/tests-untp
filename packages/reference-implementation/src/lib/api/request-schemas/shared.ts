@@ -23,6 +23,20 @@ import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 export const idSchema = z.string().min(1);
 
 /**
+ * A required text value that must carry real content: `.min(1)` counts
+ * characters, not content, so on its own it accepts a whitespace-only value
+ * like ' ' and produces a record with a blank name, key, or description.
+ * Rejected rather than trimmed: stored values stay verbatim across these
+ * APIs, so a value with padding around real content is accepted as sent.
+ */
+export const nonBlankString = z
+  .string()
+  .min(1)
+  .refine((value) => value.trim().length > 0, {
+    message: 'must not be only whitespace',
+  });
+
+/**
  * A signed 32-bit integer, matching a Prisma `Int`/Postgres int4 column, so
  * an out-of-range value is a 400 at the boundary rather than a 500 from the
  * database. A consumer narrows this further where the column has its own

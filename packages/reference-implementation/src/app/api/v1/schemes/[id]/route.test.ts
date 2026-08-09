@@ -27,12 +27,14 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 const mockGetIdentifierSchemeById = jest.fn();
 const mockUpdateIdentifierScheme = jest.fn();
 const mockDeleteIdentifierScheme = jest.fn();
+const mockGetInstanceByResolution = jest.fn();
 
 jest.mock('@/lib/prisma/repositories', () => ({
   getIdentifierSchemeById: (id: string, tenantId: string) => mockGetIdentifierSchemeById(id, tenantId),
   updateIdentifierScheme: (id: string, tenantId: string, input: unknown) =>
     mockUpdateIdentifierScheme(id, tenantId, input),
   deleteIdentifierScheme: (id: string, tenantId: string) => mockDeleteIdentifierScheme(id, tenantId),
+  getInstanceByResolution: (...args: unknown[]) => mockGetInstanceByResolution(...args),
 }));
 
 import { NotFoundError, ConflictError } from '@/lib/api/errors';
@@ -101,6 +103,7 @@ describe('GET /api/v1/schemes/:id', () => {
 describe('PATCH /api/v1/schemes/:id', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetInstanceByResolution.mockResolvedValue({ id: 'inst-1', tenantId: 'org-1' });
   });
 
   it('updates scheme fields', async () => {
@@ -252,6 +255,16 @@ describe('PATCH /api/v1/schemes/:id', () => {
     expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for a whitespace-only primaryKey and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { primaryKey: '  ' } });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('primaryKey: must not be only whitespace');
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when the body only has an unrecognised (typo) field name', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: { neme: 'Updated GTIN' } });
     const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -351,7 +364,7 @@ describe('PATCH /api/v1/schemes/:id', () => {
     expect(json.error).toContain('Identifier scheme not found');
   });
 
-  it('allows clearing idrServiceInstanceId with null', async () => {
+  it('allows clearing idrServiceInstanceId with null, without an instance lookup', async () => {
     const updated = { id: 'sch-1', idrServiceInstanceId: null };
     mockUpdateIdentifierScheme.mockResolvedValue(updated);
 
@@ -359,7 +372,34 @@ describe('PATCH /api/v1/schemes/:id', () => {
     const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
 
     expect(res.status).toBe(200);
+    // A null clears the linkage rather than referencing an instance, so there
+    // is nothing to verify.
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
     expect(mockUpdateIdentifierScheme).toHaveBeenCalledWith('sch-1', 'org-1', { idrServiceInstanceId: null });
+  });
+
+  it('verifies the instance is accessible to the tenant before updating idrServiceInstanceId', async () => {
+    const updated = { id: 'sch-1', idrServiceInstanceId: 'inst-1' };
+    mockUpdateIdentifierScheme.mockResolvedValue(updated);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { idrServiceInstanceId: 'inst-1' } });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'IDR', 'inst-1');
+    expect(mockUpdateIdentifierScheme).toHaveBeenCalledWith('sch-1', 'org-1', { idrServiceInstanceId: 'inst-1' });
+  });
+
+  it('returns 404 when idrServiceInstanceId is not accessible to the tenant, and does not call the repository', async () => {
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { idrServiceInstanceId: 'other-tenant-inst' } });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Service instance not found');
+    expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
   });
 
   it('returns 409 when repository reports a qualifier key conflict', async () => {

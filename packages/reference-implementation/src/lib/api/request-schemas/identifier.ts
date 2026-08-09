@@ -1,15 +1,15 @@
 import { z } from 'zod';
-import { idSchema, paginationQuerySchema } from './shared';
+import { idSchema, nonBlankString, paginationQuerySchema } from './shared';
 
 /** Request body for POST /identifiers. */
 export const createIdentifierRequestSchema = z.object({
   schemeId: idSchema,
-  value: z.string().min(1),
+  value: nonBlankString,
 });
 
 /** Request body for PATCH /identifiers/{id}. */
 export const updateIdentifierRequestSchema = z.object({
-  value: z.string().min(1),
+  value: nonBlankString,
 });
 
 /**

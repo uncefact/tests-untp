@@ -185,6 +185,16 @@ describe('POST /api/v1/identifiers', () => {
     expect(mockCreateIdentifier).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for a whitespace-only value and does not call the repository', async () => {
+    const req = createFakeRequest({ body: { schemeId: 'sch-1', value: '   ' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('value: must not be only whitespace');
+    expect(mockCreateIdentifier).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when value fails scheme validation', async () => {
     mockCreateIdentifier.mockRejectedValue(
       new ValidationError('Identifier value "abc" does not match scheme validation pattern: ^\\d{14}$'),

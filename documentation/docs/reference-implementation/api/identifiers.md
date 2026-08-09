@@ -91,7 +91,7 @@ Because links exist on both the local database (as audit records) and the upstre
 POST /api/v1/schemes
 ```
 
-Creates a new identifier scheme with optional nested qualifiers. The scheme is associated with a registrar and scoped to the authenticated tenant.
+Creates a new identifier scheme with optional nested qualifiers. The scheme is associated with a registrar and scoped to the authenticated tenant. Required text fields must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
 
 | Required Field | Description |
 |----------------|-------------|
@@ -103,7 +103,7 @@ Creates a new identifier scheme with optional nested qualifiers. The scheme is a
 
 | Optional Field | Description |
 |----------------|-------------|
-| `idrServiceInstanceId` | Override IDR service instance for this scheme |
+| `idrServiceInstanceId` | Override IDR service instance for this scheme. Must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404 |
 | `qualifiers` | Array of qualifier definitions (each requires `key`, `description`, `validationPattern`; `order` is optional, a non-negative 32-bit integer, defaults to 0) |
 
 ```mermaid
@@ -117,6 +117,12 @@ sequenceDiagram
     RI->>DB: Verify registrar exists and belongs to tenant
     alt registrar not found
         RI-->>Client: 404 Not Found
+    end
+    opt idrServiceInstanceId provided
+        RI->>DB: Verify instance is accessible to this tenant (own or system default)
+        alt instance not accessible
+            RI-->>Client: 404 Not Found
+        end
     end
     RI->>DB: Insert scheme with qualifiers
     DB-->>RI: Created record (with qualifiers and registrar)
@@ -136,7 +142,7 @@ Returns identifier schemes for the authenticated tenant (including system defaul
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `registrarId` | string | — | Filter by registrar ID |
-| `limit` | integer | Defaults to 20, or the configured maximum when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---
@@ -157,15 +163,15 @@ Retrieves a specific identifier scheme by its database ID. The response includes
 PATCH /api/v1/schemes/{id}
 ```
 
-Updates one or more fields of an existing identifier scheme. At least one updatable field must be provided. System-default schemes cannot be updated — only schemes owned by the authenticated tenant.
+Updates one or more fields of an existing identifier scheme. At least one updatable field must be provided. Text fields must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400. System-default schemes cannot be updated; only schemes owned by the authenticated tenant can be.
 
 | Updatable Field | Description |
 |-----------------|-------------|
-| `name` | Scheme name (must be non-empty if provided) |
+| `name` | Scheme name (non-empty and not only whitespace if provided) |
 | `primaryKey` | Primary key identifier |
 | `validationPattern` | Regex validation pattern. Rejected with a 400 if it does not compile as a regular expression |
 | `linkTemplate` | ISO 18975 link template |
-| `idrServiceInstanceId` | IDR service instance ID (set to `null` to clear) |
+| `idrServiceInstanceId` | IDR service instance ID (set to `null` to clear). A new ID must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404 |
 | `qualifiers` | Replacement qualifier array (each item requires `key`, `description`, `validationPattern`; `order` is optional, a non-negative 32-bit integer, defaults to 0). Replaces all existing qualifiers |
 
 ---
@@ -202,7 +208,7 @@ sequenceDiagram
 POST /api/v1/identifiers
 ```
 
-Creates a new identifier after validating its value against the scheme's `validationPattern`. The scheme must exist and be accessible to the authenticated tenant (either tenant-owned or a system default).
+Creates a new identifier after validating its value against the scheme's `validationPattern`. The scheme must exist and be accessible to the authenticated tenant (either tenant-owned or a system default). The value must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
 
 | Required Field | Description |
 |----------------|-------------|
@@ -264,7 +270,7 @@ Retrieves a specific identifier by its database ID. The response includes the fu
 PATCH /api/v1/identifiers/{id}
 ```
 
-Updates the value of an existing identifier. The new value is re-validated against the scheme's `validationPattern`.
+Updates the value of an existing identifier. The new value is re-validated against the scheme's `validationPattern`, and must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
 
 | Updatable Field | Description |
 |-----------------|-------------|

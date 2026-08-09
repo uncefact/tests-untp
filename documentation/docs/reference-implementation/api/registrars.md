@@ -32,7 +32,7 @@ The `namespace` field is the grouping key used when publishing identifier scheme
 
 ### IDR service instance linkage
 
-A registrar can optionally be linked to an **IDR service instance** via `idrServiceInstanceId`. This determines which configured IDR service is responsible for resolving identifiers issued under the registrar's schemes. The linkage is optional — set it to `null` to clear the association. If the linked service instance is deleted, the reference is automatically cleared (`onDelete: SetNull`).
+A registrar can optionally be linked to an **IDR service instance** via `idrServiceInstanceId`. This determines which configured IDR service is responsible for resolving identifiers issued under the registrar's schemes. The referenced instance must be one the tenant can use: its own, or a system default. An ID that does not resolve to such an instance is rejected with a 404. The linkage is optional, and a PATCH with `idrServiceInstanceId: null` clears the association. If the linked service instance is deleted, the reference is automatically cleared (`onDelete: SetNull`).
 
 ### Tenant scoping
 
@@ -48,14 +48,14 @@ System default registrars cannot be updated or deleted by regular tenants — on
 POST /api/v1/registrars
 ```
 
-Creates a new registrar for the authenticated tenant. The request body must include `name`, `namespace`, and `url`. Optionally, an `idrServiceInstanceId` can be provided to link the registrar to an IDR service instance.
+Creates a new registrar for the authenticated tenant. The request body must include `name`, `namespace`, and `url`. Optionally, an `idrServiceInstanceId` can be provided to link the registrar to an IDR service instance. Unknown keys are ignored. Sending an optional field as an explicit `null` is rejected with a 400 (omit the field instead).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | Yes | Human-readable name (e.g. "GS1") |
-| `namespace` | string | Yes | Grouping key for IDR publishing (e.g. "gs1") |
-| `url` | string | Yes | URL of the registrar's website |
-| `idrServiceInstanceId` | string | No | ID of an IDR service instance to link |
+| `name` | string | Yes | Human-readable name (e.g. "GS1"). Must contain at least one non-whitespace character |
+| `namespace` | string | Yes | Grouping key for IDR publishing (e.g. "gs1"). Must contain at least one non-whitespace character |
+| `url` | string | Yes | A valid public http(s) URL for the registrar's website. Rejected with a 400 if it is not a valid, public http(s) URL, or if it carries leading or trailing whitespace |
+| `idrServiceInstanceId` | string | No | ID of an IDR service instance to link. Must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404 |
 
 ```mermaid
 sequenceDiagram
@@ -64,9 +64,19 @@ sequenceDiagram
     participant DB as Database
 
     Client->>RI: POST /api/v1/registrars { name, namespace, url }
-    RI->>RI: Validate required fields (name, namespace, url)
+    RI->>RI: Validate body (required fields, formats)
     alt validation fails
         RI-->>Client: 400 Bad Request
+    end
+    RI->>RI: Validate url is a public http(s) URL
+    alt url is not a public http(s) URL
+        RI-->>Client: 400 Bad Request
+    end
+    opt idrServiceInstanceId provided
+        RI->>DB: Verify instance is accessible to this tenant (own or system default)
+        alt instance not accessible
+            RI-->>Client: 404 Not Found
+        end
     end
     RI->>DB: Insert registrar record
     DB-->>RI: Created record
@@ -85,7 +95,7 @@ Returns registrars for the authenticated tenant, **including system defaults**. 
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ```mermaid
@@ -123,10 +133,10 @@ Updates one or more fields of an existing registrar. At least one updatable fiel
 
 | Updatable Field | Description |
 |-----------------|-------------|
-| `name` | Registrar name (must be non-empty if provided) |
-| `namespace` | Namespace grouping key (must be non-empty if provided) |
-| `url` | Registrar URL (must be non-empty if provided) |
-| `idrServiceInstanceId` | IDR service instance ID (set to `null` to clear the linkage) |
+| `name` | Registrar name (non-empty and not only whitespace if provided; an explicit `null` is rejected with a 400) |
+| `namespace` | Namespace grouping key (non-empty and not only whitespace if provided; an explicit `null` is rejected with a 400) |
+| `url` | A valid public http(s) URL for the registrar's website. Rejected with a 400 if provided and not a valid, public http(s) URL, if it carries leading or trailing whitespace, or if it is an explicit `null` (unlike `idrServiceInstanceId`, `url` cannot be cleared through this API) |
+| `idrServiceInstanceId` | IDR service instance ID (set to `null` to clear the linkage). A new ID must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404 |
 
 ```mermaid
 sequenceDiagram
@@ -135,9 +145,21 @@ sequenceDiagram
     participant DB as Database
 
     Client->>RI: PATCH /api/v1/registrars/{id} { name, ... }
-    RI->>RI: Validate at least one field provided
-    alt no updatable fields
+    RI->>RI: Validate body (at least one recognised field, field formats)
+    alt validation fails
         RI-->>Client: 400 Bad Request
+    end
+    opt url provided
+        RI->>RI: Validate url is a public http(s) URL
+        alt url is not a public http(s) URL
+            RI-->>Client: 400 Bad Request
+        end
+    end
+    opt idrServiceInstanceId provided (non-null)
+        RI->>DB: Verify instance is accessible to this tenant (own or system default)
+        alt instance not accessible
+            RI-->>Client: 404 Not Found
+        end
     end
     RI->>DB: Find registrar (tenant-owned only)
     alt not found or system default
@@ -156,7 +178,7 @@ sequenceDiagram
 DELETE /api/v1/registrars/{id}
 ```
 
-Permanently deletes a registrar and all of its associated identifier schemes and qualifier definitions (cascade). Only tenant-owned registrars can be deleted — system defaults are protected.
+Permanently deletes a registrar and all of its associated identifier schemes and qualifier definitions (cascade). Only tenant-owned registrars can be deleted — system defaults are protected. If any of the registrar's schemes has identifiers attached, the identifier-to-scheme relationship is `onDelete: Restrict`, so that constraint blocks the whole cascade: the delete fails as a 409 and nothing is removed (not the registrar, not its schemes, not the identifiers).
 
 ```mermaid
 sequenceDiagram
@@ -170,6 +192,10 @@ sequenceDiagram
         RI-->>Client: 404 Not Found
     end
     RI->>DB: Delete registrar (cascades to schemes)
+    alt a scheme has identifiers (onDelete: Restrict blocks the cascade)
+        DB-->>RI: Foreign key violation
+        RI-->>Client: 409 Conflict (nothing deleted)
+    end
     DB-->>RI: Deleted
     RI-->>Client: 204 No Content
 ```

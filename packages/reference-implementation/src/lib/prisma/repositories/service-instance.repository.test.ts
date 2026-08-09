@@ -479,10 +479,29 @@ describe('service-instance.repository', () => {
       expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'instance-1',
+          serviceType: 'VC',
           OR: [{ tenantId: ORG_ID }, { tenantId: SYSTEM_TENANT_ID }],
         },
       });
       expect(result).toEqual(INSTANCE_RECORD);
+    });
+
+    it('filters an explicit ID by service type, so a wrong-type instance resolves to null', async () => {
+      // Without the serviceType condition, an explicit id pointing at an
+      // instance of a different type (e.g. a VC instance where an IDR one is
+      // required) would resolve here and only fail later at adapter lookup.
+      mockServiceInstance.findFirst.mockResolvedValue(null);
+
+      const result = await getInstanceByResolution(ORG_ID, 'IDR', 'vc-instance-1');
+
+      expect(mockServiceInstance.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'vc-instance-1',
+          serviceType: 'IDR',
+          OR: [{ tenantId: ORG_ID }, { tenantId: SYSTEM_TENANT_ID }],
+        },
+      });
+      expect(result).toBeNull();
     });
 
     it('returns explicit instance by ID (system default)', async () => {

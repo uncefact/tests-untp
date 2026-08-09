@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError } from '@/lib/api/errors';
+import { ServiceType } from '@uncefact/untp-ri-services';
+import { NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { parseRequestBody, definedFields } from '@/lib/api/validation';
 import { updateSchemeRequestSchema } from '@/lib/api/request-schemas/scheme';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getIdentifierSchemeById, updateIdentifierScheme, deleteIdentifierScheme } from '@/lib/prisma/repositories';
+import {
+  deleteIdentifierScheme,
+  getIdentifierSchemeById,
+  getInstanceByResolution,
+  updateIdentifierScheme,
+} from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/schemes/[id]' });
@@ -83,7 +89,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the scheme
  *     requestBody:
  *       required: true
- *       description: At least one recognised field is required; unknown keys are ignored.
+ *       description: At least one recognised field is required; unknown keys are ignored. Text fields must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
  *       content:
  *         application/json:
  *           schema:
@@ -109,7 +115,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 type: string
  *                 minLength: 1
  *                 nullable: true
- *                 description: New IDR service instance ID (set to null to clear)
+ *                 description: New IDR service instance ID (set to null to clear). Must reference a service instance the tenant can use (its own, or a system default); otherwise the request is rejected with a 404.
  *               qualifiers:
  *                 type: array
  *                 description: Replacement qualifiers (replaces all existing qualifiers)
@@ -151,7 +157,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/IdentifierScheme'
  *       400:
- *         description: Validation error (e.g. no fields provided, a validationPattern that does not compile as a regular expression, a duplicate qualifier key, an idrServiceInstanceId that does not reference an existing service instance)
+ *         description: Validation error (e.g. no fields provided, a validationPattern that does not compile as a regular expression, a duplicate qualifier key)
  *         content:
  *           application/json:
  *             schema:
@@ -169,7 +175,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Scheme not found
+ *         description: Scheme not found, or the referenced IDR service instance does not exist or is not accessible to this tenant
  *         content:
  *           application/json:
  *             schema:
@@ -193,6 +199,23 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
   const body = await parseRequestBody(req, updateSchemeRequestSchema);
   const fields = definedFields(body);
+
+  // Same boundary check as the registrars routes: the scheme row's foreign
+  // key on idrServiceInstanceId proves only that the instance exists
+  // globally, so a tenant-scoped, type-filtered lookup is needed to keep
+  // another tenant's (or a non-IDR) instance id from being stored. A null
+  // skips the check because it clears the linkage rather than referencing
+  // anything.
+  if (typeof fields.idrServiceInstanceId === 'string') {
+    logger.info(
+      { schemeId: id, idrServiceInstanceId: fields.idrServiceInstanceId },
+      'Verifying IDR service instance is accessible to this tenant',
+    );
+    const instance = await getInstanceByResolution(tenantId, ServiceType.IDR, fields.idrServiceInstanceId);
+    if (!instance) {
+      throw new ServiceInstanceNotFoundError(fields.idrServiceInstanceId);
+    }
+  }
 
   logger.info({ schemeId: id, fields: Object.keys(fields) }, 'Updating scheme');
   const updated = await updateIdentifierScheme(id, tenantId, fields);

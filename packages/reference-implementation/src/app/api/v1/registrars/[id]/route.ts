@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { ServiceType } from '@uncefact/untp-ri-services';
+import { NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
+import { parseRequestBody, definedFields, assertHttpUrl, assertPublicUrl } from '@/lib/api/validation';
+import { updateRegistrarRequestSchema } from '@/lib/api/request-schemas/registrar';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getRegistrarById, updateRegistrar, deleteRegistrar } from '@/lib/prisma/repositories';
+import { getInstanceByResolution, getRegistrarById, updateRegistrar, deleteRegistrar } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/registrars/[id]' });
@@ -31,6 +33,12 @@ const logger = apiLogger.child({ route: '/api/v1/registrars/[id]' });
  *               $ref: '#/components/schemas/Registrar'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -76,6 +84,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the registrar
  *     requestBody:
  *       required: true
+ *       description: At least one recognised field is required; unknown keys are ignored.
  *       content:
  *         application/json:
  *           schema:
@@ -83,18 +92,26 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             properties:
  *               name:
  *                 type: string
- *                 description: New name for the registrar
+ *                 minLength: 1
+ *                 description: New name for the registrar. Must contain at least one non-whitespace character; an explicit null is rejected with a 400.
  *               namespace:
  *                 type: string
- *                 description: New namespace for the registrar
+ *                 minLength: 1
+ *                 description: New namespace for the registrar. Must contain at least one non-whitespace character; an explicit null is rejected with a 400.
  *               url:
  *                 type: string
- *                 description: New URL for the registrar
+ *                 format: uri
+ *                 description: A valid public http(s) URL for the registrar's website. Rejected with a 400 if it is not a valid, public http(s) URL, if it carries leading or trailing whitespace, or if it is an explicit null.
  *               idrServiceInstanceId:
  *                 type: string
+ *                 minLength: 1
  *                 nullable: true
- *                 description: New IDR service instance ID (set to null to clear)
- *             minProperties: 1
+ *                 description: New IDR service instance ID (set to null to clear). Must reference a service instance the tenant can use (its own, or a system default); otherwise the request is rejected with a 404.
+ *             anyOf:
+ *               - required: [name]
+ *               - required: [namespace]
+ *               - required: [url]
+ *               - required: [idrServiceInstanceId]
  *     responses:
  *       200:
  *         description: Registrar updated successfully
@@ -103,7 +120,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/Registrar'
  *       400:
- *         description: Validation error - at least one field required
+ *         description: Validation error (e.g. no recognised fields provided, a blank name or namespace, a url that is not a valid public http(s) URL)
  *         content:
  *           application/json:
  *             schema:
@@ -114,8 +131,14 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Registrar not found
+ *         description: Registrar not found, or the referenced IDR service instance does not exist or is not accessible to this tenant
  *         content:
  *           application/json:
  *             schema:
@@ -129,40 +152,44 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  */
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  logger.info({ registrarId: id }, 'Parsing request body');
+  logger.info({ registrarId: id }, 'Validating update fields');
 
-  let body: {
-    name?: string;
-    namespace?: string;
-    url?: string;
-    idrServiceInstanceId?: string | null;
-  };
+  const body = await parseRequestBody(req, updateRegistrarRequestSchema);
+  const fields = definedFields(body);
 
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
+  // Same stored-URL layer as POST (see route.ts): the schema's `.url()` is
+  // format-only, so a provided url still needs the scheme/userinfo and SSRF
+  // checks here before it reaches the repository. Also stores the value
+  // verbatim rather than assertHttpUrl's canonical `.href`, for the same
+  // reason recorded in route.ts (no parser-differential gap to close here,
+  // nothing dereferences registrar.url server-side, canonicalising would
+  // mutate stored data); revisit before any server-side dereference of
+  // registrar.url is introduced.
+  if (fields.url !== undefined) {
+    assertHttpUrl(fields.url, 'url');
+    if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+      logger.info({ registrarId: id }, 'Validating registrar URL is not internal');
+      await assertPublicUrl(fields.url, 'url');
+    }
   }
 
-  const hasName = isNonEmptyString(body.name);
-  const hasNamespace = isNonEmptyString(body.namespace);
-  const hasUrl = isNonEmptyString(body.url);
-  const hasIdrServiceInstanceId = body.idrServiceInstanceId !== undefined;
-
-  if (!hasName && !hasNamespace && !hasUrl && !hasIdrServiceInstanceId) {
-    throw new ValidationError('At least one of name, namespace, url, or idrServiceInstanceId is required');
+  // Same boundary check as POST (see route.ts): the row's foreign key only
+  // proves the instance exists globally, so a tenant-scoped lookup is needed
+  // to keep another tenant's instance id from being stored. A null skips the
+  // check because it clears the linkage rather than referencing anything.
+  if (typeof fields.idrServiceInstanceId === 'string') {
+    logger.info(
+      { registrarId: id, idrServiceInstanceId: fields.idrServiceInstanceId },
+      'Verifying IDR service instance is accessible to this tenant',
+    );
+    const instance = await getInstanceByResolution(tenantId, ServiceType.IDR, fields.idrServiceInstanceId);
+    if (!instance) {
+      throw new ServiceInstanceNotFoundError(fields.idrServiceInstanceId);
+    }
   }
 
-  logger.info(
-    { registrarId: id, fields: { hasName, hasNamespace, hasUrl, hasIdrServiceInstanceId } },
-    'Updating registrar',
-  );
-  const updated = await updateRegistrar(id, tenantId, {
-    ...(hasName && { name: body.name }),
-    ...(hasNamespace && { namespace: body.namespace }),
-    ...(hasUrl && { url: body.url }),
-    ...(hasIdrServiceInstanceId && { idrServiceInstanceId: body.idrServiceInstanceId }),
-  });
+  logger.info({ registrarId: id, fields: Object.keys(fields) }, 'Updating registrar');
+  const updated = await updateRegistrar(id, tenantId, fields);
 
   logger.info({ registrarId: id }, 'Registrar updated');
   return NextResponse.json(updated);
@@ -188,6 +215,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *         description: Registrar deleted successfully
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:

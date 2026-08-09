@@ -36,6 +36,26 @@ export function isRecordNotFound(error: unknown): boolean {
 }
 
 /**
+ * P2003 scoped to a specific foreign-key column, for writes that carry more
+ * than one foreign key: a bare isForeignKeyViolation check on such a write
+ * would attribute every violation to whichever reference the caller's message
+ * happens to name. Prisma's documented P2003 message embeds the violated
+ * field ("Foreign key constraint failed on the field: `{field_name}`",
+ * https://www.prisma.io/docs/orm/reference/error-reference#p2003), and the
+ * engine also carries it in `meta` (on PostgreSQL as the constraint name,
+ * e.g. `Registrar_idrServiceInstanceId_fkey`), so the column is matched as a
+ * substring across both. No match makes no claim: the caller should rethrow
+ * rather than guess. Pass a column name specific enough not to appear inside
+ * another column's constraint name.
+ */
+export function isForeignKeyViolationOn(error: unknown, column: string): boolean {
+  if (!isForeignKeyViolation(error)) return false;
+  const { message, meta } = error as { message?: unknown; meta?: Record<string, unknown> };
+  const candidates = [message, ...Object.values(meta ?? {})];
+  return candidates.some((value) => typeof value === 'string' && value.includes(column));
+}
+
+/**
  * True for any error thrown by the Prisma client (known request errors,
  * client-side validation errors, initialisation errors, etc.). All Prisma
  * client errors carry `clientVersion` and a `PrismaClient*` name.

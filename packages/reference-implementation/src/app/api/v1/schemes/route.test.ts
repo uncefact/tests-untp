@@ -27,11 +27,13 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 const mockCreateIdentifierScheme = jest.fn();
 const mockListIdentifierSchemes = jest.fn();
 const mockGetRegistrarById = jest.fn();
+const mockGetInstanceByResolution = jest.fn();
 
 jest.mock('@/lib/prisma/repositories', () => ({
   createIdentifierScheme: (input: unknown) => mockCreateIdentifierScheme(input),
   listIdentifierSchemes: (tenantId: string, opts: unknown) => mockListIdentifierSchemes(tenantId, opts),
   getRegistrarById: (id: string, tenantId: string) => mockGetRegistrarById(id, tenantId),
+  getInstanceByResolution: (...args: unknown[]) => mockGetInstanceByResolution(...args),
 }));
 
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
@@ -70,6 +72,7 @@ describe('POST /api/v1/schemes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetRegistrarById.mockResolvedValue({ id: 'reg-1', name: 'GS1' });
+    mockGetInstanceByResolution.mockResolvedValue({ id: 'inst-1', tenantId: 'org-1' });
   });
 
   it('creates a scheme and returns 201', async () => {
@@ -260,11 +263,56 @@ describe('POST /api/v1/schemes', () => {
     });
     await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
+    // Verifies the tenant-scoped accessibility check runs before the write
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('org-1', 'IDR', 'inst-1');
     expect(mockCreateIdentifierScheme).toHaveBeenCalledWith(
       expect.objectContaining({
         idrServiceInstanceId: 'inst-1',
       }),
     );
+  });
+
+  it('skips the instance lookup when idrServiceInstanceId is omitted', async () => {
+    mockCreateIdentifierScheme.mockResolvedValue({ id: 'sch-1' });
+
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(201);
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when idrServiceInstanceId is not accessible to the tenant, and does not call the repository', async () => {
+    // The row's foreign key would accept any globally-existing instance, so
+    // the handler's tenant-scoped lookup is what keeps another tenant's
+    // instance id from being stored; a null lookup result covers a
+    // nonexistent id, another tenant's, and a non-IDR instance.
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        idrServiceInstanceId: 'other-tenant-inst',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('Service instance not found');
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing registrarId', async () => {
@@ -296,6 +344,43 @@ describe('POST /api/v1/schemes', () => {
     expect(json.error).toMatch(/^name:/);
     expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
     expect(mockGetRegistrarById).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a whitespace-only name and does not call the repository', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: '   ',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('name: must not be only whitespace');
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a whitespace-only qualifier key and does not call the repository', async () => {
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [{ key: ' ', description: 'Batch or lot number', validationPattern: '^.+$' }],
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('qualifiers.0.key: must not be only whitespace');
+    expect(mockCreateIdentifierScheme).not.toHaveBeenCalled();
   });
 
   it('returns 400 for missing primaryKey', async () => {

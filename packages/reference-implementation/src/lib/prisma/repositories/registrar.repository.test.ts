@@ -51,10 +51,21 @@ function prismaRecordNotFoundError(): Error {
   return error;
 }
 
-function prismaForeignKeyViolationError(): Error {
-  const error = new Error('Foreign key constraint failed on the field: `idrServiceInstanceId`');
+// Mirrors Prisma's documented P2003 shape: the violated field is embedded in
+// the message ("Foreign key constraint failed on the field: `{field_name}`",
+// https://www.prisma.io/docs/orm/reference/error-reference#p2003) and carried
+// in meta (on PostgreSQL as the constraint name). The column parameter lets a
+// test fabricate a violation on either of the Registrar insert's two foreign
+// keys, since the repository must attribute its message only to the
+// idrServiceInstanceId one.
+function prismaForeignKeyViolationError(column = 'idrServiceInstanceId'): Error {
+  const error = new Error(`Foreign key constraint failed on the field: \`${column}\``);
   error.name = 'PrismaClientKnownRequestError';
-  Object.assign(error, { code: 'P2003', clientVersion: '6.0.0' });
+  Object.assign(error, {
+    code: 'P2003',
+    clientVersion: '6.0.0',
+    meta: { field_name: `Registrar_${column}_fkey (index)` },
+  });
   return error;
 }
 
@@ -115,7 +126,7 @@ describe('registrar.repository', () => {
       });
     });
 
-    it('maps a foreign-key violation to ValidationError', async () => {
+    it('maps a foreign-key violation on idrServiceInstanceId to ValidationError', async () => {
       mockRegistrar.create.mockRejectedValue(prismaForeignKeyViolationError());
 
       const result = createRegistrar({
@@ -127,6 +138,24 @@ describe('registrar.repository', () => {
 
       await expect(result).rejects.toThrow(ValidationError);
       await expect(result).rejects.toThrow('The referenced IDR service instance does not exist');
+    });
+
+    it('rethrows a foreign-key violation on tenantId rather than blaming the IDR instance', async () => {
+      // The insert carries two foreign keys; a violation on tenantId (a tenant
+      // deleted between auth resolution and the insert) must not surface with
+      // the idrServiceInstanceId-specific message.
+      const tenantFkError = prismaForeignKeyViolationError('tenantId');
+      mockRegistrar.create.mockRejectedValue(tenantFkError);
+
+      const result = createRegistrar({
+        tenantId: TENANT_ID,
+        name: 'GS1',
+        namespace: 'gs1',
+      });
+
+      // Identity assertion: the original engine error is rethrown unchanged,
+      // not replaced by the instance-specific ValidationError.
+      await expect(result).rejects.toBe(tenantFkError);
     });
 
     it('rethrows a non-database error unchanged', async () => {
@@ -267,7 +296,7 @@ describe('registrar.repository', () => {
       );
     });
 
-    it('maps a foreign-key violation to ValidationError', async () => {
+    it('maps a foreign-key violation on idrServiceInstanceId to ValidationError', async () => {
       mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
       mockTx.registrar.update.mockRejectedValue(prismaForeignKeyViolationError());
 
@@ -275,6 +304,16 @@ describe('registrar.repository', () => {
 
       await expect(result).rejects.toThrow(ValidationError);
       await expect(result).rejects.toThrow('The referenced IDR service instance does not exist');
+    });
+
+    it('rethrows a foreign-key violation on another column rather than blaming the IDR instance', async () => {
+      mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
+      const tenantFkError = prismaForeignKeyViolationError('tenantId');
+      mockTx.registrar.update.mockRejectedValue(tenantFkError);
+
+      const result = updateRegistrar('reg-1', TENANT_ID, { name: 'GS1 Updated' });
+
+      await expect(result).rejects.toBe(tenantFkError);
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {
