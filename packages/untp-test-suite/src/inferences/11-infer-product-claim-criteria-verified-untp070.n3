@@ -1,0 +1,50 @@
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix result: <http://example.org/result#> .
+@prefix schemaorg: <https://schema.org/> .
+@prefix untp: <https://vocabulary.uncefact.org/untp/> .
+@prefix vc: <https://www.w3.org/2018/credentials#> .
+
+# UNTP 0.7.0 counterpart of 10-infer-product-claim-criteria-verified.n3.
+# In 0.7.0 the vocabulary is unified under https://vocabulary.uncefact.org/untp/,
+# the DPP credentialSubject IS the product (no intermediate untp:product node),
+# claims are untp:performanceClaim (was untp:conformityClaim) and their criteria
+# are untp:referenceCriteria (was untp:assessmentCriteria).
+# The 0.6.x rule is left untouched and still applies to 0.6.x credentials.
+{
+   # Find product passport claims
+   ?dppCredential a untp:DigitalProductPassport .
+   ?dppCredential vc:credentialSubject ?product .
+   ?product schemaorg:name ?productName .
+   ?product untp:performanceClaim ?claim .
+   ?claim untp:conformityTopic ?topic .
+   ?claim untp:referenceCriteria ?criterion .
+   ?criterion schemaorg:name ?criterionName .
+
+   # Find matching conformity credential
+   ?dccCredential a untp:DigitalConformityCredential .
+   ?dccCredential vc:issuer ?dccIssuer .
+   ?dccIssuer schemaorg:name ?dccIssuerName .
+   ?dccCredential vc:credentialSubject ?attestation .
+   ?attestation untp:conformityAssessment ?assessment .
+   ?assessment untp:assessedProduct ?assessedProduct .
+   ?assessedProduct untp:product ?assessedProductId .
+   ?assessment untp:conformityTopic ?assessedTopic .
+   ?assessment untp:conformance ?dccConformance .
+   ?assessment untp:assessmentCriteria ?dccCriterion .
+
+   # Only match when the assessed product Id is for the same product as the
+   # claim AND the assessed topic is the same topic as the claim AND the
+   # assessed conformance is true.
+   ?assessedProductId log:equalTo ?product .
+   ?assessedTopic log:equalTo ?topic .
+   ?dccConformance log:equalTo true .
+   ?dccCriterion log:equalTo ?criterion .
+}
+=>
+{
+   ?claim result:verifiedCriterion ?criterion .
+   ?claim result:dependsOn ?dccCredential .
+   ?dppCredential result:claimsAttestedBy ?dccCredential .
+} .

@@ -1,0 +1,24 @@
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix result: <http://example.org/result#> .
+@prefix untp: <https://vocabulary.uncefact.org/untp/> .
+
+# UNTP 0.7.0 counterpart of 20-infer-product-claim-verified.n3.
+# Depends on inferences created in 11-infer-product-claim-criteria-verified-untp070.n3
+# and so must be run after it. In 0.7.0 a claim's criteria are untp:referenceCriteria.
+{
+   ?claim a untp:Claim .
+   (
+       {
+           ?claim untp:referenceCriteria ?criterion
+       }
+       {
+           ?claim result:verifiedCriterion ?criterion
+       }
+   ) log:forAllIn _:t .
+}
+=>
+{
+   ?claim result:allCriteriaVerified true .
+} .
