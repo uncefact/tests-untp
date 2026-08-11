@@ -94,3 +94,4 @@ CONTEXT.md
 # Turborepo local cache
 .turbo/
 **/.turbo/
+.playwright-mcp/

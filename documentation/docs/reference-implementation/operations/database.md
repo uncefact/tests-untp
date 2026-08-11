@@ -26,6 +26,25 @@ The database connection can be configured either as a single connection string o
 
 Set `RI_DATABASE_URL` directly when the connection string carries options the `RI_POSTGRES_*` parts cannot express, or when a secrets manager already supplies one. When it is set, the Reference Implementation uses it as given and does not construct a URL from the other variables.
 
+The user and password defaults are the container entrypoint's fallbacks for quick local starts. Set explicit credentials in any real deployment, and see [Minimum Privileges](#minimum-privileges) for the account to provision.
+
+## Minimum Privileges
+
+Superuser access is not required. The migrations Prisma Migrate applies at startup perform standard DDL (creating, altering, and dropping the application's own tables, indexes, constraints, and enum types) plus data migrations on those tables, and never install PostgreSQL extensions.
+
+On a shared PostgreSQL instance, provision a dedicated user that owns a dedicated database:
+
+```sql
+CREATE USER ri_user WITH PASSWORD '...';
+CREATE DATABASE ri OWNER ri_user;
+```
+
+The Reference Implementation creates its tables in the database's default `public` schema; the connection URLs its tooling constructs always target `public`.
+
+On a freshly created PostgreSQL 15+ database this is sufficient for the container's startup path (`prisma migrate deploy`) and for the application at runtime: the database owner is an implicit member of `pg_database_owner`, which owns the `public` schema, so `USAGE` and `CREATE` follow without further grants. On a database that was restored from a dump or upgraded from an earlier PostgreSQL major version, the `public` schema keeps its previous owner and permissions, so check that `ri_user` can create in it and that untrusted roles cannot.
+
+The Docker Compose configuration in the repository provisions a dedicated `ri-db` container whose init user (`ri-postgres` by default) is that container's cluster superuser, which is the standard behaviour of the official PostgreSQL image for a single-purpose instance. That does not mean the application needs superuser rights; when pointing the Reference Implementation at a shared instance, the dedicated owner-user above is sufficient.
+
 ## Migrations and Seeding
 
 On startup, the Reference Implementation automatically applies database migrations and seeds system default records. See [Startup](./startup) for the full sequence, what gets seeded, and how to control each step.
