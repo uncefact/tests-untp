@@ -39,11 +39,7 @@ const CredentialInfo = ({ credential }: { credential: VerifiableCredential | Uns
       <ListItem>
         <ListItemText primary='Issued by' secondary={processIssuer(credential.issuer)} />
       </ListItem>
-      {/* Rendered as the UTC calendar date in ISO 8601: MM/DD vs DD/MM is
-          ambiguous, and a viewer-local date can differ between reviewers of
-          the same credential (#855). The validity guard matters because
-          moment(undefined) means "now": an absent or unparseable validFrom
-          must omit the row, never invent a date. */}
+      {/* moment(undefined) means "now": omit the row rather than invent a date (#855). */}
       {moment.utc(validFrom ?? NaN).isValid() && (
         <ListItem>
           <ListItemText primary='Valid from' secondary={moment.utc(validFrom).format('YYYY-MM-DD')} />
