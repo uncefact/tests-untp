@@ -28,6 +28,7 @@ import {
   ServiceType,
 } from '@uncefact/untp-ri-services';
 import { getDidConfig } from '../src/lib/config/did.config.js';
+import { databaseUrlFromEnvParts } from '../src/lib/prisma/database-url.js';
 import {
   resolveDataEncryptionKey,
   warnIfDeprecatedEncryptionKeyName,
@@ -50,11 +51,13 @@ const logger = createLogger().child({ module: 'prisma-seed' });
 // Load .env before accessing config (seed runs outside Next.js)
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-// Construct RI_DATABASE_URL from individual env vars (same as prisma.config.ts)
-// In Docker, these come from docker-compose; locally, from .env
-const { RI_POSTGRES_USER, RI_POSTGRES_PASSWORD, RI_POSTGRES_DB, RI_POSTGRES_HOST, RI_POSTGRES_PORT } = process.env;
-if (RI_POSTGRES_USER && RI_POSTGRES_PASSWORD && RI_POSTGRES_DB && RI_POSTGRES_HOST && RI_POSTGRES_PORT) {
-  process.env.RI_DATABASE_URL = `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${RI_POSTGRES_HOST}:${RI_POSTGRES_PORT}/${RI_POSTGRES_DB}?schema=public`;
+// Honour a pre-set RI_DATABASE_URL; construct one from the RI_POSTGRES_*
+// variables only when it is absent (the same rule as docker-entrypoint.sh
+// and the backfill scripts), so an explicit URL is never silently retargeted
+// by stale component variables (#766).
+const constructedDatabaseUrl = databaseUrlFromEnvParts();
+if (!process.env.RI_DATABASE_URL && constructedDatabaseUrl) {
+  process.env.RI_DATABASE_URL = constructedDatabaseUrl;
 }
 
 const prisma = new PrismaClient();

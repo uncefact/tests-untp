@@ -13,15 +13,18 @@ When using the Docker Compose configuration from the [repository](https://github
 
 ## Configuration
 
-The following environment variables must be passed to the Reference Implementation to configure the database connection:
+The database connection can be configured either as a single connection string or as separate parts.
 
 | Variable | Required | Description | Default |
 |----------|----------|-------------|---------|
-| `RI_POSTGRES_HOST` | Yes | Database hostname | — |
+| `RI_DATABASE_URL` | No | A complete PostgreSQL connection string. Takes precedence over the `RI_POSTGRES_*` variables below when set. | — |
+| `RI_POSTGRES_HOST` | Yes, if `RI_DATABASE_URL` is not set | Database hostname | — |
 | `RI_POSTGRES_PORT` | No | Database port | `5432` |
 | `RI_POSTGRES_USER` | No | Database user | `postgres` |
 | `RI_POSTGRES_PASSWORD` | No | Database password | `postgres` |
 | `RI_POSTGRES_DB` | No | Database name | `ri` |
+
+Set `RI_DATABASE_URL` directly when the connection string carries options the `RI_POSTGRES_*` parts cannot express, or when a secrets manager already supplies one. When it is set, the Reference Implementation uses it as given and does not construct a URL from the other variables.
 
 ## Migrations and Seeding
 

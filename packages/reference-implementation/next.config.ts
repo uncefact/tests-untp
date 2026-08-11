@@ -3,40 +3,29 @@ import path from 'path';
 import type { NextConfig } from 'next';
 import { PHASE_PRODUCTION_BUILD } from 'next/constants';
 
+import { databaseUrlFromEnvParts } from './src/lib/prisma/database-url';
+
 // Load .env from repository root
 // Local dev: Loads environment variables from .env file
 // Docker: Silently skips if file doesn't exist (vars already set by docker-compose)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const nextConfig = (phase: string): NextConfig => {
-  const { RI_POSTGRES_USER, RI_POSTGRES_PASSWORD, RI_POSTGRES_DB, RI_POSTGRES_HOST, RI_POSTGRES_PORT } = process.env;
-
-  // Validate required environment variables (skip during build phase for Docker)
-  if (phase !== PHASE_PRODUCTION_BUILD) {
-    const requiredEnvVars = {
-      RI_POSTGRES_USER,
-      RI_POSTGRES_PASSWORD,
-      RI_POSTGRES_DB,
-      RI_POSTGRES_HOST,
-      RI_POSTGRES_PORT,
-    };
-
-    const missingVars = Object.entries(requiredEnvVars)
-      .filter(([_, value]) => !value)
-      .map(([key]) => key);
-
-    if (missingVars.length > 0) {
-      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
-    }
+  // Honour a pre-set RI_DATABASE_URL; construct one from the RI_POSTGRES_*
+  // variables only when it is absent (the same rule as docker-entrypoint.sh,
+  // prisma.config.ts, the seed, and the backfill scripts), so an explicit URL
+  // is never silently retargeted by stale component variables (#766). Outside
+  // the production build phase (where Docker supplies env at runtime), fail
+  // loudly when neither form of database target is available.
+  const constructedDatabaseUrl = databaseUrlFromEnvParts();
+  if (!process.env.RI_DATABASE_URL && constructedDatabaseUrl) {
+    process.env.RI_DATABASE_URL = constructedDatabaseUrl;
   }
-
-  // Construct the database URL from individual environment variables
-  const databaseUrl = `postgresql://${RI_POSTGRES_USER || ''}:${RI_POSTGRES_PASSWORD || ''}@${RI_POSTGRES_HOST || ''}:${
-    RI_POSTGRES_PORT || ''
-  }/${RI_POSTGRES_DB || ''}?schema=public`;
-
-  // Set RI_DATABASE_URL for runtime access
-  process.env.RI_DATABASE_URL = databaseUrl;
+  if (!process.env.RI_DATABASE_URL && phase !== PHASE_PRODUCTION_BUILD) {
+    throw new Error(
+      'No database target configured: set RI_DATABASE_URL, or all of RI_POSTGRES_USER, RI_POSTGRES_PASSWORD, RI_POSTGRES_DB, RI_POSTGRES_HOST and RI_POSTGRES_PORT',
+    );
+  }
 
   return {
     output: 'standalone',
