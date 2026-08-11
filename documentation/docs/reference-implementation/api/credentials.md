@@ -218,7 +218,7 @@ The IDR entry's `description` field is taken from the primary entity's `descript
 
 The published link does **not** carry the credential's decryption key. The key is not registered on the Identity Resolver; it is shared out of band, so access to an encrypted credential does not travel with its discovery link (regardless of whether a given resolver is publicly readable). A credential stored encrypted (the storage default) therefore needs its decryption key supplied out of band to verify, and the published link alone verifies a credential stored unencrypted. The issuing tenant can retrieve that decryption key from the credential's [Get a Credential](#get-a-credential) response and share it through a channel of its choosing. This differs from a link shared directly as a single-link capability, which may embed the key (see [the verify page](../verify-page#decryption)).
 
-If `RI_APP_URL` is unset, is not a valid `http(s)` URL, or carries userinfo when the default is needed, the request is rejected (`400`) up front, before the credential is issued, so a misconfigured deployment fails at request time rather than publishing a broken or secret-bearing link. Set `RI_APP_URL`, or pass `humanVerificationUrl`, to resolve it.
+`RI_APP_URL` is validated when the application starts (see [Startup](../operations/startup#base-url-validation)), so a deployment that could not build a safe default link fails at boot rather than at request time. Omitting `humanVerificationUrl` is always a valid request; supplying it overrides the default for deployments that host verification elsewhere.
 
 | Publishing Option | Type | Description |
 |-------------------|------|-------------|

@@ -1055,60 +1055,6 @@ describe('POST /api/v1/credentials', () => {
         );
       });
 
-      it('fails with 400 before issuance when RI_APP_URL is unset and no humanVerificationUrl is given', async () => {
-        setupPublishingHappyPath();
-        delete process.env.RI_APP_URL;
-
-        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
-        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-        const json = await res.json();
-
-        expect(res.status).toBe(400);
-        expect(json.error).toContain('RI_APP_URL');
-        // Failure is early: nothing is signed, stored, or published.
-        expect(mockIssueCredential).not.toHaveBeenCalled();
-        expect(mockPublishLinks).not.toHaveBeenCalled();
-      });
-
-      it('fails with 400 when RI_APP_URL is syntactically not a URL', async () => {
-        setupPublishingHappyPath();
-        process.env.RI_APP_URL = 'not a url';
-
-        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
-        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-        const json = await res.json();
-
-        expect(res.status).toBe(400);
-        expect(json.error).toContain('RI_APP_URL');
-        expect(mockIssueCredential).not.toHaveBeenCalled();
-      });
-
-      it('fails with 400 when RI_APP_URL parses but is not an http(s) URL', async () => {
-        setupPublishingHappyPath();
-        process.env.RI_APP_URL = 'ftp://ri.example.com';
-
-        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
-        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-        const json = await res.json();
-
-        expect(res.status).toBe(400);
-        expect(json.error).toContain('RI_APP_URL');
-        expect(mockIssueCredential).not.toHaveBeenCalled();
-      });
-
-      it('fails with 400 when RI_APP_URL carries userinfo, rather than publishing the secret', async () => {
-        setupPublishingHappyPath();
-        process.env.RI_APP_URL = 'https://user:pass@ri.example.com';
-
-        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
-        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-        const json = await res.json();
-
-        expect(res.status).toBe(400);
-        expect(json.error).toContain('RI_APP_URL');
-        expect(mockIssueCredential).not.toHaveBeenCalled();
-      });
-
       it('uses an explicit humanVerificationUrl even when RI_APP_URL is unset', async () => {
         setupPublishingHappyPath();
         delete process.env.RI_APP_URL;

@@ -27,8 +27,13 @@ import {
   assertNotPlaceholderEncryptionKey,
   validateEncryptionKeyAtStartup,
 } from './lib/credentials/validate-encryption-key-startup';
+import { resolveAppUrl } from './lib/config/app-url.config';
 
 export async function registerNode(): Promise<void> {
+  // Fail the boot on a missing or unusable RI_APP_URL: it backs the OIDC
+  // post-logout redirect and the default human verification link, and the
+  // identity-provider documentation requires it (#823).
+  resolveAppUrl();
   await validateEncryptionKeyOnBoot();
   startOpenTelemetry();
 }
