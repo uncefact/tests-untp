@@ -6,7 +6,10 @@ class RenderPage {
     cy.contains('Issued by').should('be.visible');
     cy.contains(expectedIssuerId).should('be.visible');
 
-    cy.contains('Issue date').should('be.visible');
+    // Credentials issued by the RI follow VC data model v2 (validFrom, no
+    // issuanceDate), so the Issue date row is omitted rather than showing a
+    // fabricated date (#855).
+    cy.contains('Issue date').should('not.exist');
   }
 
   verifyButtonsVisibilityAndText() {
