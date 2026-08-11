@@ -41,6 +41,10 @@ role (it now protects service instance configurations and credential decryption 
   into an existing deployment that still has its real `SERVICE_ENCRYPTION_KEY`; rename
   your existing variable instead, keeping its value.
 
+## RI_APP_URL is required at startup
+
+The application now validates `RI_APP_URL` when it starts and refuses to boot when it is unset, is not a valid `http(s)` URL, or carries a username or password. Earlier versions started without it, skipped the identity provider's end-session redirect on logout, and rejected the first publish that needed the default human verification link. Set `RI_APP_URL` to the deployment's public base URL before upgrading; the shipped `.env.example` and Docker Compose files already default it for local development.
+
 ## Decryption-key backfill for existing credentials
 
 Credentials created by earlier versions still hold their decryption key in plaintext.
