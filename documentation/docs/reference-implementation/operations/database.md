@@ -26,6 +26,8 @@ The database connection can be configured either as a single connection string o
 
 Set `RI_DATABASE_URL` directly when the connection string carries options the `RI_POSTGRES_*` parts cannot express, or when a secrets manager already supplies one. When it is set, the Reference Implementation uses it as given and does not construct a URL from the other variables.
 
+The user and password defaults are the container entrypoint's fallbacks for quick local starts. Set explicit credentials in any real deployment, and see [Minimum Privileges](#minimum-privileges) for the account to provision.
+
 ## Minimum Privileges
 
 Superuser access is not required. The migrations Prisma Migrate applies at startup perform standard DDL (creating, altering, and dropping the application's own tables, indexes, constraints, and enum types) plus data migrations on those tables, and never install PostgreSQL extensions.
