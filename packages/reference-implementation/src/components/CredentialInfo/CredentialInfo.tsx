@@ -36,10 +36,17 @@ const CredentialInfo = ({ credential }: { credential: VerifiableCredential | Uns
       <ListItem>
         <ListItemText primary='Issued by' secondary={processIssuer(credential.issuer)} />
       </ListItem>
-      <ListItem>
-        {/* ISO 8601 for an international audience: MM/DD vs DD/MM is ambiguous (#855). */}
-        <ListItemText primary='Issue date' secondary={moment(credential.issuanceDate).format('YYYY-MM-DD')} />
-      </ListItem>
+      {/* ISO 8601 in UTC for an international audience: MM/DD vs DD/MM is
+          ambiguous, and a viewer-local date can differ between reviewers of
+          the same credential (#855). The row is omitted entirely when the
+          credential carries no parseable issuanceDate (VC data model v2 uses
+          validFrom/validUntil instead): moment(undefined) means "now", which
+          would fabricate an issue date the credential never stated. */}
+      {moment.utc(credential.issuanceDate ?? NaN).isValid() && (
+        <ListItem>
+          <ListItemText primary='Issue date' secondary={moment.utc(credential.issuanceDate).format('YYYY-MM-DD')} />
+        </ListItem>
+      )}
     </List>
   );
 };

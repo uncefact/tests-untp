@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import moment from 'moment';
 import { CredentialInfo } from '../CredentialInfo';
 
 // Mocking MUI components
@@ -111,12 +110,30 @@ describe('Credential info content', () => {
     expect(screen.getByText('OtherType')).not.toBeNull();
   });
 
-  it('renders the issue date in ISO 8601 (YYYY-MM-DD) format', () => {
+  it('renders the issue date as the UTC calendar date in ISO 8601 (YYYY-MM-DD)', () => {
     render(<CredentialInfo credential={credential} />);
-    // The fixture's issuanceDate is 2023-12-20T03:31:45.547Z; the displayed
-    // date must be the unambiguous ISO form, not MM/DD/YYYY (#855).
-    expect(screen.getByText(moment('2023-12-20T03:31:45.547Z').format('YYYY-MM-DD'))).not.toBeNull();
+    // The fixture's issuanceDate is 2023-12-20T03:31:45.547Z. The literal UTC
+    // date must render regardless of the viewer's timezone (a local-time
+    // rendering would show 2023-12-19 west of UTC), and never MM/DD/YYYY (#855).
+    expect(screen.getByText('2023-12-20')).not.toBeNull();
     expect(screen.queryByText('12/20/2023')).toBeNull();
+  });
+
+  it('omits the issue date row when the credential has no issuanceDate', () => {
+    // VC data model v2 credentials carry validFrom/validUntil, not
+    // issuanceDate. moment(undefined) would render today's date, fabricating
+    // an issue date the credential never stated (#855).
+    const { issuanceDate: _omitted, ...v2Credential } = credential;
+    // The @vckit v1 type requires issuanceDate; v2 payloads genuinely omit it.
+    render(
+      <CredentialInfo credential={v2Credential as unknown as Parameters<typeof CredentialInfo>[0]['credential']} />,
+    );
+    expect(screen.queryByText('Issue date')).toBeNull();
+  });
+
+  it('omits the issue date row when issuanceDate is unparseable', () => {
+    render(<CredentialInfo credential={{ ...credential, issuanceDate: 'not-a-date' }} />);
+    expect(screen.queryByText('Issue date')).toBeNull();
   });
 
   it('should show an issuer with string type', () => {
