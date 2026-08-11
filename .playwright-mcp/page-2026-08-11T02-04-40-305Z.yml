@@ -1,0 +1,13 @@
+- list [ref=e3]:
+  - listitem [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: Type
+      - paragraph [ref=e7]: ProductPassportCredential
+  - listitem [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]: Issued by
+      - paragraph [ref=e11]: did:web:processor.agtrace.showthething.com
+  - listitem [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]: Issue date
+      - paragraph [ref=e15]: 2024-01-15

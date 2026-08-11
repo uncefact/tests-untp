@@ -28,16 +28,21 @@ Set `RI_DATABASE_URL` directly when the connection string carries options the `R
 
 ## Minimum Privileges
 
-Superuser access is not required. The Reference Implementation performs only standard DDL through Prisma Migrate (creating, altering, and dropping its own tables, indexes, constraints, and enum types) and does not install PostgreSQL extensions.
+Superuser access is not required. The migrations Prisma Migrate applies at startup perform standard DDL (creating, altering, and dropping the application's own tables, indexes, constraints, and enum types) plus data migrations on those tables, and never install PostgreSQL extensions.
 
-The minimum required privilege is ownership of the application's database. On a shared PostgreSQL instance, provision a dedicated user and database like this:
+The recommended provisioning model on a shared PostgreSQL instance is a dedicated user that owns a dedicated database:
 
 ```sql
 CREATE USER ri_user WITH PASSWORD '...';
 CREATE DATABASE ri OWNER ri_user;
 ```
 
-Database ownership implies `USAGE` and `CREATE` on the `public` schema, which is all Prisma Migrate needs to manage the schema and all the application needs at runtime.
+On a freshly created PostgreSQL 15+ database this is sufficient for the container's startup path (`prisma migrate deploy`) and for the application at runtime: the database owner is an implicit member of `pg_database_owner`, which owns the `public` schema the Reference Implementation targets, so `USAGE` and `CREATE` follow without further grants. On a database that was restored from a dump or upgraded from an earlier PostgreSQL major version, the `public` schema keeps its previous owner and permissions, so check that `ri_user` can create in it and that untrusted roles cannot.
+
+Two caveats for this model:
+
+- It is the recommended model, not the theoretical minimum. A narrower grant set (`CONNECT` plus `USAGE` and `CREATE` on the schema) can also run the migrations, but database ownership is simpler to provision and to reason about, and the same role must own the objects it later alters or drops.
+- Local development uses `prisma migrate dev`, which additionally needs a shadow database. Give the role `CREATEDB` for that, or configure a shadow database explicitly; the deployed container runs `prisma migrate deploy`, which needs neither.
 
 The Docker Compose configuration in the repository provisions a dedicated `ri-db` container whose init user (`ri-postgres` by default) is that container's cluster superuser, which is the standard behaviour of the official PostgreSQL image for a single-purpose instance. That does not mean the application needs superuser rights; when pointing the Reference Implementation at a shared instance, the dedicated owner-user above is sufficient.
 
