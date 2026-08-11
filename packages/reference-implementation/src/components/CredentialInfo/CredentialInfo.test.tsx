@@ -110,6 +110,26 @@ describe('Credential info content', () => {
     expect(screen.getByText('OtherType')).not.toBeNull();
   });
 
+  it('renders Valid from as the UTC calendar date in ISO 8601 (YYYY-MM-DD)', () => {
+    render(<CredentialInfo credential={{ ...credential, validFrom: '2023-12-20T03:31:45.547Z' }} />);
+    // The literal UTC date must render regardless of the viewer's timezone (a
+    // local-time rendering would show 2023-12-19 west of UTC).
+    expect(screen.getByText('Valid from')).not.toBeNull();
+    expect(screen.getByText('2023-12-20')).not.toBeNull();
+  });
+
+  it('omits the Valid from row when the credential has no validFrom', () => {
+    // A missing value must omit the row, not fall through to moment's
+    // "undefined means now" behaviour and render today's date (#855).
+    render(<CredentialInfo credential={credential} />);
+    expect(screen.queryByText('Valid from')).toBeNull();
+  });
+
+  it('omits the Valid from row when validFrom is unparseable', () => {
+    render(<CredentialInfo credential={{ ...credential, validFrom: 'not-a-date' }} />);
+    expect(screen.queryByText('Valid from')).toBeNull();
+  });
+
   it('should show an issuer with string type', () => {
     // Creating a new credential object with a string issuer
     const rewriteCredential = {

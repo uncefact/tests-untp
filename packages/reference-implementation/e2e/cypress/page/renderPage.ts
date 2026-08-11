@@ -6,7 +6,7 @@ class RenderPage {
     cy.contains('Issued by').should('be.visible');
     cy.contains(expectedIssuerId).should('be.visible');
 
-    cy.contains('Issue date').should('be.visible');
+    cy.contains('Valid from').should('be.visible');
   }
 
   verifyButtonsVisibilityAndText() {
