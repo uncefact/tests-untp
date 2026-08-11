@@ -123,7 +123,7 @@ For **self-managed** DIDs created via this endpoint, the VC service still genera
 |-----------------|-------------|
 | `type` | `MANAGED` or `SELF_MANAGED`. `DEFAULT` is [system-managed and created during seeding](../operations/startup#step-2-database-seed), and cannot be created via this endpoint |
 | `method` | `DID_WEB` (the supported method today; `DID_WEB_VH` is planned but not yet implemented and is rejected with a 400) |
-| `alias` | Alias for the DID. For `did:web`, this is the domain (or domain and path) that will host the DID document, for example `example.com` to produce `did:web:example.com` |
+| `alias` | Identifier for the DID, read differently depending on `type`. For a [`MANAGED`](#managed) DID, a short name that the verifiable credential service prefixes with its own host, so `acme-corp` produces `did:web:vckit.example.com:acme-corp`; everything outside letters, digits, and hyphens is stripped, so a domain passed here loses its dots. For a [`SELF_MANAGED`](#self_managed) DID, the full domain (or domain and path) where you will host the DID document, so `example.com` produces `did:web:example.com`; dots and colons are preserved |
 
 | Optional Field | Description |
 |-----------------|-------------|
@@ -146,7 +146,7 @@ sequenceDiagram
     RI->>DB: Resolve VC service instance (specified or primary)
     DB-->>RI: Service instance config (encrypted)
     RI->>RI: Decrypt service config
-    RI->>RI: Normalise alias for DID method
+    RI->>RI: Normalise alias for DID type and method
     alt self-managed did:web claiming the system VC service host
         RI-->>Client: 403 Forbidden
     end

@@ -57,7 +57,13 @@ function assertSupported<T extends string>(field: string, value: T, supported: r
  *               alias:
  *                 type: string
  *                 minLength: 1
- *                 description: Alias for the DID (e.g., domain for did:web)
+ *                 description: |
+ *                   Identifier for the DID, read differently depending on `type`. For MANAGED, a short
+ *                   name that the verifiable credential service prefixes with its own host, so `acme-corp`
+ *                   becomes `did:web:vckit.example.com:acme-corp`; characters outside letters, digits, and
+ *                   hyphens are stripped, so a domain passed here loses its dots. For SELF_MANAGED, the
+ *                   full domain (or domain and path) that will host the DID document, so `example.com`
+ *                   becomes `did:web:example.com`; dots and colons are preserved.
  *               name:
  *                 type: string
  *                 minLength: 1
