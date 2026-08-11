@@ -126,7 +126,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Number of organisations to return per page. Defaults to 20 unless the deployment maximum is lower. Values above the deployment maximum are rejected with a 400.
+ *         description: Number of organisations to return per page. Defaults to 20 unless the deployment maximum is lower. Values above the deployment maximum are rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:

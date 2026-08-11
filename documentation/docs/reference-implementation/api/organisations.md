@@ -76,7 +76,7 @@ Returns organisations for the authenticated tenant with optional filtering. Resu
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `search` | string | — | Search by organisation name or identifier value |
-| `limit` | integer | Defaults to 20, or the configured maximum when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---

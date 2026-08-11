@@ -193,6 +193,29 @@ describe('POST /api/v1/organisations', () => {
     expect(mockCreateOrganisations).not.toHaveBeenCalled();
   });
 
+  // A separate branch from the empty-string case above: a minimum length
+  // counts characters, so a whitespace-only value satisfies it and would
+  // otherwise create an organisation whose name renders as blank everywhere.
+  it('returns 400 when name is only whitespace and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: '   ' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('0.name: must not be only whitespace');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when description is only whitespace and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme', description: '  ' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('0.description: must not be only whitespace');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when name is mistyped and does not call the repository', async () => {
     const req = createFakeRequest({ body: [{ name: 42 }] });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);

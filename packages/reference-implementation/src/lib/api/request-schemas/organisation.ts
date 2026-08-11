@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { idSchema, locationSchema, nonEmptyArraySchema, paginationQuerySchema, requireAtLeastOneField } from './shared';
+import {
+  idSchema,
+  locationSchema,
+  nonBlankString,
+  nonEmptyArraySchema,
+  paginationQuerySchema,
+  requireAtLeastOneField,
+} from './shared';
 
 /**
  * A single organisation item within the POST /organisations bulk-create array.
@@ -16,8 +23,8 @@ import { idSchema, locationSchema, nonEmptyArraySchema, paginationQuerySchema, r
  * #804, so a literal `null` here is a 400.
  */
 const organisationItemSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().min(1).optional(),
+  name: nonBlankString,
+  description: nonBlankString.optional(),
   location: locationSchema.optional(),
   primaryIdentifierId: idSchema.optional(),
   secondaryIdentifierIds: z
@@ -39,8 +46,8 @@ export const createOrganisationsRequestSchema = nonEmptyArraySchema(organisation
  */
 export const updateOrganisationRequestSchema = requireAtLeastOneField(
   z.object({
-    name: z.string().min(1).optional(),
-    description: z.string().min(1).nullable().optional(),
+    name: nonBlankString.optional(),
+    description: nonBlankString.nullable().optional(),
     location: locationSchema.optional(),
     primaryIdentifierId: idSchema.nullable().optional(),
     secondaryIdentifierIds: z
