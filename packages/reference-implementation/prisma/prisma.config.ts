@@ -3,6 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { defineConfig } from 'prisma/config';
 
+import { databaseUrlFromEnvParts } from '../src/lib/prisma/database-url.js';
+
 // Resolve the directory containing this file in ESM mode (the `prisma/`
 // directory was scoped to ESM via `prisma/package.json` so the seed and
 // backfill scripts can import `@uncefact/untp-utils/multibase-digest`).
@@ -14,30 +16,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Docker: Silently skips if file doesn't exist (vars already set by docker-compose)
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-const { RI_POSTGRES_USER, RI_POSTGRES_PASSWORD, RI_POSTGRES_DB, RI_POSTGRES_HOST, RI_POSTGRES_PORT } = process.env;
-
-// Validate required environment variables
-const requiredEnvVars = {
-  RI_POSTGRES_USER,
-  RI_POSTGRES_PASSWORD,
-  RI_POSTGRES_DB,
-  RI_POSTGRES_HOST,
-  RI_POSTGRES_PORT,
-};
-
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([_, value]) => !value)
-  .map(([key]) => key);
-
-if (missingVars.length > 0) {
-  throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+// Honour a pre-set RI_DATABASE_URL; construct one from the RI_POSTGRES_*
+// variables only when it is absent (the same rule as docker-entrypoint.sh
+// and the backfill scripts), so an explicit URL is never silently retargeted
+// by stale component variables (#766). Fail loudly when neither form of
+// database target is available, since every Prisma command needs one.
+const constructedDatabaseUrl = databaseUrlFromEnvParts();
+if (!process.env.RI_DATABASE_URL && constructedDatabaseUrl) {
+  process.env.RI_DATABASE_URL = constructedDatabaseUrl;
 }
-
-// Construct the database URL from individual environment variables
-const url = `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${RI_POSTGRES_HOST}:${RI_POSTGRES_PORT}/${RI_POSTGRES_DB}?schema=public`;
-
-// Set RI_DATABASE_URL for Prisma schema to reference
-process.env.RI_DATABASE_URL = url;
+if (!process.env.RI_DATABASE_URL) {
+  throw new Error(
+    'No database target configured: set RI_DATABASE_URL, or all of RI_POSTGRES_USER, RI_POSTGRES_PASSWORD, RI_POSTGRES_DB, RI_POSTGRES_HOST and RI_POSTGRES_PORT',
+  );
+}
 
 export default defineConfig({
   schema: './schema.prisma',
