@@ -39,14 +39,11 @@ const CredentialInfo = ({ credential }: { credential: VerifiableCredential | Uns
       <ListItem>
         <ListItemText primary='Issued by' secondary={processIssuer(credential.issuer)} />
       </ListItem>
-      {/* UNTP credentials follow the W3C VC data model 2.0, whose temporal
-          property is validFrom; the VCDM 1.1 issuanceDate the previous code
-          read never exists on them, and moment(undefined) means "now", which
-          fabricated today's date as an issue date (#855). Rendered as the
-          UTC calendar date in ISO 8601: MM/DD vs DD/MM is ambiguous, and a
-          viewer-local date can differ between reviewers of the same
-          credential. The row is omitted when validFrom is absent or
-          unparseable, rather than inventing a value. */}
+      {/* Rendered as the UTC calendar date in ISO 8601: MM/DD vs DD/MM is
+          ambiguous, and a viewer-local date can differ between reviewers of
+          the same credential (#855). The validity guard matters because
+          moment(undefined) means "now": an absent or unparseable validFrom
+          must omit the row, never invent a date. */}
       {moment.utc(validFrom ?? NaN).isValid() && (
         <ListItem>
           <ListItemText primary='Valid from' secondary={moment.utc(validFrom).format('YYYY-MM-DD')} />
