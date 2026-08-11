@@ -514,7 +514,12 @@ describe('POST /api/v1/dids', () => {
     const json = await res.json();
 
     expect(res.status).toBe(409);
-    expect(json.error).toBeDefined();
+    // Pins the local duplicate-alias message specifically. This route has three
+    // distinct 409 causes, and the other two (the unique-constraint violation
+    // in createDid, and the upstream provider reporting the alias as taken)
+    // would satisfy a bare "an error is present" check just as well, so only
+    // the exact message shows the pre-check is what rejected this request.
+    expect(json.error).toBe('A DID with alias "existing-alias" already exists on this service instance');
     expect(mockFindDidByAliasAndService).toHaveBeenCalledWith('existing-alias', 'inst-1');
     expect(mockDidService.create).not.toHaveBeenCalled();
     expect(mockCreateDid).not.toHaveBeenCalled();
