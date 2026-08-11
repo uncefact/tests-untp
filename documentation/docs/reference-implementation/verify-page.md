@@ -34,7 +34,7 @@ sequenceDiagram
     V->>U: Display result
 ```
 
-The verified credential is displayed with its type, issuer, and issue date. The issue date is rendered as the credential's UTC calendar date in ISO 8601 (`YYYY-MM-DD`); the row is omitted when the credential has no parseable issue date, which is the case for VC data model v2 credentials (they carry `validFrom`/`validUntil` rather than `issuanceDate`). The credential itself contains a `renderMethod` property that specifies the template used to render it for human review. Users can switch between the rendered template and the raw JSON data, and download the credential.
+The verified credential is displayed with its type, issuer, and validity start date. The `Valid from` date is rendered as the credential's UTC calendar date in ISO 8601 (`YYYY-MM-DD`); the row is omitted when the credential carries no parseable `validFrom`. The credential itself contains a `renderMethod` property that specifies the template used to render it for human review. Users can switch between the rendered template and the raw JSON data, and download the credential.
 
 ## Verification Link Format
 

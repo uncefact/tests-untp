@@ -110,30 +110,36 @@ describe('Credential info content', () => {
     expect(screen.getByText('OtherType')).not.toBeNull();
   });
 
-  it('renders the issue date as the UTC calendar date in ISO 8601 (YYYY-MM-DD)', () => {
-    render(<CredentialInfo credential={credential} />);
-    // The fixture's issuanceDate is 2023-12-20T03:31:45.547Z. The literal UTC
-    // date must render regardless of the viewer's timezone (a local-time
-    // rendering would show 2023-12-19 west of UTC), and never MM/DD/YYYY (#855).
+  it('renders Valid from as the UTC calendar date in ISO 8601 (YYYY-MM-DD)', () => {
+    render(<CredentialInfo credential={{ ...credential, validFrom: '2023-12-20T03:31:45.547Z' }} />);
+    // The literal UTC date must render regardless of the viewer's timezone (a
+    // local-time rendering would show 2023-12-19 west of UTC), never
+    // MM/DD/YYYY, and never under the VCDM 1.1 "Issue date" label (#855).
+    expect(screen.getByText('Valid from')).not.toBeNull();
     expect(screen.getByText('2023-12-20')).not.toBeNull();
     expect(screen.queryByText('12/20/2023')).toBeNull();
-  });
-
-  it('omits the issue date row when the credential has no issuanceDate', () => {
-    // VC data model v2 credentials carry validFrom/validUntil, not
-    // issuanceDate. moment(undefined) would render today's date, fabricating
-    // an issue date the credential never stated (#855).
-    const { issuanceDate: _omitted, ...v2Credential } = credential;
-    // The @vckit v1 type requires issuanceDate; v2 payloads genuinely omit it.
-    render(
-      <CredentialInfo credential={v2Credential as unknown as Parameters<typeof CredentialInfo>[0]['credential']} />,
-    );
     expect(screen.queryByText('Issue date')).toBeNull();
   });
 
-  it('omits the issue date row when issuanceDate is unparseable', () => {
-    render(<CredentialInfo credential={{ ...credential, issuanceDate: 'not-a-date' }} />);
+  it('omits the Valid from row when the credential has no validFrom', () => {
+    // moment(undefined) would render today's date, fabricating a validity
+    // date the credential never stated (#855).
+    render(<CredentialInfo credential={credential} />);
+    expect(screen.queryByText('Valid from')).toBeNull();
     expect(screen.queryByText('Issue date')).toBeNull();
+  });
+
+  it('omits the Valid from row when validFrom is unparseable', () => {
+    render(<CredentialInfo credential={{ ...credential, validFrom: 'not-a-date' }} />);
+    expect(screen.queryByText('Valid from')).toBeNull();
+  });
+
+  it('never renders the VCDM 1.1 issuanceDate, even when present', () => {
+    // UNTP credentials are VCDM 2.0; issuanceDate exists only on the stale
+    // v1 typing and must not surface as a date on the page (#855).
+    render(<CredentialInfo credential={credential} />);
+    expect(screen.queryByText('Issue date')).toBeNull();
+    expect(screen.queryByText('2023-12-20')).toBeNull();
   });
 
   it('should show an issuer with string type', () => {

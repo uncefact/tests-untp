@@ -6,9 +6,9 @@ class RenderPage {
     cy.contains('Issued by').should('be.visible');
     cy.contains(expectedIssuerId).should('be.visible');
 
-    // Credentials issued by the RI follow VC data model v2 (validFrom, no
-    // issuanceDate), so the Issue date row is omitted rather than showing a
-    // fabricated date (#855).
+    // UNTP credentials are VCDM 2.0: the page shows Valid from, and the
+    // VCDM 1.1 Issue date row (previously a fabricated "today") is gone (#855).
+    cy.contains('Valid from').should('be.visible');
     cy.contains('Issue date').should('not.exist');
   }
 
