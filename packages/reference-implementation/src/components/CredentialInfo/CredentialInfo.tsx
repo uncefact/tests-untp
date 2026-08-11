@@ -37,7 +37,8 @@ const CredentialInfo = ({ credential }: { credential: VerifiableCredential | Uns
         <ListItemText primary='Issued by' secondary={processIssuer(credential.issuer)} />
       </ListItem>
       <ListItem>
-        <ListItemText primary='Issue date' secondary={moment(credential.issuanceDate).format('MM/DD/YYYY')} />
+        {/* ISO 8601 for an international audience: MM/DD vs DD/MM is ambiguous (#855). */}
+        <ListItemText primary='Issue date' secondary={moment(credential.issuanceDate).format('YYYY-MM-DD')} />
       </ListItem>
     </List>
   );

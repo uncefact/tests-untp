@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import moment from 'moment';
 import { CredentialInfo } from '../CredentialInfo';
 
 // Mocking MUI components
@@ -108,6 +109,14 @@ describe('Credential info content', () => {
     render(<CredentialInfo credential={rewriteCredential2} />);
     // Expecting the text 'OtherType' to be present in the rendered component
     expect(screen.getByText('OtherType')).not.toBeNull();
+  });
+
+  it('renders the issue date in ISO 8601 (YYYY-MM-DD) format', () => {
+    render(<CredentialInfo credential={credential} />);
+    // The fixture's issuanceDate is 2023-12-20T03:31:45.547Z; the displayed
+    // date must be the unambiguous ISO form, not MM/DD/YYYY (#855).
+    expect(screen.getByText(moment('2023-12-20T03:31:45.547Z').format('YYYY-MM-DD'))).not.toBeNull();
+    expect(screen.queryByText('12/20/2023')).toBeNull();
   });
 
   it('should show an issuer with string type', () => {
