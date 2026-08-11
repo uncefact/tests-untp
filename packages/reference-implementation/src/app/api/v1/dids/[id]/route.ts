@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { ValidationError, parseRequestBody, definedFields } from '@/lib/api/validation';
+import { updateDidRequestSchema } from '@/lib/api/request-schemas/did';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDid, deleteDid } from '@/lib/prisma/repositories';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
@@ -32,6 +33,12 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]' });
  *               $ref: '#/components/schemas/Did'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -79,6 +86,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the DID
  *     requestBody:
  *       required: true
+ *       description: At least one recognised field is required; unknown keys are ignored.
  *       content:
  *         application/json:
  *           schema:
@@ -86,14 +94,19 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             properties:
  *               name:
  *                 type: string
+ *                 minLength: 1
  *                 description: New name for the DID
  *               description:
  *                 type: string
+ *                 minLength: 1
  *                 description: New description for the DID
  *               isDefault:
  *                 type: boolean
  *                 description: Whether to set this DID as the tenant default
- *             minProperties: 1
+ *             anyOf:
+ *               - required: [name]
+ *               - required: [description]
+ *               - required: [isDefault]
  *     responses:
  *       200:
  *         description: DID updated successfully
@@ -102,13 +115,19 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/Did'
  *       400:
- *         description: Validation error - at least one field required
+ *         description: Validation error (e.g. no fields provided, a field of the wrong type, or the system tenant changing isDefault on its own DEFAULT-type DID - any other tenant PATCHing that DID gets a 404 instead, since it is not scoped to their tenant)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -129,29 +148,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  logger.info({ didId: id }, 'Parsing request body');
-  let body: { name?: string; description?: string; isDefault?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
   logger.info({ didId: id }, 'Validating update fields');
-  const hasName = isNonEmptyString(body.name);
-  const hasDescription = isNonEmptyString(body.description);
-  const hasIsDefault = typeof body.isDefault === 'boolean';
+  const body = await parseRequestBody(req, updateDidRequestSchema);
+  const fields = definedFields(body);
 
-  if (!hasName && !hasDescription && !hasIsDefault) {
-    throw new ValidationError('At least one of name, description, or isDefault is required');
-  }
-
-  logger.info({ didId: id, fields: { hasName, hasDescription, hasIsDefault } }, 'Updating DID record');
-  const updated = await updateDid(id, tenantId, {
-    ...(hasName && { name: body.name }),
-    ...(hasDescription && { description: body.description }),
-    ...(hasIsDefault && { isDefault: body.isDefault }),
-  });
+  logger.info({ didId: id, fields: Object.keys(fields) }, 'Updating DID record');
+  const updated = await updateDid(id, tenantId, fields);
 
   logger.info({ didId: id }, 'DID updated');
   return NextResponse.json(updated);
@@ -162,7 +164,11 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  * /dids/{id}:
  *   delete:
  *     summary: Delete a DID
- *     description: Deletes a DID. If the DID is managed (has a serviceInstanceId), it is also removed from the upstream provider.
+ *     description: |
+ *       Deletes a DID record. If the DID is managed (has a serviceInstanceId), removal from the upstream
+ *       provider is also attempted, on a best-effort basis: the record is already deleted by that point, so
+ *       a provider that is unreachable or rejects the removal leaves an orphaned upstream DID and the
+ *       request still returns 204.
  *     tags:
  *       - DIDs
  *     parameters:
@@ -176,13 +182,19 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       204:
  *         description: DID deleted successfully
  *       400:
- *         description: Cannot delete the system default DID
+ *         description: Cannot delete a DID currently flagged isDefault - clear the flag via the update endpoint first
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -210,7 +222,9 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   }
 
   if (did.isDefault) {
-    throw new ValidationError('Cannot delete system default DID');
+    throw new ValidationError(
+      'Cannot delete a DID currently flagged isDefault - clear the flag via the update endpoint first',
+    );
   }
 
   logger.info({ didId: id }, 'Deleting DID from database');
@@ -225,9 +239,9 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
       const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId);
       await didService.delete(did.did);
     } catch (err) {
-      logger.error(
-        { didId: id, did: did.did, error: err },
-        'Best-effort upstream DID deletion failed; orphaned upstream DID is harmless',
+      logger.warn(
+        { didId: id, did: did.did, serviceInstanceId: did.serviceInstanceId, error: err },
+        'Failed to delete DID from upstream provider; upstream DID may be orphaned',
       );
     }
   }

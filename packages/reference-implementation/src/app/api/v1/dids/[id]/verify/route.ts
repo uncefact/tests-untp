@@ -18,6 +18,9 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *       Verifies that a DID can be resolved and updates its status accordingly.
  *       If verification succeeds, the DID status is set to VERIFIED.
  *       If verification fails, the DID status is set to VERIFICATION_FAILED.
+ *       Status changes only when verification runs to completion and returns a result; a pre-verification
+ *       failure (the DEFAULT-type guard, or a DID whose format or method cannot be parsed) leaves the DID's
+ *       current status unchanged.
  *     tags:
  *       - DIDs
  *     parameters:
@@ -39,8 +42,23 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *                   $ref: '#/components/schemas/VerificationResult'
  *                 did:
  *                   $ref: '#/components/schemas/Did'
+ *       400:
+ *         description: |
+ *           Either of:
+ *           - System default DIDs cannot be verified through this endpoint.
+ *           - DID_PARSE_FAILED or DID_METHOD_NOT_SUPPORTED: the stored DID string does not parse as `did:method:identifier`, or names a method this deployment does not support. Import (POST /dids/import) now rejects both at the boundary, so this check catches records stored before that validation was in place, and any record whose method stopped being supported after it was stored.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:

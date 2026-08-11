@@ -79,7 +79,7 @@ export async function createDid(input: CreateDidInput): Promise<Did> {
   } catch (e) {
     mapDatabaseError(e, {
       conflict: 'A DID record with this DID already exists',
-      invalidReference: 'Service instance not found',
+      invalidReference: 'serviceInstanceId: Service instance not found',
     });
   }
 }
@@ -195,7 +195,7 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
     }
 
     if (input.isDefault !== undefined && existing.type === 'DEFAULT') {
-      throw new ValidationError('Cannot modify default status of system DIDs');
+      throw new ValidationError('isDefault: Cannot modify default status of system DIDs');
     }
 
     if (input.isDefault) {

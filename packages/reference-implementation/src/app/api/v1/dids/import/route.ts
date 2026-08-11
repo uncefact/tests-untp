@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, validateEnum } from '@/lib/api/validation';
+import { parseRequestBody } from '@/lib/api/validation';
+import { importDidRequestSchema } from '@/lib/api/request-schemas/did';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { createDid } from '@/lib/prisma/repositories';
-import { DidMethod } from '@uncefact/untp-ri-services';
+import { createDid, getInstanceByResolution } from '@/lib/prisma/repositories';
+import { ServiceInstanceNotFoundError } from '@/lib/api/errors';
+import { ServiceType, parseDidMethod } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/dids/import' });
@@ -28,23 +30,28 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *             properties:
  *               did:
  *                 type: string
+ *                 minLength: 1
  *                 description: The DID identifier to import (e.g., did:web:example.com)
  *               method:
  *                 type: string
  *                 enum: [DID_WEB]
- *                 description: DID method
+ *                 description: DID method. did:web is the supported method today; did:webvh is planned but not yet implemented and is rejected.
  *               keyId:
  *                 type: string
+ *                 minLength: 1
  *                 description: Key identifier associated with the DID
  *               name:
  *                 type: string
+ *                 minLength: 1
  *                 description: Human-readable name for the DID
  *               description:
  *                 type: string
+ *                 minLength: 1
  *                 description: Description of the DID's purpose
  *               serviceInstanceId:
  *                 type: string
- *                 description: Service instance ID — the verifiable credential service that holds the key material for this DID
+ *                 minLength: 1
+ *                 description: Service instance ID (the verifiable credential service that holds the key material for this DID)
  *     responses:
  *       201:
  *         description: DID imported successfully
@@ -53,13 +60,25 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *             schema:
  *               $ref: '#/components/schemas/Did'
  *       400:
- *         description: Validation error
+ *         description: Validation error. Causes include a missing or non-string did/keyId/serviceInstanceId, an invalid method, a did that is not a well-formed DID (code DID_PARSE_FAILED) or whose method is not recognised (code DID_METHOD_NOT_SUPPORTED), and a serviceInstanceId deleted in the rare window between resolution and the write.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Service instance not found, or belongs to a different tenant
  *         content:
  *           application/json:
  *             schema:
@@ -78,44 +97,33 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: {
-    did?: string;
-    method?: string;
-    keyId?: string;
-    name?: string;
-    description?: string;
-    serviceInstanceId?: string;
-  };
+  logger.info('Validating request body');
+  const body = await parseRequestBody(req, importDidRequestSchema);
 
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
+  // Validate the DID string with the same parser the verify path uses, so a malformed DID
+  // (or one whose method is not recognised) is rejected here with the same DID_PARSE_FAILED /
+  // DID_METHOD_NOT_SUPPORTED 400 rather than being stored and only failing on its first verify.
+  parseDidMethod(body.did);
 
-  logger.info({ did: body.did, method: body.method }, 'Validating import parameters');
-  if (!isNonEmptyString(body.did)) {
-    throw new ValidationError('did is required');
-  }
-  if (!isNonEmptyString(body.keyId)) {
-    throw new ValidationError('keyId is required');
-  }
-  if (!isNonEmptyString(body.serviceInstanceId)) {
-    throw new ValidationError('serviceInstanceId is required');
+  // Import never resolves a working adapter (it stores the reference without calling the
+  // upstream VC service), so it uses the tenant-scoped existence lookup resolveDidService
+  // wraps rather than resolveDidService itself: resolving the full adapter would introduce
+  // failure modes (decryption, adapter registry, config validation) this route has no need
+  // to depend on. Without this check, an existing service instance belonging to a different
+  // tenant would pass the repository's plain FK check and be stored, since the FK is only
+  // ServiceInstance.id with no tenancy constraint.
+  logger.info({ serviceInstanceId: body.serviceInstanceId }, 'Verifying service instance belongs to this tenant');
+  const instance = await getInstanceByResolution(tenantId, ServiceType.VC, body.serviceInstanceId);
+  if (!instance) {
+    throw new ServiceInstanceNotFoundError(body.serviceInstanceId);
   }
 
-  const method = validateEnum(body.method, Object.values(DidMethod), 'method');
-  if (!method) {
-    throw new ValidationError('method is required');
-  }
-
-  logger.info({ did: body.did, method }, 'Saving imported DID record');
+  logger.info({ did: body.did, method: body.method }, 'Saving imported DID record');
   const record = await createDid({
     tenantId,
     did: body.did,
     type: 'SELF_MANAGED',
-    method,
+    method: body.method,
     keyId: body.keyId,
     name: body.name ?? body.did,
     description: body.description,

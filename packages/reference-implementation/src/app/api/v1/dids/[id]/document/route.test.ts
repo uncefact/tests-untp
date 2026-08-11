@@ -8,39 +8,18 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth to mirror handleRouteError behaviour
+// Mock withTenantAuth to skip auth while delegating error mapping to the real
+// handleRouteError, so this suite is checked against production's actual
+// status/code mapping rather than a hand-rolled duplicate that can drift.
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-  const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
-
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
   return {
     withTenantAuth:
       (handler: (req: unknown, ctx: unknown) => Promise<unknown>) => async (req: unknown, ctx: unknown) => {
         try {
           return await handler(req, ctx);
-        } catch (e: unknown) {
-          if (e instanceof ValidationError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 400 });
-          }
-          if (e instanceof NotFoundError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 404 });
-          }
-          if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 500 });
-          }
-          if (e instanceof ServiceError) {
-            const serviceErr = e as Error & { code?: string; statusCode?: number };
-            return jsonResponse(
-              { error: serviceErr.message, code: serviceErr.code },
-              { status: serviceErr.statusCode },
-            );
-          }
-          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
+        } catch (e) {
+          return handleRouteError(e);
         }
       },
   };
@@ -58,6 +37,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 }));
 
 import { ServiceResolutionError } from '@/lib/api/errors';
+import { DidDocumentFetchError } from '@uncefact/untp-ri-services';
 import { GET } from './route';
 
 function createContext(id: string) {
@@ -111,6 +91,17 @@ describe('GET /api/v1/dids/:id/document', () => {
     const res = await GET(createFakeRequest(), createContext('did-1') as unknown as Parameters<typeof GET>[1]);
 
     expect(res.status).toBe(500);
+  });
+
+  it('returns 502 with code DID_DOCUMENT_FETCH_FAILED when the upstream document fetch fails', async () => {
+    mockGetDidById.mockResolvedValue({ id: 'did-1', did: 'did:web:example.com' });
+    mockDidService.getDocument.mockRejectedValue(new DidDocumentFetchError('did:web:example.com', 'HTTP 500'));
+
+    const res = await GET(createFakeRequest(), createContext('did-1') as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(502);
+    expect(json.code).toBe('DID_DOCUMENT_FETCH_FAILED');
   });
 
   it('returns 500 when service resolution fails', async () => {

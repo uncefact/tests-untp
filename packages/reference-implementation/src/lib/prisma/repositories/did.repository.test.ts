@@ -244,7 +244,7 @@ describe('did.repository', () => {
       });
 
       await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('Service instance not found');
+      await expect(result).rejects.toThrow('serviceInstanceId: Service instance not found');
     });
 
     it('maps a foreign-key violation to ValidationError on the isDefault transaction path', async () => {
@@ -261,7 +261,7 @@ describe('did.repository', () => {
       });
 
       await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('Service instance not found');
+      await expect(result).rejects.toThrow('serviceInstanceId: Service instance not found');
     });
 
     it('rethrows a non-database error unchanged', async () => {
@@ -528,7 +528,7 @@ describe('did.repository', () => {
       mockTx.did.findFirst.mockResolvedValue({ ...DID_RECORD, type: 'DEFAULT' });
 
       await expect(updateDid('did-record-1', ORG_ID, { isDefault: true })).rejects.toThrow(
-        'Cannot modify default status of system DIDs',
+        'isDefault: Cannot modify default status of system DIDs',
       );
       expect(mockTx.did.updateMany).not.toHaveBeenCalled();
       expect(mockTx.did.update).not.toHaveBeenCalled();

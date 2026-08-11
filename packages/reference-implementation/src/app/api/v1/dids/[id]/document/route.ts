@@ -35,6 +35,12 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/document' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: DID or service instance not found
  *         content:
@@ -43,6 +49,12 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/document' });
  *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       502:
+ *         description: Upstream DID document fetch failed (DID_DOCUMENT_FETCH_FAILED). The verifiable credential service resolves the DID but could not retrieve its document from where the DID is hosted, which for a self-managed DID is the tenant's own hosting location.
  *         content:
  *           application/json:
  *             schema:

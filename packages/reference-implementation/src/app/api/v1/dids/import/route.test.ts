@@ -7,47 +7,35 @@ jest.mock('next/server', () => ({
   },
 }));
 
+// Mock withTenantAuth to skip auth while delegating error mapping to the real
+// handleRouteError, so this suite is checked against production's actual
+// status/code mapping rather than a hand-rolled duplicate that can drift.
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { ConflictError, NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
-
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
   return {
     withTenantAuth:
       (handler: (req: unknown, ctx: unknown) => Promise<unknown>) => async (req: unknown, ctx: unknown) => {
         try {
           return await handler(req, ctx);
-        } catch (e: unknown) {
-          if (e instanceof ValidationError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 400 });
-          }
-          if (e instanceof NotFoundError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 404 });
-          }
-          if (e instanceof ConflictError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 409 });
-          }
-          if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 500 });
-          }
-          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
+        } catch (e) {
+          return handleRouteError(e);
         }
       },
   };
 });
 
 const mockCreateDid = jest.fn();
+const mockGetInstanceByResolution = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   createDid: (...args: unknown[]) => mockCreateDid(...args),
+  getInstanceByResolution: (...args: unknown[]) => mockGetInstanceByResolution(...args),
 }));
 
-jest.mock('@uncefact/untp-ri-services', () => ({
-  DidMethod: { DID_WEB: 'DID_WEB', DID_WEB_VH: 'DID_WEB_VH' },
-}));
-
+// The request schema (request-schemas/did.ts) imports the full set of DID
+// enums from '@uncefact/untp-ri-services' (CREATABLE_DID_TYPES, DidMethod,
+// DidStatus, DidType), so this module must not be mocked with a partial
+// factory (ADR-037): a factory providing only DidMethod would leave the
+// schema's z.nativeEnum/z.enum calls undefined at import time.
 import { POST } from './route';
 
 // -- Helpers ------------------------------------------------------------------
@@ -86,6 +74,7 @@ describe('POST /api/v1/dids/import', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateDid.mockResolvedValue(MOCK_DID_RECORD);
+    mockGetInstanceByResolution.mockResolvedValue({ id: 'inst-1', tenantId: 'tenant-1' });
   });
 
   it('imports a DID and returns 201', async () => {
@@ -103,6 +92,9 @@ describe('POST /api/v1/dids/import', () => {
 
     expect(res.status).toBe(201);
     expect(body).toEqual(MOCK_DID_RECORD);
+
+    // Verifies the tenant-scoped existence check runs before the write
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-1', 'VC', 'inst-1');
 
     // Verify createDid was called with correct params -- NOT calling adapter
     expect(mockCreateDid).toHaveBeenCalledWith({
@@ -135,7 +127,7 @@ describe('POST /api/v1/dids/import', () => {
     );
   });
 
-  it('returns 400 when serviceInstanceId is missing', async () => {
+  it('returns 400 when serviceInstanceId is missing, and does not call the repository', async () => {
     const req = createFakeRequest({
       did: 'did:web:example.com',
       method: 'DID_WEB',
@@ -146,10 +138,11 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('serviceInstanceId is required');
+    expect(body.error).toMatch(/^serviceInstanceId:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when serviceInstanceId is an empty string', async () => {
+  it('returns 400 when serviceInstanceId is an empty string, and does not call the repository', async () => {
     const req = createFakeRequest({
       did: 'did:web:example.com',
       method: 'DID_WEB',
@@ -161,7 +154,159 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('serviceInstanceId is required');
+    expect(body.error).toMatch(/^serviceInstanceId:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when serviceInstanceId is an explicit null (omission, not null, is required), and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: null,
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^serviceInstanceId:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when did is a number, and does not call the repository', async () => {
+    const req = createFakeRequest({ did: 1, method: 'DID_WEB', keyId: 'key-1', serviceInstanceId: 'inst-1' });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^did:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 with code DID_PARSE_FAILED when did is not a well-formed DID, and does not call the repository', async () => {
+    const req = createFakeRequest({ did: 'not-a-did', method: 'DID_WEB', keyId: 'key-1', serviceInstanceId: 'inst-1' });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe('DID_PARSE_FAILED');
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 with code DID_METHOD_NOT_SUPPORTED when the did names an unrecognised method, and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:key:z6Mk',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe('DID_METHOD_NOT_SUPPORTED');
+    expect(mockGetInstanceByResolution).not.toHaveBeenCalled();
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when keyId is a boolean, and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: true,
+      serviceInstanceId: 'inst-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^keyId:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when serviceInstanceId is a number, and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 5,
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^serviceInstanceId:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when serviceInstanceId does not resolve for this tenant, and does not call the repository', async () => {
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'nonexistent',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body.error).toContain('nonexistent');
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-1', 'VC', 'nonexistent');
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when serviceInstanceId belongs to a different tenant, checked against the authenticated tenant not a caller-supplied one', async () => {
+    // getInstanceByResolution itself scopes the lookup to the tenantId it is called with (see
+    // service-instance.repository.test.ts's "returns null for explicit ID not accessible"), so
+    // resolving null here for tenant-2 stands in for "the instance exists but belongs to
+    // tenant-1". This asserts the route passes the AUTHENTICATED tenantId from context, since a
+    // route that read a tenantId from the request body instead would defeat the check entirely.
+    mockGetInstanceByResolution.mockResolvedValue(null);
+
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'inst-owned-by-tenant-1',
+    });
+
+    const res = await POST(req, createContext({ tenantId: 'tenant-2' }));
+
+    expect(res.status).toBe(404);
+    expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-2', 'VC', 'inst-owned-by-tenant-1');
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when serviceInstanceId is deleted in the race window between resolution and the write (P2003 backstop)', async () => {
+    // getInstanceByResolution finds the instance (it existed at check time), but createDid
+    // still rejects via the repository's P2003 mapping, simulating deletion in the narrow
+    // window between the check and the write. The 404 path above covers the common case;
+    // this is the rare backstop the repository mapping exists for.
+    const { ValidationError } = jest.requireActual('@/lib/api/validation');
+    mockCreateDid.mockRejectedValueOnce(new ValidationError('serviceInstanceId: Service instance not found'));
+
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: 'key-1',
+      serviceInstanceId: 'inst-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe('serviceInstanceId: Service instance not found');
   });
 
   it('sets status to UNVERIFIED', async () => {
@@ -198,37 +343,40 @@ describe('POST /api/v1/dids/import', () => {
     );
   });
 
-  it('returns 400 when did is missing', async () => {
-    const req = createFakeRequest({ method: 'DID_WEB', keyId: 'key-1' });
+  it('returns 400 when did is missing, and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'DID_WEB', keyId: 'key-1', serviceInstanceId: 'inst-1' });
 
     const res = await POST(req, createContext());
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('did is required');
+    expect(body.error).toMatch(/^did:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when keyId is missing', async () => {
-    const req = createFakeRequest({ did: 'did:web:example.com', method: 'DID_WEB' });
+  it('returns 400 when keyId is missing, and does not call the repository', async () => {
+    const req = createFakeRequest({ did: 'did:web:example.com', method: 'DID_WEB', serviceInstanceId: 'inst-1' });
 
     const res = await POST(req, createContext());
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('keyId is required');
+    expect(body.error).toMatch(/^keyId:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when method is missing', async () => {
+  it('returns 400 when method is missing, and does not call the repository', async () => {
     const req = createFakeRequest({ did: 'did:web:example.com', keyId: 'key-1', serviceInstanceId: 'inst-1' });
 
     const res = await POST(req, createContext());
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('method is required');
+    expect(body.error).toMatch(/^method:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for invalid method', async () => {
+  it('returns 400 for invalid method, and does not call the repository', async () => {
     const req = createFakeRequest({
       did: 'did:web:example.com',
       keyId: 'key-1',
@@ -240,10 +388,27 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('method must be one of');
+    expect(body.error).toMatch(/^method:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for invalid JSON body', async () => {
+  it('returns 400 for method DID_WEB_VH (planned but not yet implemented), and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:webvh:example.com',
+      keyId: 'key-1',
+      method: 'DID_WEB_VH',
+      serviceInstanceId: 'inst-1',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^method:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for invalid JSON body, and does not call the repository', async () => {
     const req = {
       json: async () => {
         throw new Error('bad json');
@@ -255,6 +420,18 @@ describe('POST /api/v1/dids/import', () => {
 
     expect(res.status).toBe(400);
     expect(body.error).toBe('Invalid JSON body');
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a literal null body, and does not call the repository', async () => {
+    const req = createFakeRequest(null);
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^body:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
   it('does NOT call any DID service adapter', async () => {
@@ -303,30 +480,40 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(500);
-    expect(body.error).toBeDefined();
+    // Pins handleRouteError's final fallthrough, which echoes a non-database
+    // error's own message. A toBeDefined() check here would pass just as
+    // happily if the response carried the wrong error entirely.
+    expect(body.error).toBe('Database connection lost');
   });
 
-  it('returns 400 when did is an empty string', async () => {
-    const req = createFakeRequest({ did: '', method: 'DID_WEB', keyId: 'key-1' });
+  it('returns 400 when did is an empty string, and does not call the repository', async () => {
+    const req = createFakeRequest({ did: '', method: 'DID_WEB', keyId: 'key-1', serviceInstanceId: 'inst-1' });
 
     const res = await POST(req, createContext());
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('did is required');
+    expect(body.error).toMatch(/^did:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when keyId is an empty string', async () => {
-    const req = createFakeRequest({ did: 'did:web:example.com', method: 'DID_WEB', keyId: '' });
+  it('returns 400 when keyId is an empty string, and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      method: 'DID_WEB',
+      keyId: '',
+      serviceInstanceId: 'inst-1',
+    });
 
     const res = await POST(req, createContext());
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('keyId is required');
+    expect(body.error).toMatch(/^keyId:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when method is an empty string', async () => {
+  it('returns 400 when method is an empty string, and does not call the repository', async () => {
     const req = createFakeRequest({
       did: 'did:web:example.com',
       keyId: 'key-1',
@@ -338,7 +525,42 @@ describe('POST /api/v1/dids/import', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('method');
+    expect(body.error).toMatch(/^method:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when name is an empty string (mistyped optional field), and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      keyId: 'key-1',
+      method: 'DID_WEB',
+      serviceInstanceId: 'inst-1',
+      name: '',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^name:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when description is an empty string (mistyped optional field), and does not call the repository', async () => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      keyId: 'key-1',
+      method: 'DID_WEB',
+      serviceInstanceId: 'inst-1',
+      description: '',
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/^description:/);
+    expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
   it('succeeds when description is omitted', async () => {

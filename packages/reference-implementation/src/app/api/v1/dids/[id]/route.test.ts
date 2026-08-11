@@ -8,39 +8,18 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withTenantAuth to mirror handleRouteError behaviour
+// Mock withTenantAuth to skip auth while delegating error mapping to the real
+// handleRouteError, so this suite is checked against production's actual
+// status/code mapping rather than a hand-rolled duplicate that can drift.
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-  const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
-
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
   return {
     withTenantAuth:
       (handler: (req: unknown, ctx: unknown) => Promise<unknown>) => async (req: unknown, ctx: unknown) => {
         try {
           return await handler(req, ctx);
-        } catch (e: unknown) {
-          if (e instanceof ValidationError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 400 });
-          }
-          if (e instanceof NotFoundError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 404 });
-          }
-          if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 500 });
-          }
-          if (e instanceof ServiceError) {
-            const serviceErr = e as Error & { code?: string; statusCode?: number };
-            return jsonResponse(
-              { error: serviceErr.message, code: serviceErr.code },
-              { status: serviceErr.statusCode },
-            );
-          }
-          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
+        } catch (e) {
+          return handleRouteError(e);
         }
       },
   };
@@ -127,13 +106,77 @@ describe('PATCH /api/v1/dids/:id', () => {
 
     expect(res.status).toBe(200);
     expect(json.name).toBe('New Name');
+    expect(mockUpdateDid).toHaveBeenCalledWith('did-1', 'org-1', { name: 'New Name', description: 'New desc' });
   });
 
-  it('returns 400 when no fields provided', async () => {
+  it('returns 400 when no fields provided, and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: {} });
     const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
 
     expect(res.status).toBe(400);
+    expect(json.error).toContain('At least one of name, description, or isDefault is required');
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the body only has an unrecognised (typo) field name', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { neme: 'New Name' } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('At least one of name, description, or isDefault is required');
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a literal null body, and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^body:/);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when name is an empty string, and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '' } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^name:/);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when description is an empty string, and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { description: '' } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^description:/);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isDefault is not a boolean (mistyped optional field), and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { isDefault: 'yes' } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^isDefault:/);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isDefault is an explicit null (omission, not null, leaves it unchanged)', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { isDefault: null } });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^isDefault:/);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
   });
 
   it('returns 404 when DID not found or access denied', async () => {
@@ -159,14 +202,14 @@ describe('PATCH /api/v1/dids/:id', () => {
   });
 
   it('returns 400 when setting isDefault on a DEFAULT type DID', async () => {
-    mockUpdateDid.mockRejectedValue(new ValidationError('Cannot modify default status of system DIDs'));
+    mockUpdateDid.mockRejectedValue(new ValidationError('isDefault: Cannot modify default status of system DIDs'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { isDefault: true } });
     const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('Cannot modify default status of system DIDs');
+    expect(json.error).toBe('isDefault: Cannot modify default status of system DIDs');
   });
 
   it('accepts isDefault with name together', async () => {
@@ -249,7 +292,7 @@ describe('DELETE /api/v1/dids/:id', () => {
     expect(mockDeleteDid).toHaveBeenCalledWith('did-1', 'org-1');
   });
 
-  it('returns 400 when trying to delete a default DID', async () => {
+  it('returns 400 when trying to delete a DID flagged isDefault', async () => {
     mockGetDidById.mockResolvedValue({
       id: 'did-1',
       did: 'did:web:example.com',
@@ -262,7 +305,9 @@ describe('DELETE /api/v1/dids/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('Cannot delete system default DID');
+    expect(json.error).toBe(
+      'Cannot delete a DID currently flagged isDefault - clear the flag via the update endpoint first',
+    );
     expect(mockDeleteDid).not.toHaveBeenCalled();
     expect(mockDidService.delete).not.toHaveBeenCalled();
   });
@@ -299,6 +344,25 @@ describe('DELETE /api/v1/dids/:id', () => {
     expect(res.status).toBe(204);
     expect(mockDeleteDid).toHaveBeenCalledWith('did-1', 'org-1');
     expect(mockResolveDidService).toHaveBeenCalledWith('org-1', 'inst-1');
+    expect(mockDidService.delete).not.toHaveBeenCalled();
+  });
+
+  // The two tests above prove failures AFTER the record is deleted are
+  // swallowed. This one holds the opposite line: the record deletion itself is
+  // not best-effort, so its failure must surface rather than return 204, and
+  // the upstream removal must not run for a record that is still there.
+  it('surfaces the error and skips upstream removal when deleteDid throws', async () => {
+    mockGetDidById.mockResolvedValue({
+      id: 'did-1',
+      did: 'did:web:example.com',
+      serviceInstanceId: 'inst-1',
+    });
+    mockDeleteDid.mockRejectedValue(new Error('Database unavailable'));
+
+    const req = createFakeRequest({ method: 'DELETE' });
+    const res = await DELETE(req, createContext('did-1') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(500);
     expect(mockDidService.delete).not.toHaveBeenCalled();
   });
 });

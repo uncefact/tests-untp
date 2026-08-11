@@ -1,5 +1,5 @@
 import type { IDidService, CreateDidOptions, DidRecord, DidDocument, DidVerificationResult } from '../../types.js';
-import { DidMethod, DidType, DidVerificationCheckName } from '../../types.js';
+import { DidMethod, DidType, DidVerificationCheckName, SUPPORTED_DID_METHODS } from '../../types.js';
 import { verifyDid } from '../../common/verify.js';
 import { normaliseDidWebAlias, normaliseSelfManagedAlias } from '../../common/utils.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
@@ -258,7 +258,7 @@ export class VCKitDidAdapter implements IDidService {
   }
 
   getSupportedMethods(): DidMethod[] {
-    return [DidMethod.DID_WEB];
+    return [...SUPPORTED_DID_METHODS];
   }
 
   getSupportedKeyTypes(): string[] {
