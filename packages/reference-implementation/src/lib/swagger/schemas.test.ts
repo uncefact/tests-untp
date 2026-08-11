@@ -241,6 +241,24 @@ describe('generateOpenAPISchemas — Facility component', () => {
     expect(linkScheme?.required).toContain('registrar');
   });
 
+  // The nested registrar must stay the truncated shape. FACILITY_DETAIL_INCLUDE
+  // fetches the registrar's own columns only, so republishing the standalone
+  // Registrar resource's `schemes` array here would promise consumers a list of
+  // that registrar's other schemes which no facility response returns. Both
+  // nesting paths are checked, since they are built from the same projection
+  // but reached through different relations.
+  it.each([
+    ['primaryIdentifier', () => facility.properties?.primaryIdentifier?.properties?.scheme],
+    [
+      'secondaryIdentifiers',
+      () => facility.properties?.secondaryIdentifiers?.items?.properties?.identifier?.properties?.scheme,
+    ],
+  ])('gives the %s scheme a registrar with no schemes array', (_path, getScheme) => {
+    const registrar = getScheme()?.properties?.registrar;
+    expect(registrar?.properties).toBeDefined();
+    expect(registrar?.properties).not.toHaveProperty('schemes');
+  });
+
   it('embeds the operating organisation as its own columns only, not its identifier relations', () => {
     const operatingOrganisation = facility.properties?.operatingOrganisation;
     expect(operatingOrganisation?.properties).not.toHaveProperty('primaryIdentifier');

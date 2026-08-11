@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { idSchema, locationSchema, nonEmptyArraySchema, paginationQuerySchema, requireAtLeastOneField } from './shared';
+import {
+  idSchema,
+  locationSchema,
+  nonBlankString,
+  nonEmptyArraySchema,
+  paginationQuerySchema,
+  requireAtLeastOneField,
+} from './shared';
 
 /**
  * A single item in the POST /facilities bulk-create request body.
@@ -19,8 +26,8 @@ import { idSchema, locationSchema, nonEmptyArraySchema, paginationQuerySchema, r
  * it, never send it as `null`.
  */
 const facilityItemSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().min(1).optional(),
+  name: nonBlankString,
+  description: nonBlankString.optional(),
   location: locationSchema.optional(),
   operatingOrganisationId: idSchema.optional(),
   primaryIdentifierId: idSchema.optional(),
@@ -50,8 +57,8 @@ export const createFacilitiesRequestSchema = nonEmptyArraySchema(facilityItemSch
  */
 export const updateFacilityRequestSchema = requireAtLeastOneField(
   z.object({
-    name: z.string().min(1).optional(),
-    description: z.string().min(1).nullable().optional(),
+    name: nonBlankString.optional(),
+    description: nonBlankString.nullable().optional(),
     location: locationSchema.optional(),
     operatingOrganisationId: idSchema.nullable().optional(),
     primaryIdentifierId: idSchema.nullable().optional(),

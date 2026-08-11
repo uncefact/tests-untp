@@ -280,10 +280,18 @@ function buildFacilitySchema() {
    * therefore omitted (never returned via this path) and `registrar` is
    * required (always returned via this path), narrowing identifierSchemeSchema
    * to match.
+   *
+   * `registrar` is made required in place rather than reassigned to
+   * `registrarSchema`. The nested registrar is deliberately the truncated
+   * shape, without the `schemes` array the standalone Registrar resource
+   * carries, because this include fetches the registrar's own columns only.
+   * Substituting the top-level schema would republish that array here and
+   * promise consumers a list of the registrar's other schemes that no
+   * facility response ever returns.
    */
-  const facilityIdentifierSchemeSchema = identifierSchemeSchema.omit({ qualifiers: true }).extend({
-    registrar: registrarSchema,
-  });
+  const facilityIdentifierSchemeSchema = identifierSchemeSchema
+    .omit({ qualifiers: true })
+    .required({ registrar: true });
 
   /**
    * Identifier as embedded in a facility's `primaryIdentifier` and secondary

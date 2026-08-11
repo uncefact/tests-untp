@@ -222,6 +222,26 @@ describe('PATCH /api/v1/facilities/:id', () => {
     expect(mockUpdateFacility).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when name is only whitespace and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '   ' } });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('name: must not be only whitespace');
+    expect(mockUpdateFacility).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when description is only whitespace and does not call the repository', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { description: '  ' } });
+    const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('description: must not be only whitespace');
+    expect(mockUpdateFacility).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when description is an empty string and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: { description: '' } });
     const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);

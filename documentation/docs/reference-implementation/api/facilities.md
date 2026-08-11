@@ -83,7 +83,7 @@ Returns facilities for the authenticated tenant with optional filtering. Results
 |-----------|------|---------|-------------|
 | `search` | string | — | Search by facility name or identifier value |
 | `organisationId` | string | — | Filter by operating organisation ID |
-| `limit` | integer | Defaults to 20, or the configured maximum when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---
