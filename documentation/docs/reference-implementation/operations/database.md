@@ -26,6 +26,21 @@ The database connection can be configured either as a single connection string o
 
 Set `RI_DATABASE_URL` directly when the connection string carries options the `RI_POSTGRES_*` parts cannot express, or when a secrets manager already supplies one. When it is set, the Reference Implementation uses it as given and does not construct a URL from the other variables.
 
+## Minimum Privileges
+
+Superuser access is not required. The Reference Implementation performs only standard DDL through Prisma Migrate (creating, altering, and dropping its own tables, indexes, constraints, and enum types) and does not install PostgreSQL extensions.
+
+The minimum required privilege is ownership of the application's database. On a shared PostgreSQL instance, provision a dedicated user and database like this:
+
+```sql
+CREATE USER ri_user WITH PASSWORD '...';
+CREATE DATABASE ri OWNER ri_user;
+```
+
+Database ownership implies `USAGE` and `CREATE` on the `public` schema, which is all Prisma Migrate needs to manage the schema and all the application needs at runtime.
+
+The Docker Compose configuration in the repository provisions a dedicated `ri-db` container whose init user (`ri-postgres` by default) is that container's cluster superuser, which is the standard behaviour of the official PostgreSQL image for a single-purpose instance. That does not mean the application needs superuser rights; when pointing the Reference Implementation at a shared instance, the dedicated owner-user above is sufficient.
+
 ## Migrations and Seeding
 
 On startup, the Reference Implementation automatically applies database migrations and seeds system default records. See [Startup](./startup) for the full sequence, what gets seeded, and how to control each step.
