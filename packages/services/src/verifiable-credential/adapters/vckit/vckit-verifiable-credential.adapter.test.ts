@@ -9,6 +9,18 @@ import type { VCKitVerifiableCredentialConfig } from './vckit-verifiable-credent
 import type { LoggerService } from '../../../logging/types';
 import type { CredentialPayload, EnvelopedVerifiableCredential, CredentialStatus } from '../../types';
 
+// httpFetch normalises headers into a Headers instance; match by reading through it.
+const headersMatching = (pairs: Record<string, string>) => ({
+  asymmetricMatch: (actual: unknown) => {
+    const h = new Headers(actual as HeadersInit);
+    return Object.entries(pairs).every(([k, v]) => h.get(k) === v);
+  },
+  toString: () => `headersMatching(${JSON.stringify(pairs)})`,
+});
+
+const correlationHeaderOf = (init: unknown): string | null =>
+  new Headers((init as RequestInit).headers).get('x-correlation-id');
+
 describe('VCKitVerifiableCredentialService', () => {
   const mockLogger: LoggerService = {
     debug: jest.fn(),
@@ -77,6 +89,19 @@ describe('VCKitVerifiableCredentialService', () => {
       expect(adapter).toBeInstanceOf(VCKitVerifiableCredentialService);
     });
 
+    it('carries an x-correlation-id header on outbound requests', async () => {
+      mockFetch
+        .mockResolvedValueOnce({ ok: true, json: jest.fn().mockResolvedValue(mockCredentialStatus) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: jest.fn().mockResolvedValue({ verifiableCredential: mockEnvelopedCredential }),
+        });
+      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+      await adapter.sign(mockCredentialPayload);
+
+      expect(correlationHeaderOf(mockFetch.mock.calls[0][1])).toMatch(/.+/);
+    });
+
     it('should construct Bearer token from apiKey', async () => {
       // Set up fetch mocks for sign flow: status call + issue call
       mockFetch
@@ -96,7 +121,7 @@ describe('VCKitVerifiableCredentialService', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          headers: expect.objectContaining({
+          headers: headersMatching({
             Authorization: 'Bearer test-api-key',
           }),
         }),
@@ -131,7 +156,7 @@ describe('VCKitVerifiableCredentialService', () => {
         'https://vckit.example.com/agent/issueBitstringStatusList',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
+          headers: headersMatching({
             'Content-Type': 'application/json',
             Authorization: 'Bearer test-api-key',
           }),
@@ -147,7 +172,7 @@ describe('VCKitVerifiableCredentialService', () => {
         'https://vckit.example.com/v2/credentials/issue',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
+          headers: headersMatching({
             'Content-Type': 'application/json',
             Authorization: 'Bearer test-api-key',
           }),
@@ -263,7 +288,7 @@ describe('VCKitVerifiableCredentialService', () => {
         'https://vckit.example.com/agent/routeVerificationCredential',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
+          headers: headersMatching({
             'Content-Type': 'application/json',
             Authorization: 'Bearer test-api-key',
           }),

@@ -18,6 +18,18 @@ import type { Link } from '../../types';
 import type { PyxIdrConfig } from './pyx-idr.schema';
 import type { LoggerService } from '../../../logging/types';
 
+// httpFetch normalises headers into a Headers instance; match by reading through it.
+const headersMatching = (pairs: Record<string, string>) => ({
+  asymmetricMatch: (actual: unknown) => {
+    const h = new Headers(actual as HeadersInit);
+    return Object.entries(pairs).every(([k, v]) => h.get(k) === v);
+  },
+  toString: () => `headersMatching(${JSON.stringify(pairs)})`,
+});
+
+const correlationHeaderOf = (init: unknown): string | null =>
+  new Headers((init as RequestInit).headers).get('x-correlation-id');
+
 describe('PyxIdentityResolverAdapter', () => {
   const mockLogger: LoggerService = {
     info: jest.fn(),
@@ -124,6 +136,13 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(mockFetch).toHaveBeenCalledWith('https://resolver.example.com/api/v4/resolver', expect.any(Object));
     });
 
+    it('carries an x-correlation-id header on outbound requests', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
+
+      expect(correlationHeaderOf(mockFetch.mock.calls[0][1])).toMatch(/.+/);
+    });
+
     it('should include authorization and content-type headers', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       await adapter.publishLinks('abn', '51824753556', mockLinks, undefined, mockOptions);
@@ -131,7 +150,7 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          headers: expect.objectContaining({
+          headers: headersMatching({
             Authorization: 'Bearer test-api-key',
             'Content-Type': 'application/json',
           }),
@@ -433,7 +452,7 @@ describe('PyxIdentityResolverAdapter', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://resolver.example.com/api/v4/resolver/links/link-123',
-        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }) }),
+        expect.objectContaining({ headers: headersMatching({ Authorization: 'Bearer test-api-key' }) }),
       );
     });
 
@@ -697,7 +716,7 @@ describe('PyxIdentityResolverAdapter', () => {
         'https://resolver.example.com/api/v4/resolver/links/link-123',
         expect.objectContaining({
           method: 'DELETE',
-          headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }),
+          headers: headersMatching({ Authorization: 'Bearer test-api-key' }),
         }),
       );
     });
@@ -757,7 +776,7 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(result).toEqual(mockDescription);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://resolver.example.com/.well-known/resolver',
-        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }) }),
+        expect.objectContaining({ headers: headersMatching({ Authorization: 'Bearer test-api-key' }) }),
       );
     });
 
@@ -792,7 +811,7 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(result).toEqual(mockLinkTypes);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://resolver.example.com/api/v4/voc?show=linktypes',
-        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-api-key' }) }),
+        expect.objectContaining({ headers: headersMatching({ Authorization: 'Bearer test-api-key' }) }),
       );
     });
 

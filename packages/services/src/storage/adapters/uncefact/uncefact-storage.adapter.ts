@@ -1,3 +1,4 @@
+import { httpFetch } from '../../../http/client.js';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
@@ -112,7 +113,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
     this.logger.debug({ url, encrypt, bucket, externalId }, 'Storing credential');
 
-    const response = await fetch(url, {
+    const response = await httpFetch(url, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(payload),
@@ -204,7 +205,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       multipartHeaders['X-API-Key'] = this.headers['X-API-Key'];
     }
 
-    const response = await fetch(url, {
+    const response = await httpFetch(url, {
       method: 'POST',
       headers: multipartHeaders,
       body: formData,
@@ -289,7 +290,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       deleteHeaders['X-API-Key'] = this.headers['X-API-Key'];
     }
 
-    const response = await fetch(url, {
+    const response = await httpFetch(url, {
       method: 'DELETE',
       headers: deleteHeaders,
     });

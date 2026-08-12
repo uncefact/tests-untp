@@ -19,6 +19,18 @@ const MULTIBASE_A = `zTEST${HEX_A}`;
 const HEX_B = '9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca7';
 const MULTIBASE_B = `zTEST${HEX_B}`;
 
+// httpFetch normalises headers into a Headers instance; match by reading through it.
+const headersMatching = (pairs: Record<string, string>) => ({
+  asymmetricMatch: (actual: unknown) => {
+    const h = new Headers(actual as HeadersInit);
+    return Object.entries(pairs).every(([k, v]) => h.get(k) === v);
+  },
+  toString: () => `headersMatching(${JSON.stringify(pairs)})`,
+});
+
+const correlationHeaderOf = (init: unknown): string | null =>
+  new Headers((init as RequestInit).headers).get('x-correlation-id');
+
 describe('UncefactStorageAdapter', () => {
   const MOCK_UUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
@@ -85,6 +97,14 @@ describe('UncefactStorageAdapter', () => {
       expect(adapter).toBeInstanceOf(UncefactStorageAdapter);
     });
 
+    it('carries the request context correlation ID on outbound requests', async () => {
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      const { runWithRequestContext } = jest.requireActual('../../../logging/request-context');
+      await runWithRequestContext('ctx-storage-1', () => adapter.store(mockCredential));
+
+      expect(correlationHeaderOf(mockFetch.mock.calls[0][1])).toBe('ctx-storage-1');
+    });
+
     it('should include X-API-Key header when apiKey is provided', async () => {
       const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
       await adapter.store(mockCredential);
@@ -92,7 +112,7 @@ describe('UncefactStorageAdapter', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          headers: expect.objectContaining({
+          headers: headersMatching({
             'Content-Type': 'application/json',
             'X-API-Key': 'test-api-key',
           }),
@@ -111,9 +131,9 @@ describe('UncefactStorageAdapter', () => {
       await adapter.store(mockCredential);
 
       const callArgs = mockFetch.mock.calls[0];
-      const headers = callArgs[1].headers;
-      expect(headers['Content-Type']).toBe('application/json');
-      expect(headers['X-API-Key']).toBeUndefined();
+      const headers = new Headers((callArgs[1] as RequestInit).headers);
+      expect(headers.get('Content-Type')).toBe('application/json');
+      expect(headers.get('X-API-Key')).toBeNull();
     });
 
     it('should call logger.child with service name', () => {
@@ -806,8 +826,8 @@ describe('UncefactStorageAdapter', () => {
       await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
 
       const callArgs = mockFetch.mock.calls[0];
-      const headers = callArgs[1].headers;
-      expect(headers['Content-Type']).toBeUndefined();
+      const headers = new Headers((callArgs[1] as RequestInit).headers);
+      expect(headers.get('Content-Type')).toBeNull();
     });
 
     it('should include X-API-Key header when configured', async () => {
@@ -815,8 +835,8 @@ describe('UncefactStorageAdapter', () => {
       await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
 
       const callArgs = mockFetch.mock.calls[0];
-      const headers = callArgs[1].headers;
-      expect(headers['X-API-Key']).toBe('test-api-key');
+      const headers = new Headers((callArgs[1] as RequestInit).headers);
+      expect(headers.get('X-API-Key')).toBe('test-api-key');
     });
 
     it('should not include X-API-Key header when apiKey is omitted', async () => {
@@ -830,8 +850,8 @@ describe('UncefactStorageAdapter', () => {
       await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
 
       const callArgs = mockFetch.mock.calls[0];
-      const headers = callArgs[1].headers;
-      expect(headers['X-API-Key']).toBeUndefined();
+      const headers = new Headers((callArgs[1] as RequestInit).headers);
+      expect(headers.get('X-API-Key')).toBeNull();
     });
 
     it('should return StorageRecord with uri, hash, externalId, bucket, and mimeType', async () => {
@@ -1094,7 +1114,7 @@ describe('UncefactStorageAdapter', () => {
       await adapter.delete('resource-id-42', 'my-bucket');
 
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[1].headers['X-API-Key']).toBe('test-api-key');
+      expect(new Headers((callArgs[1] as RequestInit).headers).get('X-API-Key')).toBe('test-api-key');
     });
 
     it('should not include X-API-Key header when apiKey is omitted', async () => {
@@ -1110,7 +1130,7 @@ describe('UncefactStorageAdapter', () => {
       await adapter.delete('resource-id-42', 'my-bucket');
 
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[1].headers['X-API-Key']).toBeUndefined();
+      expect(new Headers((callArgs[1] as RequestInit).headers).get('X-API-Key')).toBeNull();
     });
 
     it('should not send Content-Type header', async () => {
@@ -1120,7 +1140,7 @@ describe('UncefactStorageAdapter', () => {
       await adapter.delete('resource-id-42', 'my-bucket');
 
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[1].headers['Content-Type']).toBeUndefined();
+      expect(new Headers((callArgs[1] as RequestInit).headers).get('Content-Type')).toBeNull();
     });
 
     it('should resolve without error on 204 response', async () => {

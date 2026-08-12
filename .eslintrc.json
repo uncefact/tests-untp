@@ -51,6 +51,15 @@
   },
   "overrides": [
     {
+      // The services package routes all outbound HTTP through src/http/client.ts
+      // so x-correlation-id propagation cannot be forgotten per call site (#654).
+      "files": ["packages/services/src/**/*.ts"],
+      "excludedFiles": ["packages/services/src/http/client.ts", "packages/services/src/**/*.test.ts"],
+      "rules": {
+        "no-restricted-globals": ["error", { "name": "fetch", "message": "Use httpFetch from src/http/client.ts so x-correlation-id propagation is applied (#654)." }]
+      }
+    },
+    {
       "files": [
         "*.js"
       ],

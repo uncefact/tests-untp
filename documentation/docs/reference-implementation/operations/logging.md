@@ -32,13 +32,9 @@ Each log entry automatically includes the following fields where available:
 
 Every request is assigned a correlation ID. This ID is included in every log entry produced during that request, making it possible to trace a single request across all the services and operations it touches.
 
-The correlation ID is determined in the following order of priority:
+The correlation ID is the `x-correlation-id` request header when the caller provides one. An inbound value is validated before it is trusted: it must be at most 128 characters of letters, digits, hyphens, and underscores, and anything else is replaced. Without a valid caller ID, a request carrying an `X-Amzn-Trace-Id` header (as AWS load balancers set) has its Root token adopted, joining these logs to ALB access logs and X-Ray, and otherwise a random UUID is generated.
 
-1. The `x-correlation-id` request header, if provided by the caller
-2. The `x-amzn-trace-id` header, if present (for AWS environments)
-3. A randomly generated UUID
-
-The correlation ID is also returned in the `x-correlation-id` response header, so callers can use it to correlate their own logs with the Reference Implementation's logs.
+The correlation ID is also returned in the `x-correlation-id` response header, so callers can use it to correlate their own logs with the Reference Implementation's logs, and it is forwarded as `x-correlation-id` on outbound calls to the configured UNTP services (storage, identity resolver, and verifiable credential services), so one ID traces a request across service boundaries in a log aggregator. Calls to third-party hosts, such as resolving a `did:web` document from its own domain, deliberately carry no correlation header.
 
 ### Service Names
 
