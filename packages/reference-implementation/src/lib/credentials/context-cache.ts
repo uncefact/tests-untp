@@ -1,6 +1,7 @@
 import { createInMemoryTtlCache, type TtlCache } from '@uncefact/untp-utils/cache';
 import type { LoadedRemoteDocument } from '@uncefact/untp-utils/loaders';
 import { apiLogger } from '../api/logger';
+import { readCacheMaxEntries } from '../config/cache-max-entries.config';
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 const logger = apiLogger.child({ module: 'context-cache' });
@@ -21,11 +22,11 @@ export function readContextCacheTtlMs(env: Record<string, string | undefined> = 
 
 /**
  * Shared cache for remote JSON-LD `@context` documents, passed to
- * `validateJsonLd` on the issuance and verification paths so a burst of
- * validations fetches each context once per TTL instead of once per
- * credential. Mirrors the schema loader's cache (`schema-loader.ts`);
- * see uncefact/tests-untp#886.
+ * `validateJsonLd` on the issuance path so a burst of validations fetches
+ * each context once per TTL instead of once per credential. Mirrors the
+ * schema loader's cache (`schema-loader.ts`); see uncefact/tests-untp#886.
  */
 export const contextCache: TtlCache<LoadedRemoteDocument> = createInMemoryTtlCache<LoadedRemoteDocument>({
   ttlMs: readContextCacheTtlMs(),
+  maxEntries: readCacheMaxEntries(),
 });

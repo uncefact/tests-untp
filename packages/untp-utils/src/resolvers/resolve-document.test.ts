@@ -341,16 +341,34 @@ describe('resolveDocument', () => {
       expect(sentHeaders()['User-Agent']).toBe('operator-agent/1.0');
     });
 
-    it('never overrides a caller-supplied user-agent header, whatever its casing', async () => {
-      process.env[USER_AGENT_ENV_VAR] = 'acme-operator/1.0';
+    it('passes an invalid override through raw rather than silently substituting the default', async () => {
+      process.env[USER_AGENT_ENV_VAR] = 'evil\r\nX-Injected: 1';
       validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
       undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
 
-      await resolveDocument('https://example.com/doc.json', { headers: { 'user-agent': 'caller/2.0' } });
+      await resolveDocument('https://example.com/doc.json');
 
-      expect(sentHeaders()['user-agent']).toBe('caller/2.0');
-      expect(sentHeaders()['User-Agent']).toBeUndefined();
+      // The load-bearing rule: no request-time fallback. The raw value reaches
+      // the fetch layer, which rejects it loudly in real undici; deployments
+      // that want fail-fast validate at boot instead.
+      expect(sentHeaders()['User-Agent']).toBe('evil\r\nX-Injected: 1');
     });
+
+    it.each(['user-agent', 'User-Agent', 'USER-AGENT', 'uSeR-aGeNt'])(
+      'never overrides a caller-supplied %s header',
+      async (headerName) => {
+        process.env[USER_AGENT_ENV_VAR] = 'acme-operator/1.0';
+        validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+        undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
+
+        await resolveDocument('https://example.com/doc.json', { headers: { [headerName]: 'caller/2.0' } });
+
+        const headers = sentHeaders();
+        expect(headers[headerName]).toBe('caller/2.0');
+        const uaKeys = Object.keys(headers).filter((k) => k.toLowerCase() === 'user-agent');
+        expect(uaKeys).toEqual([headerName]);
+      },
+    );
 
     it('sends the User-Agent on every redirect hop', async () => {
       validatePublicUrl.mockResolvedValue(resolvedAddress() as never);

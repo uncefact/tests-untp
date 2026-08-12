@@ -23,7 +23,7 @@ export function validateHttpUserAgentOnBoot(env: NodeJS.ProcessEnv = process.env
   }
   if (!isValidHttpUserAgent(value)) {
     throw new Error(
-      `${USER_AGENT_ENV_VAR} is not a valid HTTP User-Agent value: it must contain only visible ASCII characters, spaces, and tabs. Fix or unset it (unset uses the built-in default).`,
+      `${USER_AGENT_ENV_VAR} is not a valid HTTP User-Agent value: it must be plain Latin-1 text with no control characters (no newlines or tabs, and no characters such as emoji). Fix or unset it (unset uses the built-in default).`,
     );
   }
 }

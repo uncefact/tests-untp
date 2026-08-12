@@ -20,6 +20,15 @@ describe('validateHttpUserAgentOnBoot', () => {
     expect(() => validate({ RI_HTTP_USER_AGENT: 'evil\r\nX-Injected: 1' })).toThrow(/RI_HTTP_USER_AGENT/);
   });
 
+  it('throws at boot when the value contains characters undici cannot send as a header (above U+00FF)', () => {
+    expect(() => validate({ RI_HTTP_USER_AGENT: 'agent\u{1f642}' })).toThrow(/RI_HTTP_USER_AGENT/);
+    expect(() => validate({ RI_HTTP_USER_AGENT: 'agent\u0100' })).toThrow(/RI_HTTP_USER_AGENT/);
+  });
+
+  it('passes for Latin-1 text, which undici can send', () => {
+    expect(() => validate({ RI_HTTP_USER_AGENT: 'caf\u00e9-agent/1.0' })).not.toThrow();
+  });
+
   it('throws at boot when the value contains other control characters', () => {
     expect(() => validate({ RI_HTTP_USER_AGENT: 'bad\u0000agent' })).toThrow(/RI_HTTP_USER_AGENT/);
   });

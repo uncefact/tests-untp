@@ -95,6 +95,72 @@ describe('createInMemoryTtlCache', () => {
     });
   });
 
+  describe('retention bound (maxEntries)', () => {
+    it('rejects a non-positive or non-integer maxEntries', () => {
+      expect(() => createInMemoryTtlCache<string>({ ttlMs: 1000, maxEntries: 0 })).toThrow(RangeError);
+      expect(() => createInMemoryTtlCache<string>({ ttlMs: 1000, maxEntries: 1.5 })).toThrow(RangeError);
+      expect(() => createInMemoryTtlCache<string>({ ttlMs: 1000, maxEntries: -1 })).toThrow(RangeError);
+    });
+
+    it('evicts the least recently used entry when the cap is reached', async () => {
+      const cache = createInMemoryTtlCache<string>({ ttlMs: 60_000, maxEntries: 2 });
+      const fetches: string[] = [];
+      const fetcher = (v: string) => async () => {
+        fetches.push(v);
+        return v;
+      };
+
+      await cache.get('a', fetcher('a'));
+      await cache.get('b', fetcher('b'));
+      await cache.get('a', fetcher('a-refetch')); // touch a, so b is now least recent
+      await cache.get('c', fetcher('c')); // cap reached: evicts b
+
+      expect(await cache.get('a', fetcher('a-refetch'))).toBe('a'); // still cached
+      expect(await cache.get('b', fetcher('b-refetch'))).toBe('b-refetch'); // evicted, refetched
+      expect(fetches).toEqual(['a', 'b', 'c', 'b-refetch']);
+    });
+
+    it('evicts expired entries before evicting live ones', async () => {
+      const realNow = Date.now;
+      let now = 1_000_000;
+      Date.now = () => now;
+      try {
+        const cache = createInMemoryTtlCache<string>({ ttlMs: 1000, maxEntries: 2 });
+        await cache.get('old', async () => 'old');
+        now += 2000; // 'old' expires
+        await cache.get('live', async () => 'live');
+        await cache.get('new', async () => 'new'); // cap: removes expired 'old', keeps 'live'
+        const fetches: string[] = [];
+        expect(
+          await cache.get('live', async () => {
+            fetches.push('live-refetch');
+            return 'live-refetch';
+          }),
+        ).toBe('live');
+        expect(fetches).toEqual([]);
+      } finally {
+        Date.now = realNow;
+      }
+    });
+
+    it('removes an expired entry when it is met, even with no cap configured', async () => {
+      const realNow = Date.now;
+      let now = 1_000_000;
+      Date.now = () => now;
+      try {
+        const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
+        await cache.get('k', async () => 'v1');
+        now += 2000;
+        // Expired: refetches, and the stale entry is deleted rather than
+        // lingering until this key happens to be rewritten.
+        await expect(cache.get('k', async () => 'v2')).resolves.toBe('v2');
+        expect(await cache.get('k', async () => 'v3')).toBe('v2');
+      } finally {
+        Date.now = realNow;
+      }
+    });
+  });
+
   describe('deduplication', () => {
     it('deduplicates concurrent fetches for the same key', async () => {
       const cache = createInMemoryTtlCache<string>({ ttlMs: 1000 });
