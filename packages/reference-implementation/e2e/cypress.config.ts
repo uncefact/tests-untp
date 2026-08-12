@@ -133,6 +133,8 @@ export default defineConfig({
     STORAGE_API_VERSION: process.env.E2E_STORAGE_API_VERSION || '4.0',
     STORAGE_PUBLIC_BUCKET: process.env.E2E_STORAGE_PUBLIC_BUCKET || 'public-data',
     STORAGE_PRIVATE_BUCKET: process.env.E2E_STORAGE_PRIVATE_BUCKET || 'private-data',
+    IDR_PUBLIC_BASE_URL: process.env.E2E_IDR_PUBLIC_BASE_URL || 'http://localhost:3000',
+    IDR_API_KEY: process.env.E2E_IDR_API_KEY || 'test123',
 
     // Test organisation
     TEST_ORG_ID: process.env.E2E_TEST_ORG_ID || 'e2e-test-org',

@@ -59,7 +59,6 @@ export const IDR_SERVICE_TYPE = 'IDR' as const;
  * enumeration in the published UNTP Identity Resolver API.
  *
  * @see https://untp.unece.org/docs/specification/DecentralisedAccessControl
- * @see https://untp.unece.org/artefacts/schema/v0.7.0/idr/idr-api.html
  */
 export enum AccessRole {
   /** Public access - any party holding a decryption secret may access */
