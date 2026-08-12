@@ -5,7 +5,11 @@ import { constructVerifyURL } from '../../utils/helpers.js';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type BuildPublishLinksOptions = {
-  /** UNTP link relation type for the credential links (defaults to gs1:sustainabilityInfo) */
+  /**
+   * UNTP link relation type for the credential links. Callers resolve this
+   * from the IDR service's configured default; gs1:sustainabilityInfo is
+   * only the last-resort fallback when neither is supplied.
+   */
   linkType?: string;
   /** URL of the machine-readable verification service (omit to skip) */
   machineVerificationUrl?: string;
@@ -40,7 +44,7 @@ export type BuildPublishLinksOptions = {
 /**
  * Builds the link set for publishing a credential to an Identity Resolver.
  *
- * Always includes a credential storage URI link (`gs1:sustainabilityInfo`).
+ * Always includes a credential storage URI link.
  * Optionally prepends a machine verification link and appends a human
  * verification link depending on the provided options.
  *
