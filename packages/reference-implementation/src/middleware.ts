@@ -20,7 +20,7 @@ import NextAuth from 'next-auth';
 import { authConfig } from '@/lib/auth/auth.config';
 import { NextResponse, type NextRequest } from 'next/server';
 import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
-import { runWithRequestContext } from '@uncefact/untp-ri-services/logging';
+import { runWithRequestContext, isValidCorrelationId, amznTraceRootToken } from '@uncefact/untp-ri-services/logging';
 import type { JWTPayload } from 'jose';
 
 const { auth } = NextAuth(authConfig);
@@ -31,13 +31,18 @@ const PUBLIC_API_ROUTES = new Set(['/api/v1/credentials/verify']);
 /**
  * Strips all x-auth-* headers from the incoming request to prevent spoofing.
  */
-function stripAuthHeaders(headers: Headers): Headers {
+function stripAuthHeaders(headers: Headers, correlationId: string): Headers {
   const cleaned = new Headers(headers);
   for (const key of [...cleaned.keys()]) {
     if (key.startsWith('x-auth-')) {
       cleaned.delete(key);
     }
   }
+  // Forward the validated-or-minted ID so route handlers, log lines, and
+  // outbound calls all use the same ID the response echoes back to the
+  // caller; without this a missing or malformed inbound ID splits into one
+  // ID on the response and a different one everywhere else (#654).
+  cleaned.set('x-correlation-id', correlationId);
   return cleaned;
 }
 
@@ -57,8 +62,16 @@ async function validateBearerAuth(req: NextRequest): Promise<JWTPayload | null> 
 }
 
 export default auth(async (req) => {
+  // Zero trust at the boundary (#654): an inbound ID outside the shared
+  // length/charset rule is replaced, never echoed into logs or responses.
+  // Behind an AWS ALB the trace header's Root token joins RI logs to ALB
+  // access logs and X-Ray; the raw header never validates, the token does.
+  const inbound = req.headers.get('x-correlation-id');
+  const amznTrace = req.headers.get('x-amzn-trace-id');
   const correlationId =
-    req.headers.get('x-correlation-id') || req.headers.get('x-amzn-trace-id') || crypto.randomUUID();
+    inbound && isValidCorrelationId(inbound)
+      ? inbound
+      : (amznTrace && amznTraceRootToken(amznTrace)) || crypto.randomUUID();
 
   return runWithRequestContext(correlationId, async () => {
     const { pathname } = req.nextUrl;
@@ -68,14 +81,14 @@ export default auth(async (req) => {
     if (pathname.startsWith('/api/v1/')) {
       // Allow public API routes through without authentication
       if (PUBLIC_API_ROUTES.has(pathname)) {
-        const requestHeaders = stripAuthHeaders(req.headers);
+        const requestHeaders = stripAuthHeaders(req.headers, correlationId);
         const response = NextResponse.next({ request: { headers: requestHeaders } });
         response.headers.set('x-correlation-id', correlationId);
         return response;
       }
 
       // Strip x-auth-* headers from incoming request to prevent spoofing
-      const requestHeaders = stripAuthHeaders(req.headers);
+      const requestHeaders = stripAuthHeaders(req.headers, correlationId);
 
       // Check session-based auth first
       if (isSessionAuthenticated) {

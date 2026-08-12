@@ -19,6 +19,8 @@ const mockLogger: Record<string, jest.Mock> = {
 mockLogger.child.mockReturnValue(mockLogger);
 
 jest.mock('@uncefact/untp-ri-services/logging', () => ({
+  // Real validator: the wrappers' reject-and-replace behaviour is the code under test.
+  isValidCorrelationId: jest.requireActual('@uncefact/untp-ri-services/logging').isValidCorrelationId,
   runWithRequestContext: (correlationId: string, callback: () => unknown) =>
     mockRunWithRequestContext(correlationId, callback),
   createLogger: () => mockLogger,
@@ -87,6 +89,17 @@ describe('withPublicRoute', () => {
     expect(mockRunWithRequestContext).toHaveBeenCalledTimes(1);
     const correlationId = mockRunWithRequestContext.mock.calls[0][0];
     expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('rejects correlation IDs with characters outside the allowed charset, warns without echoing them', async () => {
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withPublicRoute(handler);
+    await wrapped(fakeRequest('GET', { 'x-correlation-id': 'Root=1-abc;Parent=def' }));
+
+    const correlationId = mockRunWithRequestContext.mock.calls[0][0];
+    expect(correlationId).not.toBe('Root=1-abc;Parent=def');
+    expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.stringify(mockLogger.warn.mock.calls)).not.toContain('Root=1-abc;Parent=def');
   });
 
   it('ignores correlation IDs longer than 128 characters', async () => {

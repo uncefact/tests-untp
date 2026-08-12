@@ -42,6 +42,18 @@ const mockLogger: LoggerService = {
 
 // -- Tests -------------------------------------------------------------------
 
+// httpFetch normalises headers into a Headers instance; match by reading through it.
+const headersMatching = (pairs: Record<string, string>) => ({
+  asymmetricMatch: (actual: unknown) => {
+    const h = new Headers(actual as HeadersInit);
+    return Object.entries(pairs).every(([k, v]) => h.get(k) === v);
+  },
+  toString: () => `headersMatching(${JSON.stringify(pairs)})`,
+});
+
+const correlationHeaderOf = (init: unknown): string | null =>
+  new Headers((init as RequestInit).headers).get('x-correlation-id');
+
 describe('VCKitDidAdapter', () => {
   let service: VCKitDidAdapter;
 
@@ -102,6 +114,13 @@ describe('VCKitDidAdapter', () => {
         .mockResolvedValueOnce(createMockResponse({ didDocument }));
     }
 
+    it('carries an x-correlation-id header on outbound requests', async () => {
+      mockCreateAndResolve();
+      await service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' });
+
+      expect(correlationHeaderOf((global.fetch as jest.Mock).mock.calls[0][1])).toMatch(/.+/);
+    });
+
     it('sends correct payload and returns DidRecord with document', async () => {
       mockCreateAndResolve();
 
@@ -116,7 +135,7 @@ describe('VCKitDidAdapter', () => {
         `${BASE_URL}/agent/didManagerCreate`,
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+          headers: headersMatching({ Authorization: 'Bearer test-token' }),
           body: expect.stringContaining('"provider":"did:web"'),
         }),
       );
@@ -300,7 +319,7 @@ describe('VCKitDidAdapter', () => {
         `${BASE_URL}/agent/didManagerDelete`,
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+          headers: headersMatching({ Authorization: 'Bearer test-token' }),
           body: JSON.stringify({ did: 'did:web:example.com:org:123' }),
         }),
       );
@@ -350,7 +369,7 @@ describe('VCKitDidAdapter', () => {
       expect(global.fetch).toHaveBeenCalledWith(
         `${BASE_URL}/agent/resolveDid`,
         expect.objectContaining({
-          headers: expect.objectContaining({
+          headers: headersMatching({
             Host: 'example.com',
             Origin: 'https://example.com',
           }),

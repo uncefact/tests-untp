@@ -23,6 +23,8 @@ const mockLogger = (): Record<string, jest.Mock> => {
 };
 
 jest.mock('@uncefact/untp-ri-services/logging', () => ({
+  // Real validator: the wrappers' reject-and-replace behaviour is the code under test.
+  isValidCorrelationId: jest.requireActual('@uncefact/untp-ri-services/logging').isValidCorrelationId,
   runWithRequestContext: (correlationId: string, callback: () => unknown) =>
     mockRunWithRequestContext(correlationId, callback),
   updateRequestContext: (partial: Record<string, unknown>) => mockUpdateRequestContext(partial),
@@ -596,6 +598,19 @@ describe('withTenantAuth — request context propagation', () => {
 
     expect(mockRunWithRequestContext).toHaveBeenCalledTimes(1);
     const correlationId = mockRunWithRequestContext.mock.calls[0][0];
+    expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('rejects an x-correlation-id with characters outside the allowed charset', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    await wrapped(fakeRequest('GET', { 'x-correlation-id': 'bad id; DROP TABLE' }), emptyRouteContext);
+
+    const correlationId = mockRunWithRequestContext.mock.calls[0][0];
+    expect(correlationId).not.toBe('bad id; DROP TABLE');
     expect(correlationId).toMatch(/^[0-9a-f-]{36}$/);
   });
 

@@ -9,7 +9,7 @@ import { resolveClosedModeTenant } from '@/lib/api/resolve-closed-mode-tenant';
 import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
 import { prisma } from '@/lib/prisma/prisma';
 import { auth } from '@/auth';
-import { runWithRequestContext, updateRequestContext } from '@uncefact/untp-ri-services/logging';
+import { runWithRequestContext, updateRequestContext, isValidCorrelationId } from '@uncefact/untp-ri-services/logging';
 
 // Re-export for backwards compatibility — consumers that import from
 // this module will continue to work during migration.
@@ -33,8 +33,16 @@ type RouteHandler = (req: Request, context: TenantAuthContext) => Promise<Respon
 
 export function withTenantAuth(handler: RouteHandler) {
   return async (req: Request, routeContext: { params: Promise<Record<string, string>> }) => {
+    // Zero trust at the boundary (#654): an inbound ID outside the shared
+    // length/charset rule is replaced, never echoed into logs or responses.
     const raw = req.headers.get('x-correlation-id');
-    const correlationId = raw && raw.length <= 128 ? raw : crypto.randomUUID();
+    const correlationId = raw && isValidCorrelationId(raw) ? raw : crypto.randomUUID();
+    if (raw && correlationId !== raw) {
+      apiLogger.warn(
+        { inboundLength: raw.length, replacedWith: correlationId },
+        'Rejected invalid x-correlation-id header; minted a fresh id',
+      );
+    }
 
     return runWithRequestContext(correlationId, async () => {
       const method = req.method;

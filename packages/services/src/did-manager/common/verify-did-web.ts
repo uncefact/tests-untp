@@ -1,3 +1,4 @@
+import { httpFetch } from '../../http/client.js';
 import type { DidDocument, DidVerificationCheck, MethodVerificationResult } from '../types.js';
 import { DidVerificationCheckName } from '../types.js';
 import { didWebToUrl } from './utils.js';
@@ -45,7 +46,9 @@ export async function verifyDidWeb(did: string): Promise<MethodVerificationResul
   // Check 1: Resolve — fetch the DID document
   let response: Response | null = null;
   try {
-    response = await fetch(url);
+    // Third-party host (the DID's own domain): no correlation header, so
+    // internal request identifiers stay within the operator's services (#654).
+    response = await httpFetch(url, { correlate: false });
 
     if (!response.ok) {
       checks.push({ name: C.RESOLVE, passed: false, message: `HTTP ${response.status} from ${url}` });

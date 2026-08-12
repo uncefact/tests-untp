@@ -18,6 +18,9 @@ jest.mock('@/lib/auth/token-validator', () => ({
 }));
 
 jest.mock('@uncefact/untp-ri-services/logging', () => ({
+  // Real validator: the wrappers' reject-and-replace behaviour is the code under test.
+  isValidCorrelationId: jest.requireActual('@uncefact/untp-ri-services/logging').isValidCorrelationId,
+  amznTraceRootToken: jest.requireActual('@uncefact/untp-ri-services/logging').amznTraceRootToken,
   runWithRequestContext: (_id: string, fn: () => unknown) => fn(),
 }));
 
@@ -104,6 +107,76 @@ describe('middleware', () => {
       expect(mockNextResponseNext).toHaveBeenCalledTimes(1);
       // Should NOT attempt bearer token validation
       expect(mockValidateServiceAccountToken).not.toHaveBeenCalled();
+    });
+
+    it('replaces a malformed inbound x-correlation-id with a fresh UUID', async () => {
+      const req = fakeRequest('/api/v1/credentials/verify', {
+        headers: { 'x-correlation-id': 'bad value; not+allowed' },
+      });
+      const response = fakeNextResponse();
+      mockNextResponseNext.mockReturnValueOnce(response);
+
+      await (middleware as any)(req);
+
+      const echoed = response.headers.get('x-correlation-id');
+      expect(echoed).not.toBe('bad value; not+allowed');
+      expect(echoed).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
+    it('forwards the chosen correlation ID on the request headers to the route', async () => {
+      // The response echo and the route must carry the same ID: without the
+      // forward, a missing or malformed inbound ID splits into one ID on the
+      // response and a different one in route logs and outbound calls (#654).
+      const req = fakeRequest('/api/v1/credentials/verify', {
+        headers: { 'x-correlation-id': 'bad value; not+allowed' },
+      });
+      const response = fakeNextResponse();
+      mockNextResponseNext.mockReturnValueOnce(response);
+
+      await (middleware as any)(req);
+
+      const forwarded = (mockNextResponseNext.mock.calls[0][0] as { request: { headers: Headers } }).request.headers;
+      expect(forwarded.get('x-correlation-id')).toBe(response.headers.get('x-correlation-id'));
+      expect(forwarded.get('x-correlation-id')).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
+    it('adopts the x-amzn-trace-id Root token when no correlation ID is supplied', async () => {
+      const req = fakeRequest('/api/v1/credentials/verify', {
+        headers: { 'x-amzn-trace-id': 'Root=1-67891233-abcdef012345678912345678;Parent=53995c3f42cd8ad8' },
+      });
+      const response = fakeNextResponse();
+      mockNextResponseNext.mockReturnValueOnce(response);
+
+      await (middleware as any)(req);
+
+      expect(response.headers.get('x-correlation-id')).toBe('1-67891233-abcdef012345678912345678');
+    });
+
+    it('prefers a valid x-correlation-id over the amzn trace header', async () => {
+      const req = fakeRequest('/api/v1/credentials/verify', {
+        headers: {
+          'x-correlation-id': 'explicit-id',
+          'x-amzn-trace-id': 'Root=1-67891233-abcdef012345678912345678',
+        },
+      });
+      const response = fakeNextResponse();
+      mockNextResponseNext.mockReturnValueOnce(response);
+
+      await (middleware as any)(req);
+
+      expect(response.headers.get('x-correlation-id')).toBe('explicit-id');
+    });
+
+    it('mints a UUID when the amzn trace header carries no valid Root token', async () => {
+      const req = fakeRequest('/api/v1/credentials/verify', {
+        headers: { 'x-amzn-trace-id': 'Parent=53995c3f42cd8ad8' },
+      });
+      const response = fakeNextResponse();
+      mockNextResponseNext.mockReturnValueOnce(response);
+
+      await (middleware as any)(req);
+
+      expect(response.headers.get('x-correlation-id')).toMatch(/^[0-9a-f-]{36}$/);
     });
 
     it('sets x-correlation-id header on the response', async () => {

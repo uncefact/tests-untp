@@ -1,3 +1,4 @@
+import { httpFetch } from '../../../http/client.js';
 import type { IVerifyResult } from '@vckit/core-types';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
@@ -95,7 +96,7 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
 
     this.logger.debug('Verifying credential');
     const host = new URL(this.baseURL).origin;
-    const response = await fetch(`${host}/agent/routeVerificationCredential`, {
+    const response = await httpFetch(`${host}/agent/routeVerificationCredential`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(verifyParams),
@@ -125,7 +126,7 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
 
   private async issueVerifiableCredential(vc: UNTPVerifiableCredential): Promise<EnvelopedVerifiableCredential> {
     const host = new URL(this.baseURL).origin;
-    const response = await fetch(`${host}/v2/credentials/issue`, {
+    const response = await httpFetch(`${host}/v2/credentials/issue`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ credential: vc, options: { proofFormat: PROOF_FORMAT } }),
@@ -147,7 +148,7 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
     if (!issuerId) throw new VcCredentialStatusError('Issuer ID is required');
 
     const host = new URL(this.baseURL).origin;
-    const response = await fetch(`${host}/agent/issueBitstringStatusList`, {
+    const response = await httpFetch(`${host}/agent/issueBitstringStatusList`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify({ statusPurpose: 'revocation', bitstringStatusIssuer: issuerId }),

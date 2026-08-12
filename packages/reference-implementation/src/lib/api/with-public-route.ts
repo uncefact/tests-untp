@@ -1,6 +1,6 @@
 import { handleRouteError } from '@/lib/api/handle-route-error';
 import { apiLogger } from '@/lib/api/logger';
-import { runWithRequestContext } from '@uncefact/untp-ri-services/logging';
+import { runWithRequestContext, isValidCorrelationId } from '@uncefact/untp-ri-services/logging';
 
 type PublicRouteHandler = (req: Request) => Promise<Response>;
 
@@ -8,8 +8,16 @@ const logger = apiLogger.child({ handler: 'public-route' });
 
 export function withPublicRoute(handler: PublicRouteHandler) {
   return async (req: Request) => {
+    // Zero trust at the boundary (#654): an inbound ID outside the shared
+    // length/charset rule is replaced, never echoed into logs or responses.
     const raw = req.headers.get('x-correlation-id');
-    const correlationId = raw && raw.length <= 128 ? raw : crypto.randomUUID();
+    const correlationId = raw && isValidCorrelationId(raw) ? raw : crypto.randomUUID();
+    if (raw && correlationId !== raw) {
+      logger.warn(
+        { inboundLength: raw.length, replacedWith: correlationId },
+        'Rejected invalid x-correlation-id header; minted a fresh id',
+      );
+    }
 
     return runWithRequestContext(correlationId, async () => {
       const method = req.method;

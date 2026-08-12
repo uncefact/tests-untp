@@ -1,3 +1,4 @@
+import { httpFetch } from '../../../http/client.js';
 import type { IDidService, CreateDidOptions, DidRecord, DidDocument, DidVerificationResult } from '../../types.js';
 import { DidMethod, DidType, DidVerificationCheckName, SUPPORTED_DID_METHODS } from '../../types.js';
 import { verifyDid } from '../../common/verify.js';
@@ -90,7 +91,7 @@ export class VCKitDidAdapter implements IDidService {
     this.logger.debug({ method: options.method, alias: options.alias }, 'Creating DID');
 
     try {
-      const response = await fetch(`${this.baseURL}/agent/didManagerCreate`, {
+      const response = await httpFetch(`${this.baseURL}/agent/didManagerCreate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,7 +139,7 @@ export class VCKitDidAdapter implements IDidService {
     this.logger.debug({ did }, 'Deleting DID');
 
     try {
-      const response = await fetch(`${this.baseURL}/agent/didManagerDelete`, {
+      const response = await httpFetch(`${this.baseURL}/agent/didManagerDelete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -171,7 +172,7 @@ export class VCKitDidAdapter implements IDidService {
     this.logger.debug({ did, domain }, 'Fetching DID document');
 
     try {
-      const response = await fetch(`${this.baseURL}/agent/resolveDid`, {
+      const response = await httpFetch(`${this.baseURL}/agent/resolveDid`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -212,7 +213,7 @@ export class VCKitDidAdapter implements IDidService {
     let providerKeys: Array<{ kid: string }> = [];
     let keyFetchFailed = false;
     try {
-      const response = await fetch(`${this.baseURL}/agent/didManagerGet`, {
+      const response = await httpFetch(`${this.baseURL}/agent/didManagerGet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...this.headers },
         body: JSON.stringify({ did }),

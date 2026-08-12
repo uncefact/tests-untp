@@ -1,3 +1,4 @@
+import { httpFetch } from '../../../http/client.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
@@ -111,7 +112,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
 
     this.logger.info(`Publishing ${links.length} link(s) for ${identifierScheme}/${identifier}`);
 
-    const response = await fetch(`${this.apiBasePath}/resolver`, {
+    const response = await httpFetch(`${this.apiBasePath}/resolver`, {
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(payload),
@@ -148,7 +149,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
 
   async getLinkById(linkId: string): Promise<Link> {
     this.logger.info(`Getting link ${linkId}`);
-    const response = await fetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
+    const response = await httpFetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       headers: this.headers,
     });
 
@@ -183,7 +184,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     if (link.additionalRels !== undefined) payload.rel = link.additionalRels;
     if (link.public !== undefined) payload.public = link.public;
 
-    const response = await fetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
+    const response = await httpFetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       method: 'PUT',
       headers: this.headers,
       body: JSON.stringify(payload),
@@ -211,7 +212,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
 
   async deleteLink(linkId: string): Promise<void> {
     this.logger.info(`Deleting link ${linkId}`);
-    const response = await fetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
+    const response = await httpFetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       method: 'DELETE',
       headers: this.headers,
     });
@@ -227,7 +228,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
 
   async getResolverDescription(): Promise<ResolverDescription> {
     this.logger.info('Fetching resolver description');
-    const response = await fetch(`${this.baseURL}/.well-known/resolver`, {
+    const response = await httpFetch(`${this.baseURL}/.well-known/resolver`, {
       headers: this.headers,
     });
 
@@ -241,7 +242,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
 
   async getLinkTypes(): Promise<LinkType[]> {
     this.logger.info('Fetching link types');
-    const response = await fetch(`${this.apiBasePath}/voc?show=linktypes`, {
+    const response = await httpFetch(`${this.apiBasePath}/voc?show=linktypes`, {
       headers: this.headers,
     });
 
@@ -287,7 +288,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
   ): Promise<void> {
     this.logger.info(`Registering ${schemes.length} scheme(s)`);
     for (const scheme of schemes) {
-      const response = await fetch(`${this.apiBasePath}/identifiers`, {
+      const response = await httpFetch(`${this.apiBasePath}/identifiers`, {
         method: 'POST',
         headers: this.headers,
         body: JSON.stringify(scheme),
