@@ -44,6 +44,12 @@ export const config = {
       publicBucket: Cypress.env('STORAGE_PUBLIC_BUCKET') as string,
       privateBucket: Cypress.env('STORAGE_PRIVATE_BUCKET') as string,
     },
+    idr: {
+      // Host-reachable base URL of the IDR, for asserting published link
+      // state directly against the resolver rather than through the RI.
+      publicBaseUrl: Cypress.env('IDR_PUBLIC_BASE_URL') as string,
+      apiKey: Cypress.env('IDR_API_KEY') as string,
+    },
   },
   tenantMode: (Cypress.env('TENANT_MODE') || 'open') as 'open' | 'closed',
   testOrg: {

@@ -1,11 +1,15 @@
-import type { Link } from '../types.js';
+import type { AccessRole, Link } from '../types.js';
 import type { StorageRecord } from '../../storage/types.js';
 import { constructVerifyURL } from '../../utils/helpers.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type BuildPublishLinksOptions = {
-  /** UNTP link relation type for the credential links (defaults to gs1:sustainabilityInfo) */
+  /**
+   * UNTP link relation type for the credential links. Callers resolve this
+   * from the IDR service's configured default; gs1:sustainabilityInfo is
+   * only the last-resort fallback when neither is supplied.
+   */
   linkType?: string;
   /** URL of the machine-readable verification service (omit to skip) */
   machineVerificationUrl?: string;
@@ -27,6 +31,12 @@ export type BuildPublishLinksOptions = {
    * distinctly from `false`.
    */
   public?: boolean;
+  /**
+   * UNTP access roles governing who the published links are surfaced to.
+   * Attached to the credential link and the human verification link; the
+   * machine verification service link stays role-free.
+   */
+  accessRole?: AccessRole[];
 };
 
 // ── buildPublishLinks ────────────────────────────────────────────────────────
@@ -34,7 +44,7 @@ export type BuildPublishLinksOptions = {
 /**
  * Builds the link set for publishing a credential to an Identity Resolver.
  *
- * Always includes a credential storage URI link (`gs1:sustainabilityInfo`).
+ * Always includes a credential storage URI link.
  * Optionally prepends a machine verification link and appends a human
  * verification link depending on the provided options.
  *
@@ -52,6 +62,7 @@ export function buildPublishLinks(
 ): Link[] {
   const links: Link[] = [];
   const credentialLinkType = options?.linkType ?? 'gs1:sustainabilityInfo';
+  const accessRole = options?.accessRole && options.accessRole.length > 0 ? { accessRole: options.accessRole } : {};
 
   if (options?.machineVerificationUrl) {
     links.push({
@@ -70,6 +81,7 @@ export function buildPublishLinks(
     ...(options?.hreflang && options.hreflang.length > 0 ? { hreflang: options.hreflang } : {}),
     ...(options?.additionalRels && options.additionalRels.length > 0 ? { additionalRels: options.additionalRels } : {}),
     ...(options?.public !== undefined ? { public: options.public } : {}),
+    ...accessRole,
   });
 
   if (options?.humanVerificationUrl) {
@@ -82,6 +94,7 @@ export function buildPublishLinks(
       rel: credentialLinkType,
       type: 'text/html',
       title: linkTitle,
+      ...accessRole,
     });
   }
 

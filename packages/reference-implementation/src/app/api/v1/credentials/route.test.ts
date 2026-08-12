@@ -97,6 +97,8 @@ jest.mock('@/lib/services/resolve-idr-service', () => ({
 const mockBuildPublishLinks = jest.fn();
 jest.mock('@uncefact/untp-ri-services', () => ({
   buildPublishLinks: (...args: unknown[]) => mockBuildPublishLinks(...args),
+  // publishingOptionsSchema derives its accessRole values from this enum.
+  AccessRole: jest.requireActual('@uncefact/untp-ri-services').AccessRole,
 }));
 
 // Repository mocks
@@ -490,6 +492,18 @@ describe('POST /api/v1/credentials', () => {
       expect(json.error).toMatch(/public/);
     });
 
+    it('returns 400 when publishingOptions.accessRole contains a value outside the UNTP vocabulary', async () => {
+      const req = createFakeRequest(
+        validBody({ publishingOptions: { accessRole: ['untp:accessRole#Anyone' as unknown as string] } }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toMatch(/accessRole/);
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
     it('returns 400 when publishingOptions.additionalRels contains a non-string entry', async () => {
       const req = createFakeRequest(validBody({ publishingOptions: { additionalRels: [123 as unknown as string] } }));
       const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -794,7 +808,7 @@ describe('POST /api/v1/credentials', () => {
       });
 
       mockResolveIdrService.mockResolvedValue({
-        service: { publishLinks: mockPublishLinks },
+        service: { publishLinks: mockPublishLinks, defaultLinkType: 'untp:dpp' },
         instanceId: 'idr-1',
       });
 
@@ -847,6 +861,7 @@ describe('POST /api/v1/credentials', () => {
       // humanVerificationUrl defaults to `${RI_APP_URL}/verify` (RI_APP_URL is
       // set to http://localhost:3003 in beforeEach) since none was supplied.
       expect(mockBuildPublishLinks).toHaveBeenCalledWith(STORAGE_RESPONSE, 'Digital Product Passport', {
+        linkType: 'untp:dpp',
         machineVerificationUrl: undefined,
         humanVerificationUrl: 'http://localhost:3003/verify',
       });
@@ -918,6 +933,7 @@ describe('POST /api/v1/credentials', () => {
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
       expect(mockBuildPublishLinks).toHaveBeenCalledWith(STORAGE_RESPONSE, 'Digital Product Passport', {
+        linkType: 'untp:dpp',
         machineVerificationUrl: 'https://verify.example.com/api',
         humanVerificationUrl: 'https://verify.example.com/ui',
       });
@@ -1122,6 +1138,48 @@ describe('POST /api/v1/credentials', () => {
       expect(optionsArg).not.toHaveProperty('hreflang');
       expect(optionsArg).not.toHaveProperty('additionalRels');
       expect(optionsArg).not.toHaveProperty('public');
+    });
+
+    it("defaults linkType to the IDR service's configured default and lets an explicit one win", async () => {
+      setupPublishingHappyPath();
+
+      const omitted = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(omitted, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(mockBuildPublishLinks.mock.calls[0][2].linkType).toBe('untp:dpp');
+
+      mockBuildPublishLinks.mockClear();
+      setupPublishingHappyPath();
+
+      const explicit = createFakeRequest(
+        validBody({ publishingOptions: { publish: true, linkType: 'gs1:certificationInfo' } }),
+      );
+      await POST(explicit, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(mockBuildPublishLinks.mock.calls[0][2].linkType).toBe('gs1:certificationInfo');
+    });
+
+    it('passes accessRole to buildPublishLinks and omits it when unset', async () => {
+      setupPublishingHappyPath();
+
+      const withRoles = createFakeRequest(
+        validBody({
+          publishingOptions: { publish: true, accessRole: ['untp:accessRole#Regulator', 'untp:accessRole#Auditor'] },
+        }),
+      );
+      await POST(withRoles, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockBuildPublishLinks).toHaveBeenCalledWith(
+        STORAGE_RESPONSE,
+        'Digital Product Passport',
+        expect.objectContaining({ accessRole: ['untp:accessRole#Regulator', 'untp:accessRole#Auditor'] }),
+      );
+
+      mockBuildPublishLinks.mockClear();
+      setupPublishingHappyPath();
+
+      const withoutRoles = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      await POST(withoutRoles, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockBuildPublishLinks.mock.calls[0][2]).not.toHaveProperty('accessRole');
     });
 
     it('round-trips publishingOptions.public: false distinctly from unset', async () => {

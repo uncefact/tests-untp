@@ -382,13 +382,22 @@ Retrieves a link by its IDR link ID. The response combines the **live link data*
 PATCH /api/v1/identifiers/{id}/links/{linkId}
 ```
 
-Updates a link on the upstream IDR and syncs the local audit record. The `href` field is SSRF-validated if provided. If the upstream link no longer exists, returns `409 Conflict` with a desynchronisation error.
+Updates a link on the upstream IDR and syncs the local audit record. The request body must include at least one updatable field. The `href` field is SSRF-validated if provided. If the upstream link no longer exists, returns `409 Conflict` with a desynchronisation error.
 
 | Updatable Field | Description |
 |-----------------|-------------|
 | `href` | New target URL (SSRF-validated) |
 | `rel` | New link relationship type |
 | `type` | New MIME type |
+| `title` | New human-readable title |
+| `hreflang` | New BCP 47 language tags for the link's target content |
+| `context` | New link context |
+| `default` | Whether this is the default variant for its relation type |
+| `method` | New HTTP method for retrieving the link target (`GET` or `POST`) |
+| `encryptionMethod` | New encryption method identifier |
+| `accessRole` | New UNTP access roles allowed to retrieve this link, from the [UNTP access role vocabulary](https://untp.unece.org/docs/specification/DecentralisedAccessControl) |
+| `additionalRels` | New additional link relation types to attach beyond `rel` |
+| `public` | Whether the published link is publicly resolvable |
 
 ---
 

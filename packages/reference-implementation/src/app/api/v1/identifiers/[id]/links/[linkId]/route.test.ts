@@ -269,6 +269,52 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(body.error).toBe('Invalid JSON body');
   });
 
+  it('returns 400 for an empty update body', async () => {
+    const req = createFakeRequest({});
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/at least one/);
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a body containing only unknown fields', async () => {
+    const req = createFakeRequest({ typo: 'x' });
+    const res = await PATCH(req, createContext());
+
+    expect(res.status).toBe(400);
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
+  it('strips unknown fields but processes a recognised field alongside them', async () => {
+    const req = createFakeRequest({ title: 'New Title', typo: 'x' });
+    const res = await PATCH(req, createContext());
+
+    expect(res.status).toBe(200);
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', { title: 'New Title' });
+  });
+
+  it('forwards accessRole to updateLink', async () => {
+    const req = createFakeRequest({ accessRole: ['untp:accessRole#Regulator', 'untp:accessRole#Owner'] });
+    await PATCH(req, createContext());
+
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith(
+      'idr-link-1',
+      expect.objectContaining({ accessRole: ['untp:accessRole#Regulator', 'untp:accessRole#Owner'] }),
+    );
+  });
+
+  it('returns 400 when accessRole contains a value outside the UNTP vocabulary', async () => {
+    const req = createFakeRequest({ accessRole: ['untp:accessRole#Anyone'] });
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/accessRole/);
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
   it('forwards hreflang, additionalRels, and public to updateLink', async () => {
     const req = createFakeRequest({
       hreflang: ['en', 'de'],

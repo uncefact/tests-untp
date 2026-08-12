@@ -23,6 +23,7 @@ import {
   serviceInstanceResponseSchema,
   // Shared schemas
   errorResponseSchema,
+  AccessRole,
 } from '@uncefact/untp-ri-services';
 import { paginationMetaSchema } from '@/lib/api/pagination';
 
@@ -37,7 +38,10 @@ const storageOptionsSchema = z.object({
 
 export const publishingOptionsSchema = z.object({
   publish: z.boolean().optional().describe('Whether to publish the credential to the Identity Resolver'),
-  linkType: z.string().optional().describe('UNTP link relation type (defaults to gs1:sustainabilityInfo)'),
+  linkType: z
+    .string()
+    .optional()
+    .describe("UNTP link relation type (defaults to the IDR service's configured default link type)"),
   linkTitle: z.string().optional().describe('Title for the published link (defaults to data model name)'),
   qualifierPath: z
     .string()
@@ -63,6 +67,12 @@ export const publishingOptionsSchema = z.object({
     .optional()
     .describe(
       'Whether the credential target URL is safe to publish in a public directory. Distinct from access control on the resource content',
+    ),
+  accessRole: z
+    .array(z.nativeEnum(AccessRole))
+    .optional()
+    .describe(
+      'UNTP access roles governing who the published links are surfaced to, attached to the credential and human verification links (e.g. untp:accessRole#Regulator)',
     ),
 });
 
