@@ -1,8 +1,7 @@
 import { Registrar, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
-import { ConflictError, NotFoundError } from '@/lib/api/errors';
-import { ValidationError } from '@/lib/api/validation';
+import { ConflictError, NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { isForeignKeyViolation, isForeignKeyViolationOn, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -54,12 +53,12 @@ export async function createRegistrar(input: CreateRegistrarInput): Promise<Regi
     // so the violated column must be matched before attributing a message; a
     // bare P2003 mapping here would blame the IDR instance reference for a
     // tenantId violation too. The route handler pre-checks the instance with a
-    // tenant-scoped lookup, so this branch is the backstop for an instance
-    // deleted between that check and the insert. Anything else (including a
-    // tenant deleted mid-request) rethrows into the sanitised 500 branch
+    // tenant-scoped lookup and a 404, so an instance deleted between that
+    // check and the insert surfaces as the same 404. Anything else (including
+    // a tenant deleted mid-request) rethrows into the sanitised 500 branch
     // rather than carrying a misattributed message.
     if (isForeignKeyViolationOn(e, 'idrServiceInstanceId')) {
-      throw new ValidationError('The referenced IDR service instance does not exist');
+      throw new ServiceInstanceNotFoundError(String(input.idrServiceInstanceId));
     }
     throw e;
   }
@@ -138,12 +137,12 @@ export async function updateRegistrar(id: string, tenantId: string, input: Updat
       });
     } catch (e) {
       // Same two-foreign-key insert shape as createRegistrar: only a P2003
-      // whose violated column is idrServiceInstanceId gets the
-      // instance-specific message (the backstop for an instance deleted
-      // between the route handler's tenant-scoped pre-check and this write);
-      // any other violation rethrows via mapDatabaseError's fall-through.
+      // whose violated column is idrServiceInstanceId surfaces as the route
+      // pre-check's 404 (the backstop for an instance deleted between that
+      // check and this write); any other violation rethrows via
+      // mapDatabaseError's fall-through.
       if (isForeignKeyViolationOn(e, 'idrServiceInstanceId')) {
-        throw new ValidationError('The referenced IDR service instance does not exist');
+        throw new ServiceInstanceNotFoundError(String(input.idrServiceInstanceId));
       }
       mapDatabaseError(e, {
         notFound: 'Registrar not found',

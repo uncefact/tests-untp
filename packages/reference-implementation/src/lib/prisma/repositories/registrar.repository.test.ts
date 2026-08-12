@@ -5,8 +5,7 @@ import {
   updateRegistrar,
   deleteRegistrar,
 } from './registrar.repository';
-import { ConflictError, NotFoundError } from '@/lib/api/errors';
-import { ValidationError } from '@/lib/api/validation';
+import { ConflictError, NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { SYSTEM_TENANT_ID } from '../constants';
 
@@ -126,7 +125,7 @@ describe('registrar.repository', () => {
       });
     });
 
-    it('maps a foreign-key violation on idrServiceInstanceId to ValidationError', async () => {
+    it('maps a foreign-key violation on idrServiceInstanceId to the 404 the pre-check produces', async () => {
       mockRegistrar.create.mockRejectedValue(prismaForeignKeyViolationError());
 
       const result = createRegistrar({
@@ -136,8 +135,8 @@ describe('registrar.repository', () => {
         idrServiceInstanceId: 'nonexistent-si',
       });
 
-      await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('The referenced IDR service instance does not exist');
+      await expect(result).rejects.toThrow(ServiceInstanceNotFoundError);
+      await expect(result).rejects.toThrow('Service instance not found: nonexistent-si');
     });
 
     it('rethrows a foreign-key violation on tenantId rather than blaming the IDR instance', async () => {
@@ -154,7 +153,7 @@ describe('registrar.repository', () => {
       });
 
       // Identity assertion: the original engine error is rethrown unchanged,
-      // not replaced by the instance-specific ValidationError.
+      // not replaced by the instance-specific error.
       await expect(result).rejects.toBe(tenantFkError);
     });
 
@@ -292,14 +291,14 @@ describe('registrar.repository', () => {
       await expect(updateRegistrar('reg-1', TENANT_ID, { name: 'New' })).rejects.toThrow('Registrar not found');
     });
 
-    it('maps a foreign-key violation on idrServiceInstanceId to ValidationError', async () => {
+    it('maps a foreign-key violation on idrServiceInstanceId to the 404 the pre-check produces', async () => {
       mockTx.registrar.findFirst.mockResolvedValue(REGISTRAR_RECORD);
       mockTx.registrar.update.mockRejectedValue(prismaForeignKeyViolationError());
 
       const result = updateRegistrar('reg-1', TENANT_ID, { idrServiceInstanceId: 'nonexistent-si' });
 
-      await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('The referenced IDR service instance does not exist');
+      await expect(result).rejects.toThrow(ServiceInstanceNotFoundError);
+      await expect(result).rejects.toThrow('Service instance not found: nonexistent-si');
     });
 
     it('rethrows a foreign-key violation on another column rather than blaming the IDR instance', async () => {

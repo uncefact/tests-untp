@@ -5,7 +5,7 @@
 
 ## Context
 
-ADR-036 put database error translation at the repository boundary but left one status question open, tracked as #781: when a reference that passed a route's pre-check is deleted by a concurrent request before the write lands, the resulting foreign-key violation had no settled answer. The shared helper's `invalidReference` context maps a foreign-key violation to a 400, while the same missing reference caught a moment earlier by the route's pre-check returns a 404, so one condition produced two answers depending on timing. Several call sites mapped the race to neither and fell through to the sanitised 500 (identifier creation, scheme-qualifier recreation, data-model creation), and DID creation mapped it to a 400 whose message said "not found".
+ADR-036 put database error translation at the repository boundary but left one status question open, tracked as #781: when a reference that passed a route's pre-check is deleted by a concurrent request before the write lands, the resulting foreign-key violation had no settled answer. The shared helper's `invalidReference` context maps a foreign-key violation to a 400, while the same missing reference caught a moment earlier by the route's pre-check returns a 404, so one condition produced two answers depending on timing. Several call sites mapped the race to neither and fell through to the sanitised 500 (identifier creation, scheme-qualifier recreation, data-model creation, link-registration bulk creation), and DID, registrar, and identifier-scheme writes mapped it to a 400 whose message said "not found" or hedged between two references.
 
 ## Decision
 
@@ -13,13 +13,13 @@ A reference that passed a route's pre-check and vanished before the write return
 
 1. **Per-route consistency wins over cross-surface uniformity.** The caller sees one behaviour for one condition on one route, regardless of timing. A 400 is wrong for this condition because the request was valid when it was validated; the state changed underneath it, which is what the pre-check's 404 already says.
 2. **Multi-key writes match the violated column first.** Where the write carries more than one foreign key, `isForeignKeyViolationOn` matches the violated column before the pre-check's error is thrown, so a violation on any other column (for example a tenant deleted mid-request) rethrows into ADR-036's sanitised backstop instead of carrying a misattributed message.
-3. **Applied at:** identifier creation and scheme-qualifier recreation (scheme), data-model creation (parent config), DID creation (service instance, previously the helper's 400), render-template creation (data model, previously matched column-blind), and link-registration bulk creation (identifier).
+3. **Applied at:** identifier creation and scheme-qualifier recreation (scheme), data-model creation (parent config), DID creation (service instance, previously the helper's 400), registrar creation and update (IDR service instance, previously a 400), identifier-scheme creation and update (registrar and IDR service instance, previously a disjunctive 400), render-template creation (data model, previously matched column-blind), and link-registration bulk creation (identifier).
 
 ## Consequences
 
-- Easier: route contracts stay exactly as documented. The race maps to a status and description every affected route already carries, so adopting the convention needed no Swagger changes.
+- Easier: the race maps to a status every affected route already documents, so no new response codes appear anywhere. The one description that had documented the race under the old mapping (the DID import route's 400) was corrected to match.
 - Easier: clients handle one outcome per condition; retrying after a 404 means the referenced record is gone, whatever the timing was.
-- Harder: the repository catch must repeat the pre-check's message string, a small duplication kept adjacent in the same function or file.
+- Harder: the repository catch must repeat the pre-check's message string. For some sites the pre-check sits in the same function or file; for others (DID, render-template, link-registration) it lives in the route or a wrapper, where the duplicated string is likelier to drift and relies on the paired tests to catch it.
 
 ## Alternatives Considered
 

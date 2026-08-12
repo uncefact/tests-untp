@@ -5,7 +5,7 @@ import {
   updateIdentifierScheme,
   deleteIdentifierScheme,
 } from './identifier-scheme.repository';
-import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { SYSTEM_TENANT_ID } from '../constants';
@@ -169,8 +169,10 @@ describe('identifier-scheme.repository', () => {
       );
     });
 
-    it('maps a foreign-key violation to ValidationError', async () => {
-      mockIdentifierScheme.create.mockRejectedValue(prismaForeignKeyViolationError());
+    it('maps a foreign-key violation on registrarId to the 404 the pre-check produces', async () => {
+      mockIdentifierScheme.create.mockRejectedValue(
+        prismaForeignKeyViolationError('Foreign key constraint failed on the field: `registrarId`'),
+      );
 
       const result = createIdentifierScheme({
         tenantId: TENANT_ID,
@@ -181,8 +183,43 @@ describe('identifier-scheme.repository', () => {
         linkTemplate: '/{primaryKey}/{value}',
       });
 
-      await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('The referenced registrar or IDR service instance does not exist');
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Registrar not found');
+    });
+
+    it('maps a foreign-key violation on idrServiceInstanceId to the 404 the pre-check produces', async () => {
+      mockIdentifierScheme.create.mockRejectedValue(
+        prismaForeignKeyViolationError('Foreign key constraint failed on the field: `idrServiceInstanceId`'),
+      );
+
+      const result = createIdentifierScheme({
+        tenantId: TENANT_ID,
+        registrarId: REGISTRAR_ID,
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        idrServiceInstanceId: 'nonexistent-si',
+      });
+
+      await expect(result).rejects.toThrow(ServiceInstanceNotFoundError);
+      await expect(result).rejects.toThrow('Service instance not found: nonexistent-si');
+    });
+
+    it('rethrows a foreign-key violation on tenantId rather than blaming a reference', async () => {
+      const tenantFkError = prismaForeignKeyViolationError('Foreign key constraint failed on the field: `tenantId`');
+      mockIdentifierScheme.create.mockRejectedValue(tenantFkError);
+
+      const result = createIdentifierScheme({
+        tenantId: TENANT_ID,
+        registrarId: REGISTRAR_ID,
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      });
+
+      await expect(result).rejects.toBe(tenantFkError);
     });
 
     it('rejects duplicate qualifier keys without hitting the database', async () => {
@@ -468,14 +505,16 @@ describe('identifier-scheme.repository', () => {
       await expect(result).rejects.toThrow('Identifier scheme not found');
     });
 
-    it('maps a foreign-key violation to ValidationError', async () => {
+    it('maps a foreign-key violation on idrServiceInstanceId to the 404 the pre-check produces', async () => {
       mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
-      mockTx.identifierScheme.update.mockRejectedValue(prismaForeignKeyViolationError());
+      mockTx.identifierScheme.update.mockRejectedValue(
+        prismaForeignKeyViolationError('Foreign key constraint failed on the field: `idrServiceInstanceId`'),
+      );
 
       const result = updateIdentifierScheme('scheme-1', TENANT_ID, { idrServiceInstanceId: 'nonexistent-si' });
 
-      await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('The referenced IDR service instance does not exist');
+      await expect(result).rejects.toThrow(ServiceInstanceNotFoundError);
+      await expect(result).rejects.toThrow('Service instance not found: nonexistent-si');
     });
 
     it('rejects duplicate qualifier keys without hitting the database', async () => {

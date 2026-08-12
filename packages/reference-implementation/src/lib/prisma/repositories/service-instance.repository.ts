@@ -210,8 +210,10 @@ export async function deleteServiceInstance(id: string, tenantId: string): Promi
         where: { id },
       });
     } catch (e) {
-      // Every relation referencing ServiceInstance is onDelete: SetNull, so a
-      // delete cannot trip a foreign-key restriction; only the not-found race maps.
+      // Every declared relation referencing ServiceInstance is onDelete:
+      // SetNull, so a delete cannot trip a foreign-key restriction; only the
+      // not-found race maps. (RenderTemplate.storageServiceInstanceId points
+      // at instances too, but as a plain column, not a constraint.)
       mapDatabaseError(e, { notFound: 'Service instance not found' });
     }
   });
