@@ -395,7 +395,7 @@ Updates a link on the upstream IDR and syncs the local audit record. The request
 | `default` | Whether this is the default variant for its relation type |
 | `method` | New HTTP method for retrieving the link target (`GET` or `POST`) |
 | `encryptionMethod` | New encryption method identifier |
-| `accessRole` | New UNTP access roles allowed to retrieve this link, from the UNTP access role vocabulary |
+| `accessRole` | New UNTP access roles allowed to retrieve this link, from the [UNTP access role vocabulary](https://untp.unece.org/docs/specification/DecentralisedAccessControl) |
 | `additionalRels` | New additional link relation types to attach beyond `rel` |
 | `public` | Whether the published link is publicly resolvable |
 
