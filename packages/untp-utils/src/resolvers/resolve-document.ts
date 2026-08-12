@@ -1,6 +1,13 @@
 import { ReadableStream } from 'node:stream/web';
 import { Agent, fetch as undiciFetch } from 'undici';
-import { parseEntityTag, parseImfDate, parseMediaType } from '../http-headers/index.js';
+import {
+  parseEntityTag,
+  parseImfDate,
+  parseMediaType,
+  DEFAULT_USER_AGENT,
+  USER_AGENT_ENV_VAR,
+  isValidHttpUserAgent,
+} from '../http-headers/index.js';
 import { MultibaseDigest, type HashAlgorithm, type MultibaseEncoding } from '../multibase-digest/index.js';
 import { validatePublicUrl } from '../node/index.js';
 import {
@@ -35,6 +42,23 @@ export const RESOLVER_DEFAULTS = {
   digestAlgorithm: HashAlgorithm;
   digestEncoding: MultibaseEncoding;
 };
+
+/**
+ * Merges the resolved `User-Agent` into the caller's headers. A caller-supplied
+ * `user-agent` (any casing) wins; otherwise the `RI_HTTP_USER_AGENT` env
+ * override (blank treated as unset), then the default. The override is not
+ * validated here: deployments validate it at boot via
+ * {@link isValidHttpUserAgent} (the RI does, in instrumentation.node.ts),
+ * and a value that slips through with control characters makes the fetch
+ * itself fail loudly rather than being silently replaced.
+ */
+function withUserAgent(headers: Record<string, string> | undefined): Record<string, string> {
+  const hasExplicit = Object.keys(headers ?? {}).some((key) => key.toLowerCase() === 'user-agent');
+  if (hasExplicit) return headers as Record<string, string>;
+  const fromEnv = process.env[USER_AGENT_ENV_VAR];
+  const userAgent = fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv : DEFAULT_USER_AGENT;
+  return { ...headers, 'User-Agent': userAgent };
+}
 
 /**
  * Result of a fetch that produced a final response (any non-redirect status,
@@ -141,7 +165,7 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
           method: 'GET',
           redirect: 'manual',
           signal: controller.signal,
-          headers: options?.headers,
+          headers: withUserAgent(options?.headers),
           dispatcher,
         });
 

@@ -14,6 +14,7 @@ export {
   type LoadResult,
   type ResolveDocumentOptions,
 } from './resolve-document.js';
+export { DEFAULT_USER_AGENT, USER_AGENT_ENV_VAR, isValidHttpUserAgent } from '../http-headers/index.js';
 export {
   resolveJsonDocument,
   type ResolveJsonDocumentOptions,

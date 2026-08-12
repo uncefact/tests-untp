@@ -28,12 +28,16 @@ import {
   validateEncryptionKeyAtStartup,
 } from './lib/credentials/validate-encryption-key-startup';
 import { resolveAppUrl } from './lib/config/app-url.config';
+import { validateHttpUserAgentOnBoot } from './lib/config/http-user-agent.config';
 
 export async function registerNode(): Promise<void> {
   // Fail the boot on a missing or unusable RI_APP_URL: it backs the OIDC
   // post-logout redirect and the default human verification link, and the
   // identity-provider documentation requires it (#823).
   resolveAppUrl();
+  // Fail the boot on an unsendable RI_HTTP_USER_AGENT override; unset and
+  // blank are fine (the guarded fetchers use their built-in default).
+  validateHttpUserAgentOnBoot();
   await validateEncryptionKeyOnBoot();
   startOpenTelemetry();
 }
