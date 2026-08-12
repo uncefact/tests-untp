@@ -14,6 +14,7 @@ import {
   IdrLinkTypesFetchError,
   IdrSchemeRegistrationError,
 } from '../../errors';
+import { AccessRole } from '../../types';
 import type { Link } from '../../types';
 import type { PyxIdrConfig } from './pyx-idr.schema';
 import type { LoggerService } from '../../../logging/types';
@@ -258,6 +259,20 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(body.responses[1]).not.toHaveProperty('public');
     });
 
+    it('should include `accessRole` on the variant when set on the link', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks(
+        'abn',
+        '51824753556',
+        [{ ...mockLinks[0], accessRole: [AccessRole.Regulator] }, { ...mockLinks[1] }],
+        undefined,
+        mockOptions,
+      );
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.responses[0].accessRole).toEqual(['untp:accessRole#Regulator']);
+      expect(body.responses[1]).not.toHaveProperty('accessRole');
+    });
+
     it('should include `rel` (additional rels) on the variant when set on the link', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       await adapter.publishLinks(
@@ -453,6 +468,39 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(result.title).toBe('');
     });
 
+    it('should round-trip accessRole from the variant response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/dpp.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+          accessRole: ['untp:accessRole#Auditor', 'untp:accessRole#Owner'],
+        }),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.getLinkById('link-123');
+
+      expect(result.accessRole).toEqual(['untp:accessRole#Auditor', 'untp:accessRole#Owner']);
+    });
+
+    it('should omit accessRole when the variant response has none', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/dpp.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+        }),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.getLinkById('link-123');
+
+      expect(result).not.toHaveProperty('accessRole');
+    });
+
     it('should handle missing hreflang gracefully', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -546,7 +594,13 @@ describe('PyxIdentityResolverAdapter', () => {
   });
 
   describe('updateLink', () => {
-    it('should send PUT request with mapped fields', async () => {
+    it('should send PUT request with mapped fields and read the updated link back', async () => {
+      // The Pyx update endpoint acknowledges with a message only; the
+      // updated state arrives via the follow-up GET.
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ message: 'Link updated successfully' }),
+      });
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValue({
@@ -573,27 +627,58 @@ describe('PyxIdentityResolverAdapter', () => {
         hreflang: ['en'],
       });
 
-      const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[0]).toBe('https://resolver.example.com/api/v4/resolver/links/link-123');
-      expect(callArgs[1].method).toBe('PUT');
-
-      const body = JSON.parse(callArgs[1].body);
-      expect(body).toEqual({
+      const putCall = mockFetch.mock.calls[0];
+      expect(putCall[0]).toBe('https://resolver.example.com/api/v4/resolver/links/link-123');
+      expect(putCall[1].method).toBe('PUT');
+      expect(JSON.parse(putCall[1].body)).toEqual({
         targetUrl: 'https://example.com/updated.json',
         mimeType: 'application/ld+json',
         title: 'Updated Title',
       });
+
+      const getCall = mockFetch.mock.calls[1];
+      expect(getCall[0]).toBe('https://resolver.example.com/api/v4/resolver/links/link-123');
+    });
+
+    function mockUpdateAckThenLink(link: Record<string, unknown>) {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ message: 'Link updated successfully' }),
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue(link),
+      });
+    }
+
+    it('should throw IdrLinkUpdateError when the follow-up read fails after a successful update', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ message: 'Link updated successfully' }),
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        text: jest.fn().mockResolvedValue('Not Found'),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+
+      // Never IdrLinkNotFoundError: the update has already applied
+      // upstream, and a not-found here would send callers down the
+      // desync-and-delete path against a link that still exists.
+      const attempt = adapter.updateLink('link-123', { title: 'New Title' });
+      await expect(attempt).rejects.toBeInstanceOf(IdrLinkUpdateError);
+      await expect(attempt).rejects.toThrow(/update was applied upstream/);
     });
 
     it('should only include defined fields in the payload', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          targetUrl: 'https://example.com/resource.json',
-          linkType: 'untp:dpp',
-          mimeType: 'application/json',
-          title: 'New Title',
-        }),
+      mockUpdateAckThenLink({
+        targetUrl: 'https://example.com/resource.json',
+        linkType: 'untp:dpp',
+        mimeType: 'application/json',
+        title: 'New Title',
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
@@ -605,13 +690,10 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should forward `hreflang`, `additionalRels`, and `public` when set', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          targetUrl: 'https://example.com/resource.json',
-          linkType: 'untp:dpp',
-          mimeType: 'application/json',
-        }),
+      mockUpdateAckThenLink({
+        targetUrl: 'https://example.com/resource.json',
+        linkType: 'untp:dpp',
+        mimeType: 'application/json',
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
@@ -630,13 +712,10 @@ describe('PyxIdentityResolverAdapter', () => {
     });
 
     it('should round-trip `public: false` distinctly from unset in the PUT payload', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          targetUrl: 'https://example.com/resource.json',
-          linkType: 'untp:dpp',
-          mimeType: 'application/json',
-        }),
+      mockUpdateAckThenLink({
+        targetUrl: 'https://example.com/resource.json',
+        linkType: 'untp:dpp',
+        mimeType: 'application/json',
       });
 
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
@@ -644,6 +723,29 @@ describe('PyxIdentityResolverAdapter', () => {
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body).toEqual({ public: false });
+    });
+
+    it('should send accessRole in the update payload and read it back from the follow-up fetch', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ message: 'Link updated successfully' }),
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/resource.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+          accessRole: ['untp:accessRole#Customer'],
+        }),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.updateLink('link-123', { accessRole: [AccessRole.Customer] });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).toEqual({ accessRole: ['untp:accessRole#Customer'] });
+      expect(result.accessRole).toEqual(['untp:accessRole#Customer']);
     });
 
     it('should throw IdrLinkNotFoundError on HTTP 404', async () => {

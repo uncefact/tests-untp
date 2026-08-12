@@ -231,6 +231,7 @@ The published link does **not** carry the credential's decryption key. The key i
 | `hreflang` | string[] | BCP 47 language tags for the link's target content |
 | `additionalRels` | string[] | Additional link relation types to attach beyond `linkType` |
 | `public` | boolean | Whether the published link is publicly resolvable |
+| `accessRole` | string[] | UNTP access roles allowed to retrieve the published links, from the UNTP access role vocabulary (e.g. `untp:accessRole#Regulator`); attached to the credential and human verification links |
 
 ## Issuance Endpoints
 

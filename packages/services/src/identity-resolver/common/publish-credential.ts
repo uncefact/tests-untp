@@ -1,4 +1,4 @@
-import type { Link } from '../types.js';
+import type { AccessRole, Link } from '../types.js';
 import type { StorageRecord } from '../../storage/types.js';
 import { constructVerifyURL } from '../../utils/helpers.js';
 
@@ -27,6 +27,12 @@ export type BuildPublishLinksOptions = {
    * distinctly from `false`.
    */
   public?: boolean;
+  /**
+   * UNTP access roles governing who the published links are surfaced to.
+   * Attached to the credential link and the human verification link; the
+   * machine verification service link stays role-free.
+   */
+  accessRole?: AccessRole[];
 };
 
 // ── buildPublishLinks ────────────────────────────────────────────────────────
@@ -52,6 +58,7 @@ export function buildPublishLinks(
 ): Link[] {
   const links: Link[] = [];
   const credentialLinkType = options?.linkType ?? 'gs1:sustainabilityInfo';
+  const accessRole = options?.accessRole && options.accessRole.length > 0 ? { accessRole: options.accessRole } : {};
 
   if (options?.machineVerificationUrl) {
     links.push({
@@ -70,6 +77,7 @@ export function buildPublishLinks(
     ...(options?.hreflang && options.hreflang.length > 0 ? { hreflang: options.hreflang } : {}),
     ...(options?.additionalRels && options.additionalRels.length > 0 ? { additionalRels: options.additionalRels } : {}),
     ...(options?.public !== undefined ? { public: options.public } : {}),
+    ...accessRole,
   });
 
   if (options?.humanVerificationUrl) {
@@ -82,6 +90,7 @@ export function buildPublishLinks(
       rel: credentialLinkType,
       type: 'text/html',
       title: linkTitle,
+      ...accessRole,
     });
   }
 

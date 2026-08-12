@@ -55,9 +55,11 @@ export const IDR_SERVICE_TYPE = 'IDR' as const;
 // ── Enums ──────────────────────────────────────────────────────────────────
 
 /**
- * UNTP access roles for variant-based disclosure.
+ * UNTP access roles for variant-based disclosure. Mirrors the accessRole
+ * enumeration in the published UNTP Identity Resolver API.
  *
  * @see https://untp.unece.org/docs/specification/VariantBasedDisclosure
+ * @see https://untp.unece.org/artefacts/schema/v0.7.0/idr/idr-api.html
  */
 export enum AccessRole {
   /** Public access - any party holding a decryption secret may access */
@@ -70,6 +72,8 @@ export enum AccessRole {
   Recycler = 'untp:accessRole#Recycler',
   /** Authorised auditors */
   Auditor = 'untp:accessRole#Auditor',
+  /** Legitimate owner or user of the specific serialised item */
+  Owner = 'untp:accessRole#Owner',
 }
 
 // ── Link types ─────────────────────────────────────────────────────────────

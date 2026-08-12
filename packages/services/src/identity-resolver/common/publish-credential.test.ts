@@ -1,6 +1,7 @@
 import { buildPublishLinks } from './publish-credential';
 import type { BuildPublishLinksOptions } from './publish-credential';
 import type { StorageRecord } from '../../storage/types';
+import { AccessRole } from '../types';
 
 // Mock constructVerifyURL so we don't depend on window.location or URL construction details
 jest.mock('../../utils/helpers', () => ({
@@ -183,6 +184,26 @@ describe('buildPublishLinks', () => {
     expect(links[0]).not.toHaveProperty('hreflang');
     expect(links[0]).not.toHaveProperty('additionalRels');
     expect(links[0]).not.toHaveProperty('public');
+  });
+
+  it('attaches accessRole to the credential and human verification links, never the machine verification link', () => {
+    const options: BuildPublishLinksOptions = {
+      machineVerificationUrl: 'https://vckit.example.com/verify',
+      humanVerificationUrl: 'https://app.example.com/verify',
+      accessRole: [AccessRole.Regulator, AccessRole.Auditor],
+    };
+
+    const links = buildPublishLinks(storage, linkTitle, options);
+
+    expect(links).toHaveLength(3);
+    expect(links[0]).not.toHaveProperty('accessRole');
+    expect(links[1].accessRole).toEqual([AccessRole.Regulator, AccessRole.Auditor]);
+    expect(links[2].accessRole).toEqual([AccessRole.Regulator, AccessRole.Auditor]);
+  });
+
+  it('omits accessRole when not provided or empty', () => {
+    expect(buildPublishLinks(storage, linkTitle)[0]).not.toHaveProperty('accessRole');
+    expect(buildPublishLinks(storage, linkTitle, { accessRole: [] })[0]).not.toHaveProperty('accessRole');
   });
 
   it('round-trips public: false distinctly from unset', () => {

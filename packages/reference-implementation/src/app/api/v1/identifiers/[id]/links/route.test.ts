@@ -215,6 +215,45 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
     });
   });
 
+  it('forwards accessRole on a link to publishLinks', async () => {
+    const req = createFakeRequest({
+      links: [
+        {
+          href: 'https://example.com/cred.json',
+          rel: 'untp:dpp',
+          type: 'application/json',
+          accessRole: ['untp:accessRole#Regulator', 'untp:accessRole#Owner'],
+        },
+      ],
+    });
+
+    const res = await POST(req, createContext());
+    expect(res.status).toBe(201);
+
+    const linksArg = MOCK_IDR_SERVICE.publishLinks.mock.calls[0][2];
+    expect(linksArg[0]).toMatchObject({ accessRole: ['untp:accessRole#Regulator', 'untp:accessRole#Owner'] });
+  });
+
+  it('returns 400 when accessRole contains a value outside the UNTP vocabulary', async () => {
+    const req = createFakeRequest({
+      links: [
+        {
+          href: 'https://example.com/cred.json',
+          rel: 'untp:dpp',
+          type: 'application/json',
+          accessRole: ['untp:accessRole#Anyone'],
+        },
+      ],
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/accessRole/);
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when hreflang is a string rather than an array', async () => {
     const req = createFakeRequest({
       links: [{ href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json', hreflang: 'en' }],

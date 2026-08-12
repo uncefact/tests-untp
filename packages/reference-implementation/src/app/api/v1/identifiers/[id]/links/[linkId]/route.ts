@@ -9,8 +9,9 @@ import {
   deleteLinkRegistration,
 } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { IdrLinkNotFoundError } from '@uncefact/untp-ri-services';
+import { IdrLinkNotFoundError, type Link } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
+import { updateLinkRequestSchema } from '@/lib/api/request-schemas/link';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links/[linkId]' });
 
@@ -163,6 +164,18 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                   type: string
  *               public:
  *                 type: boolean
+ *               accessRole:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum:
+ *                     - untp:accessRole#Anonymous
+ *                     - untp:accessRole#Customer
+ *                     - untp:accessRole#Regulator
+ *                     - untp:accessRole#Recycler
+ *                     - untp:accessRole#Auditor
+ *                     - untp:accessRole#Owner
+ *                 description: UNTP access roles that may retrieve this link variant
  *     responses:
  *       200:
  *         description: Link updated successfully
@@ -189,6 +202,10 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                     type: string
  *                 public:
  *                   type: boolean
+ *                 accessRole:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *       400:
  *         description: Validation error
  *         content:
@@ -229,14 +246,21 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
   logger.info({ identifierId, linkId }, 'Parsing request body');
-  let body: Record<string, unknown>;
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     throw new ValidationError('Invalid JSON body');
   }
 
-  if (typeof body.href === 'string') await assertPublicUrl(body.href, 'href');
+  const parsed = updateLinkRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new ValidationError(`${issue.path.join('.') || 'body'}: ${issue.message}`);
+  }
+  const body: Partial<Link> = parsed.data;
+
+  if (body.href !== undefined) await assertPublicUrl(body.href, 'href');
 
   logger.info({ identifierId, linkId }, 'Looking up identifier and local link record for update');
   const identifier = await getIdentifierById(identifierId, tenantId);

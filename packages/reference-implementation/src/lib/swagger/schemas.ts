@@ -23,6 +23,7 @@ import {
   serviceInstanceResponseSchema,
   // Shared schemas
   errorResponseSchema,
+  AccessRole,
 } from '@uncefact/untp-ri-services';
 import { paginationMetaSchema } from '@/lib/api/pagination';
 
@@ -63,6 +64,12 @@ export const publishingOptionsSchema = z.object({
     .optional()
     .describe(
       'Whether the credential target URL is safe to publish in a public directory. Distinct from access control on the resource content',
+    ),
+  accessRole: z
+    .array(z.nativeEnum(AccessRole))
+    .optional()
+    .describe(
+      'UNTP access roles governing who the published links are surfaced to, attached to the credential and human verification links (e.g. untp:accessRole#Regulator)',
     ),
 });
 

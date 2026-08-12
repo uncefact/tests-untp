@@ -23,7 +23,7 @@ import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { getDidByDid, findConformitySchemeByCanonicalId } from '@/lib/prisma/repositories';
-import { buildPublishLinks } from '@uncefact/untp-ri-services';
+import { buildPublishLinks, type AccessRole } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
 import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
 import { publishingOptionsSchema } from '@/lib/swagger/schemas';
@@ -122,6 +122,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       hreflang?: string[];
       additionalRels?: string[];
       public?: boolean;
+      accessRole?: AccessRole[];
     };
   };
 
@@ -325,6 +326,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
         ...(publishingOptions.hreflang !== undefined ? { hreflang: publishingOptions.hreflang } : {}),
         ...(publishingOptions.additionalRels !== undefined ? { additionalRels: publishingOptions.additionalRels } : {}),
         ...(publishingOptions.public !== undefined ? { public: publishingOptions.public } : {}),
+        ...(publishingOptions.accessRole !== undefined ? { accessRole: publishingOptions.accessRole } : {}),
       });
 
       logger.info(

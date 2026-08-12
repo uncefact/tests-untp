@@ -106,6 +106,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
         fwqs,
         ...(link.additionalRels && link.additionalRels.length > 0 ? { rel: link.additionalRels } : {}),
         ...(link.public !== undefined ? { public: link.public } : {}),
+        ...(link.accessRole && link.accessRole.length > 0 ? { accessRole: link.accessRole } : {}),
       })),
     };
 
@@ -169,6 +170,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       hreflang: Array.isArray(result.hreflang) && result.hreflang.length > 0 ? result.hreflang : undefined,
       ...(Array.isArray(result.rel) && result.rel.length > 0 ? { additionalRels: result.rel } : {}),
       ...(typeof result.public === 'boolean' ? { public: result.public } : {}),
+      ...(Array.isArray(result.accessRole) && result.accessRole.length > 0 ? { accessRole: result.accessRole } : {}),
     };
   }
 
@@ -182,6 +184,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     if (link.hreflang !== undefined) payload.hreflang = link.hreflang;
     if (link.additionalRels !== undefined) payload.rel = link.additionalRels;
     if (link.public !== undefined) payload.public = link.public;
+    if (link.accessRole !== undefined) payload.accessRole = link.accessRole;
 
     const response = await fetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       method: 'PUT',
@@ -197,16 +200,20 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       throw new IdrLinkUpdateError(linkId, response.status, errorText);
     }
 
-    const result = await response.json();
-    return {
-      href: result.targetUrl,
-      rel: result.linkType,
-      type: result.mimeType,
-      title: result.title ?? result.linkTitle ?? '',
-      hreflang: Array.isArray(result.hreflang) && result.hreflang.length > 0 ? result.hreflang : undefined,
-      ...(Array.isArray(result.rel) && result.rel.length > 0 ? { additionalRels: result.rel } : {}),
-      ...(typeof result.public === 'boolean' ? { public: result.public } : {}),
-    };
+    // The Pyx update endpoint returns only an acknowledgement message, so
+    // the updated link state comes from a follow-up read. A failure there
+    // must not surface as a not-found: the update has already been applied
+    // upstream, so callers who treat not-found as "the link is gone" would
+    // mis-advise deleting local state that is merely out of sync.
+    try {
+      return await this.getLinkById(linkId);
+    } catch (readError) {
+      throw new IdrLinkUpdateError(
+        linkId,
+        502,
+        `the update was applied upstream but reading the updated link back failed: ${(readError as Error).message}`,
+      );
+    }
   }
 
   async deleteLink(linkId: string): Promise<void> {

@@ -8,21 +8,7 @@ import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 import type { Link } from '@uncefact/untp-ri-services';
-
-const linkSchema = z.object({
-  href: z.string().url(),
-  rel: z.string().min(1),
-  type: z.string().min(1),
-  title: z.string().optional(),
-  hreflang: z.array(z.string().min(1)).optional(),
-  context: z.string().optional(),
-  default: z.boolean().optional(),
-  method: z.enum(['GET', 'POST']).optional(),
-  encryptionMethod: z.string().optional(),
-  accessRole: z.array(z.string()).optional(),
-  additionalRels: z.array(z.string().min(1)).optional(),
-  public: z.boolean().optional(),
-});
+import { linkSchema } from '@/lib/api/request-schemas/link';
 
 const publishLinksRequestSchema = z.object({
   links: z.array(linkSchema).min(1),
@@ -88,6 +74,18 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
  *                     default:
  *                       type: boolean
  *                       description: Whether this is the default variant for its relation type
+ *                     accessRole:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                         enum:
+ *                           - untp:accessRole#Anonymous
+ *                           - untp:accessRole#Customer
+ *                           - untp:accessRole#Regulator
+ *                           - untp:accessRole#Recycler
+ *                           - untp:accessRole#Auditor
+ *                           - untp:accessRole#Owner
+ *                       description: UNTP access roles that may retrieve this link variant
  *                     additionalRels:
  *                       type: array
  *                       items:
