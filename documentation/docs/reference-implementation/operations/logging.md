@@ -61,6 +61,34 @@ The log level is controlled by the `LOG_LEVEL` environment variable. Only messag
 |----------|-------------|---------|
 | `LOG_LEVEL` | Minimum log level to emit (`debug`, `info`, `warn`, `error`) | `info` |
 
+## Redaction
+
+Secret-bearing fields are replaced with `[REDACTED]` before a log entry is written. The following field names are redacted by default, at the top level of a logged object, one level deep, and two levels deep:
+
+- `decryptionKey`
+- `apiKey`
+- `authorization` and `Authorization`
+- `token`
+- `password`
+
+`Authorization` and `authorization` are additionally redacted in the HTTP client error shape `error.config.headers`, which nests one level deeper than the other defaults reach.
+
+Deployments can extend the redacted set with the `LOG_REDACT_PATHS` environment variable, a comma-separated list of [pino redact paths](https://getpino.io/#/docs/redaction). This covers a secret shape specific to an environment or an integrated service without waiting for a code change.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LOG_REDACT_PATHS` | Comma-separated pino redact paths merged with the built-in defaults | (unset) |
+
+Each wildcard in a pino path matches exactly one level, and `*[*]` covers both arrays and plain objects. Worked examples:
+
+- `webhookSignature` redacts the field at the top level of a logged object.
+- `*.webhookSignature` redacts it one level deep, such as `{ integration: { webhookSignature } }`.
+- `*[*].webhookSignature` redacts it two levels deep, including inside arrays, such as `{ integrations: [{ webhookSignature }] }`.
+
+Because each wildcard matches a single level, a secret nested deeper than the paths you configure is not redacted.
+
+An invalid path in `LOG_REDACT_PATHS` fails logger construction, which stops the application at startup with an error naming the variable and the configured paths. A redaction path that was silently dropped would leak the very value it was meant to protect, so a typo is surfaced immediately rather than discovered in shipped logs. The one tolerated irregularity is an empty segment (a double or trailing comma): it is ignored with a startup warning rather than failing the boot.
+
 ## Output Format
 
 In production, logs are emitted as structured JSON — one JSON object per line. This format is compatible with log aggregation tools such as CloudWatch, Datadog, ELK, and similar platforms.

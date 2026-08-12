@@ -106,3 +106,7 @@ Before the application accepts its first request, it validates the active `DATA_
 Without this check, a `DATA_ENCRYPTION_KEY` that does not match the key data was encrypted under only surfaces once a real request tries to decrypt something — for example a `ConfigDecryptionError` when a service instance resolves. Validating at startup turns that into an immediate, loud failure instead of an intermittent one discovered by end users.
 
 If startup fails this check, verify `DATA_ENCRYPTION_KEY` matches the key the application was previously running with. Key rotation is not supported (tracked in [#720](https://github.com/uncefact/tests-untp/issues/720)), so a changed key is not recoverable — restore the previous key rather than trying to move data onto a new one.
+
+### Redaction Path Validation
+
+The first logger constructed during startup validates any paths supplied via `LOG_REDACT_PATHS`. An invalid path fails startup with a message naming the variable and the configured paths. See [Redaction](./logging#redaction) for the path syntax and what the built-in defaults already cover.
