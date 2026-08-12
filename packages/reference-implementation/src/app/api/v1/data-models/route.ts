@@ -180,7 +180,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Parent config not found
+ *         description: Parent data model configuration not found
  *         content:
  *           application/json:
  *             schema:

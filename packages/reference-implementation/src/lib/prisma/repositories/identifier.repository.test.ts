@@ -8,7 +8,7 @@ import {
 import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { SYSTEM_TENANT_ID } from '../constants';
-import { prismaUniqueConstraintError, prismaRecordNotFoundError } from '../db-errors.fixtures';
+import { prismaError, prismaUniqueConstraintError, prismaRecordNotFoundError } from '../db-errors.fixtures';
 
 // Transaction mock — functions called via $transaction callback
 const mockTx = {
@@ -152,6 +152,39 @@ describe('identifier.repository', () => {
         }),
       ).rejects.toThrow(dbError);
     });
+
+    it('maps a foreign-key violation on schemeId to NotFoundError', async () => {
+      // The scheme passed the pre-check but was deleted by a concurrent
+      // request before the insert; the loser gets the same 404 the pre-check
+      // produces.
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.identifier.create.mockRejectedValue(
+        prismaError('P2003', 'Foreign key constraint failed on the field: `schemeId`'),
+      );
+
+      const result = createIdentifier({
+        tenantId: TENANT_ID,
+        schemeId: SCHEME_ID,
+        value: '1234567890123',
+      });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Identifier scheme not found');
+    });
+
+    it('rethrows a foreign-key violation on tenantId rather than blaming the scheme', async () => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      const tenantFkError = prismaError('P2003', 'Foreign key constraint failed on the field: `tenantId`');
+      mockTx.identifier.create.mockRejectedValue(tenantFkError);
+
+      await expect(
+        createIdentifier({
+          tenantId: TENANT_ID,
+          schemeId: SCHEME_ID,
+          value: '1234567890123',
+        }),
+      ).rejects.toBe(tenantFkError);
+    });
   });
 
   describe('getIdentifierById', () => {
@@ -282,7 +315,7 @@ describe('identifier.repository', () => {
       const result = updateIdentifier('ident-1', TENANT_ID, { value: '1234567890123' });
 
       await expect(result).rejects.toBeInstanceOf(NotFoundError);
-      await expect(result).rejects.toThrow('Identifier not found or access denied');
+      await expect(result).rejects.toThrow('Identifier not found');
     });
 
     it('throws ValidationError if the new value does not match the pattern', async () => {
@@ -298,7 +331,7 @@ describe('identifier.repository', () => {
       mockTx.identifier.findFirst.mockResolvedValue(null);
 
       await expect(updateIdentifier('ident-1', 'other-tenant', { value: '123' })).rejects.toThrow(
-        'Identifier not found or access denied',
+        'Identifier not found',
       );
     });
   });
@@ -326,15 +359,13 @@ describe('identifier.repository', () => {
       const result = deleteIdentifier('ident-1', TENANT_ID);
 
       await expect(result).rejects.toBeInstanceOf(NotFoundError);
-      await expect(result).rejects.toThrow('Identifier not found or access denied');
+      await expect(result).rejects.toThrow('Identifier not found');
     });
 
     it('throws if identifier does not belong to the tenant', async () => {
       mockTx.identifier.findFirst.mockResolvedValue(null);
 
-      await expect(deleteIdentifier('ident-1', 'other-tenant')).rejects.toThrow(
-        'Identifier not found or access denied',
-      );
+      await expect(deleteIdentifier('ident-1', 'other-tenant')).rejects.toThrow('Identifier not found');
     });
   });
 });

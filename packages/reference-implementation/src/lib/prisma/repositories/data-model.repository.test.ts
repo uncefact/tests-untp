@@ -172,7 +172,7 @@ describe('data-model.repository', () => {
           isExtension: true,
           parentConfigId: 'nonexistent-id',
         }),
-      ).rejects.toThrow('Parent config not found');
+      ).rejects.toThrow('Parent data model configuration not found');
     });
 
     it('throws when parent config is itself an extension', async () => {
@@ -191,7 +191,7 @@ describe('data-model.repository', () => {
           isExtension: true,
           parentConfigId: 'config-1',
         }),
-      ).rejects.toThrow('Parent config must be a core type (isExtension=false)');
+      ).rejects.toThrow('Parent data model configuration must be a core type (isExtension=false)');
     });
 
     it('defaults isExtension to true when not provided', async () => {
@@ -232,6 +232,44 @@ describe('data-model.repository', () => {
       await expect(result).rejects.toThrow(
         'A data model with this name already exists for the credential type and version',
       );
+    });
+
+    it('maps a foreign-key violation on parentConfigId to the 404 the pre-check produces', async () => {
+      // The parent config passed the pre-check but was deleted by a
+      // concurrent request before the insert.
+      mockTx.dataModel.findFirst.mockResolvedValue(CONFIG_RECORD);
+      mockTx.dataModel.create.mockRejectedValue(
+        prismaForeignKeyViolationError('Foreign key constraint failed on the field: `parentConfigId`'),
+      );
+
+      const result = createDataModel(TENANT_ID, {
+        name: 'Extension Racing Parent Delete',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        isExtension: true,
+        parentConfigId: 'config-1',
+      });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Parent data model configuration not found');
+    });
+
+    it('rethrows a foreign-key violation on tenantId rather than blaming the parent config', async () => {
+      const tenantFkError = prismaForeignKeyViolationError('Foreign key constraint failed on the field: `tenantId`');
+      mockTx.dataModel.create.mockRejectedValue(tenantFkError);
+
+      await expect(
+        createDataModel(TENANT_ID, {
+          name: 'Core Model',
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.0',
+          schemaUrl: 'https://example.com/schema.json',
+          contextUrl: 'https://example.com/context.jsonld',
+          isExtension: false,
+        }),
+      ).rejects.toBe(tenantFkError);
     });
 
     it('rethrows a non-database error unchanged', async () => {
@@ -390,16 +428,14 @@ describe('data-model.repository', () => {
       mockTx.dataModel.findFirst.mockResolvedValue(null);
 
       await expect(updateDataModel('config-1', 'other-tenant', { name: 'Updated' })).rejects.toThrow(
-        'Data model not found or access denied',
+        'Data model not found',
       );
     });
 
     it('throws when config is not an extension', async () => {
       mockTx.dataModel.findFirst.mockResolvedValue(null);
 
-      await expect(updateDataModel('config-1', TENANT_ID, { name: 'Updated' })).rejects.toThrow(
-        'Data model not found or access denied',
-      );
+      await expect(updateDataModel('config-1', TENANT_ID, { name: 'Updated' })).rejects.toThrow('Data model not found');
     });
 
     it('applies partial update with conditional spreads', async () => {
@@ -439,7 +475,7 @@ describe('data-model.repository', () => {
       const result = updateDataModel('config-ext-1', TENANT_ID, { name: 'Updated Name' });
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Data model not found or access denied');
+      await expect(result).rejects.toThrow('Data model not found');
     });
 
     it('rethrows a non-database error unchanged', async () => {
@@ -477,9 +513,7 @@ describe('data-model.repository', () => {
     it('throws when config is not tenant-owned', async () => {
       mockTx.dataModel.findFirst.mockResolvedValue(null);
 
-      await expect(deleteDataModel('config-1', 'other-tenant')).rejects.toThrow(
-        'Data model not found or access denied',
-      );
+      await expect(deleteDataModel('config-1', 'other-tenant')).rejects.toThrow('Data model not found');
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {
@@ -489,7 +523,7 @@ describe('data-model.repository', () => {
       const result = deleteDataModel('config-ext-1', TENANT_ID);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Data model not found or access denied');
+      await expect(result).rejects.toThrow('Data model not found');
     });
 
     it('rethrows a non-database error unchanged', async () => {

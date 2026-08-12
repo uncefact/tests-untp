@@ -10,7 +10,6 @@ const mockTx = {
 jest.mock('../prisma', () => ({
   prisma: {
     linkRegistration: {
-      create: jest.fn(),
       createMany: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -22,7 +21,6 @@ jest.mock('../prisma', () => ({
 
 import { prisma } from '../prisma';
 import {
-  createLinkRegistration,
   createManyLinkRegistrations,
   getLinkRegistrationByIdrLinkId,
   listLinkRegistrations,
@@ -30,10 +28,10 @@ import {
   deleteLinkRegistration,
 } from './link-registration.repository';
 import { NotFoundError } from '@/lib/api/errors';
+import { prismaError } from '../db-errors.fixtures';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 const mockLinkRegistration = prisma.linkRegistration as unknown as {
-  create: jest.Mock;
   createMany: jest.Mock;
   findFirst: jest.Mock;
   findMany: jest.Mock;
@@ -62,17 +60,6 @@ describe('link-registration.repository', () => {
     jest.clearAllMocks();
   });
 
-  describe('createLinkRegistration', () => {
-    it('creates a link registration', async () => {
-      mockLinkRegistration.create.mockResolvedValue(SAMPLE_RECORD);
-
-      const result = await createLinkRegistration(SAMPLE_INPUT);
-
-      expect(mockLinkRegistration.create).toHaveBeenCalledWith({ data: SAMPLE_INPUT });
-      expect(result).toEqual(SAMPLE_RECORD);
-    });
-  });
-
   describe('createManyLinkRegistrations', () => {
     it('bulk-creates link registrations', async () => {
       mockLinkRegistration.createMany.mockResolvedValue({ count: 2 });
@@ -88,6 +75,26 @@ describe('link-registration.repository', () => {
       await createManyLinkRegistrations([]);
 
       expect(mockLinkRegistration.createMany).not.toHaveBeenCalled();
+    });
+
+    it('maps a foreign-key violation on identifierId to NotFoundError', async () => {
+      // The route pre-checks the identifier and returns 404; an identifier
+      // deleted between that check and this write surfaces as the same 404.
+      mockLinkRegistration.createMany.mockRejectedValue(
+        prismaError('P2003', 'Foreign key constraint failed on the field: `identifierId`'),
+      );
+
+      const result = createManyLinkRegistrations([SAMPLE_INPUT]);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Identifier not found');
+    });
+
+    it('rethrows a foreign-key violation on tenantId rather than blaming the identifier', async () => {
+      const tenantFkError = prismaError('P2003', 'Foreign key constraint failed on the field: `tenantId`');
+      mockLinkRegistration.createMany.mockRejectedValue(tenantFkError);
+
+      await expect(createManyLinkRegistrations([SAMPLE_INPUT])).rejects.toBe(tenantFkError);
     });
   });
 
@@ -161,6 +168,20 @@ describe('link-registration.repository', () => {
         }),
       ).rejects.toThrow(NotFoundError);
     });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      // The findFirst pre-check does not lock the row, so a concurrent delete
+      // can land between it and the update; the loser gets the same 404.
+      mockTx.linkRegistration.findFirst.mockResolvedValue(SAMPLE_RECORD);
+      mockTx.linkRegistration.update.mockRejectedValue(prismaError('P2025'));
+
+      const result = updateLinkRegistration('idr-link-1', 'ident-1', 'tenant-1', {
+        targetUrl: 'https://updated.com',
+      });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Link registration not found');
+    });
   });
 
   describe('deleteLinkRegistration', () => {
@@ -181,6 +202,16 @@ describe('link-registration.repository', () => {
       mockTx.linkRegistration.findFirst.mockResolvedValue(null);
 
       await expect(deleteLinkRegistration('missing', 'ident-1', 'tenant-1')).rejects.toThrow(NotFoundError);
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockTx.linkRegistration.findFirst.mockResolvedValue(SAMPLE_RECORD);
+      mockTx.linkRegistration.delete.mockRejectedValue(prismaError('P2025'));
+
+      const result = deleteLinkRegistration('idr-link-1', 'ident-1', 'tenant-1');
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Link registration not found');
     });
   });
 });

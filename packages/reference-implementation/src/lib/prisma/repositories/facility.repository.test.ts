@@ -520,9 +520,7 @@ describe('facility.repository', () => {
     it('throws NotFoundError for ownership check failure', async () => {
       mockTx.facility.findFirst.mockResolvedValue(null);
 
-      await expect(updateFacility('facility-1', OTHER_TENANT, { name: 'Nope' })).rejects.toThrow(
-        'Facility not found or access denied',
-      );
+      await expect(updateFacility('facility-1', OTHER_TENANT, { name: 'Nope' })).rejects.toThrow('Facility not found');
     });
 
     it('rejects duplicate secondary identifiers', async () => {
@@ -576,7 +574,7 @@ describe('facility.repository', () => {
     it('throws NotFoundError for a facility from another tenant', async () => {
       mockTx.facility.findFirst.mockResolvedValue(null);
 
-      await expect(deleteFacility('facility-1', OTHER_TENANT)).rejects.toThrow('Facility not found or access denied');
+      await expect(deleteFacility('facility-1', OTHER_TENANT)).rejects.toThrow('Facility not found');
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {
@@ -586,7 +584,7 @@ describe('facility.repository', () => {
       const result = deleteFacility('facility-1', TENANT_ID);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Facility not found or access denied');
+      await expect(result).rejects.toThrow('Facility not found');
     });
   });
 });

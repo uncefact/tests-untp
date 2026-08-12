@@ -123,7 +123,7 @@ export async function updateRegistrar(id: string, tenantId: string, input: Updat
     });
 
     if (!existing) {
-      throw new NotFoundError('Registrar not found or access denied');
+      throw new NotFoundError('Registrar not found');
     }
 
     try {
@@ -146,7 +146,7 @@ export async function updateRegistrar(id: string, tenantId: string, input: Updat
         throw new ValidationError('The referenced IDR service instance does not exist');
       }
       mapDatabaseError(e, {
-        notFound: 'Registrar not found or access denied',
+        notFound: 'Registrar not found',
       });
     }
   });
@@ -163,7 +163,7 @@ export async function deleteRegistrar(id: string, tenantId: string): Promise<Reg
     });
 
     if (!existing) {
-      throw new NotFoundError('Registrar not found or access denied');
+      throw new NotFoundError('Registrar not found');
     }
 
     try {
@@ -178,7 +178,7 @@ export async function deleteRegistrar(id: string, tenantId: string): Promise<Reg
       if (isForeignKeyViolation(e)) {
         throw new ConflictError('The registrar has schemes with identifiers and cannot be deleted');
       }
-      mapDatabaseError(e, { notFound: 'Registrar not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Registrar not found' });
     }
   });
 }

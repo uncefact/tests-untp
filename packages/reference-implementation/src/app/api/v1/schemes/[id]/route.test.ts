@@ -353,8 +353,8 @@ describe('PATCH /api/v1/schemes/:id', () => {
     expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
   });
 
-  it('returns 404 when scheme not found or access denied', async () => {
-    mockUpdateIdentifierScheme.mockRejectedValue(new NotFoundError('Identifier scheme not found or access denied'));
+  it('returns 404 when scheme not found', async () => {
+    mockUpdateIdentifierScheme.mockRejectedValue(new NotFoundError('Identifier scheme not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated' } });
     const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -433,8 +433,8 @@ describe('DELETE /api/v1/schemes/:id', () => {
     expect(res.status).toBe(204);
   });
 
-  it('returns 404 when scheme not found or access denied', async () => {
-    mockDeleteIdentifierScheme.mockRejectedValue(new NotFoundError('Identifier scheme not found or access denied'));
+  it('returns 404 when scheme not found', async () => {
+    mockDeleteIdentifierScheme.mockRejectedValue(new NotFoundError('Identifier scheme not found'));
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);

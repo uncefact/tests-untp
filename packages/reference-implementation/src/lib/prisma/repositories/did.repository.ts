@@ -1,7 +1,7 @@
 import { Did, DidStatus, Prisma } from '../generated';
 import { prisma } from '../prisma';
-import { NotFoundError } from '@/lib/api/errors';
-import { mapDatabaseError } from '@/lib/prisma/db-errors';
+import { NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
+import { isForeignKeyViolationOn, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -77,9 +77,13 @@ export async function createDid(input: CreateDidInput): Promise<Did> {
 
     return await prisma.did.create({ data });
   } catch (e) {
+    // A serviceInstanceId violation means the instance vanished after the
+    // routes' pre-check; it surfaces as that pre-check's 404.
+    if (isForeignKeyViolationOn(e, 'serviceInstanceId')) {
+      throw new ServiceInstanceNotFoundError(String(input.serviceInstanceId));
+    }
     mapDatabaseError(e, {
       conflict: 'A DID record with this DID already exists',
-      invalidReference: 'serviceInstanceId: Service instance not found',
     });
   }
 }
@@ -191,7 +195,7 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
     });
 
     if (!existing) {
-      throw new NotFoundError('DID not found or access denied');
+      throw new NotFoundError('DID not found');
     }
 
     if (input.isDefault !== undefined && existing.type === 'DEFAULT') {
@@ -220,7 +224,7 @@ export async function updateDid(id: string, tenantId: string, input: UpdateDidIn
         },
       });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'DID not found or access denied' });
+      mapDatabaseError(e, { notFound: 'DID not found' });
     }
   });
 }
@@ -236,7 +240,7 @@ export async function updateDidStatus(id: string, tenantId: string, status: DidS
     });
 
     if (!existing) {
-      throw new NotFoundError('DID not found or access denied');
+      throw new NotFoundError('DID not found');
     }
 
     try {
@@ -245,7 +249,7 @@ export async function updateDidStatus(id: string, tenantId: string, status: DidS
         data: { status },
       });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'DID not found or access denied' });
+      mapDatabaseError(e, { notFound: 'DID not found' });
     }
   });
 }
@@ -261,7 +265,7 @@ export async function deleteDid(id: string, tenantId: string): Promise<void> {
     });
 
     if (!existing) {
-      throw new NotFoundError('DID not found or access denied');
+      throw new NotFoundError('DID not found');
     }
 
     try {
@@ -269,7 +273,7 @@ export async function deleteDid(id: string, tenantId: string): Promise<void> {
         where: { id },
       });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'DID not found or access denied' });
+      mapDatabaseError(e, { notFound: 'DID not found' });
     }
   });
 }

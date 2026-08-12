@@ -575,7 +575,7 @@ describe('POST /api/v1/data-models', () => {
   });
 
   it('returns 404 when repository throws NotFoundError', async () => {
-    mockCreateDataModel.mockRejectedValue(new NotFoundError('Parent config not found'));
+    mockCreateDataModel.mockRejectedValue(new NotFoundError('Parent data model configuration not found'));
 
     const req = createFakeRequest({
       body: {
@@ -591,7 +591,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(404);
-    expect(json.error).toContain('Parent config not found');
+    expect(json.error).toContain('Parent data model configuration not found');
   });
 
   it('returns 500 on unexpected error', async () => {

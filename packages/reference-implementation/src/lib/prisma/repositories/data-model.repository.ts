@@ -2,7 +2,7 @@ import { Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
-import { mapDatabaseError } from '@/lib/prisma/db-errors';
+import { isForeignKeyViolationOn, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -97,11 +97,11 @@ export async function createDataModel(tenantId: string, input: CreateDataModelIn
       });
 
       if (!parent) {
-        throw new NotFoundError('Parent config not found');
+        throw new NotFoundError('Parent data model configuration not found');
       }
 
       if (parent.isExtension) {
-        throw new ValidationError('Parent config must be a core type (isExtension=false)');
+        throw new ValidationError('Parent data model configuration must be a core type (isExtension=false)');
       }
     }
 
@@ -121,6 +121,11 @@ export async function createDataModel(tenantId: string, input: CreateDataModelIn
         include: DATA_MODEL_DETAIL_INCLUDE,
       });
     } catch (e) {
+      // A parentConfigId violation means the parent vanished after the
+      // pre-check above; it surfaces as that pre-check's 404.
+      if (isForeignKeyViolationOn(e, 'parentConfigId')) {
+        throw new NotFoundError('Parent data model configuration not found');
+      }
       mapDatabaseError(e, {
         conflict: 'A data model with this name already exists for the credential type and version',
       });
@@ -199,7 +204,7 @@ export async function updateDataModel(
     });
 
     if (!existing) {
-      throw new NotFoundError('Data model not found or access denied');
+      throw new NotFoundError('Data model not found');
     }
 
     try {
@@ -216,7 +221,7 @@ export async function updateDataModel(
     } catch (e) {
       mapDatabaseError(e, {
         conflict: 'A data model with this name already exists for the credential type and version',
-        notFound: 'Data model not found or access denied',
+        notFound: 'Data model not found',
       });
     }
   });
@@ -234,13 +239,13 @@ export async function deleteDataModel(id: string, tenantId: string): Promise<voi
     });
 
     if (!existing) {
-      throw new NotFoundError('Data model not found or access denied');
+      throw new NotFoundError('Data model not found');
     }
 
     try {
       await tx.dataModel.delete({ where: { id } });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'Data model not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Data model not found' });
     }
   });
 }

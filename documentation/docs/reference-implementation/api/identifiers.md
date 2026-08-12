@@ -192,7 +192,7 @@ sequenceDiagram
 
     Client->>RI: DELETE /api/v1/schemes/{id}
     RI->>DB: Fetch scheme (tenant-scoped, excludes system defaults)
-    alt not found or access denied
+    alt not found
         RI-->>Client: 404 Not Found
     end
     RI->>DB: Delete scheme

@@ -486,8 +486,8 @@ describe('PATCH /api/v1/registrars/:id', () => {
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
-  it('returns 404 when registrar not found or access denied', async () => {
-    mockUpdateRegistrar.mockRejectedValue(new NotFoundError('Registrar not found or access denied'));
+  it('returns 404 when registrar not found', async () => {
+    mockUpdateRegistrar.mockRejectedValue(new NotFoundError('Registrar not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated' } });
     const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -527,8 +527,8 @@ describe('DELETE /api/v1/registrars/:id', () => {
     expect(res.body).toBeNull();
   });
 
-  it('returns 404 when registrar not found or access denied', async () => {
-    mockDeleteRegistrar.mockRejectedValue(new NotFoundError('Registrar not found or access denied'));
+  it('returns 404 when registrar not found', async () => {
+    mockDeleteRegistrar.mockRejectedValue(new NotFoundError('Registrar not found'));
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);

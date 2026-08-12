@@ -282,18 +282,14 @@ describe('registrar.repository', () => {
     it('throws if registrar does not belong to the tenant', async () => {
       mockTx.registrar.findFirst.mockResolvedValue(null);
 
-      await expect(updateRegistrar('reg-1', 'other-tenant', { name: 'New' })).rejects.toThrow(
-        'Registrar not found or access denied',
-      );
+      await expect(updateRegistrar('reg-1', 'other-tenant', { name: 'New' })).rejects.toThrow('Registrar not found');
     });
 
     it('does not allow updating system defaults', async () => {
       // findFirst with tenantId filter excludes system defaults
       mockTx.registrar.findFirst.mockResolvedValue(null);
 
-      await expect(updateRegistrar('reg-1', TENANT_ID, { name: 'New' })).rejects.toThrow(
-        'Registrar not found or access denied',
-      );
+      await expect(updateRegistrar('reg-1', TENANT_ID, { name: 'New' })).rejects.toThrow('Registrar not found');
     });
 
     it('maps a foreign-key violation on idrServiceInstanceId to ValidationError', async () => {
@@ -323,7 +319,7 @@ describe('registrar.repository', () => {
       const result = updateRegistrar('reg-1', TENANT_ID, { name: 'GS1 Updated' });
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Registrar not found or access denied');
+      await expect(result).rejects.toThrow('Registrar not found');
     });
   });
 
@@ -346,7 +342,7 @@ describe('registrar.repository', () => {
     it('throws if registrar does not belong to the tenant', async () => {
       mockTx.registrar.findFirst.mockResolvedValue(null);
 
-      await expect(deleteRegistrar('reg-1', 'other-tenant')).rejects.toThrow('Registrar not found or access denied');
+      await expect(deleteRegistrar('reg-1', 'other-tenant')).rejects.toThrow('Registrar not found');
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {
@@ -356,7 +352,7 @@ describe('registrar.repository', () => {
       const result = deleteRegistrar('reg-1', TENANT_ID);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Registrar not found or access denied');
+      await expect(result).rejects.toThrow('Registrar not found');
     });
 
     it('maps a foreign-key violation to ConflictError when schemes still have identifiers', async () => {

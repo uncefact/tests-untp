@@ -232,7 +232,7 @@ describe('PATCH /api/v1/data-models/:id', () => {
   });
 
   it('returns 404 when repository throws NotFoundError', async () => {
-    mockUpdateDataModel.mockRejectedValue(new NotFoundError('Data model not found or access denied'));
+    mockUpdateDataModel.mockRejectedValue(new NotFoundError('Data model not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated' } });
     const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -292,7 +292,7 @@ describe('DELETE /api/v1/data-models/:id', () => {
   });
 
   it('returns 404 when repository throws NotFoundError', async () => {
-    mockDeleteDataModel.mockRejectedValue(new NotFoundError('Data model not found or access denied'));
+    mockDeleteDataModel.mockRejectedValue(new NotFoundError('Data model not found'));
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);

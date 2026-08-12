@@ -209,8 +209,8 @@ describe('PATCH /api/v1/identifiers/:id', () => {
     expect(json.error).toContain('does not match scheme validation pattern');
   });
 
-  it('returns 404 when identifier not found or access denied', async () => {
-    mockUpdateIdentifier.mockRejectedValue(new NotFoundError('Identifier not found or access denied'));
+  it('returns 404 when identifier not found', async () => {
+    mockUpdateIdentifier.mockRejectedValue(new NotFoundError('Identifier not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { value: '09520123456799' } });
     const res = await PATCH(req, createContext('id-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -247,8 +247,8 @@ describe('DELETE /api/v1/identifiers/:id', () => {
     expect(res.body).toBeNull();
   });
 
-  it('returns 404 when identifier not found or access denied', async () => {
-    mockDeleteIdentifier.mockRejectedValue(new NotFoundError('Identifier not found or access denied'));
+  it('returns 404 when identifier not found', async () => {
+    mockDeleteIdentifier.mockRejectedValue(new NotFoundError('Identifier not found'));
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);

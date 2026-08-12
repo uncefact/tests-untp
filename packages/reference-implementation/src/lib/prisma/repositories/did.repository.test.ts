@@ -11,8 +11,7 @@ import {
 } from './did.repository';
 import { DidStatus } from '../generated';
 import { SYSTEM_TENANT_ID } from '../constants';
-import { ConflictError, NotFoundError } from '@/lib/api/errors';
-import { ValidationError } from '@/lib/api/validation';
+import { ConflictError, NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Transaction mock — functions called via $transaction callback
@@ -232,8 +231,10 @@ describe('did.repository', () => {
       await expect(result).rejects.toThrow('A DID record with this DID already exists');
     });
 
-    it('maps a foreign-key violation to ValidationError on the plain path', async () => {
-      mockDid.create.mockRejectedValue(prismaForeignKeyViolationError());
+    it('maps a foreign-key violation on serviceInstanceId to the 404 the pre-check produces, on the plain path', async () => {
+      mockDid.create.mockRejectedValue(
+        prismaForeignKeyViolationError('Foreign key constraint failed on the field: `serviceInstanceId`'),
+      );
 
       const result = createDid({
         tenantId: ORG_ID,
@@ -243,13 +244,15 @@ describe('did.repository', () => {
         serviceInstanceId: 'nonexistent',
       });
 
-      await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('serviceInstanceId: Service instance not found');
+      await expect(result).rejects.toThrow(ServiceInstanceNotFoundError);
+      await expect(result).rejects.toThrow('Service instance not found: nonexistent');
     });
 
-    it('maps a foreign-key violation to ValidationError on the isDefault transaction path', async () => {
+    it('maps a foreign-key violation on serviceInstanceId to the 404 the pre-check produces, on the isDefault transaction path', async () => {
       mockTx.did.updateMany.mockResolvedValue({ count: 1 });
-      mockTx.did.create.mockRejectedValue(prismaForeignKeyViolationError());
+      mockTx.did.create.mockRejectedValue(
+        prismaForeignKeyViolationError('Foreign key constraint failed on the field: `serviceInstanceId`'),
+      );
 
       const result = createDid({
         tenantId: ORG_ID,
@@ -260,8 +263,23 @@ describe('did.repository', () => {
         serviceInstanceId: 'nonexistent',
       });
 
-      await expect(result).rejects.toThrow(ValidationError);
-      await expect(result).rejects.toThrow('serviceInstanceId: Service instance not found');
+      await expect(result).rejects.toThrow(ServiceInstanceNotFoundError);
+      await expect(result).rejects.toThrow('Service instance not found: nonexistent');
+    });
+
+    it('rethrows a foreign-key violation on tenantId rather than blaming the service instance', async () => {
+      const tenantFkError = prismaForeignKeyViolationError('Foreign key constraint failed on the field: `tenantId`');
+      mockDid.create.mockRejectedValue(tenantFkError);
+
+      await expect(
+        createDid({
+          tenantId: ORG_ID,
+          did: 'did:web:example.com:org:123',
+          type: 'MANAGED',
+          keyId: 'key-1',
+          serviceInstanceId: 'si-1',
+        }),
+      ).rejects.toBe(tenantFkError);
     });
 
     it('rethrows a non-database error unchanged', async () => {
@@ -537,9 +555,7 @@ describe('did.repository', () => {
     it('throws if DID does not belong to the organisation', async () => {
       mockTx.did.findFirst.mockResolvedValue(null);
 
-      await expect(updateDid('did-record-1', 'other-org', { name: 'New' })).rejects.toThrow(
-        'DID not found or access denied',
-      );
+      await expect(updateDid('did-record-1', 'other-org', { name: 'New' })).rejects.toThrow('DID not found');
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {
@@ -549,7 +565,7 @@ describe('did.repository', () => {
       const result = updateDid('did-record-1', ORG_ID, { name: 'New Name' });
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('DID not found or access denied');
+      await expect(result).rejects.toThrow('DID not found');
     });
 
     it('rethrows a non-database error unchanged', async () => {
@@ -587,7 +603,7 @@ describe('did.repository', () => {
       mockTx.did.findFirst.mockResolvedValue(null);
 
       await expect(updateDidStatus('did-record-1', 'other-org', 'VERIFIED' as DidStatus)).rejects.toThrow(
-        'DID not found or access denied',
+        'DID not found',
       );
     });
 
@@ -598,7 +614,7 @@ describe('did.repository', () => {
       const result = updateDidStatus('did-record-1', ORG_ID, 'VERIFIED' as DidStatus);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('DID not found or access denied');
+      await expect(result).rejects.toThrow('DID not found');
     });
 
     it('rethrows a non-database error unchanged', async () => {
@@ -636,14 +652,14 @@ describe('did.repository', () => {
     it('throws NotFoundError when DID does not exist', async () => {
       mockTx.did.findFirst.mockResolvedValue(null);
 
-      await expect(deleteDid('nonexistent', ORG_ID)).rejects.toThrow('DID not found or access denied');
+      await expect(deleteDid('nonexistent', ORG_ID)).rejects.toThrow('DID not found');
       expect(mockTx.did.delete).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError when DID belongs to a different organisation', async () => {
       mockTx.did.findFirst.mockResolvedValue(null);
 
-      await expect(deleteDid('did-record-1', 'other-org')).rejects.toThrow('DID not found or access denied');
+      await expect(deleteDid('did-record-1', 'other-org')).rejects.toThrow('DID not found');
       expect(mockTx.did.delete).not.toHaveBeenCalled();
     });
 
@@ -654,7 +670,7 @@ describe('did.repository', () => {
       const result = deleteDid('did-record-1', ORG_ID);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('DID not found or access denied');
+      await expect(result).rejects.toThrow('DID not found');
     });
 
     it('rethrows a non-database error unchanged', async () => {

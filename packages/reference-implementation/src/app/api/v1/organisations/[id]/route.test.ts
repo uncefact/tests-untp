@@ -158,7 +158,7 @@ describe('PATCH /api/v1/organisations/:id', () => {
   });
 
   it('returns 404 when organisation not found', async () => {
-    mockUpdateOrganisation.mockRejectedValue(new NotFoundError('Organisation not found or access denied'));
+    mockUpdateOrganisation.mockRejectedValue(new NotFoundError('Organisation not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated Corp' } });
     const res = await PATCH(req, createContext('org-a') as unknown as Parameters<typeof PATCH>[1]);
@@ -196,7 +196,7 @@ describe('DELETE /api/v1/organisations/:id', () => {
   });
 
   it('returns 404 when organisation not found', async () => {
-    mockDeleteOrganisation.mockRejectedValue(new NotFoundError('Organisation not found or access denied'));
+    mockDeleteOrganisation.mockRejectedValue(new NotFoundError('Organisation not found'));
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);

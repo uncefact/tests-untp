@@ -406,6 +406,22 @@ describe('identifier-scheme.repository', () => {
       expect(mockTx.identifierScheme.update).not.toHaveBeenCalled();
     });
 
+    it('maps a foreign-key violation on qualifier creation to the 404 the pre-check produces', async () => {
+      // The scheme passed the findFirst pre-check but was deleted by a
+      // concurrent request before the qualifier insert.
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.schemeQualifier.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.schemeQualifier.createMany.mockRejectedValue(prismaForeignKeyViolationError());
+
+      const result = updateIdentifierScheme('scheme-1', TENANT_ID, {
+        qualifiers: [{ key: 'serial', description: 'Serial number', validationPattern: '^[A-Z0-9]+$' }],
+      });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Identifier scheme not found');
+      expect(mockTx.identifierScheme.update).not.toHaveBeenCalled();
+    });
+
     it('allows setting idrServiceInstanceId to null', async () => {
       mockTx.identifierScheme.findFirst.mockResolvedValue({ ...SCHEME_RECORD, idrServiceInstanceId: 'si-1' });
       mockTx.identifierScheme.update.mockResolvedValue({ ...SCHEME_RECORD, idrServiceInstanceId: null });
@@ -426,7 +442,7 @@ describe('identifier-scheme.repository', () => {
       mockTx.identifierScheme.findFirst.mockResolvedValue(null);
 
       await expect(updateIdentifierScheme('scheme-1', 'other-tenant', { name: 'New' })).rejects.toThrow(
-        'Identifier scheme not found or access denied',
+        'Identifier scheme not found',
       );
     });
 
@@ -449,7 +465,7 @@ describe('identifier-scheme.repository', () => {
       const result = updateIdentifierScheme('scheme-1', TENANT_ID, { name: 'GTIN-14' });
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Identifier scheme not found or access denied');
+      await expect(result).rejects.toThrow('Identifier scheme not found');
     });
 
     it('maps a foreign-key violation to ValidationError', async () => {
@@ -499,9 +515,7 @@ describe('identifier-scheme.repository', () => {
     it('throws if scheme does not belong to the tenant', async () => {
       mockTx.identifierScheme.findFirst.mockResolvedValue(null);
 
-      await expect(deleteIdentifierScheme('scheme-1', 'other-tenant')).rejects.toThrow(
-        'Identifier scheme not found or access denied',
-      );
+      await expect(deleteIdentifierScheme('scheme-1', 'other-tenant')).rejects.toThrow('Identifier scheme not found');
     });
 
     it('maps a foreign-key violation to ConflictError when identifiers still reference the scheme', async () => {
@@ -521,7 +535,7 @@ describe('identifier-scheme.repository', () => {
       const result = deleteIdentifierScheme('scheme-1', TENANT_ID);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Identifier scheme not found or access denied');
+      await expect(result).rejects.toThrow('Identifier scheme not found');
     });
 
     it('rejects a unique-constraint violation with the original error (uncovered code)', async () => {

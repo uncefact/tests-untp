@@ -8,6 +8,8 @@ import {
   getInstanceByResolution,
 } from './service-instance.repository';
 import { SYSTEM_TENANT_ID } from '../constants';
+import { NotFoundError } from '@/lib/api/errors';
+import { prismaError } from '../db-errors.fixtures';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Mock Prisma client — use jest.fn() inside the factory to avoid hoisting issues
@@ -139,6 +141,23 @@ describe('service-instance.repository', () => {
           isPrimary: true,
         }),
       });
+    });
+
+    it('rethrows a foreign-key violation unchanged', async () => {
+      // The insert's only foreign key is tenantId, which is not a caller
+      // error; the violation stays on the sanitised 500 path unmapped.
+      const tenantFkError = prismaError('P2003', 'Foreign key constraint failed on the field: `tenantId`');
+      mockServiceInstance.create.mockRejectedValue(tenantFkError);
+
+      await expect(
+        createServiceInstance({
+          tenantId: ORG_ID,
+          serviceType: 'VC',
+          adapterType: 'VCKIT',
+          name: 'Instance',
+          config: 'encrypted',
+        }),
+      ).rejects.toBe(tenantFkError);
     });
   });
 
@@ -374,7 +393,7 @@ describe('service-instance.repository', () => {
       mockServiceInstance.findFirst.mockResolvedValue(null);
 
       await expect(updateServiceInstance('non-existent', ORG_ID, { name: 'New' })).rejects.toThrow(
-        'Service instance not found or access denied',
+        'Service instance not found',
       );
     });
 
@@ -382,8 +401,21 @@ describe('service-instance.repository', () => {
       mockServiceInstance.findFirst.mockResolvedValue(null);
 
       await expect(updateServiceInstance('instance-1', 'other-org', { name: 'New' })).rejects.toThrow(
-        'Service instance not found or access denied',
+        'Service instance not found',
       );
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      // The findFirst pre-check does not lock the row, so a concurrent delete
+      // can land between it and the update; the loser gets the same 404 the
+      // pre-check produces for a missing record.
+      mockServiceInstance.findFirst.mockResolvedValue(INSTANCE_RECORD);
+      mockServiceInstance.update.mockRejectedValue(prismaError('P2025'));
+
+      const result = updateServiceInstance('instance-1', ORG_ID, { name: 'New' });
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Service instance not found');
     });
 
     it('unsets existing primary when setting isPrimary', async () => {
@@ -431,17 +463,23 @@ describe('service-instance.repository', () => {
     it('throws for non-existent instance', async () => {
       mockServiceInstance.findFirst.mockResolvedValue(null);
 
-      await expect(deleteServiceInstance('non-existent', ORG_ID)).rejects.toThrow(
-        'Service instance not found or access denied',
-      );
+      await expect(deleteServiceInstance('non-existent', ORG_ID)).rejects.toThrow('Service instance not found');
     });
 
     it('throws for system defaults', async () => {
       mockServiceInstance.findFirst.mockResolvedValue(null);
 
-      await expect(deleteServiceInstance('instance-1', 'other-org')).rejects.toThrow(
-        'Service instance not found or access denied',
-      );
+      await expect(deleteServiceInstance('instance-1', 'other-org')).rejects.toThrow('Service instance not found');
+    });
+
+    it('maps a record-not-found race to NotFoundError', async () => {
+      mockServiceInstance.findFirst.mockResolvedValue(INSTANCE_RECORD);
+      mockServiceInstance.delete.mockRejectedValue(prismaError('P2025'));
+
+      const result = deleteServiceInstance('instance-1', ORG_ID);
+
+      await expect(result).rejects.toThrow(NotFoundError);
+      await expect(result).rejects.toThrow('Service instance not found');
     });
   });
 

@@ -174,7 +174,7 @@ export async function updateIdentifierScheme(
     });
 
     if (!existing) {
-      throw new NotFoundError('Identifier scheme not found or access denied');
+      throw new NotFoundError('Identifier scheme not found');
     }
 
     validateQualifierKeys(input.qualifiers);
@@ -199,6 +199,11 @@ export async function updateIdentifierScheme(
             })),
           });
         } catch (e) {
+          // The qualifier rows' only foreign key is schemeId, pre-checked
+          // above; a violation surfaces as that pre-check's 404.
+          if (isForeignKeyViolation(e)) {
+            throw new NotFoundError('Identifier scheme not found');
+          }
           mapDatabaseError(e, { conflict: 'A qualifier with this key already exists for the scheme' });
         }
       }
@@ -224,7 +229,7 @@ export async function updateIdentifierScheme(
     } catch (e) {
       mapDatabaseError(e, {
         conflict: 'An identifier scheme with this primary key already exists for the registrar',
-        notFound: 'Identifier scheme not found or access denied',
+        notFound: 'Identifier scheme not found',
         invalidReference: 'The referenced IDR service instance does not exist',
       });
     }
@@ -242,7 +247,7 @@ export async function deleteIdentifierScheme(id: string, tenantId: string): Prom
     });
 
     if (!existing) {
-      throw new NotFoundError('Identifier scheme not found or access denied');
+      throw new NotFoundError('Identifier scheme not found');
     }
 
     try {
@@ -256,7 +261,7 @@ export async function deleteIdentifierScheme(id: string, tenantId: string): Prom
       if (isForeignKeyViolation(e)) {
         throw new ConflictError('The identifier scheme has identifiers and cannot be deleted');
       }
-      mapDatabaseError(e, { notFound: 'Identifier scheme not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Identifier scheme not found' });
     }
   });
 }

@@ -179,8 +179,8 @@ describe('PATCH /api/v1/dids/:id', () => {
     expect(mockUpdateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 404 when DID not found or access denied', async () => {
-    mockUpdateDid.mockRejectedValue(new NotFoundError('DID not found or access denied'));
+  it('returns 404 when DID not found', async () => {
+    mockUpdateDid.mockRejectedValue(new NotFoundError('DID not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { name: 'New Name' } });
     const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);

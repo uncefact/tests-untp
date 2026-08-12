@@ -373,7 +373,7 @@ describe('DELETE /api/v1/render-templates/:id', () => {
   });
 
   it('returns 404 when repository throws NotFoundError', async () => {
-    mockDeleteRenderTemplate.mockRejectedValue(new NotFoundError('Render template not found or access denied'));
+    mockDeleteRenderTemplate.mockRejectedValue(new NotFoundError('Render template not found'));
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);
