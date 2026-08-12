@@ -79,7 +79,17 @@ function defaultHumanVerificationUrl(): string {
  *             schema:
  *               $ref: '#/components/schemas/CredentialIssueResponse'
  *       400:
- *         description: Validation error (invalid payload, unknown data model, or issuer DID not registered to tenant)
+ *         description: >-
+ *           Validation error (invalid payload, unknown data model, or issuer
+ *           DID not registered to tenant). Payload-validation failures carry
+ *           a `code`: `SCHEMA_DOCUMENT_INVALID` or `JSONLD_DOCUMENT_INVALID`
+ *           mean the payload itself is invalid and the message says what to
+ *           fix; `SCHEMA_FETCH_FAILED` or `JSONLD_CONTEXT_FETCH_FAILED` mean
+ *           a remote schema or `@context` could not be fetched or used,
+ *           which reflects an upstream or configuration condition rather
+ *           than a payload fault (the schema message names the schema URL;
+ *           the context message carries the HTTP status or timeout where
+ *           one applies).
  *         content:
  *           application/json:
  *             schema:

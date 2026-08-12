@@ -1,5 +1,4 @@
 import { ReadableStream } from 'node:stream/web';
-import { Agent, fetch as undiciFetch } from 'undici';
 import {
   parseEntityTag,
   parseImfDate,
@@ -130,6 +129,11 @@ export interface ResolveDocumentOptions {
  * @see https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
  */
 export async function resolveDocument(url: string, options?: ResolveDocumentOptions): Promise<LoadResult> {
+  // Dynamic import: undici's module initialisation needs web globals
+  // (TextDecoder) that jsdom test environments lack, so it loads at fetch
+  // time to keep this module, and the resolvers barrel, importable there.
+  // Same pattern as validate-jsonld.ts's lazy jsonld import.
+  const { Agent, fetch: undiciFetch } = await import('undici');
   const maxBytes = options?.maxResponseBytes ?? RESOLVER_DEFAULTS.maxResponseBytes;
   const totalTimeoutMs = options?.totalTimeoutMs ?? RESOLVER_DEFAULTS.totalTimeoutMs;
   const maxRedirects = options?.maxRedirects ?? RESOLVER_DEFAULTS.maxRedirects;

@@ -27,8 +27,12 @@ const logger = apiLogger.child({ handler: 'error' });
  */
 export function handleRouteError(e: unknown): Response {
   if (e instanceof ValidationError) {
+    // The default err serialiser concatenates the messages and stacks of the
+    // native cause chain (not the causes' typed fields), so a ValidationError
+    // constructed with a cause logs the underlying failure's text here.
     logger.warn({ err: e }, 'Validation error');
-    return NextResponse.json({ error: e.message }, { status: 400 });
+    const body = e.code !== undefined ? { error: e.message, code: e.code } : { error: e.message };
+    return NextResponse.json(body, { status: 400 });
   }
   if (e instanceof ForbiddenError) {
     logger.warn({ err: e }, 'Forbidden');
