@@ -218,13 +218,14 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
 
       const credentialLink = links.find((l: any) => l.mimeType === 'application/json');
       expect(credentialLink, 'credential link').to.exist;
-      expect(credentialLink.linkType).to.eq('gs1:sustainabilityInfo');
+      // SYSTEM_IDR_DEFAULT_LINK_TYPE in docker-compose.e2e.yml
+      expect(credentialLink.linkType).to.eq('untp:dpp');
       expect(credentialLink.targetUrl).to.be.a('string').and.not.eq(MACHINE_VERIFICATION_URL);
       expect(credentialLink.accessRole).to.have.members(ACCESS_ROLES);
 
       const humanLink = links.find((l: any) => l.mimeType === 'text/html');
       expect(humanLink, 'human verification link').to.exist;
-      expect(humanLink.linkType).to.eq('gs1:sustainabilityInfo');
+      expect(humanLink.linkType).to.eq('untp:dpp');
       expect(humanLink.targetUrl).to.include('/verify');
       expect(humanLink.accessRole).to.have.members(ACCESS_ROLES);
     });

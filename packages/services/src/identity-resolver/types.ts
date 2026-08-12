@@ -241,6 +241,12 @@ export type ResolverUriParts = {
  */
 export interface IIdentityResolverService {
   /**
+   * The service's configured default link relation type, applied where a
+   * caller publishes without naming one.
+   */
+  readonly defaultLinkType: string;
+
+  /**
    * Publishes links for an identifier to the identity resolver.
    *
    * @param identifierScheme - The scheme of the identifier (e.g., "abn", "nzbn", "lei")

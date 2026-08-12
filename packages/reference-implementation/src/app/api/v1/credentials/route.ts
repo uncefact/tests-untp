@@ -320,7 +320,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
       const linkTitle = publishingOptions.linkTitle || dataModel.name;
       const links = buildPublishLinks(storageResponse, linkTitle, {
-        linkType: publishingOptions.linkType,
+        linkType: publishingOptions.linkType ?? idrService.service.defaultLinkType,
         machineVerificationUrl,
         humanVerificationUrl: effectiveHumanVerificationUrl,
         ...(publishingOptions.hreflang !== undefined ? { hreflang: publishingOptions.hreflang } : {}),

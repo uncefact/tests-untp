@@ -45,7 +45,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
   private readonly baseURL: string;
   private readonly headers: Record<string, string>;
   private readonly apiPathSegment: string;
-  private readonly defaultLinkType: string;
+  readonly defaultLinkType: string;
   private readonly defaultMimeType: string;
   private readonly defaultIanaLanguage: string;
   private readonly defaultContext: string;
