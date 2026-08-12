@@ -32,7 +32,7 @@ The `namespace` field is the grouping key used when publishing identifier scheme
 
 ### IDR service instance linkage
 
-A registrar can optionally be linked to an **IDR service instance** via `idrServiceInstanceId`. This determines which configured IDR service is responsible for resolving identifiers issued under the registrar's schemes. The referenced instance must be one the tenant can use: its own, or a system default. An ID that does not resolve to such an instance is rejected with a 404. The linkage is optional, and a PATCH with `idrServiceInstanceId: null` clears the association. If the linked service instance is deleted, the reference is automatically cleared (`onDelete: SetNull`).
+A registrar can optionally be linked to an **IDR service instance** via `idrServiceInstanceId`. This determines which configured IDR service is responsible for resolving identifiers issued under the registrar's schemes. The referenced instance must be one the tenant can use: its own, or a system default. An ID that does not resolve to such an instance is rejected with a 404. The linkage is optional, and a PATCH with `idrServiceInstanceId: null` clears the association. If the linked service instance is deleted, the reference is automatically cleared.
 
 ### Tenant scoping
 
@@ -74,7 +74,7 @@ sequenceDiagram
     end
     opt idrServiceInstanceId provided
         RI->>DB: Verify instance is accessible to this tenant (own or system default)
-        alt instance not accessible
+        alt service instance not found
             RI-->>Client: 404 Not Found
         end
     end
@@ -157,7 +157,7 @@ sequenceDiagram
     end
     opt idrServiceInstanceId provided (non-null)
         RI->>DB: Verify instance is accessible to this tenant (own or system default)
-        alt instance not accessible
+        alt service instance not found
             RI-->>Client: 404 Not Found
         end
     end

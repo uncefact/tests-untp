@@ -101,7 +101,7 @@ export async function createDataModel(tenantId: string, input: CreateDataModelIn
       }
 
       if (parent.isExtension) {
-        throw new ValidationError('Parent data model configuration must be a core type (isExtension=false)');
+        throw new ValidationError('Parent data model configuration must be a core data model');
       }
     }
 

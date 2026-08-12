@@ -42,11 +42,25 @@ export type ListDidsOptions = {
 };
 
 /**
+ * Options for creating a DID record.
+ */
+export type CreateDidOptions = {
+  /**
+   * The service instance id exactly as the caller supplied it, when they
+   * supplied one. Left unset when the server resolved an instance on the
+   * caller's behalf, so a vanished-instance race on a server-selected
+   * dependency stays on the sanitised 500 path instead of naming an id the
+   * caller never sent.
+   */
+  callerSuppliedServiceInstanceId?: string;
+};
+
+/**
  * Creates a new DID record scoped to an organisation.
  * When isDefault is true, clears any existing tenant default
  * (excluding system DEFAULT type DIDs) within a transaction.
  */
-export async function createDid(input: CreateDidInput): Promise<Did> {
+export async function createDid(input: CreateDidInput, options: CreateDidOptions = {}): Promise<Did> {
   const data = {
     tenantId: input.tenantId,
     did: input.did,
@@ -78,9 +92,15 @@ export async function createDid(input: CreateDidInput): Promise<Did> {
     return await prisma.did.create({ data });
   } catch (e) {
     // A serviceInstanceId violation means the instance vanished after the
-    // routes' pre-check; it surfaces as that pre-check's 404.
+    // routes' pre-check. When the caller named the instance it surfaces as
+    // the pre-check's 404; when the server resolved the instance itself the
+    // race is a failed server-side selection, not a caller error, and
+    // rethrows into the sanitised 500 branch.
     if (isForeignKeyViolationOn(e, 'serviceInstanceId')) {
-      throw new ServiceInstanceNotFoundError(String(input.serviceInstanceId));
+      if (options.callerSuppliedServiceInstanceId !== undefined) {
+        throw new ServiceInstanceNotFoundError(options.callerSuppliedServiceInstanceId);
+      }
+      throw e;
     }
     mapDatabaseError(e, {
       conflict: 'A DID record with this DID already exists',

@@ -120,7 +120,7 @@ sequenceDiagram
     end
     opt idrServiceInstanceId provided
         RI->>DB: Verify instance is accessible to this tenant (own or system default)
-        alt instance not accessible
+        alt service instance not found
             RI-->>Client: 404 Not Found
         end
     end

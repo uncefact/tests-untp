@@ -256,8 +256,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *     description: >
  *       Permanently deletes a service instance. If the instance is referenced by
  *       DIDs, registrars, or identifier schemes, returns 409 Conflict unless the
- *       `force` query parameter is set to `true`. When forced, Prisma's `onDelete: SetNull`
- *       behaviour nullifies the foreign keys on related records.
+ *       `force` query parameter is set to `true`. When forced, references to the instance on related records
+ *       (DIDs, registrars, and identifier schemes) are cleared.
  *     tags:
  *       - Services
  *     parameters:

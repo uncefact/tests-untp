@@ -187,7 +187,7 @@ sequenceDiagram
 
     Client->>RI: PATCH /api/v1/render-templates/{id}
     RI->>DB: Fetch existing template
-    alt not found or not owned by tenant
+    alt not found
         RI-->>Client: 404 Not Found
     end
     RI->>RI: Validate patchable fields
@@ -227,7 +227,7 @@ sequenceDiagram
 
     Client->>RI: DELETE /api/v1/render-templates/{id}
     RI->>DB: Fetch template
-    alt not found or not owned by tenant
+    alt not found
         RI-->>Client: 404 Not Found
     end
     RI->>DB: Delete record

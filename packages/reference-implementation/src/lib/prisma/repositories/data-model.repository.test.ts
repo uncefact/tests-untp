@@ -191,7 +191,7 @@ describe('data-model.repository', () => {
           isExtension: true,
           parentConfigId: 'config-1',
         }),
-      ).rejects.toThrow('Parent data model configuration must be a core type (isExtension=false)');
+      ).rejects.toThrow('Parent data model configuration must be a core data model');
     });
 
     it('defaults isExtension to true when not provided', async () => {

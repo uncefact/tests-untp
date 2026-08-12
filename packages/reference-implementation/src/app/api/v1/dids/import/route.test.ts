@@ -97,17 +97,20 @@ describe('POST /api/v1/dids/import', () => {
     expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-1', 'VC', 'inst-1');
 
     // Verify createDid was called with correct params -- NOT calling adapter
-    expect(mockCreateDid).toHaveBeenCalledWith({
-      tenantId: 'tenant-1',
-      did: 'did:web:example.com',
-      type: 'SELF_MANAGED',
-      method: 'DID_WEB',
-      keyId: 'key-1',
-      name: 'My Imported DID',
-      description: 'An externally managed DID',
-      status: 'UNVERIFIED',
-      serviceInstanceId: 'inst-1',
-    });
+    expect(mockCreateDid).toHaveBeenCalledWith(
+      {
+        tenantId: 'tenant-1',
+        did: 'did:web:example.com',
+        type: 'SELF_MANAGED',
+        method: 'DID_WEB',
+        keyId: 'key-1',
+        name: 'My Imported DID',
+        description: 'An externally managed DID',
+        status: 'UNVERIFIED',
+        serviceInstanceId: 'inst-1',
+      },
+      { callerSuppliedServiceInstanceId: 'inst-1' },
+    );
   });
 
   it('uses the DID string as the name when name is not provided', async () => {
@@ -124,6 +127,7 @@ describe('POST /api/v1/dids/import', () => {
       expect.objectContaining({
         name: 'did:web:example.com',
       }),
+      { callerSuppliedServiceInstanceId: 'inst-1' },
     );
   });
 
@@ -323,6 +327,7 @@ describe('POST /api/v1/dids/import', () => {
       expect.objectContaining({
         status: 'UNVERIFIED',
       }),
+      expect.anything(),
     );
   });
 
@@ -340,6 +345,7 @@ describe('POST /api/v1/dids/import', () => {
       expect.objectContaining({
         type: 'SELF_MANAGED',
       }),
+      expect.anything(),
     );
   });
 
@@ -580,6 +586,7 @@ describe('POST /api/v1/dids/import', () => {
       expect.objectContaining({
         description: undefined,
       }),
+      expect.anything(),
     );
   });
 });

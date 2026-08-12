@@ -224,18 +224,21 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   const status = type === DidType.SELF_MANAGED ? DidStatus.UNVERIFIED : DidStatus.ACTIVE;
 
   logger.info({ did: providerResult.did, status }, 'Saving DID record');
-  const record = await createDid({
-    tenantId,
-    did: providerResult.did,
-    type,
-    method,
-    keyId: providerResult.keyId,
-    name: body.name ?? providerResult.did,
-    description: body.description,
-    isDefault: body.isDefault,
-    status,
-    serviceInstanceId,
-  });
+  const record = await createDid(
+    {
+      tenantId,
+      did: providerResult.did,
+      type,
+      method,
+      keyId: providerResult.keyId,
+      name: body.name ?? providerResult.did,
+      description: body.description,
+      isDefault: body.isDefault,
+      status,
+      serviceInstanceId,
+    },
+    body.serviceInstanceId !== undefined ? { callerSuppliedServiceInstanceId: body.serviceInstanceId } : {},
+  );
 
   logger.info({ didId: record.id, did: record.did }, 'DID created');
   return NextResponse.json(record, { status: 201 });

@@ -139,7 +139,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Render template not found or not owned by tenant
+ *         description: Render template not found
  *         content:
  *           application/json:
  *             schema:
@@ -242,7 +242,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Render template not found or not owned by tenant
+ *         description: Render template not found
  *         content:
  *           application/json:
  *             schema:

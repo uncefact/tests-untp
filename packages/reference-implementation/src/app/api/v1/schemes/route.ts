@@ -113,7 +113,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Registrar not found, or the referenced IDR service instance does not exist or is not accessible to this tenant
+ *         description: Registrar or IDR service instance not found
  *         content:
  *           application/json:
  *             schema:

@@ -236,13 +236,16 @@ describe('did.repository', () => {
         prismaForeignKeyViolationError('Foreign key constraint failed on the field: `serviceInstanceId`'),
       );
 
-      const result = createDid({
-        tenantId: ORG_ID,
-        did: 'did:web:example.com:org:123',
-        type: 'MANAGED',
-        keyId: 'key-1',
-        serviceInstanceId: 'nonexistent',
-      });
+      const result = createDid(
+        {
+          tenantId: ORG_ID,
+          did: 'did:web:example.com:org:123',
+          type: 'MANAGED',
+          keyId: 'key-1',
+          serviceInstanceId: 'nonexistent',
+        },
+        { callerSuppliedServiceInstanceId: 'nonexistent' },
+      );
 
       await expect(result).rejects.toThrow(ServiceInstanceNotFoundError);
       await expect(result).rejects.toThrow('Service instance not found: nonexistent');
@@ -254,17 +257,38 @@ describe('did.repository', () => {
         prismaForeignKeyViolationError('Foreign key constraint failed on the field: `serviceInstanceId`'),
       );
 
-      const result = createDid({
-        tenantId: ORG_ID,
-        did: 'did:web:example.com:org:123',
-        type: 'MANAGED',
-        keyId: 'key-1',
-        isDefault: true,
-        serviceInstanceId: 'nonexistent',
-      });
+      const result = createDid(
+        {
+          tenantId: ORG_ID,
+          did: 'did:web:example.com:org:123',
+          type: 'MANAGED',
+          keyId: 'key-1',
+          isDefault: true,
+          serviceInstanceId: 'nonexistent',
+        },
+        { callerSuppliedServiceInstanceId: 'nonexistent' },
+      );
 
       await expect(result).rejects.toThrow(ServiceInstanceNotFoundError);
       await expect(result).rejects.toThrow('Service instance not found: nonexistent');
+    });
+
+    it('rethrows a serviceInstanceId violation when the instance was resolved server-side', async () => {
+      // No callerSuppliedServiceInstanceId: the route resolved the instance
+      // itself, so the race is a failed server-side selection and must not
+      // surface as a 404 naming an id the caller never sent.
+      const fkError = prismaForeignKeyViolationError('Foreign key constraint failed on the field: `serviceInstanceId`');
+      mockDid.create.mockRejectedValue(fkError);
+
+      await expect(
+        createDid({
+          tenantId: ORG_ID,
+          did: 'did:web:example.com:org:123',
+          type: 'MANAGED',
+          keyId: 'key-1',
+          serviceInstanceId: 'inst-resolved',
+        }),
+      ).rejects.toBe(fkError);
     });
 
     it('rethrows a foreign-key violation on tenantId rather than blaming the service instance', async () => {
