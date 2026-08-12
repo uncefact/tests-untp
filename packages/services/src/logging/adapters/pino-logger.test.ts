@@ -289,15 +289,67 @@ describe('PinoLoggerAdapter redaction', () => {
     const logger = new PinoLoggerAdapter({
       level: 'info',
       destination: capture.destination,
-      redactPaths: ['apiKey'],
+      redactPaths: ['sessionSecret'],
     });
 
-    logger.info({ apiKey: 'secret-key', decryptionKey: 'a'.repeat(64) }, 'configuring service');
+    logger.info({ sessionSecret: 'secret-value', decryptionKey: 'a'.repeat(64) }, 'configuring service');
 
     const [entry] = capture.entries();
-    expect(entry.apiKey).toBe('[REDACTED]');
+    expect(entry.sessionSecret).toBe('[REDACTED]');
     expect(entry.decryptionKey).toBe('[REDACTED]');
   });
+
+  it.each(['apiKey', 'authorization', 'Authorization', 'token', 'password'])(
+    'redacts a top-level %s field by default',
+    (field) => {
+      const capture = createCapture();
+      const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+      logger.info({ [field]: 'secret-value' }, 'logging a secret-bearing object');
+
+      const [entry] = capture.entries();
+      expect(entry[field]).toBe('[REDACTED]');
+    },
+  );
+
+  it('redacts apiKey nested one and two levels deep', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info({ config: { apiKey: 'secret-key' } }, 'service configured');
+    logger.info({ error: { config: { apiKey: 'secret-key' } } }, 'request failed');
+
+    const [first, second] = capture.entries();
+    expect((first.config as Record<string, unknown>).apiKey).toBe('[REDACTED]');
+    expect((second.error as { config: Record<string, unknown> }).config.apiKey).toBe('[REDACTED]');
+  });
+
+  it('redacts Authorization two levels deep inside a logged object', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.error({ error: { headers: { Authorization: 'Bearer secret-token' } } }, 'request failed');
+
+    const [entry] = capture.entries();
+    const headers = (entry.error as { headers: Record<string, unknown> }).headers;
+    expect(headers.Authorization).toBe('[REDACTED]');
+  });
+
+  it.each(['Authorization', 'authorization'])(
+    'redacts %s in the HTTP client error shape error.config.headers',
+    (field) => {
+      const capture = createCapture();
+      const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+      const error = new Error('request failed') as Error & { config: Record<string, unknown> };
+      error.config = { headers: { [field]: 'Bearer secret-token' } };
+      logger.error({ error }, 'request failed');
+
+      const [entry] = capture.entries();
+      const headers = (entry.error as { config: { headers: Record<string, unknown> } }).config.headers;
+      expect(headers[field]).toBe('[REDACTED]');
+    },
+  );
 
   it('redacts decryptionKey inside an array of objects', () => {
     const capture = createCapture();
@@ -359,5 +411,141 @@ describe('PinoLoggerAdapter redaction', () => {
     expect(entry.credentialId).toBe('cred-1');
     expect(entry.count).toBe(3);
     expect(entry.msg).toBe('credentials listed');
+  });
+});
+
+describe('PinoLoggerAdapter LOG_REDACT_PATHS environment variable', () => {
+  function createCapture(): {
+    destination: { write: (msg: string) => void };
+    entries: () => Record<string, unknown>[];
+  } {
+    const lines: string[] = [];
+    return {
+      destination: { write: (msg: string) => void lines.push(msg.trim()) },
+      entries: () => lines.map((line) => JSON.parse(line)),
+    };
+  }
+
+  const originalValue = process.env.LOG_REDACT_PATHS;
+
+  afterEach(() => {
+    if (originalValue === undefined) {
+      delete process.env.LOG_REDACT_PATHS;
+    } else {
+      process.env.LOG_REDACT_PATHS = originalValue;
+    }
+  });
+
+  it('redacts paths supplied via LOG_REDACT_PATHS alongside the defaults', () => {
+    process.env.LOG_REDACT_PATHS = 'tenantSecret, *.webhookSignature';
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info(
+      { tenantSecret: 'secret-a', integration: { webhookSignature: 'secret-b' }, decryptionKey: 'secret-c' },
+      'operator-extended redaction',
+    );
+
+    const [entry] = capture.entries();
+    expect(entry.tenantSecret).toBe('[REDACTED]');
+    expect((entry.integration as Record<string, unknown>).webhookSignature).toBe('[REDACTED]');
+    expect(entry.decryptionKey).toBe('[REDACTED]');
+  });
+
+  it('tolerates surrounding whitespace and empty segments in LOG_REDACT_PATHS', () => {
+    process.env.LOG_REDACT_PATHS = ' tenantSecret ,, ';
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info({ tenantSecret: 'secret-a' }, 'trimmed path applies');
+
+    const [entry] = capture.entries();
+    expect(entry.tenantSecret).toBe('[REDACTED]');
+  });
+
+  it('redacts defaults, env paths, and config redactPaths together in one construction', () => {
+    process.env.LOG_REDACT_PATHS = 'tenantSecret';
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({
+      level: 'info',
+      destination: capture.destination,
+      redactPaths: ['sessionSecret'],
+    });
+
+    logger.info(
+      { apiKey: 'from-defaults', tenantSecret: 'from-env', sessionSecret: 'from-config' },
+      'all three sources apply',
+    );
+
+    const [entry] = capture.entries();
+    expect(entry.apiKey).toBe('[REDACTED]');
+    expect(entry.tenantSecret).toBe('[REDACTED]');
+    expect(entry.sessionSecret).toBe('[REDACTED]');
+  });
+
+  it('children keep the parent redaction snapshot and do not re-read the environment', () => {
+    process.env.LOG_REDACT_PATHS = 'tenantSecret';
+    const capture = createCapture();
+    const parent = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    process.env.LOG_REDACT_PATHS = 'bad[path';
+    const child = parent.child({ module: 'late-child' });
+    child.info({ tenantSecret: 'still-redacted' }, 'child inherits parent paths');
+
+    const [entry] = capture.entries();
+    expect(entry.tenantSecret).toBe('[REDACTED]');
+    expect(() => new PinoLoggerAdapter({ level: 'info', destination: capture.destination })).toThrow(
+      /LOG_REDACT_PATHS/,
+    );
+  });
+
+  it('warns when LOG_REDACT_PATHS contains an empty segment', () => {
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    process.env.LOG_REDACT_PATHS = 'tenantSecret,,';
+    const capture = createCapture();
+
+    void new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('LOG_REDACT_PATHS'));
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('propagates a non-redact construction failure without naming LOG_REDACT_PATHS', () => {
+    const capture = createCapture();
+
+    const config = { level: 'not-a-level', destination: capture.destination };
+
+    expect(
+      () => new PinoLoggerAdapter(config as unknown as ConstructorParameters<typeof PinoLoggerAdapter>[0]),
+    ).toThrow(/^(?!.*LOG_REDACT_PATHS).*level/);
+  });
+
+  it.each(['', '   '])('applies only the defaults when LOG_REDACT_PATHS is %j', (value) => {
+    process.env.LOG_REDACT_PATHS = value;
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    logger.info({ apiKey: 'secret-key', tenantSecret: 'not-a-default' }, 'blank env value');
+
+    const [entry] = capture.entries();
+    expect(entry.apiKey).toBe('[REDACTED]');
+    expect(entry.tenantSecret).toBe('not-a-default');
+  });
+
+  it('fails logger construction with an error naming LOG_REDACT_PATHS and the configured paths', () => {
+    process.env.LOG_REDACT_PATHS = 'valid.path,bad[path';
+    const capture = createCapture();
+
+    expect(() => new PinoLoggerAdapter({ level: 'info', destination: capture.destination })).toThrow(
+      /LOG_REDACT_PATHS.*currently: valid\.path, bad\[path/,
+    );
+  });
+
+  it('propagates a code-supplied invalid redactPaths error without naming LOG_REDACT_PATHS', () => {
+    const capture = createCapture();
+
+    expect(
+      () => new PinoLoggerAdapter({ level: 'info', destination: capture.destination, redactPaths: ['bad[path'] }),
+    ).toThrow(/^(?!.*LOG_REDACT_PATHS).*Invalid redaction path/);
   });
 });

@@ -24,7 +24,11 @@ export interface LoggerConfig {
   level?: LogLevel;
   pretty?: boolean;
   correlationId?: string;
-  /** Additional redaction paths merged with the built-in sensitive-field defaults. */
+  /**
+   * Additional redaction paths merged with the built-in sensitive-field
+   * defaults and any paths supplied via the LOG_REDACT_PATHS environment
+   * variable. An invalid pino path fails logger construction.
+   */
   redactPaths?: string[];
   /** Custom log sink; defaults to stdout. Disables the pretty transport when set. */
   destination?: { write: (msg: string) => void };
