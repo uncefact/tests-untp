@@ -1,6 +1,7 @@
 import { createInMemoryTtlCache } from '@uncefact/untp-utils/cache';
 import { createSchemaLoader, type SchemaLoader } from '@uncefact/untp-utils/loaders';
 import { apiLogger } from '../api/logger';
+import { readCacheMaxEntries } from '../config/cache-max-entries.config';
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 const logger = apiLogger.child({ module: 'schema-loader' });
@@ -20,5 +21,5 @@ export function readSchemaCacheTtlMs(env: Record<string, string | undefined> = p
 }
 
 export const schemaLoader: SchemaLoader = createSchemaLoader(
-  createInMemoryTtlCache<object>({ ttlMs: readSchemaCacheTtlMs() }),
+  createInMemoryTtlCache<object>({ ttlMs: readSchemaCacheTtlMs(), maxEntries: readCacheMaxEntries() }),
 );

@@ -19,6 +19,7 @@ jest.mock('@uncefact/untp-utils/validation', () => {
 });
 
 import { validateCredentialPayload } from './validate-credential-payload';
+import { contextCache } from './context-cache';
 
 const payload = { '@context': ['https://www.w3.org/ns/credentials/v2'], type: ['DigitalProductPassport'] };
 const schemaUrls = ['https://example.com/schema.json'];
@@ -42,7 +43,19 @@ describe('validateCredentialPayload', () => {
 
     expect(callOrder).toEqual(['schema', 'jsonld']);
     expect(mockValidateAgainstSchemas).toHaveBeenCalledWith(payload, schemaUrls, loader);
-    expect(mockValidateJsonLd).toHaveBeenCalledWith(payload);
+    expect(mockValidateJsonLd).toHaveBeenCalledWith(payload, { contextCache });
+  });
+
+  it('passes the same shared context cache on every call, so repeated validations reuse fetched contexts', async () => {
+    mockValidateAgainstSchemas.mockResolvedValue(undefined);
+    mockValidateJsonLd.mockResolvedValue(undefined);
+
+    await validateCredentialPayload(payload, schemaUrls, loader);
+    await validateCredentialPayload(payload, schemaUrls, loader);
+
+    const caches = mockValidateJsonLd.mock.calls.map((call) => (call[1] as { contextCache: unknown }).contextCache);
+    expect(caches[0]).toBe(contextCache);
+    expect(caches[1]).toBe(contextCache);
   });
 
   it('does not throw when both validations resolve', async () => {

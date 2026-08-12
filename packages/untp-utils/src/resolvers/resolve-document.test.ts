@@ -33,6 +33,7 @@ jest.unstable_mockModule('../node/index.js', () => ({
 }));
 
 const { resolveDocument } = await import('./resolve-document.js');
+const { DEFAULT_USER_AGENT, USER_AGENT_ENV_VAR } = await import('../http-headers/index.js');
 
 function makeResponse(opts: {
   status?: number;
@@ -278,6 +279,110 @@ describe('resolveDocument', () => {
       const pullOrder = bodyPull.mock.invocationCallOrder[0];
       const closeOrder = lastAgentClose.mock.invocationCallOrder[0];
       expect(closeOrder).toBeGreaterThan(pullOrder);
+    });
+  });
+
+  describe('User-Agent', () => {
+    afterEach(() => {
+      delete process.env[USER_AGENT_ENV_VAR];
+    });
+
+    function sentHeaders(callIndex = 0): Record<string, string> {
+      const init = undiciFetch.mock.calls[callIndex][1] as { headers?: Record<string, string> };
+      return init.headers ?? {};
+    }
+
+    it('sends the default User-Agent when the caller supplies none', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
+
+      await resolveDocument('https://example.com/doc.json', { headers: { Accept: 'application/json' } });
+
+      expect(sentHeaders()['User-Agent']).toBe(DEFAULT_USER_AGENT);
+      expect(sentHeaders()['Accept']).toBe('application/json');
+    });
+
+    it('sends the default User-Agent when no headers are supplied at all', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
+
+      await resolveDocument('https://example.com/doc.json');
+
+      expect(sentHeaders()['User-Agent']).toBe(DEFAULT_USER_AGENT);
+    });
+
+    it('prefers the RI_HTTP_USER_AGENT environment override to the default', async () => {
+      process.env[USER_AGENT_ENV_VAR] = 'acme-operator/1.0';
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
+
+      await resolveDocument('https://example.com/doc.json');
+
+      expect(sentHeaders()['User-Agent']).toBe('acme-operator/1.0');
+    });
+
+    it('falls back to the default when the environment override is blank (blank is treated as unset)', async () => {
+      process.env[USER_AGENT_ENV_VAR] = '   ';
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
+
+      await resolveDocument('https://example.com/doc.json');
+
+      expect(sentHeaders()['User-Agent']).toBe(DEFAULT_USER_AGENT);
+    });
+
+    it('passes a non-blank override through unvalidated (boot-time validation owns rejection)', async () => {
+      process.env[USER_AGENT_ENV_VAR] = 'operator-agent/1.0';
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
+
+      await resolveDocument('https://example.com/doc.json');
+
+      expect(sentHeaders()['User-Agent']).toBe('operator-agent/1.0');
+    });
+
+    it('passes an invalid override through raw rather than silently substituting the default', async () => {
+      process.env[USER_AGENT_ENV_VAR] = 'evil\r\nX-Injected: 1';
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
+
+      await resolveDocument('https://example.com/doc.json');
+
+      // The load-bearing rule: no request-time fallback. The raw value reaches
+      // the fetch layer, which rejects it loudly in real undici; deployments
+      // that want fail-fast validate at boot instead.
+      expect(sentHeaders()['User-Agent']).toBe('evil\r\nX-Injected: 1');
+    });
+
+    it.each(['user-agent', 'User-Agent', 'USER-AGENT', 'uSeR-aGeNt'])(
+      'never overrides a caller-supplied %s header',
+      async (headerName) => {
+        process.env[USER_AGENT_ENV_VAR] = 'acme-operator/1.0';
+        validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+        undiciFetch.mockResolvedValue(makeResponse({ body: '{}' }) as never);
+
+        await resolveDocument('https://example.com/doc.json', { headers: { [headerName]: 'caller/2.0' } });
+
+        const headers = sentHeaders();
+        expect(headers[headerName]).toBe('caller/2.0');
+        const uaKeys = Object.keys(headers).filter((k) => k.toLowerCase() === 'user-agent');
+        expect(uaKeys).toEqual([headerName]);
+      },
+    );
+
+    it('sends the User-Agent on every redirect hop', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch
+        .mockResolvedValueOnce(
+          makeResponse({ status: 302, headers: { location: 'https://example.com/final' }, body: null }) as never,
+        )
+        .mockResolvedValueOnce(makeResponse({ body: '{}' }) as never);
+
+      await resolveDocument('https://example.com/doc.json');
+
+      expect(undiciFetch).toHaveBeenCalledTimes(2);
+      expect(sentHeaders(0)['User-Agent']).toBe(DEFAULT_USER_AGENT);
+      expect(sentHeaders(1)['User-Agent']).toBe(DEFAULT_USER_AGENT);
     });
   });
 
