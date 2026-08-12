@@ -152,7 +152,10 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
     cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
 
-  it('publishes a credential with access roles and registers all three links on the IDR', () => {
+  // Publishing and asserting are separate tests so a retry of the
+  // assertions never re-publishes: the resolver rejects a second
+  // registration of the same link set as a duplicate.
+  it('publishes a credential with access roles', () => {
     cy.request({
       method: 'POST',
       url: '/api/v1/credentials',
@@ -190,7 +193,9 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       expect(response.body.credentialId).to.be.a('string');
       expect(response.body.warnings, JSON.stringify(response.body.warnings)).to.be.undefined;
     });
+  });
 
+  it('registers all three links on the IDR with the roles on the credential and human links', () => {
     cy.request({
       method: 'GET',
       url: `${config.services.idr.publicBaseUrl}/api/v4/resolver/links`,
@@ -213,13 +218,13 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
 
       const credentialLink = links.find((l: any) => l.mimeType === 'application/json');
       expect(credentialLink, 'credential link').to.exist;
-      expect(credentialLink.linkType).to.eq('untp:dpp');
+      expect(credentialLink.linkType).to.eq('gs1:sustainabilityInfo');
       expect(credentialLink.targetUrl).to.be.a('string').and.not.eq(MACHINE_VERIFICATION_URL);
       expect(credentialLink.accessRole).to.have.members(ACCESS_ROLES);
 
       const humanLink = links.find((l: any) => l.mimeType === 'text/html');
       expect(humanLink, 'human verification link').to.exist;
-      expect(humanLink.linkType).to.eq('untp:dpp');
+      expect(humanLink.linkType).to.eq('gs1:sustainabilityInfo');
       expect(humanLink.targetUrl).to.include('/verify');
       expect(humanLink.accessRole).to.have.members(ACCESS_ROLES);
     });
