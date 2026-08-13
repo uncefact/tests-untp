@@ -4,9 +4,15 @@ import { parse as parseYaml } from 'yaml';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import type { LoggerService as Logger } from '@uncefact/untp-ri-services';
 import type { PrismaClient, Prisma } from '../src/lib/prisma/generated/index.js';
-import { ConformitySchemeSource, RecordSource, RenderMethodType } from '../src/lib/prisma/generated/index.js';
+import {
+  ConformitySchemeSource,
+  RecordSource,
+  RenderMethodType,
+  SeedEntryKind,
+} from '../src/lib/prisma/generated/index.js';
 import { schemaLoader } from '../src/lib/credentials/schema-loader.js';
 import { ingestConformityScheme } from '../src/lib/cvc/index.js';
+import { acquireCvcStructuralLock } from '../src/lib/cvc/cvc-structural-lock.js';
 import {
   customSeedSchema,
   extractSectionPresence,
@@ -70,6 +76,9 @@ function countEntities(manifest: CustomSeedManifest): number {
 
 interface ConformitySchemeSeedSummary {
   ingested: number;
+  /** Entries verified against their source and found unchanged. */
+  unchanged: number;
+  /** Entries not processed because their row is owned by another source. */
   skipped: number;
   failed: number;
   evicted: number;
@@ -79,6 +88,7 @@ interface ConformitySchemeSeedSummary {
 interface ResolvedConformityEntry {
   sourceUrl: string;
   version: string;
+  kind: SeedEntryKind;
   prefetchedBody?: Uint8Array;
 }
 
@@ -109,7 +119,7 @@ function resolveConformityEntries(
 
   for (const [index, entry] of manifest.conformitySchemes.entries()) {
     if (entry.url !== undefined) {
-      resolution.resolved.push({ sourceUrl: entry.url, version: entry.version });
+      resolution.resolved.push({ sourceUrl: entry.url, version: entry.version, kind: SeedEntryKind.URL });
       continue;
     }
     if (entry.file === undefined) {
@@ -155,7 +165,12 @@ function resolveConformityEntries(
       resolution.failed += 1;
       continue;
     }
-    resolution.resolved.push({ sourceUrl: canonicalId, version: entry.version, prefetchedBody: new Uint8Array(bytes) });
+    resolution.resolved.push({
+      sourceUrl: canonicalId,
+      version: entry.version,
+      kind: SeedEntryKind.FILE,
+      prefetchedBody: new Uint8Array(bytes),
+    });
   }
 
   return resolution;
@@ -164,11 +179,14 @@ function resolveConformityEntries(
 /**
  * Ingests the resolved conformity entries after the main upsert transaction
  * has committed. Each entry is ingested under `tenantId = SYSTEM_TENANT_ID`
- * with `source = SYSTEM_SEED`. Existing rows (matched by `(sourceUrl,
- * tenantId)`) are left untouched — the policy is insert-only-if-absent so
- * that subsequent UNTP discovery or operator updates are preserved. The
- * schema URL is resolved from the core `ConformityScheme` system data-model
- * row keyed by `(credentialType, version, isExtension: false)`.
+ * with `source = SYSTEM_SEED`. An entry whose row already exists is
+ * re-ingested so publisher updates at the source are picked up at boot: the
+ * skip chain (HTTP validators for URL entries, a local body-digest compare
+ * for FILE entries) makes an unchanged document a no-op, a changed document
+ * re-persists, and a failure records `lastFetchStatus` while retaining the
+ * previous content. Rows whose `source` is not SYSTEM_SEED are never
+ * touched. The schema URL is resolved from the core `ConformityScheme`
+ * system data-model row keyed by `(credentialType, version, isExtension: false)`.
  */
 async function processConformitySchemes(
   deps: CustomSeedDependencies,
@@ -181,11 +199,15 @@ async function processConformitySchemes(
     try {
       const existing = await prisma.conformityScheme.findUnique({
         where: { sourceUrl_tenantId: { sourceUrl: entry.sourceUrl, tenantId: systemTenantId } },
+        select: { source: true },
       });
-      if (existing) {
+      if (existing && existing.source !== ConformitySchemeSource.SYSTEM_SEED) {
+        // Unreachable under the (sourceUrl, tenantId) unique constraint and
+        // the SYSTEM_SEED-only writes of this loader, but stated: the seed
+        // never overwrites a row another source owns.
         logger.info(
-          { sourceUrl: entry.sourceUrl },
-          'Conformity scheme already present (insert-only-if-absent); skipping',
+          { sourceUrl: entry.sourceUrl, source: existing.source },
+          'Conformity scheme row is owned by another source; skipping',
         );
         summary.skipped += 1;
         continue;
@@ -215,6 +237,7 @@ async function processConformitySchemes(
         conformitySchemaUrl: dataModel.schemaUrl,
         schemaLoader,
         conformityVocabularySpecVersion: entry.version,
+        seedEntryKind: entry.kind,
         ...(entry.prefetchedBody !== undefined ? { prefetched: { body: entry.prefetchedBody } } : {}),
       });
 
@@ -233,11 +256,8 @@ async function processConformitySchemes(
         );
         summary.failed += 1;
       } else {
-        logger.info(
-          { sourceUrl: entry.sourceUrl },
-          'Conformity scheme reported unchanged on seed; counted as ingested',
-        );
-        summary.ingested += 1;
+        logger.info({ sourceUrl: entry.sourceUrl }, 'Conformity scheme unchanged at source; skip chain hit');
+        summary.unchanged += 1;
       }
     } catch (err) {
       logger.error(
@@ -262,14 +282,17 @@ async function processConformitySchemes(
  * {@link sweepOrphanCriteria} afterwards.
  */
 async function evictUnseenSeededSchemes(deps: CustomSeedDependencies, keepSourceUrls: string[]): Promise<number> {
-  const result = await deps.prisma.conformityScheme.deleteMany({
-    where: {
-      tenantId: deps.systemTenantId,
-      source: ConformitySchemeSource.SYSTEM_SEED,
-      sourceUrl: { notIn: keepSourceUrls },
-    },
+  return deps.prisma.$transaction(async (tx) => {
+    await acquireCvcStructuralLock(tx, deps.systemTenantId);
+    const result = await tx.conformityScheme.deleteMany({
+      where: {
+        tenantId: deps.systemTenantId,
+        source: ConformitySchemeSource.SYSTEM_SEED,
+        sourceUrl: { notIn: keepSourceUrls },
+      },
+    });
+    return result.count;
   });
-  return result.count;
 }
 
 /**
@@ -277,15 +300,20 @@ async function evictUnseenSeededSchemes(deps: CustomSeedDependencies, keepSource
  * more. Criteria are shared across schemes within a tenant, so scheme
  * eviction cannot delete them directly; this sweep completes the removal
  * once nothing joins to them. The sweep is tenant-wide, so it also clears
- * orphans left behind by earlier events, not only this boot's evictions. The join FK restricts deletion of a criterion
- * that gains a reference concurrently, so a race can only fail the sweep,
- * never delete a live criterion.
+ * orphans left behind by earlier events, not only this boot's evictions.
+ * The per-tenant advisory lock serialises the sweep against the other CVC
+ * structural writers; the join FK's Restrict remains the backstop for any
+ * writer outside the lock's scope, so a race can only fail the sweep, never
+ * delete a live criterion.
  */
 async function sweepOrphanCriteria(deps: CustomSeedDependencies): Promise<number> {
-  const result = await deps.prisma.conformityCriterion.deleteMany({
-    where: { tenantId: deps.systemTenantId, profiles: { none: {} } },
+  return deps.prisma.$transaction(async (tx) => {
+    await acquireCvcStructuralLock(tx, deps.systemTenantId);
+    const result = await tx.conformityCriterion.deleteMany({
+      where: { tenantId: deps.systemTenantId, profiles: { none: {} } },
+    });
+    return result.count;
   });
-  return result.count;
 }
 
 // ── Main orchestrator ────────────────────────────────────────────────────────
@@ -781,6 +809,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
   // boot rather than deleting a previously good row.
   const conformitySummary: ConformitySchemeSeedSummary = {
     ingested: 0,
+    unchanged: 0,
     skipped: 0,
     failed: 0,
     evicted: 0,

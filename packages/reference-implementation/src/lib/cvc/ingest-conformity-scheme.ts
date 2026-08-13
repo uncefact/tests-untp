@@ -9,8 +9,10 @@ import type {
   ConformityCriterion as ParsedCriterion,
   ConformityScheme as ParsedScheme,
 } from '@uncefact/untp-utils/conformity-vocabulary';
-import { ConformityFetchStatus, ConformitySchemeSource, Prisma } from '../prisma/generated';
+import { ConformityFetchStatus, ConformitySchemeSource, Prisma, SeedEntryKind } from '../prisma/generated';
 import { prisma } from '../prisma/prisma';
+import { contextCache } from '../credentials/context-cache';
+import { acquireCvcStructuralLock } from './cvc-structural-lock';
 
 export interface IngestConformitySchemeInput {
   sourceUrl: string;
@@ -20,11 +22,30 @@ export interface IngestConformitySchemeInput {
   schemaLoader: SchemaLoader;
   prefetched?: PrefetchedDocument;
   conformityVocabularySpecVersion?: string;
+  /**
+   * Seed-manifest provenance for SYSTEM_SEED rows (URL vs FILE entry),
+   * persisted so the periodic refresh knows which rows it may re-fetch.
+   * Written on every outcome that touches the row (success, unchanged, and
+   * recorded failure), so a pre-existing row converges on its first boot
+   * even when its content has not changed. Omit outside the seed loader; an
+   * omitted value leaves the stored one.
+   */
+  seedEntryKind?: SeedEntryKind;
+  /**
+   * When true, the persist never creates a row: after taking the structural
+   * lock it re-reads the row and returns `stale` if the row has been evicted
+   * (a timer must never recreate membership the manifest removed) or if
+   * another writer replaced the content this resolution was based on (an
+   * older fetch must never overwrite a newer one). Set by the periodic
+   * refresh; the seed loader owns membership and leaves this unset.
+   */
+  requireExistingRow?: boolean;
 }
 
 export type IngestConformitySchemeResult =
   | { kind: 'unchanged'; schemeId: string }
   | { kind: 'success'; schemeId: string }
+  | { kind: 'stale'; schemeId?: string }
   | { kind: 'failure'; schemeId?: string; error: ConformitySchemeResolveError };
 
 /**
@@ -72,14 +93,23 @@ export async function ingestConformityScheme(
     prefetched: input.prefetched,
     cached,
     conformityVocabularySpecVersion: input.conformityVocabularySpecVersion,
+    // Shared with the issuance path (uncefact/tests-untp#891): a pass over
+    // many schemes fetches each remote @context once per TTL, not per scheme.
+    contextCache,
   });
 
   const now = new Date();
 
+  // Convergence data written on every row-touching outcome: an unchanged
+  // poll is a successful poll (status included, so a prior failure clears
+  // once the source is reachable again), and the seed-entry marker converges
+  // pre-existing rows even when their content never changes.
+  const convergence = input.seedEntryKind !== undefined ? { seedEntryKind: input.seedEntryKind } : {};
+
   if (result.kind === 'unchanged') {
     await prisma.conformityScheme.update({
       where: { id: existing!.id },
-      data: { lastFetchedAt: now, lastSuccessAt: now },
+      data: { lastFetchedAt: now, lastSuccessAt: now, lastFetchStatus: ConformityFetchStatus.SUCCESS, ...convergence },
     });
     return { kind: 'unchanged', schemeId: existing!.id };
   }
@@ -90,13 +120,15 @@ export async function ingestConformityScheme(
     }
     await prisma.conformityScheme.update({
       where: { id: existing.id },
-      data: { lastFetchedAt: now, lastFetchStatus: result.error.status as ConformityFetchStatus },
+      data: { lastFetchedAt: now, lastFetchStatus: result.error.status as ConformityFetchStatus, ...convergence },
     });
     return { kind: 'failure', schemeId: existing.id, error: result.error };
   }
 
   return persistSuccess({
     existingId: existing?.id,
+    baselineBodyDigest: existing?.bodyDigest ?? null,
+    requireExistingRow: input.requireExistingRow === true,
     scheme: result.scheme,
     raw: result.raw,
     bodyDigestEncoded: result.bodyDigest.toString(),
@@ -109,6 +141,9 @@ export async function ingestConformityScheme(
 
 interface PersistSuccessArgs {
   existingId?: string;
+  /** The stored digest this resolution was fetched against, for the staleness compare. */
+  baselineBodyDigest: string | null;
+  requireExistingRow: boolean;
   scheme: ParsedScheme;
   raw: unknown;
   bodyDigestEncoded: string;
@@ -137,11 +172,31 @@ async function persistSuccess(args: PersistSuccessArgs): Promise<IngestConformit
     lastFetchedAt: now,
     lastSuccessAt: now,
     lastFetchStatus: ConformityFetchStatus.SUCCESS,
+    ...(input.seedEntryKind !== undefined ? { seedEntryKind: input.seedEntryKind } : {}),
     rawDocument: raw as Prisma.InputJsonValue,
     tenantId: input.tenantId,
   };
 
-  const schemeId = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  const outcome = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Serialise against the other CVC structural writers (eviction, orphan
+    // sweep, other refresh ticks) so the sweep's no-joins predicate and this
+    // delete-and-recreate of profiles cannot interleave.
+    await acquireCvcStructuralLock(tx, input.tenantId);
+
+    // Existing-only callers (the periodic refresh) validate their pre-lock
+    // decision now that the lock is held: the row must still exist (an
+    // evicted scheme is never recreated by a timer) and must still carry the
+    // digest this resolution fetched against (an older fetch never
+    // overwrites a newer writer's content).
+    if (args.requireExistingRow) {
+      const current = await tx.conformityScheme.findUnique({
+        where: { sourceUrl_tenantId: { sourceUrl: input.sourceUrl, tenantId: input.tenantId } },
+        select: { id: true, bodyDigest: true },
+      });
+      if (!current || current.bodyDigest !== args.baselineBodyDigest) {
+        return { stale: true as const };
+      }
+    }
     let row: { id: string };
     if (existingId) {
       await tx.conformityProfile.deleteMany({ where: { schemeId: existingId } });
@@ -201,10 +256,13 @@ async function persistSuccess(args: PersistSuccessArgs): Promise<IngestConformit
       }
     }
 
-    return row.id;
+    return { stale: false as const, schemeId: row.id };
   });
 
-  return { kind: 'success', schemeId };
+  if (outcome.stale) {
+    return { kind: 'stale' };
+  }
+  return { kind: 'success', schemeId: outcome.schemeId };
 }
 
 function criterionWriteData(criterion: ParsedCriterion) {

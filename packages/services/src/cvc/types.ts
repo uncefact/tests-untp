@@ -1,5 +1,6 @@
+import type { TtlCache } from '@uncefact/untp-utils/cache';
+import type { LoadedRemoteDocument, SchemaLoader } from '@uncefact/untp-utils/loaders';
 import type { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
 import type { ConformityScheme } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { ConformitySchemeResolveError } from './errors.js';
 
@@ -56,10 +57,22 @@ export interface ResolveAndParseConformitySchemeInput {
   schemaLoader: SchemaLoader;
   /** When present, bypasses `resolveDocumentIfChanged` and processes these bytes directly. */
   prefetched?: PrefetchedDocument;
-  /** Conditional-fetch validators from the previous successful run; ignored when `prefetched` is set. */
+  /**
+   * Validators from the previous successful run. On the fetched path all
+   * three feed the conditional-fetch skip chain; on the prefetched path the
+   * HTTP validators are ignored but `bodyDigest` is still compared locally,
+   * so unchanged bytes return `unchanged` without a parse or persist.
+   */
   cached?: CachedResource;
   /** Override the spec-version detection that `parseConformityScheme` performs from `@context`. */
   conformityVocabularySpecVersion?: string;
+  /**
+   * Optional shared cache for remote JSON-LD `@context` documents, forwarded
+   * to `validateJsonLd` so a pass over many schemes fetches each context once
+   * per TTL instead of once per scheme. Same cache contract as the issuance
+   * path's (see the reference implementation's `context-cache.ts`).
+   */
+  contextCache?: TtlCache<LoadedRemoteDocument>;
 }
 
 /** Outcome of a successful run; everything the caller needs to upsert the row. */

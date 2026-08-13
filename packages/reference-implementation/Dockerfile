@@ -153,6 +153,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 # Modules required by prisma/custom-seed.ts (conformity-scheme ingestion path)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/api/logger.ts ./src/lib/api/logger.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/schema-loader.ts ./src/lib/credentials/schema-loader.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/context-cache.ts ./src/lib/credentials/context-cache.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/cvc ./src/lib/cvc
 # Modules required by prisma/seed.ts and scripts/backfill-decryption-keys.ts
 # (encryption-key resolution and decryption-key protection; relative imports)
