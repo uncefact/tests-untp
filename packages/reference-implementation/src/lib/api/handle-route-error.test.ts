@@ -55,6 +55,14 @@ describe('handleRouteError', () => {
     expect(body).toEqual({ error: 'bad input' });
   });
 
+  it('includes the ValidationError code in the 400 body when present', async () => {
+    const res = handleRouteError(new ValidationError('context fetch failed', { code: 'JSONLD_CONTEXT_FETCH_FAILED' }));
+
+    expect(res.status).toBe(400);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'context fetch failed', code: 'JSONLD_CONTEXT_FETCH_FAILED' });
+  });
+
   it('maps ForbiddenError to 403', async () => {
     const res = handleRouteError(new ForbiddenError('not allowed'));
 

@@ -145,7 +145,7 @@ The credential payload is validated in two passes:
 1. **JSON Schema validation** against the data model's schema URL(s). This catches structural issues such as missing required fields, incorrect types, or invalid enum values.
 2. **JSON-LD expansion** to verify the payload is valid linked data with a resolvable `@context`.
 
-If either check fails, the request is rejected with HTTP 400.
+If either check fails, the request is rejected with HTTP 400, the error message says why, and a `code` field distinguishes the two things that can go wrong at each pass. `SCHEMA_DOCUMENT_INVALID` and `JSONLD_DOCUMENT_INVALID` mean the payload itself is invalid; the message carries the detail to fix, such as the missing property or the undefined term. `SCHEMA_FETCH_FAILED` and `JSONLD_CONTEXT_FETCH_FAILED` mean a remote schema or `@context` document could not be fetched or used. The schema message names the schema URL; the context message carries the HTTP status or timeout where one applies, and collapses to a general message when the URL itself was rejected. A document failure is fixed by correcting the payload; a fetch failure usually reflects an upstream or network condition rather than a problem with the credential.
 
 #### Stage 3.5: CVC Compliance Validation (Advisory)
 

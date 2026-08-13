@@ -9,9 +9,18 @@ import { z } from 'zod';
 import { validatePublicUrl } from '@uncefact/untp-ri-services/server';
 
 export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
+  /**
+   * Optional stable identifier for the failure class, returned in the 400
+   * body as `code` so API clients can react programmatically where the
+   * message alone is not enough (e.g. distinguishing an invalid credential
+   * document from a remote context that could not be fetched).
+   */
+  readonly code?: string;
+
+  constructor(message: string, options?: { code?: string; cause?: unknown }) {
+    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
     this.name = 'ValidationError';
+    if (options?.code !== undefined) this.code = options.code;
   }
 }
 
