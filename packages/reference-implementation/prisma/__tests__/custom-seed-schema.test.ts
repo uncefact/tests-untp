@@ -1,4 +1,4 @@
-import { customSeedSchema } from '../custom-seed-schema';
+import { customSeedSchema, extractSectionPresence } from '../custom-seed-schema';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -684,5 +684,42 @@ describe('customSeedSchema — exported types', () => {
     import('../custom-seed-schema').then((mod) => {
       expect(mod.customSeedSchema).toBeDefined();
     });
+  });
+});
+
+describe('extractSectionPresence', () => {
+  it('distinguishes absent keys from explicit empty arrays', () => {
+    const presence = extractSectionPresence({
+      registrars: [],
+      conformitySchemes: [{ url: 'https://x', version: '0.7.0' }],
+    });
+    expect(presence.registrars).toBe(true);
+    expect(presence.conformitySchemes).toBe(true);
+    expect(presence.dataModels).toBe(false);
+    expect(presence.renderTemplates).toBe(false);
+  });
+
+  it('treats a key set to null as present (YAML `registrars:` with no entries)', () => {
+    const presence = extractSectionPresence({ registrars: null });
+    expect(presence.registrars).toBe(true);
+  });
+
+  it('records nested identifierSchemes and qualifiers presence per parent id', () => {
+    const presence = extractSectionPresence({
+      registrars: [
+        { id: 'reg-with', identifierSchemes: [{ id: 'scheme-with', qualifiers: [] }, { id: 'scheme-without' }] },
+        { id: 'reg-without' },
+      ],
+    });
+    expect(presence.identifierSchemesByRegistrar.get('reg-with')).toBe(true);
+    expect(presence.identifierSchemesByRegistrar.get('reg-without')).toBe(false);
+    expect(presence.qualifiersByScheme.get('scheme-with')).toBe(true);
+    expect(presence.qualifiersByScheme.get('scheme-without')).toBe(false);
+  });
+
+  it('returns all-absent for a non-object document', () => {
+    const presence = extractSectionPresence(null);
+    expect(presence.registrars).toBe(false);
+    expect(presence.conformitySchemes).toBe(false);
   });
 });

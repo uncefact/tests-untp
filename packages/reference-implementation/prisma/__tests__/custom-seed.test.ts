@@ -36,6 +36,9 @@ const mockExit = jest.spyOn(process, 'exit').mockImplementation((() => {
 import fs from 'fs';
 import { parse as parseYaml } from 'yaml';
 import { runCustomSeed } from '../custom-seed';
+import { ingestConformityScheme } from '../../src/lib/cvc/index.js';
+
+const ingestMockFn = ingestConformityScheme as jest.Mock;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,18 +69,46 @@ function createMockLogger() {
   } as unknown as CustomSeedDependencies['logger'];
 }
 
+function createMockTx() {
+  return {
+    registrar: {
+      upsert: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    identifierScheme: {
+      upsert: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    schemeQualifier: {
+      upsert: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    dataModel: {
+      upsert: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    renderTemplate: {
+      upsert: jest.fn().mockResolvedValue({}),
+      findMany: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    identifier: { groupBy: jest.fn().mockResolvedValue([]) },
+    conformityScheme: { count: jest.fn().mockResolvedValue(0) },
+  };
+}
+
 function createMockPrisma() {
   const upsertFn = jest.fn().mockResolvedValue({});
   const findManyFn = jest.fn().mockResolvedValue([]);
+  const lastTx: { current: ReturnType<typeof createMockTx> | null } = { current: null };
   const transactionFn = jest.fn().mockImplementation(async (fn: (tx: Record<string, unknown>) => Promise<unknown>) => {
-    const tx = {
-      registrar: { upsert: jest.fn().mockResolvedValue({}) },
-      identifierScheme: { upsert: jest.fn().mockResolvedValue({}) },
-      schemeQualifier: { upsert: jest.fn().mockResolvedValue({}) },
-      dataModel: { upsert: jest.fn().mockResolvedValue({}) },
-      renderTemplate: { upsert: jest.fn().mockResolvedValue({}) },
-    };
-    return fn(tx);
+    const tx = createMockTx();
+    lastTx.current = tx;
+    return fn(tx as unknown as Record<string, unknown>);
   });
 
   return {
@@ -86,9 +117,14 @@ function createMockPrisma() {
     identifierScheme: { findMany: findManyFn, upsert: upsertFn },
     schemeQualifier: { findMany: findManyFn, upsert: upsertFn },
     renderTemplate: { findMany: findManyFn, upsert: upsertFn },
-    conformityScheme: { findUnique: jest.fn().mockResolvedValue(null) },
+    conformityScheme: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    conformityCriterion: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
     $transaction: transactionFn,
-  } as unknown as CustomSeedDependencies['prisma'];
+    __lastTx: lastTx,
+  } as unknown as CustomSeedDependencies['prisma'] & { __lastTx: { current: ReturnType<typeof createMockTx> | null } };
 }
 
 function createDeps(overrides?: Partial<CustomSeedDependencies>): CustomSeedDependencies {
@@ -129,8 +165,22 @@ describe('runCustomSeed', () => {
     });
   });
 
-  describe('when manifest is empty (zero entities)', () => {
-    it('skips with info log and returns', async () => {
+  describe('when manifest is empty', () => {
+    it('skips with info log when no section keys are present at all', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue('');
+      (parseYaml as jest.Mock).mockReturnValue({});
+
+      const deps = createDeps();
+
+      await runCustomSeed(deps);
+
+      expect(deps.logger.info).toHaveBeenCalledWith(expect.stringContaining('empty'));
+      expect(deps.prisma.$transaction).not.toHaveBeenCalled();
+      expect(mockExit).not.toHaveBeenCalled();
+    });
+
+    it('proceeds to the removal phase when sections are present but explicitly empty', async () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       (fs.readFileSync as jest.Mock).mockReturnValue('');
       (parseYaml as jest.Mock).mockReturnValue({
@@ -143,7 +193,8 @@ describe('runCustomSeed', () => {
 
       await runCustomSeed(deps);
 
-      expect(deps.logger.info).toHaveBeenCalledWith(expect.stringContaining('empty'));
+      // Present-but-empty keys are a remove-all instruction, not an empty file.
+      expect(deps.prisma.$transaction).toHaveBeenCalled();
       expect(mockExit).not.toHaveBeenCalled();
     });
   });
@@ -222,7 +273,8 @@ describe('runCustomSeed', () => {
       // and making file exist within mount dir.
       const mockPrisma = createMockPrisma();
       (mockPrisma.dataModel.findMany as jest.Mock).mockImplementation((query: Record<string, unknown>) => {
-        if ((query?.where as Record<string, unknown>)?.isExtension === false) {
+        const where = query?.where as Record<string, unknown> | undefined;
+        if (where?.isExtension === false || where?.source !== undefined) {
           return Promise.resolve([]);
         }
         return Promise.resolve([{ id: IDS.dataModel1 }]);
@@ -262,7 +314,7 @@ describe('runCustomSeed', () => {
     it('ingests a URL-based conformity scheme entry when not already present', async () => {
       setupManifest([{ url: 'https://example.com/scheme', version: '0.7.0' }]);
       const deps = createDeps();
-      const ingestMock = require('../../src/lib/cvc/index.js').ingestConformityScheme as jest.Mock;
+      const ingestMock = ingestMockFn;
       ingestMock.mockResolvedValue({ kind: 'success', schemeId: 'row-1' });
       (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
         schemaUrl: 'https://example.com/schema.json',
@@ -287,7 +339,7 @@ describe('runCustomSeed', () => {
     it('skips an entry whose (sourceUrl, tenantId) row already exists (insert-only-if-absent)', async () => {
       setupManifest([{ url: 'https://example.com/scheme', version: '0.7.0' }]);
       const deps = createDeps();
-      const ingestMock = require('../../src/lib/cvc/index.js').ingestConformityScheme as jest.Mock;
+      const ingestMock = ingestMockFn;
       (deps.prisma.conformityScheme.findUnique as jest.Mock).mockResolvedValue({ id: 'existing-row' });
 
       await runCustomSeed(deps);
@@ -302,7 +354,7 @@ describe('runCustomSeed', () => {
     it('skips an entry whose version has no ConformityScheme DataModel row', async () => {
       setupManifest([{ url: 'https://example.com/scheme', version: '9.9.9' }]);
       const deps = createDeps();
-      const ingestMock = require('../../src/lib/cvc/index.js').ingestConformityScheme as jest.Mock;
+      const ingestMock = ingestMockFn;
       (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue(null);
 
       await runCustomSeed(deps);
@@ -314,10 +366,130 @@ describe('runCustomSeed', () => {
       );
     });
 
+    it('evicts unseen seeded schemes before ingesting, keyed on the manifest keep-set', async () => {
+      setupManifest([{ url: 'https://example.com/scheme', version: '0.7.0' }]);
+      const deps = createDeps();
+      const ingestMock = ingestMockFn;
+      ingestMock.mockResolvedValue({ kind: 'success', schemeId: 'row-1' });
+      (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
+        schemaUrl: 'https://example.com/schema.json',
+      });
+      const deleteManyMock = deps.prisma.conformityScheme.deleteMany as jest.Mock;
+      const callOrder: string[] = [];
+      deleteManyMock.mockImplementation(async () => {
+        callOrder.push('evict');
+        return { count: 2 };
+      });
+      ingestMock.mockImplementation(async () => {
+        callOrder.push('ingest');
+        return { kind: 'success', schemeId: 'row-1' };
+      });
+
+      await runCustomSeed(deps);
+
+      expect(deleteManyMock).toHaveBeenCalledWith({
+        where: {
+          tenantId: SYSTEM_TENANT_ID,
+          source: 'SYSTEM_SEED',
+          sourceUrl: { notIn: ['https://example.com/scheme'] },
+        },
+      });
+      expect(callOrder).toEqual(['evict', 'ingest']);
+    });
+
+    it('sweeps orphaned criteria after the conformity pass', async () => {
+      setupManifest([{ url: 'https://example.com/scheme', version: '0.7.0' }]);
+      const deps = createDeps();
+      const ingestMock = ingestMockFn;
+      ingestMock.mockResolvedValue({ kind: 'success', schemeId: 'row-1' });
+      (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
+        schemaUrl: 'https://example.com/schema.json',
+      });
+
+      await runCustomSeed(deps);
+
+      expect(deps.prisma.conformityCriterion.deleteMany).toHaveBeenCalledWith({
+        where: { tenantId: SYSTEM_TENANT_ID, profiles: { none: {} } },
+      });
+    });
+
+    it('suppresses eviction and the sweep when a file entry cannot be resolved', async () => {
+      setupManifest([
+        { url: 'https://example.com/scheme', version: '0.7.0' },
+        { file: 'schemes/missing.json', version: '0.7.0' },
+      ]);
+      // Manifest and template checks exist, but the scheme file does not.
+      (fs.existsSync as jest.Mock).mockImplementation((p: string) => !String(p).endsWith('missing.json'));
+      const deps = createDeps();
+      const ingestMock = ingestMockFn;
+      ingestMock.mockResolvedValue({ kind: 'success', schemeId: 'row-1' });
+      (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
+        schemaUrl: 'https://example.com/schema.json',
+      });
+
+      await runCustomSeed(deps);
+
+      expect(deps.prisma.conformityScheme.deleteMany).not.toHaveBeenCalled();
+      expect(deps.prisma.conformityCriterion.deleteMany).not.toHaveBeenCalled();
+      // The resolvable URL entry still ingests.
+      expect(ingestMock).toHaveBeenCalledWith(expect.objectContaining({ sourceUrl: 'https://example.com/scheme' }));
+      expect(deps.logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ failedEntries: 1 }),
+        expect.stringContaining('skipping seeded-scheme eviction'),
+      );
+    });
+
+    it('rejects the whole run when the removal phase blocks inside the transaction', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue('');
+      (parseYaml as jest.Mock).mockReturnValue({
+        registrars: [],
+        conformitySchemes: [{ url: 'https://example.com/scheme', version: '0.7.0' }],
+      });
+      const deps = createDeps();
+      const prismaWithTx = deps.prisma as unknown as { $transaction: jest.Mock };
+      prismaWithTx.$transaction.mockImplementation(
+        async (fn: (tx: ReturnType<typeof createMockTx>) => Promise<unknown>) => {
+          const tx = createMockTx();
+          // A removed registrar with a scheme the manifest does not own → ReconcileBlockedError.
+          tx.registrar.findMany.mockResolvedValue([{ id: IDS.registrar1, name: 'Gone' }]);
+          tx.identifierScheme.findMany.mockResolvedValue([
+            {
+              id: IDS.scheme1,
+              name: 'Tenant scheme',
+              source: 'USER',
+              tenantId: 'ctenantother0000000000001',
+              registrarId: IDS.registrar1,
+            },
+          ]);
+          return fn(tx);
+        },
+      );
+      const ingestMock = ingestMockFn;
+
+      await expect(runCustomSeed(deps)).rejects.toThrow('would affect data the manifest does not own');
+      // Nothing after the failed transaction runs.
+      expect(deps.prisma.conformityScheme.deleteMany).not.toHaveBeenCalled();
+      expect(ingestMock).not.toHaveBeenCalled();
+    });
+
+    it('does not evict when the manifest has no conformitySchemes key', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue('');
+      (parseYaml as jest.Mock).mockReturnValue({
+        registrars: [{ id: IDS.registrar1, name: 'Test', namespace: 'test' }],
+      });
+      const deps = createDeps();
+
+      await runCustomSeed(deps);
+
+      expect(deps.prisma.conformityScheme.deleteMany).not.toHaveBeenCalled();
+    });
+
     it('ingests a file-based entry by reading the JSON-LD and extracting `id` as sourceUrl', async () => {
       setupManifest([{ file: 'schemes/example.json', version: '0.7.0' }]);
       const deps = createDeps();
-      const ingestMock = require('../../src/lib/cvc/index.js').ingestConformityScheme as jest.Mock;
+      const ingestMock = ingestMockFn;
       ingestMock.mockResolvedValue({ kind: 'success', schemeId: 'row-1' });
       (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
         schemaUrl: 'https://example.com/schema.json',

@@ -17,7 +17,7 @@ After the core seed completes (see [Startup](./startup.md)), the seed script loo
 /app/seed/custom/seed.yaml
 ```
 
-If the file exists, it is parsed, validated, and its contents are upserted into the database. If the file does not exist, the custom seed step is silently skipped.
+If the file exists, it is parsed, validated, and reconciled into the database: the manifest is the source of truth for the rows it manages, so entries are inserted when new, updated when changed, and the corresponding rows are deleted when entries are removed from the manifest. If the file does not exist, the custom seed step is silently skipped and nothing is deleted. See [Reconcile semantics](#reconcile-semantics) for exactly what the manifest owns and how removal behaves.
 
 To supply your own seed data, mount a directory containing your `seed.yaml` (and any referenced files) into the container:
 
@@ -63,7 +63,7 @@ Each ID must be unique across the entire manifest. If an ID matches a record alr
 
 ## Manifest Structure
 
-The manifest is a YAML file with four top-level arrays. All are optional — omit any section you do not need.
+The manifest is a YAML file with four top-level arrays. All are optional, and whether a key is present matters: an omitted key leaves that entity type unmanaged for the run, while a key that is present (even as an explicit empty array) makes the manifest authoritative for that type, including deletions. See [Reconcile semantics](#reconcile-semantics).
 
 ```yaml
 registrars: []         # Identifier registrars with nested schemes and qualifiers
@@ -231,7 +231,9 @@ conformitySchemes:
 
 Exactly one of `url` or `file` must be set per entry. The scheme's display name and structure (profiles, criteria) are derived from the document itself; no operator-supplied name is required.
 
-The seed loader is **insert-only-if-absent**: if a row already exists at `(sourceUrl, systemTenantId)` (from a prior seed run, UNTP discovery, or operator action), the entry is skipped. This preserves any post-seed updates rather than overwriting them.
+For scheme **content**, the loader is insert-only-if-absent: if a row already exists at `(sourceUrl, systemTenantId)` (from a prior seed run, UNTP discovery, or operator action), the entry's content is not re-fetched or overwritten, preserving any post-seed updates.
+
+For scheme **membership**, the manifest reconciles like the other sections when the `conformitySchemes` key is present: seeded (`SYSTEM_SEED`) rows whose source URL no longer appears in the manifest are deleted, together with their profiles, and criteria that no remaining profile references are cleaned up afterwards. UNTP-discovered and tenant-imported schemes are never touched. If any `file` entry cannot be read or parsed, deletion is skipped for that run (with an error logged), so a transiently unavailable file can never cause a previously ingested scheme to be removed.
 
 For file entries, the loader reads the top-level `id` (or `@id`) from the JSON-LD document to determine the row's `sourceUrl`. The file must be a valid JSON-LD scheme document.
 
@@ -313,6 +315,8 @@ After schema validation passes, the system checks cross-references and constrain
 - **Path traversal protection** — template file paths cannot reference files outside the mount directory (e.g. `../../etc/passwd` is rejected)
 - **Default template uniqueness** — only one render template per data model may be marked as `isDefault: true`
 - **Tenant ID collision protection** — IDs that already exist in a non-system tenant cannot be upserted
+- **Core seed protection** — IDs that belong to rows created by the core seed cannot be claimed by the manifest
+- **Cascade protection** — a render template kept in the manifest cannot reference a manifest-managed data model that the same run would delete
 
 If any validation error is detected, the seed process exits with code 1 and logs the specific errors. No data is written.
 
@@ -323,14 +327,54 @@ Conformity scheme entries are validated structurally (URL XOR file, required `ve
 Once validation passes, the custom seed processes entities in the following order:
 
 1. **Upload render template files** to the storage service
-2. **Upsert all entities** (registrars, schemes, qualifiers, data models, render templates) in a single atomic database transaction
-3. **Ingest conformity schemes** (outside the main transaction). For each entry, the loader either fetches the URL or reads the file, then runs the scheme through the CVC pipeline (fetch → JSON parse → schema validate → JSON-LD expand → parse → persist). Per-entry failures are logged and counted; the loop continues to the next entry.
+2. **Upsert all entities** (registrars, schemes, qualifiers, data models, render templates) and then **delete manifest-managed rows whose entries were removed**, in a single atomic database transaction
+3. **Reconcile and ingest conformity schemes** (outside the main transaction). The loader first resolves every entry's identity, then deletes seeded schemes no longer in the manifest, then for each remaining entry either fetches the URL or reads the file and runs the scheme through the CVC pipeline (fetch → JSON parse → schema validate → JSON-LD expand → parse → persist), and finally removes criteria that no profile references any more. Per-entry failures are logged and counted; the loop continues to the next entry.
+
+## Reconcile Semantics
+
+Every row the custom seed writes is recorded as manifest-managed, and the removal phase only ever deletes rows carrying that record. Rows created by the core seed can never be claimed or touched by the manifest (a matching id fails validation).
+
+A system-tenant row that is not core-seeded and not yet manifest-managed (one created through the API or UI, or by the custom seed before this record existed) IS claimed when a manifest entry uses its `id`: the entry updates the row and records it as manifest-managed from then on, exactly as if the manifest had created it. Each adoption is named in a warning in the seed log, because from that point the row is deletable by future reconciles. Nothing is deleted during the adopting run itself, since deletion only applies to rows already recorded as manifest-managed. If you did not intend to take over an existing row, choose a fresh id for the manifest entry.
+
+For each of the four sections (and the nested `identifierSchemes` and `qualifiers` lists), the behaviour depends on whether the key is present in the YAML:
+
+| Manifest state | Behaviour |
+|----------------|-----------|
+| Key absent | That entity type is left untouched — no inserts, updates, or deletions |
+| Key present with entries | Entries are inserted or updated; manifest-managed rows not listed are **deleted** |
+| Key present, explicitly empty (`registrars: []` or `registrars:`) | **All** manifest-managed rows of that type are deleted |
+
+:::danger
+An explicitly empty section is a deletion instruction, unlike an omitted one. Removing a section's entries while keeping the key deletes every row that section previously seeded. If you want to stop managing a type without deleting anything, remove the key entirely. A manifest with no section keys at all (an empty file or `{}`) does nothing.
+:::
+
+Moving a nested entry between parents (an identifier scheme to a different registrar, a qualifier to a different scheme) is supported: the child is re-attached to its new parent.
+
+### When removal is refused
+
+A deletion that would take data the manifest does not own down with it fails the whole seed (exit code 1, nothing written) with an error naming the blocking rows:
+
+- a registrar whose identifier schemes include any not created by this manifest (for example a tenant's own scheme attached to a seeded registrar)
+- an identifier scheme whose qualifiers include any not created by this manifest
+- an identifier scheme with registered identifiers (identifier values created through the API that link registrations depend on)
+- a data model with render templates or extensions not created by this manifest
+- the `ConformityScheme` data model entry, while seeded conformity schemes of its version are still in the database. That entry supplies the JSON Schema the ingestion pipeline validates scheme documents against, so deleting it would leave those schemes unable to be re-ingested or refreshed. Remove the schemes first (drop them from `conformitySchemes`), then the data model entry.
+
+To proceed, keep the manifest entry, or migrate or delete the blocking data first.
+
+### Render template storage objects
+
+Deleting a render template removes its database row only. The uploaded template file stays in the storage service, because credentials already issued against it may still render from it. Cleaning up storage objects is a manual operator action, taken only once no issued credentials still reference the template.
+
+### Identity Resolver (IDR) registrations
+
+The reconcile's source-of-truth boundary is the Reference Implementation database. Identifier schemes registered with an external Identity Resolver during seeding are not updated or deregistered when the manifest changes or removes them; keeping the IDR in step remains a manual operator action.
 
 ## Important Notes
 
 - **Runs after core seed** — custom seed depends on core data models and service instances already existing. It runs as the final step of the seed process described in [Startup](./startup.md).
-- **Idempotent** — all operations use upsert. Re-running the seed with the same manifest is safe and will update existing records.
-- **Atomic** — registrars, schemes, qualifiers, data models, and render templates are written in a single database transaction. If any write fails, the entire batch is rolled back.
+- **Idempotent** — re-running the seed with an unchanged manifest performs no deletions and converges to the same state.
+- **Atomic (database)** — registrar, scheme, qualifier, data model, and render template writes and deletions happen in a single database transaction. If any write fails or a removal is refused, the entire batch is rolled back. Render template files are uploaded to the storage service before that transaction, so a rolled-back run can leave uploaded template objects in storage with no database row; they are harmless and can be cleaned up manually.
 - **System tenant ownership** — all custom seed entities are owned by the system tenant.
 - **Storage service required for templates** — if your manifest includes render templates, the storage service must be configured and reachable at seed time.
 - **Network access required for URL-sourced conformity schemes** — any `conformitySchemes` entry with a `url` field must be reachable at seed time. File-sourced entries are read directly from the mount directory and do not need network access.

@@ -1,6 +1,6 @@
 import path from 'path';
 import { validateManifestReferences, ValidationContext } from '../custom-seed-validate';
-import { CustomSeedManifest } from '../custom-seed-schema';
+import { CustomSeedManifest, extractSectionPresence } from '../custom-seed-schema';
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
@@ -27,6 +27,8 @@ function buildCtx(overrides: Partial<ValidationContext> = {}): ValidationContext
     resolvePath: (relativePath) => path.join(MOUNT_DIR, relativePath),
     mountDir: MOUNT_DIR,
     isNonSystemCollision: () => false,
+    customSeedDataModelIds: new Set<string>(),
+    isCoreSeedCollision: () => false,
     ...overrides,
   };
 }
@@ -469,6 +471,63 @@ describe('validateManifestReferences', () => {
       expect(errors.some((e) => e.includes('Duplicate'))).toBe(true);
       expect(errors.some((e) => e.includes('parentConfigId'))).toBe(true);
       expect(errors.some((e) => e.includes('unknown dataModelId'))).toBe(true);
+    });
+  });
+
+  // ── Core-seed collisions and reconcile-safety checks ───────────────────────
+
+  describe('core-seed collisions', () => {
+    it('rejects a manifest id that belongs to a core-seeded row, for every entity type', () => {
+      const manifest: CustomSeedManifest = {
+        ...emptyManifest(),
+        dataModels: [buildDataModel()],
+        renderTemplates: [buildRenderTemplate()],
+      };
+      const ctx = buildCtx({ isCoreSeedCollision: (id) => id === ID_DATA_MODEL || id === ID_RENDER_TEMPLATE });
+
+      const errors = validateManifestReferences(manifest, ctx);
+
+      expect(errors).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining(`Data model ID "${ID_DATA_MODEL}" belongs to a core-seeded row`),
+          expect.stringContaining(`Render template ID "${ID_RENDER_TEMPLATE}" belongs to a core-seeded row`),
+        ]),
+      );
+    });
+  });
+
+  describe('retained template under a removed data model', () => {
+    it('rejects a template whose manifest-owned data model is absent from a present dataModels section', () => {
+      const raw = {
+        dataModels: [],
+        renderTemplates: [buildRenderTemplate(ID_RENDER_TEMPLATE, ID_DB_DATA_MODEL)],
+      };
+      const presence = extractSectionPresence(raw);
+      const manifest: CustomSeedManifest = {
+        ...emptyManifest(),
+        renderTemplates: [buildRenderTemplate(ID_RENDER_TEMPLATE, ID_DB_DATA_MODEL)],
+      };
+      const ctx = buildCtx({ customSeedDataModelIds: new Set([ID_DB_DATA_MODEL]) });
+
+      const errors = validateManifestReferences(manifest, ctx, presence);
+
+      expect(errors).toEqual(expect.arrayContaining([expect.stringContaining('would cascade-delete this template')]));
+    });
+
+    it('accepts the same template when the dataModels key is absent (data models unmanaged)', () => {
+      const raw = {
+        renderTemplates: [buildRenderTemplate(ID_RENDER_TEMPLATE, ID_DB_DATA_MODEL)],
+      };
+      const presence = extractSectionPresence(raw);
+      const manifest: CustomSeedManifest = {
+        ...emptyManifest(),
+        renderTemplates: [buildRenderTemplate(ID_RENDER_TEMPLATE, ID_DB_DATA_MODEL)],
+      };
+      const ctx = buildCtx({ customSeedDataModelIds: new Set([ID_DB_DATA_MODEL]) });
+
+      const errors = validateManifestReferences(manifest, ctx, presence);
+
+      expect(errors).toEqual([]);
     });
   });
 });
