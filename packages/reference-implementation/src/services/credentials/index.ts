@@ -1,2 +1,2 @@
-export { verifyCredential } from './verify-credential';
-export type { VerifyCredentialParams, VerifyCredentialResult } from './verify-credential';
+export { verifyCredential, VerifyCredentialError } from './verify-credential';
+export type { VerifyCredentialParams, VerifyCredentialResult, VerifyErrorCode } from './verify-credential';

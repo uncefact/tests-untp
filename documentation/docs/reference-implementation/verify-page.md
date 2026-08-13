@@ -9,29 +9,35 @@ The verify page (`/verify`) is a publicly accessible web page for verifying UNTP
 
 ## How It Works
 
-When a user navigates to the verify page via a [verification link](#verify-link), the page:
+When a user navigates to the verify page via a [verification link](#verify-link), the page sends the link's parameters to the reference implementation's verification API, which:
 
 1. Fetches the credential from the URL provided in the verification link
-2. Decrypts the credential, if it is encrypted (the decryption key is included in the verification link)
-3. Validates the credential's integrity against the hash, if one is included in the URL
-4. Sends the credential to the verifiable credential service for verification — this checks that the credential was issued by the entity claiming to have issued it, that it has not been tampered with, that it is temporally valid (issued in the past and not expired), and that it has not been revoked
-5. Renders the verified credential for the user
+2. Decrypts the credential, if it is encrypted, using the decryption key from the link or, for a keyless link, the key the user enters at the [prompt](#decryption)
+3. Validates the credential's integrity against the digest, if one is included in the URL
+4. Sends the credential to the verifiable credential service for verification. This checks that the credential was issued by the entity claiming to have issued it, that it has not been tampered with, that it is temporally valid (issued in the past and not expired), and that it has not been revoked
+5. Returns the result, which the page renders for the user
+
+Fetching and decryption happen on the server, so an entered decryption key travels to the backend in the request body. Production deployments must serve the reference implementation over HTTPS so the key is protected in transit.
 
 ```mermaid
 sequenceDiagram
     participant U as User
     participant V as Verify Page
+    participant API as Verification API
     participant CS as Credential Store
     participant VS as Verifiable Credential Service
     U->>V: Open verification link
-    V->>CS: Fetch credential
-    CS-->>V: Return credential
-    V->>V: Decrypt (if encrypted)
-    V->>V: Validate hash (if provided)
-    V->>VS: Verify credential
-    VS-->>V: Return verification result
+    V->>API: Verify request (uri, digest, key if held)
+    API->>CS: Fetch credential
+    CS-->>API: Return credential
+    API->>API: Decrypt (if encrypted)
+    API->>API: Validate digest (if provided)
+    API->>VS: Verify credential
+    VS-->>API: Return verification result
+    API-->>V: Return result
     V->>V: Render credential
     V->>U: Display result
+    Note over U,V: If the credential is encrypted and the link has no key,<br/>the page prompts the user and repeats the request with the entered key
 ```
 
 The verified credential is displayed with its type, issuer, and validity start date. The `Valid from` date is rendered as the credential's UTC calendar date in ISO 8601 (`YYYY-MM-DD`); the row is omitted when the credential carries no parseable `validFrom`. The credential itself contains a `renderMethod` property that specifies the template used to render it for human review. Users can switch between the rendered template and the raw JSON data, and download the credential.
@@ -52,7 +58,7 @@ The preferred format passes parameters directly as query parameters:
 |-----------|----------|-------------|
 | `uri` | Yes | The URL of the stored credential |
 | `digestMultibase` | No | A multibase-encoded digest of the credential for integrity validation |
-| `hash` | No | A legacy SHA-256 hex hash, accepted for backwards compatibility with links created before the digest migration. Prefer `digestMultibase`. |
+| `hash` | No | A legacy SHA-256 hex hash, accepted for backwards compatibility with links created before [the digest migration](../migration-guides/v0.7.0#dependent-service-updates). Prefer `digestMultibase`. |
 | `decryptionKey` | No | The decryption key for encrypted credentials |
 
 **Example:**
@@ -82,4 +88,12 @@ A verification link may include a digest of the credential. When present, the ve
 
 ## Decryption
 
-If the credential is encrypted and the decryption key is included in the verification link, the verify page uses that key to decrypt the credential before proceeding with verification. This allows a private credential to be shared directly via a single link without requiring the recipient to manage keys separately. A link published to the Identity Resolver omits the key, which is shared out of band instead (see [IDR publishing](./api/credentials#stage-8-idr-publishing-optional)).
+If the credential is encrypted and the decryption key is included in the verification link, the verify page uses that key to decrypt the credential before proceeding with verification. This allows a private credential to be shared directly via a single link without requiring the recipient to manage keys separately.
+
+A link published to the Identity Resolver omits the key, which is shared out of band instead (see [IDR publishing](./api/credentials#stage-8-idr-publishing-optional)). When such a keyless link opens an encrypted credential, the verify page prompts for the decryption key. Enter the key received from the issuer and submit; the credential is decrypted and verified as if the key had been in the link. A mistyped key can be corrected and resubmitted.
+
+The entered key is used for the current attempt only and is never persisted: it is not written into the URL, not stored in the browser (no local storage, session storage, or cookies), and not retained or logged by the backend. Refreshing the page discards it.
+
+If decryption fails, the message distinguishes what can be fixed. A key that does not match the credential can be re-entered, although a credential whose stored ciphertext has been tampered with produces the same failure, since AES-GCM cannot tell the two apart. If the stored envelope itself is corrupted, the page says so rather than asking for the key again.
+
+The issuing tenant can retrieve a credential's decryption key from `GET /api/v1/credentials/{id}` (see [Credentials API](./api/credentials)).

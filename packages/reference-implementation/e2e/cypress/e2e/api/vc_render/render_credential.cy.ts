@@ -115,10 +115,10 @@ describe('Verify page credential rendering', () => {
 
       cy.visit('/verify?uri=https://example.com/test-credential');
       cy.wait('@verifyCredential');
-      verifyErrorDisplayed('DIGEST_MISMATCH');
+      verifyErrorDisplayed('Credential digest does not match the expected digest');
     });
 
-    it('should display error when decryption key is missing', () => {
+    it('should show the decryption key prompt when the key is missing', () => {
       cy.intercept('POST', '/api/v1/credentials/verify', {
         statusCode: 422,
         body: {
@@ -129,21 +129,22 @@ describe('Verify page credential rendering', () => {
 
       cy.visit('/verify?uri=https://example.com/test-credential');
       cy.wait('@verifyCredential');
-      verifyErrorDisplayed('DECRYPTION_REQUIRED');
+      cy.contains('Decryption key required').should('be.visible');
+      cy.get('#decryption-key').should('be.visible');
     });
 
     it('should display error when decryption fails', () => {
       cy.intercept('POST', '/api/v1/credentials/verify', {
         statusCode: 422,
         body: {
-          error: 'Failed to decrypt credential',
+          error: 'The decryption key does not match this credential. Check the key and try again.',
           code: 'DECRYPTION_FAILED',
         },
       }).as('verifyCredential');
 
       cy.visit('/verify?uri=https://example.com/test-credential');
       cy.wait('@verifyCredential');
-      verifyErrorDisplayed('DECRYPTION_FAILED');
+      verifyErrorDisplayed('The decryption key does not match this credential');
     });
 
     it('should display error when credential type is unsupported', () => {
@@ -157,7 +158,7 @@ describe('Verify page credential rendering', () => {
 
       cy.visit('/verify?uri=https://example.com/test-credential');
       cy.wait('@verifyCredential');
-      verifyErrorDisplayed('UNSUPPORTED_CREDENTIAL_TYPE');
+      verifyErrorDisplayed('Only EnvelopedVerifiableCredential is supported');
     });
 
     it('should display error when upstream service fails', () => {
@@ -171,7 +172,7 @@ describe('Verify page credential rendering', () => {
 
       cy.visit('/verify?uri=https://example.com/test-credential');
       cy.wait('@verifyCredential');
-      verifyErrorDisplayed('UPSTREAM_ERROR');
+      verifyErrorDisplayed('Failed to fetch credential: network error');
     });
 
     it('should display error when VC service fails', () => {
@@ -185,7 +186,7 @@ describe('Verify page credential rendering', () => {
 
       cy.visit('/verify?uri=https://example.com/test-credential');
       cy.wait('@verifyCredential');
-      verifyErrorDisplayed('VC_SERVICE_ERROR');
+      verifyErrorDisplayed('Credential verification service failed');
     });
   });
 

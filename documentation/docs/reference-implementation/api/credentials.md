@@ -308,15 +308,15 @@ sequenceDiagram
     participant Storage as Storage URI
     participant VC as System VC Service
 
-    Client->>RI: POST /api/v1/credentials/verify { uri, hash?, decryptionKey? }
-    RI->>RI: Validate input + SSRF check
-    RI->>Storage: Fetch credential (10s timeout)
+    Client->>RI: POST /api/v1/credentials/verify { uri, digestMultibase?, hash?, decryptionKey? }
+    RI->>RI: Validate input
+    RI->>Storage: Guarded fetch (SSRF check per redirect hop, 10s timeout)
     Storage-->>RI: Credential (possibly encrypted)
     opt encrypted
-        RI->>RI: Decrypt with decryptionKey
+        RI->>RI: Check envelope structure, decrypt with decryptionKey
     end
-    opt hash provided
-        RI->>RI: Compute hash and compare
+    opt digest provided
+        RI->>RI: Compute digest and compare
     end
     RI->>RI: Validate credential type (EnvelopedVerifiableCredential)
     RI->>VC: Verify credential signature
@@ -330,10 +330,27 @@ sequenceDiagram
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `uri` | string (URL) | Yes | Storage URI where the credential is stored. Must be HTTP(S). |
-| `hash` | string | No | Expected SHA-256 hash (64-character hex string). If provided, the fetched credential's hash is verified against it. |
+| `digestMultibase` | string | No | Expected multibase-encoded digest of the credential content. If provided, the fetched credential's digest is verified against it. |
+| `hash` | string | No | Expected SHA-256 hash (64-character hex string), accepted for links created before [the digest migration](../../migration-guides/v0.7.0#dependent-service-updates). Prefer `digestMultibase`. |
 | `decryptionKey` | string | No | AES-GCM decryption key (64-character hex string). Required for encrypted credentials. |
 
-The endpoint always returns HTTP 200 for a completed verification attempt, even if the credential fails verification. Check the `verified` field for the outcome. Processing errors (decryption failure, hash mismatch, unsupported type) that prevent a verification attempt return non-200 status codes with a `code` field.
+The endpoint always returns HTTP 200 for a completed verification attempt, even if the credential fails verification. Check the `verified` field for the outcome. Processing errors that prevent a verification attempt return 422 with a `code` field:
+
+| Code | Meaning |
+|------|---------|
+| `INVALID_RESPONSE` | The storage URI did not return valid JSON. |
+| `DECRYPTION_REQUIRED` | The credential is encrypted and no `decryptionKey` was supplied. The [verify page](../verify-page#decryption) prompts for the key in this case. |
+| `ENVELOPE_INVALID` | The stored encrypted envelope is structurally corrupted (wrong IV or auth-tag length). Re-supplying the key will not help. |
+| `DECRYPTION_FAILED` | The decryption key does not match the credential. This is almost always a wrong key, but AES-GCM cannot distinguish a wrong key from ciphertext tampered at valid lengths. |
+| `DECRYPTED_NOT_JSON` | Decryption succeeded but the content is not valid JSON, so the stored credential is corrupted. |
+| `DIGEST_MISMATCH` | The fetched credential does not match the digest in the request. |
+| `UNSUPPORTED_CREDENTIAL_TYPE` | The credential is not an `EnvelopedVerifiableCredential`. |
+
+Upstream failures (storage unreachable, non-2xx, oversized response, VC service failure) return 502 with `UPSTREAM_ERROR` or `VC_SERVICE_ERROR`.
+
+The storage URI is fetched through a guarded resolver that validates the hostname against private and reserved ranges on every redirect hop and pins the connection to the validated address, so neither a redirect nor a DNS change between check and connect can reach a private network.
+
+Decryption happens on the server, so a `decryptionKey` travels in the request body. Production deployments must serve this endpoint over HTTPS so the key is protected in transit.
 
 ### Environment Variables
 

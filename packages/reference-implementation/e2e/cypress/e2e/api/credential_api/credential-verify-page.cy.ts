@@ -225,8 +225,8 @@ describe('Verify Page', { testIsolation: false }, () => {
       // Should not show the "invalid link" message (the link itself is valid)
       cy.contains('Invalid verification link').should('not.exist');
 
-      // The API returns 422 DIGEST_MISMATCH; the page displays the thrown error
-      cy.contains('DIGEST_MISMATCH', { timeout: 30000 }).should('be.visible');
+      // The API returns 422 DIGEST_MISMATCH; the page displays its message
+      cy.contains('digest does not match', { matchCase: false, timeout: 30000 }).should('be.visible');
     });
 
     it('shows error when legacy hex hash does not match', () => {
@@ -234,7 +234,7 @@ describe('Verify Page', { testIsolation: false }, () => {
       cy.visit(buildDirectVerifyUrl({ uri: unencryptedUri, hash: wrongHash }));
 
       cy.contains('Invalid verification link').should('not.exist');
-      cy.contains('DIGEST_MISMATCH', { timeout: 30000 }).should('be.visible');
+      cy.contains('digest does not match', { matchCase: false, timeout: 30000 }).should('be.visible');
     });
 
     it('shows error for unreachable URI', () => {
@@ -245,20 +245,60 @@ describe('Verify Page', { testIsolation: false }, () => {
 
       if (ssrfEnabled) {
         // SSRF validation rejects the URL — page shows the rejection message
-        cy.contains('could not be resolved', { matchCase: false, timeout: 30000 }).should('be.visible');
+        cy.contains('DNS resolution failed', { matchCase: false, timeout: 30000 }).should('be.visible');
       } else {
-        // The API returns 502 UPSTREAM_ERROR; the page displays the thrown error
-        cy.contains('UPSTREAM_ERROR', { timeout: 30000 }).should('be.visible');
+        // The API returns 502 UPSTREAM_ERROR; the page displays its message
+        cy.contains('Failed to fetch credential', { timeout: 30000 }).should('be.visible');
       }
     });
+  });
 
-    it('shows error when encrypted credential has no decryptionKey', () => {
-      cy.visit(buildDirectVerifyUrl({ uri: encryptedUri }));
+  // ── Decryption key prompt ────────────────────────────────────────
+  // A credential published to the Identity Resolver carries a keyless ?q=
+  // link (the key travels out of band), so that link shape is the one the
+  // prompt exists for.
 
-      cy.contains('Invalid verification link').should('not.exist');
+  describe('Decryption key prompt', () => {
+    it('prompts on a keyless ?q= link, then verifies with the entered key without touching the URL', () => {
+      cy.visit(buildLegacyVerifyUrl({ uri: encryptedUri, digestMultibase: encryptedDigest }));
 
-      // The API returns 422 DECRYPTION_REQUIRED; the page displays the thrown error
-      cy.contains('DECRYPTION_REQUIRED', { timeout: 30000 }).should('be.visible');
+      cy.contains('Decryption key required', { timeout: 30000 }).should('be.visible');
+
+      cy.get('#decryption-key').type(encryptedKey);
+      cy.contains('button', 'Decrypt and verify').click();
+
+      cy.contains('JSON', { timeout: 30000 }).should('be.visible');
+      cy.location('search').should((search) => {
+        expect(search).to.not.contain(encryptedKey);
+      });
+    });
+
+    it('prompts on keyless direct params too', () => {
+      cy.visit(buildDirectVerifyUrl({ uri: encryptedUri, digestMultibase: encryptedDigest }));
+      cy.contains('Decryption key required', { timeout: 30000 }).should('be.visible');
+    });
+
+    it('rejects a malformed key inline and allows correction', () => {
+      cy.visit(buildLegacyVerifyUrl({ uri: encryptedUri, digestMultibase: encryptedDigest }));
+      cy.contains('Decryption key required', { timeout: 30000 }).should('be.visible');
+
+      cy.get('#decryption-key').type('not-a-valid-key');
+      cy.contains('button', 'Decrypt and verify').click();
+      cy.contains('64-character hexadecimal').should('be.visible');
+      cy.get('#decryption-key').should('have.value', 'not-a-valid-key');
+    });
+
+    it('keeps the form on a wrong key and verifies after re-entry', () => {
+      cy.visit(buildLegacyVerifyUrl({ uri: encryptedUri, digestMultibase: encryptedDigest }));
+      cy.contains('Decryption key required', { timeout: 30000 }).should('be.visible');
+
+      cy.get('#decryption-key').type('f'.repeat(64));
+      cy.contains('button', 'Decrypt and verify').click();
+      cy.contains('does not match', { timeout: 30000 }).should('be.visible');
+
+      cy.get('#decryption-key').clear().type(encryptedKey);
+      cy.contains('button', 'Decrypt and verify').click();
+      cy.contains('JSON', { timeout: 30000 }).should('be.visible');
     });
   });
 });

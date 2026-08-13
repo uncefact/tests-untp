@@ -25,6 +25,41 @@ type FailedVerificationResult = {
 
 export type VerifyCredentialResult = VerifiedResult | FailedVerificationResult;
 
+/**
+ * Error codes the verification API can return with a 422/502, as documented
+ * on `POST /api/v1/credentials/verify`. `VerifyCredentialError.code` stays a
+ * plain string because the API can grow codes this client has not seen; this
+ * union types the finite set the UI branches on so a typo fails to compile.
+ */
+export type VerifyErrorCode =
+  | 'INVALID_RESPONSE'
+  | 'DECRYPTION_REQUIRED'
+  | 'ENVELOPE_INVALID'
+  | 'DECRYPTION_FAILED'
+  | 'DECRYPTED_NOT_JSON'
+  | 'DIGEST_MISMATCH'
+  | 'UNSUPPORTED_CREDENTIAL_TYPE'
+  | 'UPSTREAM_ERROR'
+  | 'VC_SERVICE_ERROR';
+
+/**
+ * A non-OK response from the verification API, carrying the HTTP status and
+ * the API's error code so callers can branch on specific failures (the verify
+ * page prompts for a key on `DECRYPTION_REQUIRED` and offers re-entry on
+ * `DECRYPTION_FAILED`) instead of parsing the message text.
+ */
+export class VerifyCredentialError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'VerifyCredentialError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export async function verifyCredential(params: VerifyCredentialParams): Promise<VerifyCredentialResult> {
   if (!params.uri) {
     throw new Error('uri is required');
@@ -57,8 +92,8 @@ export async function verifyCredential(params: VerifyCredentialParams): Promise<
     throw new Error(`Verification request failed with status ${response.status}`, { cause: e });
   }
 
-  const errorMessage = body.error as string;
-  const code = body.code as string | undefined;
+  const errorMessage = typeof body.error === 'string' ? body.error : 'Verification failed';
+  const code = typeof body.code === 'string' ? body.code : undefined;
 
-  throw new Error(code ? `${errorMessage} (${code})` : errorMessage);
+  throw new VerifyCredentialError(errorMessage, response.status, code);
 }
