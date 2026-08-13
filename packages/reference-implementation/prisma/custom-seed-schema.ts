@@ -164,7 +164,10 @@ export type CustomSeedConformityScheme = z.infer<typeof customSeedConformitySche
  * Zod schema for the custom seed manifest (`seed.yaml`).
  *
  * All top-level arrays are optional and default to `[]` so that an empty
- * (or minimal) manifest is always valid.
+ * (or minimal) manifest is always valid. That defaulting erases the
+ * absent-vs-explicitly-empty distinction the reconcile depends on, which is
+ * why key presence is captured separately via {@link extractSectionPresence}
+ * before this schema runs.
  */
 export const customSeedSchema = z.object({
   /** Registrars to upsert, each optionally containing identifier schemes and qualifiers. */
@@ -193,3 +196,65 @@ export const customSeedSchema = z.object({
 });
 
 export type CustomSeedManifest = z.infer<typeof customSeedSchema>;
+
+// ── Section presence ──────────────────────────────────────────────────────────
+
+/**
+ * Which keys the raw YAML actually contained, captured before the Zod
+ * transforms above collapse absent, `null`, and `[]` into the same empty
+ * array. Reconcile removal is driven by presence: an absent key leaves that
+ * entity type unmanaged for the boot, while a present key (including an
+ * explicit empty array) makes the manifest authoritative for it.
+ *
+ * Nested presence is per parent entry, keyed by the parent's id: a registrar
+ * entry that omits `identifierSchemes` leaves its schemes unmanaged, and a
+ * scheme entry that omits `qualifiers` leaves its qualifiers unmanaged.
+ */
+export interface ManifestSectionPresence {
+  registrars: boolean;
+  dataModels: boolean;
+  renderTemplates: boolean;
+  conformitySchemes: boolean;
+  /** Registrar id → whether that entry carried an `identifierSchemes` key. */
+  identifierSchemesByRegistrar: ReadonlyMap<string, boolean>;
+  /** Identifier scheme id → whether that entry carried a `qualifiers` key. */
+  qualifiersByScheme: ReadonlyMap<string, boolean>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Reads key presence from the raw parsed YAML. A key set to `null` is treated
+ * as present (and the Zod transform turns it into `[]`, i.e. remove-all),
+ * because YAML renders `registrars:` with no entries as `null` — an operator
+ * who writes the key has stated an intent about that entity type.
+ */
+export function extractSectionPresence(raw: unknown): ManifestSectionPresence {
+  const root = isRecord(raw) ? raw : {};
+  const identifierSchemesByRegistrar = new Map<string, boolean>();
+  const qualifiersByScheme = new Map<string, boolean>();
+
+  if (Array.isArray(root.registrars)) {
+    for (const registrar of root.registrars) {
+      if (!isRecord(registrar) || typeof registrar.id !== 'string') continue;
+      identifierSchemesByRegistrar.set(registrar.id, 'identifierSchemes' in registrar);
+      if (Array.isArray(registrar.identifierSchemes)) {
+        for (const scheme of registrar.identifierSchemes) {
+          if (!isRecord(scheme) || typeof scheme.id !== 'string') continue;
+          qualifiersByScheme.set(scheme.id, 'qualifiers' in scheme);
+        }
+      }
+    }
+  }
+
+  return {
+    registrars: 'registrars' in root,
+    dataModels: 'dataModels' in root,
+    renderTemplates: 'renderTemplates' in root,
+    conformitySchemes: 'conformitySchemes' in root,
+    identifierSchemesByRegistrar,
+    qualifiersByScheme,
+  };
+}

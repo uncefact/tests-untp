@@ -1,5 +1,5 @@
 import path from 'path';
-import { CustomSeedManifest } from './custom-seed-schema.js';
+import { CustomSeedManifest, ManifestSectionPresence } from './custom-seed-schema.js';
 
 // ── Validation context ────────────────────────────────────────────────────────
 
@@ -8,6 +8,8 @@ export interface ValidationContext {
   coreDataModelIds: Set<string>;
   /** IDs of ALL existing data models in the database (core + extensions) */
   allExistingDataModelIds: Set<string>;
+  /** IDs of existing CUSTOM_SEED data models (reconcile removal candidates) */
+  customSeedDataModelIds: Set<string>;
   /** Check if a file exists at the resolved path */
   fileExists: (resolvedPath: string) => boolean;
   /** Resolve a relative path to an absolute path (for traversal detection) */
@@ -16,6 +18,12 @@ export interface ValidationContext {
   mountDir: string;
   /** Check if an ID exists in a non-system tenant (collision) */
   isNonSystemCollision: (id: string) => boolean;
+  /**
+   * Check if an ID exists as a core-seeded (`source = CORE_SEED`) row. The
+   * manifest can never claim, overwrite, or delete a core row; a matching id
+   * is a validation error, not an upsert target.
+   */
+  isCoreSeedCollision: (id: string) => boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -67,7 +75,11 @@ function collectDuplicateIds(manifest: CustomSeedManifest): Set<string> {
  *
  * All errors are collected — validation does NOT stop at the first failure.
  */
-export function validateManifestReferences(manifest: CustomSeedManifest, ctx: ValidationContext): string[] {
+export function validateManifestReferences(
+  manifest: CustomSeedManifest,
+  ctx: ValidationContext,
+  presence?: ManifestSectionPresence,
+): string[] {
   const errors: string[] = [];
 
   // ── 1. Duplicate IDs ───────────────────────────────────────────────────────
@@ -75,6 +87,26 @@ export function validateManifestReferences(manifest: CustomSeedManifest, ctx: Va
   for (const id of duplicates) {
     errors.push(`Duplicate ID detected across manifest entities: "${id}"`);
   }
+
+  // ── 1b. Core-seed collisions ──────────────────────────────────────────────
+  // Applies to every entity type: a manifest id matching a CORE_SEED row would
+  // claim it as CUSTOM_SEED and expose it to reconcile deletion.
+  const checkCoreCollision = (entity: string, id: string) => {
+    if (ctx.isCoreSeedCollision(id)) {
+      errors.push(`${entity} ID "${id}" belongs to a core-seeded row; the custom seed manifest cannot claim core rows`);
+    }
+  };
+  for (const registrar of manifest.registrars) {
+    checkCoreCollision('Registrar', registrar.id);
+    for (const scheme of registrar.identifierSchemes) {
+      checkCoreCollision('Identifier scheme', scheme.id);
+      for (const qualifier of scheme.qualifiers) {
+        checkCoreCollision('Qualifier', qualifier.id);
+      }
+    }
+  }
+  for (const dataModel of manifest.dataModels) checkCoreCollision('Data model', dataModel.id);
+  for (const template of manifest.renderTemplates) checkCoreCollision('Render template', template.id);
 
   // Build a set of data model IDs declared in this manifest for forward-ref checks.
   const manifestDataModelIds = new Set(manifest.dataModels.map((dm) => dm.id));
@@ -133,6 +165,19 @@ export function validateManifestReferences(manifest: CustomSeedManifest, ctx: Va
     // ID collision — exists in a non-system tenant.
     if (ctx.isNonSystemCollision(template.id)) {
       errors.push(`Render template ID "${template.id}" already exists in a non-system tenant and cannot be upserted`);
+    }
+
+    // A retained template must not reference a manifest-owned data model that
+    // this boot's reconcile is about to remove: the FK cascade would delete
+    // the template the manifest asked to keep.
+    if (
+      presence?.dataModels === true &&
+      ctx.customSeedDataModelIds.has(template.dataModelId) &&
+      !manifestDataModelIds.has(template.dataModelId)
+    ) {
+      errors.push(
+        `Render template "${template.id}" references data model "${template.dataModelId}", which is manifest-owned but absent from the manifest's dataModels section — removing the data model would cascade-delete this template. Re-add the data model entry or remove the template too.`,
+      );
     }
   }
 

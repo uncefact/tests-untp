@@ -76,13 +76,9 @@ When `DATA_ENCRYPTION_KEY` is set, the seed validates it against any existing en
 
 ### Customising seed data
 
-The seed script is located at `packages/reference-implementation/prisma/seed.ts` in the [repository](https://github.com/uncefact/tests-untp). Organisations that need to modify what gets seeded — for example, adding custom identifier schemes or registrars — can edit this file directly.
+The seed script is located at `packages/reference-implementation/prisma/seed.ts` in the [repository](https://github.com/uncefact/tests-untp). Organisations that need additional seed data — custom registrars, identifier schemes, data models, render templates, or conformity schemes — supply it via a Docker volume mount, without modifying the source. See [Custom Seed](./custom-seed.md).
 
-Render templates are loaded from `packages/reference-implementation/src/templates/` and uploaded to the storage service during seeding. To customise the default templates, replace the `.hbs` files in this directory before building the Docker image.
-
-:::note
-A mechanism for supplying custom seed data (such as render templates) via Docker volumes — without modifying the source — is planned but not yet implemented.
-:::
+Render templates are loaded from `packages/reference-implementation/src/templates/` and uploaded to the storage service during seeding. To customise the default templates, replace the `.hbs` files in this directory before building the Docker image, or supply additional templates through the custom seed.
 
 ## Step 3: Application Start
 

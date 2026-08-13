@@ -12,6 +12,7 @@ import {
   DidStatus,
   DidType,
   PrismaClient,
+  RecordSource,
   RenderMethodType,
   ServiceType as PrismaServiceType,
   AdapterType as PrismaAdapterType,
@@ -45,6 +46,7 @@ import {
   SYSTEM_DID_ID,
 } from '../src/lib/prisma/constants.js';
 import { buildUntpArtefactUrls, buildSpecificationPageUrl } from '@uncefact/untp-utils/artefacts';
+import { convergeCoreProvenance } from './core-seed-provenance.js';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -525,6 +527,7 @@ async function main() {
   for (const dm of coreDataModels) {
     const exists = await prisma.dataModel.findUnique({ where: { id: dm.id } });
     if (exists) {
+      await convergeCoreProvenance(prisma.dataModel, dm.id, exists.source);
       logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model already exists, skipping');
       continue;
     }
@@ -543,6 +546,7 @@ async function main() {
         schemaUrl,
         contextUrl,
         websiteUrl,
+        source: RecordSource.CORE_SEED,
       },
     });
 
@@ -560,6 +564,7 @@ async function main() {
     where: { id: CONFORMITY_SCHEME_DATA_MODEL_ID },
   });
   if (conformitySchemeExists) {
+    await convergeCoreProvenance(prisma.dataModel, CONFORMITY_SCHEME_DATA_MODEL_ID, conformitySchemeExists.source);
     logger.info(
       { dataModelId: CONFORMITY_SCHEME_DATA_MODEL_ID, credentialType: 'ConformityScheme' },
       'Data model already exists, skipping',
@@ -578,6 +583,7 @@ async function main() {
         schemaUrl,
         contextUrl,
         websiteUrl,
+        source: RecordSource.CORE_SEED,
       },
     });
     logger.info(
@@ -603,6 +609,7 @@ async function main() {
       for (const dm of coreDataModels) {
         const exists = await prisma.renderTemplate.findUnique({ where: { id: dm.templateId } });
         if (exists) {
+          await convergeCoreProvenance(prisma.renderTemplate, dm.templateId, exists.source);
           logger.info(
             { templateId: dm.templateId, credentialType: dm.credentialType },
             'Template already exists, skipping',
@@ -645,6 +652,7 @@ async function main() {
             storageBucket: storageRecord.bucket,
             storageContentType: 'text/html',
             storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
+            source: RecordSource.CORE_SEED,
           },
         });
 

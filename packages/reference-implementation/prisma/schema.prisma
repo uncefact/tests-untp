@@ -192,6 +192,21 @@ model ServiceInstance {
 }
 
 /**
+ * Provenance of a seedable row: created by the core seed (`prisma/seed.ts`),
+ * managed by the custom seed manifest (`seed.yaml`), or created through the
+ * API/UI. The custom-seed removal phase only ever deletes `CUSTOM_SEED`
+ * rows and refuses to claim `CORE_SEED` rows. A system-tenant `USER` row
+ * whose id matches a manifest entry is adopted by the upsert (stamped
+ * `CUSTOM_SEED`), which is how pre-provenance custom-seed rows come back
+ * under manifest management. Mirrors `ConformitySchemeSource` for CVC tables.
+ */
+enum RecordSource {
+  CORE_SEED
+  CUSTOM_SEED
+  USER
+}
+
+/**
  * Registrars are organisations that operate identifier schemes.
  * Scoped to tenants, with system defaults available to all.
  */
@@ -202,6 +217,7 @@ model Registrar {
   namespace            String
   url                  String?
   idrServiceInstanceId String?
+  source               RecordSource @default(USER)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -225,6 +241,7 @@ model IdentifierScheme {
   validationPattern    String
   linkTemplate         String   // ISO 18975 link template, e.g. "/{primaryKey}/{value}"
   idrServiceInstanceId String?
+  source               RecordSource @default(USER)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -249,6 +266,7 @@ model SchemeQualifier {
   description       String
   validationPattern String
   order             Int      @default(0)  // Qualifier precedence in URI (ascending)
+  source            RecordSource @default(USER)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -441,6 +459,7 @@ model DataModel {
   schemaUrl        String
   contextUrl       String
   websiteUrl       String?
+  source           RecordSource @default(USER)
 
   renderTemplates  RenderTemplate[]
 
@@ -474,6 +493,7 @@ model RenderTemplate {
   inline                    Boolean?
   mediaType                 String?
   mediaQuery                String?
+  source                    RecordSource @default(USER)
 
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
