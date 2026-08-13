@@ -2,8 +2,10 @@ import {
   isProtectedDecryptionKey,
   looksEnvelopeLikeButInvalid,
   protectDecryptionKey,
-  revealDecryptionKey,
 } from './decryption-key-protection';
+import { auditEncryption } from './audit-encryption';
+import { eachKeyedCredentialRow, type EnvelopeStoresClient } from './envelope-stores';
+import { getEncryptionService } from '../encryption/encryption';
 
 export type BackfillDecryptionKeysResult = {
   wrapped: number;
@@ -30,34 +32,12 @@ export type BackfillDecryptionKeysOptions = {
   force?: boolean;
 };
 
-type CredentialKeyRow = { id: string; decryptionKey: string | null };
-type ServiceInstanceConfigRow = { id: string; config: string };
-
 /**
  * The subset of the Prisma client the backfill needs; structural so tests can
- * supply an in-memory fake.
+ * supply an in-memory fake. Shared with the read-only audit
+ * (audit-encryption.ts), which walks the same stores.
  */
-export type BackfillClient = {
-  credential: {
-    findMany(args: {
-      where: { decryptionKey: { not: null }; id?: { gt: string } };
-      select: { id: true; decryptionKey: true };
-      orderBy: { id: 'asc' };
-      take: number;
-    }): Promise<CredentialKeyRow[]>;
-    update(args: { where: { id: string }; data: { decryptionKey: string } }): Promise<unknown>;
-  };
-  serviceInstance: {
-    findMany(args: {
-      where?: { id?: { gt: string } };
-      select: { id: true; config: true };
-      orderBy: { id: 'asc' };
-      take: number;
-    }): Promise<ServiceInstanceConfigRow[]>;
-  };
-};
-
-const BATCH_SIZE = 100;
+export type BackfillClient = EnvelopeStoresClient;
 
 /**
  * Error thrown when no existing envelope is available to prove the active
@@ -81,34 +61,77 @@ export class KeyUnverifiedError extends Error {
  * holding an encrypted envelope are left untouched, so re-running converges
  * to no changes.
  *
- * Before writing anything, the preflight decrypts every existing envelope it
- * can find: all protected credential keys and all service instance
- * configurations (both are encrypted under the same DATA_ENCRYPTION_KEY).
- * Any decrypt failure aborts the run, naming the failing row: wrapping
- * plaintext under a wrong key would be unrecoverable (the plaintext is
- * overwritten, and a re-run would count the rows as already protected).
- * When no envelope exists anywhere and there is plaintext to wrap, the run
- * refuses unless `force` is passed.
+ * Before writing anything, the preflight audits every existing envelope
+ * (all service instance configurations and all protected credential keys,
+ * both encrypted under the same DATA_ENCRYPTION_KEY) via the shared
+ * read-only audit. Any decrypt failure, or any service instance
+ * configuration that is not a valid envelope, aborts the run naming every
+ * affected row; `force` bypasses neither (force exists for the absence of
+ * evidence, not for damaged or undecryptable evidence). Wrapping plaintext
+ * under a wrong key would be unrecoverable (the plaintext is overwritten,
+ * and a re-run would count the rows as already protected). Credential rows
+ * whose value merely resembles a corrupted envelope are reported and
+ * skipped while other plaintext rows still wrap. When no envelope exists
+ * anywhere and there is plaintext to wrap, the run refuses unless `force`
+ * is passed.
  */
 export async function backfillDecryptionKeys(
   client: BackfillClient,
   options: BackfillDecryptionKeysOptions = {},
 ): Promise<BackfillDecryptionKeysResult> {
-  const preflight = await verifyKeyAgainstAllEnvelopes(client);
+  const audit = await auditEncryption(client, getEncryptionService());
 
-  if (!preflight.keyVerified && preflight.wrappableRows > 0 && !options.force) {
+  // One aggregated abort naming every blocking row across both buckets, so a
+  // run hitting structural corruption AND decrypt failures reports the full
+  // picture rather than the first bucket only. `force` bypasses neither:
+  // service instance configurations have no legacy plaintext form (every
+  // writer encrypts them before persistence, so a non-envelope config is
+  // corruption), and force exists for the absence of evidence, not for
+  // damaged or undecryptable evidence.
+  const blockers: string[] = [];
+  if (audit.serviceInstances.corruptedIds.length > 0) {
+    blockers.push(
+      `Service instance(s) ${audit.serviceInstances.corruptedIds.join(', ')} hold configurations that are ` +
+        'not valid encrypted envelopes',
+    );
+  }
+  const decryptFailures = [
+    ...audit.serviceInstances.decryptFailedIds.map((id) => `service instance ${id}`),
+    ...audit.credentials.decryptFailedIds.map((id) => `credential ${id}`),
+  ];
+  if (decryptFailures.length > 0) {
+    blockers.push(`Preflight decrypt failed for ${decryptFailures.join(', ')}`);
+  }
+  if (blockers.length > 0) {
+    const first = audit.firstDecryptFailure;
+    // Duck-typed rather than `instanceof Error`: the error is thrown by the
+    // built services package, whose Error identity can differ from this
+    // module's realm (it does under jest), which would silently drop the detail.
+    const firstMessage =
+      first !== undefined && typeof (first.error as { message?: unknown } | null)?.message === 'string'
+        ? (first.error as { message: string }).message
+        : undefined;
+    const keyNote =
+      decryptFailures.length > 0
+        ? ' DATA_ENCRYPTION_KEY may not match the key the data was encrypted under.' +
+          (firstMessage !== undefined ? ` First failure (${first?.rowDescription}): ${firstMessage}` : '')
+        : '';
+    throw new Error(`${blockers.join('; and ')}; aborting before any write.${keyNote}`, { cause: first?.error });
+  }
+
+  if (!audit.keyVerified && audit.credentials.wrappablePlaintextCount > 0 && !options.force) {
     throw new KeyUnverifiedError();
   }
 
   const result: BackfillDecryptionKeysResult = {
     wrapped: 0,
     alreadyProtected: 0,
-    keyVerified: preflight.keyVerified,
+    keyVerified: audit.keyVerified,
     suspectRowIds: [],
     deletedRowIds: [],
   };
 
-  for await (const row of eachKeyedRow(client)) {
+  for await (const row of eachKeyedCredentialRow(client)) {
     if (isProtectedDecryptionKey(row.decryptionKey)) {
       result.alreadyProtected += 1;
       continue;
@@ -145,57 +168,6 @@ export async function backfillDecryptionKeys(
 }
 
 /**
- * Decrypts every existing envelope (credential keys and service instance
- * configurations) under the active key, throwing on the first failure so
- * nothing is written over a database the key cannot read. Also counts the
- * plaintext rows the wrap pass would change, so the caller can distinguish
- * "nothing to verify against but also nothing to write" from the
- * unverified-write hazard.
- */
-async function verifyKeyAgainstAllEnvelopes(
-  client: BackfillClient,
-): Promise<{ keyVerified: boolean; wrappableRows: number }> {
-  let keyVerified = false;
-  let wrappableRows = 0;
-
-  for await (const row of eachServiceInstanceRow(client)) {
-    // Service instance configurations have no legacy plaintext form: every
-    // writer encrypts them before persistence. A config that does not parse
-    // as an envelope is corruption, and `force` does not bypass it (force
-    // exists for the absence of evidence, not for damaged evidence).
-    if (!isProtectedDecryptionKey(row.config)) {
-      throw new Error(
-        `Service instance ${row.id} holds a configuration that is not a valid encrypted envelope; aborting before any write`,
-      );
-    }
-    decryptOrThrow(row.config, `service instance ${row.id}`);
-    keyVerified = true;
-  }
-
-  for await (const row of eachKeyedRow(client)) {
-    if (isProtectedDecryptionKey(row.decryptionKey)) {
-      decryptOrThrow(row.decryptionKey, `credential ${row.id}`);
-      keyVerified = true;
-    } else if (!looksEnvelopeLikeButInvalid(row.decryptionKey)) {
-      wrappableRows += 1;
-    }
-  }
-
-  return { keyVerified, wrappableRows };
-}
-
-function decryptOrThrow(stored: string, rowDescription: string): void {
-  try {
-    revealDecryptionKey(stored);
-  } catch (error) {
-    const detail = error instanceof Error ? ` ${error.message}` : '';
-    throw new Error(`Preflight decrypt failed for ${rowDescription}; aborting before any write.${detail}`, {
-      cause: error,
-    });
-  }
-}
-
-/**
  * Whether an update failed because the row no longer exists. Prisma raises
  * PrismaClientKnownRequestError with code P2025 ("record not found") when a
  * row is deleted between fetch and update; the backfill treats that as a
@@ -203,48 +175,4 @@ function decryptOrThrow(stored: string, rowDescription: string): void {
  */
 function isRecordNotFoundError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'P2025';
-}
-
-/**
- * Iterates every credential row holding a decryption key, in id order via
- * cursor pagination (`id > cursor`), which does not skip surviving rows when
- * other rows are deleted mid-run.
- */
-async function* eachKeyedRow(client: BackfillClient): AsyncGenerator<{ id: string; decryptionKey: string }> {
-  let cursor: string | undefined;
-  for (;;) {
-    const rows = await client.credential.findMany({
-      where: { decryptionKey: { not: null }, ...(cursor !== undefined && { id: { gt: cursor } }) },
-      select: { id: true, decryptionKey: true },
-      orderBy: { id: 'asc' },
-      take: BATCH_SIZE,
-    });
-    if (rows.length === 0) {
-      return;
-    }
-    cursor = rows[rows.length - 1].id;
-    for (const row of rows) {
-      if (row.decryptionKey !== null) {
-        yield { id: row.id, decryptionKey: row.decryptionKey };
-      }
-    }
-  }
-}
-
-/** Iterates every service instance row, in id order via cursor pagination. */
-async function* eachServiceInstanceRow(client: BackfillClient): AsyncGenerator<ServiceInstanceConfigRow> {
-  let cursor: string | undefined;
-  for (;;) {
-    const rows = await client.serviceInstance.findMany({
-      ...(cursor !== undefined && { where: { id: { gt: cursor } } }),
-      select: { id: true, config: true },
-      orderBy: { id: 'asc' },
-      take: BATCH_SIZE,
-    });
-    if (rows.length === 0) {
-      return;
-    }
-    cursor = rows[rows.length - 1].id;
-    yield* rows;
-  }
 }
