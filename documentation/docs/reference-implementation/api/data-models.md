@@ -138,7 +138,7 @@ sequenceDiagram
     alt URL points to private/reserved address
         RI-->>Client: 400 Bad Request
     end
-    RI->>DB: Verify parent config exists
+    RI->>DB: Verify parent data model configuration exists
     alt parent not found
         RI-->>Client: 404 Not Found
     end
@@ -187,7 +187,7 @@ sequenceDiagram
         RI-->>Client: 400 Bad Request
     end
     RI->>DB: Fetch and update data model
-    alt not found or not a tenant-owned extension
+    alt not found
         RI-->>Client: 404 Not Found
     end
     DB-->>RI: Updated record
@@ -214,7 +214,7 @@ sequenceDiagram
 
     Client->>RI: DELETE /api/v1/data-models/{id}
     RI->>DB: Fetch data model
-    alt not found or not a tenant-owned extension
+    alt not found
         RI-->>Client: 404 Not Found
     end
     RI->>DB: Delete record (cascades to render templates)

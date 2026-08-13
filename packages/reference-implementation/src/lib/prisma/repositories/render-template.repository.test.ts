@@ -164,8 +164,10 @@ describe('render-template.repository', () => {
       });
     });
 
-    it('maps a foreign-key violation to NotFoundError when the data model was deleted before insert', async () => {
-      mockTx.renderTemplate.create.mockRejectedValue(prismaForeignKeyViolationError());
+    it('maps a foreign-key violation on dataModelId to NotFoundError when the data model was deleted before insert', async () => {
+      mockTx.renderTemplate.create.mockRejectedValue(
+        prismaForeignKeyViolationError('Foreign key constraint failed on the field: `dataModelId`'),
+      );
 
       const result = createRenderTemplate(TENANT_ID, {
         name: 'DPP Default Template',
@@ -177,6 +179,23 @@ describe('render-template.repository', () => {
 
       await expect(result).rejects.toThrow(NotFoundError);
       await expect(result).rejects.toThrow('Data model not found');
+    });
+
+    it('rethrows a foreign-key violation on tenantId rather than blaming the data model', async () => {
+      // The insert carries two foreign keys; a violation on tenantId must not
+      // surface as the dataModelId-specific 404.
+      const tenantFkError = prismaForeignKeyViolationError('Foreign key constraint failed on the field: `tenantId`');
+      mockTx.renderTemplate.create.mockRejectedValue(tenantFkError);
+
+      await expect(
+        createRenderTemplate(TENANT_ID, {
+          name: 'DPP Default Template',
+          dataModelId: CONFIG_ID,
+          renderMethodType: 'RenderTemplate2024',
+          storageUrl: 'https://storage.example.com/templates/dpp-default.html',
+          digestMultibase: 'zTESTabc123',
+        }),
+      ).rejects.toBe(tenantFkError);
     });
 
     it('rethrows a non-database error unchanged', async () => {
@@ -397,7 +416,7 @@ describe('render-template.repository', () => {
       mockTx.renderTemplate.findFirst.mockResolvedValue(null);
 
       await expect(updateRenderTemplate('template-1', 'other-tenant', { name: 'Updated' })).rejects.toThrow(
-        'Render template not found or access denied',
+        'Render template not found',
       );
     });
 
@@ -495,7 +514,7 @@ describe('render-template.repository', () => {
       const result = updateRenderTemplate('template-1', TENANT_ID, { name: 'Updated Template' });
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Render template not found or access denied');
+      await expect(result).rejects.toThrow('Render template not found');
     });
   });
 
@@ -519,9 +538,7 @@ describe('render-template.repository', () => {
     it('throws when template is not tenant-owned', async () => {
       mockTx.renderTemplate.findFirst.mockResolvedValue(null);
 
-      await expect(deleteRenderTemplate('template-1', 'other-tenant')).rejects.toThrow(
-        'Render template not found or access denied',
-      );
+      await expect(deleteRenderTemplate('template-1', 'other-tenant')).rejects.toThrow('Render template not found');
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {
@@ -531,7 +548,7 @@ describe('render-template.repository', () => {
       const result = deleteRenderTemplate('template-1', TENANT_ID);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Render template not found or access denied');
+      await expect(result).rejects.toThrow('Render template not found');
     });
   });
 

@@ -160,7 +160,7 @@ describe('PATCH /api/v1/facilities/:id', () => {
   });
 
   it('returns 404 when facility not found', async () => {
-    mockUpdateFacility.mockRejectedValue(new NotFoundError('Facility not found or access denied'));
+    mockUpdateFacility.mockRejectedValue(new NotFoundError('Facility not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated' } });
     const res = await PATCH(req, createContext('fac-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -198,7 +198,7 @@ describe('DELETE /api/v1/facilities/:id', () => {
   });
 
   it('returns 404 when facility not found', async () => {
-    mockDeleteFacility.mockRejectedValue(new NotFoundError('Facility not found or access denied'));
+    mockDeleteFacility.mockRejectedValue(new NotFoundError('Facility not found'));
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);

@@ -60,7 +60,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *             schema:
  *               $ref: '#/components/schemas/Did'
  *       400:
- *         description: Validation error. Causes include a missing or non-string did/keyId/serviceInstanceId, an invalid method, a did that is not a well-formed DID (code DID_PARSE_FAILED) or whose method is not recognised (code DID_METHOD_NOT_SUPPORTED), and a serviceInstanceId deleted in the rare window between resolution and the write.
+ *         description: Validation error. Causes include a missing or non-string did/keyId/serviceInstanceId, an invalid method, and a did that is not a well-formed DID (code DID_PARSE_FAILED) or whose method is not recognised (code DID_METHOD_NOT_SUPPORTED).
  *         content:
  *           application/json:
  *             schema:
@@ -78,7 +78,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Service instance not found, or belongs to a different tenant
+ *         description: Service instance not found
  *         content:
  *           application/json:
  *             schema:
@@ -119,17 +119,20 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   }
 
   logger.info({ did: body.did, method: body.method }, 'Saving imported DID record');
-  const record = await createDid({
-    tenantId,
-    did: body.did,
-    type: 'SELF_MANAGED',
-    method: body.method,
-    keyId: body.keyId,
-    name: body.name ?? body.did,
-    description: body.description,
-    status: 'UNVERIFIED',
-    serviceInstanceId: body.serviceInstanceId,
-  });
+  const record = await createDid(
+    {
+      tenantId,
+      did: body.did,
+      type: 'SELF_MANAGED',
+      method: body.method,
+      keyId: body.keyId,
+      name: body.name ?? body.did,
+      description: body.description,
+      status: 'UNVERIFIED',
+      serviceInstanceId: body.serviceInstanceId,
+    },
+    { callerSuppliedServiceInstanceId: body.serviceInstanceId },
+  );
 
   logger.info({ didId: record.id, did: record.did }, 'DID imported');
   return NextResponse.json(record, { status: 201 });

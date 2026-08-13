@@ -1,6 +1,7 @@
 import { LinkRegistration, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { NotFoundError } from '@/lib/api/errors';
+import { isForeignKeyViolationOn, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 export type CreateLinkRegistrationInput = {
@@ -15,18 +16,20 @@ export type CreateLinkRegistrationInput = {
 };
 
 /**
- * Creates a single link registration audit record.
- */
-export async function createLinkRegistration(input: CreateLinkRegistrationInput): Promise<LinkRegistration> {
-  return prisma.linkRegistration.create({ data: input });
-}
-
-/**
  * Bulk-creates link registration audit records.
  */
 export async function createManyLinkRegistrations(inputs: CreateLinkRegistrationInput[]): Promise<void> {
   if (inputs.length === 0) return;
-  await prisma.linkRegistration.createMany({ data: inputs });
+  try {
+    await prisma.linkRegistration.createMany({ data: inputs });
+  } catch (e) {
+    // An identifierId violation means the identifier vanished after the
+    // route's pre-check; it surfaces as that pre-check's 404.
+    if (isForeignKeyViolationOn(e, 'identifierId')) {
+      throw new NotFoundError('Identifier not found');
+    }
+    throw e;
+  }
 }
 
 /**
@@ -81,10 +84,14 @@ export async function updateLinkRegistration(
     if (!existing) {
       throw new NotFoundError('Link registration not found');
     }
-    return tx.linkRegistration.update({
-      where: { id: existing.id },
-      data,
-    });
+    try {
+      return await tx.linkRegistration.update({
+        where: { id: existing.id },
+        data,
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Link registration not found' });
+    }
   });
 }
 
@@ -104,6 +111,10 @@ export async function deleteLinkRegistration(
     if (!existing) {
       throw new NotFoundError('Link registration not found');
     }
-    return tx.linkRegistration.delete({ where: { id: existing.id } });
+    try {
+      return await tx.linkRegistration.delete({ where: { id: existing.id } });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Link registration not found' });
+    }
   });
 }

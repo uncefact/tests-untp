@@ -1,8 +1,8 @@
 import { IdentifierScheme, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
-import { ConflictError, NotFoundError } from '@/lib/api/errors';
-import { isForeignKeyViolation, mapDatabaseError } from '@/lib/prisma/db-errors';
+import { ConflictError, NotFoundError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
+import { isForeignKeyViolation, isForeignKeyViolationOn, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -99,9 +99,19 @@ export async function createIdentifierScheme(input: CreateIdentifierSchemeInput)
       },
     });
   } catch (e) {
+    // The insert carries three foreign keys; the route pre-checks the
+    // registrar and the IDR instance with 404s, so a reference deleted after
+    // its pre-check surfaces as that pre-check's 404, matched per column; a
+    // violation on any other column rethrows via mapDatabaseError's
+    // fall-through.
+    if (isForeignKeyViolationOn(e, 'registrarId')) {
+      throw new NotFoundError('Registrar not found');
+    }
+    if (isForeignKeyViolationOn(e, 'idrServiceInstanceId')) {
+      throw new ServiceInstanceNotFoundError(String(input.idrServiceInstanceId));
+    }
     mapDatabaseError(e, {
       conflict: 'An identifier scheme with this primary key already exists for the registrar',
-      invalidReference: 'The referenced registrar or IDR service instance does not exist',
     });
   }
 }
@@ -174,7 +184,7 @@ export async function updateIdentifierScheme(
     });
 
     if (!existing) {
-      throw new NotFoundError('Identifier scheme not found or access denied');
+      throw new NotFoundError('Identifier scheme not found');
     }
 
     validateQualifierKeys(input.qualifiers);
@@ -199,6 +209,11 @@ export async function updateIdentifierScheme(
             })),
           });
         } catch (e) {
+          // The qualifier rows' only foreign key is schemeId, pre-checked
+          // above; a violation surfaces as that pre-check's 404.
+          if (isForeignKeyViolation(e)) {
+            throw new NotFoundError('Identifier scheme not found');
+          }
           mapDatabaseError(e, { conflict: 'A qualifier with this key already exists for the scheme' });
         }
       }
@@ -222,10 +237,15 @@ export async function updateIdentifierScheme(
         },
       });
     } catch (e) {
+      // The update's only failable reference is idrServiceInstanceId, which
+      // the route pre-checks with a 404; an instance deleted after that check
+      // surfaces as the same 404.
+      if (isForeignKeyViolationOn(e, 'idrServiceInstanceId')) {
+        throw new ServiceInstanceNotFoundError(String(input.idrServiceInstanceId));
+      }
       mapDatabaseError(e, {
         conflict: 'An identifier scheme with this primary key already exists for the registrar',
-        notFound: 'Identifier scheme not found or access denied',
-        invalidReference: 'The referenced IDR service instance does not exist',
+        notFound: 'Identifier scheme not found',
       });
     }
   });
@@ -242,7 +262,7 @@ export async function deleteIdentifierScheme(id: string, tenantId: string): Prom
     });
 
     if (!existing) {
-      throw new NotFoundError('Identifier scheme not found or access denied');
+      throw new NotFoundError('Identifier scheme not found');
     }
 
     try {
@@ -256,7 +276,7 @@ export async function deleteIdentifierScheme(id: string, tenantId: string): Prom
       if (isForeignKeyViolation(e)) {
         throw new ConflictError('The identifier scheme has identifiers and cannot be deleted');
       }
-      mapDatabaseError(e, { notFound: 'Identifier scheme not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Identifier scheme not found' });
     }
   });
 }

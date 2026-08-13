@@ -175,7 +175,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Scheme not found, or the referenced IDR service instance does not exist or is not accessible to this tenant
+ *         description: Scheme or IDR service instance not found
  *         content:
  *           application/json:
  *             schema:

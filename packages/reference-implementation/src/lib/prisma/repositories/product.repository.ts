@@ -348,7 +348,7 @@ export async function updateProduct(
     });
 
     if (!existing) {
-      throw new NotFoundError('Product not found or access denied');
+      throw new NotFoundError('Product not found');
     }
 
     // Validate brand organisation belongs to tenant (if provided and not null)
@@ -492,7 +492,7 @@ export async function getProductByIdentifierValue(
 export async function deleteProduct(id: string, tenantId: string): Promise<Product> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.product.findFirst({ where: { id, tenantId } });
-    if (!existing) throw new NotFoundError('Product not found or access denied');
+    if (!existing) throw new NotFoundError('Product not found');
 
     const children = await tx.product.findMany({ where: { parentId: id, tenantId } });
     const batches = children.filter((c: Product) => c.level === 'BATCH');
@@ -512,7 +512,7 @@ export async function deleteProduct(id: string, tenantId: string): Promise<Produ
       // pre-check, the constraint fires for a child of any level, so the
       // message stays level-neutral.
       mapDatabaseError(e, {
-        notFound: 'Product not found or access denied',
+        notFound: 'Product not found',
         invalidReference: 'Cannot delete: dependent products exist',
       });
     }

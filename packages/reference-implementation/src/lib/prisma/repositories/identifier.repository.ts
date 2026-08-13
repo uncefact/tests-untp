@@ -2,7 +2,7 @@ import { Identifier, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
-import { mapDatabaseError } from '@/lib/prisma/db-errors';
+import { isForeignKeyViolationOn, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -99,6 +99,11 @@ export async function createIdentifier(input: CreateIdentifierInput): Promise<Id
         },
       });
     } catch (e) {
+      // A schemeId violation means the scheme vanished after the pre-check in
+      // validateIdentifierValue; it surfaces as that pre-check's 404.
+      if (isForeignKeyViolationOn(e, 'schemeId')) {
+        throw new NotFoundError('Identifier scheme not found');
+      }
       mapDatabaseError(e, { conflict: 'An identifier with this value already exists for the scheme' });
     }
   });
@@ -173,7 +178,7 @@ export async function updateIdentifier(
     });
 
     if (!existing) {
-      throw new NotFoundError('Identifier not found or access denied');
+      throw new NotFoundError('Identifier not found');
     }
 
     if (input.value !== undefined) {
@@ -193,7 +198,7 @@ export async function updateIdentifier(
     } catch (e) {
       mapDatabaseError(e, {
         conflict: 'An identifier with this value already exists for the scheme',
-        notFound: 'Identifier not found or access denied',
+        notFound: 'Identifier not found',
       });
     }
   });
@@ -210,7 +215,7 @@ export async function deleteIdentifier(id: string, tenantId: string): Promise<Id
     });
 
     if (!existing) {
-      throw new NotFoundError('Identifier not found or access denied');
+      throw new NotFoundError('Identifier not found');
     }
 
     try {
@@ -218,7 +223,7 @@ export async function deleteIdentifier(id: string, tenantId: string): Promise<Id
         where: { id },
       });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'Identifier not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Identifier not found' });
     }
   });
 }

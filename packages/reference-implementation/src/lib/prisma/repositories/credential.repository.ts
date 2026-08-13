@@ -1,5 +1,6 @@
 import { Credential, Prisma } from '../generated';
 import { prisma } from '../prisma';
+import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
@@ -29,7 +30,9 @@ export type ListCredentialsOptions = {
 };
 
 /**
- * Creates a new credential record
+ * Creates a new credential record. The entity links are resolved server-side,
+ * so a foreign-key failure here is a race, not a caller error; #740 owns what
+ * it should mean for issuance.
  */
 export async function createCredential(input: CreateCredentialInput): Promise<Credential> {
   return prisma.credential.create({
@@ -95,8 +98,12 @@ export async function updateCredentialPublished(
   tenantId: string,
   isPublished: boolean,
 ): Promise<Credential> {
-  return prisma.credential.update({
-    where: { id, tenantId },
-    data: { isPublished },
-  });
+  try {
+    return await prisma.credential.update({
+      where: { id, tenantId },
+      data: { isPublished },
+    });
+  } catch (e) {
+    mapDatabaseError(e, { notFound: 'Credential not found' });
+  }
 }

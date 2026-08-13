@@ -274,7 +274,7 @@ export async function updateFacility(
     });
 
     if (!existing) {
-      throw new NotFoundError('Facility not found or access denied');
+      throw new NotFoundError('Facility not found');
     }
 
     const { name, description, location, operatingOrganisationId, primaryIdentifierId, secondaryIdentifierIds } = input;
@@ -385,7 +385,7 @@ export async function deleteFacility(id: string, tenantId: string): Promise<Faci
     });
 
     if (!existing) {
-      throw new NotFoundError('Facility not found or access denied');
+      throw new NotFoundError('Facility not found');
     }
 
     try {
@@ -393,7 +393,7 @@ export async function deleteFacility(id: string, tenantId: string): Promise<Faci
         where: { id },
       });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'Facility not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Facility not found' });
     }
   });
 }

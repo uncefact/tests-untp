@@ -130,7 +130,7 @@ For **self-managed** DIDs created via this endpoint, the VC service still genera
 | `name` | Human-readable name (must be non-empty if provided) |
 | `description` | Description of the DID's purpose (must be non-empty if provided) |
 | `isDefault` | Whether this DID becomes the tenant's default signing identity, used when a credential is issued without naming an explicit issuer DID |
-| `serviceInstanceId` | Verifiable credential service instance to use for creation |
+| `serviceInstanceId` | Verifiable credential service instance to use for creation. If provided, it must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404. If omitted, the service instance is resolved automatically (see [Service Instance Association](#service-instance-association)) |
 
 A tenant cannot claim the instance's own root DID. A self-managed `did:web` whose alias is exactly the hostname of the system VC service (with or without its port, so both `vckit.example.com` and `vckit.example.com:3332`) is rejected with a 403, because that DID identifies the VC service instance itself rather than anything the tenant owns. Only the alias on its own is reserved: a DID with a path under that host, such as `did:web:vckit.example.com:tenant-a`, is allowed.
 
@@ -144,6 +144,9 @@ sequenceDiagram
     Client->>RI: POST /api/v1/dids { type, method, alias }
     RI->>RI: Validate type, method, alias
     RI->>DB: Resolve VC service instance (specified or primary)
+    alt serviceInstanceId given but not found
+        RI-->>Client: 404 Not Found
+    end
     DB-->>RI: Service instance config (encrypted)
     RI->>RI: Decrypt service config
     RI->>RI: Normalise alias for DID type and method

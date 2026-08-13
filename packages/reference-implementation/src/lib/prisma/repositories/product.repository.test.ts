@@ -682,9 +682,7 @@ describe('product.repository', () => {
     it('throws NotFoundError for ownership check failure', async () => {
       mockTx.product.findFirst.mockResolvedValue(null);
 
-      await expect(updateProduct(PRODUCT_ID, 'other-tenant', { name: 'Updated' })).rejects.toThrow(
-        'Product not found or access denied',
-      );
+      await expect(updateProduct(PRODUCT_ID, 'other-tenant', { name: 'Updated' })).rejects.toThrow('Product not found');
     });
 
     it('maps a unique-constraint violation on update to ConflictError with a clean message', async () => {
@@ -769,7 +767,7 @@ describe('product.repository', () => {
     it('throws NotFoundError for another tenant', async () => {
       mockTx.product.findFirst.mockResolvedValue(null);
 
-      await expect(deleteProduct(PRODUCT_ID, 'other-tenant')).rejects.toThrow('Product not found or access denied');
+      await expect(deleteProduct(PRODUCT_ID, 'other-tenant')).rejects.toThrow('Product not found');
     });
 
     it('maps a record-not-found race on delete to NotFoundError', async () => {
@@ -780,7 +778,7 @@ describe('product.repository', () => {
       const result = deleteProduct(PARENT_ID, TENANT_ID);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Product not found or access denied');
+      await expect(result).rejects.toThrow('Product not found');
     });
 
     it('maps a foreign-key violation on delete to ValidationError', async () => {

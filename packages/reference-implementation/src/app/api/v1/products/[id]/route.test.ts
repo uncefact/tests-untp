@@ -134,7 +134,7 @@ describe('PATCH /api/v1/products/:id', () => {
   });
 
   it('returns 404 when product not found', async () => {
-    mockUpdateProduct.mockRejectedValue(new NotFoundError('Product not found or access denied'));
+    mockUpdateProduct.mockRejectedValue(new NotFoundError('Product not found'));
 
     const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated Widget' } });
     const res = await PATCH(req, createContext('nonexistent') as unknown as Parameters<typeof PATCH>[1]);
@@ -211,7 +211,7 @@ describe('DELETE /api/v1/products/:id', () => {
   });
 
   it('returns 404 when product not found', async () => {
-    mockDeleteProduct.mockRejectedValue(new NotFoundError('Product not found or access denied'));
+    mockDeleteProduct.mockRejectedValue(new NotFoundError('Product not found'));
 
     const req = createFakeRequest({});
     const res = await DELETE(req, createContext('nonexistent') as unknown as Parameters<typeof DELETE>[1]);

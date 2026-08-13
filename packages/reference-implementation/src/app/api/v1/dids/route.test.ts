@@ -46,7 +46,7 @@ jest.mock('@/lib/services/resolve-did-service', () => ({
 }));
 
 jest.mock('@/lib/prisma/repositories', () => ({
-  createDid: (input: unknown) => mockCreateDid(input),
+  createDid: (...args: unknown[]) => mockCreateDid(...args),
   listDids: (orgId: string, opts: unknown) => mockListDids(orgId, opts),
   findDidByAliasAndService: (alias: string, serviceInstanceId: string) =>
     mockFindDidByAliasAndService(alias, serviceInstanceId),
@@ -55,6 +55,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 import { ServiceResolutionError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { DidType, DidMethod, DidStatus, DidCreateError, DidDocumentFetchError } from '@uncefact/untp-ri-services';
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { prismaError } from '@/lib/prisma/db-errors.fixtures';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string; rawBody?: string }): Request {
@@ -131,7 +132,7 @@ describe('POST /api/v1/dids', () => {
     expect(json.did).toBe('did:web:example.com:org:123');
     // Pins the MANAGED side of the status ternary. Its SELF_MANAGED side is
     // covered by the next test, so flipping either branch fails a test.
-    expect(mockCreateDid).toHaveBeenCalledWith(expect.objectContaining({ status: DidStatus.ACTIVE }));
+    expect(mockCreateDid).toHaveBeenCalledWith(expect.objectContaining({ status: DidStatus.ACTIVE }), {});
   });
 
   it('creates a self-managed DID with UNVERIFIED status and serviceInstanceId', async () => {
@@ -153,7 +154,54 @@ describe('POST /api/v1/dids', () => {
     expect(res.status).toBe(201);
     expect(mockCreateDid).toHaveBeenCalledWith(
       expect.objectContaining({ status: DidStatus.UNVERIFIED, serviceInstanceId: 'inst-1' }),
+      {},
     );
+  });
+
+  it('marks the instance as caller-supplied when the request names one', async () => {
+    mockDidService.create.mockResolvedValue({
+      did: 'did:web:example.com:org:456',
+      keyId: 'key-2',
+      document: { '@context': 'https://www.w3.org/ns/did/v1', id: 'did:web:example.com:org:456' },
+    });
+    mockCreateDid.mockResolvedValue({ id: 'record-2', status: DidStatus.UNVERIFIED });
+
+    const req = createFakeRequest({
+      body: {
+        type: DidType.SELF_MANAGED,
+        method: DidMethod.DID_WEB,
+        alias: 'self-managed',
+        serviceInstanceId: 'inst-9',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(201);
+    expect(mockCreateDid).toHaveBeenCalledWith(expect.anything(), { callerSuppliedServiceInstanceId: 'inst-9' });
+  });
+
+  it('returns a sanitised 500 when a server-resolved instance vanishes before the write', async () => {
+    // The request omitted serviceInstanceId, so the route resolved one itself;
+    // the race must not surface as a 404 naming the resolved internal id.
+    mockDidService.create.mockResolvedValue({
+      did: 'did:web:example.com:org:123',
+      keyId: 'key-1',
+      document: { '@context': 'https://www.w3.org/ns/did/v1', id: 'did:web:example.com:org:123' },
+    });
+    mockCreateDid.mockRejectedValue(
+      prismaError('P2003', 'Foreign key constraint failed on the field: `serviceInstanceId`'),
+    );
+
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'my-did' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(mockCreateDid).toHaveBeenCalledWith(expect.anything(), {});
+    expect(res.status).toBe(500);
+    expect(json.error).toBe('An unexpected error has occurred.');
+    expect(JSON.stringify(json)).not.toContain('inst-1');
   });
 
   it('passes isDefault to createDid when provided', async () => {
@@ -177,7 +225,7 @@ describe('POST /api/v1/dids', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(mockCreateDid).toHaveBeenCalledWith(expect.objectContaining({ isDefault: true }));
+    expect(mockCreateDid).toHaveBeenCalledWith(expect.objectContaining({ isDefault: true }), {});
     expect(json.isDefault).toBe(true);
   });
 

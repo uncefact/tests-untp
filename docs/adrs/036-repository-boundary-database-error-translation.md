@@ -2,6 +2,7 @@
 
 - **Date:** 2026-07-02
 - **Status:** accepted
+- **Update (2026-08-12):** ADR-042 settles what a pre-checked reference that vanishes before the write returns (the pre-check's own status), a question this ADR left to per-call-site context (#781).
 
 ## Context
 

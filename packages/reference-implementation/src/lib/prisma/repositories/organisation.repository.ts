@@ -249,7 +249,7 @@ export async function updateOrganisation(
     });
 
     if (!existing) {
-      throw new NotFoundError('Organisation not found or access denied');
+      throw new NotFoundError('Organisation not found');
     }
 
     // Validate primary identifier belongs to tenant (if provided and not null)
@@ -346,7 +346,7 @@ export async function deleteOrganisation(id: string, tenantId: string): Promise<
     });
 
     if (!existing) {
-      throw new NotFoundError('Organisation not found or access denied');
+      throw new NotFoundError('Organisation not found');
     }
 
     try {
@@ -355,7 +355,7 @@ export async function deleteOrganisation(id: string, tenantId: string): Promise<
         include: ORGANISATION_DETAIL_INCLUDE,
       });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'Organisation not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Organisation not found' });
     }
   });
 }

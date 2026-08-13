@@ -2,6 +2,7 @@ import { ServiceInstance, ServiceType, AdapterType, Prisma } from '../generated'
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 export type CreateServiceInstanceInput = {
@@ -160,7 +161,7 @@ export async function updateServiceInstance(
     });
 
     if (!existing) {
-      throw new NotFoundError('Service instance not found or access denied');
+      throw new NotFoundError('Service instance not found');
     }
 
     if (input.isPrimary) {
@@ -175,15 +176,19 @@ export async function updateServiceInstance(
       });
     }
 
-    return tx.serviceInstance.update({
-      where: { id },
-      data: {
-        ...(input.name !== undefined && { name: input.name }),
-        ...(input.description !== undefined && { description: input.description }),
-        ...(input.config !== undefined && { config: input.config }),
-        ...(input.isPrimary !== undefined && { isPrimary: input.isPrimary }),
-      },
-    });
+    try {
+      return await tx.serviceInstance.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.description !== undefined && { description: input.description }),
+          ...(input.config !== undefined && { config: input.config }),
+          ...(input.isPrimary !== undefined && { isPrimary: input.isPrimary }),
+        },
+      });
+    } catch (e) {
+      mapDatabaseError(e, { notFound: 'Service instance not found' });
+    }
   });
 }
 
@@ -197,12 +202,20 @@ export async function deleteServiceInstance(id: string, tenantId: string): Promi
     });
 
     if (!existing) {
-      throw new NotFoundError('Service instance not found or access denied');
+      throw new NotFoundError('Service instance not found');
     }
 
-    return tx.serviceInstance.delete({
-      where: { id },
-    });
+    try {
+      return await tx.serviceInstance.delete({
+        where: { id },
+      });
+    } catch (e) {
+      // Every declared relation referencing ServiceInstance is onDelete:
+      // SetNull, so a delete cannot trip a foreign-key restriction; only the
+      // not-found race maps. (RenderTemplate.storageServiceInstanceId points
+      // at instances too, but as a plain column, not a constraint.)
+      mapDatabaseError(e, { notFound: 'Service instance not found' });
+    }
   });
 }
 

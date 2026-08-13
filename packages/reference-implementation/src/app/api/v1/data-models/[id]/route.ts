@@ -66,7 +66,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  * /data-models/{id}:
  *   patch:
  *     summary: Update a data model extension
- *     description: Updates one or more fields of a tenant-owned data model extension. Only extensions (isExtension=true) owned by the tenant can be updated.
+ *     description: Updates one or more fields of a tenant-owned data model extension. Only tenant-created extensions can be updated.
  *     tags:
  *       - Data Models
  *     parameters:
@@ -116,7 +116,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Data model not found or not a tenant-owned extension
+ *         description: Data model not found
  *         content:
  *           application/json:
  *             schema:
@@ -189,7 +189,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  * /data-models/{id}:
  *   delete:
  *     summary: Delete a data model extension
- *     description: Deletes a tenant-owned data model extension. Only extensions (isExtension=true) owned by the tenant can be deleted.
+ *     description: Deletes a tenant-owned data model extension. Only tenant-created extensions can be deleted.
  *     tags:
  *       - Data Models
  *     parameters:
@@ -209,7 +209,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Data model not found or not a tenant-owned extension
+ *         description: Data model not found
  *         content:
  *           application/json:
  *             schema:

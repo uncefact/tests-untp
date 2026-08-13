@@ -2,7 +2,7 @@ import { Prisma, RenderMethodType } from '../generated';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
-import { isForeignKeyViolation, mapDatabaseError } from '@/lib/prisma/db-errors';
+import { isForeignKeyViolationOn, mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
@@ -129,10 +129,9 @@ export async function createRenderTemplate(
         include: RENDER_TEMPLATE_INCLUDE,
       });
     } catch (e) {
-      // The caller pre-checks the data model, so a foreign-key violation here
-      // means it was deleted between that check and this insert. Surface the
-      // same 404 the pre-check would have produced, not a bad-request error.
-      if (isForeignKeyViolation(e)) {
+      // A dataModelId violation means the data model vanished after the
+      // caller's pre-check; it surfaces as that pre-check's 404.
+      if (isForeignKeyViolationOn(e, 'dataModelId')) {
         throw new NotFoundError('Data model not found');
       }
       throw e;
@@ -219,7 +218,7 @@ export async function updateRenderTemplate(
     });
 
     if (!existing) {
-      throw new NotFoundError('Render template not found or access denied');
+      throw new NotFoundError('Render template not found');
     }
 
     if (input.isDefault) {
@@ -255,7 +254,7 @@ export async function updateRenderTemplate(
         include: RENDER_TEMPLATE_INCLUDE,
       });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'Render template not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Render template not found' });
     }
   });
 }
@@ -270,7 +269,7 @@ export async function deleteRenderTemplate(id: string, tenantId: string): Promis
     });
 
     if (!existing) {
-      throw new NotFoundError('Render template not found or access denied');
+      throw new NotFoundError('Render template not found');
     }
 
     try {
@@ -279,7 +278,7 @@ export async function deleteRenderTemplate(id: string, tenantId: string): Promis
         include: RENDER_TEMPLATE_INCLUDE,
       });
     } catch (e) {
-      mapDatabaseError(e, { notFound: 'Render template not found or access denied' });
+      mapDatabaseError(e, { notFound: 'Render template not found' });
     }
   });
 }

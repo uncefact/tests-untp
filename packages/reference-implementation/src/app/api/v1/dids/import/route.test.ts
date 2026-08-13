@@ -97,17 +97,20 @@ describe('POST /api/v1/dids/import', () => {
     expect(mockGetInstanceByResolution).toHaveBeenCalledWith('tenant-1', 'VC', 'inst-1');
 
     // Verify createDid was called with correct params -- NOT calling adapter
-    expect(mockCreateDid).toHaveBeenCalledWith({
-      tenantId: 'tenant-1',
-      did: 'did:web:example.com',
-      type: 'SELF_MANAGED',
-      method: 'DID_WEB',
-      keyId: 'key-1',
-      name: 'My Imported DID',
-      description: 'An externally managed DID',
-      status: 'UNVERIFIED',
-      serviceInstanceId: 'inst-1',
-    });
+    expect(mockCreateDid).toHaveBeenCalledWith(
+      {
+        tenantId: 'tenant-1',
+        did: 'did:web:example.com',
+        type: 'SELF_MANAGED',
+        method: 'DID_WEB',
+        keyId: 'key-1',
+        name: 'My Imported DID',
+        description: 'An externally managed DID',
+        status: 'UNVERIFIED',
+        serviceInstanceId: 'inst-1',
+      },
+      { callerSuppliedServiceInstanceId: 'inst-1' },
+    );
   });
 
   it('uses the DID string as the name when name is not provided', async () => {
@@ -124,6 +127,7 @@ describe('POST /api/v1/dids/import', () => {
       expect.objectContaining({
         name: 'did:web:example.com',
       }),
+      { callerSuppliedServiceInstanceId: 'inst-1' },
     );
   });
 
@@ -287,13 +291,13 @@ describe('POST /api/v1/dids/import', () => {
     expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when serviceInstanceId is deleted in the race window between resolution and the write (P2003 backstop)', async () => {
+  it('returns 404 when serviceInstanceId is deleted in the race window between resolution and the write (P2003 backstop)', async () => {
     // getInstanceByResolution finds the instance (it existed at check time), but createDid
     // still rejects via the repository's P2003 mapping, simulating deletion in the narrow
     // window between the check and the write. The 404 path above covers the common case;
-    // this is the rare backstop the repository mapping exists for.
-    const { ValidationError } = jest.requireActual('@/lib/api/validation');
-    mockCreateDid.mockRejectedValueOnce(new ValidationError('serviceInstanceId: Service instance not found'));
+    // the repository mapping makes the race indistinguishable from it.
+    const { ServiceInstanceNotFoundError } = jest.requireActual('@/lib/api/errors');
+    mockCreateDid.mockRejectedValueOnce(new ServiceInstanceNotFoundError('inst-1'));
 
     const req = createFakeRequest({
       did: 'did:web:example.com',
@@ -305,8 +309,8 @@ describe('POST /api/v1/dids/import', () => {
     const res = await POST(req, createContext());
     const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(body.error).toBe('serviceInstanceId: Service instance not found');
+    expect(res.status).toBe(404);
+    expect(body.error).toBe('Service instance not found: inst-1');
   });
 
   it('sets status to UNVERIFIED', async () => {
@@ -323,6 +327,7 @@ describe('POST /api/v1/dids/import', () => {
       expect.objectContaining({
         status: 'UNVERIFIED',
       }),
+      expect.anything(),
     );
   });
 
@@ -340,6 +345,7 @@ describe('POST /api/v1/dids/import', () => {
       expect.objectContaining({
         type: 'SELF_MANAGED',
       }),
+      expect.anything(),
     );
   });
 
@@ -580,6 +586,7 @@ describe('POST /api/v1/dids/import', () => {
       expect.objectContaining({
         description: undefined,
       }),
+      expect.anything(),
     );
   });
 });

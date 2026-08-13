@@ -707,7 +707,7 @@ describe('organisation.repository', () => {
       mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
 
       await expect(updateOrganisation('org-1', OTHER_TENANT_ID, { name: 'Updated' })).rejects.toThrow(
-        'Organisation not found or access denied',
+        'Organisation not found',
       );
     });
 
@@ -790,9 +790,7 @@ describe('organisation.repository', () => {
 
       mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
 
-      await expect(deleteOrganisation('org-1', OTHER_TENANT_ID)).rejects.toThrow(
-        'Organisation not found or access denied',
-      );
+      await expect(deleteOrganisation('org-1', OTHER_TENANT_ID)).rejects.toThrow('Organisation not found');
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {
@@ -808,7 +806,7 @@ describe('organisation.repository', () => {
       const result = deleteOrganisation('org-1', TENANT_ID);
 
       await expect(result).rejects.toThrow(NotFoundError);
-      await expect(result).rejects.toThrow('Organisation not found or access denied');
+      await expect(result).rejects.toThrow('Organisation not found');
     });
   });
 });
