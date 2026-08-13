@@ -46,6 +46,7 @@ import {
   SYSTEM_DID_ID,
 } from '../src/lib/prisma/constants.js';
 import { buildUntpArtefactUrls, buildSpecificationPageUrl } from '@uncefact/untp-utils/artefacts';
+import { convergeCoreProvenance } from './core-seed-provenance.js';
 
 const logger = createLogger().child({ module: 'prisma-seed' });
 
@@ -526,11 +527,7 @@ async function main() {
   for (const dm of coreDataModels) {
     const exists = await prisma.dataModel.findUnique({ where: { id: dm.id } });
     if (exists) {
-      if (exists.source !== RecordSource.CORE_SEED) {
-        // Rows created before provenance tracking default to USER; converge
-        // known core ids so the custom-seed reconcile can never claim them.
-        await prisma.dataModel.update({ where: { id: dm.id }, data: { source: RecordSource.CORE_SEED } });
-      }
+      await convergeCoreProvenance(prisma.dataModel, dm.id, exists.source);
       logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model already exists, skipping');
       continue;
     }
@@ -567,12 +564,7 @@ async function main() {
     where: { id: CONFORMITY_SCHEME_DATA_MODEL_ID },
   });
   if (conformitySchemeExists) {
-    if (conformitySchemeExists.source !== RecordSource.CORE_SEED) {
-      await prisma.dataModel.update({
-        where: { id: CONFORMITY_SCHEME_DATA_MODEL_ID },
-        data: { source: RecordSource.CORE_SEED },
-      });
-    }
+    await convergeCoreProvenance(prisma.dataModel, CONFORMITY_SCHEME_DATA_MODEL_ID, conformitySchemeExists.source);
     logger.info(
       { dataModelId: CONFORMITY_SCHEME_DATA_MODEL_ID, credentialType: 'ConformityScheme' },
       'Data model already exists, skipping',
@@ -617,12 +609,7 @@ async function main() {
       for (const dm of coreDataModels) {
         const exists = await prisma.renderTemplate.findUnique({ where: { id: dm.templateId } });
         if (exists) {
-          if (exists.source !== RecordSource.CORE_SEED) {
-            await prisma.renderTemplate.update({
-              where: { id: dm.templateId },
-              data: { source: RecordSource.CORE_SEED },
-            });
-          }
+          await convergeCoreProvenance(prisma.renderTemplate, dm.templateId, exists.source);
           logger.info(
             { templateId: dm.templateId, credentialType: dm.credentialType },
             'Template already exists, skipping',

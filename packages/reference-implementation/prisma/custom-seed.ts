@@ -84,14 +84,14 @@ interface ResolvedConformityEntry {
 
 interface ConformityEntryResolution {
   resolved: ResolvedConformityEntry[];
-  /** Kept in step with `fileResolutionFailed`: every branch that increments this for a FILE entry must also set the flag. */
-  failed: number;
   /**
-   * True when any FILE entry could not be resolved to its identity. Eviction
-   * is suppressed for the boot in that case: a transiently unreadable file
-   * must never make its previously ingested row look manifest-removed.
+   * FILE entries that could not be resolved to their identity. A non-zero
+   * count suppresses eviction for the boot: a transiently unreadable file
+   * must never make its previously ingested row look manifest-removed. URL
+   * entries never count here; their identity is the URL itself and their
+   * failures surface later, at ingest.
    */
-  fileResolutionFailed: boolean;
+  failed: number;
 }
 
 /**
@@ -105,7 +105,7 @@ function resolveConformityEntries(
   manifest: CustomSeedManifest,
 ): ConformityEntryResolution {
   const { logger, customSeedDir } = deps;
-  const resolution: ConformityEntryResolution = { resolved: [], failed: 0, fileResolutionFailed: false };
+  const resolution: ConformityEntryResolution = { resolved: [], failed: 0 };
 
   for (const [index, entry] of manifest.conformitySchemes.entries()) {
     if (entry.url !== undefined) {
@@ -133,13 +133,11 @@ function resolveConformityEntries(
         'Conformity scheme seed file path resolves outside the seed directory (potential path traversal); skipping',
       );
       resolution.failed += 1;
-      resolution.fileResolutionFailed = true;
       continue;
     }
     if (!fs.existsSync(filePath)) {
       logger.error({ file: entry.file, filePath }, 'Conformity scheme seed file not found; skipping');
       resolution.failed += 1;
-      resolution.fileResolutionFailed = true;
       continue;
     }
     const bytes = fs.readFileSync(filePath);
@@ -149,14 +147,12 @@ function resolveConformityEntries(
     } catch (parseErr) {
       logger.error({ file: entry.file, err: parseErr }, 'Conformity scheme seed file is not valid JSON; skipping');
       resolution.failed += 1;
-      resolution.fileResolutionFailed = true;
       continue;
     }
     const canonicalId = doc?.id ?? doc?.['@id'];
     if (typeof canonicalId !== 'string' || canonicalId.length === 0) {
       logger.error({ file: entry.file }, 'Conformity scheme seed file missing top-level `id`; skipping');
       resolution.failed += 1;
-      resolution.fileResolutionFailed = true;
       continue;
     }
     resolution.resolved.push({ sourceUrl: canonicalId, version: entry.version, prefetchedBody: new Uint8Array(bytes) });
@@ -280,7 +276,8 @@ async function evictUnseenSeededSchemes(deps: CustomSeedDependencies, keepSource
  * Deletes system-tenant conformity criteria that no profile references any
  * more. Criteria are shared across schemes within a tenant, so scheme
  * eviction cannot delete them directly; this sweep completes the removal
- * once nothing joins to them. The join FK restricts deletion of a criterion
+ * once nothing joins to them. The sweep is tenant-wide, so it also clears
+ * orphans left behind by earlier events, not only this boot's evictions. The join FK restricts deletion of a criterion
  * that gains a reference concurrently, so a race can only fail the sweep,
  * never delete a live criterion.
  */
@@ -714,7 +711,11 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
       // Upsert render templates (with storage metadata from step 7)
       for (const template of ops.renderTemplates) {
         const storageResult = templateResults.find((r) => r.templateId === template.id);
-        if (!storageResult) continue; // Should not happen — templates were uploaded in step 7.
+        if (!storageResult) {
+          // Every template in ops.renderTemplates was uploaded in step 7, so
+          // a missing result is a broken invariant, not a skippable entry.
+          throw new Error(`render template "${template.id}" has no storage upload result; aborting seed transaction`);
+        }
 
         await tx.renderTemplate.upsert({
           where: { id: template.id },
@@ -791,7 +792,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     conformitySummary.failed += resolution.failed;
 
     if (presence.conformitySchemes) {
-      if (resolution.fileResolutionFailed) {
+      if (resolution.failed > 0) {
         logger.error(
           { failedEntries: resolution.failed },
           'One or more conformity scheme file entries could not be resolved; skipping seeded-scheme eviction this boot (reconciliation incomplete)',
@@ -808,7 +809,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
 
     await processConformitySchemes(deps, resolution.resolved, conformitySummary);
 
-    if (presence.conformitySchemes && !resolution.fileResolutionFailed) {
+    if (presence.conformitySchemes && resolution.failed === 0) {
       conformitySummary.criteriaSwept = await sweepOrphanCriteria(deps).catch((err: unknown) => {
         throw new Error('Orphan criterion sweep failed', { cause: err });
       });
@@ -828,5 +829,12 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     conformitySchemes: conformitySummary,
   };
 
-  logger.info(summary, 'Custom seed completed successfully');
+  if (conformitySummary.failed > 0) {
+    logger.warn(
+      summary,
+      `Custom seed completed with ${conformitySummary.failed} conformity scheme failure(s); see the errors above`,
+    );
+  } else {
+    logger.info(summary, 'Custom seed completed successfully');
+  }
 }

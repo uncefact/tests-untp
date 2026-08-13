@@ -17,9 +17,7 @@ import type { CustomSeedManifest, ManifestSectionPresence } from './custom-seed-
  * identifier scheme under a removed registrar (same-tenant USER rows and other
  * tenants' rows alike), a non-owned qualifier under a removed scheme, a
  * non-owned render template or data-model extension under a removed data
- * model, registered identifiers (`Identifier.scheme` is `onDelete: Restrict`),
- * and the ConformityScheme schema binding that retained SYSTEM_SEED
- * conformity schemes were ingested against.
+ * model, and registered identifiers (`Identifier.scheme` is `onDelete: Restrict`).
  */
 export class ReconcileBlockedError extends Error {
   /** The individual blocking problems, one per affected row, for callers and tests. */
@@ -70,6 +68,19 @@ export async function reconcileRemovals(
     : [];
   const registrarVictimIds = registrarVictims.map((r) => r.id);
 
+  // Lock every victim parent row FOR UPDATE before walking its descendants.
+  // A child INSERT's foreign-key check takes FOR KEY SHARE on the parent row,
+  // which conflicts with FOR UPDATE, so a concurrent request (an old replica
+  // still serving during a rolling deploy) attaching a scheme or template to
+  // a parent this run is about to delete blocks until this transaction ends,
+  // instead of committing into the gap between the descendant check and the
+  // delete and being silently cascade-deleted.
+  const lockRows = async (table: string, ids: string[]): Promise<void> => {
+    if (ids.length === 0) return;
+    await tx.$queryRawUnsafe(`SELECT id FROM "${table}" WHERE id = ANY($1) FOR UPDATE`, ids);
+  };
+  await lockRows('Registrar', registrarVictimIds);
+
   // Identifier schemes removed directly: for each declared registrar whose
   // entry carries an `identifierSchemes` key, owned schemes under it that the
   // entry no longer declares.
@@ -102,6 +113,7 @@ export async function reconcileRemovals(
   }
 
   const allSchemeVictimIds = [...new Set([...directSchemeVictimIds, ...cascadeSchemes.map((s) => s.id)])];
+  await lockRows('IdentifierScheme', allSchemeVictimIds);
 
   // Registered identifiers restrict scheme deletion at the database level; surface
   // them as a named error instead of an aborted transaction.
@@ -140,6 +152,7 @@ export async function reconcileRemovals(
       })
     : [];
   const dataModelVictimIds = dataModelVictims.map((dm) => dm.id);
+  await lockRows('DataModel', dataModelVictimIds);
 
   if (dataModelVictimIds.length > 0) {
     const foreignTemplates = await tx.renderTemplate.findMany({
@@ -162,20 +175,10 @@ export async function reconcileRemovals(
       );
     }
 
-    // A ConformityScheme data-model row is the schema binding that re-ingest
-    // and refresh resolve by (credentialType, version); deleting it while
-    // seeded schemes of that spec version remain would strand their refresh.
-    const conformityBindings = dataModelVictims.filter((dm) => dm.credentialType === 'ConformityScheme');
-    for (const binding of conformityBindings) {
-      const dependentSchemes = await tx.conformityScheme.count({
-        where: { tenantId: systemTenantId, source: 'SYSTEM_SEED', specVersion: binding.version },
-      });
-      if (dependentSchemes > 0) {
-        problems.push(
-          `data model "${binding.name}" (${binding.id}) is the ConformityScheme ${binding.version} schema binding and ${dependentSchemes} seeded conformity scheme(s) still depend on it`,
-        );
-      }
-    }
+    // The ConformityScheme schema binding that ingest resolves by
+    // (credentialType, version, isExtension: false) is always a core-seeded
+    // row; victims here are CUSTOM_SEED and always extensions, so removing
+    // one can never strand a scheme's binding. A unit test pins that scoping.
   }
 
   if (problems.length > 0) {
@@ -204,14 +207,27 @@ export async function reconcileRemovals(
     }
   }
 
-  // Schemes dropped from a retained registrar (per-registrar presence).
+  // Schemes dropped from a retained registrar (per-registrar presence). Their
+  // qualifiers cascade at the database level and are counted first so the
+  // operator log reports every row removed; the pre-checks above guarantee
+  // everything reached here is manifest-owned.
   if (directSchemeVictimIds.length > 0) {
+    summary.qualifiers += await tx.schemeQualifier.count({ where: { schemeId: { in: directSchemeVictimIds } } });
     const result = await tx.identifierScheme.deleteMany({ where: { id: { in: directSchemeVictimIds } } });
     summary.identifierSchemes += result.count;
   }
 
-  // Registrars removed from the manifest (owned schemes and their qualifiers cascade).
+  // Registrars removed from the manifest (owned schemes and their qualifiers
+  // cascade at the database level). The cascade victims are counted into the
+  // summary before the delete, so the operator-facing log reports every row
+  // removed rather than only the directly deleted ones; the pre-checks above
+  // guarantee everything reached here is manifest-owned.
   if (registrarVictimIds.length > 0) {
+    const cascadeSchemeIds = cascadeSchemes.map((s) => s.id).filter((id) => !directSchemeVictimIds.includes(id));
+    if (cascadeSchemeIds.length > 0) {
+      summary.identifierSchemes += cascadeSchemeIds.length;
+      summary.qualifiers += await tx.schemeQualifier.count({ where: { schemeId: { in: cascadeSchemeIds } } });
+    }
     const result = await tx.registrar.deleteMany({ where: { id: { in: registrarVictimIds } } });
     summary.registrars += result.count;
   }
@@ -230,8 +246,12 @@ export async function reconcileRemovals(
     summary.renderTemplates += result.count;
   }
 
-  // Data models removed from the manifest (owned templates and extensions cascade).
+  // Data models removed from the manifest. Owned templates and extension rows
+  // cascade at the database level; both are counted into the summary before
+  // the delete for the same operator-visibility reason as above.
   if (dataModelVictimIds.length > 0) {
+    summary.renderTemplates += await tx.renderTemplate.count({ where: { dataModelId: { in: dataModelVictimIds } } });
+    summary.dataModels += await tx.dataModel.count({ where: { parentConfigId: { in: dataModelVictimIds } } });
     const result = await tx.dataModel.deleteMany({ where: { id: { in: dataModelVictimIds } } });
     summary.dataModels += result.count;
   }

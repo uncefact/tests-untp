@@ -26,13 +26,20 @@ function createTx() {
     schemeQualifier: {
       findMany: jest.fn().mockResolvedValue([]),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
     },
-    dataModel: { findMany: jest.fn().mockResolvedValue([]), deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    dataModel: {
+      findMany: jest.fn().mockResolvedValue([]),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
+    },
     renderTemplate: {
       findMany: jest.fn().mockResolvedValue([]),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
     },
     identifier: { groupBy: jest.fn().mockResolvedValue([]) },
+    $queryRawUnsafe: jest.fn().mockResolvedValue([]),
     conformityScheme: { count: jest.fn().mockResolvedValue(0) },
   };
 }
@@ -232,21 +239,6 @@ describe('reconcileRemovals', () => {
       expect(tx.dataModel.deleteMany).not.toHaveBeenCalled();
     });
 
-    it('blocks removal of a ConformityScheme schema binding that seeded schemes still depend on', async () => {
-      const tx = createTx();
-      tx.dataModel.findMany.mockImplementation(async (query: { where?: { parentConfigId?: unknown } }) => {
-        if (query?.where && 'parentConfigId' in query.where) return [];
-        return [{ id: IDS.dataModelGone, name: 'CS binding', credentialType: 'ConformityScheme', version: '0.7.0' }];
-      });
-      tx.conformityScheme.count.mockResolvedValue(2);
-      const { manifest, presence } = manifestAndPresence({ dataModels: [] });
-
-      await expect(reconcileRemovals(asTx(tx), manifest, presence, SYSTEM_TENANT_ID)).rejects.toThrow(
-        /2 seeded conformity scheme/,
-      );
-      expect(tx.dataModel.deleteMany).not.toHaveBeenCalled();
-    });
-
     it('blocks scheme removal when a non-owned qualifier sits under it', async () => {
       const tx = createTx();
       tx.registrar.findMany.mockResolvedValue([{ id: IDS.registrarGone, name: 'Gone' }]);
@@ -327,6 +319,9 @@ describe('reconcileRemovals', () => {
 
       expect(summary.registrars).toBe(1);
       expect(summary.renderTemplates).toBe(1);
+      // The owned scheme under the removed registrar is cascade-deleted by the
+      // database; the summary counts it so the operator log reports every row.
+      expect(summary.identifierSchemes).toBe(1);
       expect(order).toEqual(['registrar', 'renderTemplate']);
     });
 
@@ -347,6 +342,24 @@ describe('reconcileRemovals', () => {
       });
       expect(tx.registrar.deleteMany).not.toHaveBeenCalled();
       expect(tx.identifierScheme.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('victim scoping invariants', () => {
+    it('only ever selects CUSTOM_SEED rows as data-model victims (the core ConformityScheme binding is unreachable)', async () => {
+      const tx = createTx();
+      const { manifest, presence } = manifestAndPresence({ dataModels: [] });
+
+      await reconcileRemovals(asTx(tx), manifest, presence, SYSTEM_TENANT_ID);
+
+      // Ingest resolves the schema binding by (credentialType, version,
+      // isExtension: false), which is always a core-seeded row; scoping victim
+      // discovery to CUSTOM_SEED is what keeps that binding undeletable here.
+      for (const call of tx.dataModel.findMany.mock.calls) {
+        const where = call[0]?.where ?? {};
+        if ('parentConfigId' in where) continue; // extension-cascade pre-check reads all sources deliberately
+        expect(where.source).toBe('CUSTOM_SEED');
+      }
     });
   });
 });

@@ -350,9 +350,11 @@ An explicitly empty section is a deletion instruction, unlike an omitted one. Re
 
 Moving a nested entry between parents (an identifier scheme to a different registrar, a qualifier to a different scheme) is supported: the child is re-attached to its new parent.
 
+Removing a parent entry removes its manifest-created children with it (a deleted registrar takes its seeded identifier schemes and qualifiers, a deleted data model takes its seeded render templates), whether or not the old entry ever declared the nested keys. The nested presence rules govern reconciliation within a retained parent, not survival of children under a removed one.
+
 ### When removal is refused
 
-A deletion that would take data the manifest does not own down with it fails the whole seed (exit code 1, nothing written) with an error naming the blocking rows:
+A deletion that would take data the manifest does not own down with it fails the whole seed (exit code 1, no database changes are committed) with an error naming the blocking rows:
 
 - a registrar whose identifier schemes include any not created by this manifest (for example a tenant's own scheme attached to a seeded registrar)
 - an identifier scheme whose qualifiers include any not created by this manifest

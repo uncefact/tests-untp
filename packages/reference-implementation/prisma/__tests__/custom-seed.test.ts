@@ -85,18 +85,22 @@ function createMockTx() {
       upsert: jest.fn().mockResolvedValue({}),
       findMany: jest.fn().mockResolvedValue([]),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
     },
     dataModel: {
       upsert: jest.fn().mockResolvedValue({}),
       findMany: jest.fn().mockResolvedValue([]),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
     },
     renderTemplate: {
       upsert: jest.fn().mockResolvedValue({}),
       findMany: jest.fn().mockResolvedValue([]),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
     },
     identifier: { groupBy: jest.fn().mockResolvedValue([]) },
+    $queryRawUnsafe: jest.fn().mockResolvedValue([]),
     conformityScheme: { count: jest.fn().mockResolvedValue(0) },
   };
 }
@@ -504,6 +508,79 @@ describe('runCustomSeed', () => {
           prefetched: expect.objectContaining({ body: expect.any(Uint8Array) }),
         }),
       );
+    });
+  });
+
+  describe('provenance wiring', () => {
+    function setupRegistrarManifest() {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue('');
+      (parseYaml as jest.Mock).mockReturnValue({
+        registrars: [{ id: IDS.registrar1, name: 'Test', namespace: 'test' }],
+      });
+    }
+
+    it('exits when a manifest id collides with a core-seeded row', async () => {
+      setupRegistrarManifest();
+      const deps = createDeps();
+      (deps.prisma.registrar.findMany as jest.Mock).mockImplementation((query: Record<string, unknown>) => {
+        const where = query?.where as Record<string, unknown> | undefined;
+        if (where?.source === 'CORE_SEED') return Promise.resolve([{ id: IDS.registrar1 }]);
+        return Promise.resolve([]);
+      });
+
+      await expect(runCustomSeed(deps)).rejects.toThrow('process.exit');
+
+      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(deps.logger.error).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('core-seeded'));
+    });
+
+    it('stamps CUSTOM_SEED on both create and update payloads, adopting id-matching system rows', async () => {
+      setupRegistrarManifest();
+      const deps = createDeps();
+
+      await runCustomSeed(deps);
+
+      const tx = (deps.prisma as unknown as { __lastTx: { current: ReturnType<typeof createMockTx> } }).__lastTx
+        .current;
+      expect(tx.registrar.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({ source: 'CUSTOM_SEED' }),
+          create: expect.objectContaining({ source: 'CUSTOM_SEED' }),
+        }),
+      );
+    });
+
+    it('runs the upsert phase before removal victim discovery inside the transaction', async () => {
+      setupRegistrarManifest();
+      const deps = createDeps();
+
+      await runCustomSeed(deps);
+
+      const tx = (deps.prisma as unknown as { __lastTx: { current: ReturnType<typeof createMockTx> } }).__lastTx
+        .current;
+      const upsertOrder = tx.registrar.upsert.mock.invocationCallOrder[0];
+      const victimQueryOrder = tx.registrar.findMany.mock.invocationCallOrder[0];
+      expect(upsertOrder).toBeLessThan(victimQueryOrder);
+    });
+
+    it('resolves the conformity schema binding with isExtension: false', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue('');
+      (parseYaml as jest.Mock).mockReturnValue({
+        conformitySchemes: [{ url: 'https://example.com/scheme', version: '0.7.0' }],
+      });
+      const deps = createDeps();
+      ingestMockFn.mockResolvedValue({ kind: 'success', schemeId: 'row-1' });
+      (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
+        schemaUrl: 'https://example.com/schema.json',
+      });
+
+      await runCustomSeed(deps);
+
+      expect(deps.prisma.dataModel.findFirst).toHaveBeenCalledWith({
+        where: expect.objectContaining({ credentialType: 'ConformityScheme', isExtension: false }),
+      });
     });
   });
 });

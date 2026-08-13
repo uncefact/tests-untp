@@ -164,7 +164,10 @@ export type CustomSeedConformityScheme = z.infer<typeof customSeedConformitySche
  * Zod schema for the custom seed manifest (`seed.yaml`).
  *
  * All top-level arrays are optional and default to `[]` so that an empty
- * (or minimal) manifest is always valid.
+ * (or minimal) manifest is always valid. That defaulting erases the
+ * absent-vs-explicitly-empty distinction the reconcile depends on, which is
+ * why key presence is captured separately via {@link extractSectionPresence}
+ * before this schema runs.
  */
 export const customSeedSchema = z.object({
   /** Registrars to upsert, each optionally containing identifier schemes and qualifiers. */
