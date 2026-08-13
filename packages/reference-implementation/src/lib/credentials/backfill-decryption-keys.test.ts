@@ -217,7 +217,7 @@ describe('backfillDecryptionKeys', () => {
     const client = createFakeClient(rows, serviceInstances);
 
     await expect(backfillDecryptionKeys(client)).rejects.toThrow(
-      'Service instance svc-1 holds a configuration that is not a valid encrypted envelope',
+      'Service instance(s) svc-1 hold configurations that are not valid encrypted envelopes',
     );
     expect(client.credential.update).not.toHaveBeenCalled();
   });
@@ -237,7 +237,7 @@ describe('backfillDecryptionKeys', () => {
     const client = createFakeClient(rows, serviceInstances);
 
     await expect(backfillDecryptionKeys(client)).rejects.toThrow(
-      'Service instance svc-1 holds a configuration that is not a valid encrypted envelope',
+      'Service instance(s) svc-1 hold configurations that are not valid encrypted envelopes',
     );
     expect(client.credential.update).not.toHaveBeenCalled();
   });
@@ -280,6 +280,62 @@ describe('backfillDecryptionKeys', () => {
     const client = createFakeClient(rows);
 
     await expect(backfillDecryptionKeys(client)).rejects.toThrow('credential cred-3');
+    expect(client.credential.update).not.toHaveBeenCalled();
+  });
+
+  it('names every failing row in the preflight abort, not only the first', async () => {
+    const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
+
+    const rows: Row[] = [
+      { id: 'cred-1', decryptionKey: await envelopeUnderOtherKey('b'.repeat(64)) },
+      { id: 'cred-2', decryptionKey: await envelopeUnderOtherKey('c'.repeat(64)) },
+    ];
+    const serviceInstances: ServiceInstanceRow[] = [{ id: 'svc-1', config: await envelopeUnderOtherKey('{"a":1}') }];
+    const client = createFakeClient(rows, serviceInstances);
+
+    const error: Error = await backfillDecryptionKeys(client).then(
+      () => {
+        throw new Error('expected the preflight to abort');
+      },
+      (thrown: Error) => thrown,
+    );
+    expect(error.message).toContain('service instance svc-1, credential cred-1, credential cred-2');
+    expect(error.message).toContain('First failure (service instance svc-1):');
+    expect((error.cause as { message?: unknown })?.message).toEqual(expect.any(String));
+    expect(client.credential.update).not.toHaveBeenCalled();
+  });
+
+  it('aborts on a decrypt failure even under --force', async () => {
+    const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
+
+    const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnderOtherKey('b'.repeat(64)) }];
+    const client = createFakeClient(rows, []);
+
+    await expect(backfillDecryptionKeys(client, { force: true })).rejects.toThrow('credential cred-1');
+    expect(client.credential.update).not.toHaveBeenCalled();
+  });
+
+  it('names corruption and decrypt failures together in one abort, even under --force', async () => {
+    const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
+
+    const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnderOtherKey('b'.repeat(64)) }];
+    const serviceInstances: ServiceInstanceRow[] = [
+      { id: 'svc-corrupt', config: 'not an envelope' },
+      { id: 'svc-wrong', config: await envelopeUnderOtherKey('{"a":1}') },
+    ];
+    const client = createFakeClient(rows, serviceInstances);
+
+    const error: Error = await backfillDecryptionKeys(client, { force: true }).then(
+      () => {
+        throw new Error('expected the preflight to abort');
+      },
+      (thrown: Error) => thrown,
+    );
+    expect(error.message).toContain(
+      'Service instance(s) svc-corrupt hold configurations that are not valid encrypted envelopes',
+    );
+    expect(error.message).toContain('Preflight decrypt failed for service instance svc-wrong, credential cred-1');
+    expect(error.message).toContain('aborting before any write');
     expect(client.credential.update).not.toHaveBeenCalled();
   });
 

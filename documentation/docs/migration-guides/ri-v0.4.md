@@ -59,9 +59,10 @@ unrecoverable, so a human confirms the key before anything is rewritten.
 
 Before running it:
 
-1. Back up the database.
-2. Confirm `DATA_ENCRYPTION_KEY` is exactly the key the running application uses.
-3. Stop any older application instances that might still write plaintext keys during a
+1. Preview what it would do with the read-only audit command (`pnpm audit:encryption`), which decrypts every stored envelope under the active key and reports what the backfill would wrap, skip, or abort on (see [Encryption Audit](../reference-implementation/operations/encryption-audit)).
+2. Back up the database.
+3. Confirm `DATA_ENCRYPTION_KEY` is exactly the key the running application uses.
+4. Stop any older application instances that might still write plaintext keys during a
    rolling upgrade (or plan to re-run the backfill after they are gone; re-running is
    safe and converges).
 
