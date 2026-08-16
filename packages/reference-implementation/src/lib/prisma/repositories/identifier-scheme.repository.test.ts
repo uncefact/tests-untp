@@ -127,6 +127,37 @@ describe('identifier-scheme.repository', () => {
       expect(result).toEqual(SCHEME_RECORD);
     });
 
+    // `order` is optional and the column defaults to 0, so a caller asking for
+    // 0 explicitly and a caller omitting it are indistinguishable in the
+    // stored row. The distinction lives in the payload, and a truthiness test
+    // in place of the undefined check would drop the explicit 0 silently.
+    it.each([
+      ['zero', 0],
+      ['a positive order', 2],
+    ])('forwards a qualifier order of %s to the nested create', async (_label, order) => {
+      mockIdentifierScheme.create.mockResolvedValue(SCHEME_RECORD);
+
+      await createIdentifierScheme({
+        tenantId: TENANT_ID,
+        registrarId: REGISTRAR_ID,
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{13,14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+        qualifiers: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$', order }],
+      });
+
+      expect(mockIdentifierScheme.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            qualifiers: {
+              create: [{ key: 'batch', description: 'Batch number', validationPattern: '^[A-Za-z0-9]{1,20}$', order }],
+            },
+          }),
+        }),
+      );
+    });
+
     it('creates a scheme without qualifiers', async () => {
       const recordWithoutQualifiers = { ...SCHEME_RECORD, qualifiers: [] };
       mockIdentifierScheme.create.mockResolvedValue(recordWithoutQualifiers);
@@ -413,6 +444,32 @@ describe('identifier-scheme.repository', () => {
           qualifiers: true,
           registrar: true,
         },
+      });
+    });
+
+    it.each([
+      ['zero', 0],
+      ['a positive order', 2],
+    ])('forwards a qualifier order of %s to the replacement createMany', async (_label, order) => {
+      mockTx.identifierScheme.findFirst.mockResolvedValue(SCHEME_RECORD);
+      mockTx.schemeQualifier.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.schemeQualifier.createMany.mockResolvedValue({ count: 1 });
+      mockTx.identifierScheme.update.mockResolvedValue(SCHEME_RECORD);
+
+      await updateIdentifierScheme('scheme-1', TENANT_ID, {
+        qualifiers: [{ key: 'serial', description: 'Serial number', validationPattern: '^[A-Z0-9]+$', order }],
+      });
+
+      expect(mockTx.schemeQualifier.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            schemeId: 'scheme-1',
+            key: 'serial',
+            description: 'Serial number',
+            validationPattern: '^[A-Z0-9]+$',
+            order,
+          },
+        ],
       });
     });
 
