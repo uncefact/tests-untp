@@ -4,7 +4,10 @@ import type {
   ConformityScheme,
   validateConformityClaim as ValidateConformityClaim,
 } from '@uncefact/untp-utils/conformity-vocabulary';
-import { extractDccConformityClaim } from './conformity-claim';
+import { extractDccConformityClaim, extractDccConformityClaimWithProvenance } from './conformity-claim';
+import { remapWarningPointers } from '../../../../../cvc/remap-warning-pointers';
+import { makeBridge } from '../../../../make-bridge';
+import { dccV070Spec } from './index';
 
 // Loaded from the untp-utils source at runtime rather than imported from the
 // package entry: this package's Jest cannot parse untp-utils' ESM build
@@ -412,5 +415,314 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
 
   it('returns null for an empty subject', () => {
     expect(extractDccConformityClaim({})).toBeNull();
+  });
+});
+
+describe('extractDccConformityClaimWithProvenance (v0.7.0)', () => {
+  // Each assertion pairs a pointer the validator can emit with the subject
+  // path the value was read from, which is the contract the credentials route
+  // relies on to resolve a warning against the document its caller submitted.
+
+  const subject = {
+    referenceScheme: { id: 'https://example.com/s' },
+    referenceProfile: { id: 'https://example.com/s/p/1.0.0' },
+    conformityAssessment: [
+      {
+        conformityTopic: [{ id: 'https://example.com/t/a' }],
+        assessmentCriteria: [
+          { id: 'https://example.com/s/c/1/1.0.0', conformityTopic: [{}, { id: 'https://example.com/t/b' }] },
+          { id: 'https://example.com/s/c/2/1.0.0', conformityTopic: { id: 'https://example.com/t/c' } },
+        ],
+      },
+      {
+        conformityTopic: [{ id: 'https://example.com/t/d' }],
+        assessmentCriteria: [{ id: 'https://example.com/s/c/3/1.0.0' }],
+      },
+    ],
+  };
+
+  it('records the scheme and profile paths', () => {
+    const { sourceMap } = extractDccConformityClaimWithProvenance(subject)!;
+
+    expect(sourceMap['/scheme']).toBe('/referenceScheme/id');
+    expect(sourceMap['/profile']).toBe('/referenceProfile/id');
+  });
+
+  it('records no profile path when the subject declares no profile', () => {
+    // `/profile` is also the not-specified warning's pointer, and that warning
+    // has no location in a document that omits the profile.
+    const { sourceMap } = extractDccConformityClaimWithProvenance({
+      referenceScheme: { id: 'https://example.com/s' },
+    })!;
+
+    expect(sourceMap).not.toHaveProperty('/profile');
+  });
+
+  it('maps a flattened criterion back to the assessment it came from', () => {
+    const { claim, sourceMap } = extractDccConformityClaimWithProvenance(subject)!;
+
+    // The third criterion is flattened onto the shared array from the second
+    // assessment, which a prefix on the claim index could never recover.
+    expect(claim.criteria[2].criterion).toBe('https://example.com/s/c/3/1.0.0');
+    expect(sourceMap['/criteria/2/criterion']).toBe('/conformityAssessment/1/assessmentCriteria/0/id');
+  });
+
+  it('maps a criterion topic to its source index, skipping dropped entries', () => {
+    const { claim, sourceMap } = extractDccConformityClaimWithProvenance(subject)!;
+
+    // The id-less first entry is dropped, so claim index 0 is source index 1.
+    expect(claim.criteria[0].conformityTopics).toEqual(['https://example.com/t/b']);
+    expect(sourceMap['/criteria/0/conformityTopics/0']).toBe(
+      '/conformityAssessment/0/assessmentCriteria/0/conformityTopic/1',
+    );
+  });
+
+  it('maps a criterion topic authored as a bare object to the field itself', () => {
+    const { sourceMap } = extractDccConformityClaimWithProvenance(subject)!;
+
+    // A lone object is not an array, so there is no index to address.
+    expect(sourceMap['/criteria/1/conformityTopics/0']).toBe(
+      '/conformityAssessment/0/assessmentCriteria/1/conformityTopic',
+    );
+  });
+
+  it('records the un-indexed topic pointer the omitted-topic warning uses', () => {
+    const { sourceMap } = extractDccConformityClaimWithProvenance(subject)!;
+
+    expect(sourceMap['/criteria/0/conformityTopics']).toBe(
+      '/conformityAssessment/0/assessmentCriteria/0/conformityTopic',
+    );
+  });
+
+  it('maps assessment topics to their own assessment', () => {
+    const { sourceMap } = extractDccConformityClaimWithProvenance(subject)!;
+
+    expect(sourceMap['/assessments/1/conformityTopics/0']).toBe('/conformityAssessment/1/conformityTopic/0');
+  });
+
+  it('is registered on the bridge the route resolves, not only exported', () => {
+    // The route reaches this through getBridge -> makeBridge(dccV070Spec).
+    // If the spec stopped registering the provenance extractor, every warning
+    // pointer would be dropped in production and no other test would notice.
+    const bridge = makeBridge(dccV070Spec);
+
+    const extracted = bridge.extractConformityClaimWithProvenance(subject);
+
+    expect(extracted).not.toBeNull();
+    expect(Object.keys(extracted!.sourceMap).length).toBeGreaterThan(0);
+    expect(extracted!.sourceMap['/scheme']).toBe('/referenceScheme/id');
+  });
+
+  it('records source paths that step over a skipped assessment and criterion', () => {
+    // The claim-side index counts only what was kept, the source-side index
+    // counts every entry the document has. Reusing one for the other is the
+    // regression this pins, and it is invisible in the claim alone.
+    const sparse = {
+      referenceScheme: { id: 'https://example.com/s' },
+      conformityAssessment: [null, { assessmentCriteria: [{ noId: true }, { id: 'https://example.com/s/c/9/1.0.0' }] }],
+    };
+
+    const { claim, sourceMap } = extractDccConformityClaimWithProvenance(sparse)!;
+
+    expect(claim.criteria).toEqual([{ criterion: 'https://example.com/s/c/9/1.0.0' }]);
+    expect(sourceMap['/criteria/0/criterion']).toBe('/conformityAssessment/1/assessmentCriteria/1/id');
+    expect(sourceMap['/assessments/0/conformityTopics']).toBe('/conformityAssessment/1/conformityTopic');
+  });
+
+  it('returns null on the same terms as the plain extractor', () => {
+    expect(extractDccConformityClaimWithProvenance({})).toBeNull();
+  });
+
+  it('records a path for every pointer the validator can emit against this claim', () => {
+    // Guards the silent failure mode: a projected value with no recorded path
+    // loses its pointer at the route, and nothing else would report that.
+    const { claim, sourceMap } = extractDccConformityClaimWithProvenance(subject)!;
+
+    const expected = ['/scheme', '/profile'];
+    claim.criteria.forEach((criterion, index) => {
+      expected.push(`/criteria/${index}/criterion`);
+      criterion.conformityTopics?.forEach((_topic, position) => {
+        expected.push(`/criteria/${index}/conformityTopics`, `/criteria/${index}/conformityTopics/${position}`);
+      });
+    });
+    claim.assessments?.forEach((assessment, index) => {
+      assessment.conformityTopics.forEach((_topic, position) => {
+        expected.push(`/assessments/${index}/conformityTopics`, `/assessments/${index}/conformityTopics/${position}`);
+      });
+    });
+
+    expect(Object.keys(sourceMap)).toEqual(expect.arrayContaining(expected));
+  });
+
+  describe('composed with the real validator and the real remap', () => {
+    // The assertions above check the map against pointers written out by hand.
+    // These drive the actual validator over the actual projection instead, so
+    // a pointer shape the extractor fails to record is caught here rather than
+    // silently dropped at the route: the remap fails closed, so an unmapped
+    // pointer disappears with no error and the feature would look like it
+    // worked while doing nothing.
+
+    // Emitted where the warning's subject is absent from the document, so
+    // there is deliberately no source path: a criterion the claim never
+    // declared, and a profile it never specified.
+    const UNMAPPABLE = ['/criteria', '/profile'];
+
+    const SCHEME_URI = 'https://example.com/s';
+    const PROFILE_URI = 'https://example.com/s/p/1.0.0';
+    const DEFINED = 'https://example.com/t/defined';
+    const WRONG = 'https://example.com/t/wrong';
+
+    const publishedCriterion = (id: string, name: string) => ({
+      canonicalId: id,
+      name,
+      version: '1.0.0',
+      status: 'active',
+      topics: [{ canonicalId: DEFINED }],
+      tags: [],
+    });
+
+    const scheme: ConformityScheme = {
+      canonicalId: SCHEME_URI,
+      sourceUrl: SCHEME_URI,
+      specVersion: '0.7.0',
+      name: 'Example',
+      profiles: [
+        {
+          canonicalId: PROFILE_URI,
+          name: 'Example profile',
+          version: '1.0.0',
+          status: 'active',
+          criteria: [
+            publishedCriterion('https://example.com/s/c/1/1.0.0', 'Claimed criterion'),
+            publishedCriterion('https://example.com/s/c/2/1.0.0', 'Criterion the claim omits'),
+          ],
+        },
+      ],
+    };
+
+    // Engineered to trigger the criterion, topic and assessment warnings at
+    // once: an unpublished criterion, a published one the claim omits, a
+    // criterion topic wrong in both directions, and an assessment topic
+    // outside its criteria's union. The assessment check is skipped where an
+    // unresolved criterion sits in the same assessment, so the second
+    // assessment carries only resolvable criteria. It repeats criterion 1,
+    // which also puts the same URI at two claim positions, the case a
+    // URI-based reverse lookup could not tell apart.
+    const composedSubject = {
+      referenceScheme: { id: SCHEME_URI },
+      referenceProfile: { id: PROFILE_URI },
+      conformityAssessment: [
+        {
+          conformityTopic: [{ id: DEFINED }],
+          assessmentCriteria: [
+            { id: 'https://example.com/s/c/1/1.0.0', conformityTopic: [{}, { id: WRONG }] },
+            { id: 'https://example.com/s/c/unknown/1.0.0' },
+          ],
+        },
+        {
+          conformityTopic: [{ id: WRONG }],
+          assessmentCriteria: [{ id: 'https://example.com/s/c/1/1.0.0' }],
+        },
+      ],
+    };
+    const document = { credentialSubject: composedSubject };
+
+    it('emits the warnings this fixture is built to trigger', () => {
+      const extracted = extractDccConformityClaimWithProvenance(composedSubject)!;
+      const codes = validateConformityClaim(extracted.claim, scheme).map((w) => w.code);
+
+      expect(codes).toEqual(
+        expect.arrayContaining([
+          'conformity-criterion.not-in-profile',
+          'conformity-criterion.missing',
+          'conformity-criterion.topic-mismatch',
+          'conformity-assessment.topic-mismatch',
+        ]),
+      );
+    });
+
+    it('records a source path for every emitted pointer bar the two with no location', () => {
+      const extracted = extractDccConformityClaimWithProvenance(composedSubject)!;
+      const emitted = validateConformityClaim(extracted.claim, scheme)
+        .map((w) => w.pointer)
+        .filter((pointer): pointer is string => pointer !== undefined);
+
+      expect(emitted.length).toBeGreaterThan(0);
+      expect(emitted.filter((p) => !UNMAPPABLE.includes(p) && extracted.sourceMap[p] === undefined)).toEqual([]);
+    });
+
+    it('rewrites every recorded pointer onto a path that resolves in the credential', () => {
+      const extracted = extractDccConformityClaimWithProvenance(composedSubject)!;
+      const warnings = validateConformityClaim(extracted.claim, scheme);
+
+      const remapped = remapWarningPointers(warnings, extracted.sourceMap, document, '/credentialSubject');
+
+      // Pinned exactly rather than by prefix: a map entry that resolved to the
+      // wrong existing node would satisfy a prefix check while still telling
+      // the caller to look in the wrong place.
+      const byCode = new Map(remapped.map((w) => [`${w.code}:${w.pointer ?? ''}`, w.pointer]));
+      expect([...byCode.values()].filter((p) => p !== undefined).sort()).toEqual([
+        '/credentialSubject/conformityAssessment/0/assessmentCriteria/0/conformityTopic',
+        '/credentialSubject/conformityAssessment/0/assessmentCriteria/0/conformityTopic/1',
+        '/credentialSubject/conformityAssessment/0/assessmentCriteria/1/id',
+        '/credentialSubject/conformityAssessment/1/conformityTopic/0',
+      ]);
+
+      remapped.forEach((warning, index) => {
+        const original = warnings[index].pointer;
+        if (original === undefined || UNMAPPABLE.includes(original)) {
+          expect(warning.pointer).toBeUndefined();
+        }
+      });
+    });
+
+    it('drops the pointer on a profile the credential never specified', () => {
+      const subject = { referenceScheme: { id: SCHEME_URI } };
+      const extracted = extractDccConformityClaimWithProvenance(subject)!;
+      const notSpecified = validateConformityClaim(extracted.claim, scheme).find(
+        (w) => w.code === 'conformity-profile.not-specified',
+      );
+
+      expect(notSpecified?.pointer).toBe('/profile');
+      const [remapped] = remapWarningPointers(
+        [notSpecified!],
+        extracted.sourceMap,
+        { credentialSubject: subject },
+        '/credentialSubject',
+      );
+      expect(remapped).not.toHaveProperty('pointer');
+    });
+
+    it('rewrites the profile pointer when the scheme does not publish that profile', () => {
+      // The other `/profile` case (none specified) has no source location and
+      // is asserted above; this one does, so it must survive the remap.
+      const subject = {
+        referenceScheme: { id: SCHEME_URI },
+        referenceProfile: { id: 'https://example.com/s/p/absent/1.0.0' },
+        conformityAssessment: [{ assessmentCriteria: [{ id: 'https://example.com/s/c/1/1.0.0' }] }],
+      };
+      const extracted = extractDccConformityClaimWithProvenance(subject)!;
+      const warnings = validateConformityClaim(extracted.claim, scheme);
+
+      const remapped = remapWarningPointers(
+        warnings,
+        extracted.sourceMap,
+        { credentialSubject: subject },
+        '/credentialSubject',
+      );
+
+      const notFound = remapped.find((w) => w.code === 'conformity-profile.not-found');
+      expect(notFound?.pointer).toBe('/credentialSubject/referenceProfile/id');
+    });
+
+    it('rewrites the scheme pointer when the catalogue does not know the scheme', () => {
+      const extracted = extractDccConformityClaimWithProvenance(composedSubject)!;
+      const warnings = validateConformityClaim(extracted.claim, null);
+
+      const [remapped] = remapWarningPointers(warnings, extracted.sourceMap, document, '/credentialSubject');
+
+      expect(warnings[0].code).toBe('conformity-scheme.not-found');
+      expect(remapped.pointer).toBe('/credentialSubject/referenceScheme/id');
+    });
   });
 });

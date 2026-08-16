@@ -162,3 +162,10 @@ export type {
 } from './data-model-bridges/index.js';
 
 export { getBridge, buildContextAndTypes } from './data-model-bridges/index.js';
+
+// Imported from its own module rather than the './cvc' barrel: that barrel
+// also loads the scheme-ingest chain and its multibase and resolver
+// dependencies, and a consumer that only rewrites warning pointers should not
+// have to resolve those.
+export { remapWarningPointers, type RemappedWarning } from './cvc/remap-warning-pointers.js';
+export type { ClaimSourceMap, ConformityClaimWithProvenance } from './data-model-bridges/index.js';

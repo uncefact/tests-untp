@@ -14,11 +14,14 @@ import type { ConformityClaim, ConformityCriterion, ConformityScheme, Conformity
  * - otherwise → criteria-level, criterion-topic, and assessment-topic warnings
  *   accumulate.
  *
- * Pointers are relative to `claim`; consumers re-map them by prepending
- * a wrapper path when the claim is extracted from a larger document. Note
- * that `/assessments/{i}` indexes the claim's `assessments` array, whose
- * positions are not guaranteed to match the source document's assessment
- * indices, because an extractor may filter empty or malformed entries.
+ * Pointers are relative to `claim`. A consumer that holds the document the
+ * claim was extracted from re-maps them onto it, and prepending a wrapper path
+ * is only sound where the claim is a sub-document of that source. Where an
+ * extractor synthesises the claim, a prefix is not enough and the consumer
+ * needs the exact source path of each projected value: `criteria` may be
+ * flattened from several places, field names need not match, and an extractor
+ * that filters empty or malformed entries shifts both `/assessments/{i}` and
+ * topic indices away from their source positions (#753).
  *
  * @see ADR-033 §3 for warning code definitions.
  */
