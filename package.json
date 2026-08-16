@@ -14,7 +14,7 @@
     "build:components": "pnpm --filter @reference-implementation/components run build",
     "build:ri": "pnpm --filter untp-reference-implementation run build",
     "build:playground": "pnpm --filter untp-playground run build",
-    "build-clean": "rimraf --glob ./node_modules ./packages/*/tsconfig.tsbuildinfo ./packages/*/build ./packages/*/node_modules",
+    "build-clean": "rimraf --glob ./node_modules ./packages/*/tsconfig.tsbuildinfo ./packages/*/build ./packages/*/node_modules ./packages/*/e2e/node_modules",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "test:coverage": "pnpm -r --workspace-concurrency=1 run test --coverage && rm -rf coverage && istanbul-merge --out coverage/coverage-final.json packages/*/coverage/coverage-final.json && nyc report --temp-dir=./coverage --reporter=html --reporter=json-summary",
     "test:components": "pnpm --filter @reference-implementation/components run test",
