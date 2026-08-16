@@ -48,7 +48,7 @@ POST /api/v1/facilities
 
 Creates one or more facilities in bulk. The request body must be a non-empty array of facility objects — each must include a non-empty `name`. Optional fields include `description` (non-empty if provided), `location`, `operatingOrganisationId`, `primaryIdentifierId`, and `secondaryIdentifierIds` (each ID unique within the array; rejected with a 400 if provided but not an array, or if it contains a duplicate). Unrecognised fields on each item are ignored.
 
-**Optional fields must be omitted to skip them — do not send them as a JSON `null`.** There is no clear-on-create semantics (nothing yet exists to clear), so an explicit `null` on any optional field is now rejected with a 400 for the whole request, the same as any other malformed value. This is a real behaviour change for `location`: it was previously accepted silently, with no different effect than omitting the field (the write skipped the column either way, leaving it unset) — that silent equivalence is gone, and `location: null` is now a 400.
+**Optional fields must be omitted to skip them — do not send them as a JSON `null`.** There is no clear-on-create semantics (nothing yet exists to clear), so an explicit `null` on any optional field is rejected with a 400 for the whole request, the same as any other malformed value. This is a real behaviour change for `location`: it was previously accepted silently, with no different effect than omitting the field (the write skipped the column either way, leaving it unset) — that silent equivalence is gone, and `location: null` is now a 400.
 
 ```mermaid
 sequenceDiagram
