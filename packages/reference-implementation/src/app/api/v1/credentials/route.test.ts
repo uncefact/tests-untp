@@ -135,6 +135,7 @@ jest.mock('@/lib/api/validation', () => {
   };
 });
 
+import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 // ---------------------------------------------------------------------------
@@ -278,7 +279,8 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(400);
-      expect(json.error).toContain('credentialPayload is required');
+      expect(json.error).toContain('credentialPayload');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
     it('returns 400 when credentialPayload is not an object', async () => {
@@ -287,7 +289,8 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(400);
-      expect(json.error).toContain('credentialPayload is required');
+      expect(json.error).toContain('credentialPayload');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
     it('returns 400 when credentialType is missing', async () => {
@@ -296,7 +299,8 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(400);
-      expect(json.error).toContain('credentialType is required');
+      expect(json.error).toContain('credentialType');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
     it('accepts any non-empty credentialType string', async () => {
@@ -312,7 +316,58 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(400);
-      expect(json.error).toContain('version is required');
+      expect(json.error).toContain('version');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['blank credentialType', { credentialType: '   ' }, 'credentialType'],
+      ['blank version', { version: ' ' }, 'version'],
+      ['mistyped storageOptions.encrypt', { storageOptions: { encrypt: 'false' } }, 'storageOptions.encrypt'],
+      [
+        'mistyped storageOptions.serviceInstanceId',
+        { storageOptions: { serviceInstanceId: 42 } },
+        'storageOptions.serviceInstanceId',
+      ],
+      ['null storageOptions', { storageOptions: null }, 'storageOptions'],
+      ['null publishingOptions', { publishingOptions: null }, 'publishingOptions'],
+      ['blank publishingOptions.linkType', { publishingOptions: { linkType: '  ' } }, 'publishingOptions.linkType'],
+      [
+        'malformed machineVerificationUrl',
+        { publishingOptions: { machineVerificationUrl: 'not-a-url' } },
+        'machineVerificationUrl',
+      ],
+      ['malformed hreflang entry', { publishingOptions: { hreflang: ['en', 'en_US'] } }, 'hreflang'],
+      ['hreflang entry repeating a variant', { publishingOptions: { hreflang: ['de-DE-1901-1901'] } }, 'hreflang'],
+      [
+        'hreflang entry repeating an extension singleton',
+        { publishingOptions: { hreflang: ['en-a-bbb-a-ccc'] } },
+        'hreflang',
+      ],
+      ['mistyped accessRole entry', { publishingOptions: { accessRole: ['not-a-role'] } }, 'accessRole'],
+    ])('returns 400 naming the field for %s, and never attempts issuance', async (_label, overrides, fieldNamed) => {
+      const req = createFakeRequest(validBody(overrides));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain(fieldNamed);
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('accepts a private-use BCP 47 hreflang tag (x-default)', async () => {
+      const req = createFakeRequest(validBody({ publishingOptions: { hreflang: ['en-AU', 'x-default'] } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(201);
+    });
+
+    it('ignores unknown body fields rather than rejecting them', async () => {
+      const req = createFakeRequest(validBody({ unknownExtraField: 'ignored' }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(201);
+      expect(mockIssueCredential).toHaveBeenCalledTimes(1);
+      const input = mockIssueCredential.mock.calls[0][0];
+      expect(input).not.toHaveProperty('unknownExtraField');
     });
   });
 
@@ -823,6 +878,23 @@ describe('POST /api/v1/credentials', () => {
 
       mockUpdateCredentialPublished.mockResolvedValue({});
     }
+
+    it('forwards hreflang tags to the published links exactly as sent, without canonicalising them', async () => {
+      setupPublishingHappyPath();
+
+      const req = createFakeRequest(
+        validBody({
+          publishingOptions: { publish: true, hreflang: ['EN-au', 'x-default', 'sl-rozaj-biske'] },
+        }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      expect(res.status).toBe(201);
+
+      // The schema validates well-formedness only: a tag that arrives with
+      // non-canonical casing must be published as the caller sent it.
+      const linkOptions = mockBuildPublishLinks.mock.calls[0][2];
+      expect(linkOptions.hreflang).toEqual(['EN-au', 'x-default', 'sl-rozaj-biske']);
+    });
 
     it('does not add PUBLISH_SKIPPED when refs extraction already failed', async () => {
       setupPublishingHappyPath();
@@ -1446,6 +1518,55 @@ describe('GET /api/v1/credentials', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockListCredentials.mockResolvedValue({ data: [], total: 0 });
+  });
+
+  it('rejects a limit above the deployment maximum with a 400 naming the bound, without querying', async () => {
+    const req = createFakeGetRequest({ limit: String(MAX_PAGE_LIMIT + 1) });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('limit');
+    expect(json.error).toContain(String(MAX_PAGE_LIMIT));
+    expect(mockListCredentials).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['1abc', 'limit'],
+    ['0x10', 'limit'],
+    ['1e3', 'limit'],
+  ])('rejects the malformed strict-integer limit %s with a 400', async (value, fieldNamed) => {
+    const req = createFakeGetRequest({ limit: value });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain(fieldNamed);
+    expect(mockListCredentials).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['', 'empty'],
+    ['   ', 'whitespace'],
+    ['NoSuchType', 'unknown'],
+  ])('keeps accepting a %j (%s) credentialType filter as a 200', async (value) => {
+    const req = createFakeGetRequest({ credentialType: value });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    expect(res.status).toBe(200);
+    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ credentialType: value }));
+  });
+
+  it('rejects a repeated query parameter with a 400', async () => {
+    const url = new URL('http://localhost/api/v1/credentials');
+    url.searchParams.append('credentialType', 'A');
+    url.searchParams.append('credentialType', 'B');
+    const req = { method: 'GET', url: url.toString(), headers: new Headers() } as unknown as Request;
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('credentialType');
+    expect(mockListCredentials).not.toHaveBeenCalled();
   });
 
   it('returns 200 with default pagination when no params provided', async () => {

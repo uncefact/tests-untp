@@ -210,7 +210,7 @@ Publishing requires the primary entity to have:
 - The scheme must have a registrar with a namespace
 - An IDR service instance (configured on the scheme, or the tenant/system default)
 
-If any of these are missing, publishing is silently skipped and a `PUBLISH_SKIPPED` warning is included in the response.
+If any of these are missing, publishing is silently skipped and a `PUBLISH_SKIPPED` warning is included in the response. Three further publishing-related warnings can appear on a 201: `REFS_EXTRACTION_FAILED` (the payload's entity references could not be extracted, so publishing was skipped), `IDR_PUBLISH_FAILED` (the Identity Resolver rejected or failed the publish; the credential is stored but not discoverable), and `DB_STATUS_UPDATE_FAILED` (the publish succeeded but recording the published status failed, so the credential record may show unpublished).
 
 The IDR entry's `description` field is taken from the primary entity's `description`, falling back to the entity's `name` if no description is set.
 
@@ -226,9 +226,9 @@ The published link does **not** carry the credential's decryption key. The key i
 | `linkType` | string | Link relation type (defaults to the IDR service's configured default link type) |
 | `linkTitle` | string | Human-readable title for the link (defaults to the data model name) |
 | `qualifierPath` | string | Qualifier path for sub-identifiers, e.g., `/10/LOT123/21/SER456` (defaults to `/`) |
-| `machineVerificationUrl` | string | URL for machine-readable verification of the credential |
-| `humanVerificationUrl` | string | URL for human-readable verification of the credential (defaults to `${RI_APP_URL}/verify`, this RI's verify page, when publishing) |
-| `hreflang` | string[] | BCP 47 language tags for the link's target content |
+| `machineVerificationUrl` | string | URL for machine-readable verification of the credential. Must be a well-formed HTTP(S) URL without embedded credentials |
+| `humanVerificationUrl` | string | URL for human-readable verification of the credential (defaults to `${RI_APP_URL}/verify`, this RI's verify page, when publishing). Must be a well-formed HTTP(S) URL without embedded credentials |
+| `hreflang` | string[] | Well-formed BCP 47 language tags for the link's target content |
 | `additionalRels` | string[] | Additional link relation types to attach beyond `linkType` |
 | `public` | boolean | Whether the published link is publicly resolvable |
 | `accessRole` | string[] | UNTP access roles allowed to retrieve the published links, from the [UNTP access role vocabulary](https://untp.unece.org/docs/specification/DecentralisedAccessControl) (e.g. `untp:accessRole#Regulator`); attached to the credential and human verification links |
@@ -261,6 +261,9 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 | `publishingOptions.hreflang` | string[] | No | BCP 47 language tags for the link's target content |
 | `publishingOptions.additionalRels` | string[] | No | Additional link relation types beyond `linkType` |
 | `publishingOptions.public` | boolean | No | Whether the published link is publicly resolvable |
+| `publishingOptions.accessRole` | string[] | No | UNTP access roles governing who the published links are surfaced to (e.g. `untp:accessRole#Regulator`) |
+
+Every field is shape-checked at the boundary: a missing or mistyped field is rejected with a 400 that names it, and unknown fields are ignored. The verification URLs must be well-formed HTTP(S) URLs without embedded credentials, `hreflang` entries must be well-formed [BCP 47](https://www.rfc-editor.org/rfc/rfc5646.html) language tags, and `linkType` must not be blank. Passing `null` for `storageOptions` or `publishingOptions` is rejected; omit them instead.
 
 ---
 
@@ -274,12 +277,14 @@ Returns a paginated list of credentials for the authenticated tenant.
 
 **Query parameters:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `credentialType` | string | Filter by credential type (case-sensitive exact match) |
-| `isPublished` | `"true"` or `"false"` | Filter by published status |
-| `limit` | integer | Maximum results (default: 20, max: 100) |
-| `offset` | integer | Number of results to skip (default: 0) |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `credentialType` | string | none | Filter by credential type (case-sensitive exact match) |
+| `isPublished` | `"true"` or `"false"` | none | Filter by published status |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
+| `offset` | integer | `0` | Number of results to skip |
+
+Pagination values must be plain decimal integers, and a repeated query parameter is rejected with a 400.
 
 ---
 
@@ -329,7 +334,7 @@ sequenceDiagram
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `uri` | string (URL) | Yes | Storage URI where the credential is stored. Must be HTTP(S). |
+| `uri` | string (URL) | Yes | Storage URI where the credential is stored. Must be HTTP(S) without embedded userinfo credentials. |
 | `digestMultibase` | string | No | Expected multibase-encoded digest of the credential content. If provided, the fetched credential's digest is verified against it. |
 | `hash` | string | No | Expected SHA-256 hash (64-character hex string), accepted for links created before [the digest migration](../../migration-guides/v0.7.0#dependent-service-updates). Prefer `digestMultibase`. |
 | `decryptionKey` | string | No | AES-GCM decryption key (64-character hex string). Required for encrypted credentials. |
@@ -338,7 +343,7 @@ The endpoint always returns HTTP 200 for a completed verification attempt, even 
 
 | Code | Meaning |
 |------|---------|
-| `INVALID_RESPONSE` | The storage URI did not return valid JSON. |
+| `INVALID_RESPONSE` | The storage URI's response is not valid JSON, or is valid JSON that is not an object (a literal `null`, an array, or a primitive), before or after decryption. |
 | `DECRYPTION_REQUIRED` | The credential is encrypted and no `decryptionKey` was supplied. The [verify page](../verify-page#decryption) prompts for the key in this case. |
 | `ENVELOPE_INVALID` | The stored encrypted envelope is structurally corrupted (wrong IV or auth-tag length). Re-supplying the key will not help. |
 | `DECRYPTION_FAILED` | The decryption key does not match the credential. This is almost always a wrong key, but AES-GCM cannot distinguish a wrong key from ciphertext tampered at valid lengths. |

@@ -268,3 +268,40 @@ describe('generateOpenAPISchemas — Facility component', () => {
     );
   });
 });
+
+/**
+ * The CredentialIssueRequest component is generated from the same schema
+ * parseRequestBody enforces on POST /credentials (ADR-037 update, #799), so
+ * these assertions pin the published request contract to the runtime one.
+ */
+describe('generateOpenAPISchemas: CredentialIssueRequest component', () => {
+  type JsonSchema = {
+    properties?: Record<string, JsonSchema>;
+    required?: string[];
+    additionalProperties?: unknown;
+    items?: JsonSchema;
+  };
+  const request = generateOpenAPISchemas().CredentialIssueRequest as JsonSchema;
+
+  it('requires exactly the fields the route requires', () => {
+    expect(request.required).toEqual(['credentialPayload', 'credentialType', 'version']);
+  });
+
+  it('declares the option objects and their fields', () => {
+    expect(request.properties?.storageOptions?.properties).toHaveProperty('serviceInstanceId');
+    expect(request.properties?.storageOptions?.properties).toHaveProperty('encrypt');
+    expect(request.properties?.publishingOptions?.properties).toHaveProperty('accessRole');
+    expect(request.properties?.publishingOptions?.properties).toHaveProperty('hreflang');
+  });
+
+  it('does not document unknown keys as rejected, matching the runtime strip, at every nesting level', () => {
+    const collect = (node: JsonSchema | undefined, acc: unknown[]): unknown[] => {
+      if (!node) return acc;
+      if ('additionalProperties' in node) acc.push(node.additionalProperties);
+      Object.values(node.properties ?? {}).forEach((child) => collect(child, acc));
+      collect(node.items, acc);
+      return acc;
+    };
+    expect(collect(request, [])).not.toContain(false);
+  });
+});

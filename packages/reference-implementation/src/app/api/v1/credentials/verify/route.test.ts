@@ -215,42 +215,126 @@ describe('POST /api/v1/credentials/verify', () => {
     const res = await POST(createFakeRequest({}));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('uri is required');
+    expect(json.error).toContain('uri');
   });
 
   it('returns 400 when uri is not a string', async () => {
     const res = await POST(createFakeRequest({ uri: 123 }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('uri is required');
+    expect(json.error).toContain('uri');
   });
 
   it('returns 400 for invalid URI format', async () => {
     const res = await POST(createFakeRequest({ uri: 'not-a-url' }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('uri must be a valid URL');
+    expect(json.error).toBe('uri: must be a valid URL');
   });
 
   it('returns 400 for non-HTTP(S) URI scheme (ftp://)', async () => {
     const res = await POST(createFakeRequest({ uri: 'ftp://example.com/file' }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('uri must be a valid HTTP(S) URL');
+    expect(json.error).toBe('uri: must be a valid HTTP(S) URL');
+  });
+
+  it('returns 400 for a literal null request body', async () => {
+    const res = await POST({
+      method: 'POST',
+      url: 'http://localhost/api/v1/credentials/verify',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => null,
+    } as unknown as Request);
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('Expected object');
+  });
+
+  it('returns 422 INVALID_RESPONSE when storage returns the literal JSON value null', async () => {
+    mockStorageDocument('null');
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.code).toBe('INVALID_RESPONSE');
+    expect(json.error).toContain('not a JSON object');
+  });
+
+  it('returns 422 INVALID_RESPONSE when the DECRYPTED content is the literal null', async () => {
+    mockStorageDocument(ENCRYPTED_DATA);
+    mockIsEncryptedEnvelope.mockReturnValue(true);
+    mockDecryptCredential.mockReturnValue('null');
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.code).toBe('INVALID_RESPONSE');
+  });
+
+  it('returns 422 INVALID_RESPONSE when the DECRYPTED content is an array', async () => {
+    mockStorageDocument(ENCRYPTED_DATA);
+    mockIsEncryptedEnvelope.mockReturnValue(true);
+    mockDecryptCredential.mockReturnValue('[1,2]');
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.code).toBe('INVALID_RESPONSE');
+  });
+
+  it('fetches the canonical href on the development-bypass branch too', async () => {
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    const res = await POST(createFakeRequest({ uri: 'https://storage.example.com/a/../credentials/abc123' }));
+    expect(res.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/credentials/abc123', expect.anything());
+  });
+
+  it('returns 422 INVALID_RESPONSE when storage returns a JSON array', async () => {
+    mockStorageDocument('[1,2]');
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.code).toBe('INVALID_RESPONSE');
+  });
+
+  it('returns 400 for a uri carrying userinfo credentials', async () => {
+    const res = await POST(createFakeRequest({ uri: 'https://user:secret@storage.example.com/cred' }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe('uri: must not contain userinfo credentials');
+  });
+
+  it('fetches the canonical parsed href, not the raw uri string', async () => {
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    // The canonical WHATWG form of this uri percent-normalises and resolves
+    // dot segments, so a raw-string fetch and a canonical fetch differ.
+    const res = await POST(createFakeRequest({ uri: 'https://storage.example.com/a/../credentials/abc123' }));
+    expect(res.status).toBe(200);
+    expect(mockResolveDocument).toHaveBeenCalledWith(
+      'https://storage.example.com/credentials/abc123',
+      expect.anything(),
+    );
   });
 
   it('returns 400 for invalid hash format (too short)', async () => {
     const res = await POST(createFakeRequest({ uri: VALID_URI, hash: 'abc123' }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('hash must be a 64-character hex string (SHA-256)');
+    expect(json.error).toBe('hash: must be a 64-character hex string (SHA-256)');
   });
 
   it('returns 400 for invalid decryptionKey format', async () => {
     const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: 'short' }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('decryptionKey must be a 64-character hex string');
+    expect(json.error).toBe('decryptionKey: must be a 64-character hex string');
   });
 
   // ── SSRF Protection (guarded fetch) ───────────────────────────────

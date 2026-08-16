@@ -23,74 +23,39 @@ import {
   serviceInstanceResponseSchema,
   // Shared schemas
   errorResponseSchema,
-  AccessRole,
 } from '@uncefact/untp-ri-services';
 import { paginationMetaSchema } from '@/lib/api/pagination';
+import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
+
+/** See the CredentialIssueRequest handling in generateOpenAPISchemas. */
+function stripAdditionalPropertiesFalse(node: unknown): void {
+  if (Array.isArray(node)) {
+    node.forEach(stripAdditionalPropertiesFalse);
+    return;
+  }
+  if (node === null || typeof node !== 'object') return;
+  const record = node as Record<string, unknown>;
+  if (record.additionalProperties === false) {
+    delete record.additionalProperties;
+  }
+  Object.values(record).forEach(stripAdditionalPropertiesFalse);
+}
 
 // ============================================================================
 // Credential Schemas (remain local — no credential service directory yet)
 // ============================================================================
 
-const storageOptionsSchema = z.object({
-  serviceInstanceId: z.string().optional().describe('Storage service instance ID'),
-  encrypt: z.boolean().optional().describe('Whether to encrypt the stored credential'),
-});
-
-export const publishingOptionsSchema = z.object({
-  publish: z.boolean().optional().describe('Whether to publish the credential to the Identity Resolver'),
-  linkType: z
-    .string()
-    .optional()
-    .describe("UNTP link relation type (defaults to the IDR service's configured default link type)"),
-  linkTitle: z.string().optional().describe('Title for the published link (defaults to data model name)'),
-  qualifierPath: z
-    .string()
-    .optional()
-    .describe('Qualifier path for sub-identifiers (e.g. /10/LOT123/21/SER456). Defaults to /'),
-  machineVerificationUrl: z.string().optional().describe('Machine verification URL'),
-  humanVerificationUrl: z
-    .string()
-    .optional()
-    .describe(
-      'Human verification URL. When publishing without one, defaults to this RI verify page, ${RI_APP_URL}/verify',
-    ),
-  hreflang: z
-    .array(z.string().min(1))
-    .optional()
-    .describe('BCP 47 language tags the credential resource is available in (attached to the credential link only)'),
-  additionalRels: z
-    .array(z.string().min(1))
-    .optional()
-    .describe('Additional link relation types qualifying the credential link beyond its primary rel'),
-  public: z
-    .boolean()
-    .optional()
-    .describe(
-      'Whether the credential target URL is safe to publish in a public directory. Distinct from access control on the resource content',
-    ),
-  accessRole: z
-    .array(z.nativeEnum(AccessRole))
-    .optional()
-    .describe(
-      'UNTP access roles governing who the published links are surfaced to, attached to the credential and human verification links (e.g. untp:accessRole#Regulator)',
-    ),
-});
-
-/** Request body for POST /credentials. */
-export const credentialIssueRequestSchema = z.object({
-  credentialPayload: z.record(z.unknown()).describe('The full credential payload to sign'),
-  credentialType: z
-    .string()
-    .describe('Type of credential to issue (e.g. DigitalProductPassport, DigitalLivestockPassport)'),
-  version: z.string().describe('Data model version'),
-  storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
-  publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),
-});
-
 /** Advisory warning that may accompany a credential-issue response. */
 export const credentialWarningSchema = z.object({
   code: z.string().describe('Warning code'),
   message: z.string().describe('Human-readable warning message'),
+  received: z.unknown().optional().describe('The value that triggered the warning, where one applies'),
+  expected: z.unknown().optional().describe('The value or shape that was expected, where one applies'),
+  remediation: z.string().optional().describe('What the caller can do about the warning, where known'),
+  pointer: z
+    .string()
+    .optional()
+    .describe('JSON pointer to the payload location the warning concerns, where one applies'),
 });
 
 /** Successful credential issue response from POST /credentials. */
@@ -434,6 +399,15 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     // Remove the $schema property as it's not needed in OpenAPI
     const schemaObj = jsonSchema as Record<string, unknown>;
     delete schemaObj.$schema;
+    // Request components mirror parseRequestBody's runtime behaviour, which
+    // strips unknown keys and accepts the request (ADR-037). The converter
+    // emits `additionalProperties: false` for every plain object, which
+    // would document those same requests as rejected, so the request
+    // component drops that assertion at every nesting level. Response
+    // components keep it: their shapes are server-produced and closed.
+    if (name === 'CredentialIssueRequest') {
+      stripAdditionalPropertiesFalse(schemaObj);
+    }
     openAPISchemas[name] = schemaObj as OpenAPISchema;
   }
 
