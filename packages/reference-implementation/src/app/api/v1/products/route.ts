@@ -1,19 +1,12 @@
 import { NextResponse } from 'next/server';
-import {
-  ValidationError,
-  isNonEmptyString,
-  parsePositiveInt,
-  parseNonNegativeInt,
-  validateEnum,
-} from '@/lib/api/validation';
+import { parseRequestBody, parseQueryParams } from '@/lib/api/validation';
+import { createProductsRequestSchema, listProductsQuerySchema } from '@/lib/api/request-schemas/product';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { createProducts, listProducts, CreateProductInput } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { createProducts, listProducts } from '@/lib/prisma/repositories';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/products' });
-
-const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
 
 /**
  * @swagger
@@ -29,6 +22,8 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *         application/json:
  *           schema:
  *             type: array
+ *             minItems: 1
+ *             description: Optional fields are omitted rather than sent as null; an explicit null is rejected with a 400.
  *             items:
  *               type: object
  *               required:
@@ -37,6 +32,7 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *               properties:
  *                 name:
  *                   type: string
+ *                   minLength: 1
  *                   description: The product name
  *                 level:
  *                   type: string
@@ -44,23 +40,30 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *                   description: The product level
  *                 description:
  *                   type: string
+ *                   minLength: 1
  *                   description: Optional product description
  *                 parentId:
  *                   type: string
+ *                   minLength: 1
  *                   description: Optional parent product ID
  *                 producedByOrganisationId:
  *                   type: string
+ *                   minLength: 1
  *                   description: ID of the producing organisation
  *                 manufacturingFacilityId:
  *                   type: string
+ *                   minLength: 1
  *                   description: ID of the manufacturing facility
  *                 primaryIdentifierId:
  *                   type: string
+ *                   minLength: 1
  *                   description: ID of the primary identifier
  *                 secondaryIdentifierIds:
  *                   type: array
+ *                   uniqueItems: true
  *                   items:
  *                     type: string
+ *                     minLength: 1
  *                   description: IDs of secondary identifiers
  *     responses:
  *       201:
@@ -72,7 +75,7 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *               items:
  *                 $ref: '#/components/schemas/Product'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. a body that is not a non-empty array, a missing or empty name, an invalid level, an optional field sent as null, a non-array or duplicated secondaryIdentifierIds)
  *         content:
  *           application/json:
  *             schema:
@@ -101,41 +104,11 @@ const PRODUCT_LEVELS = ['MODEL', 'BATCH', 'ITEM'] as const;
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: Array<{
-    name?: string;
-    level?: string;
-    description?: string;
-    parentId?: string;
-  }>;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info('Validating input parameters');
-  if (!Array.isArray(body)) {
-    throw new ValidationError('Request body must be an array');
-  }
-
-  if (body.length === 0) {
-    throw new ValidationError('Request body must not be empty');
-  }
-
-  for (const item of body) {
-    if (!isNonEmptyString(item.name)) {
-      throw new ValidationError('name is required for all items');
-    }
-    if (!isNonEmptyString(item.level)) {
-      throw new ValidationError('level is required for all items');
-    }
-    validateEnum(item.level, PRODUCT_LEVELS, 'level');
-  }
+  logger.info('Validating request body');
+  const body = await parseRequestBody(req, createProductsRequestSchema);
 
   logger.info({ count: body.length }, 'Creating products');
-  const products = await createProducts(tenantId, body as CreateProductInput[]);
+  const products = await createProducts(tenantId, body);
 
   logger.info({ count: products.length }, 'Products created');
   return NextResponse.json(products, { status: 201 });
@@ -181,7 +154,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of products to return
+ *         description: Number of products to return per page. Defaults to 20 unless the deployment maximum is lower. Values above the deployment maximum are rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
@@ -203,7 +176,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. a non-integer limit/offset, a negative offset, a limit above the maximum, an invalid level, a repeated query parameter)
  *         content:
  *           application/json:
  *             schema:
@@ -220,16 +193,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing query filters');
-  const url = new URL(req.url);
-  const search = url.searchParams.get('search') ?? undefined;
-  const level = validateEnum(url.searchParams.get('level') ?? undefined, PRODUCT_LEVELS, 'level');
-  const parentId = url.searchParams.get('parentId') ?? undefined;
-  const organisationId = url.searchParams.get('organisationId') ?? undefined;
-  const facilityId = url.searchParams.get('facilityId') ?? undefined;
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  logger.info('Parsing query parameters');
+  const query = parseQueryParams(new URL(req.url), listProductsQuerySchema);
+  const { search, level, parentId, organisationId, facilityId, limit, offset } = query;
 
   logger.info({ filters: { search, level, parentId, organisationId, facilityId, limit, offset } }, 'Querying products');
   const { data, total } = await listProducts(tenantId, {

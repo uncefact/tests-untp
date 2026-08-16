@@ -90,6 +90,8 @@ Creates one or more products in bulk. The request body is an array of product ob
 
 The [hierarchy rules](#product-hierarchy) are enforced for each item. If any item violates the rules, the entire request is rejected.
 
+Omit an optional field to skip it rather than sending it as `null`. There is nothing to clear on a product that does not exist yet, so an explicit `null` on create is rejected with a 400.
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -136,7 +138,7 @@ Returns products for the authenticated tenant with optional filtering. Results a
 | `parentId` | string | — | Filter by parent product ID |
 | `organisationId` | string | — | Filter by producing organisation ID |
 | `facilityId` | string | — | Filter by manufacturing facility ID |
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---
@@ -162,12 +164,12 @@ Updates one or more fields of an existing product. The product `level` is **immu
 | Updatable Field | Description |
 |-----------------|-------------|
 | `name` | Product name (must be non-empty if provided) |
-| `description` | Free-text description |
-| `parentId` | Parent product ID (subject to [hierarchy rules](#product-hierarchy)) |
+| `description` | Free-text description (set to `null` to clear) |
+| `parentId` | Parent product ID (subject to [hierarchy rules](#product-hierarchy); set to `null` to clear) |
 | `producedByOrganisationId` | ID of the producing organisation (set to `null` to clear) |
 | `manufacturingFacilityId` | ID of the manufacturing facility (set to `null` to clear) |
 | `primaryIdentifierId` | ID of the primary identifier (set to `null` to clear) |
-| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing) |
+| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing; send an empty array to clear them all, or omit the field to leave them unchanged) |
 
 ---
 

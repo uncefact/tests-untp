@@ -343,3 +343,104 @@ describe('generateOpenAPISchemas — Conformity Vocabulary Catalogue components'
     expect(topicItem?.properties?.definition).toBeDefined();
   });
 });
+
+describe('generateOpenAPISchemas — Product component', () => {
+  type JsonSchema = {
+    type?: string;
+    properties?: Record<string, JsonSchema>;
+    required?: string[];
+    items?: JsonSchema;
+    nullable?: boolean;
+  };
+
+  const product = generateOpenAPISchemas().Product as JsonSchema;
+
+  it('requires every product column that every handler returns', () => {
+    expect(product.required).toEqual(
+      expect.arrayContaining([
+        'id',
+        'tenantId',
+        'name',
+        'level',
+        'description',
+        'batchNumber',
+        'serialNumber',
+        'parentId',
+        'producedByOrganisationId',
+        'manufacturingFacilityId',
+        'primaryIdentifierId',
+        'createdAt',
+        'updatedAt',
+      ]),
+    );
+  });
+
+  it('declares but does not require the list-versus-detail asymmetric fields', () => {
+    const asymmetricFields = [
+      'secondaryIdentifierIds',
+      'primaryIdentifier',
+      'secondaryIdentifiers',
+      'producedByOrganisation',
+      'manufacturingFacility',
+      'parent',
+    ];
+    for (const field of asymmetricFields) {
+      expect(product.properties).toHaveProperty(field);
+      expect(product.required).not.toContain(field);
+    }
+  });
+
+  it('marks each nullable relation nullable', () => {
+    expect(product.properties?.primaryIdentifier?.nullable).toBe(true);
+    expect(product.properties?.producedByOrganisation?.nullable).toBe(true);
+    expect(product.properties?.manufacturingFacility?.nullable).toBe(true);
+    expect(product.properties?.parent?.nullable).toBe(true);
+  });
+
+  it("embeds the primary identifier's scheme without qualifiers, with registrar required", () => {
+    const primaryIdentifier = product.properties?.primaryIdentifier;
+    expect(primaryIdentifier?.required).toContain('scheme');
+
+    const scheme = primaryIdentifier?.properties?.scheme;
+    expect(scheme?.properties).not.toHaveProperty('qualifiers');
+    expect(scheme?.required).toContain('registrar');
+  });
+
+  it('requires productId, identifierId, and identifier on each secondary identifier link', () => {
+    const link = product.properties?.secondaryIdentifiers?.items;
+    expect(link?.required).toEqual(expect.arrayContaining(['productId', 'identifierId', 'identifier']));
+  });
+
+  it.each([
+    ['primaryIdentifier', () => product.properties?.primaryIdentifier?.properties?.scheme],
+    [
+      'secondaryIdentifiers',
+      () => product.properties?.secondaryIdentifiers?.items?.properties?.identifier?.properties?.scheme,
+    ],
+  ])('gives the %s scheme a registrar with no schemes array', (_path, getScheme) => {
+    const registrar = getScheme()?.properties?.registrar;
+    expect(registrar?.properties).toBeDefined();
+    expect(registrar?.properties).not.toHaveProperty('schemes');
+  });
+
+  // PRODUCT_DETAIL_INCLUDE fetches these two relations with `true`, so only
+  // their own columns come back. Publishing their identifier relations would
+  // promise a shape no product response returns.
+  it.each([['producedByOrganisation'], ['manufacturingFacility']])('embeds %s as its own columns only', (relation) => {
+    const embedded = product.properties?.[relation];
+    expect(embedded?.properties).toHaveProperty('name');
+    expect(embedded?.properties).not.toHaveProperty('primaryIdentifier');
+    expect(embedded?.properties).not.toHaveProperty('secondaryIdentifiers');
+  });
+
+  // The parent is fetched with its primary identifier and nothing else, so the
+  // component must stop there rather than recursing into another parent.
+  it('embeds the parent with its primary identifier and no deeper relations', () => {
+    const parent = product.properties?.parent;
+    expect(parent?.properties).toHaveProperty('primaryIdentifier');
+    expect(parent?.properties).not.toHaveProperty('parent');
+    expect(parent?.properties).not.toHaveProperty('secondaryIdentifiers');
+    expect(parent?.properties).not.toHaveProperty('producedByOrganisation');
+    expect(parent?.properties).not.toHaveProperty('manufacturingFacility');
+  });
+});

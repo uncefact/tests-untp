@@ -130,7 +130,7 @@ describe('PATCH /api/v1/products/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('At least one updatable field must be provided');
+    expect(json.error).toContain('At least one updatable field is required');
   });
 
   it('returns 404 when product not found', async () => {
@@ -180,7 +180,7 @@ describe('PATCH /api/v1/products/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
+    expect(json.error).toMatch(/^name:/);
   });
 
   it('returns 500 on unexpected error', async () => {
@@ -211,6 +211,130 @@ describe('PATCH /api/v1/products/:id', () => {
       expect.anything(),
       expect.objectContaining({ primaryIdentifierId: 'ident-1' }),
     );
+  });
+
+  // The previous handler probed the body with `field in body` before checking
+  // it was an object. Any JSON primitive parses fine, so `in` threw a
+  // TypeError that reached the client as a 500 carrying the raw message.
+  it.each([[null], [42], ['x'], [true]])(
+    'returns 400 for a non-object PATCH body of %p and does not reach the repository',
+    async (body) => {
+      const req = createFakeRequest({ method: 'PATCH', body });
+      const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+      expect(res.status).toBe(400);
+      expect(mockUpdateProduct).not.toHaveBeenCalled();
+    },
+  );
+
+  it('returns 400 when the body carries only unrecognised keys', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { nmae: 'typo', level: 'ITEM' } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('At least one updatable field is required');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  // level is immutable, so it is stripped rather than rejected when it
+  // accompanies a field that can be updated (ADR-037 decision point 4).
+  it('strips an immutable level and updates the rest', async () => {
+    mockUpdateProduct.mockResolvedValue({ id: 'p-1', name: 'Renamed' });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 'Renamed', level: 'ITEM' } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateProduct).toHaveBeenCalledWith('p-1', 'org-1', { name: 'Renamed' });
+  });
+
+  // Each of these columns is nullable and an explicit null clears it, so the
+  // schema must forward the null rather than reject it or drop it.
+  it.each([
+    ['description'],
+    ['parentId'],
+    ['producedByOrganisationId'],
+    ['manufacturingFacilityId'],
+    ['primaryIdentifierId'],
+  ])('forwards an explicit null %s as a clear', async (field) => {
+    mockUpdateProduct.mockResolvedValue({ id: 'p-1' });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { [field]: null } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateProduct).toHaveBeenCalledWith('p-1', 'org-1', { [field]: null });
+  });
+
+  // An empty array is the clear; omitting the field leaves the links alone.
+  it('forwards an empty secondaryIdentifierIds array as a clear', async () => {
+    mockUpdateProduct.mockResolvedValue({ id: 'p-1' });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { secondaryIdentifierIds: [] } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateProduct).toHaveBeenCalledWith('p-1', 'org-1', { secondaryIdentifierIds: [] });
+  });
+
+  it('returns 400 for a whitespace-only name', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '   ' } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('name: must not be only whitespace');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for duplicate secondary identifiers', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { secondaryIdentifierIds: ['id-1', 'id-1'] } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('secondaryIdentifierIds: must not contain duplicate identifiers');
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  it.each([[''], ['   ']])('returns 400 for a description of %p on update', async (description) => {
+    const req = createFakeRequest({ method: 'PATCH', body: { description } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  // An empty string iterated zero times, so it reached the repository as a
+  // clear. Only an array expresses that now.
+  it('returns 400 for an empty-string secondaryIdentifierIds', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { secondaryIdentifierIds: '' } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  // A null entered the repository's `!== undefined` branch and then iterated
+  // over null, which threw a TypeError the client received as a 500.
+  it('returns 400 for a null secondaryIdentifierIds', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { secondaryIdentifierIds: null } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockUpdateProduct).not.toHaveBeenCalled();
+  });
+
+  // Omitting the field leaves the existing links untouched, so it must not
+  // reach the repository as an empty array.
+  it('leaves secondaryIdentifierIds out of the update when it is omitted', async () => {
+    mockUpdateProduct.mockResolvedValue({ id: 'p-1', name: 'Renamed' });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 'Renamed' } });
+    await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(mockUpdateProduct).toHaveBeenCalledWith('p-1', 'org-1', { name: 'Renamed' });
   });
 });
 
