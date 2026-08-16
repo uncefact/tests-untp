@@ -57,7 +57,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   listIdentifiers: (tenantId: string, opts: unknown) => mockListIdentifiers(tenantId, opts),
 }));
 
-import { NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
@@ -237,6 +237,20 @@ describe('POST /api/v1/identifiers', () => {
 
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
+  });
+
+  it('returns 409 when the repository reports a duplicate value for the scheme', async () => {
+    mockCreateIdentifier.mockRejectedValue(
+      new ConflictError('An identifier with this value already exists for the scheme'),
+    );
+
+    const req = createFakeRequest({ body: { schemeId: 'sch-1', value: '09520123456788' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('An identifier with this value already exists for the scheme');
+    expect(mockCreateIdentifier).toHaveBeenCalled();
   });
 });
 

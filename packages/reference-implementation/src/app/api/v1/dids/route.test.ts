@@ -52,7 +52,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
     mockFindDidByAliasAndService(alias, serviceInstanceId),
 }));
 
-import { ServiceResolutionError, ServiceInstanceNotFoundError } from '@/lib/api/errors';
+import { ConflictError, ServiceInstanceNotFoundError, ServiceResolutionError } from '@/lib/api/errors';
 import { DidType, DidMethod, DidStatus, DidCreateError, DidDocumentFetchError } from '@uncefact/untp-ri-services';
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { prismaError } from '@/lib/prisma/db-errors.fixtures';
@@ -571,6 +571,30 @@ describe('POST /api/v1/dids', () => {
     expect(mockFindDidByAliasAndService).toHaveBeenCalledWith('existing-alias', 'inst-1');
     expect(mockDidService.create).not.toHaveBeenCalled();
     expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the DID record itself already exists', async () => {
+    // The third documented cause: the pre-check passes and the provider
+    // succeeds, then the insert hits the unique constraint that createDid
+    // maps to a conflict.
+    mockDidService.normaliseAlias.mockReturnValue('fresh-alias');
+    mockFindDidByAliasAndService.mockResolvedValue(false);
+    mockDidService.create.mockResolvedValue({
+      did: 'did:web:example.com:org:123',
+      keyId: 'key-1',
+      document: { '@context': 'https://www.w3.org/ns/did/v1', id: 'did:web:example.com:org:123' },
+    });
+    mockCreateDid.mockRejectedValueOnce(new ConflictError('A DID record with this DID already exists'));
+
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'fresh-alias' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('A DID record with this DID already exists');
+    expect(mockDidService.create).toHaveBeenCalled();
   });
 
   it('returns 409 when upstream provider reports DID already exists', async () => {

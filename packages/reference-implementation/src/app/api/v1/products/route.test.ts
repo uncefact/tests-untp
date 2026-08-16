@@ -32,7 +32,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   listProducts: (tenantId: string, opts: unknown) => mockListProducts(tenantId, opts),
 }));
 
-import { NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -163,6 +163,26 @@ describe('POST /api/v1/products', () => {
 
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
+  });
+
+  it('returns 409 when an identifier already belongs to another product', async () => {
+    mockCreateProducts.mockRejectedValue(
+      new ConflictError('An identifier in this request is already the primary identifier of another product'),
+    );
+
+    const req = createFakeRequest({
+      body: [{ name: 'Widget A', level: 'MODEL', primaryIdentifierId: 'ident-1' }],
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('An identifier in this request is already the primary identifier of another product');
+    // The identifier the conflict is about must actually reach the repository.
+    expect(mockCreateProducts).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([expect.objectContaining({ primaryIdentifierId: 'ident-1' })]),
+    );
   });
 });
 

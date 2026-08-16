@@ -37,6 +37,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 }));
 
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { ConflictError } from '@/lib/api/errors';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -594,6 +595,28 @@ describe('POST /api/v1/schemes', () => {
 
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
+  });
+
+  it('returns 409 when the repository reports a primary-key clash for the registrar', async () => {
+    mockCreateIdentifierScheme.mockRejectedValue(
+      new ConflictError('An identifier scheme with this primary key already exists for the registrar'),
+    );
+
+    const req = createFakeRequest({
+      body: {
+        registrarId: 'reg-1',
+        name: 'GTIN',
+        primaryKey: 'gtin',
+        validationPattern: '^\\d{14}$',
+        linkTemplate: '/{primaryKey}/{value}',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('An identifier scheme with this primary key already exists for the registrar');
+    expect(mockCreateIdentifierScheme).toHaveBeenCalled();
   });
 });
 
