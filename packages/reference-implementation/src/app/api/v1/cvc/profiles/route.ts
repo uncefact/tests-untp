@@ -20,7 +20,7 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/profiles' });
  *       stable canonical profile URI to reference in a conformityClaim. An
  *       unknown scheme returns an empty list.
  *     tags:
- *       - Conformity Vocabulary
+ *       - Conformity Vocabulary Catalogue
  *     parameters:
  *       - in: query
  *         name: schemeId
@@ -44,12 +44,41 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/profiles' });
  *     responses:
  *       200:
  *         description: A page of conformity profiles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ConformityProfile'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error (e.g. a missing or blank schemeId, a limit above the maximum, a repeated query parameter)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: No tenant found for user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const { schemeId, limit, offset } = parseQueryParams(new URL(req.url), listCvcProfilesQuerySchema);

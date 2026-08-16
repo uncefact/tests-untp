@@ -20,7 +20,7 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/schemes' });
  *       URI. Each entry's `id` is the stable canonical scheme URI to reference
  *       in a conformityClaim.
  *     tags:
- *       - Conformity Vocabulary
+ *       - Conformity Vocabulary Catalogue
  *     parameters:
  *       - in: query
  *         name: limit
@@ -37,12 +37,41 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/schemes' });
  *     responses:
  *       200:
  *         description: A page of conformity schemes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ConformityScheme'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error (e.g. an invalid or above-maximum limit or offset, a repeated query parameter)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: No tenant found for user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const { limit, offset } = parseQueryParams(new URL(req.url), listCvcSchemesQuerySchema);

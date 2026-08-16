@@ -26,6 +26,11 @@ import {
 } from '@uncefact/untp-ri-services';
 import { paginationMetaSchema } from '@/lib/api/pagination';
 import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
+import {
+  conformitySchemeSummarySchema,
+  conformityProfileSummarySchema,
+  conformityCriterionSummarySchema,
+} from '@/lib/prisma/repositories/conformity-scheme.schemas';
 
 /** See the CredentialIssueRequest handling in generateOpenAPISchemas. */
 function stripAdditionalPropertiesFalse(node: unknown): void {
@@ -386,6 +391,9 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     Product: productSchema,
     Organisation: buildOrganisationSchema(),
     Facility: buildFacilitySchema(),
+    ConformityScheme: conformitySchemeSummarySchema,
+    ConformityProfile: conformityProfileSummarySchema,
+    ConformityCriterion: conformityCriterionSummarySchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};

@@ -5,6 +5,11 @@ import type {
   ConformityTopic,
   ConformitySchemeOwner,
 } from '@uncefact/untp-utils/conformity-vocabulary';
+import type {
+  ConformitySchemeSummary,
+  ConformityProfileSummary,
+  ConformityCriterionSummary,
+} from './conformity-scheme.schemas';
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 
@@ -105,37 +110,19 @@ export async function findConformitySchemeByCanonicalId(
   return row ? toScheme(row) : null;
 }
 
-// ── Issuer-facing browse projections ───────────────────────────────────────────
-// Flat, picker-friendly shapes that let an issuer drill scheme -> profile ->
-// criterion and yield the canonical URIs a conformityClaim carries (profile and
-// criterion URIs are versioned; the scheme URI is not).
-
-/** A conformity scheme as listed in the browse API; `id` is the canonical URI. */
-export interface ConformitySchemeSummary {
-  id: string;
-  name: string;
-  specVersion: string;
-  owner?: ConformitySchemeOwner;
-}
-
-/** A profile as listed under a scheme; `id` is the canonical (versioned) URI. */
-export interface ConformityProfileSummary {
-  id: string;
-  name: string;
-  version: string;
-  status: string;
-  validFrom?: string;
-}
-
-/** A criterion as listed under a profile; `id` is the canonical (versioned) URI. */
-export interface ConformityCriterionSummary {
-  id: string;
-  name: string;
-  version: string;
-  status: string;
-  topics: ConformityTopic[];
-  tags: string[];
-}
+// The issuer-facing browse projection shapes live in conformity-scheme.schemas.ts
+// (a Prisma-free module the Swagger generator also imports); re-exported here so
+// repository consumers keep a single import site.
+export {
+  conformitySchemeSummarySchema,
+  conformityProfileSummarySchema,
+  conformityCriterionSummarySchema,
+} from './conformity-scheme.schemas';
+export type {
+  ConformitySchemeSummary,
+  ConformityProfileSummary,
+  ConformityCriterionSummary,
+} from './conformity-scheme.schemas';
 
 /**
  * Lists the conformity schemes visible to a tenant for issuer browsing: the
