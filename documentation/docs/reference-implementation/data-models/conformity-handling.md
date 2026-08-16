@@ -13,12 +13,11 @@ The Reference Implementation maintains a conformity vocabulary catalogue (CVC) w
 
 | Level | Description | Example |
 |-------|-------------|---------|
-| **Catalogue** | Top-level grouping of related schemes, standards, and regulations | "Australian Agriculture Standards" |
 | **Scheme / Standard / Regulation** | A conformity assessment programme, standard, or regulation | "Organic Certification Scheme", "ISO 14001", "EU Deforestation Regulation" |
 | **Profile** | A specific assessment profile within a scheme, standard, or regulation | "Organic Crop Production v2.1" |
 | **Criteria** | Individual assessment requirements within a profile | "No synthetic pesticides used" |
 
-Conformity schemes reach the catalogue from three sources: operator-seeded into the system tenant (live in this release), UNTP-discovered from the Conformity Vocabulary Catalogue register (not yet operational, pending the register settling), and tenant-imported (scoped to a tenant, on the roadmap for a future release). Each tenant browses the schemes visible to it through the CVC API endpoints (`/api/v1/cvc/schemes`, `/api/v1/cvc/profiles?schemeId=`, `/api/v1/cvc/criteria?profileId=`); where the same canonical URI exists in both the system tenant and a tenant's own lane, the system-provisioned entry takes precedence.
+Where those schemes come from, how they are kept current, and which of them a tenant can see are described in [Conformity Vocabulary Catalogue](./conformity-vocabulary-catalogue). Issuers browse them through the [Conformity Vocabulary Catalogue API](../api/conformity-vocabulary-catalogue).
 
 ## Supported credential types
 
@@ -46,7 +45,7 @@ The cascading conformity picker UI is not yet implemented. The form-config endpo
 
 After extraction, the conformity references can be validated against the locally known conformity schemes (operator-seeded in this release). This validation checks whether the credential's attestations cover all the criteria defined by a given profile.
 
-Currently, CVC validation is implemented for **Digital Conformity Credentials only**. The extracted criteria are compared against the criteria defined in the matching profile — if any required criteria are missing from the credential, an advisory warning is produced. These warnings are informational; they never prevent the credential from being issued.
+Currently, CVC validation is implemented for **UNTP v0.7.0 Digital Conformity Credentials only**; earlier DCC versions, and the other credential types above, are issued without it. The extracted criteria are compared against the criteria defined in the matching profile — if any required criteria are missing from the credential, an advisory warning is produced. These warnings are informational; they never prevent the credential from being issued.
 
 For DPP and DFR credentials, conformity data is extracted but not yet validated against CVC profiles. This is planned for future work — the extraction infrastructure is already in place, so validation can be added without changes to the bridge layer.
 
