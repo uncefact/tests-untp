@@ -21,7 +21,7 @@ From a source checkout, in `packages/reference-implementation`:
 pnpm audit:encryption
 ```
 
-Inside the published Docker image (which ships no pnpm), against the running application (live triage):
+The published Docker image carries no package manifest for the Reference Implementation, so inside the image run the script directly against the running application (live triage):
 
 ```bash
 docker compose exec -w /app ri node_modules/.bin/tsx scripts/audit-encryption.ts

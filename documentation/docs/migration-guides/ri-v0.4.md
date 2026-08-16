@@ -81,7 +81,7 @@ From a source checkout, in `packages/reference-implementation`:
 pnpm backfill:decryption-keys
 ```
 
-Inside the published Docker image (which ships no pnpm):
+The published Docker image carries no package manifest for the Reference Implementation, so inside the image run the script directly:
 
 ```bash
 docker compose exec -w /app ri node_modules/.bin/tsx scripts/backfill-decryption-keys.ts
