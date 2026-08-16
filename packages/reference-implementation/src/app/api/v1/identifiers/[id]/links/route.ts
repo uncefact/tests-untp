@@ -1,20 +1,13 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { NotFoundError } from '@/lib/api/errors';
-import { assertPublicUrl, ValidationError, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { assertHttpUrl, assertPublicUrl, parseQueryParams, parseRequestBody } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getIdentifierById, createManyLinkRegistrations, listLinkRegistrations } from '@/lib/prisma/repositories';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 import type { Link } from '@uncefact/untp-ri-services';
-import { linkSchema } from '@/lib/api/request-schemas/link';
-
-const publishLinksRequestSchema = z.object({
-  links: z.array(linkSchema).min(1),
-  qualifierPath: z.string().optional(),
-  description: z.string().optional(),
-});
+import { listLinksQuerySchema, publishLinksRequestSchema } from '@/lib/api/request-schemas/link';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 
@@ -57,23 +50,32 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
  *                       description: Target URL of the linked resource
  *                     rel:
  *                       type: string
- *                       description: Primary RFC 9264 link relation type (e.g. untp:dpp)
+ *                       description: Primary RFC 9264 link relation type (e.g. untp:dpp). Must carry non-whitespace content.
  *                     type:
  *                       type: string
- *                       description: IANA media type of the target resource
+ *                       description: IANA media type of the target resource. Must carry non-whitespace content.
  *                     title:
  *                       type: string
  *                     hreflang:
  *                       type: array
  *                       items:
  *                         type: string
- *                       description: BCP 47 language tags the variant serves
+ *                       description: BCP 47 (RFC 5646) language tags the variant serves, e.g. "en", "en-AU", "x-default". An entry that is not a well-formed tag is rejected with a 400.
  *                     context:
  *                       type: string
- *                       description: Regional context for the variant (e.g. au)
+ *                       description: Regional context for the variant (e.g. au). The current Identity Resolver adapter does not publish this field.
  *                     default:
  *                       type: boolean
- *                       description: Whether this is the default variant for its relation type
+ *                       description: Whether this is the default variant for its relation type. The current Identity Resolver adapter does not publish this field.
+ *                     method:
+ *                       type: string
+ *                       enum:
+ *                         - GET
+ *                         - POST
+ *                       description: HTTP method used to retrieve the link target. The current Identity Resolver adapter does not publish this field.
+ *                     encryptionMethod:
+ *                       type: string
+ *                       description: Encryption method identifier for the target resource. The current Identity Resolver adapter does not publish this field.
  *                     accessRole:
  *                       type: array
  *                       items:
@@ -90,7 +92,7 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
  *                       type: array
  *                       items:
  *                         type: string
- *                       description: Additional link relation types qualifying the link beyond its primary rel
+ *                       description: Additional link relation types qualifying the link beyond its primary rel. Each entry must carry non-whitespace content.
  *                     public:
  *                       type: boolean
  *                       description: Whether the target URL itself is safe to publish in a public directory
@@ -154,28 +156,32 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
-  logger.info({ identifierId }, 'Parsing request body');
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
+  logger.info({ identifierId }, 'Parsing and validating request body');
+  const body = await parseRequestBody(req, publishLinksRequestSchema);
+
+  // Each link's target URL is validated as a well-formed, absolute,
+  // userinfo-free http(s) URL, and the WHATWG-canonical href replaces the
+  // caller's raw string before anything downstream sees it. Validating and
+  // publishing the same canonical form closes a parser-differential SSRF gap:
+  // a value like `https://1.1.1.1\@127.0.0.1/` that this parser reads as host
+  // `1.1.1.1` cannot be re-read as `127.0.0.1` by the IDR's parser once the
+  // canonical href is what leaves the route. This follows credentials/route.ts,
+  // which canonicalises for the same reason; registrars/route.ts deliberately
+  // stores its URL verbatim instead, because nothing dereferences that value
+  // server-side (see the comment there). The private-address check is gated on
+  // VERIFY_ALLOW_PRIVATE_URLS as it is on every sibling route, so local
+  // development can publish links to a private IDR target.
+  const links = body.links.map((link, index) => ({
+    ...link,
+    href: assertHttpUrl(link.href, `links.${index}.href`).href,
+  }));
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    for (const [index, link] of links.entries()) {
+      await assertPublicUrl(link.href, `links.${index}.href`);
+    }
   }
 
-  logger.info({ identifierId }, 'Validating input parameters');
-  const parsed = publishLinksRequestSchema.safeParse(rawBody);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    throw new ValidationError(`${issue.path.join('.') || 'body'}: ${issue.message}`);
-  }
-  const body = parsed.data;
-
-  // SSRF guard on each link's target URL.
-  for (const link of body.links) {
-    await assertPublicUrl(link.href, 'links[].href');
-  }
-
-  logger.info({ identifierId, linkCount: body.links.length }, 'Looking up identifier for link publishing');
+  logger.info({ identifierId, linkCount: links.length }, 'Looking up identifier for link publishing');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
@@ -192,11 +198,11 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     registrar.idrServiceInstanceId,
   );
 
-  logger.info({ identifierId, linkCount: body.links.length }, 'Publishing links to IDR service');
+  logger.info({ identifierId, linkCount: links.length }, 'Publishing links to IDR service');
   const registration = await idrService.publishLinks(
     scheme.primaryKey,
     identifier.value,
-    body.links as Link[],
+    links as Link[],
     body.qualifierPath,
     { namespace, ...(body.description !== undefined ? { description: body.description } : {}) },
   );
@@ -238,7 +244,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of results to return
+ *         description: Number of link registrations to return per page. Defaults to 20, or the configured maximum when it is lower. A larger value is rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
@@ -285,16 +291,16 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
 export const GET = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId } = await params;
 
+  // Before the identifier lookup, so a caller who sends both a bad limit and
+  // an identifier that does not exist is told about the parameter they can
+  // fix. POST and PATCH validate ahead of their lookups for the same reason.
+  const { limit, offset } = parseQueryParams(new URL(req.url), listLinksQuerySchema);
+
   logger.info({ identifierId }, 'Looking up identifier for link listing');
   const identifier = await getIdentifierById(identifierId, tenantId);
   if (!identifier) {
     throw new NotFoundError('Identifier not found');
   }
-
-  const url = new URL(req.url);
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
 
   const { data, total } = await listLinkRegistrations(identifierId, tenantId, limit, offset);
   logger.info({ identifierId, count: data.length }, 'Link registrations listed');

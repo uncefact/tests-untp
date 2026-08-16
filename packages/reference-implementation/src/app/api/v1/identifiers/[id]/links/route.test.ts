@@ -68,6 +68,7 @@ jest.mock('@/lib/services/resolve-idr-service', () => ({
 }));
 
 import { IdrPublishError } from '@uncefact/untp-ri-services';
+import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 // -- Helpers -------------------------------------------------------------------
@@ -147,20 +148,26 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
     expect(mockCreateManyLinkRegistrations).toHaveBeenCalledTimes(1);
   });
 
-  it('returns 400 for missing links', async () => {
+  it('returns 400 naming links for a missing links array, without attempting a publish', async () => {
     const req = createFakeRequest({});
 
     const res = await POST(req, createContext());
+    const body = await res.json();
 
     expect(res.status).toBe(400);
+    expect(body.error).toMatch(/links/);
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for empty links array', async () => {
+  it('returns 400 naming links for an empty links array, without attempting a publish', async () => {
     const req = createFakeRequest({ links: [] });
 
     const res = await POST(req, createContext());
+    const body = await res.json();
 
     expect(res.status).toBe(400);
+    expect(body.error).toMatch(/links/);
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
   });
 
   it('returns 404 when identifier not found', async () => {
@@ -266,13 +273,195 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
     expect(body.error).toMatch(/hreflang/);
   });
 
-  it('returns 400 when a link is missing required href/rel/type', async () => {
+  it.each([
+    ['href', { rel: 'untp:dpp', type: 'application/json' }],
+    ['rel', { href: 'https://example.com/cred.json', type: 'application/json' }],
+    ['type', { href: 'https://example.com/cred.json', rel: 'untp:dpp' }],
+  ])('returns 400 naming %s when a link omits it, without attempting a publish', async (field, link) => {
+    const req = createFakeRequest({ links: [link] });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(new RegExp(field));
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['rel', { href: 'https://example.com/cred.json', rel: 42, type: 'application/json' }],
+    ['type', { href: 'https://example.com/cred.json', rel: 'untp:dpp', type: true }],
+  ])('returns 400 naming %s when a link mistypes it, without attempting a publish', async (field, link) => {
+    const req = createFakeRequest({ links: [link] });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(new RegExp(field));
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['rel', { href: 'https://example.com/cred.json', rel: '   ', type: 'application/json' }],
+    ['type', { href: 'https://example.com/cred.json', rel: 'untp:dpp', type: '   ' }],
+    [
+      'additionalRels',
+      { href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json', additionalRels: ['  '] },
+    ],
+  ])('returns 400 naming %s for a whitespace-only value, without attempting a publish', async (field, link) => {
+    const req = createFakeRequest({ links: [link] });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(new RegExp(field));
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
+  });
+
+  // A relative value is rejected earlier, by the schema's own `.url()` check,
+  // so it is covered by 'returns 400 when href is not a valid URL' below and
+  // reports zod's dotted path rather than the guard's bracketed one.
+  it.each([
+    ['a non-http scheme', 'ftp://example.com/cred.json'],
+    ['embedded userinfo', 'https://user:pass@example.com/cred.json'],
+  ])('returns 400 naming the offending link when href carries %s', async (_case, href) => {
     const req = createFakeRequest({
-      links: [{ rel: 'untp:dpp', type: 'application/json' }],
+      links: [
+        { href: 'https://example.com/ok.json', rel: 'untp:dpp', type: 'application/json' },
+        { href, rel: 'untp:dpp', type: 'application/json' },
+      ],
     });
 
     const res = await POST(req, createContext());
+    const body = await res.json();
+
     expect(res.status).toBe(400);
+    expect(body.error).toMatch(/links\.1\.href/);
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
+  });
+
+  describe('private-address guard', () => {
+    const originalValue = process.env.VERIFY_ALLOW_PRIVATE_URLS;
+
+    afterEach(() => {
+      if (originalValue === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalValue;
+    });
+
+    it('rejects a private target address with a 400 when the guard is active', async () => {
+      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      const req = createFakeRequest({
+        links: [{ href: 'http://127.0.0.1/cred.json', rel: 'untp:dpp', type: 'application/json' }],
+      });
+
+      const res = await POST(req, createContext());
+      const body = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(body.error).toMatch(/links\.0\.href/);
+      expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
+    });
+
+    it('publishes to a private target address when VERIFY_ALLOW_PRIVATE_URLS relaxes the guard', async () => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      const req = createFakeRequest({
+        links: [{ href: 'http://127.0.0.1/cred.json', rel: 'untp:dpp', type: 'application/json' }],
+      });
+
+      const res = await POST(req, createContext());
+
+      expect(res.status).toBe(201);
+      expect(MOCK_IDR_SERVICE.publishLinks).toHaveBeenCalledWith(
+        '01',
+        '09520123456788',
+        [expect.objectContaining({ href: 'http://127.0.0.1/cred.json' })],
+        undefined,
+        expect.anything(),
+      );
+    });
+  });
+
+  it('audits the href the IDR echoed back, so a canonical publish cannot be audited raw', async () => {
+    // This mock echoes its input, unlike the suite's default hard-coded reply,
+    // so the assertion fails if the route ever publishes one value and audits
+    // another.
+    MOCK_IDR_SERVICE.publishLinks.mockImplementation(
+      async (_key: string, _value: string, links: { href: string }[]) => ({
+        resolverUri: 'https://resolver.example.com/01/09520123456788',
+        identifierScheme: '01',
+        identifier: '09520123456788',
+        links: links.map((link, index) => ({ idrLinkId: `idr-link-${index}`, link })),
+      }),
+    );
+
+    const req = createFakeRequest({
+      links: [{ href: 'https://example.com', rel: 'untp:dpp', type: 'application/json' }],
+    });
+
+    const res = await POST(req, createContext());
+
+    expect(res.status).toBe(201);
+    expect(mockCreateManyLinkRegistrations).toHaveBeenCalledWith([
+      expect.objectContaining({ targetUrl: 'https://example.com/' }),
+    ]);
+  });
+
+  it('publishes the canonical href rather than the raw caller string', async () => {
+    const req = createFakeRequest({
+      links: [{ href: 'https://example.com', rel: 'untp:dpp', type: 'application/json' }],
+    });
+
+    const res = await POST(req, createContext());
+
+    expect(res.status).toBe(201);
+    expect(MOCK_IDR_SERVICE.publishLinks).toHaveBeenCalledWith(
+      '01',
+      '09520123456788',
+      [expect.objectContaining({ href: 'https://example.com/' })],
+      undefined,
+      expect.anything(),
+    );
+  });
+
+  it('returns 400 naming hreflang when an entry is not a well-formed BCP 47 language tag', async () => {
+    const req = createFakeRequest({
+      links: [
+        { href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json', hreflang: ['en', 'e n'] },
+      ],
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/hreflang/);
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
+  });
+
+  it('accepts well-formed hreflang tags across the BCP 47 forms and forwards them verbatim', async () => {
+    const req = createFakeRequest({
+      links: [
+        {
+          href: 'https://example.com/cred.json',
+          rel: 'untp:dpp',
+          type: 'application/json',
+          hreflang: ['en', 'en-AU', 'zh-Hans-CN', 'x-default'],
+        },
+      ],
+    });
+
+    const res = await POST(req, createContext());
+
+    expect(res.status).toBe(201);
+    expect(MOCK_IDR_SERVICE.publishLinks).toHaveBeenCalledWith(
+      '01',
+      '09520123456788',
+      [expect.objectContaining({ hreflang: ['en', 'en-AU', 'zh-Hans-CN', 'x-default'] })],
+      undefined,
+      expect.anything(),
+    );
   });
 
   it('returns 400 when href is not a valid URL', async () => {
@@ -356,25 +545,78 @@ describe('GET /api/v1/identifiers/[id]/links', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 400 for non-numeric limit', async () => {
+  it.each(['abc', '1.5', '1e3', '0x10', '1abc', '0', '-1'])(
+    'returns 400 naming limit for the non-integer or out-of-range value %s',
+    async (value) => {
+      mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+
+      const req = { url: `http://localhost/api/v1/identifiers/ident-1/links?limit=${value}` } as unknown as Request;
+      const res = await GET(req, createContext());
+      const body = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(body.error).toContain('limit: must be a positive integer');
+      expect(mockListLinkRegistrations).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['abc', '1.5', '-1'])('returns 400 naming offset for the invalid value %s', async (value) => {
     mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+
+    const req = { url: `http://localhost/api/v1/identifiers/ident-1/links?offset=${value}` } as unknown as Request;
+    const res = await GET(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('offset: must be a non-negative integer');
+    expect(mockListLinkRegistrations).not.toHaveBeenCalled();
+  });
+
+  it('rejects a limit above the maximum with a 400 naming the maximum, rather than clamping it', async () => {
+    mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+
+    const req = {
+      url: `http://localhost/api/v1/identifiers/ident-1/links?limit=${MAX_PAGE_LIMIT + 1}`,
+    } as unknown as Request;
+    const res = await GET(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain(`limit: must not exceed the maximum of ${MAX_PAGE_LIMIT}`);
+    expect(mockListLinkRegistrations).not.toHaveBeenCalled();
+  });
+
+  it('passes a valid limit and offset through to the repository', async () => {
+    mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
+    mockListLinkRegistrations.mockResolvedValue({ data: [], total: 0 });
+
+    const req = { url: 'http://localhost/api/v1/identifiers/ident-1/links?limit=5&offset=10' } as unknown as Request;
+    const res = await GET(req, createContext());
+
+    expect(res.status).toBe(200);
+    expect(mockListLinkRegistrations).toHaveBeenCalledWith('ident-1', 'tenant-1', 5, 10);
+  });
+
+  it('reports an invalid limit rather than the missing identifier when both are wrong', async () => {
+    mockGetIdentifierById.mockResolvedValue(null);
 
     const req = { url: 'http://localhost/api/v1/identifiers/ident-1/links?limit=abc' } as unknown as Request;
     const res = await GET(req, createContext());
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('limit must be a positive integer');
+    expect(body.error).toContain('limit: must be a positive integer');
   });
 
-  it('returns 400 for negative offset', async () => {
+  it('returns 400 for a repeated query parameter', async () => {
     mockGetIdentifierById.mockResolvedValue(MOCK_IDENTIFIER);
 
-    const req = { url: 'http://localhost/api/v1/identifiers/ident-1/links?offset=-1' } as unknown as Request;
+    const req = { url: 'http://localhost/api/v1/identifiers/ident-1/links?limit=5&limit=6' } as unknown as Request;
     const res = await GET(req, createContext());
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain('offset must be a non-negative integer');
+    expect(body.error).toContain('limit: repeated query parameter');
+    expect(mockListLinkRegistrations).not.toHaveBeenCalled();
   });
 });

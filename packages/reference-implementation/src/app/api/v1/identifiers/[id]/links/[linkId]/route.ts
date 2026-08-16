@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { assertPublicUrl, ValidationError } from '@/lib/api/validation';
+import { assertHttpUrl, assertPublicUrl, parseRequestBody } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import {
   getIdentifierById,
@@ -148,18 +148,37 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 format: uri
  *               rel:
  *                 type: string
+ *                 description: Must carry non-whitespace content
  *               type:
  *                 type: string
+ *                 description: Must carry non-whitespace content
  *               title:
  *                 type: string
  *               hreflang:
  *                 type: array
  *                 items:
  *                   type: string
+ *                 description: BCP 47 (RFC 5646) language tags the variant serves, e.g. "en", "en-AU", "x-default". An entry that is not a well-formed tag is rejected with a 400.
+ *               context:
+ *                 type: string
+ *                 description: Regional context for the variant (e.g. au). The current Identity Resolver adapter does not apply this field on update.
+ *               default:
+ *                 type: boolean
+ *                 description: Whether this is the default variant for its relation type. The current Identity Resolver adapter does not apply this field on update.
+ *               method:
+ *                 type: string
+ *                 enum:
+ *                   - GET
+ *                   - POST
+ *                 description: HTTP method used to retrieve the link target. The current Identity Resolver adapter does not apply this field on update.
+ *               encryptionMethod:
+ *                 type: string
+ *                 description: Encryption method identifier for the target resource. The current Identity Resolver adapter does not apply this field on update.
  *               additionalRels:
  *                 type: array
  *                 items:
  *                   type: string
+ *                 description: Each entry must carry non-whitespace content
  *               public:
  *                 type: boolean
  *               accessRole:
@@ -241,22 +260,18 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id: identifierId, linkId } = await params;
 
-  logger.info({ identifierId, linkId }, 'Parsing request body');
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
+  logger.info({ identifierId, linkId }, 'Parsing and validating request body');
+  const body: Partial<Link> = await parseRequestBody(req, updateLinkRequestSchema);
 
-  const parsed = updateLinkRequestSchema.safeParse(rawBody);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    throw new ValidationError(`${issue.path.join('.') || 'body'}: ${issue.message}`);
+  // Validated and canonicalised exactly as the publishing route does, so an
+  // href reaching the IDR by update carries the same guarantees as one that
+  // arrived by publish (see the comment on POST /identifiers/{id}/links).
+  if (body.href !== undefined) {
+    body.href = assertHttpUrl(body.href, 'href').href;
+    if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+      await assertPublicUrl(body.href, 'href');
+    }
   }
-  const body: Partial<Link> = parsed.data;
-
-  if (body.href !== undefined) await assertPublicUrl(body.href, 'href');
 
   logger.info({ identifierId, linkId }, 'Looking up identifier and local link record for update');
   const identifier = await getIdentifierById(identifierId, tenantId);
