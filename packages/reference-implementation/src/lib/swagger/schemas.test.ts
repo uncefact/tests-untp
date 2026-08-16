@@ -159,3 +159,112 @@ describe('generateOpenAPISchemas — Organisation component', () => {
     expect(scheme?.required).toContain('registrar');
   });
 });
+
+/**
+ * Structural coverage for the Facility response component. buildFacilitySchema
+ * (schemas.ts) is deliberately function-local rather than a module-level export
+ * (a top-level Zod chain off '@uncefact/untp-ri-services' imports crashes any
+ * suite that partially mocks that package), so the only way to assert its shape
+ * is against the generated JSON output, which is also the actual published
+ * contract consumers read.
+ *
+ * Scoped to the Facility component only; other domains' components are not this
+ * suite's concern.
+ */
+describe('generateOpenAPISchemas — Facility component', () => {
+  type JsonSchema = {
+    type?: string;
+    properties?: Record<string, JsonSchema>;
+    required?: string[];
+    items?: JsonSchema;
+    nullable?: boolean;
+  };
+
+  const facility = generateOpenAPISchemas().Facility as JsonSchema;
+
+  it('requires every field that every handler returns', () => {
+    expect(facility.required).toEqual(
+      expect.arrayContaining([
+        'id',
+        'tenantId',
+        'name',
+        'description',
+        'location',
+        'operatingOrganisationId',
+        'primaryIdentifierId',
+        'createdAt',
+        'updatedAt',
+      ]),
+    );
+  });
+
+  it('declares but does not require the list-versus-detail asymmetric fields', () => {
+    const asymmetricFields = [
+      'secondaryIdentifierIds',
+      'primaryIdentifier',
+      'secondaryIdentifiers',
+      'operatingOrganisation',
+    ];
+    for (const field of asymmetricFields) {
+      expect(facility.properties).toHaveProperty(field);
+      expect(facility.required).not.toContain(field);
+    }
+  });
+
+  it('marks primaryIdentifier and operatingOrganisation nullable (both are nullable FKs)', () => {
+    expect(facility.properties?.primaryIdentifier?.nullable).toBe(true);
+    expect(facility.properties?.operatingOrganisation?.nullable).toBe(true);
+  });
+
+  it("embeds the primary identifier's scheme without qualifiers, with registrar required", () => {
+    const primaryIdentifier = facility.properties?.primaryIdentifier;
+    expect(primaryIdentifier?.required).toContain('scheme');
+
+    const scheme = primaryIdentifier?.properties?.scheme;
+    expect(scheme?.properties).not.toHaveProperty('qualifiers');
+    expect(scheme?.properties).toHaveProperty('registrar');
+    expect(scheme?.required).toContain('registrar');
+  });
+
+  it('requires facilityId, identifierId, and identifier on each secondary identifier link', () => {
+    const link = facility.properties?.secondaryIdentifiers?.items;
+    expect(link?.required).toEqual(expect.arrayContaining(['facilityId', 'identifierId', 'identifier']));
+  });
+
+  it('embeds the same scheme shape (no qualifiers, required registrar) in secondary identifier links', () => {
+    const linkIdentifier = facility.properties?.secondaryIdentifiers?.items?.properties?.identifier;
+    expect(linkIdentifier?.required).toContain('scheme');
+
+    const linkScheme = linkIdentifier?.properties?.scheme;
+    expect(linkScheme?.properties).not.toHaveProperty('qualifiers');
+    expect(linkScheme?.properties).toHaveProperty('registrar');
+    expect(linkScheme?.required).toContain('registrar');
+  });
+
+  // The nested registrar must stay the truncated shape. FACILITY_DETAIL_INCLUDE
+  // fetches the registrar's own columns only, so republishing the standalone
+  // Registrar resource's `schemes` array here would promise consumers a list of
+  // that registrar's other schemes which no facility response returns. Both
+  // nesting paths are checked, since they are built from the same projection
+  // but reached through different relations.
+  it.each([
+    ['primaryIdentifier', () => facility.properties?.primaryIdentifier?.properties?.scheme],
+    [
+      'secondaryIdentifiers',
+      () => facility.properties?.secondaryIdentifiers?.items?.properties?.identifier?.properties?.scheme,
+    ],
+  ])('gives the %s scheme a registrar with no schemes array', (_path, getScheme) => {
+    const registrar = getScheme()?.properties?.registrar;
+    expect(registrar?.properties).toBeDefined();
+    expect(registrar?.properties).not.toHaveProperty('schemes');
+  });
+
+  it('embeds the operating organisation as its own columns only, not its identifier relations', () => {
+    const operatingOrganisation = facility.properties?.operatingOrganisation;
+    expect(operatingOrganisation?.properties).not.toHaveProperty('primaryIdentifier');
+    expect(operatingOrganisation?.properties).not.toHaveProperty('secondaryIdentifierIds');
+    expect(operatingOrganisation?.required).toEqual(
+      expect.arrayContaining(['id', 'tenantId', 'name', 'description', 'location', 'primaryIdentifierId']),
+    );
+  });
+});

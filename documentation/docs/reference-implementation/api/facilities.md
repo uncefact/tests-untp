@@ -46,7 +46,9 @@ Facilities are scoped to the authenticated tenant. Each tenant manages its own s
 POST /api/v1/facilities
 ```
 
-Creates one or more facilities in bulk. The request body is an array of facility objects — each must include a `name`. Optional fields include `description`, `location`, `operatingOrganisationId`, `primaryIdentifierId`, and `secondaryIdentifierIds`.
+Creates one or more facilities in bulk. The request body must be a non-empty array of facility objects — each must include a non-empty `name`. Optional fields include `description` (non-empty if provided), `location`, `operatingOrganisationId`, `primaryIdentifierId`, and `secondaryIdentifierIds` (each ID unique within the array; rejected with a 400 if provided but not an array, or if it contains a duplicate). Unrecognised fields on each item are ignored.
+
+**Optional fields must be omitted to skip them — do not send them as a JSON `null`.** There is no clear-on-create semantics (nothing yet exists to clear), so an explicit `null` on any optional field is rejected with a 400 for the whole request, the same as any other malformed value. This is a real behaviour change for `location`: it was previously accepted silently, with no different effect than omitting the field (the write skipped the column either way, leaving it unset) — that silent equivalence is gone, and `location: null` is now a 400.
 
 ```mermaid
 sequenceDiagram
@@ -81,7 +83,7 @@ Returns facilities for the authenticated tenant with optional filtering. Results
 |-----------|------|---------|-------------|
 | `search` | string | — | Search by facility name or identifier value |
 | `organisationId` | string | — | Filter by operating organisation ID |
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---
@@ -102,16 +104,16 @@ Retrieves a specific facility by its database ID. The response includes the full
 PATCH /api/v1/facilities/{id}
 ```
 
-Updates one or more fields of an existing facility. At least one updatable field must be provided.
+Updates one or more fields of an existing facility. At least one recognised field is required — a body with none of the fields below (or only unrecognised keys) is rejected with a 400; unrecognised keys are otherwise ignored.
 
 | Updatable Field | Description |
 |-----------------|-------------|
-| `name` | Facility name (must be non-empty if provided) |
-| `description` | Free-text description |
-| `location` | UNTP location object (set to `null` to clear) |
-| `operatingOrganisationId` | ID of the operating organisation (set to `null` to clear) |
-| `primaryIdentifierId` | ID of the primary identifier (set to `null` to clear) |
-| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing) |
+| `name` | Facility name (non-empty if provided) |
+| `description` | Free-text description (non-empty if provided; set to `null` to clear) |
+| `location` | UNTP location object. Rejected with a 400 if provided as `null` — there is no clear mechanism for this field yet |
+| `operatingOrganisationId` | ID of the operating organisation (non-empty if provided; set to `null` to clear) |
+| `primaryIdentifierId` | ID of the primary identifier (non-empty if provided; set to `null` to clear) |
+| `secondaryIdentifierIds` | Array of secondary identifier IDs, each non-empty and unique within the array — an empty array clears them, otherwise replaces the existing set. Rejected with a 400 if provided but not an array, or if it contains a duplicate ID |
 
 ---
 
@@ -121,7 +123,7 @@ Updates one or more fields of an existing facility. At least one updatable field
 DELETE /api/v1/facilities/{id}
 ```
 
-Permanently deletes a facility. If the facility is referenced as the manufacturing facility for any products, those references are cleared (set to `null`) — the product records are not deleted.
+Permanently deletes a facility. If the facility is referenced as the manufacturing facility for any products, or as the facility on any credentials, those references are cleared (set to `null`) — the product and credential records are not deleted.
 
 ```mermaid
 sequenceDiagram

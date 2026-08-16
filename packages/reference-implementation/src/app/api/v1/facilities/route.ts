@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { parseRequestBody, parseQueryParams } from '@/lib/api/validation';
+import { createFacilitiesRequestSchema, listFacilitiesQuerySchema } from '@/lib/api/request-schemas/facility';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createFacilities, listFacilities } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/facilities' });
@@ -12,15 +13,17 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  * /facilities:
  *   post:
  *     summary: Create one or more facilities
- *     description: Creates one or more facilities from an array of inputs. Each item must include a name.
+ *     description: Creates one or more facilities from a non-empty array of inputs. Each item must include a name.
  *     tags:
  *       - Facilities
  *     requestBody:
  *       required: true
+ *       description: Unrecognised keys on each item are ignored. Every optional field below must be OMITTED to skip it; sending it as an explicit JSON null is rejected with a 400 for the whole request, including location (which previously accepted null as a silent no-op).
  *       content:
  *         application/json:
  *           schema:
  *             type: array
+ *             minItems: 1
  *             items:
  *               type: object
  *               required:
@@ -28,24 +31,29 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *               properties:
  *                 name:
  *                   type: string
+ *                   minLength: 1
  *                   description: Name of the facility
  *                 description:
  *                   type: string
- *                   description: Optional description
+ *                   minLength: 1
+ *                   description: Optional description. Omit to skip; null is rejected with a 400
  *                 location:
  *                   type: object
- *                   description: Optional UNTP location object
+ *                   description: Optional UNTP location object. Omit to skip; null is rejected with a 400
  *                 operatingOrganisationId:
  *                   type: string
- *                   description: ID of the operating organisation
+ *                   minLength: 1
+ *                   description: ID of the operating organisation. Omit to skip; null is rejected with a 400
  *                 primaryIdentifierId:
  *                   type: string
- *                   description: ID of the primary identifier
+ *                   minLength: 1
+ *                   description: ID of the primary identifier. Omit to skip; null is rejected with a 400
  *                 secondaryIdentifierIds:
  *                   type: array
  *                   items:
  *                     type: string
- *                   description: IDs of secondary identifiers
+ *                     minLength: 1
+ *                   description: IDs of secondary identifiers, each unique within the array. Omit to skip; null is rejected with a 400
  *     responses:
  *       201:
  *         description: Facilities created successfully
@@ -56,7 +64,7 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *               items:
  *                 $ref: '#/components/schemas/Facility'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. a body that is not a non-empty array, a missing or empty name, a non-array or duplicated secondaryIdentifierIds, an overlapping primary/secondary identifier, a referenced record that no longer exists)
  *         content:
  *           application/json:
  *             schema:
@@ -67,8 +75,14 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Referenced entity not found
+ *         description: Referenced organisation or identifier not found
  *         content:
  *           application/json:
  *             schema:
@@ -87,29 +101,8 @@ const logger = apiLogger.child({ route: '/api/v1/facilities' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing request body');
-  let body: unknown;
-
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info('Validating input parameters');
-  if (!Array.isArray(body)) {
-    throw new ValidationError('Request body must be an array');
-  }
-
-  if (body.length === 0) {
-    throw new ValidationError('Request body must not be empty');
-  }
-
-  for (const item of body) {
-    if (!isNonEmptyString(item.name)) {
-      throw new ValidationError('name is required for each facility');
-    }
-  }
+  logger.info('Validating request body');
+  const body = await parseRequestBody(req, createFacilitiesRequestSchema);
 
   logger.info({ count: body.length }, 'Creating facilities');
   const facilities = await createFacilities(tenantId, body);
@@ -142,7 +135,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of facilities to return
+ *         description: Number of facilities to return per page. Defaults to 20 unless the deployment maximum is lower. Values above the deployment maximum are rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
@@ -164,13 +157,19 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. a non-integer limit/offset, a negative offset, a limit above the maximum, a repeated query parameter)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised - missing or invalid authentication
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -183,13 +182,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  logger.info('Parsing query filters');
-  const url = new URL(req.url);
-  const search = url.searchParams.get('search') ?? undefined;
-  const organisationId = url.searchParams.get('organisationId') ?? undefined;
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  logger.info('Parsing query parameters');
+  const query = parseQueryParams(new URL(req.url), listFacilitiesQuerySchema);
+  const { search, organisationId, limit, offset } = query;
 
   logger.info({ filters: { search, organisationId, limit, offset } }, 'Querying facilities');
   const { data, total } = await listFacilities(tenantId, { search, organisationId, limit, offset });
