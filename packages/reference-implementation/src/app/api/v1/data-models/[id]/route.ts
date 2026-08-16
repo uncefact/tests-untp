@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { assertPublicUrl, ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { assertHttpUrl, assertPublicUrl, definedFields, parseRequestBody } from '@/lib/api/validation';
+import { updateDataModelRequestSchema } from '@/lib/api/request-schemas/data-model';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDataModelById, updateDataModel, deleteDataModel } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/data-models/[id]' });
-
-const UPDATABLE_FIELDS = ['name', 'schemaUrl', 'contextUrl', 'websiteUrl'] as const;
 
 /**
  * @swagger
@@ -76,6 +75,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the data model
  *     requestBody:
  *       required: true
+ *       description: At least one recognised field is required; unknown keys are ignored.
  *       content:
  *         application/json:
  *           schema:
@@ -86,14 +86,21 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 description: Updated name for the data model extension
  *               schemaUrl:
  *                 type: string
- *                 description: Updated JSON schema URL
+ *                 format: uri
+ *                 description: Updated JSON schema URL. Rejected with a 400 if it is not a valid, public http(s) URL, or if it carries leading or trailing whitespace.
  *               contextUrl:
  *                 type: string
- *                 description: Updated JSON-LD context URL
+ *                 format: uri
+ *                 description: Updated JSON-LD context URL. Rejected with a 400 if it is not a valid, public http(s) URL, or if it carries leading or trailing whitespace.
  *               websiteUrl:
  *                 type: string
- *                 description: Updated website URL
- *             minProperties: 1
+ *                 format: uri
+ *                 description: Updated website URL. Rejected with a 400 if it is not a valid, public http(s) URL, or if it carries leading or trailing whitespace.
+ *             anyOf:
+ *               - required: [name]
+ *               - required: [schemaUrl]
+ *               - required: [contextUrl]
+ *               - required: [websiteUrl]
  *     responses:
  *       200:
  *         description: Data model updated successfully
@@ -134,47 +141,23 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
   logger.info({ dataModelId: id }, 'Parsing request body');
-  let body: Record<string, unknown>;
+  const body = await parseRequestBody(req, updateDataModelRequestSchema);
 
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info({ dataModelId: id }, 'Validating input parameters');
-  const hasUpdatableField = UPDATABLE_FIELDS.some((field) => field in body);
-  if (!hasUpdatableField) {
-    throw new ValidationError(`At least one updatable field must be provided: ${UPDATABLE_FIELDS.join(', ')}`);
-  }
-
-  if (body.name !== undefined && !isNonEmptyString(body.name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
-  if (body.schemaUrl !== undefined && !isNonEmptyString(body.schemaUrl)) {
-    throw new ValidationError('schemaUrl must be a non-empty string');
-  }
-  if (body.contextUrl !== undefined && !isNonEmptyString(body.contextUrl)) {
-    throw new ValidationError('contextUrl must be a non-empty string');
-  }
-  if (body.websiteUrl !== undefined && !isNonEmptyString(body.websiteUrl)) {
-    throw new ValidationError('websiteUrl must be a non-empty string');
-  }
+  // The schema checks URL syntax only; see the POST handler for what
+  // assertHttpUrl adds on top of it.
+  if (body.schemaUrl !== undefined) assertHttpUrl(body.schemaUrl, 'schemaUrl');
+  if (body.contextUrl !== undefined) assertHttpUrl(body.contextUrl, 'contextUrl');
+  if (body.websiteUrl !== undefined) assertHttpUrl(body.websiteUrl, 'websiteUrl');
 
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
     logger.info({ dataModelId: id }, 'Validating URLs are not internal');
-    if (isNonEmptyString(body.schemaUrl)) await assertPublicUrl(body.schemaUrl, 'schemaUrl');
-    if (isNonEmptyString(body.contextUrl)) await assertPublicUrl(body.contextUrl, 'contextUrl');
-    if (isNonEmptyString(body.websiteUrl)) await assertPublicUrl(body.websiteUrl, 'websiteUrl');
+    if (body.schemaUrl !== undefined) await assertPublicUrl(body.schemaUrl, 'schemaUrl');
+    if (body.contextUrl !== undefined) await assertPublicUrl(body.contextUrl, 'contextUrl');
+    if (body.websiteUrl !== undefined) await assertPublicUrl(body.websiteUrl, 'websiteUrl');
   }
 
   logger.info({ dataModelId: id }, 'Updating data model');
-  const dataModel = await updateDataModel(id, tenantId, {
-    ...(body.name !== undefined && { name: body.name as string }),
-    ...(body.schemaUrl !== undefined && { schemaUrl: body.schemaUrl as string }),
-    ...(body.contextUrl !== undefined && { contextUrl: body.contextUrl as string }),
-    ...(body.websiteUrl !== undefined && { websiteUrl: body.websiteUrl as string }),
-  });
+  const dataModel = await updateDataModel(id, tenantId, definedFields(body));
 
   logger.info({ dataModelId: id }, 'Data model updated');
   return NextResponse.json(dataModel);

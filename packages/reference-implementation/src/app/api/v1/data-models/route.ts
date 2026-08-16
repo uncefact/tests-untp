@@ -1,13 +1,7 @@
 import { apiLogger } from '@/lib/api/logger';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
-import {
-  assertPublicUrl,
-  isNonEmptyString,
-  parseBooleanString,
-  parseNonNegativeInt,
-  parsePositiveInt,
-  ValidationError,
-} from '@/lib/api/validation';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { assertHttpUrl, assertPublicUrl, parseQueryParams, parseRequestBody } from '@/lib/api/validation';
+import { createDataModelRequestSchema, listDataModelsQuerySchema } from '@/lib/api/request-schemas/data-model';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDataModel, listDataModels } from '@/lib/prisma/repositories';
 
@@ -45,8 +39,7 @@ const logger = apiLogger.child({ route: '/api/v1/data-models' });
  *         schema:
  *           type: integer
  *           minimum: 1
- *           maximum: 100
- *         description: Maximum number of results to return (capped at 100)
+ *         description: Number of entries to return per page. Defaults to 20, or the configured maximum when it is lower. A larger value is rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
@@ -68,7 +61,7 @@ const logger = apiLogger.child({ route: '/api/v1/data-models' });
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g. a non-integer limit/offset, a negative offset, a limit above the maximum, a non-boolean isExtension, a repeated query parameter)
  *         content:
  *           application/json:
  *             schema:
@@ -85,16 +78,11 @@ const logger = apiLogger.child({ route: '/api/v1/data-models' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  const url = new URL(req.url);
-
   logger.info('Parsing query filters');
-  const isExtension = parseBooleanString(url.searchParams.get('isExtension'), 'isExtension');
-  const rawCredentialType = url.searchParams.get('credentialType');
-  const credentialType = rawCredentialType && rawCredentialType.trim() !== '' ? rawCredentialType : undefined;
-  const version = url.searchParams.get('version') ?? undefined;
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const { isExtension, credentialType, version, limit, offset } = parseQueryParams(
+    new URL(req.url),
+    listDataModelsQuerySchema,
+  );
 
   logger.info(
     { filters: { isExtension, credentialType, version, limit, offset } },
@@ -148,16 +136,19 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *                 description: Specification version (e.g., "0.6.0")
  *               schemaUrl:
  *                 type: string
- *                 description: URL to the JSON schema for this extension
+ *                 format: uri
+ *                 description: URL to the JSON schema for this extension. Rejected with a 400 if it is not a valid, public http(s) URL, or if it carries leading or trailing whitespace.
  *               contextUrl:
  *                 type: string
- *                 description: URL to the JSON-LD context for this extension
+ *                 format: uri
+ *                 description: URL to the JSON-LD context for this extension. Rejected with a 400 if it is not a valid, public http(s) URL, or if it carries leading or trailing whitespace.
  *               parentConfigId:
  *                 type: string
  *                 description: ID of the parent core data model
  *               websiteUrl:
  *                 type: string
- *                 description: Optional website URL for the extension specification
+ *                 format: uri
+ *                 description: Optional website URL for the extension specification. Rejected with a 400 if it is not a valid, public http(s) URL, or if it carries leading or trailing whitespace.
  *     responses:
  *       201:
  *         description: Data model extension created successfully
@@ -196,36 +187,26 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info('Parsing request body');
-  let body: {
-    name?: string;
-    credentialType?: string;
-    version?: string;
-    schemaUrl?: string;
-    contextUrl?: string;
-    parentConfigId?: string;
-    websiteUrl?: string;
-  };
+  const body = await parseRequestBody(req, createDataModelRequestSchema);
 
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  logger.info('Validating input parameters');
-  if (!isNonEmptyString(body.name)) throw new ValidationError('name is required');
-
-  if (!isNonEmptyString(body.credentialType)) throw new ValidationError('credentialType is required');
-  const credentialType = body.credentialType;
-
-  if (!isNonEmptyString(body.version)) throw new ValidationError('version is required');
-  if (!isNonEmptyString(body.schemaUrl)) throw new ValidationError('schemaUrl is required');
-  if (!isNonEmptyString(body.contextUrl)) throw new ValidationError('contextUrl is required');
-  if (!isNonEmptyString(body.parentConfigId)) {
-    throw new ValidationError('parentConfigId is required');
-  }
-  if (body.websiteUrl !== undefined && !isNonEmptyString(body.websiteUrl)) {
-    throw new ValidationError('websiteUrl must be a non-empty string');
+  // The schema checks URL syntax only. assertHttpUrl additionally requires an
+  // absolute http(s) scheme and rejects embedded userinfo, as the registrars
+  // route does for its own stored URL, so none of the three can be stored as
+  // a `javascript:` value or carry a credential.
+  //
+  // All three are stored as the caller submitted them rather than as
+  // assertHttpUrl's canonical `.href`, so a caller reads back the URL they
+  // sent. Of the three, only schemaUrl is read back by this system:
+  // resolveDataModel collects it and validateAgainstSchemas fetches it during
+  // credential validation. Storing a value that a later parser may read
+  // differently from the one that checked it therefore matters for schemaUrl;
+  // #936 tracks closing that by rejecting the ambiguous input rather than by
+  // rewriting it, and is open. contextUrl and websiteUrl are stored and served
+  // back to API consumers without this system fetching them.
+  assertHttpUrl(body.schemaUrl, 'schemaUrl');
+  assertHttpUrl(body.contextUrl, 'contextUrl');
+  if (body.websiteUrl !== undefined) {
+    assertHttpUrl(body.websiteUrl, 'websiteUrl');
   }
 
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
@@ -237,10 +218,10 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     }
   }
 
-  logger.info({ credentialType, name: body.name }, 'Creating data model extension');
+  logger.info({ credentialType: body.credentialType, name: body.name }, 'Creating data model extension');
   const dataModel = await createDataModel(tenantId, {
     name: body.name,
-    credentialType,
+    credentialType: body.credentialType,
     version: body.version,
     schemaUrl: body.schemaUrl,
     contextUrl: body.contextUrl,

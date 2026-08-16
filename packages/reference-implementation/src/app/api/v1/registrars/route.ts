@@ -85,9 +85,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // check the address is public. assertHttpUrl further requires an absolute
   // http(s) scheme and rejects embedded userinfo; assertPublicUrl (unless
   // VERIFY_ALLOW_PRIVATE_URLS relaxes it for local development) rejects a
-  // private or unresolvable address. Mirrors the stored-URL validation layer
-  // credentials/route.ts applies to its own URL fields (ADR-037);
-  // data-models/route.ts applies only the env-gated assertPublicUrl today.
+  // private or unresolvable address. The data-models route layers the same two
+  // checks on its own stored URL fields (ADR-037).
   assertHttpUrl(body.url, 'url');
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
     logger.info('Validating registrar URL is not internal');

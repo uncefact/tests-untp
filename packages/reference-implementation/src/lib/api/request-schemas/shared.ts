@@ -37,6 +37,27 @@ export const nonBlankString = z
   });
 
 /**
+ * A stored URL field.
+ *
+ * `.url()` here is WHATWG `new URL` parsing, not RFC 3986 validation (it
+ * accepts a value RFC 3986 forbids, e.g. `https://example.com/%`), and is a
+ * format check only: any scheme, embedded userinfo permitted, no check that
+ * the address is public. A route handler layers `assertHttpUrl` (scheme and
+ * userinfo) and `assertPublicUrl` (SSRF) on top of this after parsing, so do
+ * not treat this schema check as the whole contract for a URL field.
+ */
+export const urlSchema = z
+  .string()
+  .url({ message: 'must be a valid URL' })
+  // WHATWG parsing strips surrounding whitespace before parsing, so a padded
+  // value like ' https://gs1.org ' passes `.url()` (and the handler's
+  // assertHttpUrl/assertPublicUrl, which parse the same way) yet would be
+  // stored verbatim with the padding intact. The stored value stays verbatim
+  // by design (see the route handlers), so padding is rejected rather than
+  // silently trimmed.
+  .refine((value) => value === value.trim(), { message: 'must not have leading or trailing whitespace' });
+
+/**
  * A signed 32-bit integer, matching a Prisma `Int`/Postgres int4 column, so
  * an out-of-range value is a 400 at the boundary rather than a 500 from the
  * database. A consumer narrows this further where the column has its own

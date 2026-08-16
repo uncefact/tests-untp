@@ -9,6 +9,7 @@ import {
   bcp47TagSchema,
   paginationQuerySchema,
   booleanQuerySchema,
+  urlSchema,
 } from './shared';
 
 describe('idSchema', () => {
@@ -406,5 +407,47 @@ describe('bcp47TagSchema uniqueness rules', () => {
     ['a repeated subtag inside a private-use suffix', 'en-a-bbb-x-a-ccc'],
   ])('still accepts %s', (_label, tag) => {
     expect(bcp47TagSchema.safeParse(tag).success).toBe(true);
+  });
+});
+
+describe('urlSchema', () => {
+  it('accepts an ordinary http(s) URL and returns it unchanged', () => {
+    const result = urlSchema.safeParse('https://gs1.org/standards');
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data).toBe('https://gs1.org/standards');
+  });
+
+  it.each([
+    ['a value that is not a URL', 'not-a-url'],
+    ['a bare path', '/standards'],
+    ['an empty string', ''],
+  ])('rejects %s with the valid-URL message', (_label, value) => {
+    const result = urlSchema.safeParse(value);
+
+    expect(result.success).toBe(false);
+    expect(!result.success && result.error.issues[0].message).toBe('must be a valid URL');
+  });
+
+  it.each([
+    ['leading whitespace', ' https://gs1.org'],
+    ['trailing whitespace', 'https://gs1.org '],
+  ])('rejects %s rather than trimming it, since the value is stored as sent', (_label, value) => {
+    const result = urlSchema.safeParse(value);
+
+    expect(result.success).toBe(false);
+    expect(!result.success && result.error.issues[0].message).toBe('must not have leading or trailing whitespace');
+  });
+
+  // The schema is a format check only. Each of these is left for the route
+  // handler's assertHttpUrl and assertPublicUrl, so the contract the two
+  // consumers rely on is that the schema does NOT reject them.
+  it.each([
+    ['a non-http scheme', 'javascript:alert(1)'],
+    ['embedded userinfo', 'https://user:pass@gs1.org'],
+    ['a private address', 'http://127.0.0.1/registry'],
+    ['a percent sign RFC 3986 forbids, which WHATWG parsing accepts', 'https://example.com/%'],
+  ])('accepts %s, leaving it to the handler-level checks', (_label, value) => {
+    expect(urlSchema.safeParse(value).success).toBe(true);
   });
 });

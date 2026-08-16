@@ -74,11 +74,11 @@ Each data model specifies two required URLs:
 | `schemaUrl` | The [JSON Schema](https://json-schema.org/) that defines the structure and validation rules for credentials of this type |
 | `contextUrl` | The [JSON-LD context](https://www.w3.org/TR/json-ld/#the-context) that provides semantic meaning to the credential's fields |
 
-For extensions, both the parent's and extension's schema and context URLs are used during credential issuance — the parent provides the base structure and the extension adds its custom fields.
+For extensions, both the parent's and the extension's schema URLs are fetched during credential issuance, so the parent provides the base structure and the extension adds its custom fields. The context URL is stored and returned to API consumers rather than fetched.
 
 An optional `websiteUrl` can be provided as a link to human-readable documentation about the data model.
 
-All URL fields (`schemaUrl`, `contextUrl`, `websiteUrl`) are validated to ensure they do not point to private or reserved network addresses. This prevents SSRF attacks where a stored URL could later be used to target internal services.
+All URL fields (`schemaUrl`, `contextUrl`, `websiteUrl`) must be well-formed, absolute HTTP(S) URLs without embedded userinfo, and are validated to ensure they do not point to private or reserved network addresses. The private-address check prevents SSRF attacks where a stored URL could later be used to target internal services. Each field is stored exactly as submitted rather than normalised, so leading or trailing whitespace is rejected rather than trimmed.
 
 ### Cascading Deletes
 
@@ -99,8 +99,10 @@ Returns data models visible to the authenticated tenant, including system-provis
 | `credentialType` | string | — | Filter by credential type (e.g., `DigitalProductPassport`) |
 | `version` | string | — | Filter by version (e.g., `0.6.0`) |
 | `isExtension` | string | — | Filter by extension status (`true` or `false`) |
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | `20` | Maximum results per page. A value above the maximum is rejected with a 400 naming the maximum. |
 | `offset` | integer | `0` | Number of results to skip (must be non-negative) |
+
+Each parameter is a single value. Supplying the same one twice is rejected with a 400 naming it.
 
 ```mermaid
 sequenceDiagram
@@ -124,7 +126,9 @@ POST /api/v1/data-models
 
 Creates a new data model **extension** for the authenticated tenant. All data models created through the API are extensions (`isExtension: true`) — UNTP core data models are system-provisioned and cannot be created by tenants.
 
-The `parentConfigId` must reference an existing UNTP core data model (`isExtension: false`) — use the [list endpoint](#list-data-models) with `isExtension=false` to retrieve available core data models and their IDs. Extensions of extensions are not permitted at this time.
+The `parentConfigId` must reference an existing UNTP core data model (`isExtension: false`) — use the [list endpoint](#list-data-models) with `isExtension=false` to retrieve available core data models and their IDs. Extensions of extensions are not permitted at this time. Unrecognised fields are ignored.
+
+The parent must also be one the tenant can see, meaning its own data model or a system-provisioned one. A `parentConfigId` naming a model that does not exist and one naming another tenant's model both return the same 404, so the response does not reveal whether that id exists elsewhere.
 
 ```mermaid
 sequenceDiagram
@@ -172,7 +176,7 @@ Updates one or more fields of a data model extension owned by the tenant. System
 
 Only the following fields can be updated: `name`, `schemaUrl`, `contextUrl`, `websiteUrl`. The `credentialType`, `version`, `isExtension`, and `parentConfigId` are immutable — they cannot be changed after creation.
 
-At least one updatable field must be provided.
+At least one recognised field must be provided; unrecognised keys are ignored.
 
 ```mermaid
 sequenceDiagram

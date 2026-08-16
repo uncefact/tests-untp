@@ -92,8 +92,17 @@ export async function createDataModel(tenantId: string, input: CreateDataModelIn
         throw new ValidationError('parentConfigId is required for extension configs');
       }
 
+      // Scoped to what the tenant can see, matching getDataModelById and
+      // listDataModels: a core model belonging to another tenant is not a
+      // valid parent, and an unscoped lookup would accept and store the
+      // reference. A parent outside that set is reported as not found rather
+      // than as forbidden, so the response does not confirm that another
+      // tenant holds a model with this id.
       const parent = await tx.dataModel.findFirst({
-        where: { id: input.parentConfigId },
+        where: {
+          id: input.parentConfigId,
+          OR: [{ tenantId }, { tenantId: SYSTEM_TENANT_ID }],
+        },
       });
 
       if (!parent) {

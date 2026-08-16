@@ -140,10 +140,68 @@ describe('data-model.repository', () => {
       });
 
       expect(mockTx.dataModel.findFirst).toHaveBeenCalledWith({
-        where: { id: 'config-1' },
+        where: {
+          id: 'config-1',
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
+        },
       });
       expect(mockTx.dataModel.create).toHaveBeenCalled();
       expect(result).toEqual(EXTENSION_RECORD);
+    });
+
+    // The parent must be one the caller can see. Another tenant's core model
+    // resolves to nothing under this scope, so it is refused before the row
+    // that would reference it is written.
+    it('does not resolve a parent belonging to another tenant, and does not create', async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue(null);
+
+      await expect(
+        createDataModel(TENANT_ID, {
+          name: 'Extension On Foreign Parent',
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.0',
+          schemaUrl: 'https://example.com/schema.json',
+          contextUrl: 'https://example.com/context.jsonld',
+          isExtension: true,
+          parentConfigId: 'other-tenant-config',
+        }),
+      ).rejects.toThrow('Parent data model configuration not found');
+
+      expect(mockTx.dataModel.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'other-tenant-config',
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
+        },
+      });
+      expect(mockTx.dataModel.create).not.toHaveBeenCalled();
+    });
+
+    // CONFIG_RECORD is system-owned, so the valid-parent test above already
+    // covers a system parent. The tenant's own core model is the other half of
+    // the visibility rule, and the create must carry the parent through.
+    it("accepts the tenant's own core model as the parent", async () => {
+      mockTx.dataModel.findFirst.mockResolvedValue({ ...CONFIG_RECORD, tenantId: TENANT_ID });
+      mockTx.dataModel.create.mockResolvedValue(EXTENSION_RECORD);
+
+      await createDataModel(TENANT_ID, {
+        name: 'Extension On Own Parent',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/ext-schema.json',
+        contextUrl: 'https://example.com/ext-context.jsonld',
+        isExtension: true,
+        parentConfigId: 'config-1',
+      });
+
+      expect(mockTx.dataModel.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'config-1',
+          OR: [{ tenantId: TENANT_ID }, { tenantId: SYSTEM_TENANT_ID }],
+        },
+      });
+      expect(mockTx.dataModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentConfigId: 'config-1' }) }),
+      );
     });
 
     it('throws when isExtension is true but parentConfigId is missing', async () => {
