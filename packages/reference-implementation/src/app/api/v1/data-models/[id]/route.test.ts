@@ -63,7 +63,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   deleteDataModel: (id: string, tenantId: string) => mockDeleteDataModel(id, tenantId),
 }));
 
-import { NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { GET, PATCH, DELETE } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -273,6 +273,20 @@ describe('PATCH /api/v1/data-models/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toMatch(/schemaUrl.*valid URL/);
+  });
+
+  it('returns 409 when the repository reports a name clash for the credential type and version', async () => {
+    mockUpdateDataModel.mockRejectedValue(
+      new ConflictError('A data model with this name already exists for the credential type and version'),
+    );
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 'Updated Extension' } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('A data model with this name already exists for the credential type and version');
+    expect(mockUpdateDataModel).toHaveBeenCalled();
   });
 });
 

@@ -402,6 +402,21 @@ describe('PATCH /api/v1/schemes/:id', () => {
     expect(mockUpdateIdentifierScheme).not.toHaveBeenCalled();
   });
 
+  it('returns 409 when the repository reports a primary-key clash for the registrar', async () => {
+    // The PATCH 409 documents two causes; the qualifier half is covered below.
+    mockUpdateIdentifierScheme.mockRejectedValue(
+      new ConflictError('An identifier scheme with this primary key already exists for the registrar'),
+    );
+
+    const req = createFakeRequest({ method: 'PATCH', body: { primaryKey: 'gtin' } });
+    const res = await PATCH(req, createContext('sch-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('An identifier scheme with this primary key already exists for the registrar');
+    expect(mockUpdateIdentifierScheme).toHaveBeenCalled();
+  });
+
   it('returns 409 when repository reports a qualifier key conflict', async () => {
     mockUpdateIdentifierScheme.mockRejectedValue(
       new ConflictError('A qualifier with this key already exists for the scheme'),
@@ -453,5 +468,19 @@ describe('DELETE /api/v1/schemes/:id', () => {
 
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
+  });
+
+  it('returns 409 when the scheme still has identifiers', async () => {
+    mockDeleteIdentifierScheme.mockRejectedValue(
+      new ConflictError('The identifier scheme has identifiers and cannot be deleted'),
+    );
+
+    const req = createFakeRequest({ method: 'DELETE' });
+    const res = await DELETE(req, createContext('sch-1') as unknown as Parameters<typeof DELETE>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('The identifier scheme has identifiers and cannot be deleted');
+    expect(mockDeleteIdentifierScheme).toHaveBeenCalled();
   });
 });

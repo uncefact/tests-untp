@@ -43,7 +43,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   deleteProduct: (id: string, tenantId: string) => mockDeleteProduct(id, tenantId),
 }));
 
-import { NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { GET, PATCH, DELETE } from './route';
 
@@ -192,6 +192,25 @@ describe('PATCH /api/v1/products/:id', () => {
 
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
+  });
+
+  it('returns 409 when the identifier already belongs to another product', async () => {
+    mockUpdateProduct.mockRejectedValue(
+      new ConflictError('The identifier is already the primary identifier of another product'),
+    );
+
+    const req = createFakeRequest({ method: 'PATCH', body: { primaryIdentifierId: 'ident-1' } });
+    const res = await PATCH(req, createContext('p-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('The identifier is already the primary identifier of another product');
+    // The identifier the conflict is about must actually reach the repository.
+    expect(mockUpdateProduct).toHaveBeenCalledWith(
+      'p-1',
+      expect.anything(),
+      expect.objectContaining({ primaryIdentifierId: 'ident-1' }),
+    );
   });
 });
 

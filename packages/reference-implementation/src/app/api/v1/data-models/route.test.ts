@@ -52,7 +52,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   createDataModel: (tenantId: string, input: unknown) => mockCreateDataModel(tenantId, input),
 }));
 
-import { NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { GET, POST } from './route';
 
@@ -715,5 +715,28 @@ describe('POST /api/v1/data-models', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toMatch(/schemaUrl.*valid URL/);
+  });
+
+  it('returns 409 when the repository reports a name clash for the credential type and version', async () => {
+    mockCreateDataModel.mockRejectedValue(
+      new ConflictError('A data model with this name already exists for the credential type and version'),
+    );
+
+    const req = createFakeRequest({
+      body: {
+        name: 'Custom DPP Extension',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        schemaUrl: 'https://example.com/schema.json',
+        contextUrl: 'https://example.com/context.jsonld',
+        parentConfigId: 'cfg-parent',
+      },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('A data model with this name already exists for the credential type and version');
+    expect(mockCreateDataModel).toHaveBeenCalled();
   });
 });

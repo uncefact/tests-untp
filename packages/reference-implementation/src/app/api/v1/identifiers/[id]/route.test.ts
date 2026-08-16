@@ -59,7 +59,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   deleteIdentifier: (id: string, tenantId: string) => mockDeleteIdentifier(id, tenantId),
 }));
 
-import { NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { GET, PATCH, DELETE } from './route';
 
@@ -229,6 +229,20 @@ describe('PATCH /api/v1/identifiers/:id', () => {
 
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
+  });
+
+  it('returns 409 when the repository reports a duplicate value for the scheme', async () => {
+    mockUpdateIdentifier.mockRejectedValue(
+      new ConflictError('An identifier with this value already exists for the scheme'),
+    );
+
+    const req = createFakeRequest({ method: 'PATCH', body: { value: '09520123456799' } });
+    const res = await PATCH(req, createContext('id-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('An identifier with this value already exists for the scheme');
+    expect(mockUpdateIdentifier).toHaveBeenCalled();
   });
 });
 
