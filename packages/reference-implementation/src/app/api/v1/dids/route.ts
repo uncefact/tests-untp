@@ -93,11 +93,7 @@ function assertSupported<T extends string>(field: string, value: T, supported: r
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorized - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
  *         description: |
  *           Forbidden. Either of:
@@ -304,17 +300,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorized - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         description: Forbidden - authenticated principal has no resolvable tenant assignment
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       500:
  *         description: Server error
  *         content:

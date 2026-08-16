@@ -63,17 +63,9 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/profiles' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorised
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         description: No tenant found for user
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       500:
  *         description: Server error
  *         content:

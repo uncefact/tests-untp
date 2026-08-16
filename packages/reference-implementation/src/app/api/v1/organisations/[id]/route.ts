@@ -31,17 +31,9 @@ const logger = apiLogger.child({ route: '/api/v1/organisations/[id]' });
  *             schema:
  *               $ref: '#/components/schemas/Organisation'
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         description: Forbidden - authenticated principal has no resolvable tenant assignment
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Organisation not found
  *         content:
@@ -132,17 +124,9 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         description: Forbidden - authenticated principal has no resolvable tenant assignment
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Organisation not found, or a referenced primary or secondary identifier does not exist
  *         content:
@@ -195,17 +179,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       204:
  *         description: Organisation deleted successfully
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         description: Forbidden - authenticated principal has no resolvable tenant assignment
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Organisation not found
  *         content:

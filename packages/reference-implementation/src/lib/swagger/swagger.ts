@@ -21,6 +21,28 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
         },
       ],
       components: {
+        // The auth responses every withTenantAuth route shares. Declared once
+        // and referenced, because hand-copied blocks have already drifted into
+        // four wordings across the fleet, including an em-dash and American
+        // spellings the repository's own conventions rule out.
+        responses: {
+          UnauthorisedResponse: {
+            description: 'Unauthorised - missing or invalid authentication',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          TenantAssignmentForbiddenResponse: {
+            description: 'Forbidden - authenticated principal has no resolvable tenant assignment',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
         securitySchemes: {
           BearerAuth: {
             type: 'http',

@@ -41,11 +41,9 @@ const UPDATABLE_FIELDS = [
  *             schema:
  *               $ref: '#/components/schemas/Product'
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Product not found
  *         content:
@@ -132,11 +130,9 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Product not found
  *         content:
@@ -218,11 +214,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Product not found
  *         content:

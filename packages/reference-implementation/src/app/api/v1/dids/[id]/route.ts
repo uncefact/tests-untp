@@ -32,17 +32,9 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]' });
  *             schema:
  *               $ref: '#/components/schemas/Did'
  *       401:
- *         description: Unauthorized - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         description: Forbidden - authenticated principal has no resolvable tenant assignment
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: DID not found
  *         content:
@@ -121,17 +113,9 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorized - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         description: Forbidden - authenticated principal has no resolvable tenant assignment
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: DID not found
  *         content:
@@ -188,17 +172,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorized - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         description: Forbidden - authenticated principal has no resolvable tenant assignment
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: DID not found
  *         content:
