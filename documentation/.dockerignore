@@ -1,0 +1,23 @@
+# This image builds with context ./documentation, so the repository root's
+# .dockerignore does not apply. It must not be copied here either: the root
+# file excludes *.md, which would drop the docs tree itself.
+
+# The Dockerfile installs into /app before COPY . ., so a host install here
+# would be merged over pnpm's symlink tree and fail the build.
+node_modules
+
+build
+.docusaurus
+.cache-loader
+
+# Compose supplies .env at run time via env_file, so the builder never needs
+# any of these.
+.env*
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+**/.DS_Store
+*-debug.log*
+*-error.log*

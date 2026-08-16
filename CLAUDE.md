@@ -109,7 +109,11 @@ pnpm lint:check               # ESLint across packages
 ```bash
 pnpm storybook:components                  # Component library docs
 pnpm storybook:reference-implementation    # RI component docs
-pnpm build-clean                           # Remove all artifacts and node_modules
+# build-clean removes node_modules and build artifacts from every workspace package
+# (including each package's e2e/ subdirectory), but leaves documentation/node_modules
+# alone. That install runs under a Docker bind mount, and removing it while the stack
+# is running fails with EACCES.
+pnpm build-clean
 ```
 
 ## Architecture Patterns
