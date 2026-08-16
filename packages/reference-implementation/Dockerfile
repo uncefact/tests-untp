@@ -163,6 +163,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 # Encryption key startup validation, required by prisma/seed.ts (#762)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/validate-encryption-key-startup.ts ./src/lib/credentials/validate-encryption-key-startup.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/backfill-decryption-keys.ts ./src/lib/credentials/backfill-decryption-keys.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/rotate-encryption-key.ts ./src/lib/credentials/rotate-encryption-key.ts
 # Read-only encryption audit and shared envelope-store iteration, required by
 # scripts/audit-encryption.ts and (via the preflight) the backfill (#764)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/audit-encryption.ts ./src/lib/credentials/audit-encryption.ts

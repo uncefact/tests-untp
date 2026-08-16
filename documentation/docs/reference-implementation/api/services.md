@@ -7,7 +7,7 @@ title: Services
 
 The services API manages **service instances** — the configurations that connect the Reference Implementation to its [dependent services](../services/service-architecture#service-types) (verifiable credential services, storage services, and identity resolver services).
 
-Each service instance records which adapter to use, the connection details (base URL, API key, etc.), and whether the instance is the primary for its service type. The configuration is [encrypted at rest](../services/service-architecture#encryption) and sensitive fields (such as API keys) are [masked](../services/service-architecture#sensitive-field-handling) in API responses.
+Each service instance records which adapter to use, the connection details (base URL, API key, etc.), and whether the instance is the primary for its service type. The configuration is [encrypted at rest](../services/service-architecture#encryption-at-rest) and sensitive fields (such as API keys) are [masked](../services/service-architecture#sensitive-field-handling) in API responses.
 
 For background on how services fit into the architecture, see [Service Architecture](../services/service-architecture).
 
@@ -39,7 +39,7 @@ When a service instance is created or updated with `isPrimary: true`, any existi
 
 ### Configuration Encryption
 
-Service configurations contain sensitive data (API keys, credentials). The `config` object is [encrypted at rest](../services/service-architecture#encryption) and sensitive fields are [masked](../services/service-architecture#sensitive-field-handling) in API responses.
+Service configurations contain sensitive data (API keys, credentials). The `config` object is [encrypted at rest](../services/service-architecture#encryption-at-rest) and sensitive fields are [masked](../services/service-architecture#sensitive-field-handling) in API responses.
 
 ## Endpoints
 

@@ -5,11 +5,14 @@ import type { LoggerService } from '@uncefact/untp-ri-services';
  * deprecated SERVICE_ENCRYPTION_KEY name while it remains supported (#721
  * tracks its removal).
  *
- * Divergent values are a hard failure: rotation is not supported (#720), so
- * two different keys have no valid operational meaning, and proceeding would
- * split the database across keys (the seed re-encrypts service-instance
- * configurations under whichever key wins). Failing before any write keeps
- * the existing ciphertext recoverable.
+ * Divergent values are a hard failure: the two names are aliases for the
+ * same active key, so two different values have no valid operational
+ * meaning, and proceeding would split the database across keys (the seed
+ * re-encrypts service-instance configurations under whichever key wins).
+ * Failing before any write keeps the existing ciphertext recoverable.
+ * Moving data to a new key is the rotate:encryption-key maintenance
+ * command's job, which reads its key pair directly rather than through
+ * this resolver.
  */
 export type ResolvedDataEncryptionKey = {
   key: string | undefined;
@@ -28,8 +31,9 @@ export function resolveDataEncryptionKey(env: NodeJS.ProcessEnv = process.env): 
   if (dataKey && serviceKey && dataKey !== serviceKey) {
     throw new Error(
       'DATA_ENCRYPTION_KEY and SERVICE_ENCRYPTION_KEY are both set with different values. ' +
-        'Key rotation is not supported, so divergent values would split encrypted data across keys. ' +
-        'Remove SERVICE_ENCRYPTION_KEY (or set both to the same value) and restart.',
+        'These two names are aliases for the same active key, so divergent values would split encrypted ' +
+        'data across keys. Remove SERVICE_ENCRYPTION_KEY (or set both to the same value) and restart. ' +
+        'To move existing data to a new key, use the rotate:encryption-key maintenance command instead.',
     );
   }
 
