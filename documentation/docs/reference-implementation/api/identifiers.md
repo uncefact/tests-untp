@@ -310,11 +310,17 @@ sequenceDiagram
 POST /api/v1/identifiers/{id}/links
 ```
 
-Publishes one or more links for an identifier to the upstream IDR service. Each link is registered on the IDR and a local audit record is stored. Target URLs are validated for SSRF protection.
+Publishes one or more links for an identifier to the upstream IDR service. Each link is registered on the IDR and a local audit record is stored.
+
+Each `href` must be an absolute `http` or `https` URL without embedded credentials, and it is published in its canonical form rather than exactly as sent. Unless `VERIFY_ALLOW_PRIVATE_URLS` is enabled for local development, an `href` pointing at a private or reserved address is rejected with a 400. The same rules apply to `href` on `PATCH /api/v1/identifiers/{id}/links/{linkId}`.
 
 | Required Field | Description |
 |----------------|-------------|
-| `links` | Non-empty array of link objects (each requires `linkType`, `targetUrl`, `mimeType`; optional `title`) |
+| `links` | Non-empty array of link objects. Each requires `href` (a valid URL), `rel` and `type`. Optional per link: `title`, `hreflang`, `context`, `default`, `method`, `encryptionMethod`, `accessRole`, `additionalRels`, `public` |
+
+`context`, `default`, `method` and `encryptionMethod` are accepted by both the publish and the update routes, and the current Identity Resolver adapter does not send them upstream, so setting them has no effect on the published link.
+
+`rel`, `type` and each `additionalRels` entry must carry non-whitespace content, and each `hreflang` entry must be a well-formed BCP 47 (RFC 5646) language tag, such as `en`, `en-AU` or `x-default`. A value that fails either rule is rejected with a 400 naming the field, and nothing is published upstream. The same rules apply on `PATCH`.
 
 | Optional Field | Description |
 |----------------|-------------|
@@ -354,7 +360,7 @@ Returns link registration audit records for a specific identifier. The identifie
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | `20` | Maximum results per page. A value above the [configured maximum](../operations/api-pagination#maximum-page-size) is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---
@@ -390,11 +396,11 @@ Updates a link on the upstream IDR and syncs the local audit record. The request
 | `rel` | New link relationship type |
 | `type` | New MIME type |
 | `title` | New human-readable title |
-| `hreflang` | New BCP 47 language tags for the link's target content |
-| `context` | New link context |
-| `default` | Whether this is the default variant for its relation type |
-| `method` | New HTTP method for retrieving the link target (`GET` or `POST`) |
-| `encryptionMethod` | New encryption method identifier |
+| `hreflang` | New language tags for the link's target content. Each entry must be a well-formed BCP 47 (RFC 5646) tag, such as `en`, `en-AU` or `x-default` |
+| `context` | New link context. Accepted, and not applied by the current Identity Resolver adapter |
+| `default` | Whether this is the default variant for its relation type. Accepted, and not applied by the current Identity Resolver adapter |
+| `method` | New HTTP method for retrieving the link target (`GET` or `POST`). Accepted, and not applied by the current Identity Resolver adapter |
+| `encryptionMethod` | New encryption method identifier. Accepted, and not applied by the current Identity Resolver adapter |
 | `accessRole` | New UNTP access roles allowed to retrieve this link, from the [UNTP access role vocabulary](https://untp.unece.org/docs/specification/DecentralisedAccessControl) |
 | `additionalRels` | New additional link relation types to attach beyond `rel` |
 | `public` | Whether the published link is publicly resolvable |

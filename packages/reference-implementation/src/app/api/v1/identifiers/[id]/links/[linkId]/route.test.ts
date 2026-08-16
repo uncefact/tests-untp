@@ -336,6 +336,108 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
     await PATCH(req, createContext());
     expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', { public: false });
   });
+
+  it.each([
+    ['href', { href: 123 }],
+    ['rel', { rel: 42 }],
+    ['type', { type: true }],
+    ['title', { title: ['a'] }],
+    ['additionalRels', { additionalRels: 'gs1:certificationInfo' }],
+  ])('returns 400 naming %s when the provided field is of the wrong type', async (field, body) => {
+    const req = createFakeRequest(body);
+    const res = await PATCH(req, createContext());
+    const responseBody = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(responseBody.error).toMatch(new RegExp(field));
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['rel', { rel: '   ' }],
+    ['type', { type: '   ' }],
+    ['additionalRels', { additionalRels: ['  '] }],
+  ])('returns 400 naming %s for a whitespace-only value', async (field, body) => {
+    const req = createFakeRequest(body);
+    const res = await PATCH(req, createContext());
+    const responseBody = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(responseBody.error).toMatch(new RegExp(field));
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a non-http scheme', 'ftp://example.com/cred.json'],
+    ['embedded userinfo', 'https://user:pass@example.com/cred.json'],
+    ['a relative value', '/cred.json'],
+  ])('returns 400 naming href when it carries %s', async (_case, href) => {
+    // A relative value trips the schema's `.url()` check and the rest trip the
+    // guard; both name href, which is what the caller needs.
+    const req = createFakeRequest({ href });
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/href/);
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
+  describe('private-address guard', () => {
+    const originalValue = process.env.VERIFY_ALLOW_PRIVATE_URLS;
+
+    afterEach(() => {
+      if (originalValue === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalValue;
+    });
+
+    it('rejects a private href with a 400 when the guard is active', async () => {
+      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      const req = createFakeRequest({ href: 'http://127.0.0.1/cred.json' });
+
+      const res = await PATCH(req, createContext());
+      const body = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(body.error).toMatch(/href/);
+      expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+    });
+
+    it('updates to a private href when VERIFY_ALLOW_PRIVATE_URLS relaxes the guard', async () => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      const req = createFakeRequest({ href: 'http://127.0.0.1/cred.json' });
+
+      const res = await PATCH(req, createContext());
+
+      expect(res.status).toBe(200);
+      expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', { href: 'http://127.0.0.1/cred.json' });
+    });
+  });
+
+  it('sends the canonical href upstream rather than the raw caller string', async () => {
+    const req = createFakeRequest({ href: 'https://updated.com' });
+    await PATCH(req, createContext());
+
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', { href: 'https://updated.com/' });
+  });
+
+  it('returns 400 naming hreflang when an entry is not a well-formed BCP 47 language tag', async () => {
+    const req = createFakeRequest({ hreflang: ['en', 'not a tag'] });
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/hreflang/);
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
+  it('accepts an hreflang entry that is a well-formed private-use tag', async () => {
+    const req = createFakeRequest({ hreflang: ['x-default'] });
+    const res = await PATCH(req, createContext());
+
+    expect(res.status).toBe(200);
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith('idr-link-1', { hreflang: ['x-default'] });
+  });
 });
 
 describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
