@@ -149,6 +149,21 @@ describe('PATCH /api/v1/dids/:id', () => {
     expect(mockUpdateDid).not.toHaveBeenCalled();
   });
 
+  // `.min(1)` counts characters, so a whitespace-only value passed and
+  // overwrote the stored value with a blank one.
+  it.each([
+    ['name', { name: '   ' }],
+    ['description', { description: '   ' }],
+  ])('returns 400 when %s is only whitespace, and does not call the repository', async (field, body) => {
+    const req = createFakeRequest({ method: 'PATCH', body });
+    const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe(`${field}: must not be only whitespace`);
+    expect(mockUpdateDid).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when description is an empty string, and does not call the repository', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: { description: '' } });
     const res = await PATCH(req, createContext('did-1') as unknown as Parameters<typeof PATCH>[1]);

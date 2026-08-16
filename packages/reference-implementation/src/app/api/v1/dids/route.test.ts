@@ -355,6 +355,40 @@ describe('POST /api/v1/dids', () => {
     expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
+  // A whitespace-only alias used to reach the did-manager and fail there with
+  // "produces an empty identifier after normalisation"; it is now named at the
+  // boundary like every other text field.
+  it('returns 400 when alias is only whitespace, before reaching the DID service', async () => {
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: '   ' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe('alias: must not be only whitespace');
+    expect(mockResolveDidService).not.toHaveBeenCalled();
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
+  // `.min(1)` counts characters, so a whitespace-only value passed and was
+  // stored verbatim as a blank name or description.
+  it.each([
+    ['name', { name: '   ' }],
+    ['description', { description: '   ' }],
+  ])('returns 400 when %s is only whitespace', async (field, overrides) => {
+    const req = createFakeRequest({
+      body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test', ...overrides },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe(`${field}: must not be only whitespace`);
+    expect(mockResolveDidService).not.toHaveBeenCalled();
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when description is an empty string (mistyped optional field)', async () => {
     const req = createFakeRequest({
       body: { type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test', description: '' },

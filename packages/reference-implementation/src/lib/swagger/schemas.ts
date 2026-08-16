@@ -26,6 +26,7 @@ import {
 } from '@uncefact/untp-ri-services';
 import { paginationMetaSchema } from '@/lib/api/pagination';
 import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
+import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
 import {
   conformitySchemeSummarySchema,
   conformityProfileSummarySchema,
@@ -480,6 +481,11 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     Identifier: identifierSchema,
     LinkRegistration: linkRegistrationSchema,
     ServiceInstance: serviceInstanceResponseSchema,
+    // Derived from the same schemas the routes validate against, so the
+    // documented values cannot fall behind the accepted ones. Routes
+    // reference these rather than restating the members.
+    ServiceType: serviceTypeSchema,
+    AdapterType: adapterTypeSchema,
     DataModel: dataModelSchema,
     RenderTemplate: renderTemplateSchema,
     Product: buildProductSchema(),

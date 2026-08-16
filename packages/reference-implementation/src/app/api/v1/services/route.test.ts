@@ -205,7 +205,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('serviceType is required');
+    expect(json.error).toContain('serviceType: Required');
   });
 
   it('returns 400 when adapterType is missing', async () => {
@@ -216,7 +216,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('adapterType is required');
+    expect(json.error).toContain('adapterType: Required');
   });
 
   it('returns 400 when name is missing', async () => {
@@ -227,7 +227,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('name is required');
+    expect(json.error).toContain('name: Required');
   });
 
   it('returns 400 when name is an empty string', async () => {
@@ -238,7 +238,56 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('name is required');
+    expect(json.error).toContain('name: String must contain at least 1 character(s)');
+  });
+
+  // `.min(1)` counts characters, so a whitespace-only name passed the old
+  // isNonEmptyString check and created a blank-named instance.
+  it('returns 400 when name is only whitespace, and does not create', async () => {
+    const req = createFakeRequest({ body: { ...VALID_BODY, name: '   ' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('name: must not be only whitespace');
+    expect(mockCreateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a number', 42],
+    ['an explicit null', null],
+    ['only whitespace', '  '],
+  ])('returns 400 when description is %s', async (_label, description) => {
+    const req = createFakeRequest({ body: { ...VALID_BODY, description } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('description');
+    expect(mockCreateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when isPrimary is not a boolean', async () => {
+    const req = createFakeRequest({ body: { ...VALID_BODY, isPrimary: 'yes' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('isPrimary');
+    expect(mockCreateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an array', []],
+    ['null', null],
+    ['a string', 'nope'],
+    ['a number', 7],
+  ])('returns 400 when the top-level body is %s', async (_label, body) => {
+    const req = createFakeRequest({ body });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockCreateServiceInstance).not.toHaveBeenCalled();
   });
 
   it('returns 400 when config is missing', async () => {
@@ -249,7 +298,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('config must be an object');
+    expect(json.error).toContain('config: is required');
   });
 
   it('returns 400 when config is not an object', async () => {
@@ -260,7 +309,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('config must be an object');
+    expect(json.error).toContain('config: must be an object');
   });
 
   it('returns 400 when config is an array', async () => {
@@ -271,7 +320,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('config must be an object');
+    expect(json.error).toContain('config: must be an object');
   });
 
   it('returns 400 for invalid serviceType enum value', async () => {
@@ -282,7 +331,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('serviceType must be one of');
+    expect(json.error).toContain('serviceType: Invalid enum value');
   });
 
   it('returns 400 for invalid adapterType enum value', async () => {
@@ -293,7 +342,7 @@ describe('POST /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('adapterType must be one of');
+    expect(json.error).toContain('adapterType: Invalid enum value');
   });
 
   it('returns 400 when adapter type does not match service type (registry lookup fails)', async () => {
@@ -474,15 +523,34 @@ describe('GET /api/v1/services', () => {
     });
   });
 
-  it('clamps limit to MAX_PAGE_LIMIT', async () => {
+  // A limit above the maximum is rejected rather than quietly clamped, so a
+  // client asking for more than the maximum is told the bound instead of
+  // being handed a smaller page it never asked for (#834).
+  it('returns 400 naming the maximum when limit exceeds it, and does not query', async () => {
     mockListServiceInstances.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
-      url: 'http://localhost/api/v1/services?limit=500',
+      url: `http://localhost/api/v1/services?limit=${MAX_PAGE_LIMIT + 1}`,
     });
-    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
 
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain(`limit: must not exceed the maximum of ${MAX_PAGE_LIMIT}`);
+    expect(mockListServiceInstances).not.toHaveBeenCalled();
+  });
+
+  it('accepts a limit at the maximum', async () => {
+    mockListServiceInstances.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: `http://localhost/api/v1/services?limit=${MAX_PAGE_LIMIT}`,
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(res.status).toBe(200);
     expect(mockListServiceInstances).toHaveBeenCalledWith('org-1', expect.objectContaining({ limit: MAX_PAGE_LIMIT }));
   });
 
@@ -495,7 +563,7 @@ describe('GET /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('serviceType must be one of');
+    expect(json.error).toContain('serviceType: Invalid enum value');
   });
 
   it('returns 400 for invalid adapterType filter', async () => {
@@ -507,7 +575,7 @@ describe('GET /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('adapterType must be one of');
+    expect(json.error).toContain('adapterType: Invalid enum value');
   });
 
   it('returns 400 for invalid limit (non-numeric)', async () => {
@@ -519,7 +587,7 @@ describe('GET /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('limit must be a positive integer');
+    expect(json.error).toContain('limit: must be a positive integer');
   });
 
   it('returns 400 for zero limit', async () => {
@@ -531,7 +599,37 @@ describe('GET /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('limit must be a positive integer');
+    expect(json.error).toContain('limit: must be a positive integer');
+  });
+
+  // The old parseInt-based helpers parsed only a value's leading digits, so
+  // these were accepted by accident (1e3 as 1, 0x10 as 0 or 16).
+  it.each([
+    ['scientific notation', 'limit=1e3'],
+    ['hexadecimal', 'limit=0x10'],
+    ['a fractional value', 'limit=5.5'],
+    ['trailing garbage', 'limit=1abc'],
+  ])('returns 400 for %s, and does not query', async (_label, query) => {
+    const req = createFakeRequest({ method: 'GET', url: `http://localhost/api/v1/services?${query}` });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('limit: must be a positive integer');
+    expect(mockListServiceInstances).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a repeated query parameter', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/services?limit=1&limit=2',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('limit: repeated query parameter');
+    expect(mockListServiceInstances).not.toHaveBeenCalled();
   });
 
   it('returns 400 for negative offset', async () => {
@@ -543,7 +641,7 @@ describe('GET /api/v1/services', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toContain('offset must be a non-negative integer');
+    expect(json.error).toContain('offset: must be a non-negative integer');
   });
 
   it('returns 500 when listServiceInstances throws', async () => {

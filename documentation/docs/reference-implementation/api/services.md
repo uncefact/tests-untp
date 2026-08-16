@@ -51,6 +51,8 @@ POST /api/v1/services
 
 Registers a new service instance for the authenticated tenant. The `config` object is validated against the adapter's schema (see [Service Types and Adapter Types](#service-types-and-adapter-types) above), encrypted, and stored.
 
+`serviceType`, `adapterType`, `name` and `config` are required. `name` and `description` cannot be empty or contain only whitespace, and `description` is omitted rather than sent as null. `config` must be an object.
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -87,6 +89,13 @@ GET /api/v1/services
 
 Returns service instances for the authenticated tenant, including system defaults. Results are paginated and can be filtered by service type and adapter type.
 
+| Parameter     | Type    | Default                                                                                                      | Description                                                                                                   |
+| ------------- | ------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `serviceType` | string  | All types                                                                                                    | Filter by service type. One of `IDR`, `STORAGE`, `VC`; any other value is rejected with a 400                 |
+| `adapterType` | string  | All adapters                                                                                                 | Filter by adapter type. One of `VCKIT`, `PYX_IDR`, `UNCEFACT_STORAGE`; any other value is rejected with a 400 |
+| `limit`       | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum                                       |
+| `offset`      | integer | `0`                                                                                                          | Number of results to skip                                                                                     |
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -119,6 +128,8 @@ PATCH /api/v1/services/{id}
 ```
 
 Updates one or more fields of a service instance owned by the tenant. System defaults cannot be updated.
+
+At least one of `name`, `description`, `config`, or `isPrimary` must be provided. A body with none of them, including one whose only keys are unrecognised, is rejected with a 400 rather than applied as a no-op. Sending `description: null` clears the description. Neither `name` nor `description` may be empty or contain only whitespace, and `name` cannot be cleared.
 
 When `config` is provided, the new fields are **merged** with the existing configuration (shallow merge), the merged result is validated against the adapter's schema, and then encrypted before storage. This means you can update individual config fields without re-sending the entire config object.
 
@@ -161,6 +172,10 @@ DELETE /api/v1/services/{id}
 Permanently deletes a service instance owned by the tenant. System defaults cannot be deleted.
 
 If the instance is referenced by other records (DIDs, registrars, or identifier schemes), the request is rejected with a `409 Conflict` unless `force=true` is set. When forced, the foreign keys on referencing records are set to `null`.
+
+| Parameter | Type   | Default | Description                                                                                                                       |
+| --------- | ------ | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `force`   | string | `false` | Accepts exactly `true` or `false`. Any other value is rejected with a 400 naming the parameter, rather than being read as `false` |
 
 ```mermaid
 sequenceDiagram

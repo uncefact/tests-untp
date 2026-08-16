@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError, ConflictError } from '@/lib/api/errors';
-import { assertPublicUrl, ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { assertPublicUrl, ValidationError, parseRequestBody, parseQueryParams } from '@/lib/api/validation';
+import { deleteServiceQuerySchema, updateServiceRequestSchema } from '@/lib/api/request-schemas/service';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import {
@@ -92,6 +93,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the service instance
  *     requestBody:
  *       required: true
+ *       description: At least one recognised field is required; unknown keys are ignored.
  *       content:
  *         application/json:
  *           schema:
@@ -99,17 +101,30 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             properties:
  *               name:
  *                 type: string
- *                 description: New name for the service instance
+ *                 minLength: 1
+ *                 description: New name for the service instance. Cannot be empty or only whitespace
  *               description:
  *                 type: string
- *                 description: New description for the service instance
+ *                 minLength: 1
+ *                 nullable: true
+ *                 description: >-
+ *                   New description for the service instance. Cannot be empty or
+ *                   only whitespace; send null to clear it
  *               config:
  *                 type: object
- *                 description: New configuration (plain JSON, will be validated and encrypted)
+ *                 description: >-
+ *                   Configuration fields to apply. Shallow-merged onto the stored
+ *                   configuration, then validated against the adapter schema and
+ *                   encrypted. An explicit null is rejected; omit the field to
+ *                   leave the stored configuration untouched
  *               isPrimary:
  *                 type: boolean
  *                 description: Whether this instance should be the primary for its service type
- *             minProperties: 1
+ *             anyOf:
+ *               - required: [name]
+ *               - required: [description]
+ *               - required: [config]
+ *               - required: [isPrimary]
  *     responses:
  *       200:
  *         description: Service instance updated successfully
@@ -144,32 +159,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
   logger.info({ serviceInstanceId: id }, 'Parsing request body');
-  let body: { name?: string; description?: string; config?: Record<string, unknown>; isPrimary?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
+  const { name, description, config, isPrimary } = await parseRequestBody(req, updateServiceRequestSchema);
 
-  const { name, description, config, isPrimary } = body;
-
-  logger.info({ serviceInstanceId: id }, 'Validating fields');
   const hasName = name !== undefined;
   const hasDescription = description !== undefined;
   const hasConfig = config !== undefined;
   const hasIsPrimary = isPrimary !== undefined;
-
-  if (!hasName && !hasDescription && !hasConfig && !hasIsPrimary) {
-    throw new ValidationError('At least one of name, description, config, or isPrimary is required');
-  }
-
-  if (hasName && !isNonEmptyString(name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
-
-  if (hasConfig && (typeof config !== 'object' || Array.isArray(config) || config === null)) {
-    throw new ValidationError('config must be an object');
-  }
 
   logger.info({ serviceInstanceId: id }, 'Looking up existing service instance');
   const existing = await getServiceInstanceById(id, tenantId);
@@ -266,11 +261,21 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       - in: query
  *         name: force
  *         schema:
- *           type: boolean
- *         description: Set to true to delete even when other records reference this instance
+ *           type: string
+ *           enum: ['true', 'false']
+ *         description: >-
+ *           Set to true to delete even when other records reference this
+ *           instance. Accepts exactly "true" or "false"; any other value is
+ *           rejected with a 400 naming the parameter
  *     responses:
  *       204:
  *         description: Service instance deleted successfully
+ *       400:
+ *         description: Validation error - force is neither "true" nor "false"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
@@ -296,8 +301,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  */
 export const DELETE = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
-  const url = new URL(req.url);
-  const force = url.searchParams.get('force') === 'true';
+  const { force = false } = parseQueryParams(new URL(req.url), deleteServiceQuerySchema);
 
   logger.info({ serviceInstanceId: id }, 'Looking up service instance for deletion');
   const existing = await getServiceInstanceById(id, tenantId);

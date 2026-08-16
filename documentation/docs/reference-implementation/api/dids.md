@@ -127,8 +127,8 @@ For **self-managed** DIDs created via this endpoint, the VC service still genera
 
 | Optional Field | Description |
 |-----------------|-------------|
-| `name` | Human-readable name (must be non-empty if provided) |
-| `description` | Description of the DID's purpose (must be non-empty if provided) |
+| `name` | Human-readable name (cannot be empty or only whitespace if provided) |
+| `description` | Description of the DID's purpose (cannot be empty or only whitespace if provided) |
 | `isDefault` | Whether this DID becomes the tenant's default signing identity, used when a credential is issued without naming an explicit issuer DID |
 | `serviceInstanceId` | Verifiable credential service instance to use for creation. If provided, it must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404. If omitted, the service instance is resolved automatically (see [Service Instance Association](#service-instance-association)) |
 
@@ -204,8 +204,8 @@ Updates the metadata of a DID. Only `name`, `description`, and `isDefault` can b
 
 | Updatable Field | Description |
 |-----------------|-------------|
-| `name` | New name (must be non-empty if provided) |
-| `description` | New description (must be non-empty if provided) |
+| `name` | New name (cannot be empty or only whitespace if provided) |
+| `description` | New description (cannot be empty or only whitespace if provided) |
 | `isDefault` | Whether to set this DID as the tenant's default signing identity, used when a credential is issued without naming an explicit issuer DID. Cannot be changed on system default DIDs |
 
 ---
@@ -347,8 +347,8 @@ Importing a `did:webvh` identifier is rejected because `method` is restricted to
 
 | Optional Field | Description |
 |-----------------|-------------|
-| `name` | Human-readable name (must be non-empty if provided) |
-| `description` | Description of the DID's purpose (must be non-empty if provided) |
+| `name` | Human-readable name (cannot be empty or only whitespace if provided) |
+| `description` | Description of the DID's purpose (cannot be empty or only whitespace if provided) |
 
 ```mermaid
 sequenceDiagram

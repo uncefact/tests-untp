@@ -1,24 +1,12 @@
 import { NextResponse } from 'next/server';
-import {
-  assertPublicUrl,
-  ValidationError,
-  validateEnum,
-  isNonEmptyString,
-  parsePositiveInt,
-  parseNonNegativeInt,
-} from '@/lib/api/validation';
+import { assertPublicUrl, ValidationError, parseRequestBody, parseQueryParams } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { createServiceRequestSchema, listServicesQuerySchema } from '@/lib/api/request-schemas/service';
 import { createServiceInstance, listServiceInstances } from '@/lib/prisma/repositories';
 import { getEncryptionService } from '@/lib/encryption/encryption';
-import {
-  ServiceType,
-  AdapterType,
-  EncryptionAlgorithm,
-  adapterRegistry,
-  maskInstanceConfig,
-} from '@uncefact/untp-ri-services';
+import { EncryptionAlgorithm, adapterRegistry, maskInstanceConfig } from '@uncefact/untp-ri-services';
 import type { AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 
 const logger = apiLogger.child({ route: '/api/v1/services' });
@@ -48,19 +36,23 @@ const logger = apiLogger.child({ route: '/api/v1/services' });
  *               - config
  *             properties:
  *               serviceType:
- *                 type: string
- *                 enum: [IDR, STORAGE, VC]
+ *                 allOf:
+ *                   - $ref: '#/components/schemas/ServiceType'
  *                 description: The service category
  *               adapterType:
- *                 type: string
- *                 enum: [VCKIT, PYX_IDR, UNCEFACT_STORAGE]
+ *                 allOf:
+ *                   - $ref: '#/components/schemas/AdapterType'
  *                 description: The adapter implementation to use
  *               name:
  *                 type: string
- *                 description: Human-readable name for the instance
+ *                 minLength: 1
+ *                 description: Human-readable name for the instance. Cannot be empty or only whitespace
  *               description:
  *                 type: string
- *                 description: Optional description of the instance's purpose
+ *                 minLength: 1
+ *                 description: >-
+ *                   Optional description of the instance's purpose. Cannot be empty
+ *                   or only whitespace; omit it rather than sending null
  *               config:
  *                 type: object
  *                 description: Adapter-specific configuration (validated against the adapter schema)
@@ -92,42 +84,11 @@ const logger = apiLogger.child({ route: '/api/v1/services' });
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: {
-    serviceType?: string;
-    adapterType?: string;
-    name?: string;
-    description?: string;
-    config?: unknown;
-    isPrimary?: boolean;
-  };
-
   logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  // --- Field validation ---------------------------------------------------
-
-  logger.info(
-    { serviceType: body.serviceType, adapterType: body.adapterType, name: body.name },
-    'Validating input parameters',
+  const { serviceType, adapterType, name, description, config, isPrimary } = await parseRequestBody(
+    req,
+    createServiceRequestSchema,
   );
-
-  const serviceType = validateEnum(body.serviceType, Object.values(ServiceType), 'serviceType');
-  if (!serviceType) throw new ValidationError('serviceType is required');
-
-  const adapterType = validateEnum(body.adapterType, Object.values(AdapterType), 'adapterType');
-  if (!adapterType) throw new ValidationError('adapterType is required');
-
-  if (!isNonEmptyString(body.name)) {
-    throw new ValidationError('name is required');
-  }
-
-  if (!body.config || typeof body.config !== 'object' || Array.isArray(body.config)) {
-    throw new ValidationError('config must be an object');
-  }
 
   // --- Registry look-up & config schema validation ------------------------
 
@@ -145,7 +106,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   logger.info({ serviceType, adapterType }, 'Validating config against adapter schema');
 
-  const parseResult = registryEntry.configSchema.safeParse(body.config);
+  const parseResult = registryEntry.configSchema.safeParse(config);
   if (!parseResult.success) {
     const messages = parseResult.error.issues.map((i) => i.message).join('; ');
     throw new ValidationError(`Invalid config: ${messages}`);
@@ -154,29 +115,28 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // --- SSRF protection on config URLs --------------------------------------
 
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
-    const configObj = body.config as Record<string, unknown>;
-    if (typeof configObj.baseUrl === 'string') {
+    if (typeof config.baseUrl === 'string') {
       logger.info('Validating config baseUrl is not internal');
-      await assertPublicUrl(configObj.baseUrl, 'config.baseUrl');
+      await assertPublicUrl(config.baseUrl, 'config.baseUrl');
     }
   }
 
   // --- Encrypt & persist --------------------------------------------------
 
-  logger.info({ serviceType, adapterType, name: body.name }, 'Encrypting and persisting service instance');
+  logger.info({ serviceType, adapterType, name }, 'Encrypting and persisting service instance');
 
   const encryptedConfig = JSON.stringify(
-    getEncryptionService().encrypt(JSON.stringify(body.config), EncryptionAlgorithm.AES_256_GCM),
+    getEncryptionService().encrypt(JSON.stringify(config), EncryptionAlgorithm.AES_256_GCM),
   );
 
   const record = await createServiceInstance({
     tenantId,
     serviceType,
     adapterType,
-    name: body.name,
-    description: body.description,
+    name,
+    description,
     config: encryptedConfig,
-    isPrimary: body.isPrimary,
+    isPrimary,
   });
 
   const masked = maskInstanceConfig(record, getEncryptionService(), logger);
@@ -201,21 +161,21 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *       - in: query
  *         name: serviceType
  *         schema:
- *           type: string
- *           enum: [IDR, STORAGE, VC]
+ *           $ref: '#/components/schemas/ServiceType'
  *         description: Filter by service type
  *       - in: query
  *         name: adapterType
  *         schema:
- *           type: string
- *           enum: [VCKIT, PYX_IDR, UNCEFACT_STORAGE]
+ *           $ref: '#/components/schemas/AdapterType'
  *         description: Filter by adapter type
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Maximum number of instances to return
+ *         description: >-
+ *           Maximum number of instances to return. A value above the configured
+ *           maximum is rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
@@ -254,23 +214,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  const url = new URL(req.url);
-
   logger.info('Parsing and validating query filters');
 
-  const serviceType = validateEnum(
-    url.searchParams.get('serviceType') ?? undefined,
-    Object.values(ServiceType),
-    'serviceType',
-  );
-  const adapterType = validateEnum(
-    url.searchParams.get('adapterType') ?? undefined,
-    Object.values(AdapterType),
-    'adapterType',
-  );
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const { serviceType, adapterType, limit, offset } = parseQueryParams(new URL(req.url), listServicesQuerySchema);
 
   logger.info({ filters: { serviceType, adapterType, limit, offset } }, 'Querying service instances');
 

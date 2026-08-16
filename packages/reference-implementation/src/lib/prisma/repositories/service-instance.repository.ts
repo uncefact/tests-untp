@@ -15,9 +15,14 @@ export type CreateServiceInstanceInput = {
   isPrimary?: boolean;
 };
 
+/**
+ * Input for updating an existing service instance.
+ * Fields set to undefined are left unchanged.
+ * description set to null clears the description (a nullable scalar column).
+ */
 export type UpdateServiceInstanceInput = {
   name?: string;
-  description?: string;
+  description?: string | null;
   config?: string; // Already encrypted by the caller
   isPrimary?: boolean;
 };

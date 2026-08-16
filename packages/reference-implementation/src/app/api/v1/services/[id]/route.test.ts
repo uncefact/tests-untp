@@ -238,6 +238,76 @@ describe('PATCH /api/v1/services/:id', () => {
     expect(mockUpdateServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1', { description: 'New desc' });
   });
 
+  // The column is nullable and the handler forwards an explicit null, so a
+  // caller can clear a description that exists.
+  it('clears the description when null is sent', async () => {
+    const updated = { ...MOCK_INSTANCE, description: null };
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+    mockUpdateServiceInstance.mockResolvedValue(updated);
+    mockMaskInstanceConfig.mockReturnValue({ ...MOCK_MASKED, description: null });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { description: null } });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1', { description: null });
+  });
+
+  it('returns 400 when name is only whitespace, and does not update', async () => {
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '   ' } });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('name: must not be only whitespace');
+    expect(mockUpdateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  // `config` is optional but not nullable: it has no clear-via-null meaning,
+  // and a null here would otherwise reach the merge as a missing object.
+  it('returns 400 when config is an explicit null, and does not update', async () => {
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { config: null } });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('config: must be an object');
+    expect(mockUpdateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['description', { description: 42 }],
+    ['isPrimary', { isPrimary: 'yes' }],
+  ])('returns 400 when %s is the wrong type, and does not update', async (field, body) => {
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+
+    const req = createFakeRequest({ method: 'PATCH', body });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain(field);
+    expect(mockUpdateServiceInstance).not.toHaveBeenCalled();
+  });
+
+  // Without this guard the unknown key is stripped, leaving an empty update
+  // that would return a silent no-op 200.
+  it('returns 400 when the body carries only unrecognised keys', async () => {
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { nmae: 'typo' } });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('At least one of name, description, config, or isPrimary is required');
+    expect(mockUpdateServiceInstance).not.toHaveBeenCalled();
+  });
+
   it('updates config (merges with existing, validates against schema, encrypts)', async () => {
     const existingPlainConfig = { baseUrl: 'https://old.com', apiKey: 'old-key' };
     const newConfigPatch = { baseUrl: 'https://new.com' };
@@ -263,6 +333,26 @@ describe('PATCH /api/v1/services/:id', () => {
       config: JSON.stringify(encryptedEnvelope),
     });
     expect(json.config.baseUrl).toBe('https://new.com');
+  });
+
+  // A stored record can name a serviceType/adapterType pair the registry no
+  // longer carries, for instance an adapter retired after the instance was
+  // created. The merged config then has nothing to validate against, so the
+  // request is refused rather than stored unvalidated.
+  it('returns 400 when the stored record names an adapter the registry does not carry', async () => {
+    mockGetServiceInstanceById.mockResolvedValue({ ...MOCK_INSTANCE, adapterType: 'RETIRED_ADAPTER' });
+    mockGetEncryptionService.mockReturnValue({
+      decrypt: mockDecrypt.mockReturnValue(JSON.stringify({ baseUrl: 'https://old.com' })),
+      encrypt: mockEncrypt,
+    });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { config: { baseUrl: 'https://new.com' } } });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("No registered adapter 'RETIRED_ADAPTER' for service type 'VC'");
+    expect(mockUpdateServiceInstance).not.toHaveBeenCalled();
   });
 
   it('updates isPrimary', async () => {
@@ -304,7 +394,7 @@ describe('PATCH /api/v1/services/:id', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/name must be a non-empty string/i);
+    expect(json.error).toContain('name: String must contain at least 1 character(s)');
   });
 
   it('returns 400 when config is not an object', async () => {
@@ -313,7 +403,7 @@ describe('PATCH /api/v1/services/:id', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/config must be an object/i);
+    expect(json.error).toContain('config: must be an object');
   });
 
   it('returns 400 when config is an array', async () => {
@@ -322,7 +412,7 @@ describe('PATCH /api/v1/services/:id', () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/config must be an object/i);
+    expect(json.error).toContain('config: must be an object');
   });
 
   it('returns 400 when config schema validation fails after merge', async () => {
@@ -451,6 +541,40 @@ describe('DELETE /api/v1/services/:id', () => {
     // Should not check references when force=true
     expect(mockCountServiceInstanceReferences).not.toHaveBeenCalled();
     expect(mockDeleteServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1');
+  });
+
+  // Previously read as `searchParams.get('force') === 'true'`, so these
+  // silently meant false and the caller got the 409 they thought they had
+  // opted out of.
+  it.each([['TRUE'], ['1'], ['yes'], ['']])(
+    'returns 400 for force=%s rather than silently treating it as false',
+    async (value) => {
+      const req = createFakeRequest({
+        method: 'DELETE',
+        url: `http://localhost/api/v1/services/svc-123?force=${value}`,
+      });
+      const res = await DELETE(req, createContext('svc-123') as unknown as Parameters<typeof DELETE>[1]);
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toContain('force: must be "true" or "false"');
+      expect(mockDeleteServiceInstance).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts an explicit force=false and still checks references', async () => {
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+    mockCountServiceInstanceReferences.mockResolvedValue({ dids: 0, registrars: 0, schemes: 0 });
+    mockDeleteServiceInstance.mockResolvedValue(undefined);
+
+    const req = createFakeRequest({
+      method: 'DELETE',
+      url: 'http://localhost/api/v1/services/svc-123?force=false',
+    });
+    const res = await DELETE(req, createContext('svc-123') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(204);
+    expect(mockCountServiceInstanceReferences).toHaveBeenCalledWith('svc-123');
   });
 
   it('returns 404 when instance not found', async () => {
