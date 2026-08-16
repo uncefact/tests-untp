@@ -57,52 +57,26 @@ The application now validates `RI_APP_URL` when it starts and refuses to boot wh
 ## Decryption-key backfill for existing credentials
 
 Credentials created by earlier versions still hold their decryption key in plaintext.
-They keep working unchanged after the upgrade (the read path recognises legacy
-plaintext keys), so the backfill is not required for continuity. Run it once to bring
-existing rows under encryption at rest; until it has run, the confidentiality
-improvement only covers newly issued credentials.
+They keep working unchanged after the upgrade, because the read path recognises legacy
+plaintext keys, so this step is not required for continuity. Run it once to bring
+existing rows under encryption at rest. Until it has run, the confidentiality
+improvement covers only newly issued credentials.
 
-Unlike the automatic data backfills that run when the container starts, this backfill
-is deliberately manual: wrapping keys under a wrong `DATA_ENCRYPTION_KEY` would be
+Unlike the backfills that run automatically when the container starts, this one is
+deliberately manual: wrapping keys under a wrong `DATA_ENCRYPTION_KEY` would be
 unrecoverable, so a human confirms the key before anything is rewritten.
 
-Before running it:
+Where it sits in the upgrade:
 
-1. Preview what it would do with the read-only audit command (`pnpm audit:encryption`), which decrypts every stored envelope under the active key and reports what the backfill would wrap, skip, or abort on (see [Encryption Audit](../reference-implementation/operations/encryption-audit)).
-2. Back up the database (see [Key Management and Recovery](../reference-implementation/operations/key-management#backups-pair-with-the-key) for how backups pair with the key).
-3. Confirm `DATA_ENCRYPTION_KEY` is exactly the key the running application uses.
-4. Stop any older application instances that might still write plaintext keys during a
-   rolling upgrade (or plan to re-run the backfill after they are gone; re-running is
-   safe and converges).
+1. Complete the `SERVICE_ENCRYPTION_KEY` rename above, so the application and the
+   backfill agree on which key is active.
+2. Preview the work with the read-only audit command, `pnpm audit:encryption` (see [Encryption Audit](../reference-implementation/operations/encryption-audit)), and back up the database, recording the key it pairs with (see [Key Management and Recovery](../reference-implementation/operations/key-management#backups-pair-with-the-key)).
+3. Run the backfill, once any older instances that could still write plaintext keys
+   have stopped. Re-running after they are gone is safe and converges.
 
-From a source checkout, in `packages/reference-implementation`:
-
-```bash
-pnpm backfill:decryption-keys
-```
-
-The published Docker image carries no package manifest for the Reference Implementation, so inside the image run the script directly:
-
-```bash
-docker compose exec -w /app ri node_modules/.bin/tsx scripts/backfill-decryption-keys.ts
-# with the force flag, after out-of-band key verification and a backup:
-docker compose exec -w /app ri node_modules/.bin/tsx scripts/backfill-decryption-keys.ts --force
-```
-
-The run protects itself before writing anything: it decrypts every existing encrypted
-value it can find (credential keys and service instance configurations) and aborts on
-any failure, naming the failing row. When the database holds nothing encrypted to
-check against, the run refuses to proceed and asks for `--force`; only pass it after
-verifying the key out of band, with a backup in hand:
-
-```bash
-pnpm backfill:decryption-keys -- --force
-```
-
-Rows whose stored value looks like a corrupted envelope are skipped and listed rather
-than re-encrypted; inspect any such rows manually. After the run, confirm a wrapped
-key still round-trips by retrieving a credential through the API
-(`GET /api/v1/credentials/{id}`) and checking its `decryptionKey` verifies as before.
+The commands for a source checkout and for the Docker image, the preflight that aborts
+on a wrong key, when `--force` applies, and what the run reports are in the
+[decryption keys backfill reference](../reference-implementation/operations/backfills/decryption-keys).
 
 ## Rollback
 

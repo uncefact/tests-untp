@@ -19,7 +19,7 @@ Keys do not travel between environments. Supplying a key other than a backup's p
 
 ## Backups pair with the key
 
-A database backup without its paired key is not a recovery artefact. Stored envelopes carry no key identifier, and the serving application holds exactly one active key, so losing the key makes every stored envelope permanently unreadable: every service instance configuration, and every credential decryption key that has been wrapped. Credential rows created before v0.4 keep their stored keys in plaintext until the [backfill](../../migration-guides/ri-v0.4#decryption-key-backfill-for-existing-credentials) wraps them, so they, like credentials stored unencrypted, do not depend on the key and survive its loss.
+A database backup without its paired key is not a recovery artefact. Stored envelopes carry no key identifier, and the serving application holds exactly one active key, so losing the key makes every stored envelope permanently unreadable: every service instance configuration, and every credential decryption key that has been wrapped. Credential rows created before v0.4 keep their stored keys in plaintext until the [backfill](./backfills/decryption-keys) wraps them, so they, like credentials stored unencrypted, do not depend on the key and survive its loss.
 
 For every backup, record which key opens it: the backup's identity (timestamp or version), its source environment, the secret-store version of the paired key, and, when a backup sits on one side of a [rotation](./encryption-key-rotation), which side. Record the secret-store reference, never the raw key, and keep raw key material out of logs and tickets.
 

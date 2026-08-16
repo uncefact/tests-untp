@@ -12,7 +12,7 @@ Rather than requiring operators to run these steps manually, the Docker containe
 How this is triggered depends on how you run the Reference Implementation:
 
 - **Docker** — The container's entrypoint script runs migrations, data backfills, and seeding automatically before starting the application. This applies whether you are using the Docker Compose configuration from the [repository](https://github.com/uncefact/tests-untp) or the standalone [Docker image](https://github.com/orgs/uncefact/packages/container/package/tests-untp%2Freference-implementation).
-- **Local development** — Running the application on the host does not go through the entrypoint, so none of these steps happen on their own. See the [repository README](https://github.com/uncefact/tests-untp) for setup instructions. Where an existing database still needs the digest conversion, run it by hand with the command in the [digest backfill section](../../migration-guides/v0.7.0#digest-backfill-for-existing-data) of the v0.7.0 upgrade guide.
+- **Local development** does not go through the entrypoint, so none of these steps happen on their own. See the [repository README](https://github.com/uncefact/tests-untp) for setup instructions. Where an existing database still needs the digest conversion, run it by hand with the command in the [digest multibase backfill reference](./backfills/digest-multibase).
 
 This page walks through what happens during startup, what gets created, and how to control the process.
 
@@ -52,13 +52,13 @@ If the database is already up to date, this step completes immediately.
 |----------|-------------|---------|
 | `SKIP_MIGRATIONS` | Set to `true` to skip automatic migrations | `false` |
 
-Set `SKIP_MIGRATIONS=true` if your deployment process applies migrations separately, for example in a CI/CD pipeline. This also skips the backfills in step 2, so a deployment that applies migrations out of band runs the backfills out of band too. The [digest backfill section](../../migration-guides/v0.7.0#digest-backfill-for-existing-data) of the v0.7.0 upgrade guide gives the command.
+Set `SKIP_MIGRATIONS=true` if your deployment process applies migrations separately, for example in a CI/CD pipeline. This also skips the backfills in step 2, so a deployment that applies migrations out of band runs the backfills out of band too. The [digest multibase backfill reference](./backfills/digest-multibase) gives the command for the one that runs there today.
 
 ## Step 2: Data Backfills
 
 A migration changes the shape of the tables. It does not always bring the rows that already exist into line with what the new version writes. Backfills do that second part, so an upgraded database matches the current version's expectations rather than only its schema.
 
-They run immediately after `migrate deploy`, under the same `SKIP_MIGRATIONS` guard, so the columns they write have already been renamed or added by the time they execute. One backfill is wired up. It converts credential and render template digests from the legacy hexadecimal form to the multibase encoding the application now writes. A value it does not recognise is left alone and warned about, and a value it has already converted is skipped, so repeated container starts converge rather than rewriting.
+They run immediately after `migrate deploy`, under the same `SKIP_MIGRATIONS` guard, so the columns they write have already been renamed or added by the time they execute. One backfill is wired up. It converts credential and render template digests from the legacy hexadecimal form to the multibase encoding the application now writes, and is documented in full under [Backfills](./backfills/digest-multibase). A value it does not recognise is left alone and warned about, and a value it has already converted is skipped, so repeated container starts converge rather than rewriting.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -68,7 +68,7 @@ Skipping them leaves the old values in place. The application still starts, and 
 
 A backfill that fails is a different matter. The entrypoint stops at the first failing step, so the seed does not run and the application does not start, while any rows converted before the failure stay converted. A restart scans again from the beginning and skips the rows already converted.
 
-Conversions that cannot be undone are deliberately kept out of this step and ship as commands an operator runs when they choose, which is why encrypting existing credential decryption keys is a [step in the v0.4 upgrade guide](../../migration-guides/ri-v0.4#decryption-key-backfill-for-existing-credentials) rather than something a container start does.
+Conversions that cannot be undone are deliberately kept out of this step and ship as [commands an operator runs](./backfills) when they choose, which is why encrypting existing credential decryption keys is not something a container start does.
 
 ## Step 3: Database Seed
 

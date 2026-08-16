@@ -36,7 +36,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const DOCS_URL =
-  'https://uncefact.github.io/tests-untp/docs/next/reference-implementation/api/credentials#encryption-and-privacy';
+  'https://uncefact.github.io/tests-untp/docs/next/reference-implementation/operations/backfills/decryption-keys';
 
 const force = process.argv.includes('--force');
 
