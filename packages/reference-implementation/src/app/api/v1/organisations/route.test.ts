@@ -32,8 +32,8 @@ jest.mock('@/lib/prisma/repositories', () => ({
   listOrganisations: (tenantId: string, opts: unknown) => mockListOrganisations(tenantId, opts),
 }));
 
-import { NotFoundError } from '@/lib/api/errors';
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { NotFoundError, ConflictError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 
 function createFakeRequest(options: { method?: string; body?: unknown; url?: string }): Request {
@@ -87,40 +87,235 @@ describe('POST /api/v1/organisations', () => {
     expect(json).toEqual(organisations);
   });
 
-  it('returns 400 when body is not an array', async () => {
+  it('creates an organisation with optional fields and forwards them to the repository', async () => {
+    mockCreateOrganisations.mockResolvedValue([{ id: 'org-a' }]);
+
+    const req = createFakeRequest({
+      body: [
+        {
+          name: 'Acme Corp',
+          description: 'A test organisation',
+          location: { address: { streetAddress: '123 Main St' } },
+          primaryIdentifierId: 'ident-1',
+          secondaryIdentifierIds: ['ident-2', 'ident-3'],
+        },
+      ],
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(201);
+    expect(mockCreateOrganisations).toHaveBeenCalledWith('org-1', [
+      {
+        name: 'Acme Corp',
+        description: 'A test organisation',
+        location: { address: { streetAddress: '123 Main St' } },
+        primaryIdentifierId: 'ident-1',
+        secondaryIdentifierIds: ['ident-2', 'ident-3'],
+      },
+    ]);
+  });
+
+  it('strips an unrecognised key from an otherwise-valid item rather than rejecting or forwarding it', async () => {
+    mockCreateOrganisations.mockResolvedValue([{ id: 'org-a' }]);
+
+    const req = createFakeRequest({
+      body: [{ name: 'Acme Corp', typo: 'x' }],
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(res.status).toBe(201);
+    expect(mockCreateOrganisations).toHaveBeenCalledWith('org-1', [{ name: 'Acme Corp' }]);
+  });
+
+  it('returns 400 for an explicit null location and does not call the repository', async () => {
+    // A schema regression re-admitting null here would forward a value the
+    // Prisma client's input types exclude (Json null writes require the
+    // DbNull/JsonNull sentinels), and location's clear mechanism is
+    // deliberately deferred to #804.
+    const req = createFakeRequest({
+      body: [{ name: 'Acme Corp', location: null }],
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.location:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when body is not an array and does not call the repository', async () => {
     const req = createFakeRequest({ body: { name: 'Acme Corp' } });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('Request body must be an array');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when body is an empty array', async () => {
+  it('returns 400 when body is an empty array and does not call the repository', async () => {
     const req = createFakeRequest({ body: [] });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('Request body must not be empty');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when name is missing on an item', async () => {
+  it('returns 400 for a literal null body and does not call the repository', async () => {
+    const req = createFakeRequest({ body: null });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('body: Expected object, received null');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when name is missing on an item and does not call the repository', async () => {
     const req = createFakeRequest({ body: [{ description: 'No name here' }] });
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required for each organisation');
+    expect(json.error).toMatch(/^0\.name:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for invalid JSON body', async () => {
+  it('returns 400 when name is an empty string and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: '' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.name:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  // A separate branch from the empty-string case above: a minimum length
+  // counts characters, so a whitespace-only value satisfies it and would
+  // otherwise create an organisation whose name renders as blank everywhere.
+  it('returns 400 when name is only whitespace and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: '   ' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('0.name: must not be only whitespace');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when description is only whitespace and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme', description: '  ' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('0.description: must not be only whitespace');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when name is mistyped and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: 42 }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.name:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when description is an empty string and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', description: '' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.description:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when description is an explicit null and does not call the repository', async () => {
+    // Create has no null-to-clear contract for any field (there is nothing
+    // to clear on a brand-new record); null is rejected the same as any
+    // other mistyped value, not silently accepted as omission.
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', description: null }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.description:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when primaryIdentifierId is mistyped and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', primaryIdentifierId: 42 }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.primaryIdentifierId:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when primaryIdentifierId is an explicit null and does not call the repository', async () => {
+    // Create has nothing to clear, so unlike PATCH, null is not a supported
+    // way to say "no primary identifier"; omitting the field is.
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', primaryIdentifierId: null }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.primaryIdentifierId:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when secondaryIdentifierIds is not an array and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', secondaryIdentifierIds: 'ident-1' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.secondaryIdentifierIds:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when a secondaryIdentifierIds entry is an empty string and does not call the repository', async () => {
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', secondaryIdentifierIds: [''] }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^0\.secondaryIdentifierIds\.0:/);
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when secondaryIdentifierIds contains a duplicate in-request identifier and does not call the repository', async () => {
+    // organisationSecondaryIdentifier.createMany runs without skipDuplicates,
+    // so an in-request duplicate hits the composite primary key and surfaces
+    // as the concurrent-link 409, a misleading response for what is a client
+    // typo; catching it here (shape-level, boundary self-consistency) keeps
+    // it a 400 naming the field instead.
+    const req = createFakeRequest({
+      body: [{ name: 'Acme Corp', secondaryIdentifierIds: ['ident-1', 'ident-1'] }],
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('0.secondaryIdentifierIds: must not contain duplicate identifiers');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for invalid JSON body and does not call the repository', async () => {
     const req = createBadJsonRequest();
     const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
     expect(json.error).toBe('Invalid JSON body');
+    expect(mockCreateOrganisations).not.toHaveBeenCalled();
   });
 
   it('returns 404 when repository throws NotFoundError', async () => {
@@ -132,6 +327,21 @@ describe('POST /api/v1/organisations', () => {
 
     expect(res.status).toBe(404);
     expect(json.error).toContain('Tenant not found');
+  });
+
+  it('returns 409 when repository reports a primary identifier conflict', async () => {
+    mockCreateOrganisations.mockRejectedValue(
+      new ConflictError('An identifier in this request is already the primary identifier of another organisation'),
+    );
+
+    const req = createFakeRequest({ body: [{ name: 'Acme Corp', primaryIdentifierId: 'ident-1' }] });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toContain(
+      'An identifier in this request is already the primary identifier of another organisation',
+    );
   });
 
   it('returns 500 on unexpected error', async () => {
@@ -185,6 +395,23 @@ describe('GET /api/v1/organisations', () => {
     });
   });
 
+  it('accepts an empty search filter unchanged', async () => {
+    mockListOrganisations.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/organisations?search=',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockListOrganisations).toHaveBeenCalledWith('org-1', {
+      search: '',
+      limit: undefined,
+      offset: undefined,
+    });
+  });
+
   it('handles no query parameters', async () => {
     mockListOrganisations.mockResolvedValue({ data: [], total: 0 });
 
@@ -198,7 +425,7 @@ describe('GET /api/v1/organisations', () => {
     });
   });
 
-  it('returns 400 for non-numeric limit', async () => {
+  it('returns 400 for non-numeric limit and does not query', async () => {
     const req = createFakeRequest({
       method: 'GET',
       url: 'http://localhost/api/v1/organisations?limit=abc',
@@ -207,10 +434,11 @@ describe('GET /api/v1/organisations', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('limit must be a positive integer');
+    expect(json.error).toContain('limit: must be a positive integer');
+    expect(mockListOrganisations).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for negative offset', async () => {
+  it('returns 400 for negative offset and does not query', async () => {
     const req = createFakeRequest({
       method: 'GET',
       url: 'http://localhost/api/v1/organisations?offset=-1',
@@ -219,7 +447,34 @@ describe('GET /api/v1/organisations', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('offset must be a non-negative integer');
+    expect(json.error).toContain('offset: must be a non-negative integer');
+    expect(mockListOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('rejects a limit above the maximum with a 400 and does not query', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: `http://localhost/api/v1/organisations?limit=${MAX_PAGE_LIMIT + 1}`,
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^limit:/);
+    expect(mockListOrganisations).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a repeated query key and does not query', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/organisations?limit=10&limit=20',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('repeated query parameter');
+    expect(mockListOrganisations).not.toHaveBeenCalled();
   });
 
   it('returns 500 when listOrganisations throws', async () => {

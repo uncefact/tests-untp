@@ -4,7 +4,6 @@ import { NotFoundError } from '@/lib/api/errors';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { ValidationError } from '@/lib/api/validation';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
-import { UntpLocation } from '@/lib/types';
 
 /** Full relations for detail endpoints. */
 const ORGANISATION_DETAIL_INCLUDE = {
@@ -33,11 +32,20 @@ export type OrganisationListItem = Omit<OrganisationListRow, 'secondaryIdentifie
 
 /**
  * Input for creating a new organisation entity.
+ *
+ * `location` is an open JSON object (ADR-037): a UNTP-shaped location schema
+ * is a separate deferred design tracked in #804, so this type stays a plain
+ * record rather than the more specific UntpLocation shape. Not nullable: the
+ * generated Prisma client types `location` as
+ * `NullableJsonNullValueInput | InputJsonValue`, which excludes a plain
+ * `null` (clearing a Json column needs the `Prisma.DbNull`/`Prisma.JsonNull`
+ * sentinels), so the request schema rejects a literal `null` before it
+ * reaches here.
  */
 export type CreateOrganisationInput = {
   name: string;
   description?: string;
-  location?: UntpLocation;
+  location?: Record<string, unknown>;
   primaryIdentifierId?: string;
   secondaryIdentifierIds?: string[];
 };
@@ -45,13 +53,16 @@ export type CreateOrganisationInput = {
 /**
  * Input for updating an existing organisation entity.
  * Fields set to undefined are left unchanged.
+ * description set to null clears the description (a nullable scalar column).
  * primaryIdentifierId set to null clears the primary identifier.
  * secondaryIdentifierIds set to [] clears all secondary identifiers.
+ * location is an open JSON object (see CreateOrganisationInput for why this
+ * stays a plain record, ADR-037) and, like create, is not nullable.
  */
 export type UpdateOrganisationInput = {
   name?: string;
-  description?: string;
-  location?: UntpLocation;
+  description?: string | null;
+  location?: Record<string, unknown>;
   primaryIdentifierId?: string | null;
   secondaryIdentifierIds?: string[];
 };
@@ -243,9 +254,13 @@ export async function updateOrganisation(
   input: UpdateOrganisationInput,
 ): Promise<OrganisationEntityWithRelations> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    // Ownership check
+    // Ownership check. Also fetches the currently stored secondary
+    // identifier IDs: a primary-only update still needs them to validate
+    // against, since the overlap rule below covers the request's effective
+    // state, not only fields the request happens to touch.
     const existing = await tx.organisationEntity.findFirst({
       where: { id, tenantId },
+      include: { secondaryIdentifiers: { select: { identifierId: true } } },
     });
 
     if (!existing) {
@@ -257,12 +272,25 @@ export async function updateOrganisation(
       await validateIdentifierOwnership(tx, input.primaryIdentifierId, tenantId);
     }
 
-    // Validate secondary identifiers and check for overlap with primary
-    if (input.secondaryIdentifierIds !== undefined) {
+    // Validate no overlap between the effective primary and effective
+    // secondary sets: the incoming value when a field is part of this
+    // request, otherwise the organisation's current stored value. A
+    // primary-only update whose new primary matches an existing stored
+    // secondary identifier must be rejected exactly like the reverse
+    // (a secondary-only update matching the existing primary); no database
+    // constraint enforces this, so both directions are checked here.
+    if (input.primaryIdentifierId !== undefined || input.secondaryIdentifierIds !== undefined) {
       const effectivePrimaryId =
         input.primaryIdentifierId !== undefined ? input.primaryIdentifierId : existing.primaryIdentifierId;
-      validateNoPrimarySecondaryOverlap(effectivePrimaryId, input.secondaryIdentifierIds);
+      const effectiveSecondaryIds =
+        input.secondaryIdentifierIds !== undefined
+          ? input.secondaryIdentifierIds
+          : existing.secondaryIdentifiers.map((si) => si.identifierId);
+      validateNoPrimarySecondaryOverlap(effectivePrimaryId, effectiveSecondaryIds);
+    }
 
+    // Validate secondary identifiers belong to tenant, then replace them
+    if (input.secondaryIdentifierIds !== undefined) {
       for (const secId of input.secondaryIdentifierIds) {
         await validateIdentifierOwnership(tx, secId, tenantId);
       }
@@ -313,6 +341,7 @@ export async function updateOrganisation(
       mapDatabaseError(e, {
         conflict: 'The identifier is already the primary identifier of another organisation',
         notFound: 'Organisation or a referenced resource not found',
+        invalidReference: 'The referenced primary identifier no longer exists',
       });
     }
   });

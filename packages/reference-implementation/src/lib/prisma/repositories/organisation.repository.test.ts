@@ -537,6 +537,7 @@ describe('organisation.repository', () => {
 
       expect(mockTx.organisationEntity.findFirst).toHaveBeenCalledWith({
         where: { id: 'org-1', tenantId: TENANT_ID },
+        include: { secondaryIdentifiers: { select: { identifierId: true } } },
       });
       expect(mockTx.organisationEntity.update).toHaveBeenCalledWith({
         where: { id: 'org-1' },
@@ -547,6 +548,35 @@ describe('organisation.repository', () => {
         },
       });
       expect(result.name).toBe('Acme Industries');
+    });
+
+    it('forwards an explicit null description into the update data', async () => {
+      // The data object is built with `input.description !== undefined && {...}`,
+      // not a truthiness check; a regression to a truthy check would silently
+      // drop `description: null` (indistinguishable from omitting the field)
+      // instead of forwarding the clear to Prisma. The route-level test mocks
+      // the repository, so it cannot see this; only a repository-level
+      // assertion on the actual transaction call does.
+      const updatedOrg = { ...ORG_RECORD, description: null };
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn().mockResolvedValue(updatedOrg),
+        },
+        identifier: { findFirst: jest.fn() },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn(),
+          createMany: jest.fn(),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      await updateOrganisation('org-1', TENANT_ID, { description: null });
+
+      expect(mockTx.organisationEntity.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ description: null }) }),
+      );
     });
 
     it('rejects duplicate secondary identifiers', async () => {
@@ -691,6 +721,74 @@ describe('organisation.repository', () => {
       expect(result.secondaryIdentifiers).toHaveLength(0);
     });
 
+    it('throws ValidationError when a primary-only update matches an existing stored secondary identifier', async () => {
+      // The overlap check must cover the request's *effective* state, not
+      // only fields the request happens to touch: a primary-only update
+      // that is never checked against the organisation's currently stored
+      // secondaries would silently persist the forbidden
+      // primary-also-secondary state (no database constraint enforces it).
+      const orgWithStoredSecondary = {
+        ...ORG_RECORD,
+        secondaryIdentifiers: [{ organisationId: 'org-1', identifierId: 'ident-2', identifier: IDENTIFIER_RECORD_2 }],
+      };
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(orgWithStoredSecondary),
+          update: jest.fn(),
+        },
+        identifier: { findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2) },
+        organisationSecondaryIdentifier: { deleteMany: jest.fn(), createMany: jest.fn() },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = updateOrganisation('org-1', TENANT_ID, { primaryIdentifierId: 'ident-2' });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Primary identifier cannot also be a secondary identifier');
+      expect(mockTx.organisationEntity.update).not.toHaveBeenCalled();
+    });
+
+    it('succeeds when a request reassigns an existing secondary to primary in the same call', async () => {
+      // The effective-state rule must not over-block: replacing the
+      // secondary set in the same request as the primary change resolves
+      // the overlap, so this combination is valid.
+      const orgWithStoredSecondary = {
+        ...ORG_RECORD,
+        secondaryIdentifiers: [{ organisationId: 'org-1', identifierId: 'ident-2', identifier: IDENTIFIER_RECORD_2 }],
+      };
+      const updatedOrg = {
+        ...ORG_RECORD,
+        primaryIdentifierId: 'ident-2',
+        primaryIdentifier: IDENTIFIER_RECORD_2,
+        secondaryIdentifiers: [],
+      };
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(orgWithStoredSecondary),
+          update: jest.fn().mockResolvedValue(updatedOrg),
+        },
+        identifier: { findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2) },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+          createMany: jest.fn(),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = await updateOrganisation('org-1', TENANT_ID, {
+        primaryIdentifierId: 'ident-2',
+        secondaryIdentifierIds: [],
+      });
+
+      expect(mockTx.organisationSecondaryIdentifier.deleteMany).toHaveBeenCalledWith({
+        where: { organisationId: 'org-1' },
+      });
+      expect(mockTx.organisationEntity.update).toHaveBeenCalled();
+      expect(result.primaryIdentifierId).toBe('ident-2');
+    });
+
     it('throws NotFoundError if organisation does not belong to tenant', async () => {
       const mockTx = {
         organisationEntity: {
@@ -730,6 +828,32 @@ describe('organisation.repository', () => {
 
       await expect(result).rejects.toThrow(ConflictError);
       await expect(result).rejects.toThrow('The identifier is already the primary identifier of another organisation');
+    });
+
+    it('maps a foreign-key violation on the main update to ValidationError', async () => {
+      // Covers the ownership-check-to-write race: primaryIdentifierId passes
+      // validateIdentifierOwnership, then the referenced identifier is
+      // deleted before this update's connect executes, and Prisma raises
+      // P2003. Without this mapping, that race surfaced as a sanitised 500
+      // instead of the documented 400 "referenced record" response.
+      const mockTx = {
+        organisationEntity: {
+          findFirst: jest.fn().mockResolvedValue(ORG_RECORD),
+          update: jest.fn().mockRejectedValue(prismaForeignKeyViolationError()),
+        },
+        identifier: { findFirst: jest.fn().mockResolvedValue(IDENTIFIER_RECORD_2) },
+        organisationSecondaryIdentifier: {
+          deleteMany: jest.fn(),
+          createMany: jest.fn(),
+        },
+      };
+
+      mockTransaction.mockImplementation((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx));
+
+      const result = updateOrganisation('org-1', TENANT_ID, { primaryIdentifierId: 'ident-2' });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('The referenced primary identifier no longer exists');
     });
 
     it('maps a record-not-found race to NotFoundError', async () => {

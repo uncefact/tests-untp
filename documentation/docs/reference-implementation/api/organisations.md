@@ -28,7 +28,7 @@ Identifiers are managed through the [Identifiers API](./identifiers) and linked 
 
 ### Location
 
-The optional `location` field stores a structured JSON object describing the geographical location of the organisation. See [Location](../master-data/#location) for the field structure.
+The optional `location` field accepts any JSON object; no shape validation is currently applied. The UNTP location field shapes are described in the [Location](../master-data/#location) section of the master data documentation, but the Reference Implementation does not yet validate submitted values against them.
 
 ### Tenant Scoping
 
@@ -42,7 +42,7 @@ Organisations are scoped to the authenticated tenant. Each tenant manages its ow
 POST /api/v1/organisations
 ```
 
-Creates one or more organisations in bulk. The request body is an array of organisation objects — each must include a `name`. Optional fields include `description`, `location`, `primaryIdentifierId`, and `secondaryIdentifierIds`.
+Creates one or more organisations in bulk. The request body must be a non-empty array of organisation objects — each must include a non-empty `name`. Optional fields include `description` (non-empty if provided), `location`, `primaryIdentifierId`, and `secondaryIdentifierIds` (each entry must be a non-empty identifier ID, and the array must not contain duplicates). Unknown keys on any item are ignored.
 
 ```mermaid
 sequenceDiagram
@@ -71,12 +71,12 @@ sequenceDiagram
 GET /api/v1/organisations
 ```
 
-Returns organisations for the authenticated tenant with optional filtering. Results are paginated.
+Returns organisations for the authenticated tenant with optional filtering. Results are paginated. Each list item includes `secondaryIdentifierIds` but omits the full `primaryIdentifier` and `secondaryIdentifiers` relations (unlike the single-record, create, and update responses, which include them).
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `search` | string | — | Search by organisation name or identifier value |
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
 ---
@@ -97,15 +97,15 @@ Retrieves a specific organisation by its database ID. The response includes the 
 PATCH /api/v1/organisations/{id}
 ```
 
-Updates one or more fields of an existing organisation. At least one updatable field must be provided.
+Updates one or more fields of an existing organisation. At least one recognised field must be provided; unknown keys are ignored.
 
 | Updatable Field | Description |
 |-----------------|-------------|
 | `name` | Organisation name (must be non-empty if provided) |
-| `description` | Free-text description |
-| `location` | UNTP location object (set to `null` to clear) |
+| `description` | Free-text description (must be non-empty if provided; set to `null` to clear) |
+| `location` | Any JSON object is accepted; the UNTP location field shapes (see [Location](../master-data/#location)) are not currently validated |
 | `primaryIdentifierId` | ID of the primary identifier (set to `null` to clear) |
-| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing) |
+| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing; an empty array clears all secondary identifiers; the array must not contain duplicates) |
 
 ---
 
@@ -115,7 +115,7 @@ Updates one or more fields of an existing organisation. At least one updatable f
 DELETE /api/v1/organisations/{id}
 ```
 
-Permanently deletes an organisation. If the organisation is referenced by products or facilities, those references are cleared (set to `null`) — the related records are not deleted.
+Permanently deletes an organisation. If the organisation is referenced by products, facilities, or credentials, those references are cleared (set to `null`) — the related records are not deleted.
 
 ```mermaid
 sequenceDiagram
