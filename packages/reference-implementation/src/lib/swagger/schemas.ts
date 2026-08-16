@@ -138,22 +138,112 @@ export const renderTemplateSchema = z.object({
 // Master Data Schemas
 // ============================================================================
 
-export const productSchema = z.object({
-  id: z.string(),
-  tenantId: z.string(),
-  name: z.string(),
-  level: z.enum(['MODEL', 'BATCH', 'ITEM']),
-  description: z.string().nullable(),
-  batchNumber: z.string().nullable(),
-  serialNumber: z.string().nullable(),
-  parentId: z.string().nullable(),
-  producedByOrganisationId: z.string().nullable(),
-  manufacturingFacilityId: z.string().nullable(),
-  primaryIdentifierId: z.string().nullable(),
-  secondaryIdentifierIds: z.array(z.string()).describe('IDs of secondary identifiers'),
-  createdAt: z.string().describe('ISO 8601 timestamp'),
-  updatedAt: z.string().describe('ISO 8601 timestamp'),
-});
+/**
+ * Builds the Product response schema, including its nested identifier,
+ * organisation, facility, and parent relations.
+ */
+function buildProductSchema() {
+  /**
+   * Identifier scheme as embedded in a product's identifier relations.
+   * PRODUCT_DETAIL_INCLUDE's `scheme` include fetches `registrar` but not
+   * `qualifiers`, so `qualifiers` is omitted (never returned via this path)
+   * and `registrar` is required (always returned via this path).
+   */
+  const productIdentifierSchemeSchema = identifierSchemeSchema.omit({ qualifiers: true }).required({ registrar: true });
+
+  /**
+   * Identifier as embedded in a product's `primaryIdentifier` and secondary
+   * identifier relations, which eagerly load the owning scheme and its
+   * registrar; mirrors IDENTIFIER_INCLUDE in product.repository.ts.
+   */
+  const productIdentifierWithSchemeSchema = identifierSchema.extend({
+    scheme: productIdentifierSchemeSchema,
+  });
+
+  /** A product's secondary-identifier join record, as returned by the detail endpoints. */
+  const productSecondaryIdentifierLinkSchema = z.object({
+    productId: z.string(),
+    identifierId: z.string(),
+    identifier: productIdentifierWithSchemeSchema,
+  });
+
+  /** The producing organisation, embedded via `producedByOrganisation: true`: its own columns only. */
+  const productOrganisationSchema = z.object({
+    id: z.string(),
+    tenantId: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    location: z.record(z.unknown()).nullable().describe('UNTP location object'),
+    primaryIdentifierId: z.string().nullable(),
+    createdAt: z.string().describe('ISO 8601 timestamp'),
+    updatedAt: z.string().describe('ISO 8601 timestamp'),
+  });
+
+  /** The manufacturing facility, embedded via `manufacturingFacility: true`: its own columns only. */
+  const productFacilitySchema = z.object({
+    id: z.string(),
+    tenantId: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    location: z.record(z.unknown()).nullable().describe('UNTP location object'),
+    operatingOrganisationId: z.string().nullable(),
+    primaryIdentifierId: z.string().nullable(),
+    createdAt: z.string().describe('ISO 8601 timestamp'),
+    updatedAt: z.string().describe('ISO 8601 timestamp'),
+  });
+
+  const productOwnColumns = {
+    id: z.string(),
+    tenantId: z.string(),
+    name: z.string(),
+    level: z.enum(['MODEL', 'BATCH', 'ITEM']),
+    description: z.string().nullable(),
+    batchNumber: z.string().nullable(),
+    serialNumber: z.string().nullable(),
+    parentId: z.string().nullable(),
+    producedByOrganisationId: z.string().nullable(),
+    manufacturingFacilityId: z.string().nullable(),
+    primaryIdentifierId: z.string().nullable(),
+    createdAt: z.string().describe('ISO 8601 timestamp'),
+    updatedAt: z.string().describe('ISO 8601 timestamp'),
+  };
+
+  /**
+   * The parent product, embedded via `parent: { include: { primaryIdentifier } }`:
+   * its own columns plus its primary identifier, and no deeper nesting.
+   */
+  const productParentSchema = z.object({
+    ...productOwnColumns,
+    primaryIdentifier: productIdentifierWithSchemeSchema.nullable(),
+  });
+
+  // The create, get-by-id, and update handlers return the full nested
+  // relations (PRODUCT_DETAIL_INCLUDE); the list handler returns the lighter
+  // `secondaryIdentifierIds` and omits every nested relation
+  // (PRODUCT_LIST_INCLUDE). Each group is optional to match that asymmetry
+  // rather than promising a field some endpoints never return.
+  return z.object({
+    ...productOwnColumns,
+    secondaryIdentifierIds: z.array(z.string()).optional().describe('IDs of secondary identifiers (list items only)'),
+    primaryIdentifier: productIdentifierWithSchemeSchema
+      .nullable()
+      .optional()
+      .describe('Primary identifier with its scheme and registrar (detail responses only)'),
+    secondaryIdentifiers: z
+      .array(productSecondaryIdentifierLinkSchema)
+      .optional()
+      .describe('Secondary identifier links, each with its identifier, scheme, and registrar (detail responses only)'),
+    producedByOrganisation: productOrganisationSchema
+      .nullable()
+      .optional()
+      .describe('Producing organisation (detail responses only)'),
+    manufacturingFacility: productFacilitySchema
+      .nullable()
+      .optional()
+      .describe('Manufacturing facility (detail responses only)'),
+    parent: productParentSchema.nullable().optional().describe('Parent product (detail responses only)'),
+  });
+}
 
 /**
  * Builds the Organisation response schema, including its nested
@@ -392,7 +482,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     ServiceInstance: serviceInstanceResponseSchema,
     DataModel: dataModelSchema,
     RenderTemplate: renderTemplateSchema,
-    Product: productSchema,
+    Product: buildProductSchema(),
     Organisation: buildOrganisationSchema(),
     Facility: buildFacilitySchema(),
     ConformityScheme: conformitySchemeSummarySchema,

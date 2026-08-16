@@ -70,7 +70,9 @@ export type CreateProductInput = {
  */
 export type UpdateProductInput = {
   name?: string;
-  description?: string;
+  // Nullable like the relation ids below: `description` is a nullable column
+  // and an explicit null is forwarded as a clear.
+  description?: string | null;
   parentId?: string | null;
   producedByOrganisationId?: string | null;
   manufacturingFacilityId?: string | null;
