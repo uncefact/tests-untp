@@ -11,7 +11,8 @@
  * Usage (from packages/reference-implementation, source checkout):
  *   pnpm audit:encryption
  *
- * Usage (inside the published Docker image, which ships no pnpm):
+ * Usage (inside the published Docker image, which carries no package
+ * manifest for this package, so the pnpm alias has no script to resolve):
  *   docker compose exec -w /app ri node_modules/.bin/tsx scripts/audit-encryption.ts
  *
  * Requires DATA_ENCRYPTION_KEY and a database target: a pre-set

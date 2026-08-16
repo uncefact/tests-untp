@@ -25,7 +25,7 @@ From a source checkout, in `packages/reference-implementation`:
 pnpm rotate:encryption-key
 ```
 
-Inside the published Docker image (which ships no pnpm):
+The published Docker image carries no package manifest for the Reference Implementation, so inside the image run the script directly:
 
 ```bash
 docker compose run --rm \

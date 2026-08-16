@@ -12,10 +12,11 @@
  * Usage (from packages/reference-implementation, source checkout):
  *   pnpm rotate:encryption-key
  *
- * Usage (inside the published Docker image, which ships no pnpm; both keys
- * arrive from .env via compose, and the SKIP_ variables stop the
- * entrypoint's seed, whose own key validation fails by design while the
- * database is still under the old key):
+ * Usage (inside the published Docker image, which carries no package
+ * manifest for this package, so the pnpm alias has no script to resolve.
+ * Both keys arrive from .env via compose, and the SKIP_ variables stop
+ * the entrypoint's seed, whose own key validation fails by design while
+ * the database is still under the old key):
  *   docker compose run --rm -e SKIP_MIGRATIONS=true -e SKIP_SEED=true \
  *     ri node_modules/.bin/tsx scripts/rotate-encryption-key.ts
  *

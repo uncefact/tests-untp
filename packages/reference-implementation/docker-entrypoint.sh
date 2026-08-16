@@ -25,7 +25,11 @@ if [ "${SKIP_MIGRATIONS:-false}" = "false" ]; then
     # existing database fully in sync with the application's data
     # expectations. Keep this block ordered after migrate deploy so
     # column renames / adds have already landed by the time the
-    # backfills run.
+    # backfills run. This is an explicit ordered list, not a directory scan,
+    # so a new file under backfills/ runs only once it is added here. Only
+    # backfills whose writes can be turned back, and which paginate and take
+    # no lock, belong here: under set -e a throw stops the container starting.
+    # See docs/adrs/043-data-backfill-conventions.md.
     if [ "${SKIP_BACKFILLS:-false}" = "false" ]; then
         echo "Running database backfills..."
         cd /app/prisma

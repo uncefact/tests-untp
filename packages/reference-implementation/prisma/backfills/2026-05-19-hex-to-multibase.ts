@@ -12,6 +12,14 @@
  * alone. Safe to run multiple times. The script never re-fetches content
  * from storage and never touches the `storageUri` / `storageUrl` field, so
  * external references to the credential or render template remain stable.
+ *
+ * Runs automatically from docker-entrypoint.sh because its writes can be
+ * turned back: a converted value carries the same digest bytes in another
+ * encoding, recoverable through `MultibaseDigest.fromString` without the
+ * content or any secret. See docs/adrs/043-data-backfill-conventions.md for
+ * when a backfill is auto-run rather than operator-run, and for the
+ * constraints new auto-run backfills meet that this one predates (it loads
+ * both tables in one query rather than paginating).
  */
 
 import { PrismaClient } from '../../src/lib/prisma/generated/index.js';
