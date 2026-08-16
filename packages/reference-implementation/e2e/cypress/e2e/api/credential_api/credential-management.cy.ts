@@ -430,6 +430,45 @@ describe('Credential API', { testIsolation: false }, () => {
   // Validation errors
   // -----------------------------------------------------------------------
   describe('Validation errors', () => {
+    it('returns 400 naming the bound when the list limit exceeds the deployment maximum', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/credentials?limit=100000',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('limit');
+      });
+    });
+
+    it('returns 400 for a malformed strict-integer limit (1abc)', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/credentials?limit=1abc',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('limit');
+      });
+    });
+
+    it('returns 400 for a mistyped storageOptions.encrypt', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: { type: ['DigitalProductPassport'] },
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+          storageOptions: { encrypt: 'false' },
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('storageOptions.encrypt');
+      });
+    });
+
     it('returns 400 with error body when credentialPayload is missing', () => {
       cy.request({
         method: 'POST',

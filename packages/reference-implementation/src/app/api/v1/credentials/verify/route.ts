@@ -1,7 +1,8 @@
 import { TextDecoder } from 'node:util';
 import { NextResponse } from 'next/server';
 import { apiLogger } from '@/lib/api/logger';
-import { ValidationError } from '@/lib/api/validation';
+import { ValidationError, parseRequestBody } from '@/lib/api/validation';
+import { verifyCredentialRequestSchema } from '@/lib/api/request-schemas/credential';
 import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
@@ -25,7 +26,6 @@ import { decodeJwt } from 'jose';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials/verify' });
 
-const HEX_64 = /^[a-f0-9]{64}$/i;
 const JWT_PREFIX = 'data:application/vc+jwt,';
 const DEFAULT_MAX_CREDENTIAL_SIZE = 10_485_760; // 10 MB
 
@@ -73,7 +73,7 @@ function getMaxCredentialSize(): number {
  *               uri:
  *                 type: string
  *                 format: uri
- *                 description: Storage URI where the credential is stored
+ *                 description: Storage URI where the credential is stored. Must be an HTTP(S) URL without embedded userinfo credentials.
  *                 example: https://storage.example.com/credentials/abc123
  *               digestMultibase:
  *                 type: string
@@ -122,7 +122,7 @@ function getMaxCredentialSize(): number {
  *                     message:
  *                       type: string
  *       400:
- *         description: Validation error (missing or malformed input)
+ *         description: Validation error naming the offending field (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format)
  *         content:
  *           application/json:
  *             schema:
@@ -147,6 +147,10 @@ function getMaxCredentialSize(): number {
  *                     - DIGEST_MISMATCH
  *                     - UNSUPPORTED_CREDENTIAL_TYPE
  *                   description: |
+ *                     `INVALID_RESPONSE`: the storage URI's response is not
+ *                     valid JSON, or is valid JSON that is not an object (a
+ *                     literal null, an array, or a primitive), before or after
+ *                     decryption.
  *                     `DECRYPTION_REQUIRED`: the credential is encrypted and no
  *                     `decryptionKey` was supplied.
  *                     `ENVELOPE_INVALID`: the stored encrypted envelope is
@@ -184,55 +188,20 @@ export const POST = withPublicRoute(async (req) => {
   // is fragile across serverless instances.
 
   // ── Step 1: Parse and validate input ────────────────────────────────
-  logger.info('Parsing request body');
-  let body: { uri?: string; digestMultibase?: string; hash?: string; decryptionKey?: string };
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
+  // The schema owns the shape checks that used to live here as manual ifs
+  // (http(s)-only uri, digest validity, hex-64 hash/key); it additionally
+  // rejects userinfo-bearing uris, since this endpoint fetches the value
+  // server-side and embedded credentials would be sent or logged. Legacy
+  // `hash` stays accepted for verify URLs issued before the multibase
+  // migration; they're out in the wild on QR codes and can't be reissued.
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, verifyCredentialRequestSchema);
 
-  logger.info({ uri: body.uri }, 'Validating input parameters');
-
-  if (!body.uri || typeof body.uri !== 'string') {
-    throw new ValidationError('uri is required');
-  }
-
-  let parsedUri: URL;
-  try {
-    parsedUri = new URL(body.uri);
-  } catch {
-    throw new ValidationError('uri must be a valid URL');
-  }
-
-  if (parsedUri.protocol !== 'http:' && parsedUri.protocol !== 'https:') {
-    throw new ValidationError('uri must be a valid HTTP(S) URL');
-  }
-
-  if (body.digestMultibase !== undefined) {
-    if (typeof body.digestMultibase !== 'string') {
-      throw new ValidationError('digestMultibase must be a string');
-    }
-    try {
-      MultibaseDigest.fromString(body.digestMultibase);
-    } catch {
-      throw new ValidationError('digestMultibase must be a valid multibase-encoded multihash');
-    }
-  }
-
-  // Accept the legacy `hash` query parameter (hex SHA-256) for verify URLs
-  // already issued before the multibase migration; they're out in the wild on
-  // QR codes and can't be reissued. Prefer `digestMultibase` when both are set.
-  if (body.hash !== undefined && (typeof body.hash !== 'string' || !HEX_64.test(body.hash))) {
-    throw new ValidationError('hash must be a 64-character hex string (SHA-256)');
-  }
-
-  if (
-    body.decryptionKey !== undefined &&
-    (typeof body.decryptionKey !== 'string' || !HEX_64.test(body.decryptionKey))
-  ) {
-    throw new ValidationError('decryptionKey must be a 64-character hex string');
-  }
+  // The canonical WHATWG href, not the raw caller string, is what every
+  // fetch branch and every URI-bearing log line below uses, so validation
+  // and fetching cannot diverge on parser differentials (the same invariant
+  // the issue route holds for its verification URLs).
+  const credentialUri = new URL(body.uri).href;
 
   // ── Step 2: Fetch credential from storage URI ──────────────────────
   // The guarded resolver validates the hostname against private/reserved
@@ -241,7 +210,7 @@ export const POST = withPublicRoute(async (req) => {
   // validate-then-fetch sequence leaves open. VERIFY_ALLOW_PRIVATE_URLS=true
   // (development only) falls back to a plain fetch so private storage hosts
   // in local compose setups keep working.
-  logger.info({ uri: body.uri }, 'Fetching credential from storage');
+  logger.info({ uri: credentialUri }, 'Fetching credential from storage');
 
   const maxSize = getMaxCredentialSize();
   let responseText: string;
@@ -249,26 +218,26 @@ export const POST = withPublicRoute(async (req) => {
   if (process.env.VERIFY_ALLOW_PRIVATE_URLS === 'true') {
     let fetchResponse: Response;
     try {
-      fetchResponse = await fetch(body.uri, { signal: AbortSignal.timeout(10_000) });
+      fetchResponse = await fetch(credentialUri, { signal: AbortSignal.timeout(10_000) });
     } catch (e: unknown) {
       const message =
         e instanceof Error && e.name === 'TimeoutError'
           ? 'Failed to fetch credential: request timed out'
           : 'Failed to fetch credential: network error';
-      logger.warn({ uri: body.uri, error: message }, 'Credential fetch failed');
+      logger.warn({ uri: credentialUri, error: message }, 'Credential fetch failed');
       return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
     }
 
     if (!fetchResponse.ok) {
       const message = `Failed to fetch credential: storage returned ${fetchResponse.status}`;
-      logger.warn({ uri: body.uri, status: fetchResponse.status }, 'Credential fetch failed');
+      logger.warn({ uri: credentialUri, status: fetchResponse.status }, 'Credential fetch failed');
       return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
     }
 
     try {
       responseText = await fetchResponse.text();
     } catch (e: unknown) {
-      logger.warn({ uri: body.uri, err: e }, 'Failed to read credential response body');
+      logger.warn({ uri: credentialUri, err: e }, 'Failed to read credential response body');
       return NextResponse.json(
         { error: 'Failed to read credential response', code: 'UPSTREAM_ERROR' },
         { status: 502 },
@@ -276,6 +245,10 @@ export const POST = withPublicRoute(async (req) => {
     }
 
     if (responseText.length > maxSize) {
+      logger.warn(
+        { uri: credentialUri, size: responseText.length, maxSize },
+        'Credential response exceeds maximum size',
+      );
       return NextResponse.json(
         { error: `Credential response exceeds maximum size of ${maxSize} bytes`, code: 'UPSTREAM_ERROR' },
         { status: 502 },
@@ -283,13 +256,14 @@ export const POST = withPublicRoute(async (req) => {
     }
   } else {
     try {
-      const resolved = await resolveDocument(body.uri, { maxResponseBytes: maxSize, totalTimeoutMs: 10_000 });
+      const resolved = await resolveDocument(credentialUri, { maxResponseBytes: maxSize, totalTimeoutMs: 10_000 });
       responseText = new TextDecoder().decode(resolved.body);
     } catch (e: unknown) {
       if (e instanceof UrlValidationError) {
         throw new ValidationError(e.message);
       }
       if (e instanceof ResolverTooLargeError) {
+        logger.warn({ uri: credentialUri, maxSize }, 'Credential response exceeds maximum size');
         return NextResponse.json(
           { error: `Credential response exceeds maximum size of ${maxSize} bytes`, code: 'UPSTREAM_ERROR' },
           { status: 502 },
@@ -297,18 +271,18 @@ export const POST = withPublicRoute(async (req) => {
       }
       if (e instanceof ResolverHttpError) {
         const message = `Failed to fetch credential: storage returned ${e.status}`;
-        logger.warn({ uri: body.uri, status: e.status }, 'Credential fetch failed');
+        logger.warn({ uri: credentialUri, status: e.status }, 'Credential fetch failed');
         return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
       }
       if (e instanceof ResolverTimedOutError) {
-        logger.warn({ uri: body.uri }, 'Credential fetch timed out');
+        logger.warn({ uri: credentialUri }, 'Credential fetch timed out');
         return NextResponse.json(
           { error: 'Failed to fetch credential: request timed out', code: 'UPSTREAM_ERROR' },
           { status: 502 },
         );
       }
       if (e instanceof ResolverError) {
-        logger.warn({ uri: body.uri, err: e }, 'Credential fetch failed');
+        logger.warn({ uri: credentialUri, err: e }, 'Credential fetch failed');
         return NextResponse.json(
           { error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' },
           { status: 502 },
@@ -322,7 +296,7 @@ export const POST = withPublicRoute(async (req) => {
   try {
     fetchedData = JSON.parse(responseText);
   } catch {
-    logger.warn({ uri: body.uri }, 'Storage URI returned non-JSON response');
+    logger.warn({ uri: credentialUri }, 'Storage URI returned non-JSON response');
     return NextResponse.json(
       { error: 'Response from storage URI is not valid JSON', code: 'INVALID_RESPONSE' },
       { status: 422 },
@@ -347,7 +321,7 @@ export const POST = withPublicRoute(async (req) => {
     // throws the same error for a wrong-length IV/tag as for a wrong key, so
     // corruption is only distinguishable from a key mismatch up front.
     if (!hasValidEnvelopeStructure(fetchedData)) {
-      logger.warn({ uri: body.uri }, 'Encrypted envelope is structurally invalid');
+      logger.warn({ uri: credentialUri }, 'Encrypted envelope is structurally invalid');
       return NextResponse.json(
         {
           error: 'The stored credential data is corrupted and cannot be decrypted. Re-entering the key will not help.',
@@ -368,7 +342,7 @@ export const POST = withPublicRoute(async (req) => {
         type: fetchedData.type,
       });
     } catch (e: unknown) {
-      logger.warn({ uri: body.uri, err: e }, 'Credential decryption failed');
+      logger.warn({ uri: credentialUri, err: e }, 'Credential decryption failed');
       return NextResponse.json(
         {
           error: 'The decryption key does not match this credential. Check the key and try again.',
@@ -381,7 +355,7 @@ export const POST = withPublicRoute(async (req) => {
     try {
       credential = JSON.parse(decryptedString);
     } catch {
-      logger.warn({ uri: body.uri }, 'Decrypted credential is not valid JSON');
+      logger.warn({ uri: credentialUri }, 'Decrypted credential is not valid JSON');
       return NextResponse.json(
         {
           error:
@@ -393,6 +367,20 @@ export const POST = withPublicRoute(async (req) => {
     }
   } else {
     credential = fetchedData as Record<string, unknown>;
+  }
+
+  // JSON.parse accepts any JSON value, so both branches above can yield a
+  // non-object (a literal null, an array, a primitive). None is a credential:
+  // without this check a null reaches the type read below as a TypeError
+  // turned 500, and the others reach it as a misleading
+  // UNSUPPORTED_CREDENTIAL_TYPE. Both encrypted and unencrypted paths land
+  // on the documented INVALID_RESPONSE instead.
+  if (credential === null || typeof credential !== 'object' || Array.isArray(credential)) {
+    logger.warn({ uri: credentialUri }, 'Credential content is not a JSON object');
+    return NextResponse.json(
+      { error: 'Credential content from the storage URI is not a JSON object', code: 'INVALID_RESPONSE' },
+      { status: 422 },
+    );
   }
 
   // ── Step 4: Digest verification ────────────────────────────────────
@@ -435,7 +423,7 @@ export const POST = withPublicRoute(async (req) => {
   logger.info({ credentialType: credential.type }, 'Validating credential type');
   const types = Array.isArray(credential.type) ? credential.type : [credential.type];
   if (!types.includes('EnvelopedVerifiableCredential')) {
-    logger.warn({ uri: body.uri, credentialType: credential.type }, 'Unsupported credential type');
+    logger.warn({ uri: credentialUri, credentialType: credential.type }, 'Unsupported credential type');
     return NextResponse.json(
       { error: 'Only EnvelopedVerifiableCredential is supported', code: 'UNSUPPORTED_CREDENTIAL_TYPE' },
       { status: 422 },

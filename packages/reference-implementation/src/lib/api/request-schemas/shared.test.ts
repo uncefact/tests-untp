@@ -6,6 +6,7 @@ import {
   nonBlankString,
   requireAtLeastOneField,
   nonEmptyArraySchema,
+  bcp47TagSchema,
   paginationQuerySchema,
   booleanQuerySchema,
 } from './shared';
@@ -344,5 +345,66 @@ describe('booleanQuerySchema', () => {
     if (!result.success) {
       expect(result.error.issues[0]).toMatchObject({ path: ['active'], message: 'must be "true" or "false"' });
     }
+  });
+});
+
+describe('bcp47TagSchema', () => {
+  // The accept set spans the grammar's three alternatives: ordinary langtags,
+  // private-use-only tags, and grandfathered tags, since Intl-based
+  // validators wrongly reject the latter two (the reason this schema exists).
+  it.each(['en', 'en-AU', 'en-GB', 'zh-Hant-TW', 'de-DE-1996', 'x-default', 'x-private', 'en-GB-oed', 'i-default'])(
+    'accepts the well-formed tag %s',
+    (tag) => {
+      expect(bcp47TagSchema.safeParse(tag).success).toBe(true);
+    },
+  );
+
+  it('accepts tags case-insensitively as the RFC specifies', () => {
+    expect(bcp47TagSchema.safeParse('EN-au').success).toBe(true);
+    expect(bcp47TagSchema.safeParse('X-DEFAULT').success).toBe(true);
+  });
+
+  it.each(['', ' ', 'en_US', 'not a tag', 'a', 'en-', '-en', '123', 'en--US', 'x-', 'toolongsubtag1'])(
+    'rejects the malformed value %j with the named message, never a throw',
+    (value) => {
+      const result = bcp47TagSchema.safeParse(value);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('BCP 47');
+      }
+    },
+  );
+});
+
+describe('bcp47TagSchema uniqueness rules', () => {
+  it('accepts a grammar-valid tag of any length (RFC 5646 defines no upper bound)', () => {
+    // Fifteen distinct well-formed 8-character variant subtags, so the
+    // length alone is what a cap would reject.
+    const tag = 'en' + Array.from({ length: 15 }, (_, i) => `-varian${i.toString().padStart(2, '0')}`).join('');
+    expect(tag.length).toBeGreaterThan(100);
+    expect(bcp47TagSchema.safeParse(tag).success).toBe(true);
+  });
+
+  it.each([
+    ['a repeated variant', 'de-DE-1901-1901'],
+    ['a repeated extension singleton', 'en-a-bbb-a-ccc'],
+    ['a repeated singleton in either case', 'en-A-bbb-a-ccc'],
+  ])('rejects %s', (_label, tag) => {
+    expect(bcp47TagSchema.safeParse(tag).success).toBe(false);
+  });
+
+  it.each([
+    ['distinct variants', 'sl-rozaj-biske'],
+    ['distinct singletons', 'en-a-bbb-b-ccc'],
+    ['a private-use suffix after an extension', 'en-a-bbb-x-private'],
+    // Private use carries no variants or extensions, so repetition inside it
+    // is well-formed and uniqueness must not be applied there.
+    ['a private-use-only tag with repeated subtags', 'x-a-a'],
+    ['a private-use-only tag with repeated longer subtags', 'x-aaaaa-aaaaa'],
+    ['a private-use-only tag with repeated digit-initial subtags', 'x-1901-1901'],
+    ['a private-use-only tag repeating a word', 'x-default-default'],
+    ['a repeated subtag inside a private-use suffix', 'en-a-bbb-x-a-ccc'],
+  ])('still accepts %s', (_label, tag) => {
+    expect(bcp47TagSchema.safeParse(tag).success).toBe(true);
   });
 });

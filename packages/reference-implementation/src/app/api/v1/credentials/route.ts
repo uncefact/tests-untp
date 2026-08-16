@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
   ValidationError,
-  isNonEmptyString,
-  parsePositiveInt,
-  parseNonNegativeInt,
-  parseBooleanString,
+  parseRequestBody,
+  parseQueryParams,
   assertPublicUrl,
   assertHttpUrl,
 } from '@/lib/api/validation';
+import { credentialIssueRequestSchema, listCredentialsQuerySchema } from '@/lib/api/request-schemas/credential';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { errorMessage } from '@/lib/api/errors';
 import { resolveAppUrl, buildVerifyUrl } from '@/lib/config/app-url.config';
@@ -18,15 +17,14 @@ import { issueCredential } from '@/lib/credentials/issue-credential';
 import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 import { schemaLoader } from '@/lib/credentials/schema-loader';
 import { updateCredentialPublished, listCredentials } from '@/lib/prisma/repositories';
-import { buildPaginatedResponse, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { getDidByDid, findConformitySchemeByCanonicalId } from '@/lib/prisma/repositories';
-import { buildPublishLinks, type AccessRole } from '@uncefact/untp-ri-services';
+import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
 import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
-import { publishingOptionsSchema } from '@/lib/swagger/schemas';
 
 type CredentialWarning = {
   code: string;
@@ -80,8 +78,13 @@ function defaultHumanVerificationUrl(): string {
  *               $ref: '#/components/schemas/CredentialIssueResponse'
  *       400:
  *         description: >-
- *           Validation error (invalid payload, unknown data model, or issuer
- *           DID not registered to tenant). Payload-validation failures carry
+ *           Validation error. Request-shape failures name the offending field
+ *           (missing or mistyped credentialPayload, credentialType, version,
+ *           storageOptions, or publishingOptions, including a malformed
+ *           verification URL or hreflang entry; unknown body fields are
+ *           ignored). An unknown data model (credentialType and version pair)
+ *           and an issuer DID not registered to the tenant are also 400s.
+ *           Payload-validation failures carry
  *           a `code`: `SCHEMA_DOCUMENT_INVALID` or `JSONLD_DOCUMENT_INVALID`
  *           mean the payload itself is invalid and the message says what to
  *           fix; `SCHEMA_FETCH_FAILED` or `JSONLD_CONTEXT_FETCH_FAILED` mean
@@ -100,8 +103,14 @@ function defaultHumanVerificationUrl(): string {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
- *         description: Data model or service instance not found
+ *         description: Service instance not found
  *         content:
  *           application/json:
  *             schema:
@@ -114,60 +123,17 @@ function defaultHumanVerificationUrl(): string {
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  let body: {
-    credentialPayload?: CredentialPayload;
-    credentialType?: string;
-    version?: string;
-    storageOptions?: {
-      serviceInstanceId?: string;
-      encrypt?: boolean;
-    };
-    publishingOptions?: {
-      publish?: boolean;
-      linkType?: string;
-      linkTitle?: string;
-      qualifierPath?: string;
-      machineVerificationUrl?: string;
-      humanVerificationUrl?: string;
-      hreflang?: string[];
-      additionalRels?: string[];
-      public?: boolean;
-      accessRole?: AccessRole[];
-    };
-  };
-
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch (e) {
-    logger.warn({ err: e }, 'Failed to parse request body as JSON');
-    throw new ValidationError('Invalid JSON body');
-  }
-
   // ── Step 1: Validate request ────────────────────────────────────────────
 
-  logger.info('Validating input parameters');
-  if (!body.credentialPayload || typeof body.credentialPayload !== 'object') {
-    throw new ValidationError('credentialPayload is required and must be an object');
-  }
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(req, credentialIssueRequestSchema);
 
-  if (!isNonEmptyString(body.credentialType)) {
-    throw new ValidationError('credentialType is required');
-  }
-
-  if (!isNonEmptyString(body.version)) {
-    throw new ValidationError('version is required');
-  }
-
-  const { credentialPayload, credentialType, version } = body;
+  const { credentialType, version } = body;
+  // Omitted option objects stay empty objects, as they always have: an
+  // undefined publishingOptions must not change the happy-path publish and
+  // encrypt defaults downstream.
   const storageOptions = body.storageOptions ?? {};
-
-  const publishingOptionsParse = publishingOptionsSchema.safeParse(body.publishingOptions ?? {});
-  if (!publishingOptionsParse.success) {
-    const issue = publishingOptionsParse.error.issues[0];
-    throw new ValidationError(`publishingOptions.${issue.path.join('.') || ''}: ${issue.message}`);
-  }
-  const publishingOptions = publishingOptionsParse.data;
+  const publishingOptions = body.publishingOptions ?? {};
 
   // ── Verification URL validation ───────────────────────────────────────
   // Caller-supplied verification URLs are always validated as well-formed,
@@ -213,7 +179,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // ── Step 3: Validate payload ────────────────────────────────────────────
 
   logger.info('Validating credential payload against schema');
-  await validateCredentialPayload(credentialPayload, schemaUrls, schemaLoader);
+  await validateCredentialPayload(body.credentialPayload, schemaUrls, schemaLoader);
+
+  // The boundary schema keeps the payload an open object; the JSON Schema +
+  // JSON-LD pass above is what actually inspects it, so this is the one place
+  // the opaque record is asserted to the payload type the rest of the handler
+  // (and issueCredential) works with.
+  const credentialPayload = body.credentialPayload as CredentialPayload;
 
   // ── Step 3.5: Extract entity references for publishing ──────────────────
 
@@ -269,7 +241,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   logger.info({ issuerDid }, 'Validating issuer DID ownership');
   const didRecord = await getDidByDid(issuerDid, tenantId);
   if (!didRecord) {
-    logger.warn({ issuerDid, tenantId }, 'Issuer DID not found for tenant');
+    logger.warn({ issuerDid }, 'Issuer DID not found for tenant');
     throw new ValidationError(
       `Issuer DID "${issuerDid}" is not registered to your tenant. ` +
         'You can only issue credentials with a DID that belongs to your tenant or the system default DID.',
@@ -421,15 +393,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *         schema:
  *           type: integer
  *           minimum: 1
- *           default: 20
- *         description: Maximum number of results
+ *         description: Number of credentials to return per page. Defaults to 20 unless the deployment maximum is lower. Values above the deployment maximum are rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
  *           type: integer
  *           minimum: 0
  *           default: 0
- *         description: Number of results to skip
+ *         description: Number of credentials to skip for pagination
  *     responses:
  *       200:
  *         description: Paginated list of credentials
@@ -448,13 +419,19 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
- *         description: Validation error
+ *         description: Validation error (malformed or repeated query parameter, non-integer or out-of-range pagination value, or non-boolean isPublished)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - authenticated principal has no resolvable tenant assignment
  *         content:
  *           application/json:
  *             schema:
@@ -470,11 +447,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
   const url = new URL(req.url);
 
   logger.info('Parsing query filters');
-  const credentialType = url.searchParams.get('credentialType') ?? undefined;
-  const isPublished = parseBooleanString(url.searchParams.get('isPublished'), 'isPublished');
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const { credentialType, isPublished, limit, offset } = parseQueryParams(url, listCredentialsQuerySchema);
 
   logger.info({ filters: { credentialType, isPublished, limit, offset } }, 'Querying credentials from database');
   const { data, total } = await listCredentials({

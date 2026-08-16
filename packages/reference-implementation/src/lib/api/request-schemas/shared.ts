@@ -151,6 +151,68 @@ export const paginationQuerySchema = z.object({
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
 
 /**
+ * RFC 5646 `Language-Tag` well-formedness (BCP 47), covering the grammar's
+ * three alternatives: ordinary langtags (language, optional extlang chain,
+ * script, region, variants, extensions, private-use suffix), private-use-only
+ * tags (`x-default`), and the RFC's closed grandfathered list (`en-GB-oed`,
+ * `i-default`, ...). Case-insensitive, as the RFC specifies. Well-formedness
+ * only: subtags are not checked against the IANA registry, and the value is
+ * neither canonicalised nor transformed, so what the caller sent is what is
+ * stored and published.
+ *
+ * Deliberately not `Intl.getCanonicalLocales`/`Intl.Locale`: those implement
+ * Unicode locale identifiers, a strict subset of BCP 47 that rejects valid
+ * private-use-only and grandfathered tags, and they throw (a naive refine
+ * would surface a 500 where the contract requires a 400).
+ *
+ * @see https://www.rfc-editor.org/rfc/rfc5646.html#section-2.1
+ */
+const BCP47_LANGUAGE_TAG =
+  /^(?:(?:en-GB-oed|i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn|i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE)|(?:art-lojban|cel-gaulish|no-bok|no-nyn|zh-guoyu|zh-hakka|zh-min|zh-min-nan|zh-xiang)|(?:(?:[a-z]{2,3}(?:-[a-z]{3}){0,3}|[a-z]{4}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z0-9]{5,8}|\d[a-z0-9]{3}))*(?:-[a-wy-z0-9](?:-[a-z0-9]{2,8})+)*(?:-x(?:-[a-z0-9]{1,8})+)?)|(?:x(?:-[a-z0-9]{1,8})+))$/i;
+
+/**
+ * RFC 5646's grammar allows a subtag sequence the same document then forbids:
+ * a variant must not repeat (section 2.2.5) and an extension singleton must
+ * not repeat (section 2.2.6). Both are checked after the grammar match, so
+ * `de-DE-1901-1901` and `en-a-bbb-a-ccc` are rejected rather than reaching
+ * issuance.
+ */
+function hasUniqueVariantsAndSingletons(tag: string): boolean {
+  const subtags = tag.toLowerCase().split('-');
+  // A private-use-only tag carries no variants or extensions at all
+  // (sections 2.2.6 and 2.2.7), so every subtag after the leading `x` is
+  // free-form and repetition is legal: `x-a-a` and `x-default-default` are
+  // both well-formed.
+  if (subtags[0] === 'x') return true;
+  const variants = new Set<string>();
+  const singletons = new Set<string>();
+  let inExtension = false;
+  for (let i = 1; i < subtags.length; i += 1) {
+    const subtag = subtags[i];
+    if (subtag.length === 1) {
+      if (subtag === 'x') return true; // private use runs to the end
+      if (singletons.has(subtag)) return false;
+      singletons.add(subtag);
+      inExtension = true;
+      continue;
+    }
+    if (inExtension) continue; // extension payload, not a variant
+    const isVariant = subtag.length >= 5 || (subtag.length === 4 && /^\d/.test(subtag));
+    if (isVariant) {
+      if (variants.has(subtag)) return false;
+      variants.add(subtag);
+    }
+  }
+  return true;
+}
+
+export const bcp47TagSchema = z
+  .string()
+  .regex(BCP47_LANGUAGE_TAG, 'must be a well-formed BCP 47 language tag')
+  .refine(hasUniqueVariantsAndSingletons, { message: 'must be a well-formed BCP 47 language tag' })
+  .describe('A well-formed BCP 47 (RFC 5646) language tag, e.g. "en", "en-AU", or "x-default".');
+
+/**
  * Shared boolean query-parameter schema, accepting exactly "true" or
  * "false" (case-sensitive) and rejecting everything else, matching the
  * parseBooleanString helper in '@/lib/api/validation' that this replaces
