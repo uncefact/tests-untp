@@ -54,4 +54,5 @@ This means an extension automatically gets population, extraction, and validatio
 
 - [Bridge Architecture](./bridge-architecture) — the technical implementation: interfaces, the delta pattern, version composition, and the registry
 - [Conformity Handling](./conformity-handling) — how conformity data flows through different credential types and how CVC validation works
+- [Conformity Vocabulary Catalogue](./conformity-vocabulary-catalogue) — where conformity schemes come from, how they refresh, and what a tenant can see
 - [Adding a Bridge](./adding-a-bridge) — step-by-step guide for adding support for a new UNTP version or credential type

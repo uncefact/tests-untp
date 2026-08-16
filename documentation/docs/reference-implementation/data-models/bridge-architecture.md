@@ -77,7 +77,7 @@ sequenceDiagram
 
     API->>Bridge: Extract refs from credential subject
     Bridge-->>API: Entity + conformity refs
-    API->>API: CVC validation (advisory, DCC only)
+    API->>API: CVC validation (advisory, DCC v0.7.0 only)
 
     API->>VC: Sign credential
     VC-->>API: Signed credential

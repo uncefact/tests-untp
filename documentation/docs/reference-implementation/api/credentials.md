@@ -77,7 +77,7 @@ Publishing is optional and requires the credential's primary entity (product, fa
 
 ### CVC Compliance (Conformity Credentials Only)
 
-For [Digital Conformity Credentials](./data-models), the issuance pipeline performs an extra advisory check: it compares the conformity scheme, profile, and criteria referenced in the credential against the locally known [Conformity Vocabulary Catalogue (CVC)](https://untp.unece.org/docs/specification/ConformityVocabularyCatalog) schemes. This helps catch mistakes like referencing a non-existent scheme or omitting a required criterion.
+For UNTP v0.7.0 [Digital Conformity Credentials](./data-models), the issuance pipeline performs an extra advisory check: it compares the conformity scheme, profile, and criteria referenced in the credential against the locally known [Conformity Vocabulary Catalogue (CVC)](https://untp.unece.org/docs/specification/ConformityVocabularyCatalog) schemes. Earlier DCC versions are issued without this check. This helps catch mistakes like referencing a non-existent scheme or omitting a required criterion. See [Conformity Vocabulary Catalogue](../data-models/conformity-vocabulary-catalogue) for where those schemes come from, and the [Conformity Vocabulary Catalogue API](./conformity-vocabulary-catalogue) for browsing them.
 
 CVC validation is **advisory only** — it never blocks issuance. If issues are found, the credential is still issued but the response includes warnings.
 
@@ -99,7 +99,7 @@ sequenceDiagram
     RI->>DB: 2. Resolve data model + bridge
     DB-->>RI: Data model config + schema URLs
     RI->>RI: 3. Validate payload (JSON Schema + JSON-LD)
-    RI->>RI: 3.5. CVC validation (advisory, DCC only)
+    RI->>RI: 3.5. CVC validation (advisory, DCC v0.7.0 only)
     RI->>DB: 4. Validate issuer DID ownership
     DB-->>RI: DID record (tenant-owned or system default)
     RI->>RI: 5. Validate DID has service association
