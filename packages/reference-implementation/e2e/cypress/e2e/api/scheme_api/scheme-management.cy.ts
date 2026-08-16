@@ -227,6 +227,41 @@ describe('Scheme API', { testIsolation: false }, () => {
   });
 
   describe('Validation errors', () => {
+    // Each case owns its fixture: the shared scheme is deleted by the CRUD
+    // block that created it, well before this block runs. Ids are removed in
+    // afterEach rather than inline, so a failing assertion still cleans up.
+    // Cypress abandons the remaining command queue on failure, and a retry
+    // would otherwise re-POST the same primaryKey and hit the uniqueness
+    // constraint, reporting a 409 in place of the original failure.
+    const createdIds: string[] = [];
+
+    afterEach(() => {
+      while (createdIds.length > 0) {
+        const id = createdIds.pop();
+        cy.request({ method: 'DELETE', url: `/api/v1/schemes/${id}`, failOnStatusCode: false });
+      }
+    });
+
+    const createTempScheme = (slug: string, overrides: Record<string, unknown> = {}) =>
+      cy
+        .request({
+          method: 'POST',
+          url: '/api/v1/schemes',
+          body: {
+            registrarId,
+            name: `Temp Scheme ${slug} ${RUN_ID}`,
+            primaryKey: `temp-${slug}-${RUN_ID}`,
+            validationPattern: '.*',
+            linkTemplate: '/{primaryKey}/{value}',
+            ...overrides,
+          },
+        })
+        .then((response) => {
+          expect(response.status).to.eq(201);
+          createdIds.push(response.body.id);
+          return response.body.id as string;
+        });
+
     it('returns 400 when registrarId is missing', () => {
       cy.request({
         method: 'POST',
@@ -326,20 +361,7 @@ describe('Scheme API', { testIsolation: false }, () => {
     });
 
     it('returns 400 when PATCH body is empty', () => {
-      // Create a temp scheme to test PATCH validation
-      cy.request({
-        method: 'POST',
-        url: '/api/v1/schemes',
-        body: {
-          registrarId,
-          name: `Temp Scheme ${RUN_ID}`,
-          primaryKey: `temp-pk-${RUN_ID}`,
-          validationPattern: '.*',
-          linkTemplate: '/{primaryKey}/{value}',
-        },
-      }).then((createResponse) => {
-        const tempId = createResponse.body.id;
-
+      createTempScheme('empty-patch').then((tempId) => {
         cy.request({
           method: 'PATCH',
           url: `/api/v1/schemes/${tempId}`,
@@ -349,8 +371,6 @@ describe('Scheme API', { testIsolation: false }, () => {
           expect(response.status).to.eq(400);
           expect(response.body.error).to.be.a('string');
         });
-
-        cy.request({ method: 'DELETE', url: `/api/v1/schemes/${tempId}` });
       });
     });
 
@@ -407,6 +427,145 @@ describe('Scheme API', { testIsolation: false }, () => {
       }).then((response) => {
         expect(response.status).to.eq(400);
         expect(response.body.error).to.be.a('string');
+      });
+    });
+
+    // The maximum is resolved at startup from API_MAX_PAGE_LIMIT and defaults
+    // to 100; the e2e stack leaves the variable unset, so the default applies.
+    it('returns 400 when limit exceeds the maximum page size', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/schemes?limit=101',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('limit');
+        expect(response.body.error).to.contain('100');
+      });
+    });
+
+    // The value is deliberately within the permitted range once parsed (1e1 is
+    // 10), so only the strict decimal-integer check can reject it. An
+    // out-of-range value such as 1e3 would also be rejected by the maximum
+    // bound, leaving the test green even if scientific notation became
+    // acceptable.
+    it('returns 400 for a limit in scientific notation', () => {
+      cy.request({
+        method: 'GET',
+        url: '/api/v1/schemes?limit=1e1',
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('limit');
+        expect(response.body.error).to.contain('positive integer');
+      });
+    });
+
+    it('returns 400 when a PATCH body carries only unrecognised keys', () => {
+      createTempScheme('unknown-keys').then((tempId) => {
+        cy.request({
+          method: 'PATCH',
+          url: `/api/v1/schemes/${tempId}`,
+          body: { nmae: 'typo', unknownField: true },
+          failOnStatusCode: false,
+        }).then((response) => {
+          expect(response.status).to.eq(400);
+          expect(response.body.error).to.contain('At least one field is required');
+        });
+      });
+    });
+
+    it('returns 400 for a non-integer qualifier order', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/schemes',
+        body: {
+          registrarId,
+          name: `Fractional Order ${RUN_ID}`,
+          primaryKey: `frac-order-${RUN_ID}`,
+          validationPattern: '.*',
+          linkTemplate: '/{primaryKey}/{value}',
+          qualifiers: [{ key: 'lot', description: 'Lot', validationPattern: '.*', order: 1.5 }],
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('qualifiers.0.order');
+      });
+    });
+
+    // The column is a Postgres int4, so a value above its range is rejected at
+    // the boundary rather than reaching the database as a 500.
+    it('returns 400 for a qualifier order beyond the 32-bit range', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/schemes',
+        body: {
+          registrarId,
+          name: `Overflow Order ${RUN_ID}`,
+          primaryKey: `overflow-order-${RUN_ID}`,
+          validationPattern: '.*',
+          linkTemplate: '/{primaryKey}/{value}',
+          qualifiers: [{ key: 'lot', description: 'Lot', validationPattern: '.*', order: 2147483648 }],
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('qualifiers.0.order');
+      });
+    });
+
+    // Zero is the first resolution position, so it must survive the lower bound
+    // on order. This proves zero is accepted and read back; it cannot prove the
+    // stored value came from the request, because the column defaults to zero
+    // too. That distinction is asserted where it is observable, in the route's
+    // own test against the repository call.
+    it('accepts a qualifier order of zero and reads it back', () => {
+      const qualifiers = [{ key: 'lot', description: 'Lot', validationPattern: '.*', order: 0 }];
+
+      createTempScheme('zero-order', { qualifiers }).then((tempId) => {
+        cy.request(`/api/v1/schemes/${tempId}`).then((response) => {
+          expect(response.status).to.eq(200);
+          expect(response.body.qualifiers).to.have.length(1);
+          expect(response.body.qualifiers[0].order).to.eq(0);
+        });
+      });
+    });
+
+    it('returns 400 for a negative qualifier order', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/schemes',
+        body: {
+          registrarId,
+          name: `Negative Order ${RUN_ID}`,
+          primaryKey: `negative-order-${RUN_ID}`,
+          validationPattern: '.*',
+          linkTemplate: '/{primaryKey}/{value}',
+          qualifiers: [{ key: 'lot', description: 'Lot', validationPattern: '.*', order: -1 }],
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('qualifiers.0.order');
+      });
+    });
+
+    it('returns 400 for a validationPattern that is not a valid regular expression', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/schemes',
+        body: {
+          registrarId,
+          name: `Bad Pattern ${RUN_ID}`,
+          primaryKey: `bad-pattern-${RUN_ID}`,
+          validationPattern: '[unclosed',
+          linkTemplate: '/{primaryKey}/{value}',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.error).to.contain('validationPattern');
       });
     });
   });
