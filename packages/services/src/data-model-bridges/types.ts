@@ -115,17 +115,67 @@ export interface IDataModelBridge<TSubject extends CredentialSubject = Credentia
    * extractor return `null`.
    */
   extractConformityClaim(subject: TSubject): ConformityClaim | null;
+  /**
+   * Extracts the conformity claim together with a map from claim pointers to
+   * the subject paths each projected value came from, or `null` on the same
+   * terms as {@link IDataModelBridge.extractConformityClaim}: the credential
+   * type carries no conformity claim, or this subject has none.
+   *
+   * The claim is a synthesised projection rather than a sub-document of the
+   * credential: `criteria` is flattened across every assessment, and the
+   * projection's field names and indices need not match the source. A warning
+   * pointer therefore cannot be resolved against the submitted credential by
+   * prepending a wrapper path, which is what this map exists to make possible
+   * (#753).
+   *
+   * A version that extracts a claim but records no provenance returns that
+   * claim with an empty map, so its claim is still validated and only the
+   * pointers are missing. A consumer omits a pointer it cannot translate
+   * rather than returning an untranslated one.
+   */
+  extractConformityClaimWithProvenance(subject: TSubject): ConformityClaimWithProvenance | null;
 }
+
+/**
+ * A conformity claim together with the provenance of the values in it.
+ *
+ * `sourceMap` keys are JSON pointers into the claim, exactly as
+ * `validateConformityClaim` emits them; values are JSON pointers into the
+ * `credentialSubject` the claim was extracted from. Both follow RFC 6901.
+ * Paths are subject-relative because the extractor is given the subject and
+ * nothing above it, so a consumer holding the whole credential prepends its
+ * own path to the subject.
+ *
+ * Entries are recorded per addressable value rather than per parent, because
+ * a suffix appended to a parent's path can name the wrong value: topic entries
+ * without a usable `id` are dropped while extracting, so a projected topic
+ * index need not match its source index.
+ */
+export type ConformityClaimWithProvenance = {
+  claim: ConformityClaim;
+  sourceMap: ClaimSourceMap;
+};
+
+/** Claim JSON pointer to subject JSON pointer, per {@link ConformityClaimWithProvenance}. */
+export type ClaimSourceMap = Record<string, string>;
 
 // ── Internal types (not exported from index.ts) ───────────────────────────────
 
 export type SubjectBuilder = (entities: BridgeEntities) => CredentialSubject;
 export type RefsExtractor = (subject: CredentialSubject) => ExtractedRefs;
 export type ConformityClaimExtractor = (subject: CredentialSubject) => ConformityClaim | null;
+export type ConformityClaimProvenanceExtractor = (subject: CredentialSubject) => ConformityClaimWithProvenance | null;
 
 export interface VersionSpec {
   builder: SubjectBuilder;
   extractor: RefsExtractor;
   /** Optional; only credential types carrying a conformity claim (DCC) set this. */
   conformityClaimExtractor?: ConformityClaimExtractor;
+  /**
+   * Optional; set by versions that record where each projected value came
+   * from. A version setting this derives its
+   * {@link VersionSpec.conformityClaimExtractor} from the same projection
+   * rather than building the claim twice.
+   */
+  conformityClaimProvenanceExtractor?: ConformityClaimProvenanceExtractor;
 }

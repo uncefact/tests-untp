@@ -22,7 +22,7 @@ import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { getDidByDid, findConformitySchemeByCanonicalId } from '@/lib/prisma/repositories';
-import { buildPublishLinks } from '@uncefact/untp-ri-services';
+import { buildPublishLinks, remapWarningPointers } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
 import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
 
@@ -213,10 +213,17 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // only the local projection (no network).
   try {
     const subject = credentialPayload.credentialSubject as Record<string, unknown>;
-    const claim = bridge.extractConformityClaim(subject);
-    if (claim) {
-      const scheme = await findConformitySchemeByCanonicalId(claim.scheme, tenantId);
-      warnings.push(...validateConformityClaim(claim, scheme));
+    // The validator's pointers address the extracted claim, which is a
+    // synthesised projection the caller never sees, so they are rewritten onto
+    // the submitted credential using the paths the extractor recorded (#753).
+    // A pointer that cannot be translated is dropped rather than returned.
+    const extracted = bridge.extractConformityClaimWithProvenance(subject);
+    if (extracted) {
+      const scheme = await findConformitySchemeByCanonicalId(extracted.claim.scheme, tenantId);
+      const claimWarnings = validateConformityClaim(extracted.claim, scheme);
+      warnings.push(
+        ...remapWarningPointers(claimWarnings, extracted.sourceMap, credentialPayload, '/credentialSubject'),
+      );
     }
   } catch (error) {
     logger.error({ err: error, credentialType }, 'Conformity claim validation failed');

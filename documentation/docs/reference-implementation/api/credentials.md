@@ -166,6 +166,17 @@ CVC validation is advisory only. It never blocks issuance. If the check fails or
 
 Criterion and topic warnings name the versioned profile URI they were checked against in their message, since profile URIs carry a version segment and the same criterion can differ between profile versions.
 
+Alongside `code` and `message`, a warning can carry structured fields so a client can act on it without reading the message text:
+
+| Field | What it carries |
+|-------|-----------------|
+| `received` | The value that triggered the warning, such as the criterion URI the profile does not publish |
+| `expected` | The value or shape that was expected, where there is one |
+| `pointer` | A JSON pointer to the place in the credential you submitted that the warning concerns, for example `/credentialSubject/conformityAssessment/0/assessmentCriteria/1/id` |
+| `remediation` | What to do about it, where the check can say |
+
+A pointer appears only where the warning has a location in your credential and that location resolves, so treat it as present-or-absent rather than guaranteed. Two warnings never carry one, because their subject is not in the document at all. `conformity-criterion.missing` names a criterion the claim never declared, so read `expected` for the criterion the profile publishes. `conformity-profile.not-specified` reports the absence of a profile and carries neither `received` nor `expected`, so the message is the whole of it.
+
 The assessment-level topic check runs only when the assessment references at least one criterion and every referenced criterion resolves in the profile. An assessment that references no criteria is not warned, because its own `conformityTopic` is then the claim's only classification (the intended modelling when, for example, a scheme publishes no digital vocabulary of criteria); an unresolved criterion is reported as `conformity-criterion.not-in-profile` instead of producing a topic verdict from incomplete evidence.
 
 #### Stage 4: Issuer DID Ownership Validation

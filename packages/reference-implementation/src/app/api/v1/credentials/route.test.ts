@@ -99,6 +99,9 @@ jest.mock('@uncefact/untp-ri-services', () => ({
   buildPublishLinks: (...args: unknown[]) => mockBuildPublishLinks(...args),
   // publishingOptionsSchema derives its accessRole values from this enum.
   AccessRole: jest.requireActual('@uncefact/untp-ri-services').AccessRole,
+  // The real implementation, so the warning-pointer assertions below exercise
+  // the actual rewriting rather than a stub of it.
+  remapWarningPointers: jest.requireActual('@uncefact/untp-ri-services').remapWarningPointers,
 }));
 
 // Repository mocks
@@ -202,6 +205,7 @@ const stubBridge = {
   buildSubject: jest.fn().mockReturnValue({}),
   extractRefs: jest.fn().mockReturnValue({ organisations: [], facilities: [], products: [] }),
   extractConformityClaim: jest.fn().mockReturnValue(null),
+  extractConformityClaimWithProvenance: jest.fn().mockReturnValue(null),
 };
 
 const DATA_MODEL = {
@@ -245,6 +249,7 @@ function setupHappyPath() {
   // Conformity-claim defaults: no claim on the credential (non-DCC), so the
   // validator is not invoked. DCC tests override these.
   stubBridge.extractConformityClaim.mockReturnValue(null);
+  stubBridge.extractConformityClaimWithProvenance.mockReturnValue(null);
   mockValidateConformityClaim.mockReturnValue([]);
   mockFindConformityScheme.mockResolvedValue(null);
 }
@@ -1396,9 +1401,13 @@ describe('POST /api/v1/credentials', () => {
       criteria: [{ criterion: 'https://example.com/rra/v3.0/criterion/26' }],
     };
     const SCHEME = { canonicalId: 'https://example.com', profiles: [] };
+    // The extractor's map from claim pointers to paths in the submitted
+    // credentialSubject; the route substitutes these before responding (#753).
+    const SOURCE_MAP = { '/criteria/0/criterion': '/conformityAssessment/0/assessmentCriteria/0/id' };
+    const EXTRACTED = { claim: CLAIM, sourceMap: SOURCE_MAP };
 
     it('validates the extracted claim against the resolved scheme and attaches no warnings on a clean match', async () => {
-      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
       mockFindConformityScheme.mockResolvedValue(SCHEME);
       mockValidateConformityClaim.mockReturnValue([]);
 
@@ -1413,18 +1422,31 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('attaches the validator warnings (with structured detail) to the response', async () => {
-      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
       mockFindConformityScheme.mockResolvedValue(SCHEME);
       mockValidateConformityClaim.mockReturnValue([
         {
           code: 'conformity-criterion.not-in-profile',
           message: 'Criterion is not published by the profile.',
           received: 'https://example.com/rra/v3.0/criterion/26',
-          pointer: '/criteria/0',
+          pointer: '/criteria/0/criterion',
         },
       ]);
 
-      const req = createFakeRequest(validBody());
+      // The payload has to carry the path the source map names, since a
+      // remapped pointer is kept only once it resolves in the submitted
+      // document.
+      const req = createFakeRequest(
+        validBody({
+          credentialPayload: {
+            ...VALID_PAYLOAD,
+            credentialSubject: {
+              id: 'urn:example:product:123',
+              conformityAssessment: [{ assessmentCriteria: [{ id: 'https://example.com/rra/v3.0/criterion/26' }] }],
+            },
+          },
+        }),
+      );
       const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
       const json = await res.json();
 
@@ -1434,13 +1456,32 @@ describe('POST /api/v1/credentials', () => {
           code: 'conformity-criterion.not-in-profile',
           message: 'Criterion is not published by the profile.',
           received: 'https://example.com/rra/v3.0/criterion/26',
-          pointer: '/criteria/0',
+          // Resolves in the submitted credential, not the extracted claim.
+          pointer: '/credentialSubject/conformityAssessment/0/assessmentCriteria/0/id',
         },
       ]);
     });
 
+    it('drops a pointer the extractor recorded no source path for', async () => {
+      // `/criteria` is the missing-criterion warning: its subject is absent
+      // from the document, so no pointer can resolve and none is returned.
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
+      mockFindConformityScheme.mockResolvedValue(SCHEME);
+      mockValidateConformityClaim.mockReturnValue([
+        { code: 'conformity-criterion.missing', message: 'Profile criterion is not claimed.', pointer: '/criteria' },
+      ]);
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings[0]).not.toHaveProperty('pointer');
+      expect(json.warnings[0].code).toBe('conformity-criterion.missing');
+    });
+
     it('passes a null scheme to the validator when the scheme URI is unknown', async () => {
-      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
       mockFindConformityScheme.mockResolvedValue(null);
       mockValidateConformityClaim.mockReturnValue([
         { code: 'conformity-scheme.not-found', message: 'Scheme URI is not in the known set.' },
@@ -1456,7 +1497,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('skips validation entirely when the credential carries no conformity claim', async () => {
-      stubBridge.extractConformityClaim.mockReturnValue(null);
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue(null);
 
       const req = createFakeRequest(validBody());
       const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -1469,7 +1510,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('never blocks issuance: emits an advisory warning when extraction throws', async () => {
-      stubBridge.extractConformityClaim.mockImplementation(() => {
+      stubBridge.extractConformityClaimWithProvenance.mockImplementation(() => {
         throw new Error('boom');
       });
 
@@ -1482,7 +1523,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('never blocks issuance: degrades to an advisory warning when the scheme lookup rejects', async () => {
-      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
       mockFindConformityScheme.mockRejectedValue(new Error('db down'));
 
       const req = createFakeRequest(validBody());
@@ -1494,7 +1535,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('never blocks issuance: degrades to an advisory warning when the validator throws', async () => {
-      stubBridge.extractConformityClaim.mockReturnValue(CLAIM);
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
       mockFindConformityScheme.mockResolvedValue(SCHEME);
       mockValidateConformityClaim.mockImplementation(() => {
         throw new Error('validator blew up');

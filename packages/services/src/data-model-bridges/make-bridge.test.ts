@@ -73,4 +73,56 @@ describe('makeBridge', () => {
     expect(typeof bridge.buildSubject).toBe('function');
     expect(typeof bridge.extractRefs).toBe('function');
   });
+
+  describe('conformity claim provenance', () => {
+    const builder = jest.fn().mockReturnValue(mockSubject);
+    const extractor = jest.fn().mockReturnValue(mockRefs);
+    const claim = { scheme: 'https://example.com/s', criteria: [] };
+
+    it("delegates to the version's provenance extractor", () => {
+      // Guards the wiring: a mis-keyed spec field, or a version that forgets
+      // to register its provenance extractor, would drop every warning
+      // pointer in production with nothing else failing.
+      const withProvenance = { claim, sourceMap: { '/scheme': '/referenceScheme/id' } };
+      const conformityClaimProvenanceExtractor = jest.fn().mockReturnValue(withProvenance);
+      const spec: VersionSpec = { builder, extractor, conformityClaimProvenanceExtractor };
+
+      const result = makeBridge(spec).extractConformityClaimWithProvenance(mockSubject);
+
+      expect(conformityClaimProvenanceExtractor).toHaveBeenCalledWith(mockSubject);
+      expect(result).toEqual(withProvenance);
+    });
+
+    it('still returns the claim, with an empty map, when the version records no provenance', () => {
+      // Validation must keep running for such a version; only pointers go.
+      const conformityClaimExtractor = jest.fn().mockReturnValue(claim);
+      const spec: VersionSpec = { builder, extractor, conformityClaimExtractor };
+
+      const result = makeBridge(spec).extractConformityClaimWithProvenance(mockSubject);
+
+      expect(result).toEqual({ claim, sourceMap: {} });
+    });
+
+    it('returns null when the version carries no conformity claim at all', () => {
+      const spec: VersionSpec = { builder, extractor };
+
+      expect(makeBridge(spec).extractConformityClaimWithProvenance(mockSubject)).toBeNull();
+    });
+
+    it('returns null when the claim extractor finds no claim in the subject', () => {
+      const conformityClaimExtractor = jest.fn().mockReturnValue(null);
+      const spec: VersionSpec = { builder, extractor, conformityClaimExtractor };
+
+      expect(makeBridge(spec).extractConformityClaimWithProvenance(mockSubject)).toBeNull();
+    });
+
+    it('reports the claim from the provenance extractor when no plain one is registered', () => {
+      // Both directions fall back, so a version registering only one extractor
+      // cannot make the other method claim the credential carries no claim.
+      const conformityClaimProvenanceExtractor = jest.fn().mockReturnValue({ claim, sourceMap: {} });
+      const spec: VersionSpec = { builder, extractor, conformityClaimProvenanceExtractor };
+
+      expect(makeBridge(spec).extractConformityClaim(mockSubject)).toEqual(claim);
+    });
+  });
 });

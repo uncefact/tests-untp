@@ -13,6 +13,8 @@ export type {
   UntpLocation,
   CredentialSubject,
   DataModelConfig,
+  ClaimSourceMap,
+  ConformityClaimWithProvenance,
 } from './types.js';
 
 export { getBridge } from './bridge-registry.js';
