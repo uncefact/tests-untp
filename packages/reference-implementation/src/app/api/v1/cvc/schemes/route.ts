@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import { listConformitySchemes } from '@/lib/prisma/repositories';
-import { paginateInMemory, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
-import { parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { paginateInMemory } from '@/lib/api/pagination';
+import { parseQueryParams } from '@/lib/api/validation';
+import { listCvcSchemesQuerySchema } from '@/lib/api/request-schemas/cvc';
 
 const logger = apiLogger.child({ route: '/api/v1/cvc/schemes' });
 
@@ -25,27 +26,26 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/schemes' });
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Maximum entries per page (capped at the server maximum)
+ *           minimum: 1
+ *         description: Number of entries to return per page. Defaults to 20, or the configured maximum when it is lower. A larger value is rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
  *           type: integer
- *         description: Number of entries to skip
+ *           minimum: 0
+ *         description: Number of entries to skip for pagination
  *     responses:
  *       200:
  *         description: A page of conformity schemes
  *       400:
- *         description: Invalid pagination parameter (limit or offset)
+ *         description: Validation error (e.g. an invalid or above-maximum limit or offset, a repeated query parameter)
  *       401:
  *         description: Unauthorised
  *       403:
  *         description: No tenant found for user
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  const url = new URL(req.url);
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const { limit, offset } = parseQueryParams(new URL(req.url), listCvcSchemesQuerySchema);
 
   logger.info({ tenantId }, 'Listing conformity schemes');
   const schemes = await listConformitySchemes(tenantId);

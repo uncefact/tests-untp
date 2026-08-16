@@ -29,6 +29,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
 }));
 
 import { GET } from './route';
+import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 
 type Ctx = Parameters<typeof GET>[1];
 const CTX = { tenantId: 'tenant-1', params: Promise.resolve({}) } as unknown as Ctx;
@@ -42,8 +43,87 @@ beforeEach(() => jest.clearAllMocks());
 describe('GET /api/v1/cvc/profiles', () => {
   it('returns 400 when schemeId is missing', async () => {
     const res = await GET(req('http://localhost/api/v1/cvc/profiles'), CTX);
+    const json = await res.json();
+
     expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^schemeId:/);
     expect(mockListProfiles).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a blank schemeId', async () => {
+    const res = await GET(req('http://localhost/api/v1/cvc/profiles?schemeId=%20'), CTX);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^schemeId:/);
+    expect(mockListProfiles).not.toHaveBeenCalled();
+  });
+
+  it('reports the schemeId issue before a pagination issue', async () => {
+    const res = await GET(req('http://localhost/api/v1/cvc/profiles?limit=abc'), CTX);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^schemeId:/);
+  });
+
+  it('returns 400 for a non-numeric limit', async () => {
+    const res = await GET(req('http://localhost/api/v1/cvc/profiles?schemeId=https://a.example&limit=abc'), CTX);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('limit: must be a positive integer');
+  });
+
+  it('rejects a limit above the maximum with a 400 and does not load the catalogue', async () => {
+    const res = await GET(
+      req(`http://localhost/api/v1/cvc/profiles?schemeId=https://a.example&limit=${MAX_PAGE_LIMIT + 1}`),
+      CTX,
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain(`maximum of ${MAX_PAGE_LIMIT}`);
+    expect(mockListProfiles).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a negative offset', async () => {
+    const res = await GET(req('http://localhost/api/v1/cvc/profiles?schemeId=https://a.example&offset=-1'), CTX);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('offset: must be a non-negative integer');
+  });
+
+  it('returns 400 for a repeated query key', async () => {
+    const res = await GET(req('http://localhost/api/v1/cvc/profiles?schemeId=a&schemeId=b'), CTX);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('repeated query parameter');
+    expect(mockListProfiles).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 when listConformityProfiles throws', async () => {
+    mockListProfiles.mockRejectedValue(new Error('Database error'));
+
+    const res = await GET(req('http://localhost/api/v1/cvc/profiles?schemeId=https://a.example'), CTX);
+    const json = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(json.error).toContain('Database error');
+  });
+
+  it('applies limit and offset to the page', async () => {
+    mockListProfiles.mockResolvedValue(
+      Array.from({ length: 5 }, (_, i) => ({ id: `p${i}`, name: `P${i}`, version: '1', status: 'active' })),
+    );
+
+    const res = await GET(req('http://localhost/api/v1/cvc/profiles?schemeId=https://a.example&limit=2&offset=1'), CTX);
+    const json = await res.json();
+
+    expect(json.data.map((p: { id: string }) => p.id)).toEqual(['p1', 'p2']);
+    expect(json.pagination).toEqual({ total: 5, limit: 2, offset: 1, hasMore: true });
   });
 
   it('lists the profiles for the requested scheme', async () => {
@@ -54,7 +134,7 @@ describe('GET /api/v1/cvc/profiles', () => {
 
     expect(res.status).toBe(200);
     expect(json.data).toHaveLength(1);
-    expect(json.pagination).toEqual({ total: 1, limit: 20, offset: 0, hasMore: false });
+    expect(json.pagination).toEqual({ total: 1, limit: DEFAULT_PAGE_LIMIT, offset: 0, hasMore: false });
     expect(mockListProfiles).toHaveBeenCalledWith('https://a.example', 'tenant-1');
   });
 });
