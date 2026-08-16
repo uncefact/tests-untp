@@ -4,14 +4,11 @@ const jestConfig = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
-  testMatch: [
-    '**/src/**/*.test.{ts,tsx}',
-    '**/prisma/__tests__/**/*.test.{ts,tsx}',
-  ],
-  testPathIgnorePatterns: ['<rootDir>/node_modules/'],
-  transformIgnorePatterns: [
-    'node_modules/(?!@reference-implementation|uuid)',
-  ],
+  testMatch: ['**/src/**/*.test.{ts,tsx}', '**/prisma/__tests__/**/*.test.{ts,tsx}'],
+  // Integration-layer files run only via jest.integration.config.mjs; the
+  // unit run must never collect them (they expect the rig's database).
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '\\.integration\\.test\\.'],
+  transformIgnorePatterns: ['node_modules/(?!@reference-implementation|uuid)'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
@@ -32,7 +29,8 @@ const jestConfig = {
     '^@uncefact/untp-utils/cache$': '<rootDir>/../untp-utils/build/cache/index.js',
     '^@uncefact/untp-utils/conformity-vocabulary$': '<rootDir>/../untp-utils/build/conformity-vocabulary/index.js',
     '^@uncefact/untp-utils$': '<rootDir>/../untp-utils/build/index.js',
-    '^@reference-implementation/components$': '<rootDir>/node_modules/@reference-implementation/components/build/index.js',
+    '^@reference-implementation/components$':
+      '<rootDir>/node_modules/@reference-implementation/components/build/index.js',
   },
   transform: {
     '^.+\\.m?[tj]sx?$': [
