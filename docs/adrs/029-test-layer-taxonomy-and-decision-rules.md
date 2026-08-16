@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** proposed
+- **Update (2026-08-16):** the reference implementation's integration rig (`packages/reference-implementation/__tests__/integration/`, #900) implements this layer's "real DB" requirement with the `docker` CLI managing an ephemeral `postgres:17-alpine` container directly, rather than the testcontainers library named below. The rig also accepts an operator-supplied `TEST_DATABASE_URL` as an alternative to the ephemeral container. The layer's decision (real Postgres, per-package `__tests__/integration/`, `*.integration.test.ts`) is unchanged.
 
 ## Context
 

@@ -66,6 +66,13 @@ pnpm test:services                  # Services package only
 pnpm test:reference-implementation  # Reference implementation only
 pnpm test:components                # Components only
 
+# Postgres-backed integration tests (reference implementation only; needs a running Docker daemon)
+# By default the rig starts and tears down its own ephemeral postgres:17-alpine container.
+# To point it at an existing database instead, set TEST_DATABASE_URL; the rig refuses a URL
+# naming a real environment's database (ri, vckit) unless TEST_DATABASE_ACCEPT_DESTRUCTIVE=true
+# is also set, because the suites truncate tables between tests.
+cd packages/reference-implementation && pnpm test:integration
+
 # E2E Testing (per-app suites; see packages/<app>/e2e/README.md for details)
 
 # RI open mode
