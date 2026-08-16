@@ -169,6 +169,71 @@ describe('handleRouteError', () => {
 
   // --- Database errors (sanitised backstop) ---
 
+  it('quotes the correlation id so the caller has something to give support', async () => {
+    const { handlePipelineError } = await import('./handle-route-error');
+    const { runWithRequestContext } = await import('@uncefact/untp-ri-services/logging');
+
+    const res = await runWithRequestContext('corr-abc-123', async () =>
+      handlePipelineError(new Error('session decode failed')),
+    );
+    const body = (await res.json()) as { error: string };
+
+    expect(res.status).toBe(500);
+    expect(body.error).toContain('An unexpected error has occurred.');
+    expect(body.error).toContain('contact support');
+    // Quoted so the id is unambiguous when pasted into a support ticket.
+    expect(body.error).toContain('"corr-abc-123"');
+    // Still nothing of the underlying failure.
+    expect(body.error).not.toContain('session decode failed');
+  });
+
+  it('quotes the correlation id on a sanitised database failure too', async () => {
+    const { handleRouteError } = await import('./handle-route-error');
+    const { runWithRequestContext } = await import('@uncefact/untp-ri-services/logging');
+    const prismaError = Object.assign(new Error('Invalid `prisma.tenant.findUnique()` invocation'), {
+      code: 'P2021',
+      clientVersion: '5.0.0',
+      name: 'PrismaClientKnownRequestError',
+    });
+
+    const res = await runWithRequestContext('corr-db-9', async () => handleRouteError(prismaError));
+    const body = (await res.json()) as { error: string };
+
+    expect(body.error).toContain('"corr-db-9"');
+    expect(body.error).not.toContain('prisma.tenant.findUnique');
+  });
+
+  it('omits the support guidance when there is no request context to quote', async () => {
+    const { handlePipelineError } = await import('./handle-route-error');
+
+    const res = handlePipelineError(new Error('boom'));
+    const body = (await res.json()) as { error: string };
+
+    expect(body.error).toBe('An unexpected error has occurred.');
+    expect(body.error).not.toContain('contact support');
+  });
+
+  it('redacts an unmapped error through the pipeline entry point, leaving the default contract alone', async () => {
+    const { handleRouteError, handlePipelineError } = await import('./handle-route-error');
+
+    const redacted = handlePipelineError(new Error('session decode failed for issuer https://idp.internal'));
+    expect(redacted.status).toBe(500);
+    expect(await redacted.json()).toEqual({ error: 'An unexpected error has occurred.' });
+
+    const defaulted = handleRouteError(new Error('session decode failed for issuer https://idp.internal'));
+    expect(await defaulted.json()).toEqual({ error: 'session decode failed for issuer https://idp.internal' });
+  });
+
+  it('still maps a typed error normally through the pipeline entry point', async () => {
+    const { handlePipelineError } = await import('./handle-route-error');
+    const { NotFoundError } = await import('./errors');
+
+    const res = handlePipelineError(new NotFoundError('Scheme not found'));
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Scheme not found' });
+  });
+
   it('sanitises an unhandled Prisma known request error to a generic 500', async () => {
     const dbError = new Error('Unique constraint failed on the fields: (`schemeId`,`value`,`tenantId`)');
     dbError.name = 'PrismaClientKnownRequestError';

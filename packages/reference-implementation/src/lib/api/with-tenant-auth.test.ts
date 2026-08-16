@@ -31,6 +31,19 @@ jest.mock('@uncefact/untp-ri-services/logging', () => ({
   createLogger: () => mockLogger(),
 }));
 
+const mockApiLoggerInfo = jest.fn();
+const mockApiLoggerWarn = jest.fn();
+const mockApiLoggerError = jest.fn();
+jest.mock('@/lib/api/logger', () => ({
+  apiLogger: {
+    info: (...args: unknown[]) => mockApiLoggerInfo(...args),
+    warn: (...args: unknown[]) => mockApiLoggerWarn(...args),
+    error: (...args: unknown[]) => mockApiLoggerError(...args),
+    debug: jest.fn(),
+    child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
+  },
+}));
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number }) => ({
@@ -54,9 +67,13 @@ jest.mock('@/lib/api/service-account-user', () => ({
 }));
 
 // Tenant config mock — controlled by mockTenantMode
-let mockTenantMode: 'open' | 'closed' = 'open';
+let mockTenantMode: 'open' | 'closed' | 'invalid' = 'open';
 jest.mock('@/lib/auth/tenant-config', () => ({
   getTenantConfig: () => {
+    if (mockTenantMode === 'invalid') {
+      // Mirrors the real thrown shape, which names the rejected value.
+      throw new Error('Invalid TENANT_MODE: "sideways". Must be one of: open, closed');
+    }
     if (mockTenantMode === 'closed') {
       return { mode: 'closed', claimName: 'groups', claimFormat: 'array_first' };
     }
@@ -754,6 +771,272 @@ describe('withTenantAuth — request context propagation', () => {
 // ========================================================
 // handleRouteError tests (unchanged)
 // ========================================================
+
+// ========================================================
+// Pre-handler pipeline failures (#850)
+// ========================================================
+
+describe('withTenantAuth — unexpected failures before the handler runs', () => {
+  const SENTINEL = 'tenant lookup exploded with connection string postgres://user:pw@host/db';
+
+  it('returns the documented envelope with a canned message when open-mode tenant resolution throws', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockRejectedValue(new Error(SENTINEL));
+    const handler = jest.fn();
+
+    const res = (await withTenantAuth(handler)(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+    // The thrown text must not reach the client: Next's own uncaught path
+    // returns a plain fallback carrying no message, so this boundary must not
+    // become a new disclosure channel.
+    expect(JSON.stringify(body)).not.toContain('postgres://');
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns the canned envelope when the session read itself throws in closed mode', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockRejectedValue(new Error(SENTINEL));
+
+    const res = (await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+  });
+
+  it('returns the canned envelope when the closed-mode tenant lookup throws', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' }, group_claim: 'group-1' });
+    mockPrismaTenant.findUnique.mockRejectedValue(new Error(SENTINEL));
+
+    const res = (await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+  });
+
+  it('routes a service-account resolution failure through the same central boundary', async () => {
+    mockGetSessionUserId.mockResolvedValue(null);
+    mockResolveServiceAccountUser.mockRejectedValue(new Error(SENTINEL));
+
+    const res = (await withTenantAuth(jest.fn())(
+      fakeRequest('GET', { 'x-auth-sub': 'sub-1' }),
+      emptyRouteContext,
+    )) as unknown as MockResponse & { status: number };
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    // The same canned body as every other pre-handler failure, rather than a
+    // second wording produced by a catch local to this path.
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+  });
+
+  it('attributes a service-account failure by putting the subject on the request context', async () => {
+    mockGetSessionUserId.mockResolvedValue(null);
+    mockResolveServiceAccountUser.mockRejectedValue(new Error(SENTINEL));
+
+    await withTenantAuth(jest.fn())(fakeRequest('GET', { 'x-auth-sub': 'sub-1' }), emptyRouteContext);
+
+    // Without this the central boundary's log could not say which service
+    // account the failure belonged to, which the removed local catch did.
+    expect(mockUpdateRequestContext).toHaveBeenCalledWith(expect.objectContaining({ serviceAccountSub: 'sub-1' }));
+  });
+
+  it('keeps the sanitised database mapping for a Prisma failure thrown before the handler', async () => {
+    const prismaError = Object.assign(new Error('Invalid `prisma.tenant.findUnique()` invocation: table missing'), {
+      code: 'P2021',
+      clientVersion: '5.0.0',
+      name: 'PrismaClientKnownRequestError',
+    });
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockRejectedValue(prismaError);
+
+    const res = (await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    // The database branch already sanitises, so this proves the pipeline
+    // reaches the mapper's typed branches rather than short-circuiting them.
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(JSON.stringify(body)).not.toContain('prisma.tenant.findUnique');
+  });
+
+  it('logs a typed pre-handler failure at its status level rather than as an error', async () => {
+    const { NotFoundError } = await import('@/lib/api/errors');
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockRejectedValue(new NotFoundError('Tenant not found'));
+
+    await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext);
+
+    // A 404 is not an error-level event; executeHandler already picks its
+    // level from the mapped status and this boundary must match.
+    expect(mockApiLoggerWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 404 }),
+      'Request failed before the handler ran',
+    );
+  });
+
+  it('keeps the deliberate mapping for a typed error thrown before the handler', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockRejectedValue(new NotFoundError('Tenant not found'));
+
+    const res = (await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body).toEqual({ error: 'Tenant not found' });
+  });
+
+  it('leaves the explicit 401 and 403 returns untouched', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue(null);
+
+    const res = (await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'No tenant found for user' });
+  });
+
+  it('returns the canned envelope when bearer token validation throws', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue(null);
+    mockExtractBearerToken.mockReturnValue('token-1');
+    mockValidateServiceAccountToken.mockRejectedValue(new Error(SENTINEL));
+
+    const res = (await withTenantAuth(jest.fn())(
+      fakeRequest('GET', { authorization: 'Bearer token-1' }),
+      emptyRouteContext,
+    )) as unknown as MockResponse & { status: number };
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'An unexpected error has occurred.' });
+  });
+
+  it('returns the canned envelope when closed-mode tenant resolution throws on the bearer path', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue(null);
+    mockExtractBearerToken.mockReturnValue('token-1');
+    mockValidateServiceAccountToken.mockResolvedValue({ valid: true, payload: { sub: 'sub-1' } });
+    mockExtractGroupClaim.mockReturnValue('group-1');
+    mockResolveClosedModeTenant.mockRejectedValue(new Error(SENTINEL));
+
+    const res = (await withTenantAuth(jest.fn())(
+      fakeRequest('GET', { authorization: 'Bearer token-1' }),
+      emptyRouteContext,
+    )) as unknown as MockResponse & { status: number };
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'An unexpected error has occurred.' });
+  });
+
+  it('returns the canned envelope when re-linking the user to a changed tenant throws', async () => {
+    mockTenantMode = 'closed';
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' }, group_claim: 'group-1' });
+    mockPrismaTenant.findUnique.mockResolvedValue({ id: 'tenant-2' });
+    mockPrismaUser.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+    mockPrismaUser.update.mockRejectedValue(new Error(SENTINEL));
+
+    const res = (await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(mockPrismaUser.update).toHaveBeenCalled();
+  });
+
+  it('answers rather than escaping when the tenant-config read throws, redacting the offending value', async () => {
+    // Invalid configuration fails at module import in production (auth.config.ts
+    // reads it at module scope), so this pins the boundary's handling of a
+    // throw from that position rather than a reachable TENANT_MODE failure.
+    mockTenantMode = 'invalid';
+
+    const res = (await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(JSON.stringify(body)).not.toContain('TENANT_MODE');
+  });
+
+  it('answers rather than escaping when the request URL cannot be parsed', async () => {
+    const malformed = {
+      method: 'GET',
+      url: 'not a url',
+      headers: { get: () => null },
+    } as unknown as Request;
+
+    const res = (await withTenantAuth(jest.fn())(malformed, emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'An unexpected error has occurred.' });
+  });
+
+  it('answers rather than escaping when establishing the request context itself throws', async () => {
+    mockRunWithRequestContext.mockImplementation(() => {
+      throw new Error(SENTINEL);
+    });
+
+    const res = (await withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)) as unknown as MockResponse & {
+      status: number;
+    };
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+    // No correlation id exists at this point, so the outer boundary logs
+    // directly rather than relying on the request context.
+    expect(JSON.stringify(body)).not.toContain('postgres://');
+  });
+
+  it('lets a Next control-flow throw escape the outer boundary too', async () => {
+    const redirectError = Object.assign(new Error('NEXT_REDIRECT'), { digest: 'NEXT_REDIRECT;replace;/login;307;' });
+    mockRunWithRequestContext.mockImplementation(() => {
+      throw redirectError;
+    });
+
+    await expect(withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)).rejects.toBe(redirectError);
+  });
+
+  it('lets Next control-flow throws propagate rather than mapping them to a 500', async () => {
+    // NEXT_REDIRECT is how Next signals redirect(); unstable_rethrow must let it pass.
+    const redirectError = Object.assign(new Error('NEXT_REDIRECT'), { digest: 'NEXT_REDIRECT;replace;/login;307;' });
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockRejectedValue(redirectError);
+
+    await expect(withTenantAuth(jest.fn())(fakeRequest(), emptyRouteContext)).rejects.toBe(redirectError);
+  });
+
+  it('lets a Next control-flow throw from inside the handler propagate too', async () => {
+    const redirectError = Object.assign(new Error('NEXT_REDIRECT'), { digest: 'NEXT_REDIRECT;replace;/login;307;' });
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('tenant-1');
+
+    await expect(
+      withTenantAuth(jest.fn().mockRejectedValue(redirectError))(fakeRequest(), emptyRouteContext),
+    ).rejects.toBe(redirectError);
+  });
+});
 
 describe('handleRouteError', () => {
   it('maps ValidationError to 400', async () => {

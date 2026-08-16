@@ -6,11 +6,13 @@ import {
   UnprocessableError,
   errorMessage,
   ServiceRegistryError,
+  unexpectedErrorMessage,
 } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { isDatabaseError } from '@/lib/prisma/db-errors';
 import { ServiceError } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
+import { getRequestContext } from '@uncefact/untp-ri-services/logging';
 
 const logger = apiLogger.child({ handler: 'error' });
 
@@ -25,7 +27,26 @@ const logger = apiLogger.child({ handler: 'error' });
  *   - ServiceInstanceNotFoundError (name check) returns 404
  *   - All other registry errors return 500
  */
-export function handleRouteError(e: unknown): Response {
+type HandleRouteErrorOptions = {
+  /**
+   * Return the canned message instead of the thrown text when no branch
+   * below claims the error. Deliberately not part of the exported surface:
+   * `handlePipelineError` is the only way to ask for it, so a route caller
+   * cannot redact a handler failure whose contract is to echo its message.
+   */
+  redactUnmapped?: boolean;
+};
+
+/**
+ * Maps an error raised outside a route handler, where an unmapped message
+ * must not reach the client. Typed and database errors map exactly as they
+ * do for handlers; anything else becomes the canned message.
+ */
+export function handlePipelineError(e: unknown): Response {
+  return handleRouteError(e, { redactUnmapped: true });
+}
+
+export function handleRouteError(e: unknown, options: HandleRouteErrorOptions = {}): Response {
   if (e instanceof ValidationError) {
     // The default err serialiser concatenates the messages and stacks of the
     // native cause chain (not the causes' typed fields), so a ValidationError
@@ -65,8 +86,13 @@ export function handleRouteError(e: unknown): Response {
     // fallback below, this branch never echoes error text. The distinct log message
     // is the signal that a repository is missing a mapping.
     logger.error({ err: e }, 'Unhandled database error');
-    return NextResponse.json({ error: 'An unexpected error has occurred.' }, { status: 500 });
+    return NextResponse.json({ error: unexpectedErrorMessage(getRequestContext()?.correlationId) }, { status: 500 });
   }
   logger.error({ err: e }, 'Unexpected error');
-  return NextResponse.json({ error: errorMessage(e) }, { status: 500 });
+  return NextResponse.json(
+    {
+      error: options.redactUnmapped ? unexpectedErrorMessage(getRequestContext()?.correlationId) : errorMessage(e),
+    },
+    { status: 500 },
+  );
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { unstable_rethrow } from 'next/navigation';
 import { getSessionUserId, getTenantId } from '@/lib/api/helpers';
-import { handleRouteError } from '@/lib/api/handle-route-error';
+import { handlePipelineError, handleRouteError } from '@/lib/api/handle-route-error';
+import { unexpectedErrorMessage } from '@/lib/api/errors';
 import { apiLogger } from '@/lib/api/logger';
 import { resolveServiceAccountUser } from '@/lib/api/service-account-user';
 import { getTenantConfig } from '@/lib/auth/tenant-config';
@@ -33,39 +35,75 @@ type RouteHandler = (req: Request, context: TenantAuthContext) => Promise<Respon
 
 export function withTenantAuth(handler: RouteHandler) {
   return async (req: Request, routeContext: { params: Promise<Record<string, string>> }) => {
-    // Zero trust at the boundary (#654): an inbound ID outside the shared
-    // length/charset rule is replaced, never echoed into logs or responses.
-    const raw = req.headers.get('x-correlation-id');
-    const correlationId = raw && isValidCorrelationId(raw) ? raw : crypto.randomUUID();
-    if (raw && correlationId !== raw) {
-      apiLogger.warn(
-        { inboundLength: raw.length, replacedWith: correlationId },
-        'Rejected invalid x-correlation-id header; minted a fresh id',
-      );
-    }
+    const start = Date.now();
 
-    return runWithRequestContext(correlationId, async () => {
-      const method = req.method;
-      const url = new URL(req.url);
-      const path = url.pathname;
-      const start = Date.now();
-      const tenantConfig = getTenantConfig();
-
-      // Carry the request method and path in the request context so every
-      // downstream log entry, including a centrally-handled error, is
-      // attributable to its route without each handler restating them. The
-      // `request`-prefixed keys avoid colliding with per-log `method` fields
-      // that some handlers already use for a domain concept (e.g. a DID method).
-      updateRequestContext({ requestMethod: method, requestPath: path });
-
-      apiLogger.info({ method, path }, 'Request received');
-
-      if (tenantConfig.mode === 'closed') {
-        return handleClosedMode(handler, req, routeContext, method, path, start, tenantConfig);
+    // Nothing may escape this wrapper: every route documents a 500 as an
+    // ErrorResponse, and an uncaught throw would instead reach Next's
+    // plain-text fallback. The inner boundary handles everything once the
+    // request context exists, so a failure there is logged with its
+    // correlation id; this outer one is the last resort for the context
+    // establishment itself, which has no context to log against.
+    try {
+      // Zero trust at the boundary (#654): an inbound ID outside the shared
+      // length/charset rule is replaced, never echoed into logs or responses.
+      const raw = req.headers.get('x-correlation-id');
+      const correlationId = raw && isValidCorrelationId(raw) ? raw : crypto.randomUUID();
+      if (raw && correlationId !== raw) {
+        apiLogger.warn(
+          { inboundLength: raw.length, replacedWith: correlationId },
+          'Rejected invalid x-correlation-id header; minted a fresh id',
+        );
       }
 
-      return handleOpenMode(handler, req, routeContext, method, path, start);
-    });
+      return await runWithRequestContext(correlationId, async () => {
+        // Established before the try so the catch can still attribute a
+        // failure that happens while working them out.
+        let method = 'UNKNOWN';
+        let path = 'unknown';
+
+        try {
+          method = req.method;
+          path = new URL(req.url).pathname;
+
+          // Carry the request method and path in the request context so every
+          // downstream log entry, including a centrally-handled error, is
+          // attributable to its route without each handler restating them. The
+          // `request`-prefixed keys avoid colliding with per-log `method` fields
+          // that some handlers already use for a domain concept (e.g. a DID method).
+          updateRequestContext({ requestMethod: method, requestPath: path });
+
+          apiLogger.info({ method, path }, 'Request received');
+
+          // Read inside the boundary so a throw here is answered rather than
+          // escaping. Note that invalid tenant configuration does not reach
+          // this point in practice: auth.config.ts calls getTenantConfig() at
+          // module scope, so a bad TENANT_MODE fails the route module's import
+          // and never runs a request. That fail-fast behaviour is deliberate
+          // and outside this boundary.
+          const tenantConfig = getTenantConfig();
+
+          // Awaited rather than returned: an unawaited promise's rejection
+          // would not land in this catch.
+          if (tenantConfig.mode === 'closed') {
+            return await handleClosedMode(handler, req, routeContext, method, path, start, tenantConfig);
+          }
+
+          return await handleOpenMode(handler, req, routeContext, method, path, start);
+        } catch (error: unknown) {
+          return respondToPipelineFailure(error, method, path, start);
+        }
+      });
+    } catch (error: unknown) {
+      unstable_rethrow(error);
+
+      apiLogger.error(
+        { err: error, durationMs: Date.now() - start },
+        'Request failed before the request context was established',
+      );
+      // Outside the request context by definition, so there is no correlation
+      // id to quote; the log line above is the only record of this failure.
+      return NextResponse.json({ error: unexpectedErrorMessage(undefined) }, { status: 500 });
+    }
   };
 }
 
@@ -242,16 +280,13 @@ async function handleOpenMode(
     const email = req.headers.get('x-auth-email') ?? undefined;
     const azp = req.headers.get('x-auth-azp') ?? undefined;
 
-    let resolved: { userId: string; tenantId: string } | null;
-    try {
-      resolved = await resolveServiceAccountUser({ sub, name, email });
-    } catch (error) {
-      apiLogger.error(
-        { method, path, sub, error, durationMs: Date.now() - start },
-        'Service account user resolution failed unexpectedly',
-      );
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
+    // No local catch: an unexpected failure here joins the wrapper's central
+    // boundary, so it is logged and answered like every other pre-handler
+    // failure rather than through a second, differently-worded 500. The
+    // subject goes on the request context first, so a failure is still
+    // attributable to a service account without that catch's own log line.
+    updateRequestContext({ serviceAccountSub: sub });
+    const resolved = await resolveServiceAccountUser({ sub, name, email });
 
     if (!resolved) {
       apiLogger.warn(
@@ -281,6 +316,35 @@ async function handleOpenMode(
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
+/**
+ * Maps an unexpected failure from the auth-and-tenant-resolution pipeline to
+ * the documented ErrorResponse body.
+ *
+ * Typed API errors and database errors keep their existing mapping; an
+ * unmapped error is redacted to the canned message, because echoing it here
+ * would newly disclose session, cookie and auth-provider detail that Next's
+ * own uncaught path never returns. Redaction is scoped to this pipeline: a
+ * handler that throws an unmapped error still echoes its message, which is
+ * the established route contract and is deliberately left alone here.
+ */
+function respondToPipelineFailure(error: unknown, method: string, path: string, start: number): Response {
+  // Next signals redirects and similar framework control flow by throwing;
+  // those must pass through untouched rather than becoming a 500.
+  unstable_rethrow(error);
+
+  const response = handlePipelineError(error);
+
+  // The error itself is already logged by the mapper; this line is the
+  // completion record, matching what executeHandler emits for handler
+  // failures, including its status-derived level.
+  const level = response.status >= 500 ? 'error' : 'warn';
+  apiLogger[level](
+    { method, path, status: response.status, durationMs: Date.now() - start },
+    'Request failed before the handler ran',
+  );
+  return response;
+}
+
 async function executeHandler(
   handler: RouteHandler,
   req: Request,
@@ -301,6 +365,7 @@ async function executeHandler(
     );
     return response;
   } catch (e: unknown) {
+    unstable_rethrow(e);
     const errorResponse = handleRouteError(e);
     const logLevel = errorResponse.status >= 500 ? 'error' : 'warn';
     apiLogger[logLevel](
