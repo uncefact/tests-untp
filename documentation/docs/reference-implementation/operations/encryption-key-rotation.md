@@ -41,7 +41,7 @@ The new key must not be the placeholder value published in `.env.example`: outsi
 
 ## Reading the report
 
-For each store the report shows how many envelopes were already under the active key, how many opened only under the outgoing key, how many were rotated, and the ids of anything else: envelopes neither key opened, corrupted service configurations (both abort the run before any write), corrupted-looking credential rows the rotation leaves untouched, rows deleted or changed while the run was in flight, and legacy plaintext credential keys (which belong to [`backfill:decryption-keys`](../../migration-guides/ri-v0.4#decryption-key-backfill-for-existing-credentials), run under the new key).
+For each store the report shows how many envelopes were already under the active key, how many opened only under the outgoing key, how many were rotated, and the ids of anything else: envelopes neither key opened, corrupted service configurations (both abort the run before any write), corrupted-looking credential rows the rotation leaves untouched, rows deleted or changed while the run was in flight, and legacy plaintext credential keys (which belong to [`backfill:decryption-keys`](./backfills/decryption-keys), run under the new key).
 
 When a valid envelope opens under neither key, the report shows both decrypt errors for the first such row. A wrong third key and tampered data produce the same error, so the report does not claim which it is.
 
