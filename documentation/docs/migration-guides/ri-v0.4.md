@@ -11,9 +11,14 @@ import Disclaimer from '.././\_disclaimer.mdx';
 Back up the Reference Implementation database, and record the encryption key the
 deployment currently runs with (`SERVICE_ENCRYPTION_KEY` in earlier versions). This
 release encrypts credential decryption keys at rest under that key, so from this
-version onwards **losing the key means losing access to every privately stored
-credential**. Store the key with the same care as the database backups: a database
-backup without the matching key cannot be recovered.
+version onwards **losing the key means losing every service instance configuration and
+every credential decryption key stored as an encrypted envelope**. Credential rows
+created before this release keep their plaintext stored keys until the
+[backfill below](#decryption-key-backfill-for-existing-credentials) wraps them, so they,
+like credentials stored unencrypted, are unaffected by key loss. Store the
+key with the same care as the database backups: once a backup holds any encrypted
+envelope, it cannot be recovered without its matching key. The full pairing, retention, and recovery contract lives in
+[Key Management and Recovery](../reference-implementation/operations/key-management).
 :::
 
 ## Overview
@@ -33,6 +38,8 @@ role (it now protects service instance configurations and credential decryption 
   warning. Rename the variable at your convenience; removal of the fallback is tracked
   in [#721](https://github.com/uncefact/tests-untp/issues/721).
 - Setting both names to the same value works and logs a reminder to remove the old name.
+  The active key's backup pairing and recovery contract is documented in
+  [Key Management and Recovery](../reference-implementation/operations/key-management).
 - Setting both names to **different values fails before anything encrypted is
   written** (on the standard Docker path this surfaces at startup, when the seed
   resolves the key). The two names are aliases for the same active key, so two
@@ -62,7 +69,7 @@ unrecoverable, so a human confirms the key before anything is rewritten.
 Before running it:
 
 1. Preview what it would do with the read-only audit command (`pnpm audit:encryption`), which decrypts every stored envelope under the active key and reports what the backfill would wrap, skip, or abort on (see [Encryption Audit](../reference-implementation/operations/encryption-audit)).
-2. Back up the database.
+2. Back up the database (see [Key Management and Recovery](../reference-implementation/operations/key-management#backups-pair-with-the-key) for how backups pair with the key).
 3. Confirm `DATA_ENCRYPTION_KEY` is exactly the key the running application uses.
 4. Stop any older application instances that might still write plaintext keys during a
    rolling upgrade (or plan to re-run the backfill after they are gone; re-running is

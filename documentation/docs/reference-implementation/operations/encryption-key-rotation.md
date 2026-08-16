@@ -1,5 +1,5 @@
 ---
-sidebar_position: 6
+sidebar_position: 7
 title: Encryption Key Rotation
 ---
 
@@ -11,13 +11,13 @@ The command is idempotent. A re-run with the same key pair finds rows already on
 
 ## Before you start
 
-1. Back up the database, and keep both key values somewhere safe until the rotation is verified. A backup without its matching key is not a recovery artefact.
+1. Back up the database, and keep both key values somewhere safe until the rotation is verified. A backup without its matching key is not a recovery artefact; see [Key Management and Recovery](./key-management#backups-pair-with-the-key) for the pairing and retention rules.
 2. Run [`audit:encryption`](./encryption-audit) under the current key and resolve any findings. The rotation refuses to write when any stored envelope fails to decrypt under both supplied keys, or any service configuration is corrupted.
 3. Stop every application instance, including replicas and any maintenance jobs. The rotation must be the only thing touching the database. Run it as a one-off process (for Docker deployments, `docker compose run --rm`), never by `exec`-ing into a serving container.
 
 ## Running the rotation
 
-Set `DATA_ENCRYPTION_KEY` to the **new** key and `OUTGOING_DATA_ENCRYPTION_KEY` to the **previous** key, in the rotation process only.
+Set both keys in `.env`: `DATA_ENCRYPTION_KEY` becomes the **new** key (its end state anyway, and an accidental application start before the rotation has written anything then fails loudly at startup validation), and `OUTGOING_DATA_ENCRYPTION_KEY` holds the **previous** key for the duration of the rotation. Compose forwards both to the rotation container; the serving application never reads the outgoing variable, and it is removed before the application starts. Make sure none of the key variables are exported in your shell: the shell environment takes precedence over `.env` for both compose and the source-checkout scripts, so a stale exported value would silently win over what you just wrote to `.env`.
 
 From a source checkout, in `packages/reference-implementation`:
 
@@ -27,18 +27,13 @@ pnpm rotate:encryption-key
 
 Inside the published Docker image (which ships no pnpm):
 
-Export both keys from your secret store first (name-only `-e` forwards the exported value without putting key material in shell history):
-
 ```bash
-export DATA_ENCRYPTION_KEY='<new key>'
-export OUTGOING_DATA_ENCRYPTION_KEY='<previous key>'
 docker compose run --rm \
   -e SKIP_MIGRATIONS=true -e SKIP_SEED=true \
-  -e DATA_ENCRYPTION_KEY -e OUTGOING_DATA_ENCRYPTION_KEY \
   ri node_modules/.bin/tsx scripts/rotate-encryption-key.ts
 ```
 
-Every variable on the command matters. The compose file only forwards the variables it lists, and `OUTGOING_DATA_ENCRYPTION_KEY` is not among them, so both keys are passed to this one container explicitly (which also keeps the outgoing key out of the serving container's environment). The two `SKIP_` variables stop the image's entrypoint running migrations and the database seed before the command: the seed validates `DATA_ENCRYPTION_KEY` against existing encrypted data, which fails by design while the database is still under the old key. Skipping both keeps the rotation the only thing touching the database.
+Both keys arrive from `.env` like every other variable. The two `SKIP_` variables stop the image's entrypoint running migrations and the database seed before the command: the seed validates `DATA_ENCRYPTION_KEY` against existing encrypted data, which fails by design while the database is still under the old key. Skipping both keeps the rotation the only thing touching the database.
 
 The command needs a database target: a pre-set `RI_DATABASE_URL` is honoured as given, and the `RI_POSTGRES_*` variables are used to construct one only when it is absent (the same rule the application, audit, and backfill follow).
 
@@ -56,8 +51,8 @@ Exit codes: `0` when every stored envelope ended under the active key; `1` when 
 
 ## After the rotation
 
-1. Run `audit:encryption` with `DATA_ENCRYPTION_KEY` set to the new key. With the application still stopped, the Docker form needs the same `SKIP_` pair, and an empty `SERVICE_ENCRYPTION_KEY` override when the deployment still carries that deprecated alias (compose forwards it, and the audit refuses to run while the two names disagree): `docker compose run --rm -e SKIP_MIGRATIONS=true -e SKIP_SEED=true -e DATA_ENCRYPTION_KEY -e SERVICE_ENCRYPTION_KEY= ri node_modules/.bin/tsx scripts/audit-encryption.ts`. On a source checkout, likewise make sure a stale `SERVICE_ENCRYPTION_KEY` is unset or overridden for this step. Success means no decrypt failures and no new corruption; credential rows the rotation reported as corrupted-looking will still be flagged, and they match the rotation's report.
-2. If the deployment still sets the deprecated `SERVICE_ENCRYPTION_KEY` alias, set it to the new key or remove it before starting the application; startup fails when the two names disagree.
-3. Start the application, confirm a credential read and a service resolution work, then remove `OUTGOING_DATA_ENCRYPTION_KEY` from the environment and retire the old key.
+1. With writers still stopped, run the [stopped-writers audit](./encryption-audit#running-with-the-application-stopped) with `DATA_ENCRYPTION_KEY` set to the new key. Success means no decrypt failures and no new corruption; credential rows the rotation reported as corrupted-looking will still be flagged, and they match the rotation's report. Do not continue to startup while the audit shows decrypt failures or new corruption.
+2. Remove `OUTGOING_DATA_ENCRYPTION_KEY` from `.env`, and if the deployment still sets the deprecated `SERVICE_ENCRYPTION_KEY` alias, set it to the new key or remove it. Both must happen before the application starts: containers capture their environment when created, so a variable removed from `.env` afterwards lives on in the running container until it is recreated (and startup fails while the alias names disagree).
+3. Start the application and confirm a credential read and a service resolution work. Retire the old key only per the [retention rule](./key-management#backups-pair-with-the-key): retained backups taken while it was active still open only under it.
 
 If the rotation failed partway, keep every writer stopped, fix what the report names, and re-run with the same key pair; the run converges. Do not start the application against a partially rotated database: the sampled startup check can pass on a row under one key while requests fail on rows under the other.

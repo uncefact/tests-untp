@@ -47,3 +47,5 @@ packages/untp-test-suite
 
 packages/reference-implementation/src/constants/app-config.json
 packages/components/src/constants/app-config.json
+# Never ship key material to the image builder (compose reads .env at run time)
+.env
