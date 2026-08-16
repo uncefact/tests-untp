@@ -16,7 +16,7 @@ const DOCS_URL =
  * format check same as a real key, but it is public: anything encrypted
  * under it is recoverable by anyone who has read the file.
  */
-const PLACEHOLDER_ENCRYPTION_KEY = '0'.repeat(64);
+export const PLACEHOLDER_ENCRYPTION_KEY = '0'.repeat(64);
 
 const LOCAL_DEPLOYMENT_ENVIRONMENT = 'local';
 

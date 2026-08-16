@@ -40,7 +40,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "audit:encryption": "npx tsx scripts/audit-encryption.ts",
-    "backfill:decryption-keys": "npx tsx scripts/backfill-decryption-keys.ts"
+    "backfill:decryption-keys": "npx tsx scripts/backfill-decryption-keys.ts",
+    "rotate:encryption-key": "npx tsx scripts/rotate-encryption-key.ts"
   },
   "browserslist": {
     "production": [

@@ -35,8 +35,10 @@ role (it now protects service instance configurations and credential decryption 
 - Setting both names to the same value works and logs a reminder to remove the old name.
 - Setting both names to **different values fails before anything encrypted is
   written** (on the standard Docker path this surfaces at startup, when the seed
-  resolves the key). Two different keys have no valid meaning (key rotation is not
-  yet supported), and proceeding would split the encrypted data across keys. In
+  resolves the key). The two names are aliases for the same active key, so two
+  different values have no valid meaning, and proceeding would split the encrypted
+  data across keys (moving data to a new key is a separate maintenance task, see
+  [Encryption Key Rotation](../reference-implementation/operations/encryption-key-rotation)). In
   particular, do not copy the placeholder `DATA_ENCRYPTION_KEY` from `.env.example`
   into an existing deployment that still has its real `SERVICE_ENCRYPTION_KEY`; rename
   your existing variable instead, keeping its value.
@@ -105,7 +107,8 @@ issued, or restore the paired database backup when rolling back.
 
 ## Key rotation
 
-Rotating `DATA_ENCRYPTION_KEY` is not yet supported: existing envelopes are readable
-only under the key that wrote them. Support for rotation is tracked in
-[#720](https://github.com/uncefact/tests-untp/issues/720). Until it lands, treat the
-key as immutable and recoverable.
+Existing envelopes are readable only under the key that wrote them, so changing
+`DATA_ENCRYPTION_KEY` in place makes them unreadable. To move data onto a new key,
+follow the [Encryption Key Rotation](../reference-implementation/operations/encryption-key-rotation)
+procedure, which re-encrypts every stored envelope with the `rotate:encryption-key`
+maintenance command.

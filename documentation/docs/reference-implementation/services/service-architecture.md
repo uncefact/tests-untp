@@ -53,6 +53,8 @@ flowchart TD
 
 Once resolved, the Reference Implementation looks up the appropriate adapter in the registry, decrypts and validates the configuration against the adapter's schema, and instantiates the service adapter.
 
+## Encryption at rest
+
 When a tenant registers a service instance, the Reference Implementation encrypts the configuration and stores it in the database. Service configurations contain sensitive information such as API keys and authentication tokens; these are encrypted at rest using the `DATA_ENCRYPTION_KEY` (formerly `SERVICE_ENCRYPTION_KEY`, which is still read as a deprecated fallback) and only decrypted at runtime when the service adapter is instantiated. The same key also encrypts the decryption keys of encrypted credentials before they are persisted on the credential record.
 
 ## Service Types
@@ -90,7 +92,7 @@ This means every adapter — whether it is the bundled default or a custom contr
 
 Service configurations often contain sensitive information such as API keys. When a service instance is returned through the API, sensitive fields are automatically masked (replaced with `***`) before the response is sent. This ensures credentials are never exposed through the API.
 
-## Encryption
+## Encryption adapter
 
 The Reference Implementation also uses the adapter pattern for encrypting and decrypting credentials. The current implementation uses AES-256-GCM, but the adapter interface is designed so that alternative implementations — such as AWS KMS, Azure Key Vault, or other key management services — can be introduced without changing the rest of the application.
 
