@@ -158,7 +158,7 @@ describe('GET /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('isExtension must be "true" or "false"');
+    expect(json.error).toBe('isExtension: must be "true" or "false"');
   });
 
   it('passes credentialType filter correctly', async () => {
@@ -279,12 +279,87 @@ describe('GET /api/v1/data-models', () => {
     expect(json.data[0]).toEqual({ id: 'cfg-1', name: 'DPP v0.6.0', credentialType: 'DigitalProductPassport' });
   });
 
-  it('clamps limit to maximum', async () => {
+  // The two free-text filters keep the handling they had before #797 moved
+  // this route onto a query schema, and they differ from each other.
+  it.each([
+    ['empty', ''],
+    ['whitespace-only', '%20%20'],
+  ])('drops a %s credentialType rather than filtering on it', async (_label, raw) => {
     mockListDataModels.mockResolvedValue({ data: [], total: 0 });
 
     const req = createFakeRequest({
       method: 'GET',
+      url: `http://localhost/api/v1/data-models?credentialType=${raw}`,
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ credentialType: undefined }));
+  });
+
+  it('passes an empty version through to the repository as sent', async () => {
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?version=',
+    });
+    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(mockListDataModels).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ version: '' }));
+  });
+
+  // parseInt accepted each of these by reading only the leading digits, so a
+  // malformed page size silently became a valid one.
+  it.each([
+    ['scientific notation', 'limit=1e1'],
+    ['trailing garbage', 'limit=1abc'],
+    ['hexadecimal', 'offset=0x10'],
+    ['a fractional value', 'limit=5.5'],
+  ])('returns 400 for %s and does not query', async (_label, query) => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: `http://localhost/api/v1/data-models?${query}`,
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockListDataModels).not.toHaveBeenCalled();
+  });
+
+  // Each parameter is declared as a scalar, so a repeated key is rejected
+  // rather than resolved by picking one of the values.
+  it('returns 400 naming a repeated query parameter and does not query', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
+      url: 'http://localhost/api/v1/data-models?version=0.6.0&version=0.7.0',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('version: repeated query parameter');
+    expect(mockListDataModels).not.toHaveBeenCalled();
+  });
+
+  it('rejects a limit above the maximum with a 400 naming the maximum, and does not query', async () => {
+    const req = createFakeRequest({
+      method: 'GET',
       url: 'http://localhost/api/v1/data-models?limit=500',
+    });
+    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe(`limit: must not exceed the maximum of ${MAX_PAGE_LIMIT}`);
+    expect(mockListDataModels).not.toHaveBeenCalled();
+  });
+
+  it('accepts a limit at the maximum', async () => {
+    mockListDataModels.mockResolvedValue({ data: [], total: 0 });
+
+    const req = createFakeRequest({
+      method: 'GET',
+      url: `http://localhost/api/v1/data-models?limit=${MAX_PAGE_LIMIT}`,
     });
     await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
 
@@ -300,7 +375,7 @@ describe('GET /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('limit must be a positive integer');
+    expect(json.error).toBe('limit: must be a positive integer');
   });
 
   it('returns 400 for negative offset', async () => {
@@ -312,7 +387,7 @@ describe('GET /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('offset must be a non-negative integer');
+    expect(json.error).toBe('offset: must be a non-negative integer');
   });
 
   it('returns 500 when listDataModels throws', async () => {
@@ -408,6 +483,113 @@ describe('POST /api/v1/data-models', () => {
     expect(mockCreateDataModel).toHaveBeenCalledWith('tenant-1', expect.objectContaining({ isExtension: true }));
   });
 
+  const VALID_BODY = {
+    name: 'My Extension',
+    credentialType: 'DigitalProductPassport',
+    version: '0.6.0',
+    schemaUrl: 'https://example.com/schema.json',
+    contextUrl: 'https://example.com/context.jsonld',
+    parentConfigId: 'cfg-parent',
+  };
+
+  it.each(['name', 'credentialType', 'version', 'parentConfigId'] as const)(
+    'returns 400 for a non-string %s and does not create',
+    async (field) => {
+      const res = await POST(
+        createFakeRequest({ body: { ...VALID_BODY, [field]: 42 } }),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toMatch(new RegExp(`^${field}:`));
+      expect(mockCreateDataModel).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['name', 'credentialType', 'version'] as const)(
+    'returns 400 for a whitespace-only %s and does not create',
+    async (field) => {
+      const res = await POST(
+        createFakeRequest({ body: { ...VALID_BODY, [field]: '   ' } }),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe(`${field}: must not be only whitespace`);
+      expect(mockCreateDataModel).not.toHaveBeenCalled();
+    },
+  );
+
+  // Tightened by #797: these were previously accepted as any non-empty string,
+  // so a value that is not a URL at all could be stored and served back.
+  it.each(['schemaUrl', 'contextUrl', 'websiteUrl'] as const)(
+    'returns 400 for a %s that is not a URL and does not create',
+    async (field) => {
+      const res = await POST(
+        createFakeRequest({ body: { ...VALID_BODY, [field]: 'not-a-url' } }),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe(`${field}: must be a valid URL`);
+      expect(mockCreateDataModel).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['schemaUrl', 'contextUrl', 'websiteUrl'] as const)(
+    'returns 400 for a padded %s, which would otherwise be stored verbatim',
+    async (field) => {
+      const res = await POST(
+        createFakeRequest({ body: { ...VALID_BODY, [field]: ' https://example.com/x.json ' } }),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe(`${field}: must not have leading or trailing whitespace`);
+      expect(mockCreateDataModel).not.toHaveBeenCalled();
+    },
+  );
+
+  // assertHttpUrl, layered on top of the schema: Zod's `.url()` accepts both
+  // of these, so only the handler check rejects them. Parameterised over all
+  // three fields because dropping the call for any one of them would
+  // otherwise leave the suite green.
+  it.each([
+    ['schemaUrl', 'a non-http scheme', 'javascript:alert(1)'],
+    ['schemaUrl', 'embedded userinfo', 'https://user:pass@example.com/schema.json'],
+    ['contextUrl', 'a non-http scheme', 'javascript:alert(1)'],
+    ['contextUrl', 'embedded userinfo', 'https://user:pass@example.com/context.jsonld'],
+    ['websiteUrl', 'a non-http scheme', 'javascript:alert(1)'],
+    ['websiteUrl', 'embedded userinfo', 'https://user:pass@example.com'],
+  ])('returns 400 for a %s with %s and does not create', async (field, _label, value) => {
+    const res = await POST(
+      createFakeRequest({ body: { ...VALID_BODY, [field]: value } }),
+      AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
+  });
+
+  it.each(['schemaUrl', 'contextUrl'] as const)(
+    'returns 400 for a non-string %s and does not create',
+    async (field) => {
+      const res = await POST(
+        createFakeRequest({ body: { ...VALID_BODY, [field]: 42 } }),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toMatch(new RegExp(`^${field}:`));
+      expect(mockCreateDataModel).not.toHaveBeenCalled();
+    },
+  );
+
   it('returns 400 when name is missing', async () => {
     const req = createFakeRequest({
       body: {
@@ -422,7 +604,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name is required');
+    expect(json.error).toMatch(/^name:/);
   });
 
   it('returns 400 when credentialType is missing', async () => {
@@ -439,7 +621,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('credentialType is required');
+    expect(json.error).toMatch(/^credentialType:/);
   });
 
   it('accepts a custom credentialType string', async () => {
@@ -492,7 +674,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('version is required');
+    expect(json.error).toMatch(/^version:/);
   });
 
   it('returns 400 when schemaUrl is missing', async () => {
@@ -509,7 +691,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('schemaUrl is required');
+    expect(json.error).toMatch(/^schemaUrl:/);
   });
 
   it('returns 400 when contextUrl is missing', async () => {
@@ -526,7 +708,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('contextUrl is required');
+    expect(json.error).toMatch(/^contextUrl:/);
   });
 
   it('returns 400 when parentConfigId is missing', async () => {
@@ -543,7 +725,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('parentConfigId is required');
+    expect(json.error).toMatch(/^parentConfigId:/);
   });
 
   it('returns 400 when websiteUrl is empty string', async () => {
@@ -562,7 +744,7 @@ describe('POST /api/v1/data-models', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('websiteUrl must be a non-empty string');
+    expect(json.error).toMatch(/^websiteUrl:/);
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -675,6 +857,40 @@ describe('POST /api/v1/data-models', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toMatch(/schemaUrl.*private or reserved/);
+  });
+
+  it('returns 400 when websiteUrl points to a private address', async () => {
+    mockValidatePublicUrl
+      .mockResolvedValueOnce(undefined) // schemaUrl passes
+      .mockResolvedValueOnce(undefined) // contextUrl passes
+      .mockRejectedValueOnce(new Error('uri must not point to a private or reserved network address'));
+
+    const req = createFakeRequest({
+      body: { ...VALID_BODY, websiteUrl: 'http://169.254.169.254/spec' },
+    });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/websiteUrl.*private or reserved/);
+    expect(mockCreateDataModel).not.toHaveBeenCalled();
+  });
+
+  it('skips the private-address checks when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    try {
+      mockCreateDataModel.mockResolvedValue({ id: 'cfg-new' });
+
+      const req = createFakeRequest({
+        body: { ...VALID_BODY, schemaUrl: 'http://127.0.0.1/schema.json' },
+      });
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(201);
+      expect(mockValidatePublicUrl).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    }
   });
 
   it('returns 400 when contextUrl points to a private address', async () => {

@@ -1,27 +1,5 @@
 import { z } from 'zod';
-import { idSchema, nonBlankString, paginationQuerySchema, requireAtLeastOneField } from './shared';
-
-/**
- * `.url()` here is WHATWG `new URL` parsing, not RFC 3986 validation (it
- * accepts a value RFC 3986 forbids, e.g. `https://example.com/%`), and is a
- * format check only: any scheme, embedded userinfo permitted, no check that
- * the address is public. The POST and PATCH route handlers layer
- * `assertHttpUrl` (scheme + userinfo) and `assertPublicUrl` (SSRF) on top of
- * this after parsing, matching the stored-URL validation credentials/route.ts
- * applies to its own URL fields (ADR-037; data-models/route.ts applies only
- * the env-gated assertPublicUrl today); do not treat this schema check as
- * the whole contract for `url`.
- */
-const urlSchema = z
-  .string()
-  .url({ message: 'must be a valid URL' })
-  // WHATWG parsing strips surrounding whitespace before parsing, so a padded
-  // value like ' https://gs1.org ' passes `.url()` (and the handler's
-  // assertHttpUrl/assertPublicUrl, which parse the same way) yet would be
-  // stored verbatim with the padding intact. The stored value stays verbatim
-  // by design (see the route handlers), so padding is rejected rather than
-  // silently trimmed.
-  .refine((value) => value === value.trim(), { message: 'must not have leading or trailing whitespace' });
+import { idSchema, nonBlankString, paginationQuerySchema, requireAtLeastOneField, urlSchema } from './shared';
 
 /** Request body for POST /registrars. */
 export const createRegistrarRequestSchema = z.object({

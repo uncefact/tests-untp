@@ -170,13 +170,81 @@ describe('PATCH /api/v1/data-models/:id', () => {
     });
   });
 
+  // A body whose only key is a typo would otherwise be stripped to {} and
+  // answered with a 200 that changed nothing.
+  it('returns 400 for a body whose only key is unrecognised, and does not update', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { nmae: 'Updated Extension' } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('At least one of name, schemaUrl, contextUrl, or websiteUrl is required');
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
+  });
+
+  it.each(['credentialType', 'version', 'parentConfigId', 'isExtension'] as const)(
+    'ignores %s, which is fixed at creation, rather than forwarding it',
+    async (field) => {
+      mockUpdateDataModel.mockResolvedValue({ id: 'dm-1' });
+
+      const req = createFakeRequest({
+        method: 'PATCH',
+        body: { name: 'Updated Extension', [field]: 'anything' },
+      });
+      await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+
+      expect(mockUpdateDataModel).toHaveBeenCalledWith('dm-1', 'tenant-1', { name: 'Updated Extension' });
+    },
+  );
+
+  it.each(['schemaUrl', 'contextUrl', 'websiteUrl'] as const)(
+    'returns 400 for a %s that is not a URL and does not update',
+    async (field) => {
+      const req = createFakeRequest({ method: 'PATCH', body: { [field]: 'not-a-url' } });
+      const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe(`${field}: must be a valid URL`);
+      expect(mockUpdateDataModel).not.toHaveBeenCalled();
+    },
+  );
+
+  // Zod's `.url()` accepts both of these, so only the handler's assertHttpUrl
+  // rejects them. Parameterised over all three fields because dropping the
+  // call for any one of them would otherwise leave the suite green.
+  it.each([
+    ['schemaUrl', 'a non-http scheme', 'javascript:alert(1)'],
+    ['schemaUrl', 'embedded userinfo', 'https://user:pass@example.com/schema.json'],
+    ['contextUrl', 'a non-http scheme', 'javascript:alert(1)'],
+    ['contextUrl', 'embedded userinfo', 'https://user:pass@example.com/context.jsonld'],
+    ['websiteUrl', 'a non-http scheme', 'javascript:alert(1)'],
+    ['websiteUrl', 'embedded userinfo', 'https://user:pass@example.com'],
+  ])('returns 400 for a %s with %s and does not update', async (field, _label, value) => {
+    const req = createFakeRequest({ method: 'PATCH', body: { [field]: value } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(400);
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a non-string name and does not update', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: 42 } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^name:/);
+    expect(mockUpdateDataModel).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when no updatable fields are provided', async () => {
     const req = createFakeRequest({ method: 'PATCH', body: {} });
     const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('At least one updatable field must be provided');
+    expect(json.error).toContain('At least one of name, schemaUrl, contextUrl, or websiteUrl is required');
   });
 
   it('returns 400 when name is empty string', async () => {
@@ -185,7 +253,7 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
+    expect(json.error).toMatch(/^name:/);
   });
 
   it('returns 400 when schemaUrl is empty string', async () => {
@@ -194,7 +262,7 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('schemaUrl must be a non-empty string');
+    expect(json.error).toMatch(/^schemaUrl:/);
   });
 
   it('returns 400 when contextUrl is empty string', async () => {
@@ -203,7 +271,7 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('contextUrl must be a non-empty string');
+    expect(json.error).toMatch(/^contextUrl:/);
   });
 
   it('returns 400 when websiteUrl is empty string', async () => {
@@ -212,7 +280,7 @@ describe('PATCH /api/v1/data-models/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('websiteUrl must be a non-empty string');
+    expect(json.error).toMatch(/^websiteUrl:/);
   });
 
   it('returns 400 for invalid JSON body', async () => {
