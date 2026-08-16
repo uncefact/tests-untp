@@ -136,11 +136,9 @@ const ENTITY_REQUIREMENTS: Record<string, Array<FormSection>> = {
  *                             type: string
  *                             description: The entityType this section depends on. If set, this section is only active when the referenced section has a value.
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Data model not found
  *         content:

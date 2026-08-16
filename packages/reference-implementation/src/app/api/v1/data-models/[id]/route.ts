@@ -32,11 +32,9 @@ const UPDATABLE_FIELDS = ['name', 'schemaUrl', 'contextUrl', 'websiteUrl'] as co
  *             schema:
  *               $ref: '#/components/schemas/DataModel'
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Data model not found
  *         content:
@@ -110,11 +108,9 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Data model not found
  *         content:
@@ -203,11 +199,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       204:
  *         description: Data model deleted successfully
  *       401:
- *         description: Unauthorised - missing or invalid authentication
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
  *         description: Data model not found
  *         content:
