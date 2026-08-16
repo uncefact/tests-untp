@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
-import { ValidationError, isNonEmptyString } from '@/lib/api/validation';
+import { parseRequestBody } from '@/lib/api/validation';
+import { updateRenderTemplateRequestSchema } from '@/lib/api/request-schemas/render-template';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getRenderTemplateById, deleteRenderTemplate } from '@/lib/prisma/repositories';
 import { updateRenderTemplate } from '@/lib/render-templates/update-render-template';
@@ -9,12 +10,6 @@ import type { ResolvedStorageService } from '@/lib/services/resolve-storage-serv
 import { apiLogger } from '@/lib/api/logger';
 
 const logger = apiLogger.child({ route: '/api/v1/render-templates/[id]' });
-
-// `hash` is in the rejected list (alongside the canonical `digestMultibase`)
-// so PATCH calls from legacy clients that still send the pre-migration field
-// name get a clear error rather than a silent drop.
-const REJECTED_FIELDS = ['storageUrl', 'digestMultibase', 'hash', 'renderMethodType'] as const;
-const PATCHABLE_FIELDS = ['name', 'template', 'isDefault', 'inline', 'mediaType', 'mediaQuery'] as const;
 
 /**
  * @swagger
@@ -73,8 +68,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *     summary: Update a render template
  *     description: >
  *       Updates one or more fields of a tenant-owned render template.
- *       The fields storageUrl, hash, and renderMethodType cannot be set directly — they are managed by the server.
- *       When template content is provided, the server re-uploads it to storage and updates storageUrl/hash automatically.
+ *       The fields storageUrl, digestMultibase, the legacy hash, and renderMethodType are rejected with a 400 when present: the first three are managed by the server, and the render method type is fixed once the template exists.
+ *       When template content is provided, the server re-uploads it to storage and updates storageUrl and digestMultibase automatically.
  *       When setting isDefault to true, any existing default template for the same data model will be unset.
  *     tags:
  *       - Render Templates
@@ -87,6 +82,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *         description: The database ID of the render template
  *     requestBody:
  *       required: true
+ *       description: At least one updatable field is required, and unknown keys are ignored. storageOptions is read only when template is also provided, since it says where the replacement content is uploaded. A body carrying it alone is rejected with a 400, and a body pairing it with another valid updatable field succeeds with the storage option ignored. Sending an empty template is rejected, where it previously returned 200 without changing anything.
  *       content:
  *         application/json:
  *           schema:
@@ -94,9 +90,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *             properties:
  *               name:
  *                 type: string
- *                 description: Updated human-readable name for the render template
+ *                 minLength: 1
+ *                 description: Updated human-readable name for the render template. Must carry more than whitespace
  *               template:
  *                 type: string
+ *                 minLength: 1
  *                 description: HTML content to replace the existing template
  *               isDefault:
  *                 type: boolean
@@ -106,17 +104,28 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 description: Whether to inline the template (RenderTemplate2024 only)
  *               mediaType:
  *                 type: string
- *                 description: Media type of the template (RenderTemplate2024 only)
+ *                 minLength: 1
+ *                 nullable: true
+ *                 description: Media type of the template (RenderTemplate2024 only). Null resets it to the type's default
  *               mediaQuery:
  *                 type: string
- *                 description: CSS media query (RenderTemplate2024 only)
+ *                 minLength: 1
+ *                 nullable: true
+ *                 description: CSS media query (RenderTemplate2024 only). Null clears it
  *               storageOptions:
  *                 type: object
  *                 properties:
  *                   serviceInstanceId:
  *                     type: string
- *                     description: Explicit storage service instance ID to use for upload
- *             minProperties: 1
+ *                     minLength: 1
+ *                     description: Explicit storage service instance ID to use for the re-upload. Read only when template is also provided
+ *             anyOf:
+ *               - required: [name]
+ *               - required: [template]
+ *               - required: [isDefault]
+ *               - required: [inline]
+ *               - required: [mediaType]
+ *               - required: [mediaQuery]
  *     responses:
  *       200:
  *         description: Render template updated successfully
@@ -135,7 +144,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *       403:
  *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
- *         description: Render template not found
+ *         description: The render template was not found, or storageOptions.serviceInstanceId names a storage service instance that does not exist for this tenant. The response body names which of the two it was
  *         content:
  *           application/json:
  *             schema:
@@ -150,63 +159,27 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
 
-  let body: Record<string, unknown>;
-  logger.info('Parsing request body');
-  try {
-    body = await req.json();
-  } catch {
-    throw new ValidationError('Invalid JSON body');
-  }
-
-  // Reject server-managed and immutable fields
-  for (const field of REJECTED_FIELDS) {
-    if (body[field] !== undefined) {
-      throw new ValidationError(`${field} cannot be set directly`);
-    }
-  }
-
   logger.info({ renderTemplateId: id }, 'Validating update fields');
-  const hasPatchableField = PATCHABLE_FIELDS.some((f) => f in body);
-  if (!hasPatchableField) {
-    throw new ValidationError(`At least one updatable field must be provided: ${PATCHABLE_FIELDS.join(', ')}`);
-  }
+  const body = await parseRequestBody(req, updateRenderTemplateRequestSchema);
 
   // Resolve storage service if template content is being replaced
   let storageService: ResolvedStorageService | undefined;
-  if (isNonEmptyString(body.template)) {
-    const storageOptions = (body.storageOptions as { serviceInstanceId?: string } | undefined) ?? {};
+  if (body.template !== undefined) {
     logger.info('Resolving storage service for template re-upload');
-    storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
-  }
-
-  // Validate optional field types
-  if (body.name !== undefined && !isNonEmptyString(body.name)) {
-    throw new ValidationError('name must be a non-empty string');
-  }
-  if (body.isDefault !== undefined && typeof body.isDefault !== 'boolean') {
-    throw new ValidationError('isDefault must be a boolean');
-  }
-  if (body.inline !== undefined && typeof body.inline !== 'boolean') {
-    throw new ValidationError('inline must be a boolean');
-  }
-  if (body.mediaType !== undefined && body.mediaType !== null && !isNonEmptyString(body.mediaType)) {
-    throw new ValidationError('mediaType must be a non-empty string');
-  }
-  if (body.mediaQuery !== undefined && body.mediaQuery !== null && !isNonEmptyString(body.mediaQuery)) {
-    throw new ValidationError('mediaQuery must be a non-empty string');
+    storageService = await resolveStorageService(tenantId, body.storageOptions?.serviceInstanceId);
   }
 
   logger.info({ renderTemplateId: id }, 'Updating render template');
   const renderTemplate = await updateRenderTemplate({
     id,
     tenantId,
-    name: body.name as string | undefined,
-    template: body.template as string | undefined,
+    name: body.name,
+    template: body.template,
     storageService,
     isDefault: body.isDefault,
     inline: body.inline,
-    mediaType: body.mediaType as string | undefined,
-    mediaQuery: body.mediaQuery as string | undefined,
+    mediaType: body.mediaType,
+    mediaQuery: body.mediaQuery,
   });
 
   logger.info({ renderTemplateId: id }, 'Render template updated');

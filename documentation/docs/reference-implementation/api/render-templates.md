@@ -69,7 +69,7 @@ Script content is removed. If the sanitiser strips any content, a warning is log
 
 ### Storage Integration
 
-Render template HTML content is not stored in the database — it is uploaded to the [storage service](../services/storage-service) and the resulting URL, hash, and storage metadata are recorded in the database. When a template is updated with new content, the old content is deleted from storage (best-effort) and the new content is uploaded.
+Render template HTML content is not stored in the database — it is uploaded to the [storage service](../services/storage-service) and the resulting URL, content digest, and storage metadata are recorded in the database. When a template is updated with new content, the old content is deleted from storage (best-effort) and the new content is uploaded.
 
 The storage service instance can be specified explicitly via `storageOptions.serviceInstanceId`, or the tenant's primary storage service is used by default.
 
@@ -97,6 +97,12 @@ Creates a new render template for the authenticated tenant. The template HTML co
 
 The `dataModelId` must reference a data model that is visible to the tenant — either a system-provisioned data model or one owned by the tenant. The `renderMethodType` determines which optional fields are available — see [Render Method Types](#render-method-types) and [RenderTemplate2024 Fields](#rendertemplate2024-fields).
 
+`name` must carry more than whitespace. The server-managed `storageUrl` and `digestMultibase` fields, and the legacy `hash` field, are rejected with a 400 naming the field when a request provides them.
+
+A 404 from this endpoint has two possible causes. Either the `dataModelId` does not name a data model the tenant can see, or `storageOptions.serviceInstanceId` does not name a storage service instance that exists for the tenant. The response body says which.
+
+On create, `mediaType` and `mediaQuery` sent as `null` are treated the same as omitting them, so the template takes the render method type's defaults.
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -107,6 +113,9 @@ sequenceDiagram
     Client->>RI: POST /api/v1/render-templates
     RI->>RI: Validate fields and renderMethodType
     RI->>DB: Resolve storage service instance
+    alt storage instance not found
+        RI-->>Client: 404 Not Found
+    end
     RI->>DB: Verify data model exists for tenant
     alt data model not found
         RI-->>Client: 404 Not Found
@@ -114,7 +123,7 @@ sequenceDiagram
     RI->>RI: Validate render method fields
     RI->>RI: Sanitise template HTML
     RI->>Storage: Upload sanitised HTML
-    Storage-->>RI: URL, hash, externalId, bucket
+    Storage-->>RI: URL, digestMultibase, externalId, bucket
     alt isDefault = true
         RI->>DB: Unset other defaults for same data model
     end
@@ -136,8 +145,8 @@ Returns render templates for the authenticated tenant, including system defaults
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `dataModelId` | string | — | Filter templates by associated data model |
-| `limit` | integer | `20` | Maximum results per page (clamped to 100) |
-| `offset` | integer | `0` | Number of results to skip (must be non-negative) |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
+| `offset` | integer | `0` | Number of results to skip. Must be a non-negative integer |
 
 
 ```mermaid
@@ -172,7 +181,15 @@ PATCH /api/v1/render-templates/{id}
 
 Updates one or more fields of a render template owned by the tenant. System templates cannot be updated.
 
-Only the following fields can be updated: `name`, `template`, `isDefault`, `inline`, `mediaType`, `mediaQuery`. The `renderMethodType` is immutable — it cannot be changed after creation. The `storageUrl` and `hash` fields are server-managed and cannot be set directly.
+Only the following fields can be updated: `name`, `template`, `isDefault`, `inline`, `mediaType`, `mediaQuery`. A request that provides none of them is rejected with a 400, including one that carries only `storageOptions`. The `renderMethodType` is immutable and cannot be changed after creation. The `storageUrl` and `digestMultibase` fields are server-managed, and the legacy `hash` field is no longer accepted. All four are rejected with a 400 naming the field.
+
+`storageOptions` says where replacement content is uploaded, so it is read only when `template` is also provided. Sending it alongside another valid updatable field succeeds and the storage option is ignored, which means a rename that also names a different storage instance changes the name only.
+
+Sending an empty `template` is rejected with a 400. Previously it returned 200 without changing anything.
+
+For a `RenderTemplate2024` template, sending `mediaType` as `null` resets it to the default of `text/html`, and sending `mediaQuery` as `null` clears it. This differs from create, where both are treated as omitted.
+
+A 404 from this endpoint has two possible causes. Either the render template does not exist for the tenant, or `storageOptions.serviceInstanceId` does not name a storage service instance that exists for the tenant. Storage resolution happens before the template is looked up, so a bad storage instance is reported even when the template id is also wrong. The response body says which.
 
 When `template` is provided, the new content is sanitised and uploaded to the storage service. The old content is deleted from storage on a best-effort basis (a warning is logged if the deletion fails, but the update proceeds).
 
@@ -186,16 +203,21 @@ sequenceDiagram
     participant Storage as Storage Service
 
     Client->>RI: PATCH /api/v1/render-templates/{id}
+    RI->>RI: Validate request body
+    alt template content provided
+        RI->>DB: Resolve storage service instance
+        alt storage instance not found
+            RI-->>Client: 404 Not Found
+        end
+    end
     RI->>DB: Fetch existing template
     alt not found
         RI-->>Client: 404 Not Found
     end
-    RI->>RI: Validate patchable fields
     alt template content provided
         RI->>RI: Sanitise new template HTML
-        RI->>DB: Resolve storage service instance
         RI->>Storage: Upload new content
-        Storage-->>RI: URL, hash, externalId, bucket
+        Storage-->>RI: URL, digestMultibase, externalId, bucket
         RI->>Storage: Delete old content (best-effort)
     end
     alt isDefault = true
