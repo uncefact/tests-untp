@@ -753,7 +753,7 @@ async function main() {
           if (status === 409) {
             logger.warn(
               { namespace },
-              'Schemes already registered with IDR — skipping. If scheme definitions have changed, manually update or delete and re-register via the IDR.',
+              'IDR returned a conflict for this namespace, skipping registration. Pyx IDR 4.0 upserts on registration and is not expected to return a conflict; inspect the existing namespace in the IDR before changing it. See the custom seed operations documentation.',
             );
           } else if (status === 400 || status === 422) {
             failedNamespaces.push(namespace);
