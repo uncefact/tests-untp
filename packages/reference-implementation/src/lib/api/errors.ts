@@ -1,7 +1,26 @@
 /**
+ * The body text returned when an error has no deliberate mapping, so nothing
+ * of the underlying failure reaches the client. Shared by the route-error
+ * mapper's database branch and the auth pipeline's boundary.
+ */
+export const UNEXPECTED_ERROR_MESSAGE = 'An unexpected error has occurred.';
+
+/**
+ * The same message with the request's correlation id appended, so a caller
+ * who cannot act on the failure themselves has the one identifier that ties
+ * their request to its server-side logs. Falls back to the bare message when
+ * called outside a request context, where no id exists to quote.
+ */
+export function unexpectedErrorMessage(correlationId: string | undefined): string {
+  return correlationId
+    ? `${UNEXPECTED_ERROR_MESSAGE} If the issue persists, please contact support and quote correlation id "${correlationId}".`
+    : UNEXPECTED_ERROR_MESSAGE;
+}
+
+/**
  * Extract a human-readable message from an unknown caught value.
  */
-export function errorMessage(e: unknown, fallback = 'An unexpected error has occurred.'): string {
+export function errorMessage(e: unknown, fallback: string = UNEXPECTED_ERROR_MESSAGE): string {
   return e instanceof Error ? e.message : fallback;
 }
 
