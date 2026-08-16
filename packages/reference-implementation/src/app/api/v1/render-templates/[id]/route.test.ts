@@ -231,7 +231,165 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain('name must be a non-empty string');
+    expect(json.error).toMatch(/^name:/);
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when name is only whitespace', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { name: '   ' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('name: must not be only whitespace');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  // Each updatable field must satisfy the at-least-one-field rule on its own.
+  // `name` and `template` are covered by the happy-path tests above; without
+  // these, dropping an entry from UPDATABLE_FIELDS would start rejecting a
+  // valid single-field PATCH and no test would notice.
+  it.each([
+    ['isDefault', { isDefault: true }],
+    ['inline', { inline: true }],
+    ['mediaType', { mediaType: 'text/plain' }],
+    ['mediaQuery', { mediaQuery: 'print' }],
+  ])('accepts %s as the only field provided', async (_field, body) => {
+    mockUpdateRenderTemplate.mockResolvedValue({ id: 'rt-1' });
+
+    const req = createFakeRequest({ method: 'PATCH', body });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith(expect.objectContaining(body));
+  });
+
+  // The update schema keeps `.min(1)` on these three, matching what the old
+  // isNonEmptyString checks accepted. Without these the create-side revert is
+  // pinned but a PATCH-only retightening would stay green.
+  it.each([
+    ['template', { template: '   ' }],
+    ['mediaType', { mediaType: '   ' }],
+    ['mediaQuery', { mediaQuery: '   ' }],
+  ])('still accepts a whitespace-only %s', async (_field, body) => {
+    mockResolveStorageService.mockResolvedValue({ service: {}, instanceId: 'si-1' });
+    mockUpdateRenderTemplate.mockResolvedValue({ id: 'rt-1' });
+
+    const req = createFakeRequest({ method: 'PATCH', body });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith(expect.objectContaining(body));
+  });
+
+  // Deliberate change: this used to return 200 having done nothing, because
+  // the key satisfied the at-least-one check while the empty string failed
+  // the old isNonEmptyString guard and skipped the upload.
+  it('rejects an empty template rather than returning a no-op 200', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { template: '' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^template:/);
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['isDefault', { isDefault: false }],
+    ['inline', { inline: false }],
+  ])('accepts a false %s as the only field provided', async (_field, body) => {
+    mockUpdateRenderTemplate.mockResolvedValue({ id: 'rt-1' });
+
+    const req = createFakeRequest({ method: 'PATCH', body });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith(expect.objectContaining(body));
+  });
+
+  it('rejects a body whose only key is unrecognised', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { nmae: 'typo' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('At least one updatable field must be provided');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('forwards an explicit null for mediaType and mediaQuery to the orchestrator', async () => {
+    mockUpdateRenderTemplate.mockResolvedValue({ id: 'rt-1' });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { mediaType: null, mediaQuery: null } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ mediaType: null, mediaQuery: null }),
+    );
+  });
+
+  it('ignores storageOptions when template is not being replaced', async () => {
+    mockUpdateRenderTemplate.mockResolvedValue({ id: 'rt-1' });
+
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { name: 'Rebrand', storageOptions: { serviceInstanceId: 'si-other' } },
+    });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplate).toHaveBeenCalledWith(expect.objectContaining({ storageService: undefined }));
+  });
+
+  it('returns 404 when the requested storage service instance does not resolve', async () => {
+    const { ServiceInstanceNotFoundError } = jest.requireActual('@/lib/api/errors');
+    mockResolveStorageService.mockRejectedValue(new ServiceInstanceNotFoundError('missing-instance'));
+
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { template: '<div>new</div>', storageOptions: { serviceInstanceId: 'missing-instance' } },
+    });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('missing-instance');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a wrong-typed storageOptions.serviceInstanceId', async () => {
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { template: '<div>new</div>', storageOptions: { serviceInstanceId: 123 } },
+    });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/^storageOptions\.serviceInstanceId:/);
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['template', { template: 42 }],
+    ['isDefault', { isDefault: 'yes' }],
+    ['inline', { inline: 'yes' }],
+    ['mediaType', { mediaType: 42 }],
+    ['mediaQuery', { mediaQuery: [] }],
+  ])('rejects a wrong-typed %s and neither resolves storage nor updates', async (field, body) => {
+    const req = createFakeRequest({ method: 'PATCH', body });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(new RegExp(`^${field}:`));
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects storageUrl in body', async () => {
@@ -240,7 +398,8 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('storageUrl cannot be set directly');
+    expect(json.error).toBe('storageUrl: cannot be set directly');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects digestMultibase in body', async () => {
@@ -249,7 +408,18 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('digestMultibase cannot be set directly');
+    expect(json.error).toBe('digestMultibase: cannot be set directly');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('rejects the legacy hash field in body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: { hash: 'sha256-abc123' } });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('hash: is no longer accepted; use digestMultibase');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('rejects renderMethodType in body', async () => {
@@ -258,7 +428,8 @@ describe('PATCH /api/v1/render-templates/:id', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('renderMethodType cannot be set directly');
+    expect(json.error).toBe('renderMethodType: cannot be set directly');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('returns 400 when no patchable field provided', async () => {
@@ -268,6 +439,31 @@ describe('PATCH /api/v1/render-templates/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toContain('At least one updatable field must be provided');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when storageOptions is the only field provided', async () => {
+    const req = createFakeRequest({
+      method: 'PATCH',
+      body: { storageOptions: { serviceInstanceId: 'si-1' } },
+    });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('At least one updatable field must be provided');
+    expect(mockResolveStorageService).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a null body', async () => {
+    const req = createFakeRequest({ method: 'PATCH', body: null });
+    const res = await PATCH(req, createContext('rt-1') as unknown as Parameters<typeof PATCH>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toBe('body: Expected object, received null');
+    expect(mockUpdateRenderTemplate).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON body', async () => {

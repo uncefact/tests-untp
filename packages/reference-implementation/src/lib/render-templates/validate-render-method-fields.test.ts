@@ -21,6 +21,19 @@ describe('validateRenderMethodFields', () => {
       expect(result.mediaQuery).toBeNull();
     });
 
+    // An explicit null is what a PATCH sends to reset these fields, and it is
+    // a different input from an absent one even though both land on the
+    // defaults here. The API documents the reset, so it needs its own case.
+    it('treats an explicit null mediaType as a reset to the default', () => {
+      const result = validateRenderMethodFields(type, { mediaType: null });
+      expect(result.mediaType).toBe('text/html');
+    });
+
+    it('treats an explicit null mediaQuery as a clear', () => {
+      const result = validateRenderMethodFields(type, { mediaQuery: null });
+      expect(result.mediaQuery).toBeNull();
+    });
+
     it('passes through provided inline value', () => {
       const result = validateRenderMethodFields(type, { inline: true });
       expect(result.inline).toBe(true);
