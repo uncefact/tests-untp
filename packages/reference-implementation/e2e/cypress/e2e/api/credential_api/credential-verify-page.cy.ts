@@ -288,6 +288,18 @@ describe('Verify Page', { testIsolation: false }, () => {
       cy.get('#decryption-key').should('have.value', 'not-a-valid-key');
     });
 
+    it('discards a typed key on refresh and shows the prompt again', () => {
+      cy.visit(buildLegacyVerifyUrl({ uri: encryptedUri, digestMultibase: encryptedDigest }));
+      cy.contains('Decryption key required', { timeout: 30000 }).should('be.visible');
+
+      cy.get('#decryption-key').type(encryptedKey);
+      cy.get('#decryption-key').should('have.value', encryptedKey);
+      cy.reload();
+
+      cy.contains('Decryption key required', { timeout: 30000 }).should('be.visible');
+      cy.get('#decryption-key').should('have.value', '');
+    });
+
     it('keeps the form on a wrong key and verifies after re-entry', () => {
       cy.visit(buildLegacyVerifyUrl({ uri: encryptedUri, digestMultibase: encryptedDigest }));
       cy.contains('Decryption key required', { timeout: 30000 }).should('be.visible');

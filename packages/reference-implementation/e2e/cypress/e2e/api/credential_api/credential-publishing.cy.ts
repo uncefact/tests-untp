@@ -18,6 +18,7 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
 
   let testTenantId: string;
   let defaultDidValue: string;
+  let publishedCredentialId: string;
 
   before(() => {
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
@@ -192,6 +193,7 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       expect(response.status).to.eq(201);
       expect(response.body.credentialId).to.be.a('string');
       expect(response.body.warnings, JSON.stringify(response.body.warnings)).to.be.undefined;
+      publishedCredentialId = response.body.credentialId;
     });
   });
 
@@ -228,6 +230,59 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       expect(humanLink.linkType).to.eq('untp:dpp');
       expect(humanLink.targetUrl).to.include('/verify');
       expect(humanLink.accessRole).to.have.members(ACCESS_ROLES);
+    });
+  });
+
+  // The prompt journey drives the ACTUAL link the resolver registered, not a
+  // hand-built copy of its shape, so a regression in the publish-and-register
+  // wiring (a key embedded in the link, a payload the page cannot parse)
+  // fails here even though the verify-page suite's own links stay correct.
+  it('registers a keyless human link that completes verification through the key prompt', () => {
+    cy.request({
+      method: 'GET',
+      url: `${config.services.idr.publicBaseUrl}/api/v4/resolver/links`,
+      headers: idrAuthHeaders,
+      qs: {
+        namespace: NAMESPACE,
+        identificationKeyType: PRIMARY_KEY,
+        identificationKey: IDENTIFIER_VALUE,
+      },
+    }).then((response) => {
+      expect(response.status).to.eq(200);
+      const humanLink = response.body.find((l: any) => l.mimeType === 'text/html');
+      expect(humanLink, 'human verification link').to.exist;
+
+      const target = new URL(humanLink.targetUrl);
+      // The visit below strips the origin to stay on Cypress's baseUrl, so
+      // pin the registered origin explicitly rather than letting the strip
+      // mask a link registered against the wrong host.
+      expect(target.origin, 'registered link origin').to.eq(new URL(Cypress.config('baseUrl') as string).origin);
+      expect(target.username, 'userinfo on the registered link').to.eq('');
+      expect(target.password, 'userinfo on the registered link').to.eq('');
+      const q = target.searchParams.get('q');
+      expect(q, 'q payload on the human link').to.be.a('string');
+      const payload = JSON.parse(q as string).payload;
+      expect(payload, 'published link must not carry a key').to.not.have.any.keys('decryptionKey', 'key');
+
+      cy.request(`/api/v1/credentials/${publishedCredentialId}`).then((credRes) => {
+        expect(payload.uri, 'storage uri in the payload').to.eq(credRes.body.storageUri);
+        expect(payload.digestMultibase, 'digest in the payload').to.eq(credRes.body.digestMultibase);
+
+        const key = credRes.body.decryptionKey;
+        expect(key, 'decryption key held by the issuing tenant').to.be.a('string');
+        expect(humanLink.targetUrl, 'registered link must not contain the key anywhere').to.not.contain(key);
+
+        cy.visit(target.pathname + target.search + target.hash);
+        cy.contains('Decryption key required', { timeout: 30000 }).should('be.visible');
+
+        cy.get('#decryption-key').type(key);
+        cy.contains('button', 'Decrypt and verify').click();
+
+        cy.contains('[role="tab"]', 'JSON', { timeout: 30000 }).should('be.visible');
+        cy.location('search').should((search) => {
+          expect(search).to.not.contain(key);
+        });
+      });
     });
   });
 });
