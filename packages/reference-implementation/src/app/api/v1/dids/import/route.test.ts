@@ -552,6 +552,28 @@ describe('POST /api/v1/dids/import', () => {
     expect(mockCreateDid).not.toHaveBeenCalled();
   });
 
+  // `.min(1)` counts characters, so a whitespace-only value passed and was
+  // stored verbatim as a blank name or description.
+  it.each([
+    ['name', { name: '   ' }],
+    ['description', { description: '   ' }],
+  ])('returns 400 when %s is only whitespace, and does not call the repository', async (field, overrides) => {
+    const req = createFakeRequest({
+      did: 'did:web:example.com',
+      keyId: 'key-1',
+      method: 'DID_WEB',
+      serviceInstanceId: 'inst-1',
+      ...overrides,
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe(`${field}: must not be only whitespace`);
+    expect(mockCreateDid).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when description is an empty string (mistyped optional field), and does not call the repository', async () => {
     const req = createFakeRequest({
       did: 'did:web:example.com',

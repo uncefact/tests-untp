@@ -389,6 +389,22 @@ describe('service-instance.repository', () => {
       expect(result.name).toBe('Updated Name');
     });
 
+    // The data build uses `!== undefined` rather than a truthiness check, so
+    // an explicit null reaches the update and clears the column. A truthiness
+    // check would drop it, which is indistinguishable from omitting the field
+    // and would silently turn a clear into a no-op.
+    it('forwards an explicit description: null straight through to the update data', async () => {
+      mockServiceInstance.findFirst.mockResolvedValue(INSTANCE_RECORD);
+      mockServiceInstance.update.mockResolvedValue({ ...INSTANCE_RECORD, description: null });
+
+      await updateServiceInstance('instance-1', ORG_ID, { description: null });
+
+      expect(mockServiceInstance.update).toHaveBeenCalledWith({
+        where: { id: 'instance-1' },
+        data: { description: null },
+      });
+    });
+
     it('throws for non-existent instance', async () => {
       mockServiceInstance.findFirst.mockResolvedValue(null);
 

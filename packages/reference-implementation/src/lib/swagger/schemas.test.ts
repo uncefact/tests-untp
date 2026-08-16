@@ -1,3 +1,4 @@
+import { ServiceType, AdapterType } from '@uncefact/untp-ri-services';
 import { generateOpenAPISchemas } from './schemas';
 
 /**
@@ -11,6 +12,7 @@ type JsonSchemaObject = {
   required?: string[];
   items?: JsonSchemaObject;
   nullable?: boolean;
+  enum?: string[];
 };
 
 /**
@@ -341,6 +343,20 @@ describe('generateOpenAPISchemas — Conformity Vocabulary Catalogue components'
     expect(topicItem?.required).toEqual(['canonicalId']);
     expect(topicItem?.properties?.name).toBeDefined();
     expect(topicItem?.properties?.definition).toBeDefined();
+  });
+  // The services route documents these two parameters by referencing the
+  // components rather than listing members, so adding a service or adapter
+  // type updates the published contract with no annotation edit. These
+  // assertions compare the generated components against the constants of
+  // record, so a component that stops deriving fails here by name.
+  it('derives the ServiceType and AdapterType components from the registry constants', () => {
+    const schemas = generateOpenAPISchemas();
+
+    const serviceType = schemas.ServiceType as JsonSchemaObject;
+    const adapterType = schemas.AdapterType as JsonSchemaObject;
+
+    expect(serviceType.enum).toEqual(Object.values(ServiceType));
+    expect(adapterType.enum).toEqual(Object.values(AdapterType));
   });
 });
 
