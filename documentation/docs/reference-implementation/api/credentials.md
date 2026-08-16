@@ -71,9 +71,9 @@ Every stored credential has a **content hash** — a fingerprint computed from t
 
 A credential on its own is just a file at a URL. To make it useful, it needs to be **discoverable** — someone who knows a product's identifier should be able to find the credential. This is the role of the [UNTP Identity Resolver](https://untp.unece.org/docs/specification/IdentityResolver) and [Decentralised Access Control](https://untp.unece.org/docs/specification/DecentralisedAccessControl) specifications.
 
-This is where the [Identity Resolver](./identifiers#links) comes in. When a credential is published, the Reference Implementation registers a link with the Identity Resolver that connects the entity's identifier (e.g., a GS1 GTIN) to the credential's storage URL. Now anyone who resolves that identifier can find the credential.
+This is where the [Identity Resolver](./identifiers#what-are-links) comes in. When a credential is published, the Reference Implementation registers a link with the Identity Resolver that connects the entity's identifier (e.g., a GS1 GTIN) to the credential's storage URL. Now anyone who resolves that identifier can find the credential.
 
-Publishing is optional and requires the credential's primary entity (product, facility, or organisation) to have a configured [identifier scheme](./identifiers#identifier-schemes) with an IDR service.
+Publishing is optional and requires the credential's primary entity (product, facility, or organisation) to have a configured [identifier scheme](./identifiers#what-is-an-identifier-scheme) with an IDR service.
 
 ### CVC Compliance (Conformity Credentials Only)
 
@@ -136,7 +136,7 @@ The three required fields are validated:
 
 The `credentialType` and `version` are used to look up a registered [data model](./data-models). The data model provides the JSON Schema URL(s) for validation, the JSON-LD context URL, and the [bridge](./data-models#data-model-bridges) that extracts entity references from the payload.
 
-For [extension data models](./data-models#extension-data-models), both the parent schema and the extension schema are validated.
+For [extension data models](./data-models#untp-core-data-models-and-extensions), both the parent schema and the extension schema are validated.
 
 #### Stage 3: Payload Validation
 
@@ -203,10 +203,10 @@ The credential payload is signed by the VC service, producing an [Enveloped Veri
 
 #### Stage 8: IDR Publishing (Optional)
 
-When `publishingOptions.publish` is `true`, the Reference Implementation publishes a link to the stored credential on the [Identity Resolver](./identifiers#links) for the primary entity's identifier. This makes the credential discoverable via the entity's identifier scheme (e.g., resolving a GS1 GTIN leads to the credential).
+When `publishingOptions.publish` is `true`, the Reference Implementation publishes a link to the stored credential on the [Identity Resolver](./identifiers#what-are-links) for the primary entity's identifier. This makes the credential discoverable via the entity's identifier scheme (e.g., resolving a GS1 GTIN leads to the credential).
 
 Publishing requires the primary entity to have:
-- A primary identifier with a configured [identifier scheme](./identifiers#identifier-schemes)
+- A primary identifier with a configured [identifier scheme](./identifiers#what-is-an-identifier-scheme)
 - The scheme must have a registrar with a namespace
 - An IDR service instance (configured on the scheme, or the tenant/system default)
 

@@ -17,9 +17,9 @@ But the credential structures that *reference* those entities do change. A produ
 
 This is what [**data model bridges**](#data-model-bridges) solve. Each UNTP core data model type and version has a corresponding bridge that maps between the evolving UNTP credential structure and the Reference Implementation's stable internal entity models. This enables the system to:
 
-- [**Extract**](#extraction) entity references from issued credentials and link them to database records
-- [**Populate**](#population) credential payloads from existing entity data, so users don't re-enter information for each credential
-- [**Validate**](#validation) credential content against expected requirements
+- [**Extract**](../data-models/index.md#extraction) entity references from issued credentials and link them to database records
+- [**Populate**](../data-models/index.md#population) credential payloads from existing entity data, so users don't re-enter information for each credential
+- [**Validate**](../data-models/index.md#validation) credential content against expected requirements
 
 Beyond UNTP core data models, tenants can create [extensions](#untp-core-data-models-and-extensions) for industry-specific or regional variants. Each data model — whether core or extension — also has associated [render templates](./render-templates) that control how credentials of that type and version are visually presented.
 
