@@ -29,6 +29,7 @@ jest.mock('@/lib/credentials/validate-encryption-key-startup', () => ({
   validateEncryptionKeyAtStartup: jest.fn(),
 }));
 jest.mock('@/lib/api/pagination', () => ({ warnOnRejectedMaxPageLimitOverride: jest.fn() }));
+jest.mock('@/lib/cvc/seeded-refresh-interval', () => ({ startSeededSchemeRefreshInterval: jest.fn() }));
 jest.mock('@/lib/api/logger', () => ({
   apiLogger: { child: () => ({ warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() }) },
 }));
@@ -49,6 +50,9 @@ beforeEach(() => {
 describe('registerNode boot wiring', () => {
   it('runs every boot validation: app URL, HTTP User-Agent, encryption key', async () => {
     await registerNode();
+
+    const { startSeededSchemeRefreshInterval } = jest.requireMock('@/lib/cvc/seeded-refresh-interval');
+    expect(startSeededSchemeRefreshInterval).toHaveBeenCalledTimes(1);
 
     expect(mockResolveAppUrl).toHaveBeenCalledTimes(1);
     expect(mockValidateHttpUserAgentOnBoot).toHaveBeenCalledTimes(1);

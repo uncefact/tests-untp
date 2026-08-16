@@ -101,7 +101,9 @@ function createMockTx() {
     },
     identifier: { groupBy: jest.fn().mockResolvedValue([]) },
     $queryRawUnsafe: jest.fn().mockResolvedValue([]),
-    conformityScheme: { count: jest.fn().mockResolvedValue(0) },
+    $executeRaw: jest.fn().mockResolvedValue(0),
+    conformityScheme: { count: jest.fn().mockResolvedValue(0), deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    conformityCriterion: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
   };
 }
 
@@ -109,9 +111,11 @@ function createMockPrisma() {
   const upsertFn = jest.fn().mockResolvedValue({});
   const findManyFn = jest.fn().mockResolvedValue([]);
   const lastTx: { current: ReturnType<typeof createMockTx> | null } = { current: null };
+  const allTxs: ReturnType<typeof createMockTx>[] = [];
   const transactionFn = jest.fn().mockImplementation(async (fn: (tx: Record<string, unknown>) => Promise<unknown>) => {
     const tx = createMockTx();
-    lastTx.current = tx;
+    if (lastTx.current === null) lastTx.current = tx; // first transaction = the main upsert/removal one
+    allTxs.push(tx);
     return fn(tx as unknown as Record<string, unknown>);
   });
 
@@ -128,7 +132,11 @@ function createMockPrisma() {
     conformityCriterion: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
     $transaction: transactionFn,
     __lastTx: lastTx,
-  } as unknown as CustomSeedDependencies['prisma'] & { __lastTx: { current: ReturnType<typeof createMockTx> | null } };
+    __allTxs: allTxs,
+  } as unknown as CustomSeedDependencies['prisma'] & {
+    __lastTx: { current: ReturnType<typeof createMockTx> | null };
+    __allTxs: ReturnType<typeof createMockTx>[];
+  };
 }
 
 function createDeps(overrides?: Partial<CustomSeedDependencies>): CustomSeedDependencies {
@@ -326,9 +334,11 @@ describe('runCustomSeed', () => {
 
       await runCustomSeed(deps);
 
-      expect(deps.prisma.conformityScheme.findUnique).toHaveBeenCalledWith({
-        where: { sourceUrl_tenantId: { sourceUrl: 'https://example.com/scheme', tenantId: SYSTEM_TENANT_ID } },
-      });
+      expect(deps.prisma.conformityScheme.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { sourceUrl_tenantId: { sourceUrl: 'https://example.com/scheme', tenantId: SYSTEM_TENANT_ID } },
+        }),
+      );
       expect(ingestMock).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceUrl: 'https://example.com/scheme',
@@ -340,18 +350,42 @@ describe('runCustomSeed', () => {
       );
     });
 
-    it('skips an entry whose (sourceUrl, tenantId) row already exists (insert-only-if-absent)', async () => {
+    it('re-ingests an existing SYSTEM_SEED row so publisher updates are picked up at boot', async () => {
       setupManifest([{ url: 'https://example.com/scheme', version: '0.7.0' }]);
       const deps = createDeps();
       const ingestMock = ingestMockFn;
-      (deps.prisma.conformityScheme.findUnique as jest.Mock).mockResolvedValue({ id: 'existing-row' });
+      ingestMock.mockResolvedValue({ kind: 'unchanged', schemeId: 'existing-row' });
+      (deps.prisma.conformityScheme.findUnique as jest.Mock).mockResolvedValue({ source: 'SYSTEM_SEED' });
+      (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
+        schemaUrl: 'https://example.com/schema.json',
+      });
+
+      await runCustomSeed(deps);
+
+      expect(ingestMock).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceUrl: 'https://example.com/scheme', seedEntryKind: 'URL' }),
+      );
+      // The boot summary distinguishes verified-unchanged from ownership skips.
+      expect(deps.logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conformitySchemes: expect.objectContaining({ ingested: 0, unchanged: 1, skipped: 0, failed: 0 }),
+        }),
+        expect.stringContaining('completed successfully'),
+      );
+    });
+
+    it('never re-ingests a row owned by another source', async () => {
+      setupManifest([{ url: 'https://example.com/scheme', version: '0.7.0' }]);
+      const deps = createDeps();
+      const ingestMock = ingestMockFn;
+      (deps.prisma.conformityScheme.findUnique as jest.Mock).mockResolvedValue({ source: 'UNTP' });
 
       await runCustomSeed(deps);
 
       expect(ingestMock).not.toHaveBeenCalled();
       expect(deps.logger.info).toHaveBeenCalledWith(
-        expect.objectContaining({ sourceUrl: 'https://example.com/scheme' }),
-        expect.stringContaining('insert-only-if-absent'),
+        expect.objectContaining({ sourceUrl: 'https://example.com/scheme', source: 'UNTP' }),
+        expect.stringContaining('owned by another source'),
       );
     });
 
@@ -378,11 +412,18 @@ describe('runCustomSeed', () => {
       (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue({
         schemaUrl: 'https://example.com/schema.json',
       });
-      const deleteManyMock = deps.prisma.conformityScheme.deleteMany as jest.Mock;
       const callOrder: string[] = [];
-      deleteManyMock.mockImplementation(async () => {
-        callOrder.push('evict');
-        return { count: 2 };
+      const txs = (deps.prisma as unknown as { __allTxs: ReturnType<typeof createMockTx>[] }).__allTxs;
+      // Wrap tx creation so every tx's conformityScheme.deleteMany records order.
+      const origTransaction = deps.prisma.$transaction as jest.Mock;
+      origTransaction.mockImplementation(async (fn: (tx: Record<string, unknown>) => Promise<unknown>) => {
+        const tx = createMockTx();
+        tx.conformityScheme.deleteMany.mockImplementation(async () => {
+          callOrder.push('evict');
+          return { count: 2 };
+        });
+        txs.push(tx);
+        return fn(tx as unknown as Record<string, unknown>);
       });
       ingestMock.mockImplementation(async () => {
         callOrder.push('ingest');
@@ -391,14 +432,19 @@ describe('runCustomSeed', () => {
 
       await runCustomSeed(deps);
 
-      expect(deleteManyMock).toHaveBeenCalledWith({
+      const evictTx = txs.find((tx) => tx.conformityScheme.deleteMany.mock.calls.length > 0);
+      expect(evictTx).toBeDefined();
+      // The eviction transaction takes the structural advisory lock first.
+      expect(evictTx!.$executeRaw).toHaveBeenCalled();
+      expect(evictTx!.conformityScheme.deleteMany).toHaveBeenCalledWith({
         where: {
           tenantId: SYSTEM_TENANT_ID,
           source: 'SYSTEM_SEED',
           sourceUrl: { notIn: ['https://example.com/scheme'] },
         },
       });
-      expect(callOrder).toEqual(['evict', 'ingest']);
+      expect(callOrder[0]).toBe('evict');
+      expect(callOrder).toContain('ingest');
     });
 
     it('sweeps orphaned criteria after the conformity pass', async () => {
@@ -412,7 +458,10 @@ describe('runCustomSeed', () => {
 
       await runCustomSeed(deps);
 
-      expect(deps.prisma.conformityCriterion.deleteMany).toHaveBeenCalledWith({
+      const txs = (deps.prisma as unknown as { __allTxs: ReturnType<typeof createMockTx>[] }).__allTxs;
+      const sweepTx = txs.find((tx) => tx.conformityCriterion.deleteMany.mock.calls.length > 0);
+      expect(sweepTx).toBeDefined();
+      expect(sweepTx!.conformityCriterion.deleteMany).toHaveBeenCalledWith({
         where: { tenantId: SYSTEM_TENANT_ID, profiles: { none: {} } },
       });
     });
@@ -433,8 +482,9 @@ describe('runCustomSeed', () => {
 
       await runCustomSeed(deps);
 
-      expect(deps.prisma.conformityScheme.deleteMany).not.toHaveBeenCalled();
-      expect(deps.prisma.conformityCriterion.deleteMany).not.toHaveBeenCalled();
+      const txs = (deps.prisma as unknown as { __allTxs: ReturnType<typeof createMockTx>[] }).__allTxs;
+      expect(txs.some((tx) => tx.conformityScheme.deleteMany.mock.calls.length > 0)).toBe(false);
+      expect(txs.some((tx) => tx.conformityCriterion.deleteMany.mock.calls.length > 0)).toBe(false);
       // The resolvable URL entry still ingests.
       expect(ingestMock).toHaveBeenCalledWith(expect.objectContaining({ sourceUrl: 'https://example.com/scheme' }));
       expect(deps.logger.error).toHaveBeenCalledWith(
@@ -487,7 +537,8 @@ describe('runCustomSeed', () => {
 
       await runCustomSeed(deps);
 
-      expect(deps.prisma.conformityScheme.deleteMany).not.toHaveBeenCalled();
+      const txs = (deps.prisma as unknown as { __allTxs: ReturnType<typeof createMockTx>[] }).__allTxs;
+      expect(txs.some((tx) => tx.conformityScheme.deleteMany.mock.calls.length > 0)).toBe(false);
     });
 
     it('ingests a file-based entry by reading the JSON-LD and extracting `id` as sourceUrl', async () => {
@@ -505,6 +556,7 @@ describe('runCustomSeed', () => {
         expect.objectContaining({
           sourceUrl: 'https://example.com/scheme',
           source: 'SYSTEM_SEED',
+          seedEntryKind: 'FILE',
           prefetched: expect.objectContaining({ body: expect.any(Uint8Array) }),
         }),
       );

@@ -28,6 +28,7 @@ import {
   validateEncryptionKeyAtStartup,
 } from './lib/credentials/validate-encryption-key-startup';
 import { resolveAppUrl } from './lib/config/app-url.config';
+import { startSeededSchemeRefreshInterval } from './lib/cvc/seeded-refresh-interval';
 import { validateHttpUserAgentOnBoot } from './lib/config/http-user-agent.config';
 import { validateCacheMaxEntriesOnBoot } from './lib/config/cache-max-entries.config';
 
@@ -43,6 +44,9 @@ export async function registerNode(): Promise<void> {
   validateCacheMaxEntriesOnBoot();
   await validateEncryptionKeyOnBoot();
   startOpenTelemetry();
+  // Periodic refresh of seeded conformity schemes (#728). Validates
+  // CVC_REFRESH_INTERVAL_HOURS as part of the fail-fast boot checks above.
+  startSeededSchemeRefreshInterval(apiLogger);
 }
 
 /**

@@ -44,6 +44,7 @@ The mounted directory should contain:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SKIP_CUSTOM_SEED` | Set to `true` to skip custom seed processing entirely | `false` |
+| `CVC_REFRESH_INTERVAL_HOURS` | Cadence, in hours, of the periodic refresh of URL-seeded conformity schemes (maximum 500) | `24` |
 
 Setting `SKIP_CUSTOM_SEED=true` prevents the custom seed from running even if a manifest file is present.
 
@@ -231,7 +232,7 @@ conformitySchemes:
 
 Exactly one of `url` or `file` must be set per entry. The scheme's display name and structure (profiles, criteria) are derived from the document itself; no operator-supplied name is required.
 
-For scheme **content**, the loader is insert-only-if-absent: if a row already exists at `(sourceUrl, systemTenantId)` (from a prior seed run, UNTP discovery, or operator action), the entry's content is not re-fetched or overwritten, preserving any post-seed updates.
+For scheme **content**, every entry is re-ingested on each boot so publisher updates are picked up: an unchanged document is detected cheaply (HTTP validators for URL entries, a content digest for file entries) and skipped, a changed document replaces the stored scheme and its profiles, and a failed fetch or parse keeps the previously stored content while recording the failure on the row. Between boots, URL-sourced entries are also refreshed periodically; see [Periodic refresh](#periodic-refresh).
 
 For scheme **membership**, the manifest reconciles like the other sections when the `conformitySchemes` key is present: seeded (`SYSTEM_SEED`) rows whose source URL no longer appears in the manifest are deleted, together with their profiles, and criteria that no remaining profile references are cleaned up afterwards. UNTP-discovered and tenant-imported schemes are never touched. If any `file` entry cannot be read or parsed, deletion is skipped for that run (with an error logged), so a transiently unavailable file can never cause a previously ingested scheme to be removed.
 
@@ -329,6 +330,10 @@ Once validation passes, the custom seed processes entities in the following orde
 1. **Upload render template files** to the storage service
 2. **Upsert all entities** (registrars, schemes, qualifiers, data models, render templates) and then **delete manifest-managed rows whose entries were removed**, in a single atomic database transaction
 3. **Reconcile and ingest conformity schemes** (outside the main transaction). The loader first resolves every entry's identity, then deletes seeded schemes no longer in the manifest, then for each remaining entry either fetches the URL or reads the file and runs the scheme through the CVC pipeline (fetch → JSON parse → schema validate → JSON-LD expand → parse → persist), and finally removes criteria that no profile references any more. Per-entry failures are logged and counted; the loop continues to the next entry.
+
+## Periodic Refresh
+
+URL-sourced conformity schemes are re-fetched on a periodic in-process schedule (default every 24 hours, configurable via `CVC_REFRESH_INTERVAL_HOURS`), so a publisher updating a scheme document at its source URL is picked up without redeploying. The refresh reads the rows from the database rather than the manifest, applies the same unchanged/changed/failure behaviour as the boot ingest, and removes criteria that no profile references once a refresh drops them. File-sourced schemes are not fetched between boots; their content refreshes at boot from the mounted file, which is their source of truth. A failed refresh never removes a scheme: the previously stored content stays until a later fetch succeeds, with the failure recorded on the row and in the logs.
 
 ## Reconcile Semantics
 

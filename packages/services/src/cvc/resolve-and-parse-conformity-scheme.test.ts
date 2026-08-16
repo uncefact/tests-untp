@@ -115,6 +115,17 @@ describe('resolveAndParseConformityScheme', () => {
       });
     });
 
+    it('forwards the contextCache to validateJsonLd', async () => {
+      const contextCache = { get: jest.fn(), set: jest.fn() } as never;
+      mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('{"id":"x"}'));
+      mockValidateJsonLd.mockResolvedValue(undefined);
+      mockValidateAgainstSchemas.mockResolvedValue(undefined);
+      mockParseConformityScheme.mockReturnValue(fakeScheme());
+
+      await resolveAndParseConformityScheme(baseInput({ contextCache }));
+      expect(mockValidateJsonLd).toHaveBeenCalledWith(expect.anything(), { contextCache });
+    });
+
     it('passes an empty object to resolveDocumentIfChanged when no cached resource is supplied', async () => {
       mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('{"id":"x"}'));
       mockValidateJsonLd.mockResolvedValue(undefined);
@@ -154,6 +165,44 @@ describe('resolveAndParseConformityScheme', () => {
       if (result.kind !== 'success') throw new Error('unreachable');
       expect(result.raw).toEqual({ id: 'seed' });
       expect(result.etag).toBe('"seed-etag"');
+    });
+
+    it('returns unchanged without parsing when the prefetched bytes match the cached digest', async () => {
+      const body = new TextEncoder().encode('{"id":"seed"}');
+      const bodyDigest = await MultibaseDigest.fromData(body, { algorithm: 'sha2-256', base: 'base58btc' });
+
+      const result = await resolveAndParseConformityScheme(
+        baseInput({
+          source: 'SYSTEM_SEED',
+          prefetched: { body },
+          cached: { bodyDigest },
+        }),
+      );
+
+      expect(result.kind).toBe('unchanged');
+      expect(mockValidateAgainstSchemas).not.toHaveBeenCalled();
+      expect(mockValidateJsonLd).not.toHaveBeenCalled();
+      expect(mockParseConformityScheme).not.toHaveBeenCalled();
+    });
+
+    it('processes prefetched bytes whose digest differs from the cached one', async () => {
+      mockValidateJsonLd.mockResolvedValue(undefined);
+      mockValidateAgainstSchemas.mockResolvedValue(undefined);
+      mockParseConformityScheme.mockReturnValue(fakeScheme());
+      const previous = await MultibaseDigest.fromData(new TextEncoder().encode('{"id":"old"}'), {
+        algorithm: 'sha2-256',
+        base: 'base58btc',
+      });
+
+      const result = await resolveAndParseConformityScheme(
+        baseInput({
+          source: 'SYSTEM_SEED',
+          prefetched: { body: new TextEncoder().encode('{"id":"seed"}') },
+          cached: { bodyDigest: previous },
+        }),
+      );
+
+      expect(result.kind).toBe('success');
     });
   });
 

@@ -509,6 +509,18 @@ enum ConformitySchemeSource {
   TENANT_IMPORTED
 }
 
+/**
+ * How a seeded (`SYSTEM_SEED`) conformity scheme entered the seed manifest:
+ * from a fetchable URL, or from a local file whose document id doubles as the
+ * row's `sourceUrl`. The periodic refresh only re-fetches `URL` rows; `FILE`
+ * rows refresh at boot from the mounted file. Null means the row predates the
+ * marker; the refresh treats a null with an http(s) `sourceUrl` as `URL`.
+ */
+enum SeedEntryKind {
+  URL
+  FILE
+}
+
 enum ConformityFetchStatus {
   SUCCESS
   FETCH_FAILED
@@ -541,6 +553,7 @@ model ConformityScheme {
   lastFetchedAt      DateTime?
   lastSuccessAt      DateTime?
   lastFetchStatus    ConformityFetchStatus
+  seedEntryKind      SeedEntryKind?
   rawDocument        Json?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt

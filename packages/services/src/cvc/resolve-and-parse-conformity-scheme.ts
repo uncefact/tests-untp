@@ -48,6 +48,22 @@ export async function resolveAndParseConformityScheme(
     body = input.prefetched.body;
     etag = input.prefetched.etag;
     lastModifiedHeader = input.prefetched.lastModifiedHeader;
+
+    // Prefetched content bypasses the HTTP conditional-fetch chain, so the
+    // unchanged check is a local digest comparison: identical bytes skip the
+    // parse and persist exactly like a 304 or matching digest does on the
+    // fetched path. Without this, every boot re-parses and rewrites a
+    // file-seeded scheme whose content has not changed.
+    if (input.cached?.bodyDigest) {
+      try {
+        const prefetchedDigest = await MultibaseDigest.fromData(body, { algorithm: 'sha2-256', base: 'base58btc' });
+        if (prefetchedDigest.toString() === input.cached.bodyDigest.toString()) {
+          return { kind: 'unchanged' };
+        }
+      } catch (cause) {
+        return failure(RESOLVE_FAILURE_STATUS.DigestFailed, input.sourceUrl, cause);
+      }
+    }
   } else {
     try {
       const outcome = await resolveDocumentIfChanged(input.sourceUrl, input.cached ?? {}, {
@@ -78,7 +94,7 @@ export async function resolveAndParseConformityScheme(
   }
 
   try {
-    await validateJsonLd(parsedJson);
+    await validateJsonLd(parsedJson, { contextCache: input.contextCache });
   } catch (cause) {
     return failure(RESOLVE_FAILURE_STATUS.JsonLdExpansionFailed, input.sourceUrl, cause);
   }

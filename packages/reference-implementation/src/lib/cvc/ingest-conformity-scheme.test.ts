@@ -4,6 +4,11 @@ jest.mock('@uncefact/untp-ri-services/cvc', () => ({
   resolveAndParseConformityScheme: (...args: unknown[]) => mockResolveAndParseConformityScheme(...args),
 }));
 
+const mockContextCache = { get: jest.fn(), set: jest.fn() };
+jest.mock('../credentials/context-cache', () => ({
+  contextCache: mockContextCache,
+}));
+
 const mockMultibaseDigestFromString = jest.fn();
 jest.mock('@uncefact/untp-utils/multibase-digest', () => ({
   MultibaseDigest: {
@@ -17,6 +22,7 @@ const mockTx = {
     create: jest.fn(),
   },
   conformityScheme: {
+    findUnique: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -26,6 +32,7 @@ const mockTx = {
   conformityProfileCriterion: {
     create: jest.fn(),
   },
+  $executeRaw: jest.fn().mockResolvedValue(0),
 };
 
 jest.mock('@/lib/prisma/prisma', () => ({
@@ -121,7 +128,7 @@ describe('ingestConformityScheme', () => {
       expect(result).toEqual({ kind: 'unchanged', schemeId: 'row-1' });
       expect(mockScheme.update).toHaveBeenCalledWith({
         where: { id: 'row-1' },
-        data: { lastFetchedAt: expect.any(Date), lastSuccessAt: expect.any(Date) },
+        data: { lastFetchedAt: expect.any(Date), lastSuccessAt: expect.any(Date), lastFetchStatus: 'SUCCESS' },
       });
     });
 
@@ -146,6 +153,17 @@ describe('ingestConformityScheme', () => {
             bodyDigest: cachedDigest,
           },
         }),
+      );
+    });
+
+    it('forwards the shared JSON-LD context cache to the resolver', async () => {
+      mockScheme.findUnique.mockResolvedValue(null);
+      mockResolveAndParseConformityScheme.mockResolvedValue({ kind: 'unchanged' });
+
+      await ingestConformityScheme(baseInput()).catch(() => undefined);
+
+      expect(mockResolveAndParseConformityScheme).toHaveBeenCalledWith(
+        expect.objectContaining({ contextCache: mockContextCache }),
       );
     });
   });
@@ -343,6 +361,108 @@ describe('ingestConformityScheme', () => {
       expect(mockTx.conformityProfileCriterion.create).toHaveBeenCalledWith({
         data: { profileId: 'prof-1', criterionId: 'crit-dup' },
       });
+    });
+  });
+
+  describe('stale guard (requireExistingRow)', () => {
+    it('returns stale instead of creating when the row vanished before the lock was taken', async () => {
+      mockScheme.findUnique.mockResolvedValue({
+        id: 'row-1',
+        etag: null,
+        lastModifiedHeader: null,
+        bodyDigest: 'zOLD',
+      });
+      mockResolveAndParseConformityScheme.mockResolvedValue({
+        kind: 'success',
+        scheme: parsedScheme({ profiles: [] }),
+        raw: { '@context': [], id: 'x' },
+        bodyDigest: { toString: () => 'zNEW' },
+      });
+      // Inside the locked transaction the row is gone (evicted by the seed).
+      (mockTx.conformityScheme.findUnique as jest.Mock).mockResolvedValue(null);
+
+      const result = await ingestConformityScheme(baseInput({ requireExistingRow: true }));
+
+      expect(result).toEqual({ kind: 'stale' });
+      expect(mockTx.conformityScheme.create).not.toHaveBeenCalled();
+      expect(mockTx.conformityScheme.update).not.toHaveBeenCalled();
+    });
+
+    it('returns stale when another writer replaced the content this resolution fetched against', async () => {
+      mockScheme.findUnique.mockResolvedValue({
+        id: 'row-1',
+        etag: null,
+        lastModifiedHeader: null,
+        bodyDigest: 'zOLD',
+      });
+      mockResolveAndParseConformityScheme.mockResolvedValue({
+        kind: 'success',
+        scheme: parsedScheme({ profiles: [] }),
+        raw: { '@context': [], id: 'x' },
+        bodyDigest: { toString: () => 'zNEW' },
+      });
+      // Inside the lock the row now carries a digest newer than our baseline.
+      (mockTx.conformityScheme.findUnique as jest.Mock).mockResolvedValue({ id: 'row-1', bodyDigest: 'zNEWER' });
+
+      const result = await ingestConformityScheme(baseInput({ requireExistingRow: true }));
+
+      expect(result).toEqual({ kind: 'stale' });
+      expect(mockTx.conformityScheme.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('seedEntryKind persistence and structural lock', () => {
+    function setupSuccessResolve() {
+      mockScheme.findUnique.mockResolvedValue(null);
+      mockResolveAndParseConformityScheme.mockResolvedValue({
+        kind: 'success',
+        scheme: parsedScheme({ profiles: [] }),
+        raw: { '@context': [], id: 'x' },
+        bodyDigest: { toString: () => 'zNEW' },
+      });
+      mockTx.conformityScheme.create.mockResolvedValue({ id: 'row-new' });
+    }
+
+    it('includes seedEntryKind in the persisted data only when the caller supplies it', async () => {
+      setupSuccessResolve();
+      await ingestConformityScheme(baseInput({ seedEntryKind: 'FILE' as never }));
+      expect(mockTx.conformityScheme.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ seedEntryKind: 'FILE' }) }),
+      );
+
+      jest.clearAllMocks();
+      setupSuccessResolve();
+      await ingestConformityScheme(baseInput());
+      const createData = (mockTx.conformityScheme.create as jest.Mock).mock.calls[0][0].data;
+      // The key must be absent entirely, not present as undefined, so a refresh
+      // ingest never nulls a stored marker.
+      expect(Object.keys(createData)).not.toContain('seedEntryKind');
+    });
+
+    it('stamps seedEntryKind on the unchanged path so pre-existing rows converge without a content change', async () => {
+      mockScheme.findUnique.mockResolvedValue({
+        id: 'row-1',
+        etag: '"e"',
+        lastModifiedHeader: null,
+        bodyDigest: 'zSAME',
+      });
+      mockResolveAndParseConformityScheme.mockResolvedValue({ kind: 'unchanged' });
+      mockScheme.update.mockResolvedValue({ id: 'row-1' });
+
+      await ingestConformityScheme(baseInput({ seedEntryKind: 'FILE' as never }));
+
+      expect(mockScheme.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ seedEntryKind: 'FILE', lastFetchStatus: 'SUCCESS' }),
+        }),
+      );
+    });
+
+    it('acquires the per-tenant structural lock inside the persist transaction', async () => {
+      setupSuccessResolve();
+      await ingestConformityScheme(baseInput());
+
+      expect(mockTx.$executeRaw).toHaveBeenCalled();
     });
   });
 });
