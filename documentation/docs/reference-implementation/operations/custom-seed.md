@@ -5,7 +5,7 @@ title: Custom Seed
 
 # Custom Seed
 
-The Reference Implementation ships with a set of [default seed data](./startup.md#step-2-database-seed) — registrars, identifier schemes, data models, render templates, and service instances. These defaults cover common UNTP use cases out of the box.
+The Reference Implementation ships with a set of [default seed data](./startup.md#step-3-database-seed) — registrars, identifier schemes, data models, render templates, and service instances. These defaults cover common UNTP use cases out of the box.
 
 Deployers who need additional data — custom registrars, identifier schemes, data models, render templates, or conformity schemes — can supply a YAML manifest via a Docker volume mount, without modifying the source code or rebuilding the image.
 

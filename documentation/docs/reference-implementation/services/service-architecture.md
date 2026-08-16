@@ -25,7 +25,7 @@ The same extensibility principle applies to [data model bridges](../data-models/
 
 Service instances exist at two levels:
 
-**System services** are registered within the [system tenant](../system-architecture#system-tenant) during the [seeding process](../operations/startup#step-2-database-seed). These are the default service instances that every tenant has access to. System services are read-only and available to all tenants — a tenant can continue using the system defaults or optionally register their own. See the individual service pages ([Verifiable Credential](./verifiable-credential-service), [Storage](./storage-service), [Identity Resolver](./identity-resolver-service)) for the environment variables that configure each system service.
+**System services** are registered within the [system tenant](../system-architecture#system-tenant) during the [seeding process](../operations/startup#step-3-database-seed). These are the default service instances that every tenant has access to. System services are read-only and available to all tenants — a tenant can continue using the system defaults or optionally register their own. See the individual service pages ([Verifiable Credential](./verifiable-credential-service), [Storage](./storage-service), [Identity Resolver](./identity-resolver-service)) for the environment variables that configure each system service.
 
 **Tenant services** are registered by a tenant through the API and are scoped exclusively to that tenant. No other tenant can see or use them. A tenant can register multiple service instances for a given service type and designate one as the default for that type.
 

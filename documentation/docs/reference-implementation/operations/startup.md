@@ -7,25 +7,29 @@ title: Startup
 
 Before the Reference Implementation begins accepting requests, its database schema must be up to date, and a set of default records must exist for the system to function — things like identifier schemes, data models, default service instances, and render templates.
 
-Rather than requiring operators to run these steps manually, the Docker container's [entrypoint script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/docker-entrypoint.sh) handles them automatically. The entrypoint script runs database migrations and seeds default records before starting the application. If the database is already up to date, the process completes in seconds.
+Rather than requiring operators to run these steps manually, the Docker container's [entrypoint script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/docker-entrypoint.sh) handles them automatically. The entrypoint script applies database migrations, converts existing rows to the formats the current version writes, and seeds default records before starting the application. A database that is already up to date needs no migrations applied and no rows converted, but the conversion step still scans the credential and render template tables on every start, so the time that takes grows with both tables.
 
 How this is triggered depends on how you run the Reference Implementation:
 
-- **Docker** — The container's entrypoint script runs migrations and seeding automatically before starting the application. This applies whether you are using the Docker Compose configuration from the [repository](https://github.com/uncefact/tests-untp) or the standalone [Docker image](https://github.com/orgs/uncefact/packages/container/package/tests-untp%2Freference-implementation).
-- **Local development** — Migrations and seeding are run manually as part of the initial setup. See the [repository README](https://github.com/uncefact/tests-untp) for setup instructions.
+- **Docker** — The container's entrypoint script runs migrations, data backfills, and seeding automatically before starting the application. This applies whether you are using the Docker Compose configuration from the [repository](https://github.com/uncefact/tests-untp) or the standalone [Docker image](https://github.com/orgs/uncefact/packages/container/package/tests-untp%2Freference-implementation).
+- **Local development** — Running the application on the host does not go through the entrypoint, so none of these steps happen on their own. See the [repository README](https://github.com/uncefact/tests-untp) for setup instructions. Where an existing database still needs the digest conversion, run it by hand with the command in the [digest backfill section](../../migration-guides/v0.7.0#digest-backfill-for-existing-data) of the v0.7.0 upgrade guide.
 
 This page walks through what happens during startup, what gets created, and how to control the process.
 
 ## What Happens on Startup
 
-The entrypoint script runs two steps in order before the application begins accepting requests:
+The entrypoint script runs three steps in order before the application begins accepting requests:
 
 ```mermaid
 flowchart TD
     Start["Entrypoint script runs"] --> Migrations{"Run migrations?"}
     Migrations -->|"Yes (default)"| RunMigrations["Apply pending database migrations"]
     Migrations -->|"No (SKIP_MIGRATIONS=true)"| SkipMigrations["Skip migrations"]
-    RunMigrations --> Seed
+    RunMigrations --> Backfills{"Run backfills?"}
+    Backfills -->|"Yes (default)"| RunBackfills["Convert existing rows to current formats"]
+    Backfills -->|"No (SKIP_BACKFILLS=true)"| SkipBackfills["Skip backfills"]
+    RunBackfills --> Seed
+    SkipBackfills --> Seed
     SkipMigrations --> Seed
     Seed{"Run seed?"}
     Seed -->|"Yes (default)"| RunSeed["Create system default records"]
@@ -34,7 +38,9 @@ flowchart TD
     SkipSeed --> App
 ```
 
-Both steps are **idempotent** — they can run repeatedly without duplicating data or causing errors. Migrations that have already been applied are skipped. Seed records that already exist are updated if the environment variables have changed (upsert), so you can modify configuration values and restart the container to apply them.
+All three steps are **idempotent** — they can run repeatedly without duplicating data or causing errors. Migrations that have already been applied are skipped. Backfills leave rows they have already converted alone. Seed records that already exist are updated if the environment variables have changed (upsert), so you can modify configuration values and restart the container to apply them.
+
+Note the path the diagram takes when migrations are skipped. `SKIP_MIGRATIONS=true` skips the backfills as well, because they sit inside the same `SKIP_MIGRATIONS` guard as `migrate deploy`.
 
 ## Step 1: Database Migrations
 
@@ -46,11 +52,27 @@ If the database is already up to date, this step completes immediately.
 |----------|-------------|---------|
 | `SKIP_MIGRATIONS` | Set to `true` to skip automatic migrations | `false` |
 
-Set `SKIP_MIGRATIONS=true` if your deployment process applies migrations separately, for example in a CI/CD pipeline.
+Set `SKIP_MIGRATIONS=true` if your deployment process applies migrations separately, for example in a CI/CD pipeline. This also skips the backfills in step 2, so a deployment that applies migrations out of band runs the backfills out of band too. The [digest backfill section](../../migration-guides/v0.7.0#digest-backfill-for-existing-data) of the v0.7.0 upgrade guide gives the command.
 
-## Step 2: Database Seed
+## Step 2: Data Backfills
 
-After migrations, the entrypoint script runs the [seed script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/prisma/seed.ts) to create a set of system default records that the Reference Implementation needs to function. These are the baseline records that every instance requires — the data that makes the system usable out of the box.
+A migration changes the shape of the tables. It does not always bring the rows that already exist into line with what the new version writes. Backfills do that second part, so an upgraded database matches the current version's expectations rather than only its schema.
+
+They run immediately after `migrate deploy`, under the same `SKIP_MIGRATIONS` guard, so the columns they write have already been renamed or added by the time they execute. One backfill is wired up. It converts credential and render template digests from the legacy hexadecimal form to the multibase encoding the application now writes. A value it does not recognise is left alone and warned about, and a value it has already converted is skipped, so repeated container starts converge rather than rewriting.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SKIP_BACKFILLS` | Set to `true` to skip automatic backfills | `false` |
+
+Skipping them leaves the old values in place. The application still starts, and rows that were never converted keep whatever format they held.
+
+A backfill that fails is a different matter. The entrypoint stops at the first failing step, so the seed does not run and the application does not start, while any rows converted before the failure stay converted. A restart scans again from the beginning and skips the rows already converted.
+
+Conversions that cannot be undone are deliberately kept out of this step and ship as commands an operator runs when they choose, which is why encrypting existing credential decryption keys is a [step in the v0.4 upgrade guide](../../migration-guides/ri-v0.4#decryption-key-backfill-for-existing-credentials) rather than something a container start does.
+
+## Step 3: Database Seed
+
+After migrations and backfills, the entrypoint script runs the [seed script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/prisma/seed.ts) to create a set of system default records that the Reference Implementation needs to function. These are the baseline records that every instance requires — the data that makes the system usable out of the box.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -80,9 +102,9 @@ The seed script is located at `packages/reference-implementation/prisma/seed.ts`
 
 Render templates are loaded from `packages/reference-implementation/src/templates/` and uploaded to the storage service during seeding. To customise the default templates, replace the `.hbs` files in this directory before building the Docker image, or supply additional templates through the custom seed.
 
-## Step 3: Application Start
+## Step 4: Application Start
 
-Once migrations and seeding are complete, the application starts and begins accepting requests on port 3003.
+Once migrations, backfills, and seeding are complete, the application starts and begins accepting requests on port 3003.
 
 ### Base URL Validation
 
@@ -90,7 +112,7 @@ Before the application accepts its first request, it validates `RI_APP_URL` (the
 
 ### Encryption Key Validation
 
-Before the application accepts its first request, it validates the active `DATA_ENCRYPTION_KEY` by decrypting one existing encrypted value — a service instance configuration, or (when no service instance has a usable one, whether because none exists yet or because every existing configuration is corrupted) a protected credential decryption key. This runs once per process start, using the same check the [seed](#step-2-database-seed) already runs before it writes.
+Before the application accepts its first request, it validates the active `DATA_ENCRYPTION_KEY` by decrypting one existing encrypted value — a service instance configuration, or (when no service instance has a usable one, whether because none exists yet or because every existing configuration is corrupted) a protected credential decryption key. This runs once per process start, using the same check the [seed](#step-3-database-seed) already runs before it writes.
 
 | Situation | Result |
 |-----------|--------|

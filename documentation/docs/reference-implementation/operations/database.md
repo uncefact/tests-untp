@@ -45,9 +45,9 @@ On a freshly created PostgreSQL 15+ database this is sufficient for the containe
 
 The Docker Compose configuration in the repository provisions a dedicated `ri-db` container whose init user (`ri-postgres` by default) is that container's cluster superuser, which is the standard behaviour of the official PostgreSQL image for a single-purpose instance. That does not mean the application needs superuser rights; when pointing the Reference Implementation at a shared instance, the dedicated owner-user above is sufficient.
 
-## Migrations and Seeding
+## Migrations, Backfills, and Seeding
 
-On startup, the Reference Implementation automatically applies database migrations and seeds system default records. See [Startup](./startup) for the full sequence, what gets seeded, and how to control each step.
+On startup, the Reference Implementation automatically applies database migrations, converts existing rows to the formats the current version writes, and seeds system default records. See [Startup](./startup) for the full sequence, what gets seeded, and how to control each step.
 
 ## Local Development
 
