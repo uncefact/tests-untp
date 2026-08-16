@@ -191,7 +191,7 @@ The **storage service** and **IDR service** follow the standard [resolution chai
 |---------|---------|-------------|
 | **VC Service** | Signs the credential payload | From the issuer DID's associated service instance |
 | **Storage Service** | Stores the signed credential | `storageOptions.serviceInstanceId`, or tenant primary, or system default |
-| **IDR Service** | Publishes links (only when `publish: true`) | From the entity's scheme configuration |
+| **IDR Service** | Publishes links (only when `publish: true`) | From the resolved identifier's scheme, then its registrar, then the tenant/system default |
 
 #### Stage 7: Sign, Store, and Record
 
@@ -199,20 +199,35 @@ The credential payload is signed by the VC service, producing an [Enveloped Veri
 
 **Encryption**: By default, the stored credential is encrypted with AES-GCM. The decryption key is returned in the credential record and must be provided when [verifying](#verify-a-credential) encrypted credentials. Set `storageOptions.encrypt` to `false` to store the credential unencrypted.
 
-**Entity linking**: The data model bridge extracts entity references (organisations, facilities, products) from the credential payload. The primary entity (priority: product > facility > organisation) is linked to the credential record in the database. This link enables the optional publishing step.
+**Entity linking**: The data model bridge extracts entity references (organisations, facilities, products) from the credential payload. The primary entity (priority: product > facility > organisation) is linked to the credential record in the database. This link is best-effort enrichment; it never gates the optional publishing step, and a match that fails to link (for example the entity was deleted between extraction and insert) is reported as an advisory `ENTITY_LINK_FAILED` warning rather than affecting the credential or the publish.
 
 #### Stage 8: IDR Publishing (Optional)
 
-When `publishingOptions.publish` is `true`, the Reference Implementation publishes a link to the stored credential on the [Identity Resolver](./identifiers#what-are-links) for the primary entity's identifier. This makes the credential discoverable via the entity's identifier scheme (e.g., resolving a GS1 GTIN leads to the credential).
+When `publishingOptions.publish` is `true`, the Reference Implementation publishes a link to the stored credential on the [Identity Resolver](./identifiers#what-are-links) for the credential's own identifier. This makes the credential discoverable via that identifier's scheme (e.g., resolving a GS1 GTIN leads to the credential).
 
-Publishing requires the primary entity to have:
-- A primary identifier with a configured [identifier scheme](./identifiers#what-is-an-identifier-scheme)
-- The scheme must have a registrar with a namespace
-- An IDR service instance (configured on the scheme, or the tenant/system default)
+Publishing resolves its target from the same reference used for entity linking (priority: product > facility > organisation), looked up against the tenant's identifiers rather than against master data. Publishing requires that lookup to resolve to exactly one identifier with:
+- An [identifier scheme](./identifiers#what-is-an-identifier-scheme) that has a primary key
+- A registrar with a namespace
+- An IDR service instance (configured on the scheme, the registrar, or the tenant/system default)
 
-If any of these are missing, publishing is silently skipped and a `PUBLISH_SKIPPED` warning is included in the response. Three further publishing-related warnings can appear on a 201: `REFS_EXTRACTION_FAILED` (the payload's entity references could not be extracted, so publishing was skipped), `IDR_PUBLISH_FAILED` (the Identity Resolver rejected or failed the publish; the credential is stored but not discoverable), and `DB_STATUS_UPDATE_FAILED` (the publish succeeded but recording the published status failed, so the credential record may show unpublished).
+When publishing cannot complete, the credential is still issued and returned, and a warning names the unmet prerequisite along with what to do about it:
 
-The IDR entry's `description` field is taken from the primary entity's `description`, falling back to the entity's `name` if no description is set.
+| Code | Meaning | What to do |
+|------|---------|------------|
+| `REFS_EXTRACTION_FAILED` | No identifier could be read from the credential payload. | Check the subject carries the identifier fields its data model defines, such as a `registeredId`. |
+| `PUBLISH_REFERENCE_MISSING` | The payload carries no identifier to publish under. | Check the subject carries the identifier fields its data model defines. |
+| `PUBLISH_SCHEME_INCOMPLETE` | The identifier resolved to a scheme without a primary key, or a registrar without a namespace. | Complete the scheme and registrar configuration, then issue again. |
+| `PUBLISH_IDENTIFIER_UNKNOWN` | No identifier matching the value is registered for the tenant, or the scheme named in `identifierSchemeId` does not hold that value. | Register the identifier under a scheme, or correct `identifierSchemeId`. |
+| `PUBLISH_IDENTIFIER_AMBIGUOUS` | The value exists under more than one scheme, so the target is not decidable. | Set `publishingOptions.identifierSchemeId` to the scheme you want to publish under. |
+| `PUBLISH_IDR_UNAVAILABLE` | No Identity Resolver service is configured for the scheme, registrar, or tenant. | Ask your operator to configure an IDR service instance. |
+| `PUBLISH_TARGET_UNRESOLVED` | The identifier lookup itself failed, so no publish was attempted. | The credential was issued; ask your operator to check the service. |
+| `PUBLISH_LINKS_UNBUILDABLE` | The credential links could not be built from the stored credential. | The credential was issued and stored; ask your operator to check the storage response. |
+| `IDR_PUBLISH_FAILED` | The Identity Resolver rejected the links. | Check the scheme is registered with the resolver, then issue again once it is. |
+| `IDR_PUBLISH_UNCONFIRMED` | The resolver could not be reached or did not answer, so whether the links were registered is unknown. | Ask your operator to check the resolver before issuing again: a second publish of the same links is rejected as a duplicate. |
+| `DB_STATUS_UPDATE_FAILED` | The links are live on the resolver, but the stored published status could not be saved. | The credential is discoverable; only the local status is stale. |
+| `ENTITY_LINK_FAILED` | The credential could not be linked to its master-data record, which no longer exists. | Optional enrichment only; publishing and the credential itself are unaffected. |
+
+The IDR entry's `description` field is taken from the linked primary entity's `description`, falling back to the entity's `name`, and then to the link title (`publishingOptions.linkTitle`, or the data model's name) when no entity is linked, since the resolver requires a non-empty description.
 
 **Human verification link**: When publishing without an explicit `humanVerificationUrl`, the published link set includes a link to this Reference Implementation's own verify page. The base is derived from the `RI_APP_URL` environment variable, which is parsed as a URL with `/verify` appended to its path (any query or fragment is dropped, a base path is preserved, and a trailing slash is trimmed); for the default `http://localhost:3003` the link is `http://localhost:3003/verify`. `RI_APP_URL` is configured in the RI's environment (the shipped `.env.example` and Docker Compose files default it to `http://localhost:3003`) and is the same base URL that backs the OIDC post-logout redirect (see [Identity provider requirements](../authentication/idp-requirements)). Supplying `humanVerificationUrl` overrides the default, for deployments that host verification elsewhere.
 
@@ -255,6 +270,7 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 | `publishingOptions.publish` | boolean | No | Whether to publish to IDR |
 | `publishingOptions.linkType` | string | No | Link relation type |
 | `publishingOptions.linkTitle` | string | No | Link title (defaults to data model name) |
+| `publishingOptions.identifierSchemeId` | string | No | Scheme to publish under, needed only when the credential's identifier value exists under more than one scheme |
 | `publishingOptions.qualifierPath` | string | No | Qualifier path (default: `/`) |
 | `publishingOptions.machineVerificationUrl` | string | No | Machine verification URL |
 | `publishingOptions.humanVerificationUrl` | string | No | Human verification URL (defaults to `${RI_APP_URL}/verify` when publishing) |

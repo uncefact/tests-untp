@@ -8,7 +8,6 @@ import {
 } from '@/lib/api/validation';
 import { credentialIssueRequestSchema, listCredentialsQuerySchema } from '@/lib/api/request-schemas/credential';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { errorMessage } from '@/lib/api/errors';
 import { resolveAppUrl, buildVerifyUrl } from '@/lib/config/app-url.config';
 import { apiLogger } from '@/lib/api/logger';
 import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
@@ -21,6 +20,7 @@ import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
+import { resolvePublishTarget } from '@/lib/credentials/resolve-publish-target';
 import { getDidByDid, findConformitySchemeByCanonicalId } from '@/lib/prisma/repositories';
 import { buildPublishLinks } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
@@ -71,7 +71,11 @@ function defaultHumanVerificationUrl(): string {
  *             $ref: '#/components/schemas/CredentialIssueRequest'
  *     responses:
  *       201:
- *         description: Credential issued
+ *         description: >-
+ *           Credential issued. When publishing was requested and could not
+ *           complete, the credential is still returned and a warning names the
+ *           unmet prerequisite with a remediation; publishing never fails
+ *           issuance.
  *         content:
  *           application/json:
  *             schema:
@@ -200,7 +204,9 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     if (publishingOptions.publish) {
       warnings.push({
         code: 'REFS_EXTRACTION_FAILED',
-        message: 'Failed to extract references from credential payload — publishing will be skipped',
+        message: 'Publishing was requested but no identifier could be extracted from the credential payload.',
+        remediation:
+          "Check that the credential's subject carries the identifier fields its data model defines, such as a registeredId on the party or product.",
       });
     }
   }
@@ -271,7 +277,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // ── Step 7: Issue credential ────────────────────────────────────────────
 
   logger.info({ credentialType }, 'Issuing credential');
-  const { credentialId, storageResponse, primaryEntity } = await issueCredential({
+  const { credentialId, storageResponse, primaryEntity, entityLinkFailed } = await issueCredential({
     tenantId,
     credentialPayload,
     credentialType,
@@ -281,76 +287,194 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     storageOptions,
   });
 
+  if (entityLinkFailed) {
+    warnings.push({
+      code: 'ENTITY_LINK_FAILED' as const,
+      message: 'The credential was issued but could not be linked to its master-data record, which no longer exists.',
+      remediation:
+        'Re-create the master-data record if the link matters to you. The credential itself is unaffected, and publishing does not depend on the link.',
+    });
+  }
+
   // ── Step 8: Publish to IDR ──────────────────────────────────────────────
 
   if (publishingOptions.publish === true && refs) {
-    if (!primaryEntity.schemePrimaryKey || !primaryEntity.schemeNamespace) {
-      logger.warn({ credentialId }, 'Publishing requested but entity has no scheme configuration — skipping');
+    // Publishing resolves its target from the credential's own identifier
+    // (ADR-043): the scheme, registrar and IDR instance all hang off
+    // Identifier, so a missing master-data record no longer decides whether a
+    // credential is discoverable. Every failure below names the unmet
+    // prerequisite and what the caller does about it, and nothing throws: the
+    // credential exists by this point, so a caller who loses the response
+    // loses the id of a credential that was signed and stored.
+    let resolution: Awaited<ReturnType<typeof resolvePublishTarget>>;
+    try {
+      resolution = await resolvePublishTarget(refs, tenantId, publishingOptions.identifierSchemeId);
+    } catch (error) {
+      logger.error({ err: error, credentialId }, 'Could not resolve the publish target');
+      resolution = { outcome: 'unavailable' };
+    }
+
+    if (resolution.outcome === 'ambiguous') {
       warnings.push({
-        code: 'PUBLISH_SKIPPED' as const,
-        message: 'Publishing was requested but the entity has no identity scheme configuration',
+        code: 'PUBLISH_IDENTIFIER_AMBIGUOUS' as const,
+        message: `Publishing was requested but the identifier "${resolution.value}" exists under more than one scheme.`,
+        remediation: `Set publishingOptions.identifierSchemeId to the scheme you want to publish under. Candidates: ${resolution.candidates
+          .map((candidate) => `${candidate.schemeName} (${candidate.schemeId})`)
+          .join(', ')}.`,
       });
-    } else if (!primaryEntity.primaryIdentifier) {
-      logger.warn({ credentialId }, 'Publishing requested but no primary identifier resolved — skipping');
+    } else if (resolution.outcome === 'not-found') {
       warnings.push({
-        code: 'PUBLISH_SKIPPED' as const,
-        message: 'Publishing was requested but no primary identifier could be resolved from the credential payload',
+        code: 'PUBLISH_IDENTIFIER_UNKNOWN' as const,
+        message: `Publishing was requested but no identifier matching "${resolution.value}" is registered for this tenant.`,
+        remediation: 'Register the identifier under an identifier scheme, then issue the credential again.',
+      });
+    } else if (resolution.outcome === 'no-reference') {
+      warnings.push({
+        code: 'PUBLISH_REFERENCE_MISSING' as const,
+        message: 'Publishing was requested but the credential payload carries no identifier to publish under.',
+        remediation:
+          "Check that the credential's subject carries the identifier fields its data model defines, such as a registeredId on the party or product.",
+      });
+    } else if (resolution.outcome === 'unavailable') {
+      warnings.push({
+        code: 'PUBLISH_TARGET_UNRESOLVED' as const,
+        message: "Publishing was requested but the credential's identifier could not be looked up.",
+        remediation:
+          'The credential was issued. Ask your operator to check the service, then issue again if you need it published.',
+      });
+    } else if (resolution.outcome === 'incomplete') {
+      warnings.push({
+        code: 'PUBLISH_SCHEME_INCOMPLETE' as const,
+        message: `Publishing was requested but the identifier "${resolution.value}" belongs to a scheme without both a primary key and a registrar namespace.`,
+        remediation:
+          'Give the identifier scheme a primary key, and its registrar a namespace, then issue the credential again.',
       });
     } else {
-      // Resolve IDR service outside try-catch — config failures should be fatal
-      const idrService = await resolveIdrService(tenantId, primaryEntity.schemeIdrServiceInstanceId);
-
-      const linkTitle = publishingOptions.linkTitle || dataModel.name;
-      const links = buildPublishLinks(storageResponse, linkTitle, {
-        linkType: publishingOptions.linkType ?? idrService.service.defaultLinkType,
-        machineVerificationUrl,
-        humanVerificationUrl: effectiveHumanVerificationUrl,
-        ...(publishingOptions.hreflang !== undefined ? { hreflang: publishingOptions.hreflang } : {}),
-        ...(publishingOptions.additionalRels !== undefined ? { additionalRels: publishingOptions.additionalRels } : {}),
-        ...(publishingOptions.public !== undefined ? { public: publishingOptions.public } : {}),
-        ...(publishingOptions.accessRole !== undefined ? { accessRole: publishingOptions.accessRole } : {}),
-      });
-
-      logger.info(
-        { idrInstanceId: idrService.instanceId, primaryIdentifier: primaryEntity.primaryIdentifier },
-        'Publishing credential to IDR',
-      );
-
+      const { target } = resolution;
+      let idrService: Awaited<ReturnType<typeof resolveIdrService>> | undefined;
       try {
-        await idrService.service.publishLinks(
-          primaryEntity.schemePrimaryKey,
-          primaryEntity.primaryIdentifier,
-          links,
-          publishingOptions.qualifierPath || '/',
-          {
-            namespace: primaryEntity.schemeNamespace,
-            description: primaryEntity.entityDescription || primaryEntity.entityName,
-          },
+        // Scheme, then registrar, then tenant or system default, matching how
+        // POST /identifiers/{id}/links resolves the same chain.
+        idrService = await resolveIdrService(
+          tenantId,
+          target.schemeIdrServiceInstanceId,
+          target.registrarIdrServiceInstanceId,
         );
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        logger.error(
-          { err: error, credentialId, scheme: primaryEntity.schemePrimaryKey },
-          'Failed to publish credential to IDR',
-        );
+        logger.error({ err: error, credentialId }, 'Publishing requested but no IDR service could be resolved');
         warnings.push({
-          code: 'IDR_PUBLISH_FAILED',
-          message: `Failed to publish credential to identity resolver: ${detail}. Ensure the identifier scheme is registered with the IDR service. Contact your IDR operator if this persists.`,
+          code: 'PUBLISH_IDR_UNAVAILABLE' as const,
+          message: 'Publishing was requested but no identity resolver service is available for this credential.',
+          remediation:
+            'Ask your operator to configure an identity resolver service instance for the scheme, the registrar, or the tenant.',
         });
       }
 
-      if (!warnings.some((w) => w.code === 'IDR_PUBLISH_FAILED')) {
+      if (idrService) {
+        const linkTitle = publishingOptions.linkTitle || dataModel.name;
+        let links: ReturnType<typeof buildPublishLinks> | undefined;
         try {
-          await updateCredentialPublished(credentialId, tenantId, true);
-        } catch (error) {
-          logger.error(
-            { err: error, credentialId },
-            'Failed to update published status — credential was published to IDR but DB record is stale',
-          );
-          warnings.push({
-            code: 'DB_STATUS_UPDATE_FAILED' as const,
-            message: 'Credential was published to IDR but the published status could not be saved',
+          links = buildPublishLinks(storageResponse, linkTitle, {
+            linkType: publishingOptions.linkType ?? idrService.service.defaultLinkType,
+            machineVerificationUrl,
+            humanVerificationUrl: effectiveHumanVerificationUrl,
+            ...(publishingOptions.hreflang !== undefined ? { hreflang: publishingOptions.hreflang } : {}),
+            ...(publishingOptions.additionalRels !== undefined
+              ? { additionalRels: publishingOptions.additionalRels }
+              : {}),
+            ...(publishingOptions.public !== undefined ? { public: publishingOptions.public } : {}),
+            ...(publishingOptions.accessRole !== undefined ? { accessRole: publishingOptions.accessRole } : {}),
           });
+        } catch (error) {
+          logger.error({ err: error, credentialId }, 'Could not build the publish links');
+          warnings.push({
+            code: 'PUBLISH_LINKS_UNBUILDABLE' as const,
+            message: 'Publishing was requested but the credential links could not be built.',
+            remediation:
+              'The credential was issued and stored. Ask your operator to check the storage response, then issue again if you need it published.',
+          });
+        }
+
+        let published = false;
+        if (links) {
+          logger.info(
+            { idrInstanceId: idrService.instanceId, primaryIdentifier: target.identifierValue },
+            'Publishing credential to IDR',
+          );
+          try {
+            await idrService.service.publishLinks(
+              target.schemePrimaryKey,
+              target.identifierValue,
+              links,
+              publishingOptions.qualifierPath || '/',
+              {
+                namespace: target.schemeNamespace,
+                // The resolver requires a non-empty description. The entity
+                // supplied it before publishing was decoupled from entity
+                // matching; with no entity the link title is the stable
+                // fallback, itself defaulting to the data model's name.
+                description: primaryEntity.entityDescription || primaryEntity.entityName || linkTitle,
+              },
+            );
+            published = true;
+          } catch (error) {
+            // The upstream error carries the resolver's raw response body, which
+            // is operator detail: it goes to the log, not to the caller.
+            logger.error(
+              { err: error, credentialId, scheme: target.schemePrimaryKey },
+              'Failed to publish credential to IDR',
+            );
+            // A rejection the resolver stated is distinguishable from one where
+            // the call itself failed: the second may have committed upstream, so
+            // it must not invite a blind retry (the resolver is append-only).
+            // A 4xx is the resolver stating it did not accept the links. A 5xx,
+            // or a failure of the call itself, may still have committed upstream,
+            // so it is reported as unknown rather than as a refusal.
+            // The upstream status is in details.httpStatus; the error's own
+            // statusCode is this service's 502 for any upstream failure.
+            const status = (error as { details?: { httpStatus?: number } })?.details?.httpStatus;
+            const rejected =
+              error instanceof Error &&
+              error.name === 'IdrPublishError' &&
+              typeof status === 'number' &&
+              status >= 400 &&
+              status < 500;
+            warnings.push(
+              rejected
+                ? {
+                    code: 'IDR_PUBLISH_FAILED' as const,
+                    message:
+                      'The identity resolver rejected the credential links, so the credential is not discoverable.',
+                    remediation:
+                      'Check that the identifier scheme is registered with the identity resolver, then issue the credential again once it is.',
+                  }
+                : {
+                    code: 'IDR_PUBLISH_UNCONFIRMED' as const,
+                    message:
+                      'The identity resolver could not be reached or did not answer, so whether the credential links were registered is unknown.',
+                    remediation:
+                      'Ask your operator to check the resolver for these links before issuing again: a second publish of the same links is rejected as a duplicate.',
+                  },
+            );
+          }
+
+          if (published) {
+            try {
+              await updateCredentialPublished(credentialId, tenantId, true);
+            } catch (error) {
+              logger.error(
+                { err: error, credentialId },
+                'Failed to update published status — credential was published to IDR but DB record is stale',
+              );
+              warnings.push({
+                code: 'DB_STATUS_UPDATE_FAILED' as const,
+                message:
+                  'The credential was published to the identity resolver but its published status could not be saved.',
+                remediation:
+                  'The credential is discoverable; only its stored status is stale. No action is needed unless you rely on that flag.',
+              });
+            }
+          }
         }
       }
     }
@@ -463,8 +587,11 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     try {
       return { ...credential, decryptionKey: revealDecryptionKey(credential.decryptionKey) };
     } catch (error) {
+      // The underlying message names the operator's encryption key, so it
+      // stays in the log; the caller gets the sanitised 500 every other
+      // unhandled failure returns (ADR-036).
       logger.error({ err: error, credentialId: credential.id }, 'Failed to reveal a stored decryption key');
-      throw new Error(`${errorMessage(error)} (credential ${credential.id})`, { cause: error });
+      throw new Error('Failed to read a stored credential', { cause: error });
     }
   });
   return NextResponse.json(buildPaginatedResponse(credentials, total, limit, offset));

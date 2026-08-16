@@ -75,11 +75,40 @@ describe('credential.repository', () => {
   });
 
   describe('createCredential', () => {
-    it('rethrows a foreign-key violation unchanged', async () => {
-      // The entity links (organisationId, facilityId, productId) are resolved
-      // server-side, so a violation is a server-side race with no honest 4xx;
-      // this pins the deliberate absence of a mapping.
-      const fkError = prismaError('P2003', 'Foreign key constraint failed on the field: `organisationId`');
+    it.each(['organisationId', 'facilityId', 'productId'])(
+      'retries without entity links when %s vanished, so a stored credential is never lost',
+      async (column) => {
+        // ADR-043: the credential is already signed and stored externally by
+        // this point, so an entity that disappeared mid-request must not fail
+        // the write. The retry drops only the links and says so.
+        const created = { ...SEED_CREDENTIALS[0], organisationId: null, facilityId: null, productId: null };
+        mockCredential.create
+          .mockRejectedValueOnce(prismaError('P2003', `Foreign key constraint failed on the field: \`${column}\``))
+          .mockResolvedValueOnce(created);
+
+        const result = await createCredential({
+          tenantId: TENANT_ID,
+          storageUri: 'https://storage.example/credential-new',
+          digestMultibase: 'zNew',
+          credentialType: 'DigitalProductPassport',
+          organisationId: 'org-1',
+          facilityId: 'fac-1',
+          productId: 'prod-1',
+        });
+
+        expect(result).toEqual({ credential: created, entityLinkFailed: true });
+        expect(mockCredential.create).toHaveBeenCalledTimes(2);
+        const retryData = mockCredential.create.mock.calls[1][0].data;
+        expect(retryData).not.toHaveProperty('organisationId');
+        expect(retryData).not.toHaveProperty('facilityId');
+        expect(retryData).not.toHaveProperty('productId');
+      },
+    );
+
+    it('rethrows a foreign-key violation on a column that is not an entity link', async () => {
+      // Only the optional enrichment columns are retried; a tenant that
+      // vanished is a real failure and stays fatal under ADR-036.
+      const fkError = prismaError('P2003', 'Foreign key constraint failed on the field: `tenantId`');
       mockCredential.create.mockRejectedValue(fkError);
 
       await expect(
@@ -91,6 +120,22 @@ describe('credential.repository', () => {
           organisationId: 'org-1',
         }),
       ).rejects.toBe(fkError);
+      expect(mockCredential.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('rethrows an unrelated database failure without retrying', async () => {
+      const other = prismaError('P2002', 'Unique constraint failed');
+      mockCredential.create.mockRejectedValue(other);
+
+      await expect(
+        createCredential({
+          tenantId: TENANT_ID,
+          storageUri: 'https://storage.example/credential-new',
+          digestMultibase: 'zNew',
+          credentialType: 'DigitalProductPassport',
+        }),
+      ).rejects.toBe(other);
+      expect(mockCredential.create).toHaveBeenCalledTimes(1);
     });
   });
 

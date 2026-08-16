@@ -197,6 +197,46 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
     });
   });
 
+  // A publish that cannot happen must still return the credential, with a
+  // warning naming the unmet prerequisite (ADR-043).
+  it('returns the credential with a named publish warning when the identifier is not registered', () => {
+    cy.request({
+      method: 'POST',
+      url: '/api/v1/credentials',
+      body: {
+        credentialPayload: {
+          '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
+          id: `urn:uuid:e2e-pub-unknown-${RUN_ID}`,
+          type: ['DigitalProductPassport', 'VerifiableCredential'],
+          issuer: { type: ['CredentialIssuer'], id: defaultDidValue, name: `E2E Issuer ${RUN_ID}` },
+          credentialSubject: {
+            type: ['ProductPassport'],
+            id: `https://example.com/products/e2e-pub-unknown-${RUN_ID}`,
+            product: {
+              type: ['Product'],
+              id: `https://example.com/products/e2e-pub-unknown-${RUN_ID}`,
+              registeredId: `unregistered-${RUN_ID}`,
+              name: `E2E Unregistered Product ${RUN_ID}`,
+            },
+          },
+        },
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.1',
+        publishingOptions: { publish: true },
+      },
+    }).then((response) => {
+      expect(response.status).to.eq(201);
+      expect(response.body.credentialId).to.be.a('string');
+
+      const warnings = response.body.warnings as Array<{ code: string; remediation?: string }>;
+      expect(warnings, JSON.stringify(warnings)).to.be.an('array');
+      const publishWarning = warnings.find((w) => w.code.startsWith('PUBLISH_') || w.code === 'REFS_EXTRACTION_FAILED');
+      expect(publishWarning, JSON.stringify(warnings)).to.exist;
+      expect(publishWarning?.code).to.not.eq('PUBLISH_SKIPPED');
+      expect(publishWarning?.remediation).to.be.a('string').and.not.be.empty;
+    });
+  });
+
   it('registers all three links on the IDR with the roles on the credential and human links', () => {
     cy.request({
       method: 'GET',

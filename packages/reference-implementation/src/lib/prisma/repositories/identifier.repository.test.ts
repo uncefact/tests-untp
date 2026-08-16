@@ -1,4 +1,5 @@
 import {
+  findIdentifiersByValue,
   createIdentifier,
   getIdentifierById,
   listIdentifiers,
@@ -367,5 +368,30 @@ describe('identifier.repository', () => {
 
       await expect(deleteIdentifier('ident-1', 'other-tenant')).rejects.toThrow('Identifier not found');
     });
+  });
+});
+
+describe('findIdentifiersByValue', () => {
+  it('queries by value and tenant with the scheme, registrar and qualifiers included', async () => {
+    mockIdentifier.findMany.mockResolvedValue([]);
+
+    await findIdentifiersByValue('09506000134352', 'tenant-1');
+
+    expect(mockIdentifier.findMany).toHaveBeenCalledWith({
+      where: { value: '09506000134352', tenantId: 'tenant-1' },
+      include: { scheme: { include: { registrar: true, qualifiers: true } } },
+    });
+  });
+
+  it('narrows to a scheme when one is given, so a shared value resolves to one identifier', async () => {
+    mockIdentifier.findMany.mockResolvedValue([]);
+
+    await findIdentifiersByValue('09506000134352', 'tenant-1', 'scheme-1');
+
+    expect(mockIdentifier.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { value: '09506000134352', tenantId: 'tenant-1', schemeId: 'scheme-1' },
+      }),
+    );
   });
 });

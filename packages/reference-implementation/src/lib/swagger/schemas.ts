@@ -52,7 +52,11 @@ function stripAdditionalPropertiesFalse(node: unknown): void {
 
 /** Advisory warning that may accompany a credential-issue response. */
 export const credentialWarningSchema = z.object({
-  code: z.string().describe('Warning code'),
+  code: z
+    .string()
+    .describe(
+      'Warning code. Publishing codes: `REFS_EXTRACTION_FAILED` (no identifier could be read from the payload), `PUBLISH_REFERENCE_MISSING` (the payload carries no identifier to publish under), `PUBLISH_SCHEME_INCOMPLETE` (the identifier resolved to a scheme missing a primary key or registrar namespace), `PUBLISH_IDENTIFIER_UNKNOWN` (no identifier registered for the value), `PUBLISH_IDENTIFIER_AMBIGUOUS` (the value exists under more than one scheme; set publishingOptions.identifierSchemeId), `PUBLISH_IDR_UNAVAILABLE` (no identity resolver service is configured), `PUBLISH_TARGET_UNRESOLVED` (the identifier lookup itself failed), `IDR_PUBLISH_FAILED` (the resolver rejected the links), `IDR_PUBLISH_UNCONFIRMED` (the resolver could not be reached, so whether the links were registered is unknown), `DB_STATUS_UPDATE_FAILED` (the links are live but the stored status was not saved). `ENTITY_LINK_FAILED` reports that the credential could not be linked to a master-data record, which does not affect publishing.',
+    ),
   message: z.string().describe('Human-readable warning message'),
   received: z.unknown().optional().describe('The value that triggered the warning, where one applies'),
   expected: z.unknown().optional().describe('The value or shape that was expected, where one applies'),

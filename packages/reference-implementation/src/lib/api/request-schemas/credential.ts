@@ -34,6 +34,11 @@ export const publishingOptionsSchema = z.object({
     .optional()
     .describe("UNTP link relation type (defaults to the IDR service's configured default link type)"),
   linkTitle: z.string().optional().describe('Title for the published link (defaults to data model name)'),
+  identifierSchemeId: idSchema
+    .optional()
+    .describe(
+      "Identifier scheme to publish under, required only when the credential's identifier value exists under more than one scheme",
+    ),
   qualifierPath: z
     .string()
     .optional()

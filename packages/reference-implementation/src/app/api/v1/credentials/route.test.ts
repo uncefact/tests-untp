@@ -32,7 +32,10 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
             return jsonResponse({ error: (e as Error).message }, { status: 404 });
           }
           if (e instanceof ServiceRegistryError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 500 });
+            // Mirrors handleRouteError: a named missing instance is a 404,
+            // every other registry failure is a 500.
+            const status = (e as Error).name === 'ServiceInstanceNotFoundError' ? 404 : 500;
+            return jsonResponse({ error: (e as Error).message }, { status });
           }
           if (e instanceof ServiceError) {
             const serviceErr = e as Error & { code?: string; statusCode?: number };
@@ -91,6 +94,11 @@ jest.mock('@/lib/services/resolve-storage-service', () => ({
 }));
 jest.mock('@/lib/services/resolve-idr-service', () => ({
   resolveIdrService: (...args: unknown[]) => mockResolveIdrService(...args),
+}));
+
+const mockResolvePublishTarget = jest.fn();
+jest.mock('@/lib/credentials/resolve-publish-target', () => ({
+  resolvePublishTarget: (...args: unknown[]) => mockResolvePublishTarget(...args),
 }));
 
 // Services package mocks
@@ -856,6 +864,19 @@ describe('POST /api/v1/credentials', () => {
       };
       const primaryEntity = { ...defaults, ...overrides };
 
+      // Publishing resolves its target from the identifier now, not the
+      // entity; the entity remains only as the description source.
+      mockResolvePublishTarget.mockResolvedValue({
+        outcome: 'resolved',
+        target: {
+          identifierValue: '09506000134352',
+          schemePrimaryKey: 'gtin',
+          schemeNamespace: 'gs1',
+          schemeIdrServiceInstanceId: 'idr-scheme-1',
+          registrarIdrServiceInstanceId: null,
+        },
+      });
+
       mockIssueCredential.mockResolvedValue({
         credentialId: 'cred-1',
         storageResponse: STORAGE_RESPONSE,
@@ -896,7 +917,252 @@ describe('POST /api/v1/credentials', () => {
       expect(linkOptions.hreflang).toEqual(['EN-au', 'x-default', 'sl-rozaj-biske']);
     });
 
-    it('does not add PUBLISH_SKIPPED when refs extraction already failed', async () => {
+    it.each([
+      [
+        'the payload carries no identifier',
+        { outcome: 'no-reference' },
+        'PUBLISH_REFERENCE_MISSING',
+        'identifier fields',
+      ],
+      [
+        'the identifier scheme is incomplete',
+        { outcome: 'incomplete', value: '09506000134352' },
+        'PUBLISH_SCHEME_INCOMPLETE',
+        'primary key',
+      ],
+    ])(
+      'warns with its own code and a remediation when %s',
+      async (_label, resolution, expectedCode, remediationFragment) => {
+        setupPublishingHappyPath();
+        mockResolvePublishTarget.mockResolvedValue(resolution);
+
+        const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+        const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+        const json = await res.json();
+
+        expect(res.status).toBe(201);
+        expect(json.credentialId).toBe('cred-1');
+        const warning = (json.warnings as Array<{ code: string; remediation?: string }>).find(
+          (w) => w.code === expectedCode,
+        );
+        expect(warning).toBeDefined();
+        expect(warning?.remediation).toContain(remediationFragment);
+        expect(mockPublishLinks).not.toHaveBeenCalled();
+      },
+    );
+
+    it('warns PUBLISH_IDENTIFIER_AMBIGUOUS naming the colliding schemes rather than guessing', async () => {
+      setupPublishingHappyPath();
+      mockResolvePublishTarget.mockResolvedValue({
+        outcome: 'ambiguous',
+        value: '09506000134352',
+        candidates: [
+          { schemeId: 'scheme-1', schemeName: 'GS1 GTIN' },
+          { schemeId: 'scheme-2', schemeName: 'Internal SKU' },
+        ],
+      });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      const warning = (json.warnings as Array<{ code: string; message: string; remediation?: string }>).find(
+        (w) => w.code === 'PUBLISH_IDENTIFIER_AMBIGUOUS',
+      );
+      // The caller needs the scheme id the option takes, not just its name.
+      expect(warning?.remediation).toContain('identifierSchemeId');
+      expect(warning?.remediation).toContain('scheme-1');
+      expect(warning?.remediation).toContain('GS1 GTIN');
+      expect(mockPublishLinks).not.toHaveBeenCalled();
+    });
+
+    it('warns PUBLISH_IDENTIFIER_UNKNOWN when no identifier is registered for the value', async () => {
+      setupPublishingHappyPath();
+      mockResolvePublishTarget.mockResolvedValue({ outcome: 'not-found', value: '09506000134352' });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      const warning = (json.warnings as Array<{ code: string; remediation?: string }>).find(
+        (w) => w.code === 'PUBLISH_IDENTIFIER_UNKNOWN',
+      );
+      expect(warning?.remediation).toContain('Register the identifier');
+      expect(mockPublishLinks).not.toHaveBeenCalled();
+    });
+
+    it('warns ENTITY_LINK_FAILED when the credential was stored without its entity links', async () => {
+      setupPublishingHappyPath();
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {
+          primaryIdentifier: '09506000134352',
+          schemePrimaryKey: 'gtin',
+          schemeNamespace: 'gs1',
+          schemeIdrServiceInstanceId: 'idr-scheme-1',
+          entityName: 'Test Product',
+        },
+        entityLinkFailed: true,
+      });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      const warning = (json.warnings as Array<{ code: string; remediation?: string }>).find(
+        (w) => w.code === 'ENTITY_LINK_FAILED',
+      );
+      expect(warning).toBeDefined();
+      expect(warning?.remediation).toContain('master-data');
+      // Linking is enrichment: its failure must not stop the publish.
+      expect(mockPublishLinks).toHaveBeenCalledTimes(1);
+    });
+
+    it('warns ENTITY_LINK_FAILED even when publishing was not requested', async () => {
+      // Entity linking is enrichment in its own right (ADR-043 decision 4), so
+      // the warning does not belong to the publish branch.
+      setupPublishingHappyPath();
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        entityLinkFailed: true,
+      });
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect((json.warnings as Array<{ code: string }>).map((w) => w.code)).toContain('ENTITY_LINK_FAILED');
+      expect(mockPublishLinks).not.toHaveBeenCalled();
+    });
+
+    it('warns PUBLISH_TARGET_UNRESOLVED instead of losing the credential when the lookup itself fails', async () => {
+      setupPublishingHappyPath();
+      mockResolvePublishTarget.mockRejectedValue(new Error('connection lost'));
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      expect((json.warnings as Array<{ code: string }>).map((w) => w.code)).toContain('PUBLISH_TARGET_UNRESOLVED');
+    });
+
+    it('distinguishes a resolver rejection from an unconfirmed publish, and never leaks the upstream body', async () => {
+      setupPublishingHappyPath();
+      const rejection = Object.assign(new Error('HTTP 409: {"detail":"duplicate response for /gtin/095"}'), {
+        name: 'IdrPublishError',
+        details: { httpStatus: 409 },
+      });
+      mockPublishLinks.mockRejectedValueOnce(rejection);
+
+      let res = await POST(
+        createFakeRequest(validBody({ publishingOptions: { publish: true } })),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      let json = await res.json();
+      let warning = (json.warnings as Array<{ code: string; message: string }>).find((w) =>
+        w.code.startsWith('IDR_PUBLISH'),
+      );
+      expect(warning?.code).toBe('IDR_PUBLISH_FAILED');
+      expect(warning?.message).not.toContain('duplicate response');
+      expect(warning?.message).not.toContain('409');
+
+      // A transport failure may have committed upstream, so it must not be
+      // reported as a confirmed rejection nor invite a blind retry.
+      mockPublishLinks.mockRejectedValueOnce(new Error('socket hang up'));
+      res = await POST(
+        createFakeRequest(validBody({ publishingOptions: { publish: true } })),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      json = await res.json();
+      warning = (json.warnings as Array<{ code: string; message: string; remediation?: string }>).find((w) =>
+        w.code.startsWith('IDR_PUBLISH'),
+      );
+      expect(warning?.code).toBe('IDR_PUBLISH_UNCONFIRMED');
+      expect((warning as { remediation?: string }).remediation).toContain('duplicate');
+
+      // A resolver 5xx may still have committed, so it is unknown, not refused.
+      mockPublishLinks.mockRejectedValueOnce(
+        Object.assign(new Error('HTTP 503: upstream unavailable'), {
+          name: 'IdrPublishError',
+          details: { httpStatus: 503 },
+        }),
+      );
+      res = await POST(
+        createFakeRequest(validBody({ publishingOptions: { publish: true } })),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      json = await res.json();
+      warning = (json.warnings as Array<{ code: string; message: string }>).find((w) =>
+        w.code.startsWith('IDR_PUBLISH'),
+      );
+      expect(warning?.code).toBe('IDR_PUBLISH_UNCONFIRMED');
+    });
+
+    it('warns PUBLISH_IDR_UNAVAILABLE and still returns the credential when no IDR service resolves', async () => {
+      setupPublishingHappyPath();
+      // Previously this threw and destroyed the response for a credential that
+      // had already been signed and stored (ADR-043 decision 2).
+      mockResolveIdrService.mockRejectedValue(new Error('No service instance available for IDR'));
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      const warning = (json.warnings as Array<{ code: string; remediation?: string }>).find(
+        (w) => w.code === 'PUBLISH_IDR_UNAVAILABLE',
+      );
+      expect(warning).toBeDefined();
+      expect(warning?.remediation).toContain('identity resolver');
+      expect(mockPublishLinks).not.toHaveBeenCalled();
+    });
+
+    it('warns DB_STATUS_UPDATE_FAILED with a remediation when the status write fails after a successful publish', async () => {
+      setupPublishingHappyPath();
+      mockUpdateCredentialPublished.mockRejectedValue(new Error('connection lost'));
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(mockPublishLinks).toHaveBeenCalledTimes(1);
+      const warning = (json.warnings as Array<{ code: string; remediation?: string }>).find(
+        (w) => w.code === 'DB_STATUS_UPDATE_FAILED',
+      );
+      expect(warning).toBeDefined();
+      expect(warning?.remediation).toContain('discoverable');
+    });
+
+    it('every publish warning carries a remediation the caller can act on', async () => {
+      setupPublishingHappyPath();
+      mockResolvePublishTarget.mockResolvedValue({ outcome: 'incomplete', value: '09506000134352' });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      const publishWarnings = (json.warnings as Array<{ code: string; remediation?: string }>).filter((w) =>
+        w.code.startsWith('PUBLISH_'),
+      );
+      expect(publishWarnings.length).toBeGreaterThan(0);
+      for (const warning of publishWarnings) {
+        expect(warning.remediation).toEqual(expect.any(String));
+      }
+    });
+
+    it('does not add a publish-prerequisite warning when refs extraction already failed', async () => {
       setupPublishingHappyPath();
       const failingBridge = {
         buildSubject: jest.fn().mockReturnValue({}),
@@ -917,7 +1183,7 @@ describe('POST /api/v1/credentials', () => {
       expect(res.status).toBe(201);
       const codes = ((json.warnings ?? []) as Array<{ code: string }>).map((w) => w.code);
       expect(codes).toContain('REFS_EXTRACTION_FAILED');
-      expect(codes).not.toContain('PUBLISH_SKIPPED');
+      expect(codes).not.toContain('PUBLISH_SCHEME_INCOMPLETE');
     });
 
     it('publishes to IDR when publish=true and entity has scheme config', async () => {
@@ -926,8 +1192,9 @@ describe('POST /api/v1/credentials', () => {
       const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      // resolveIdrService called with scheme IDR only
-      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1');
+      // Scheme, then registrar, then tenant/system default, matching the
+      // identifier-links route (ADR-043).
+      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1', null);
 
       // buildPublishLinks called with storage response, link title, and options.
       // humanVerificationUrl defaults to `${RI_APP_URL}/verify` (RI_APP_URL is
@@ -957,7 +1224,7 @@ describe('POST /api/v1/credentials', () => {
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
       // serviceInstanceId should be ignored — resolveIdrService called with scheme IDR only
-      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1');
+      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1', null);
     });
 
     it('uses publishingOptions.linkTitle override when provided', async () => {
@@ -1307,24 +1574,27 @@ describe('POST /api/v1/credentials', () => {
       expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
     });
 
-    it('skips publishing when primaryEntity has no schemePrimaryKey', async () => {
-      setupPublishingHappyPath({ schemePrimaryKey: undefined });
+    it('publishes from the identifier even when no master-data entity matched', async () => {
+      // The decoupling this ADR makes: an identifier with no entity record
+      // used to skip publishing entirely (#738's misdirection).
+      setupPublishingHappyPath();
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        entityLinkFailed: false,
+      });
 
       const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
-      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      expect(mockResolveIdrService).not.toHaveBeenCalled();
-      expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
-    });
-
-    it('skips publishing when primaryEntity has no schemeNamespace', async () => {
-      setupPublishingHappyPath({ schemeNamespace: undefined });
-
-      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
-      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
-
-      expect(mockResolveIdrService).not.toHaveBeenCalled();
-      expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
+      expect(res.status).toBe(201);
+      expect(mockPublishLinks).toHaveBeenCalledTimes(1);
+      expect(mockUpdateCredentialPublished).toHaveBeenCalledTimes(1);
+      // With no entity to describe it, the link title is the description.
+      expect(mockPublishLinks.mock.calls[0][4]).toEqual(
+        expect.objectContaining({ description: 'Digital Product Passport' }),
+      );
     });
 
     it('issues credential with IDR_PUBLISH_FAILED warning when publishLinks throws', async () => {
@@ -1337,14 +1607,12 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(201);
       expect(json.credentialId).toBe('cred-1');
+      // A plain Error is not a stated resolver rejection, so the outcome is
+      // unconfirmed rather than failed, and the upstream text stays in the log.
       expect(json.warnings).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            code: 'IDR_PUBLISH_FAILED',
-            message: expect.stringContaining('scheme not registered'),
-          }),
-        ]),
+        expect.arrayContaining([expect.objectContaining({ code: 'IDR_PUBLISH_UNCONFIRMED' })]),
       );
+      expect(JSON.stringify(json.warnings)).not.toContain('scheme not registered');
     });
 
     it('does not mark credential as published when publishLinks throws', async () => {
@@ -1357,25 +1625,39 @@ describe('POST /api/v1/credentials', () => {
       expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
     });
 
-    it('skips publishing when primaryEntity is empty (no scheme info)', async () => {
-      // primaryEntity returned from issueCredential has no scheme fields
-      mockIssueCredential.mockResolvedValue({
-        credentialId: 'cred-1',
-        storageResponse: STORAGE_RESPONSE,
-        primaryEntity: {},
+    it('uses the registrar IDR instance when the scheme carries none', async () => {
+      setupPublishingHappyPath();
+      mockResolvePublishTarget.mockResolvedValue({
+        outcome: 'resolved',
+        target: {
+          identifierValue: '09506000134352',
+          schemePrimaryKey: 'gtin',
+          schemeNamespace: 'gs1',
+          schemeIdrServiceInstanceId: null,
+          registrarIdrServiceInstanceId: 'idr-registrar-1',
+        },
       });
 
       const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
-      expect(mockResolveIdrService).not.toHaveBeenCalled();
-      expect(mockUpdateCredentialPublished).not.toHaveBeenCalled();
+      expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', null, 'idr-registrar-1');
     });
   });
 
   // ── Error propagation ─────────────────────────────────────────────────
 
   describe('error propagation', () => {
+    it('returns 404 when an explicitly requested service instance no longer exists', async () => {
+      const { ServiceInstanceNotFoundError } = jest.requireActual('@/lib/api/errors');
+      mockResolveStorageService.mockRejectedValue(new ServiceInstanceNotFoundError('STORAGE', 'missing-instance'));
+
+      const req = createFakeRequest(validBody({ storageOptions: { serviceInstanceId: 'missing-instance' } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(404);
+    });
+
     it('returns 500 when issueCredential throws', async () => {
       mockIssueCredential.mockRejectedValue(new Error('Signing service unavailable'));
 
@@ -1608,8 +1890,11 @@ describe('GET /api/v1/credentials', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    // The failing row is named so an operator can find it without trawling logs.
-    expect(json.error).toContain('cred-1');
+    // The underlying message names the operator's encryption key and the
+    // failing row, so neither reaches the caller; both go to the log.
+    expect(json.error).not.toContain('cred-1');
+    expect(json.error).not.toContain('DATA_ENCRYPTION_KEY');
+    expect(json.error).not.toContain('decrypt the stored credential');
   });
 
   it('reveals stored decryption keys in the listed credentials', async () => {

@@ -30,6 +30,12 @@ export type IssueCredentialResult = {
   credentialId: string;
   storageResponse: StorageRecord;
   primaryEntity: PrimaryEntityResult;
+  /**
+   * True when the matched entity vanished before the credential row was
+   * written, so the credential was stored without its entity links. Advisory
+   * enrichment only (ADR-043): the caller is told, and issuance still succeeds.
+   */
+  entityLinkFailed: boolean;
 };
 
 export async function issueCredential(input: IssueCredentialInput): Promise<IssueCredentialResult> {
@@ -47,7 +53,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
 
   const decryptionKey = protectDecryptionKey(storageResponse.decryptionKey);
 
-  const credentialRecord = await createCredential({
+  const { credential: credentialRecord, entityLinkFailed } = await createCredential({
     tenantId,
     storageUri: storageResponse.uri,
     digestMultibase: storageResponse.digestMultibase,
@@ -61,9 +67,17 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
 
   logger.info({ tenantId, credentialId: credentialRecord.id }, 'Credential issued and stored');
 
+  if (entityLinkFailed) {
+    logger.warn(
+      { tenantId, credentialId: credentialRecord.id },
+      'Credential stored without entity links: the matched entity no longer exists',
+    );
+  }
+
   return {
     credentialId: credentialRecord.id,
     storageResponse,
     primaryEntity,
+    entityLinkFailed,
   };
 }
