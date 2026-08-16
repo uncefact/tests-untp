@@ -375,11 +375,23 @@ Deleting a render template removes its database row only. The uploaded template 
 
 ### Identity Resolver (IDR) registrations
 
-The reconcile's source-of-truth boundary is the Reference Implementation database. Identifier schemes registered with an external Identity Resolver during seeding are not updated or deregistered when the manifest changes or removes them; keeping the IDR in step remains a manual operator action.
+IDR registration runs after the custom seed's database transaction has committed, and only when the system IDR service instance was seeded successfully with the Pyx IDR adapter (the data encryption key is present, the IDR configuration is valid, and the service instance upsert succeeded). If that instance was not seeded, registration is skipped and the earlier service-instance warning is the signal.
+
+Each qualifying seed run reads every identifier scheme on the system tenant (including any created outside the manifest), groups them by the registrar's `namespace` (the manifest field `registrars[].namespace`), and sends one complete application-identifier document per non-empty namespace to the IDR. Against the bundled Pyx Identity Resolver 4.0.0 that request is a replacing upsert: the IDR overwrites the namespace's application-identifier list and returns success, on first seed and on every later run alike. See [Identifier Management in the Pyx IDR developer guide](https://pyx-industries.github.io/pyx-identity-resolver/docs/developer-guide/#identifier-management).
+
+What that means for manifest changes:
+
+- Changing a scheme's name, primary key, validation pattern, or qualifiers, or adding a scheme, is applied to the IDR by the next successful seed run. No manual step is needed.
+- Removing a scheme whose registrar still has other schemes is also applied by the next seed run, which re-sends the namespace without it. Do not delete the namespace for this case; deleting a namespace orphans every link registered under it.
+- Removing a registrar, removing its last scheme, or renaming `registrars[].namespace` stops that namespace being sent at all, so the old registration stays in the IDR. The seed never deletes a namespace. Leave the stale namespace in place by default, and remove it (`DELETE /api/v4/identifiers?namespace=<namespace>`) only after confirming that no other system registers against it or resolves through it and that no registered links still depend on it. That confirmation sits with the operator of the IDR, outside this application's tooling. To inspect what the IDR currently holds, use `GET /api/v4/identifiers?namespace=<namespace>`.
+
+An IDR can be shared by multiple systems, and the Reference Implementation does not own the namespaces it registers. The seed does not yet account for that: because each run replaces the whole application-identifier list for a namespace, application identifiers added to a seed-managed namespace by another system or by hand are removed by the next seed run. Until that is addressed, register other systems' schemes under namespaces the seed does not manage, or they will not survive a re-seed.
+
+IDR failures never affect the database reconcile, which commits in its own transaction before IDR registration runs. A per-namespace validation rejection from the IDR is logged and that namespace is skipped, without failing the seed. Any other registration failure (the IDR unreachable, an authentication error, a server error) exits the seed with code 1 so the failure is visible rather than leaving namespaces silently unregistered; re-run the seed once the IDR is available, and it registers every namespace again.
 
 ## Important Notes
 
-- **Runs after core seed** — custom seed depends on core data models and service instances already existing. It runs as the final step of the seed process described in [Startup](./startup.md).
+- **Runs after core seed** — custom seed depends on core data models and service instances already existing. It runs as the final database-seeding step of the seed process described in [Startup](./startup.md), followed only by IDR registration.
 - **Idempotent** — re-running the seed with an unchanged manifest performs no deletions and converges to the same state.
 - **Atomic (database)** — registrar, scheme, qualifier, data model, and render template writes and deletions happen in a single database transaction. If any write fails or a removal is refused, the entire batch is rolled back. Render template files are uploaded to the storage service before that transaction, so a rolled-back run can leave uploaded template objects in storage with no database row; they are harmless and can be cleaned up manually.
 - **System tenant ownership** — all custom seed entities are owned by the system tenant.
