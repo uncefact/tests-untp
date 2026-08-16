@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
 import { listConformityProfiles } from '@/lib/prisma/repositories';
-import { paginateInMemory, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
-import { ValidationError, isNonEmptyString, parsePositiveInt, parseNonNegativeInt } from '@/lib/api/validation';
+import { paginateInMemory } from '@/lib/api/pagination';
+import { parseQueryParams } from '@/lib/api/validation';
+import { listCvcProfilesQuerySchema } from '@/lib/api/request-schemas/cvc';
 
 const logger = apiLogger.child({ route: '/api/v1/cvc/profiles' });
 
@@ -26,35 +27,32 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/profiles' });
  *         required: true
  *         schema:
  *           type: string
- *         description: Canonical URI of the scheme whose profiles to list
+ *           minLength: 1
+ *         description: Canonical URI of the scheme whose profiles to list. A whitespace-only value is rejected with a 400.
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
+ *           minimum: 1
+ *         description: Number of entries to return per page. Defaults to 20, or the configured maximum when it is lower. A larger value is rejected with a 400 naming the maximum.
  *       - in: query
  *         name: offset
  *         schema:
  *           type: integer
+ *           minimum: 0
+ *         description: Number of entries to skip for pagination
  *     responses:
  *       200:
  *         description: A page of conformity profiles
  *       400:
- *         description: schemeId is missing, or a pagination parameter is invalid
+ *         description: Validation error (e.g. a missing or blank schemeId, a limit above the maximum, a repeated query parameter)
  *       401:
  *         description: Unauthorised
  *       403:
  *         description: No tenant found for user
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
-  const url = new URL(req.url);
-  const schemeId = url.searchParams.get('schemeId');
-  if (!isNonEmptyString(schemeId)) {
-    throw new ValidationError('schemeId is required');
-  }
-
-  const rawLimit = parsePositiveInt(url.searchParams.get('limit'), 'limit');
-  const limit = rawLimit !== undefined ? Math.min(rawLimit, MAX_PAGE_LIMIT) : undefined;
-  const offset = parseNonNegativeInt(url.searchParams.get('offset'), 'offset');
+  const { schemeId, limit, offset } = parseQueryParams(new URL(req.url), listCvcProfilesQuerySchema);
 
   logger.info({ tenantId, schemeId }, 'Listing conformity profiles');
   const profiles = await listConformityProfiles(schemeId, tenantId);
