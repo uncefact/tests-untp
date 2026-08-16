@@ -23,7 +23,7 @@ Every DID has a **type** that determines how it was created, who manages its key
 
 #### `DEFAULT`
 
-A system DID created during [startup](../operations/startup#step-2-database-seed). It belongs to the [system tenant](../system-architecture#system-tenant) and is available to all tenants as a read-only default. The DID document and key material are hosted by the system's [verifiable credential service](../services/verifiable-credential-service). Default DIDs cannot be deleted or verified through the API. Initial status: `ACTIVE`.
+A system DID created during [startup](../operations/startup#step-3-database-seed). It belongs to the [system tenant](../system-architecture#system-tenant) and is available to all tenants as a read-only default. The DID document and key material are hosted by the system's [verifiable credential service](../services/verifiable-credential-service). Default DIDs cannot be deleted or verified through the API. Initial status: `ACTIVE`.
 
 #### `MANAGED`
 
@@ -91,7 +91,7 @@ The [verify endpoint](#verify-a-did) runs the following checks in order. All che
 
 ### System DIDs vs Tenant DIDs
 
-DIDs exist at two levels: the **system default DID** (created during [startup](../operations/startup#step-2-database-seed), owned by the [system tenant](../system-architecture#system-tenant), read-only and visible to all tenants) and **tenant DIDs** (created or imported by a tenant through this API, scoped exclusively to that tenant). When listing DIDs, tenants see both their own DIDs and the system default.
+DIDs exist at two levels: the **system default DID** (created during [startup](../operations/startup#step-3-database-seed), owned by the [system tenant](../system-architecture#system-tenant), read-only and visible to all tenants) and **tenant DIDs** (created or imported by a tenant through this API, scoped exclusively to that tenant). When listing DIDs, tenants see both their own DIDs and the system default.
 
 **Credential signing is restricted to these two pools.** When [issuing a credential](./credentials#stage-4-issuer-did-ownership-validation), the `issuer.id` in the credential payload must be a DID that belongs to the authenticated tenant or a system default DID, which is available to all tenants as part of the [incremental adoption ramp](../overview#incremental-adoption). A tenant cannot issue credentials using a DID that belongs to another tenant.
 
@@ -121,7 +121,7 @@ For **self-managed** DIDs created via this endpoint, the VC service still genera
 
 | Required Field | Description |
 |-----------------|-------------|
-| `type` | `MANAGED` or `SELF_MANAGED`. `DEFAULT` is [system-managed and created during seeding](../operations/startup#step-2-database-seed), and cannot be created via this endpoint |
+| `type` | `MANAGED` or `SELF_MANAGED`. `DEFAULT` is [system-managed and created during seeding](../operations/startup#step-3-database-seed), and cannot be created via this endpoint |
 | `method` | `DID_WEB` (the supported method today; `DID_WEB_VH` is planned but not yet implemented and is rejected with a 400) |
 | `alias` | Identifier for the DID, read differently depending on `type`. For a [`MANAGED`](#managed) DID, a short name that the verifiable credential service prefixes with its own host, so `acme-corp` produces `did:web:vckit.example.com:acme-corp`; everything outside letters, digits, and hyphens is stripped, so a domain passed here loses its dots. For a [`SELF_MANAGED`](#self_managed) DID, the full domain (or domain and path) where you will host the DID document, so `example.com` produces `did:web:example.com`; dots and colons are preserved |
 

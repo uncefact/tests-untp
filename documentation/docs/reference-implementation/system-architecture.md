@@ -38,7 +38,7 @@ The Reference Implementation uses a PostgreSQL database to store the information
 
 All data in the database is scoped to a tenant; see [Multi-Tenancy](#multi-tenancy) for how isolation is enforced. See [Database](./operations/database) for provisioning and configuration.
 
-On startup, the Reference Implementation automatically applies database migrations and seeds system default records (tenants, service instances, identifier schemes, data models, render templates, and more). Both steps are idempotent and can be individually disabled. See [Startup](./operations/startup) for the full sequence and what gets seeded.
+On startup, the Reference Implementation automatically applies database migrations, converts existing rows to the formats the current version writes, and seeds system default records (tenants, service instances, identifier schemes, data models, render templates, and more). All three steps are idempotent and can be disabled. See [Startup](./operations/startup) for the full sequence and what gets seeded.
 
 ### Federated IDP (Identity Provider)
 
@@ -66,7 +66,7 @@ In addition to tenant-specific data, every instance of the Reference Implementat
 
 ### System Tenant
 
-The system tenant is a special internal tenant that owns all system default records. It is created automatically during [startup](./operations/startup) via the [seeding process](./operations/startup#step-2-database-seed) and serves as the mechanism through which system-wide configuration propagates to all tenants.
+The system tenant is a special internal tenant that owns all system default records. It is created automatically during [startup](./operations/startup) via the [seeding process](./operations/startup#step-3-database-seed) and serves as the mechanism through which system-wide configuration propagates to all tenants.
 
 Records owned by the system tenant — such as core UNTP data models, identifier schemes, registrars, and default service instances — are read-only and accessible to every tenant in the instance. This means that every tenant can immediately issue credentials against the core UNTP data models (DPP, DCC, DFR, DIA, DTE), use the built-in identifier schemes (GTIN, GLN, ABN, ACN), and use the default verifiable credential, storage, and identity resolver service instances — all without any configuration of their own.
 
