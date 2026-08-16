@@ -12,15 +12,16 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/criteria' });
  * @swagger
  * /cvc/criteria:
  *   get:
- *     summary: List the criteria a conformity profile references
+ *     summary: List the criteria a registered conformity profile references
  *     description: |
  *       Returns the versioned criteria for the profile identified by `profileId`
- *       (its canonical URI), resolved against the catalogue with system-tenant
- *       precedence. Each entry's `id` is the stable canonical criterion URI to
- *       reference in a conformityClaim, alongside the conformity topics that
- *       criterion defines. An unknown profile returns an empty list.
+ *       (its canonical URI), resolved against the profiles registered in this
+ *       reference implementation with system-tenant precedence. Each entry's
+ *       `id` is the stable canonical criterion URI to reference in a
+ *       conformityClaim, alongside the conformity topics that criterion
+ *       defines. A profile that is not registered here returns an empty list.
  *     tags:
- *       - Conformity Vocabulary
+ *       - Conformity Vocabulary Catalogue
  *     parameters:
  *       - in: query
  *         name: profileId
@@ -44,12 +45,41 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/criteria' });
  *     responses:
  *       200:
  *         description: A page of conformity criteria
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ConformityCriterion'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Validation error (e.g. a missing or blank profileId, a limit above the maximum, a repeated query parameter)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorised
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: No tenant found for user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const GET = withTenantAuth(async (req, { tenantId }) => {
   const { profileId, limit, offset } = parseQueryParams(new URL(req.url), listCvcCriteriaQuerySchema);

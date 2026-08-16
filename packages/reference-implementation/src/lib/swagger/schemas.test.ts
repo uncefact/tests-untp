@@ -305,3 +305,41 @@ describe('generateOpenAPISchemas: CredentialIssueRequest component', () => {
     expect(collect(request, [])).not.toContain(false);
   });
 });
+
+describe('generateOpenAPISchemas — Conformity Vocabulary Catalogue components', () => {
+  // The three components derive from the same Zod schemas the browse
+  // repository types are inferred from (conformity-scheme.schemas.ts), so
+  // these assertions guard the projection each browse route's `data` array
+  // documents. A failure names the field that moved.
+
+  it('documents ConformityScheme with required id/name/specVersion and an optional owner', () => {
+    const schemas = generateOpenAPISchemas();
+    const scheme = schemas.ConformityScheme as JsonSchemaObject;
+
+    expect(scheme.required).toEqual(expect.arrayContaining(['id', 'name', 'specVersion']));
+    expect(scheme.required).not.toContain('owner');
+    expect(scheme.properties?.owner?.properties?.canonicalId).toBeDefined();
+    expect(scheme.properties?.owner?.properties?.name).toBeDefined();
+    expect(scheme.properties?.owner?.required ?? []).toEqual([]);
+  });
+
+  it('documents ConformityProfile with required id/name/version/status and optional validFrom', () => {
+    const schemas = generateOpenAPISchemas();
+    const profile = schemas.ConformityProfile as JsonSchemaObject;
+
+    expect(profile.required).toEqual(expect.arrayContaining(['id', 'name', 'version', 'status']));
+    expect(profile.required).not.toContain('validFrom');
+    expect(profile.properties?.validFrom).toBeDefined();
+  });
+
+  it('documents ConformityCriterion with required topics and tags arrays', () => {
+    const schemas = generateOpenAPISchemas();
+    const criterion = schemas.ConformityCriterion as JsonSchemaObject;
+
+    expect(criterion.required).toEqual(expect.arrayContaining(['id', 'name', 'version', 'status', 'topics', 'tags']));
+    const topicItem = criterion.properties?.topics?.items;
+    expect(topicItem?.required).toEqual(['canonicalId']);
+    expect(topicItem?.properties?.name).toBeDefined();
+    expect(topicItem?.properties?.definition).toBeDefined();
+  });
+});
