@@ -28,6 +28,38 @@ import { reconcileRemovals, ReconcileBlockedError, type RemovalSummary } from '.
 const TRANSACTION_TIMEOUT = 60_000;
 const TRANSACTION_MAX_WAIT = 10_000;
 
+/**
+ * Thrown for a custom-seed manifest problem the operator must fix before a
+ * retry can succeed (unparsable YAML, a schema violation, a reference
+ * validation failure, or render templates requested with no storage
+ * service configured). `runCustomSeed()` throws rather than calling
+ * `process.exit()` itself, so this reaches `main()`'s own summary-and-exit
+ * handling (ADR-043 decision 6) the same way any other mid-run failure
+ * does, instead of terminating the process before a summary is built.
+ */
+export class CustomSeedFatalError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'CustomSeedFatalError';
+  }
+}
+
+/**
+ * Thrown when custom seed fails after some of its work already committed
+ * or produced a real external side effect (registrars/data models/render
+ * templates written by the atomic transaction, or a template already
+ * uploaded to storage before the transaction that would have recorded it
+ * failed). The caller's outcome tracking needs to know this failure is not
+ * "nothing happened", unlike `CustomSeedFatalError`, which is always
+ * thrown before any write.
+ */
+export class CustomSeedPartialProgressError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'CustomSeedPartialProgressError';
+  }
+}
+
 // ── Dependencies interface ───────────────────────────────────────────────────
 
 export interface CustomSeedDependencies {
@@ -48,6 +80,18 @@ export interface CustomSeedDependencies {
     }>;
   } | null;
   storageServiceInstanceId: string | null;
+}
+
+/**
+ * What actually happened on a successful (non-throwing) run, so the caller
+ * can report an honest category outcome: `ran: false` for the two no-op
+ * cases (no manifest, or an empty one — nothing to seed, not a failure),
+ * and `conformityFailed > 0` for the per-entry conformity-scheme failures
+ * `processConformitySchemes` acknowledges and counts without throwing.
+ */
+export interface CustomSeedRunResult {
+  ran: boolean;
+  conformityFailed: number;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -326,14 +370,14 @@ async function sweepOrphanCriteria(deps: CustomSeedDependencies): Promise<number
  * identities are resolved, unseen seeded rows evicted, entries ingested, and
  * orphaned criteria swept.
  */
-export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void> {
+export async function runCustomSeed(deps: CustomSeedDependencies): Promise<CustomSeedRunResult> {
   const { logger, prisma, systemTenantId, customSeedDir } = deps;
 
   // ── 1. Check manifest exists ─────────────────────────────────────────────
   const manifestPath = path.join(customSeedDir, 'seed.yaml');
   if (!fs.existsSync(manifestPath)) {
     logger.info({ manifestPath }, 'No custom seed manifest found — skipping custom seed');
-    return;
+    return { ran: false, conformityFailed: 0 };
   }
 
   // ── 2. Parse YAML ────────────────────────────────────────────────────────
@@ -347,7 +391,12 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     const line = linePos?.[0]?.line ?? err?.line;
     const col = linePos?.[0]?.col ?? err?.col;
     logger.error({ file: manifestPath, line, col, error: err?.message }, 'Failed to parse custom seed YAML');
-    process.exit(1);
+    throw new CustomSeedFatalError(
+      `Failed to parse custom seed YAML at ${manifestPath}${
+        line !== undefined ? ` (line ${line}${col !== undefined ? `, col ${col}` : ''})` : ''
+      }: ${err?.message ?? 'unknown parse error'}`,
+      { cause: error },
+    );
   }
 
   // Which keys the YAML actually contains — captured before Zod defaulting
@@ -365,7 +414,11 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
         `Schema validation error: ${issue.message}`,
       );
     }
-    process.exit(1);
+    throw new CustomSeedFatalError(
+      `Custom seed manifest failed schema validation:\n${parseResult.error.issues
+        .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+        .join('\n')}`,
+    );
   }
 
   const manifest = parseResult.data;
@@ -381,7 +434,7 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     presence.registrars || presence.dataModels || presence.renderTemplates || presence.conformitySchemes;
   if (entityCount === 0 && !anySectionPresent) {
     logger.info('Custom seed manifest is empty — nothing to seed');
-    return;
+    return { ran: false, conformityFailed: 0 };
   }
 
   // ── 5. Phase 2 validation (referential integrity) ────────────────────────
@@ -571,7 +624,9 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     for (const error of validationErrors) {
       logger.error({ error }, `Validation error: ${error}`);
     }
-    process.exit(1);
+    throw new CustomSeedFatalError(
+      `Custom seed manifest failed reference validation:\n${validationErrors.map((e) => `  - ${e}`).join('\n')}`,
+    );
   }
 
   // ── 6. Build upsert operations ──────────────────────────────────────────
@@ -592,7 +647,9 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
   if (ops.renderTemplates.length > 0) {
     if (!deps.storageService) {
       logger.error('Render templates require a storage service but none is available');
-      process.exit(1);
+      throw new CustomSeedFatalError(
+        'Custom seed manifest requests render templates, but no storage service is configured or was seeded',
+      );
     }
 
     for (const template of ops.renderTemplates) {
@@ -625,179 +682,193 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
     renderTemplates: 0,
     dataModels: 0,
   };
-  await prisma.$transaction(
-    async (tx: Prisma.TransactionClient) => {
-      // Upsert registrars. Updates stamp `source: CUSTOM_SEED` so the
-      // manifest claims (or re-claims) ownership of the rows it manages;
-      // core-seed collisions were rejected during validation, so a claimed
-      // row is either already manifest-owned or a pre-provenance legacy row.
-      for (const registrar of ops.registrars) {
-        await tx.registrar.upsert({
-          where: { id: registrar.id },
-          update: {
-            name: registrar.name,
-            namespace: registrar.namespace,
-            url: registrar.url,
-            idrServiceInstanceId: registrar.idrServiceInstanceId,
-            source: RecordSource.CUSTOM_SEED,
-          },
-          create: {
-            id: registrar.id,
-            tenantId: registrar.tenantId,
-            name: registrar.name,
-            namespace: registrar.namespace,
-            url: registrar.url,
-            idrServiceInstanceId: registrar.idrServiceInstanceId,
-            source: RecordSource.CUSTOM_SEED,
-          },
-        });
-      }
-
-      // Upsert identifier schemes. `registrarId` is part of the update so a
-      // scheme moved between registrars in the manifest is re-attached rather
-      // than left behind for its old parent's cascade to delete.
-      for (const scheme of ops.identifierSchemes) {
-        await tx.identifierScheme.upsert({
-          where: { id: scheme.id },
-          update: {
-            registrarId: scheme.registrarId,
-            name: scheme.name,
-            primaryKey: scheme.primaryKey,
-            validationPattern: scheme.validationPattern,
-            linkTemplate: scheme.linkTemplate,
-            source: RecordSource.CUSTOM_SEED,
-          },
-          create: {
-            id: scheme.id,
-            tenantId: scheme.tenantId,
-            registrarId: scheme.registrarId,
-            name: scheme.name,
-            primaryKey: scheme.primaryKey,
-            validationPattern: scheme.validationPattern,
-            linkTemplate: scheme.linkTemplate,
-            source: RecordSource.CUSTOM_SEED,
-          },
-        });
-      }
-
-      // Upsert qualifiers. `schemeId` is part of the update for the same
-      // reparenting reason as identifier schemes above.
-      for (const qualifier of ops.qualifiers) {
-        await tx.schemeQualifier.upsert({
-          where: { id: qualifier.id },
-          update: {
-            schemeId: qualifier.schemeId,
-            key: qualifier.key,
-            description: qualifier.description,
-            validationPattern: qualifier.validationPattern,
-            order: qualifier.order,
-            source: RecordSource.CUSTOM_SEED,
-          },
-          create: {
-            id: qualifier.id,
-            schemeId: qualifier.schemeId,
-            key: qualifier.key,
-            description: qualifier.description,
-            validationPattern: qualifier.validationPattern,
-            order: qualifier.order,
-            source: RecordSource.CUSTOM_SEED,
-          },
-        });
-      }
-
-      // Upsert data models (as extensions)
-      for (const dataModel of ops.dataModels) {
-        await tx.dataModel.upsert({
-          where: { id: dataModel.id },
-          update: {
-            name: dataModel.name,
-            credentialType: dataModel.credentialType,
-            version: dataModel.version,
-            isExtension: true,
-            parentConfigId: dataModel.parentConfigId,
-            schemaUrl: dataModel.schemaUrl,
-            contextUrl: dataModel.contextUrl,
-            websiteUrl: dataModel.websiteUrl,
-            source: RecordSource.CUSTOM_SEED,
-          },
-          create: {
-            id: dataModel.id,
-            tenantId: dataModel.tenantId,
-            name: dataModel.name,
-            credentialType: dataModel.credentialType,
-            version: dataModel.version,
-            isExtension: true,
-            parentConfigId: dataModel.parentConfigId,
-            schemaUrl: dataModel.schemaUrl,
-            contextUrl: dataModel.contextUrl,
-            websiteUrl: dataModel.websiteUrl,
-            source: RecordSource.CUSTOM_SEED,
-          },
-        });
-      }
-
-      // Upsert render templates (with storage metadata from step 7)
-      for (const template of ops.renderTemplates) {
-        const storageResult = templateResults.find((r) => r.templateId === template.id);
-        if (!storageResult) {
-          // Every template in ops.renderTemplates was uploaded in step 7, so
-          // a missing result is a broken invariant, not a skippable entry.
-          throw new Error(`render template "${template.id}" has no storage upload result; aborting seed transaction`);
+  try {
+    await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        // Upsert registrars. Updates stamp `source: CUSTOM_SEED` so the
+        // manifest claims (or re-claims) ownership of the rows it manages;
+        // core-seed collisions were rejected during validation, so a claimed
+        // row is either already manifest-owned or a pre-provenance legacy row.
+        for (const registrar of ops.registrars) {
+          await tx.registrar.upsert({
+            where: { id: registrar.id },
+            update: {
+              name: registrar.name,
+              namespace: registrar.namespace,
+              url: registrar.url,
+              idrServiceInstanceId: registrar.idrServiceInstanceId,
+              source: RecordSource.CUSTOM_SEED,
+            },
+            create: {
+              id: registrar.id,
+              tenantId: registrar.tenantId,
+              name: registrar.name,
+              namespace: registrar.namespace,
+              url: registrar.url,
+              idrServiceInstanceId: registrar.idrServiceInstanceId,
+              source: RecordSource.CUSTOM_SEED,
+            },
+          });
         }
 
-        await tx.renderTemplate.upsert({
-          where: { id: template.id },
-          update: {
-            name: template.name,
-            dataModelId: template.dataModelId,
-            storageUrl: storageResult.storageUrl,
-            digestMultibase: storageResult.digestMultibase,
-            isDefault: template.isDefault,
-            renderMethodType: template.renderMethodType as RenderMethodType,
-            inline: template.inline,
-            mediaType: template.mediaType,
-            mediaQuery: template.mediaQuery,
-            storageServiceInstanceId: deps.storageServiceInstanceId,
-            storageExternalId: storageResult.externalId,
-            storageBucket: storageResult.bucket,
-            storageContentType: storageResult.contentType,
-            source: RecordSource.CUSTOM_SEED,
-          },
-          create: {
-            id: template.id,
-            tenantId: template.tenantId,
-            name: template.name,
-            dataModelId: template.dataModelId,
-            storageUrl: storageResult.storageUrl,
-            digestMultibase: storageResult.digestMultibase,
-            isDefault: template.isDefault,
-            renderMethodType: template.renderMethodType as RenderMethodType,
-            inline: template.inline,
-            mediaType: template.mediaType,
-            mediaQuery: template.mediaQuery,
-            storageServiceInstanceId: deps.storageServiceInstanceId,
-            storageExternalId: storageResult.externalId,
-            storageBucket: storageResult.bucket,
-            storageContentType: storageResult.contentType,
-            source: RecordSource.CUSTOM_SEED,
-          },
-        });
-      }
+        // Upsert identifier schemes. `registrarId` is part of the update so a
+        // scheme moved between registrars in the manifest is re-attached rather
+        // than left behind for its old parent's cascade to delete.
+        for (const scheme of ops.identifierSchemes) {
+          await tx.identifierScheme.upsert({
+            where: { id: scheme.id },
+            update: {
+              registrarId: scheme.registrarId,
+              name: scheme.name,
+              primaryKey: scheme.primaryKey,
+              validationPattern: scheme.validationPattern,
+              linkTemplate: scheme.linkTemplate,
+              source: RecordSource.CUSTOM_SEED,
+            },
+            create: {
+              id: scheme.id,
+              tenantId: scheme.tenantId,
+              registrarId: scheme.registrarId,
+              name: scheme.name,
+              primaryKey: scheme.primaryKey,
+              validationPattern: scheme.validationPattern,
+              linkTemplate: scheme.linkTemplate,
+              source: RecordSource.CUSTOM_SEED,
+            },
+          });
+        }
 
-      // Removal phase: delete manifest-owned rows whose entries are gone.
-      // Runs after the upserts (so reparented children are re-attached before
-      // their old parent is considered) and inside the same transaction, so a
-      // blocked removal rolls back the whole run. Throws ReconcileBlockedError
-      // when a deletion would cascade into rows the manifest does not own;
-      // the outer catch in seed.ts logs it and exits non-zero.
-      removalSummary = await reconcileRemovals(tx, manifest, presence, systemTenantId).catch((err: unknown) => {
-        if (err instanceof ReconcileBlockedError) throw err;
-        throw new Error('Custom seed removal phase failed', { cause: err });
-      });
-      logger.info({ ...removalSummary }, 'Custom seed removal phase complete');
-    },
-    { timeout: TRANSACTION_TIMEOUT, maxWait: TRANSACTION_MAX_WAIT },
-  );
+        // Upsert qualifiers. `schemeId` is part of the update for the same
+        // reparenting reason as identifier schemes above.
+        for (const qualifier of ops.qualifiers) {
+          await tx.schemeQualifier.upsert({
+            where: { id: qualifier.id },
+            update: {
+              schemeId: qualifier.schemeId,
+              key: qualifier.key,
+              description: qualifier.description,
+              validationPattern: qualifier.validationPattern,
+              order: qualifier.order,
+              source: RecordSource.CUSTOM_SEED,
+            },
+            create: {
+              id: qualifier.id,
+              schemeId: qualifier.schemeId,
+              key: qualifier.key,
+              description: qualifier.description,
+              validationPattern: qualifier.validationPattern,
+              order: qualifier.order,
+              source: RecordSource.CUSTOM_SEED,
+            },
+          });
+        }
+
+        // Upsert data models (as extensions)
+        for (const dataModel of ops.dataModels) {
+          await tx.dataModel.upsert({
+            where: { id: dataModel.id },
+            update: {
+              name: dataModel.name,
+              credentialType: dataModel.credentialType,
+              version: dataModel.version,
+              isExtension: true,
+              parentConfigId: dataModel.parentConfigId,
+              schemaUrl: dataModel.schemaUrl,
+              contextUrl: dataModel.contextUrl,
+              websiteUrl: dataModel.websiteUrl,
+              source: RecordSource.CUSTOM_SEED,
+            },
+            create: {
+              id: dataModel.id,
+              tenantId: dataModel.tenantId,
+              name: dataModel.name,
+              credentialType: dataModel.credentialType,
+              version: dataModel.version,
+              isExtension: true,
+              parentConfigId: dataModel.parentConfigId,
+              schemaUrl: dataModel.schemaUrl,
+              contextUrl: dataModel.contextUrl,
+              websiteUrl: dataModel.websiteUrl,
+              source: RecordSource.CUSTOM_SEED,
+            },
+          });
+        }
+
+        // Upsert render templates (with storage metadata from step 7)
+        for (const template of ops.renderTemplates) {
+          const storageResult = templateResults.find((r) => r.templateId === template.id);
+          if (!storageResult) {
+            // Every template in ops.renderTemplates was uploaded in step 7, so
+            // a missing result is a broken invariant, not a skippable entry.
+            throw new Error(`render template "${template.id}" has no storage upload result; aborting seed transaction`);
+          }
+
+          await tx.renderTemplate.upsert({
+            where: { id: template.id },
+            update: {
+              name: template.name,
+              dataModelId: template.dataModelId,
+              storageUrl: storageResult.storageUrl,
+              digestMultibase: storageResult.digestMultibase,
+              isDefault: template.isDefault,
+              renderMethodType: template.renderMethodType as RenderMethodType,
+              inline: template.inline,
+              mediaType: template.mediaType,
+              mediaQuery: template.mediaQuery,
+              storageServiceInstanceId: deps.storageServiceInstanceId,
+              storageExternalId: storageResult.externalId,
+              storageBucket: storageResult.bucket,
+              storageContentType: storageResult.contentType,
+              source: RecordSource.CUSTOM_SEED,
+            },
+            create: {
+              id: template.id,
+              tenantId: template.tenantId,
+              name: template.name,
+              dataModelId: template.dataModelId,
+              storageUrl: storageResult.storageUrl,
+              digestMultibase: storageResult.digestMultibase,
+              isDefault: template.isDefault,
+              renderMethodType: template.renderMethodType as RenderMethodType,
+              inline: template.inline,
+              mediaType: template.mediaType,
+              mediaQuery: template.mediaQuery,
+              storageServiceInstanceId: deps.storageServiceInstanceId,
+              storageExternalId: storageResult.externalId,
+              storageBucket: storageResult.bucket,
+              storageContentType: storageResult.contentType,
+              source: RecordSource.CUSTOM_SEED,
+            },
+          });
+        }
+
+        // Removal phase: delete manifest-owned rows whose entries are gone.
+        // Runs after the upserts (so reparented children are re-attached before
+        // their old parent is considered) and inside the same transaction, so a
+        // blocked removal rolls back the whole run. Throws ReconcileBlockedError
+        // when a deletion would cascade into rows the manifest does not own;
+        // the outer catch in seed.ts logs it and exits non-zero.
+        removalSummary = await reconcileRemovals(tx, manifest, presence, systemTenantId).catch((err: unknown) => {
+          if (err instanceof ReconcileBlockedError) throw err;
+          throw new Error('Custom seed removal phase failed', { cause: err });
+        });
+        logger.info({ ...removalSummary }, 'Custom seed removal phase complete');
+      },
+      { timeout: TRANSACTION_TIMEOUT, maxWait: TRANSACTION_MAX_WAIT },
+    );
+  } catch (error) {
+    // A template already uploaded to storage (step 7) survives a rolled-back
+    // transaction as an orphaned object with no database row pointing at it:
+    // a real, if incomplete, side effect the caller's outcome tracking needs
+    // to see, rather than the "nothing happened" a plain rethrow implies.
+    if (templateResults.length > 0) {
+      throw new CustomSeedPartialProgressError(
+        'Custom seed database transaction failed after external template upload(s) already completed',
+        { cause: error },
+      );
+    }
+    throw error;
+  }
 
   // ── 9. Reconcile and ingest conformity schemes (post-transaction) ─────
   // Each ingest manages its own transaction internally; run after the main
@@ -817,31 +888,42 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
   };
 
   if (presence.conformitySchemes || manifest.conformitySchemes.length > 0) {
-    const resolution = resolveConformityEntries(deps, manifest);
-    conformitySummary.failed += resolution.failed;
+    try {
+      const resolution = resolveConformityEntries(deps, manifest);
+      conformitySummary.failed += resolution.failed;
 
-    if (presence.conformitySchemes) {
-      if (resolution.failed > 0) {
-        logger.error(
-          { failedEntries: resolution.failed },
-          'One or more conformity scheme file entries could not be resolved; skipping seeded-scheme eviction this boot (reconciliation incomplete)',
-        );
-      } else {
-        conformitySummary.evicted = await evictUnseenSeededSchemes(
-          deps,
-          resolution.resolved.map((entry) => entry.sourceUrl),
-        ).catch((err: unknown) => {
-          throw new Error('Seeded conformity scheme eviction failed', { cause: err });
+      if (presence.conformitySchemes) {
+        if (resolution.failed > 0) {
+          logger.error(
+            { failedEntries: resolution.failed },
+            'One or more conformity scheme file entries could not be resolved; skipping seeded-scheme eviction this boot (reconciliation incomplete)',
+          );
+        } else {
+          conformitySummary.evicted = await evictUnseenSeededSchemes(
+            deps,
+            resolution.resolved.map((entry) => entry.sourceUrl),
+          ).catch((err: unknown) => {
+            throw new Error('Seeded conformity scheme eviction failed', { cause: err });
+          });
+        }
+      }
+
+      await processConformitySchemes(deps, resolution.resolved, conformitySummary);
+
+      if (presence.conformitySchemes && resolution.failed === 0) {
+        conformitySummary.criteriaSwept = await sweepOrphanCriteria(deps).catch((err: unknown) => {
+          throw new Error('Orphan criterion sweep failed', { cause: err });
         });
       }
-    }
-
-    await processConformitySchemes(deps, resolution.resolved, conformitySummary);
-
-    if (presence.conformitySchemes && resolution.failed === 0) {
-      conformitySummary.criteriaSwept = await sweepOrphanCriteria(deps).catch((err: unknown) => {
-        throw new Error('Orphan criterion sweep failed', { cause: err });
-      });
+    } catch (error) {
+      // The transaction above already committed the registrars, data
+      // models and templates it upserted; only the post-commit conformity
+      // reconciliation failed, so this is partial progress, not "nothing
+      // happened".
+      throw new CustomSeedPartialProgressError(
+        'Custom seed failed during conformity scheme reconciliation after registrars, data models and templates were already committed',
+        { cause: error },
+      );
     }
   }
 
@@ -866,4 +948,6 @@ export async function runCustomSeed(deps: CustomSeedDependencies): Promise<void>
   } else {
     logger.info(summary, 'Custom seed completed successfully');
   }
+
+  return { ran: true, conformityFailed: conformitySummary.failed };
 }

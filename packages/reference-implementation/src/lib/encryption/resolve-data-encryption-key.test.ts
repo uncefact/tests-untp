@@ -54,4 +54,27 @@ describe('resolveDataEncryptionKey', () => {
       deprecatedName: 'absent',
     });
   });
+
+  // A whitespace-only value has no legitimate meaning (the same rule
+  // seed-preflight's normalizeEnvValue applies) and must not be treated as
+  // a real, divergent alias value.
+  it('treats a whitespace-only DATA_ENCRYPTION_KEY as unset, not as diverging from a set SERVICE_ENCRYPTION_KEY', () => {
+    const resolved = resolveDataEncryptionKey(
+      asEnv({
+        DATA_ENCRYPTION_KEY: '   ',
+        SERVICE_ENCRYPTION_KEY: SERVICE_KEY,
+      }),
+    );
+    expect(resolved).toEqual({ key: SERVICE_KEY, deprecatedName: 'source' });
+  });
+
+  it('treats a whitespace-only SERVICE_ENCRYPTION_KEY as unset, not as diverging from a set DATA_ENCRYPTION_KEY', () => {
+    const resolved = resolveDataEncryptionKey(
+      asEnv({
+        DATA_ENCRYPTION_KEY: DATA_KEY,
+        SERVICE_ENCRYPTION_KEY: '   ',
+      }),
+    );
+    expect(resolved).toEqual({ key: DATA_KEY, deprecatedName: 'absent' });
+  });
 });

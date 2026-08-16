@@ -48,8 +48,8 @@ Each version of the Reference Implementation may include changes to the database
 
 If the database is already up to date, this step completes immediately.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
+| Variable          | Description                                | Default |
+| ----------------- | ------------------------------------------ | ------- |
 | `SKIP_MIGRATIONS` | Set to `true` to skip automatic migrations | `false` |
 
 Set `SKIP_MIGRATIONS=true` if your deployment process applies migrations separately, for example in a CI/CD pipeline. This also skips the backfills in step 2, so a deployment that applies migrations out of band runs the backfills out of band too. The [digest multibase backfill reference](./backfills/digest-multibase) gives the command for the one that runs there today.
@@ -72,33 +72,40 @@ Conversions that cannot be undone are deliberately kept out of this step and shi
 
 ## Step 3: Database Seed
 
-After migrations and backfills, the entrypoint script runs the [seed script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/prisma/seed.ts) to create a set of system default records that the Reference Implementation needs to function. These are the baseline records that every instance requires — the data that makes the system usable out of the box.
+After migrations and backfills, the entrypoint script runs the [seed script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/prisma/seed-cli.ts) to create a set of system default records that the Reference Implementation needs to function. These are the baseline records that every instance requires — the data that makes the system usable out of the box.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SKIP_SEED` | Set to `true` to skip automatic seeding | `false` |
+| Variable             | Description                                                                                                                             | Default |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `SKIP_SEED`          | Set to `true` to skip automatic seeding                                                                                                 | `false` |
+| `SEED_ALLOW_PARTIAL` | Set to `true` to seed whichever categories below are configured and skip the rest with a warning, instead of failing (see next section) | `false` |
 
 ### What gets seeded
 
-The seed creates the following defaults. Each category is independent — if a required environment variable is missing, that category is skipped with a warning and the rest still proceed.
+The seed creates the defaults listed below. Some categories need their own environment variables (service instances, the default DID, render templates); the system tenant, registrars, identifier schemes and data models need none and always seed.
 
-| What | Description | Additional Environment Variables Required |
-|------|-------------|------------------------------------------|
-| System tenant | An internal tenant that owns all system default records | None |
-| Registrars | Identifier registrars (GS1, Australian Business Register, ASIC) | None |
-| Identifier schemes | Identifier types (GTIN, GLN, ABN, ACN) with validation patterns and qualifiers | None |
-| Data models | UNTP credential types (DPP, DCC, DFR, DIA, DTE) for each supported spec version, with their schema and context URLs | None |
-| Service instances | Default [verifiable credential](../services/verifiable-credential-service), [storage](../services/storage-service), and [identity resolver](../services/identity-resolver-service) service instances — see each service's page for the required environment variables and what they do | `DATA_ENCRYPTION_KEY` and each service's `SYSTEM_*` variables |
-| Default DID | A system Decentralised Identifier (DID) created via the verifiable credential service | `SYSTEM_DID` and `SYSTEM_VC_*` variables |
-| Render templates | Default HTML render templates for each data model, uploaded to the storage service | `SYSTEM_STORAGE_*` variables (storage service must be reachable) |
+**By default, a category whose required environment variables are missing fails the whole seed before it writes anything**, and the container does not start. This surfaces a misconfigured deployment at deploy time, naming every missing variable in one boot cycle, rather than as a downstream failure once someone tries to issue or resolve a credential. Set `SEED_ALLOW_PARTIAL=true` to restore the previous behaviour instead: eligible categories seed, and categories with missing variables are skipped with a warning while the rest still proceed. This suits a deployment that is intentionally brought up with only some services configured, with the rest added later through the application.
 
-For example, if `DATA_ENCRYPTION_KEY` is not set, the service instances, default DID, and render templates are all skipped — but the system tenant, registrars, identifier schemes, and data models are still created. The skipped items must be configured before the system can issue, store, or resolve credentials — ensure all required environment variables are set.
+| What               | Description                                                                                                                                                                                                                                                                            | Additional Environment Variables Required                        |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| System tenant      | An internal tenant that owns all system default records                                                                                                                                                                                                                                | None                                                             |
+| Registrars         | Identifier registrars (GS1, Australian Business Register, ASIC)                                                                                                                                                                                                                        | None                                                             |
+| Identifier schemes | Identifier types (GTIN, GLN, ABN, ACN) with validation patterns and qualifiers                                                                                                                                                                                                         | None                                                             |
+| Data models        | UNTP credential types (DPP, DCC, DFR, DIA, DTE) for each supported spec version, with their schema and context URLs                                                                                                                                                                    | None                                                             |
+| Service instances  | Default [verifiable credential](../services/verifiable-credential-service), [storage](../services/storage-service), and [identity resolver](../services/identity-resolver-service) service instances — see each service's page for the required environment variables and what they do | `DATA_ENCRYPTION_KEY` and each service's `SYSTEM_*` variables    |
+| Default DID        | A system Decentralised Identifier (DID) created via the verifiable credential service                                                                                                                                                                                                  | `SYSTEM_DID` and `SYSTEM_VC_*` variables                         |
+| Render templates   | Default HTML render templates for each data model, uploaded to the storage service                                                                                                                                                                                                     | `SYSTEM_STORAGE_*` variables (storage service must be reachable) |
+
+For example, with `SEED_ALLOW_PARTIAL=true` and `DATA_ENCRYPTION_KEY` not set, the service instances, default DID, and render templates are all skipped — but the system tenant, registrars, identifier schemes, and data models are still created. The skipped items must be configured before the system can issue, store, or resolve credentials.
+
+Every seed run, whichever mode it ran in, ends with one structured summary naming the categories seeded, the categories skipped, and the variables responsible, so confirming a healthy deployment and diagnosing a misconfigured one both read the same record.
+
+**Migrating from the previous default:** deployments that relied on the old skip-and-continue behaviour across restarts (for example, a deployment intentionally running with only some services configured) will fail to start after upgrading until `SEED_ALLOW_PARTIAL=true` is set. The documented startup paths — copying `.env.example` before starting Compose, and the E2E Compose stack — populate every variable and are unaffected.
 
 When `DATA_ENCRYPTION_KEY` is set, the seed validates it against any existing encrypted data before it writes any service instance configuration (the system tenant and other non-encrypted records may already exist by that point): see [Encryption Key Validation](#encryption-key-validation) below for what this checks and how it fails.
 
 ### Customising seed data
 
-The seed script is located at `packages/reference-implementation/prisma/seed.ts` in the [repository](https://github.com/uncefact/tests-untp). Organisations that need additional seed data — custom registrars, identifier schemes, data models, render templates, or conformity schemes — supply it via a Docker volume mount, without modifying the source. See [Custom Seed](./custom-seed.md).
+The seed script is located at `packages/reference-implementation/prisma/seed-cli.ts` (which runs the logic in `prisma/seed.ts`) in the [repository](https://github.com/uncefact/tests-untp). Organisations that need additional seed data — custom registrars, identifier schemes, data models, render templates, or conformity schemes — supply it via a Docker volume mount, without modifying the source. See [Custom Seed](./custom-seed.md).
 
 Render templates are loaded from `packages/reference-implementation/src/templates/` and uploaded to the storage service during seeding. To customise the default templates, replace the `.hbs` files in this directory before building the Docker image, or supply additional templates through the custom seed.
 
@@ -114,12 +121,12 @@ Before the application accepts its first request, it validates `RI_APP_URL` (the
 
 Before the application accepts its first request, it validates the active `DATA_ENCRYPTION_KEY` by decrypting one existing encrypted value — a service instance configuration, or (when no service instance has a usable one, whether because none exists yet or because every existing configuration is corrupted) a protected credential decryption key. This runs once per process start, using the same check the [seed](#step-3-database-seed) already runs before it writes.
 
-| Situation | Result |
-|-----------|--------|
-| The key decrypts the sample value | Startup proceeds normally |
-| Nothing is encrypted yet (fresh deployment, `DATA_ENCRYPTION_KEY` not yet configured) | Startup proceeds normally — there is nothing to validate against |
-| The key cannot decrypt the sample value | Startup fails with a named error identifying the row that failed to decrypt |
-| `DATA_ENCRYPTION_KEY` is still the placeholder value from `.env.example` | Startup fails outside local development (`DEPLOYMENT_ENVIRONMENT` unset or `local` is treated as local development); a warning is logged and startup proceeds within it |
+| Situation                                                                             | Result                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The key decrypts the sample value                                                     | Startup proceeds normally                                                                                                                                               |
+| Nothing is encrypted yet (fresh deployment, `DATA_ENCRYPTION_KEY` not yet configured) | Startup proceeds normally — there is nothing to validate against                                                                                                        |
+| The key cannot decrypt the sample value                                               | Startup fails with a named error identifying the row that failed to decrypt                                                                                             |
+| `DATA_ENCRYPTION_KEY` is still the placeholder value from `.env.example`              | Startup fails outside local development (`DEPLOYMENT_ENVIRONMENT` unset or `local` is treated as local development); a warning is logged and startup proceeds within it |
 
 Without this check, a `DATA_ENCRYPTION_KEY` that does not match the key data was encrypted under only surfaces once a real request tries to decrypt something — for example a `ConfigDecryptionError` when a service instance resolves. Validating at startup turns that into an immediate, loud failure instead of an intermittent one discovered by end users.
 

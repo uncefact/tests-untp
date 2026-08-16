@@ -98,7 +98,9 @@ packages/reference-implementation/
 ├── prisma/
 │   ├── prisma.config.ts       # Database connection configuration
 │   ├── schema.prisma          # Schema definition
-│   └── seed.ts                # System tenant and default data seeding
+│   ├── seed.ts                # System tenant and default data seeding
+│   ├── seed-cli.ts            # Seed entrypoint (invoked by Docker and `prisma.seed`)
+│   └── seed-preflight.ts      # Required-variable checks run before seeding writes anything
 └── src/lib/prisma/
     ├── generated/             # Auto-generated Prisma client
     └── prisma.ts              # Prisma client instance
