@@ -12,13 +12,16 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/schemes' });
  * @swagger
  * /cvc/schemes:
  *   get:
- *     summary: List registered conformity schemes
+ *     summary: List the conformity schemes registered in this reference implementation
  *     description: |
- *       Returns the conformity schemes visible to the authenticated tenant: the
- *       system catalogue (UNTP and operator-seeded) plus the tenant's own
- *       imports. A system-tenant entry supersedes a tenant import of the same
- *       URI. Each entry's `id` is the stable canonical scheme URI to reference
- *       in a conformityClaim.
+ *       Returns the conformity schemes registered in this reference
+ *       implementation and visible to the authenticated tenant: the system
+ *       catalogue (UNTP-discovered and operator-seeded) plus the tenant's own
+ *       imports. This is the reference implementation's own catalogue, not the
+ *       UNTP register it draws from, so a scheme published elsewhere appears
+ *       here only once it has been registered. A system-tenant entry supersedes
+ *       a tenant import of the same URI. Each entry's `id` is the stable
+ *       canonical scheme URI to reference in a conformityClaim.
  *     tags:
  *       - Conformity Vocabulary Catalogue
  *     parameters:

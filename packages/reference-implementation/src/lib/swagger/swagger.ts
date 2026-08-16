@@ -41,7 +41,8 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
         { name: 'Links', description: 'IDR link management' },
         {
           name: 'Conformity Vocabulary Catalogue',
-          description: 'Browse the catalogue of conformity schemes, profiles, and criteria',
+          description:
+            'Browse the conformity schemes, profiles, and criteria registered in this reference implementation',
         },
         { name: 'Data Models', description: 'UNTP data model template management' },
         { name: 'Facilities', description: 'Facility entity management' },

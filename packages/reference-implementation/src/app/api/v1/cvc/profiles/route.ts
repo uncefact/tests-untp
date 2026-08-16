@@ -12,13 +12,14 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/profiles' });
  * @swagger
  * /cvc/profiles:
  *   get:
- *     summary: List the profiles a conformity scheme publishes
+ *     summary: List the profiles a registered conformity scheme publishes
  *     description: |
  *       Returns the versioned profiles for the scheme identified by `schemeId`
- *       (its canonical URI), resolved against the catalogue with the same
- *       system-tenant precedence as scheme lookup. Each entry's `id` is the
- *       stable canonical profile URI to reference in a conformityClaim. An
- *       unknown scheme returns an empty list.
+ *       (its canonical URI), resolved against the schemes registered in this
+ *       reference implementation with the same system-tenant precedence as
+ *       scheme lookup. Each entry's `id` is the stable canonical profile URI to
+ *       reference in a conformityClaim. A scheme that is not registered here
+ *       returns an empty list.
  *     tags:
  *       - Conformity Vocabulary Catalogue
  *     parameters:

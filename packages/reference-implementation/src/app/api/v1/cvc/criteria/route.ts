@@ -12,13 +12,14 @@ const logger = apiLogger.child({ route: '/api/v1/cvc/criteria' });
  * @swagger
  * /cvc/criteria:
  *   get:
- *     summary: List the criteria a conformity profile references
+ *     summary: List the criteria a registered conformity profile references
  *     description: |
  *       Returns the versioned criteria for the profile identified by `profileId`
- *       (its canonical URI), resolved against the catalogue with system-tenant
- *       precedence. Each entry's `id` is the stable canonical criterion URI to
- *       reference in a conformityClaim, alongside the conformity topics that
- *       criterion defines. An unknown profile returns an empty list.
+ *       (its canonical URI), resolved against the profiles registered in this
+ *       reference implementation with system-tenant precedence. Each entry's
+ *       `id` is the stable canonical criterion URI to reference in a
+ *       conformityClaim, alongside the conformity topics that criterion
+ *       defines. A profile that is not registered here returns an empty list.
  *     tags:
  *       - Conformity Vocabulary Catalogue
  *     parameters:
