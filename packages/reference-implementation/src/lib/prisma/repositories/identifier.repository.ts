@@ -110,6 +110,39 @@ export async function createIdentifier(input: CreateIdentifierInput): Promise<Id
 }
 
 /**
+ * Finds the identifiers matching a value for a tenant, with their scheme,
+ * registrar and qualifiers.
+ *
+ * Returns every match rather than the first: `Identifier` is unique on
+ * (schemeId, value, tenantId), so one value can legitimately exist under two
+ * schemes (a GTIN and an internal code that coincide). Publishing must not
+ * guess between them, so the caller decides what an ambiguous result means
+ * (ADR-043). Passing `schemeId` narrows to the exact identifier when the
+ * caller named the scheme to publish under.
+ */
+export async function findIdentifiersByValue(
+  value: string,
+  tenantId: string,
+  schemeId?: string,
+): Promise<IdentifierWithScheme[]> {
+  return prisma.identifier.findMany({
+    where: {
+      value,
+      tenantId,
+      ...(schemeId ? { schemeId } : {}),
+    },
+    include: {
+      scheme: {
+        include: {
+          registrar: true,
+          qualifiers: true,
+        },
+      },
+    },
+  });
+}
+
+/**
  * Retrieves an identifier by ID, scoped to an organisation.
  * Identifiers belong to a single tenant — no system default sharing.
  * Includes the full scheme with registrar and qualifiers.

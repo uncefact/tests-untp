@@ -13,8 +13,8 @@ export type ResolvedIdrService = ResolvedService<IIdentityResolverService>;
  * 2. Registrar-level: `Registrar.idrServiceInstanceId`
  * 3. System default: tenant's primary IDR service instance (or system-wide default)
  *
- * The credentials route uses a two-tier chain (scheme → system default),
- * while the identifier links route uses the full three-tier chain.
+ * Both the credentials route and the identifier links route pass the full
+ * chain (scheme, then registrar, then tenant or system default); see ADR-043.
  */
 export async function resolveIdrService(
   tenantId: string,

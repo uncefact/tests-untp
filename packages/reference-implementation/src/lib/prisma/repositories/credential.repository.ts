@@ -1,3 +1,4 @@
+import { isForeignKeyViolationOn } from '@/lib/prisma/db-errors';
 import { Credential, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
@@ -30,24 +31,50 @@ export type ListCredentialsOptions = {
 };
 
 /**
- * Creates a new credential record. The entity links are resolved server-side,
- * so a foreign-key failure here is a race, not a caller error; #740 owns what
- * it should mean for issuance.
+ * Creates a new credential record.
+ *
+ * Entity links are optional enrichment (ADR-043): the server picks the entity
+ * on the caller's behalf, and by the time this runs the credential has already
+ * been signed and stored externally, so an entity that vanished between the
+ * lookup and this write must not destroy work that succeeded. A foreign-key
+ * violation on one of the three entity columns is retried once without any of
+ * them and reported through `entityLinkFailed` (a credential carries at most
+ * one entity link, since the publish target is a single chosen reference); every other database failure,
+ * including a violation on `tenantId`, stays fatal and is translated by
+ * ADR-036's mapping. This is the carve-out ADR-043 makes to ADR-042, which
+ * otherwise routes a vanished server-selected dependency to the sanitised
+ * server-failure path.
  */
-export async function createCredential(input: CreateCredentialInput): Promise<Credential> {
-  return prisma.credential.create({
-    data: {
-      tenantId: input.tenantId,
-      storageUri: input.storageUri,
-      digestMultibase: input.digestMultibase,
-      decryptionKey: input.decryptionKey,
-      credentialType: input.credentialType,
-      isPublished: input.isPublished ?? false,
-      organisationId: input.organisationId,
-      facilityId: input.facilityId,
-      productId: input.productId,
-    },
-  });
+export async function createCredential(
+  input: CreateCredentialInput,
+): Promise<{ credential: Credential; entityLinkFailed: boolean }> {
+  const data = {
+    tenantId: input.tenantId,
+    storageUri: input.storageUri,
+    digestMultibase: input.digestMultibase,
+    decryptionKey: input.decryptionKey,
+    credentialType: input.credentialType,
+    isPublished: input.isPublished ?? false,
+  };
+
+  try {
+    const credential = await prisma.credential.create({
+      data: {
+        ...data,
+        organisationId: input.organisationId,
+        facilityId: input.facilityId,
+        productId: input.productId,
+      },
+    });
+    return { credential, entityLinkFailed: false };
+  } catch (error) {
+    const onEntityColumn = ['organisationId', 'facilityId', 'productId'].some((column) =>
+      isForeignKeyViolationOn(error, column),
+    );
+    if (!onEntityColumn) throw error;
+    const credential = await prisma.credential.create({ data });
+    return { credential, entityLinkFailed: true };
+  }
 }
 
 /**

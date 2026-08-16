@@ -86,7 +86,7 @@ function buildInput(overrides: Partial<IssueCredentialInput> = {}): IssueCredent
 
 function setupHappyPath() {
   mockResolvePrimaryEntity.mockResolvedValue(PRIMARY_ENTITY);
-  mockCreateCredential.mockResolvedValue({ id: 'cred-1' });
+  mockCreateCredential.mockResolvedValue({ credential: { id: 'cred-1' }, entityLinkFailed: false });
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -160,11 +160,21 @@ describe('issueCredential', () => {
     expect(saved.decryptionKey).toBeUndefined();
   });
 
+  it('reports entityLinkFailed when the repository stored the credential without its entity links', async () => {
+    mockCreateCredential.mockResolvedValue({ credential: { id: 'cred-1' }, entityLinkFailed: true });
+
+    const result = await issueCredential(buildInput());
+
+    expect(result.credentialId).toBe('cred-1');
+    expect(result.entityLinkFailed).toBe(true);
+  });
+
   it('returns storage response and primary entity for publishing', async () => {
     const result = await issueCredential(buildInput());
 
     expect(result).toEqual({
       credentialId: 'cred-1',
+      entityLinkFailed: false,
       storageResponse: STORAGE_RESPONSE,
       primaryEntity: PRIMARY_ENTITY,
     });
