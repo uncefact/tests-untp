@@ -1,12 +1,21 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 
-// Reconstruct `__dirname` for ESM (prisma/ is scoped to `"type": "module"`
-// via prisma/package.json so the multibase digest imports resolve).
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Resolves to this file's own directory (prisma/, which is ESM-scoped via
+// prisma/package.json) without `import.meta.url`. This module is imported
+// directly by the integration suite so `main()` can be driven against the
+// rig database, and `import.meta` syntax anywhere in a file this repo's
+// ts-jest integration config type-checks is rejected outright, so the file
+// stays free of it. `process.argv[1]` resolves to the same directory in
+// every real invocation (`tsx prisma/seed-cli.ts`, the CLI entrypoint that
+// imports this module, lives alongside it in prisma/); under a test runner
+// it resolves to something else, which is fine, because no code path a
+// test exercises reads this value for anything other than the (irrelevant
+// there) render-template file lookup and the (harmless, file-not-found)
+// dotenv path below.
+const scriptDir = process.argv[1] ? path.dirname(path.resolve(process.cwd(), process.argv[1])) : process.cwd();
 import {
   DidMethod,
   DidStatus,
@@ -47,11 +56,22 @@ import {
 } from '../src/lib/prisma/constants.js';
 import { buildUntpArtefactUrls, buildSpecificationPageUrl } from '@uncefact/untp-utils/artefacts';
 import { convergeCoreProvenance } from './core-seed-provenance.js';
+import {
+  runSeedPreflight,
+  EXECUTION_CATEGORIES,
+  ALWAYS_RUN_CATEGORIES,
+  SeedConfigurationError,
+  buildOutcomeSummary,
+  normalizeEnvValue,
+  type SeedRunSummary,
+  type SummaryCategoryName,
+  type CategoryOutcome,
+} from './seed-preflight.js';
 
-const logger = createLogger().child({ module: 'prisma-seed' });
+export const logger = createLogger().child({ module: 'prisma-seed' });
 
 // Load .env before accessing config (seed runs outside Next.js)
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(scriptDir, '../../../.env') });
 
 // Honour a pre-set RI_DATABASE_URL; construct one from the RI_POSTGRES_*
 // variables only when it is absent (the same rule as docker-entrypoint.sh
@@ -62,746 +82,998 @@ if (!process.env.RI_DATABASE_URL && constructedDatabaseUrl) {
   process.env.RI_DATABASE_URL = constructedDatabaseUrl;
 }
 
-const prisma = new PrismaClient();
+// Exported so a test can drive the real seed's decision path (preflight,
+// aggregate abort, structured summary) directly against a rig database and
+// inspect the outcome, without going through a child process: this file's
+// prisma/ directory is ESM-scoped (see the scriptDir comment above) while
+// src/ is not, and a raw `tsx` subprocess crossing that boundary depends on
+// a Docker-build-time step this test environment doesn't reproduce.
+export const prisma = new PrismaClient();
 
-// Resolved before any write: divergent DATA_ENCRYPTION_KEY and
-// SERVICE_ENCRYPTION_KEY values throw here, so the seed cannot re-encrypt
-// service instance configurations under a key that splits the database.
-const resolvedEncryptionKey = resolveDataEncryptionKey();
-warnIfDeprecatedEncryptionKeyName(resolvedEncryptionKey, logger);
+export async function main() {
+  // Resolve every category's configuration from the environment before
+  // writing anything or calling any external service (ADR-043 decision 3).
+  // A category with missing required variables fails the whole run by
+  // default; SEED_ALLOW_PARTIAL=true opts back into seeding whatever is
+  // configured and skipping the rest (decision 5).
+  const preflight = runSeedPreflight(process.env);
+  const allowPartial = process.env.SEED_ALLOW_PARTIAL === 'true';
 
-async function main() {
-  // Upsert the system tenant (used for system-wide defaults)
-  await prisma.tenant.upsert({
-    where: { id: SYSTEM_TENANT_ID },
-    update: {},
-    create: {
-      id: SYSTEM_TENANT_ID,
-      name: 'System',
-    },
-  });
+  if (preflight.hasMissing && !allowPartial) {
+    const summary: SeedRunSummary = {
+      mode: 'default',
+      categoriesSeeded: [],
+      categoriesPartial: [],
+      categoriesSkipped: [],
+      categoriesNotRun: [...EXECUTION_CATEGORIES, ...ALWAYS_RUN_CATEGORIES],
+      missingVariables: preflight.missingByCategory,
+      invalidSiblings: preflight.otherIssuesByCategory,
+      partialDetails: {},
+    };
+    // The summary is not logged here: `SeedConfigurationError` carries it
+    // as `.summary`, and the one caller that logs a caught seed error
+    // (seed-cli.ts) already serialises the whole error, which pino's
+    // default err serializer expands to include every own property —
+    // logging it again here would print the same summary twice for one
+    // run, which is exactly what ADR-043 decision 6 rules out.
+    throw new SeedConfigurationError(summary);
+  }
 
-  // Read DID configuration (DID creation happens after VC service is available)
+  // Every category's outcome is tracked here, hoisted above the try block
+  // below, so a mid-run failure can still build an honest summary from
+  // whatever state was established before the throw (ADR-043 decision 6).
+  // Each is set at the point in the run where its real-world side effect
+  // happened (not inferred afterwards from an end-of-block boolean), so a
+  // category interrupted partway through — a DID created upstream but not
+  // yet written to the database, a render template uploaded before a
+  // later one failed — is reported 'partial' rather than 'skipped'.
   let didConfig: { defaultDid: string; defaultKeyId?: string } | null = null;
-  try {
-    didConfig = getDidConfig();
-  } catch (error) {
-    logger.warn(
-      { error: error instanceof Error ? error.message : error },
-      'DID configuration not available; skipping default DID seed',
-    );
-  }
-
-  // ── Seed service instances (requires DATA_ENCRYPTION_KEY) ───────────────────
-
-  const ENCRYPTION_KEY = resolvedEncryptionKey.key;
+  let didConfigError: string | null = null;
   let encryptionService: AesGcmEncryptionAdapter | null = null;
-  if (ENCRYPTION_KEY) {
-    // Refuse (or warn, in local development) the .env.example placeholder
-    // before touching any existing envelope, then confirm the key can
-    // actually decrypt what is already stored — same preflight the
-    // backfill:decryption-keys script runs, so a wrong key is caught here
-    // rather than after this seed re-encrypts the system service instances
-    // under it.
-    assertNotPlaceholderEncryptionKey(ENCRYPTION_KEY, { deploymentEnvironment: process.env.DEPLOYMENT_ENVIRONMENT });
-    encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
-    await validateEncryptionKeyAtStartup(prisma, encryptionService);
-  } else {
-    logger.warn(
-      'DATA_ENCRYPTION_KEY not set; skipping service instance seeds (IDR, storage, VC). ' +
-        'These can be configured later via the application UI.',
-    );
-  }
-
-  // ── Seed system Pyx IDR service instance ────────────────────────────────────
-
   let idrAdapterType: string | null = null;
   let idrConfig: unknown = null;
   let idrSeeded = false;
-  if (encryptionService) {
-    try {
-      const idrAdapters = adapterRegistry[ServiceType.IDR];
-      const permittedIdrTypes = Object.keys(idrAdapters) as Array<keyof typeof idrAdapters>;
-      const resolvedIdrAdapterType = (process.env.SYSTEM_IDR_ADAPTER_TYPE as keyof typeof idrAdapters) || 'PYX_IDR';
-      idrAdapterType = resolvedIdrAdapterType;
-      const idrRegistryEntry = idrAdapters[resolvedIdrAdapterType];
-      if (!idrRegistryEntry) {
-        throw new Error(
-          `Unknown IDR adapter type: "${idrAdapterType}". Permitted types: ${permittedIdrTypes.join(', ')}`,
-        );
-      }
-      idrConfig = idrRegistryEntry.configSchema.parse({
-        baseUrl: process.env.SYSTEM_IDR_BASE_URL,
-        apiKey: process.env.SYSTEM_IDR_API_KEY,
-        apiVersion: process.env.SYSTEM_IDR_API_VERSION || undefined,
-        defaultLinkType: process.env.SYSTEM_IDR_DEFAULT_LINK_TYPE,
-        defaultMimeType: process.env.SYSTEM_IDR_DEFAULT_MIME_TYPE,
-        defaultIanaLanguage: process.env.SYSTEM_IDR_DEFAULT_LANGUAGE,
-        defaultContext: process.env.SYSTEM_IDR_DEFAULT_CONTEXT,
-        defaultFwqs: process.env.SYSTEM_IDR_DEFAULT_FWQS === 'true',
-      });
-      const idrServiceConfig = JSON.stringify(idrConfig);
-      const encryptedIdrConfig = JSON.stringify(
-        encryptionService.encrypt(idrServiceConfig, EncryptionAlgorithm.AES_256_GCM),
-      );
-
-      await prisma.serviceInstance.upsert({
-        where: { id: SYSTEM_IDR_SERVICE_ID },
-        update: { config: encryptedIdrConfig },
-        create: {
-          id: SYSTEM_IDR_SERVICE_ID,
-          tenantId: SYSTEM_TENANT_ID,
-          serviceType: PrismaServiceType.IDR,
-          adapterType: idrAdapterType as unknown as PrismaAdapterType,
-          name: process.env.SYSTEM_IDR_SERVICE_NAME || 'System Default IDR',
-          description:
-            process.env.SYSTEM_IDR_SERVICE_DESCRIPTION || 'System-wide default Identity Resolver service instance',
-          config: encryptedIdrConfig,
-          isPrimary: true,
-        },
-      });
-      idrSeeded = true;
-    } catch (error) {
-      logger.warn(
-        { error: error instanceof Error ? error.message : error },
-        'Skipping IDR service instance seed: IDR configuration not available',
-      );
-    }
-  }
-
-  // ── Seed system UNCEFACT storage service instance ───────────────────────────
-
+  let idrOutcome: CategoryOutcome = 'skipped';
   let storageSeeded = false;
+  let storageOutcome: CategoryOutcome = 'skipped';
   let storageRegistryEntry:
     | (typeof adapterRegistry)[typeof ServiceType.STORAGE][keyof (typeof adapterRegistry)[typeof ServiceType.STORAGE]]
     | null = null;
   let storageConfig: unknown = null;
-  if (encryptionService) {
-    try {
-      const storageAdapters = adapterRegistry[ServiceType.STORAGE];
-      const permittedStorageTypes = Object.keys(storageAdapters) as Array<keyof typeof storageAdapters>;
-      const storageAdapterType =
-        (process.env.SYSTEM_STORAGE_ADAPTER_TYPE as keyof typeof storageAdapters) || 'UNCEFACT_STORAGE';
-      const resolvedStorageEntry = storageAdapters[storageAdapterType];
-      if (!resolvedStorageEntry) {
-        throw new Error(
-          `Unknown storage adapter type: "${storageAdapterType}". Permitted types: ${permittedStorageTypes.join(', ')}`,
-        );
-      }
-      const parsedStorageConfig = resolvedStorageEntry.configSchema.parse({
-        baseUrl: process.env.SYSTEM_STORAGE_BASE_URL,
-        apiKey: process.env.SYSTEM_STORAGE_API_KEY || undefined,
-        apiVersion: process.env.SYSTEM_STORAGE_API_VERSION || undefined,
-        publicBucket: process.env.SYSTEM_STORAGE_PUBLIC_BUCKET || undefined,
-        privateBucket: process.env.SYSTEM_STORAGE_PRIVATE_BUCKET || undefined,
-      });
-      storageConfig = parsedStorageConfig;
-      storageRegistryEntry = resolvedStorageEntry;
-      const storageServiceConfig = JSON.stringify(parsedStorageConfig);
-      const encryptedStorageConfig = JSON.stringify(
-        encryptionService.encrypt(storageServiceConfig, EncryptionAlgorithm.AES_256_GCM),
-      );
-
-      await prisma.serviceInstance.upsert({
-        where: { id: SYSTEM_STORAGE_SERVICE_ID },
-        update: { config: encryptedStorageConfig },
-        create: {
-          id: SYSTEM_STORAGE_SERVICE_ID,
-          tenantId: SYSTEM_TENANT_ID,
-          serviceType: PrismaServiceType.STORAGE,
-          adapterType: storageAdapterType as unknown as PrismaAdapterType,
-          name: process.env.SYSTEM_STORAGE_SERVICE_NAME || 'System Default Storage',
-          description: process.env.SYSTEM_STORAGE_SERVICE_DESCRIPTION || 'System-wide default storage service instance',
-          config: encryptedStorageConfig,
-          isPrimary: true,
-        },
-      });
-      storageSeeded = true;
-    } catch (error) {
-      logger.warn(
-        { error: error instanceof Error ? error.message : error },
-        'Skipping storage service instance seed: storage configuration not available',
-      );
-    }
-  }
-
-  // ── Seed system VC service instance ───────────────────────────────────────
   let vcSeeded = false;
+  let vcOutcome: CategoryOutcome = 'skipped';
   let vcAdapterType: string | null = null;
   let vcConfig: unknown = null;
-  if (encryptionService) {
-    try {
-      const vcAdapters = adapterRegistry[ServiceType.VC];
-      const permittedVcTypes = Object.keys(vcAdapters) as Array<keyof typeof vcAdapters>;
-      const resolvedVcAdapterType = (process.env.SYSTEM_VC_ADAPTER_TYPE as keyof typeof vcAdapters) || 'VCKIT';
-      const vcRegistryEntry = vcAdapters[resolvedVcAdapterType];
-      if (!vcRegistryEntry) {
-        throw new Error(
-          `Unknown VC adapter type: "${resolvedVcAdapterType}". Permitted types: ${permittedVcTypes.join(', ')}`,
-        );
-      }
-      vcConfig = vcRegistryEntry.configSchema.parse({
-        baseUrl: process.env.SYSTEM_VC_BASE_URL,
-        apiKey: process.env.SYSTEM_VC_API_KEY,
-        apiVersion: process.env.SYSTEM_VC_API_VERSION || undefined,
-      });
-      vcAdapterType = resolvedVcAdapterType;
-      const vcServiceConfig = JSON.stringify(vcConfig);
-      const encryptedVcConfig = JSON.stringify(
-        encryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
-      );
+  let didOutcome: CategoryOutcome = 'skipped';
+  const templatesSkippedFiles: string[] = [];
+  let templatesCreatedCount = 0;
+  let renderTemplatesOutcome: CategoryOutcome = 'skipped';
+  // Set right before the storage upload for whichever core data model is
+  // currently being processed, and cleared once its database row commits.
+  // If the loop is interrupted in between, this names which item was mid
+  // flight, for the same reason `failedNamespaces` names which IDR
+  // namespaces did not register (Moderate finding 8).
+  let renderTemplateInterruptedItem: string | null = null;
+  const failedNamespaces: string[] = [];
+  const conflictedNamespaces: string[] = [];
+  let idrRegistrationFatalError: string | null = null;
+  let tenantOutcome: CategoryOutcome = 'skipped';
+  let dataModelsOutcome: CategoryOutcome = 'skipped';
+  let dataModelsCompletedCount = 0;
+  let customSeedOutcome: CategoryOutcome = 'skipped';
+  let customSeedPartialDetail: string | null = null;
 
-      await prisma.serviceInstance.upsert({
-        where: { id: SYSTEM_VC_SERVICE_ID },
-        update: { config: encryptedVcConfig },
-        create: {
-          id: SYSTEM_VC_SERVICE_ID,
-          tenantId: SYSTEM_TENANT_ID,
-          serviceType: PrismaServiceType.VC,
-          adapterType: resolvedVcAdapterType as unknown as PrismaAdapterType,
-          name: process.env.SYSTEM_VC_SERVICE_NAME || 'System Default VC',
-          description:
-            process.env.SYSTEM_VC_SERVICE_DESCRIPTION || 'System-wide default verifiable credential service instance',
-          config: encryptedVcConfig,
-          isPrimary: true,
-        },
-      });
-      vcSeeded = true;
-    } catch (error) {
-      logger.warn(
-        { error: error instanceof Error ? error.message : error },
-        'Skipping VC service instance seed: VC configuration not available',
-      );
-    }
-  }
+  // Marked the moment the run reaches the point of deciding whether to
+  // execute a category (whether that decision is "run it" or "skip it
+  // because its gate is unmet"), never only on success. A category whose
+  // flag is still unset when a failure is caught was never reached at all
+  // (an earlier, unrelated failure aborted the run before control got
+  // there), which `categoriesNotRun` reports distinctly from a category
+  // that was reached and genuinely skipped (Moderate finding 6).
+  const reachedCategories = new Set<SummaryCategoryName>();
 
-  // ── Seed system default DID via VC service ─────────────────────────────────
-  // Uses the DID adapter registry to resolve the correct DID adapter for the
-  // seeded VC service, creates the DID (if it doesn't already exist), resolves
-  // the key ID from the DID document, and records it in the database.
-
-  let defaultDid: string | null = null;
-  if (didConfig && vcSeeded && vcAdapterType && vcConfig) {
-    const { defaultDid: didString, defaultKeyId: envKeyId } = didConfig;
-
-    // 1. Validate DID format (parseDidMethod throws for invalid/unsupported methods)
-    parseDidMethod(didString);
-
-    // 2. Resolve the DID adapter from the registry using the seeded VC adapter type
-    const didRegistryEntry = didAdapterRegistry[vcAdapterType as keyof typeof didAdapterRegistry];
-    if (!didRegistryEntry) {
-      throw new Error(
-        `No DID adapter registered for VC adapter type: "${vcAdapterType}". ` +
-          `Permitted types: ${Object.keys(didAdapterRegistry).join(', ')}`,
-      );
-    }
-    const didAdapter = didRegistryEntry.factory(
-      vcConfig as Parameters<typeof didRegistryEntry.factory>[0],
-      logger.child({ service: 'DID - Seed' }),
-    );
-
-    // 3. Create DID via VC service (or confirm it already exists)
-    // Extract alias from the DID (everything after did:web:)
-    const alias = didString.replace(/^did:[^:]+:/, '');
-    let resolvedKeyId: string;
-
-    try {
-      const didRecord = await didAdapter.create({
-        type: ServiceDidType.SELF_MANAGED,
-        method: ServiceDidMethod.DID_WEB,
-        alias,
-      });
-      resolvedKeyId = didRecord.keyId;
-      logger.info({ did: didRecord.did, keyId: resolvedKeyId }, 'DID created via VC service');
-    } catch (error) {
-      if (error instanceof DidConflictError) {
-        // DID already exists on the upstream provider — fetch its document to resolve the key ID
-        logger.warn({ did: didString }, 'DID already exists in VC service — skipping creation');
-        const document = await didAdapter.getDocument(didString);
-        const verificationMethods: Array<{ id: string }> = document.verificationMethod ?? [];
-        if (verificationMethods.length === 0) {
-          throw new Error(
-            `No verification methods found in DID document for "${didString}" — ` +
-              'cannot resolve key ID. Set SYSTEM_DID_KEY_ID explicitly.',
-          );
-        }
-        resolvedKeyId = verificationMethods[0].id;
-        logger.info({ did: didString, keyId: resolvedKeyId }, 'Resolved key ID from existing DID document');
-      } else {
-        throw error;
-      }
-    }
-
-    // 4. If SYSTEM_DID_KEY_ID is set, validate it matches the resolved key
-    if (envKeyId && envKeyId !== resolvedKeyId) {
-      // Fetch document to check all verification methods
-      const document = await didAdapter.getDocument(didString);
-      const verificationMethods: Array<{ id: string }> = document.verificationMethod ?? [];
-      const found = verificationMethods.some((vm) => vm.id === envKeyId || vm.id.endsWith(`#${envKeyId}`));
-      if (!found) {
-        throw new Error(
-          `SYSTEM_DID_KEY_ID "${envKeyId}" not found in DID document for "${didString}". ` +
-            `Available verification methods: ${verificationMethods.map((vm) => vm.id).join(', ') || 'none'}`,
-        );
-      }
-      resolvedKeyId = envKeyId;
-      logger.info({ did: didString, keyId: resolvedKeyId }, 'Using explicitly configured key ID');
-    }
-
-    // 5. Record DID in database
-    await prisma.did.upsert({
-      where: { id: SYSTEM_DID_ID },
-      update: {
-        did: didString,
-        name: process.env.SYSTEM_DID_NAME || 'System Default DID',
-        description:
-          process.env.SYSTEM_DID_DESCRIPTION || 'System-wide default DID for the UNTP reference implementation',
-        keyId: resolvedKeyId,
-        status: DidStatus.ACTIVE,
-        isDefault: true,
-        serviceInstanceId: SYSTEM_VC_SERVICE_ID,
-      },
-      create: {
-        id: SYSTEM_DID_ID,
-        tenantId: SYSTEM_TENANT_ID,
-        did: didString,
-        type: DidType.DEFAULT,
-        method: DidMethod.DID_WEB,
-        name: process.env.SYSTEM_DID_NAME || 'System Default DID',
-        description:
-          process.env.SYSTEM_DID_DESCRIPTION || 'System-wide default DID for the UNTP reference implementation',
-        keyId: resolvedKeyId,
-        status: DidStatus.ACTIVE,
-        isDefault: true,
-        serviceInstanceId: SYSTEM_VC_SERVICE_ID,
-      },
-    });
-    defaultDid = didString;
-
-    logger.info({ did: didString, keyId: resolvedKeyId }, 'Default DID seeded and linked to VC service instance');
-  } else if (didConfig && !vcSeeded) {
-    logger.warn('Skipping default DID seed: VC service instance was not seeded (required for DID creation)');
-  }
-
-  // ── Seed core data model configs ────────────────────────────────────────────
-  // Static UUIDs ensure idempotent seeding — if the record already exists, skip.
-
-  const coreDataModels = [
-    {
-      id: 'cxuj555flzqtp4ldvklv6ya39',
-      templateId: 'ctehlnyxvdpmp4kv1cxa0tj0t',
-      credentialType: 'DigitalProductPassport',
-      version: '0.6.0',
-      name: 'Digital Product Passport v0.6.0',
-      shortCode: 'dpp',
-      templateDir: 'digital_product_passport',
-    },
-    {
-      id: 'c3imzyum0txv1y9xkww88aktp',
-      templateId: 'cb6ka4fhk68m1wqeitptm24z1',
-      credentialType: 'DigitalConformityCredential',
-      version: '0.6.0',
-      name: 'Digital Conformity Credential v0.6.0',
-      shortCode: 'dcc',
-      templateDir: 'digital_conformity_credential',
-    },
-    {
-      id: 'ctfgtrsuiwv1fedo9t5swxhnk',
-      templateId: 'c62zomihgkn6iimbv7dzhr1fj',
-      credentialType: 'DigitalFacilityRecord',
-      version: '0.6.0',
-      name: 'Digital Facility Record v0.6.0',
-      shortCode: 'dfr',
-      templateDir: 'digital_facility_record',
-    },
-    {
-      id: 'cz9raijqcay5nzmq59geoggrk',
-      templateId: 'cv2ldbzupwtbluam7nrfqqv1e',
-      credentialType: 'DigitalIdentityAnchor',
-      version: '0.6.0',
-      name: 'Digital Identity Anchor v0.6.0',
-      shortCode: 'dia',
-      templateDir: 'digital_identity_anchor',
-    },
-    {
-      id: 'crqvpwffc0k2p4bvr8za1ii6j',
-      templateId: 'c1fx8t9k9p6q8wcaxib6e6id1',
-      credentialType: 'DigitalTraceabilityEvent',
-      version: '0.6.0',
-      name: 'Digital Traceability Event v0.6.0',
-      shortCode: 'dte',
-      templateDir: 'digital_traceability_event',
-    },
-    {
-      id: 'c1pxfzzkeb86jgeel7hrvmcle',
-      templateId: 'co3tub0ndto2lzq9l4rsnw22y',
-      credentialType: 'DigitalProductPassport',
-      version: '0.6.1',
-      name: 'Digital Product Passport v0.6.1',
-      shortCode: 'dpp',
-      templateDir: 'digital_product_passport',
-    },
-    {
-      id: 'cttpz40pfgcfeue2wmbc3jti8',
-      templateId: 'cx5qp969tkboeem04szgwyb32',
-      credentialType: 'DigitalConformityCredential',
-      version: '0.6.1',
-      name: 'Digital Conformity Credential v0.6.1',
-      shortCode: 'dcc',
-      templateDir: 'digital_conformity_credential',
-    },
-    {
-      id: 'csrtste8ai2llop7ui8u6n11l',
-      templateId: 'c91eyblwyejyfoq1pfqsik0ty',
-      credentialType: 'DigitalFacilityRecord',
-      version: '0.6.1',
-      name: 'Digital Facility Record v0.6.1',
-      shortCode: 'dfr',
-      templateDir: 'digital_facility_record',
-    },
-    {
-      id: 'cn5u63huxvqgdwppebaxmqt9l',
-      templateId: 'c5khe5ju6ai3ptaw55r01vayo',
-      credentialType: 'DigitalIdentityAnchor',
-      version: '0.6.1',
-      name: 'Digital Identity Anchor v0.6.1',
-      shortCode: 'dia',
-      templateDir: 'digital_identity_anchor',
-    },
-    {
-      id: 'cwb7m3k0hpz9xqft6rjn2oe4s',
-      templateId: 'c8yvd2gnmr5w1kbjx4hq0zp7f',
-      credentialType: 'DigitalTraceabilityEvent',
-      version: '0.6.1',
-      name: 'Digital Traceability Event v0.6.1',
-      shortCode: 'dte',
-      templateDir: 'digital_traceability_event',
-    },
-    {
-      id: 'ca3frzta22f7lblxntvw6ukuh',
-      templateId: 'cb7bad861g78bcgovjrw98szt',
-      credentialType: 'DigitalProductPassport',
-      version: '0.7.0',
-      name: 'Digital Product Passport v0.7.0',
-      shortCode: 'dpp',
-      templateDir: 'digital_product_passport',
-    },
-    {
-      id: 'ca9ndkrc8lxmtsfzwynui40zy',
-      templateId: 'cpfsywtmlq5wthxc6w6al6e2b',
-      credentialType: 'DigitalConformityCredential',
-      version: '0.7.0',
-      name: 'Digital Conformity Credential v0.7.0',
-      shortCode: 'dcc',
-      templateDir: 'digital_conformity_credential',
-    },
-    {
-      id: 'cj3s37lt6pvh56ggspr9upt5m',
-      templateId: 'c7jafa80eu2wa35rly4eeqona',
-      credentialType: 'DigitalFacilityRecord',
-      version: '0.7.0',
-      name: 'Digital Facility Record v0.7.0',
-      shortCode: 'dfr',
-      templateDir: 'digital_facility_record',
-    },
-    {
-      id: 'cw0tzf723j1oql3u4s1r0c2g2',
-      templateId: 'ch4d269bf6szab6p955vfwj40',
-      credentialType: 'DigitalIdentityAnchor',
-      version: '0.7.0',
-      name: 'Digital Identity Anchor v0.7.0',
-      shortCode: 'dia',
-      templateDir: 'digital_identity_anchor',
-    },
-    {
-      id: 'cfhlj3bumipb74z8irp6uiuxn',
-      templateId: 'chv69r38brqzchvqc47v4qoqo',
-      credentialType: 'DigitalTraceabilityEvent',
-      version: '0.7.0',
-      name: 'Digital Traceability Event v0.7.0',
-      shortCode: 'dte',
-      templateDir: 'digital_traceability_event',
-    },
-  ];
-
-  for (const dm of coreDataModels) {
-    const exists = await prisma.dataModel.findUnique({ where: { id: dm.id } });
-    if (exists) {
-      await convergeCoreProvenance(prisma.dataModel, dm.id, exists.source);
-      logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model already exists, skipping');
-      continue;
-    }
-
-    const { schemaUrl, contextUrl } = buildUntpArtefactUrls(dm.credentialType, dm.version);
-    const websiteUrl = buildSpecificationPageUrl(dm.credentialType, dm.version);
-
-    await prisma.dataModel.create({
-      data: {
-        id: dm.id,
-        tenantId: SYSTEM_TENANT_ID,
-        name: dm.name,
-        credentialType: dm.credentialType,
-        version: dm.version,
-        isExtension: false,
-        schemaUrl,
-        contextUrl,
-        websiteUrl,
-        source: RecordSource.CORE_SEED,
-      },
-    });
-
-    logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model created');
-  }
-
-  // ── Seed the ConformityScheme data model row ────────────────────────────────
-  // The custom-seed `conformitySchemes` processor resolves the JSON Schema URL
-  // for ingestion by looking this row up via (credentialType, version).
-  // ConformityScheme was introduced in v0.7.0, so it always resolves to the
-  // v0.7.0+ artefacts layout (schema under `untp.unece.org/artefacts`, unified
-  // context on `vocabulary.uncefact.org`).
-  const CONFORMITY_SCHEME_DATA_MODEL_ID = 'c4fxk5o3sqrm6n0u7c7akm0sb';
-  const conformitySchemeExists = await prisma.dataModel.findUnique({
-    where: { id: CONFORMITY_SCHEME_DATA_MODEL_ID },
+  // Reads the state above at the moment they're called, whether that's
+  // after a clean finish or right after catching a mid-run failure.
+  const currentCategoryOutcomes = (): Record<SummaryCategoryName, CategoryOutcome> => ({
+    idr: idrOutcome,
+    storage: storageOutcome,
+    vc: vcOutcome,
+    did: didOutcome,
+    renderTemplates: renderTemplatesOutcome,
+    tenant: tenantOutcome,
+    dataModels: dataModelsOutcome,
+    customSeed: customSeedOutcome,
   });
-  if (conformitySchemeExists) {
-    await convergeCoreProvenance(prisma.dataModel, CONFORMITY_SCHEME_DATA_MODEL_ID, conformitySchemeExists.source);
-    logger.info(
-      { dataModelId: CONFORMITY_SCHEME_DATA_MODEL_ID, credentialType: 'ConformityScheme' },
-      'Data model already exists, skipping',
-    );
-  } else {
-    const { schemaUrl, contextUrl } = buildUntpArtefactUrls('ConformityScheme', '0.7.0');
-    const websiteUrl = buildSpecificationPageUrl('ConformityScheme', '0.7.0');
-    await prisma.dataModel.create({
-      data: {
-        id: CONFORMITY_SCHEME_DATA_MODEL_ID,
-        tenantId: SYSTEM_TENANT_ID,
-        name: 'Conformity Scheme v0.7.0',
-        credentialType: 'ConformityScheme',
-        version: '0.7.0',
-        isExtension: false,
-        schemaUrl,
-        contextUrl,
-        websiteUrl,
-        source: RecordSource.CORE_SEED,
+  const currentNotRunCategories = (): SummaryCategoryName[] =>
+    [...EXECUTION_CATEGORIES, ...ALWAYS_RUN_CATEGORIES].filter(
+      (category) => !reachedCategories.has(category as SummaryCategoryName),
+    ) as SummaryCategoryName[];
+  const currentPartialDetails = (): Record<string, string[]> => {
+    const details: Record<string, string[]> = {};
+    const idrDetails = [
+      ...failedNamespaces,
+      ...conflictedNamespaces.map((ns) => `${ns} (IDR returned a conflict; existing registration not verified)`),
+    ];
+    if (idrRegistrationFatalError) idrDetails.push(`registration aborted: ${idrRegistrationFatalError}`);
+    if (idrDetails.length > 0) details.idr = idrDetails;
+    const templateDetails = [...templatesSkippedFiles];
+    if (renderTemplateInterruptedItem)
+      templateDetails.push(`${renderTemplateInterruptedItem} (interrupted mid upload)`);
+    if (templateDetails.length > 0) details.renderTemplates = templateDetails;
+    if (dataModelsOutcome === 'partial') {
+      details.dataModels = [`completed ${dataModelsCompletedCount} data model row(s) before failing`];
+    }
+    if (customSeedPartialDetail) details.customSeed = [customSeedPartialDetail];
+    return details;
+  };
+
+  try {
+    // Resolved before any write: divergent DATA_ENCRYPTION_KEY and
+    // SERVICE_ENCRYPTION_KEY values throw here, so the seed cannot
+    // re-encrypt service instance configurations under a key that splits
+    // the database. Resolved inside the try (not at module load) so this
+    // failure is covered by the same summary-and-rethrow the rest of a
+    // mid-run failure gets, instead of an uncaught exception at import
+    // time with no summary at all.
+    const resolvedEncryptionKey = resolveDataEncryptionKey();
+    warnIfDeprecatedEncryptionKeyName(resolvedEncryptionKey, logger);
+
+    // Upsert the system tenant (used for system-wide defaults)
+    reachedCategories.add('tenant');
+    await prisma.tenant.upsert({
+      where: { id: SYSTEM_TENANT_ID },
+      update: {},
+      create: {
+        id: SYSTEM_TENANT_ID,
+        name: 'System',
       },
     });
-    logger.info(
-      { dataModelId: CONFORMITY_SCHEME_DATA_MODEL_ID, credentialType: 'ConformityScheme' },
-      'Data model created',
-    );
-  }
+    tenantOutcome = 'seeded';
 
-  // ── Seed default render templates ───────────────────────────────────────────
-  // Upload .hbs templates to the storage service and record the returned URIs.
-  // Requires the storage service to be available (skipped otherwise).
-
-  let templatesSeeded = false;
-  if (storageSeeded && storageRegistryEntry && storageConfig) {
+    // Read DID configuration (DID creation happens after VC service is available).
+    // The failure is reported below, alongside the other reasons a default
+    // DID can end up not seeded, so every skip logs exactly once. The
+    // presence check is done here, against the same normalisation
+    // preflight used, rather than trusting `getDidConfig()`'s own weaker
+    // (empty-string-only) check: a whitespace-only SYSTEM_DID would
+    // otherwise pass it and fail much later, somewhere less clear, when a
+    // blank value reaches `parseDidMethod` or the VC service.
     try {
-      const storageService = storageRegistryEntry.factory(
-        storageConfig as Parameters<typeof storageRegistryEntry.factory>[0],
-        logger.child({ service: 'Storage - Seed' }),
+      if (!normalizeEnvValue(process.env.SYSTEM_DID)) {
+        throw new Error('Missing required DID configuration: SYSTEM_DID. Set this in your .env file or environment.');
+      }
+      didConfig = getDidConfig();
+    } catch (error) {
+      didConfigError = error instanceof Error ? error.message : String(error);
+    }
+
+    // ── Seed service instances (requires DATA_ENCRYPTION_KEY) ───────────────────
+
+    const ENCRYPTION_KEY = normalizeEnvValue(resolvedEncryptionKey.key);
+    if (ENCRYPTION_KEY) {
+      // Refuse (or warn, in local development) the .env.example placeholder
+      // before touching any existing envelope, then confirm the key can
+      // actually decrypt what is already stored — same preflight the
+      // backfill:decryption-keys script runs, so a wrong key is caught here
+      // rather than after this seed re-encrypts the system service instances
+      // under it.
+      assertNotPlaceholderEncryptionKey(ENCRYPTION_KEY, { deploymentEnvironment: process.env.DEPLOYMENT_ENVIRONMENT });
+      encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
+      await validateEncryptionKeyAtStartup(prisma, encryptionService);
+    } else {
+      logger.warn(
+        'DATA_ENCRYPTION_KEY not set; skipping service instance seeds (IDR, storage, VC). ' +
+          'These can be configured later via the application UI.',
       );
+    }
 
-      const TEMPLATES_BASE = path.resolve(__dirname, '../src/templates');
+    // ── Seed system Pyx IDR service instance ────────────────────────────────────
 
-      for (const dm of coreDataModels) {
-        const exists = await prisma.renderTemplate.findUnique({ where: { id: dm.templateId } });
-        if (exists) {
-          await convergeCoreProvenance(prisma.renderTemplate, dm.templateId, exists.source);
-          logger.info(
-            { templateId: dm.templateId, credentialType: dm.credentialType },
-            'Template already exists, skipping',
+    reachedCategories.add('idr');
+    if (encryptionService) {
+      try {
+        const idrAdapters = adapterRegistry[ServiceType.IDR];
+        const permittedIdrTypes = Object.keys(idrAdapters) as Array<keyof typeof idrAdapters>;
+        const resolvedIdrAdapterType = (process.env.SYSTEM_IDR_ADAPTER_TYPE as keyof typeof idrAdapters) || 'PYX_IDR';
+        idrAdapterType = resolvedIdrAdapterType;
+        const idrRegistryEntry = idrAdapters[resolvedIdrAdapterType];
+        if (!idrRegistryEntry) {
+          throw new Error(
+            `Unknown IDR adapter type: "${idrAdapterType}". Permitted types: ${permittedIdrTypes.join(', ')}`,
           );
-          continue;
         }
-
-        const templatePath = path.join(TEMPLATES_BASE, `v${dm.version}`, dm.templateDir, 'template.hbs');
-        if (!fs.existsSync(templatePath)) {
-          logger.warn({ templatePath, credentialType: dm.credentialType }, 'Template file not found, skipping');
-          continue;
-        }
-
-        const templateContent = fs.readFileSync(templatePath, 'utf-8');
-
-        // Upload template to storage via the seeded storage service adapter
-        const storageRecord = await storageService.storeBinary(
-          templateContent,
-          `${dm.shortCode}-template.hbs`,
-          'text/html',
+        idrConfig = idrRegistryEntry.configSchema.parse({
+          baseUrl: normalizeEnvValue(process.env.SYSTEM_IDR_BASE_URL),
+          apiKey: normalizeEnvValue(process.env.SYSTEM_IDR_API_KEY),
+          apiVersion: normalizeEnvValue(process.env.SYSTEM_IDR_API_VERSION),
+          defaultLinkType: normalizeEnvValue(process.env.SYSTEM_IDR_DEFAULT_LINK_TYPE),
+          defaultMimeType: normalizeEnvValue(process.env.SYSTEM_IDR_DEFAULT_MIME_TYPE),
+          defaultIanaLanguage: normalizeEnvValue(process.env.SYSTEM_IDR_DEFAULT_LANGUAGE),
+          defaultContext: normalizeEnvValue(process.env.SYSTEM_IDR_DEFAULT_CONTEXT),
+          defaultFwqs: process.env.SYSTEM_IDR_DEFAULT_FWQS === 'true',
+        });
+        const idrServiceConfig = JSON.stringify(idrConfig);
+        const encryptedIdrConfig = JSON.stringify(
+          encryptionService.encrypt(idrServiceConfig, EncryptionAlgorithm.AES_256_GCM),
         );
 
-        await prisma.renderTemplate.create({
-          data: {
-            id: dm.templateId,
+        await prisma.serviceInstance.upsert({
+          where: { id: SYSTEM_IDR_SERVICE_ID },
+          update: { config: encryptedIdrConfig },
+          create: {
+            id: SYSTEM_IDR_SERVICE_ID,
             tenantId: SYSTEM_TENANT_ID,
-            dataModelId: dm.id,
-            name: `${dm.name} Default Template`,
-            storageUrl: storageRecord.uri,
-            digestMultibase:
-              storageRecord.digestMultibase ??
-              (
-                await MultibaseDigest.fromText(templateContent, { algorithm: 'sha2-256', base: 'base58btc' })
-              ).toString(),
-            isDefault: true,
-            renderMethodType: RenderMethodType.RenderTemplate2024,
-            inline: false,
-            mediaType: 'text/html',
-            storageExternalId: storageRecord.externalId,
-            storageBucket: storageRecord.bucket,
-            storageContentType: 'text/html',
-            storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
-            source: RecordSource.CORE_SEED,
+            serviceType: PrismaServiceType.IDR,
+            adapterType: idrAdapterType as unknown as PrismaAdapterType,
+            name: process.env.SYSTEM_IDR_SERVICE_NAME || 'System Default IDR',
+            description:
+              process.env.SYSTEM_IDR_SERVICE_DESCRIPTION || 'System-wide default Identity Resolver service instance',
+            config: encryptedIdrConfig,
+            isPrimary: true,
           },
         });
-
-        logger.info(
-          { templateId: dm.templateId, uri: storageRecord.uri, credentialType: dm.credentialType },
-          'Template uploaded and seeded',
+        idrSeeded = true;
+        idrOutcome = 'seeded';
+      } catch (error) {
+        logger.warn(
+          { error: error instanceof Error ? error.message : error },
+          'IDR service instance seed did not complete; skipping. See the attached error for the cause.',
         );
       }
-      templatesSeeded = true;
-    } catch (error) {
-      logger.warn(
-        { error: error instanceof Error ? error.message : error },
-        'Skipping render template seed: storage service not available',
-      );
     }
-  } else {
-    logger.warn('Skipping render template seed: storage service was not seeded');
-  }
 
-  // ── Run custom seed (deployer-provided data) ──────────────────────────────
-  // Environment variables:
-  //   SKIP_CUSTOM_SEED=true   - Skip custom seed (deployer-provided data from /app/seed/custom/)
-  if (process.env.SKIP_CUSTOM_SEED !== 'true') {
-    const { runCustomSeed } = await import('./custom-seed');
+    // ── Seed system UNCEFACT storage service instance ───────────────────────────
 
-    await runCustomSeed({
-      logger: logger.child({ module: 'custom-seed' }),
-      prisma,
-      systemTenantId: SYSTEM_TENANT_ID,
-      customSeedDir: '/app/seed/custom',
-      storageService:
-        storageSeeded && storageRegistryEntry && storageConfig
-          ? storageRegistryEntry.factory(
-              storageConfig as Parameters<typeof storageRegistryEntry.factory>[0],
-              logger.child({ service: 'Storage - Custom Seed' }),
-            )
-          : null,
-      storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
-    });
-  } else {
-    logger.info('Skipping custom seed (SKIP_CUSTOM_SEED is set)');
-  }
+    reachedCategories.add('storage');
+    if (encryptionService) {
+      try {
+        const storageAdapters = adapterRegistry[ServiceType.STORAGE];
+        const permittedStorageTypes = Object.keys(storageAdapters) as Array<keyof typeof storageAdapters>;
+        const storageAdapterType =
+          (process.env.SYSTEM_STORAGE_ADAPTER_TYPE as keyof typeof storageAdapters) || 'UNCEFACT_STORAGE';
+        const resolvedStorageEntry = storageAdapters[storageAdapterType];
+        if (!resolvedStorageEntry) {
+          throw new Error(
+            `Unknown storage adapter type: "${storageAdapterType}". Permitted types: ${permittedStorageTypes.join(
+              ', ',
+            )}`,
+          );
+        }
+        const parsedStorageConfig = resolvedStorageEntry.configSchema.parse({
+          baseUrl: normalizeEnvValue(process.env.SYSTEM_STORAGE_BASE_URL),
+          apiKey: normalizeEnvValue(process.env.SYSTEM_STORAGE_API_KEY),
+          apiVersion: normalizeEnvValue(process.env.SYSTEM_STORAGE_API_VERSION),
+          publicBucket: normalizeEnvValue(process.env.SYSTEM_STORAGE_PUBLIC_BUCKET),
+          privateBucket: normalizeEnvValue(process.env.SYSTEM_STORAGE_PRIVATE_BUCKET),
+        });
+        storageConfig = parsedStorageConfig;
+        storageRegistryEntry = resolvedStorageEntry;
+        const storageServiceConfig = JSON.stringify(parsedStorageConfig);
+        const encryptedStorageConfig = JSON.stringify(
+          encryptionService.encrypt(storageServiceConfig, EncryptionAlgorithm.AES_256_GCM),
+        );
 
-  // ── Register identifier schemes with IDR service ────────────────────────────
-  // In the dev environment, the RI operates the Pyx IDR — register seeded schemes.
-  if (idrSeeded && idrAdapterType === 'PYX_IDR') {
-    try {
-      const { PyxIdentityResolverAdapter } = await import('@uncefact/untp-ri-services/server');
-      const pyxAdapter = new PyxIdentityResolverAdapter(
-        idrConfig as ConstructorParameters<typeof PyxIdentityResolverAdapter>[0],
-        logger.child({ service: 'IDR - Seed' }),
+        await prisma.serviceInstance.upsert({
+          where: { id: SYSTEM_STORAGE_SERVICE_ID },
+          update: { config: encryptedStorageConfig },
+          create: {
+            id: SYSTEM_STORAGE_SERVICE_ID,
+            tenantId: SYSTEM_TENANT_ID,
+            serviceType: PrismaServiceType.STORAGE,
+            adapterType: storageAdapterType as unknown as PrismaAdapterType,
+            name: process.env.SYSTEM_STORAGE_SERVICE_NAME || 'System Default Storage',
+            description:
+              process.env.SYSTEM_STORAGE_SERVICE_DESCRIPTION || 'System-wide default storage service instance',
+            config: encryptedStorageConfig,
+            isPrimary: true,
+          },
+        });
+        storageSeeded = true;
+        storageOutcome = 'seeded';
+      } catch (error) {
+        logger.warn(
+          { error: error instanceof Error ? error.message : error },
+          'Storage service instance seed did not complete; skipping. See the attached error for the cause.',
+        );
+      }
+    }
+
+    // ── Seed system VC service instance ───────────────────────────────────────
+    reachedCategories.add('vc');
+    if (encryptionService) {
+      try {
+        const vcAdapters = adapterRegistry[ServiceType.VC];
+        const permittedVcTypes = Object.keys(vcAdapters) as Array<keyof typeof vcAdapters>;
+        const resolvedVcAdapterType = (process.env.SYSTEM_VC_ADAPTER_TYPE as keyof typeof vcAdapters) || 'VCKIT';
+        const vcRegistryEntry = vcAdapters[resolvedVcAdapterType];
+        if (!vcRegistryEntry) {
+          throw new Error(
+            `Unknown VC adapter type: "${resolvedVcAdapterType}". Permitted types: ${permittedVcTypes.join(', ')}`,
+          );
+        }
+        vcConfig = vcRegistryEntry.configSchema.parse({
+          baseUrl: normalizeEnvValue(process.env.SYSTEM_VC_BASE_URL),
+          apiKey: normalizeEnvValue(process.env.SYSTEM_VC_API_KEY),
+          apiVersion: normalizeEnvValue(process.env.SYSTEM_VC_API_VERSION),
+        });
+        vcAdapterType = resolvedVcAdapterType;
+        const vcServiceConfig = JSON.stringify(vcConfig);
+        const encryptedVcConfig = JSON.stringify(
+          encryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
+        );
+
+        await prisma.serviceInstance.upsert({
+          where: { id: SYSTEM_VC_SERVICE_ID },
+          update: { config: encryptedVcConfig },
+          create: {
+            id: SYSTEM_VC_SERVICE_ID,
+            tenantId: SYSTEM_TENANT_ID,
+            serviceType: PrismaServiceType.VC,
+            adapterType: resolvedVcAdapterType as unknown as PrismaAdapterType,
+            name: process.env.SYSTEM_VC_SERVICE_NAME || 'System Default VC',
+            description:
+              process.env.SYSTEM_VC_SERVICE_DESCRIPTION || 'System-wide default verifiable credential service instance',
+            config: encryptedVcConfig,
+            isPrimary: true,
+          },
+        });
+        vcSeeded = true;
+        vcOutcome = 'seeded';
+      } catch (error) {
+        logger.warn(
+          { error: error instanceof Error ? error.message : error },
+          'VC service instance seed did not complete; skipping. See the attached error for the cause.',
+        );
+      }
+    }
+
+    // ── Seed system default DID via VC service ─────────────────────────────────
+    // Uses the DID adapter registry to resolve the correct DID adapter for the
+    // seeded VC service, creates the DID (if it doesn't already exist), resolves
+    // the key ID from the DID document, and records it in the database.
+
+    reachedCategories.add('did');
+    if (didConfig && vcSeeded && vcAdapterType && vcConfig) {
+      const { defaultDid: didString, defaultKeyId: envKeyId } = didConfig;
+
+      // 1. Validate DID format (parseDidMethod throws for invalid/unsupported methods)
+      parseDidMethod(didString);
+
+      // 2. Resolve the DID adapter from the registry using the seeded VC adapter type
+      const didRegistryEntry = didAdapterRegistry[vcAdapterType as keyof typeof didAdapterRegistry];
+      if (!didRegistryEntry) {
+        throw new Error(
+          `No DID adapter registered for VC adapter type: "${vcAdapterType}". ` +
+            `Permitted types: ${Object.keys(didAdapterRegistry).join(', ')}`,
+        );
+      }
+      const didAdapter = didRegistryEntry.factory(
+        vcConfig as Parameters<typeof didRegistryEntry.factory>[0],
+        logger.child({ service: 'DID - Seed' }),
       );
 
-      // Fetch seeded schemes grouped by registrar namespace
-      const schemes = await prisma.identifierScheme.findMany({
-        where: { tenantId: SYSTEM_TENANT_ID },
-        include: { registrar: true, qualifiers: { orderBy: { order: 'asc' } } },
-      });
+      // 3. Create DID via VC service (or confirm it already exists)
+      // Extract alias from the DID (everything after did:web:)
+      const alias = didString.replace(/^did:[^:]+:/, '');
+      let resolvedKeyId: string;
 
-      // Group by registrar namespace
-      const grouped = new Map<string, typeof schemes>();
-      for (const scheme of schemes) {
-        const ns = scheme.registrar.namespace;
-        if (!grouped.has(ns)) grouped.set(ns, []);
-        grouped.get(ns)!.push(scheme);
-      }
-
-      const failedNamespaces: string[] = [];
-      for (const [namespace, nsSchemes] of grouped) {
-        const applicationIdentifiers = nsSchemes.flatMap((s) => {
-          const primary = {
-            title: s.name,
-            label: s.primaryKey,
-            shortcode: s.primaryKey,
-            ai: s.primaryKey,
-            type: 'I' as const,
-            regex: s.validationPattern,
-            qualifiers: s.qualifiers.map((q) => q.key),
-          };
-          const quals = s.qualifiers.map((q) => ({
-            title: q.description,
-            label: q.key,
-            shortcode: q.key,
-            ai: q.key,
-            type: 'Q' as const,
-            regex: q.validationPattern,
-          }));
-          return [primary, ...quals];
+      try {
+        const didRecord = await didAdapter.create({
+          type: ServiceDidType.SELF_MANAGED,
+          method: ServiceDidMethod.DID_WEB,
+          alias,
         });
-
-        try {
-          await pyxAdapter.registerSchemes([{ namespace, applicationIdentifiers }]);
-          logger.info({ namespace, count: applicationIdentifiers.length }, 'Registered schemes with IDR');
-        } catch (error) {
-          const status = (error as { context?: { httpStatus?: number } })?.context?.httpStatus;
-          const message = error instanceof Error ? error.message : String(error);
-
-          if (status === 409) {
-            logger.warn(
-              { namespace },
-              'IDR returned a conflict for this namespace, skipping registration. Pyx IDR 4.0 upserts on registration and is not expected to return a conflict; inspect the existing namespace in the IDR before changing it. See the custom seed operations documentation.',
+        resolvedKeyId = didRecord.keyId;
+        logger.info({ did: didRecord.did, keyId: resolvedKeyId }, 'DID created via VC service');
+      } catch (error) {
+        if (error instanceof DidConflictError) {
+          // DID already exists on the upstream provider — fetch its document to resolve the key ID
+          logger.warn({ did: didString }, 'DID already exists in VC service — skipping creation');
+          const document = await didAdapter.getDocument(didString);
+          const verificationMethods: Array<{ id: string }> = document.verificationMethod ?? [];
+          if (verificationMethods.length === 0) {
+            throw new Error(
+              `No verification methods found in DID document for "${didString}" — ` +
+                'cannot resolve key ID. Set SYSTEM_DID_KEY_ID explicitly.',
             );
-          } else if (status === 400 || status === 422) {
-            failedNamespaces.push(namespace);
-            logger.error(
-              { namespace, error: message },
-              'IDR scheme registration validation error — skipping namespace',
-            );
-          } else {
-            // Fatal: auth errors (401/403), server errors (5xx), network errors
-            throw error;
           }
+          resolvedKeyId = verificationMethods[0].id;
+          logger.info({ did: didString, keyId: resolvedKeyId }, 'Resolved key ID from existing DID document');
+        } else {
+          throw error;
         }
       }
 
-      if (failedNamespaces.length > 0) {
-        logger.warn(
-          { failedNamespaces },
-          'IDR scheme registration completed with failures — some namespaces were not registered',
-        );
-      } else {
-        logger.info('IDR scheme registration complete');
+      // The DID now exists at the VC service (newly created, or confirmed
+      // already present), whether or not the database write below
+      // succeeds: an interruption from here on is a real side effect
+      // already performed, not nothing having happened, so the outcome is
+      // upgraded from 'skipped' now rather than only on full success.
+      didOutcome = 'partial';
+
+      // 4. If SYSTEM_DID_KEY_ID is set, validate it matches the resolved key
+      if (envKeyId && envKeyId !== resolvedKeyId) {
+        // Fetch document to check all verification methods
+        const document = await didAdapter.getDocument(didString);
+        const verificationMethods: Array<{ id: string }> = document.verificationMethod ?? [];
+        const found = verificationMethods.some((vm) => vm.id === envKeyId || vm.id.endsWith(`#${envKeyId}`));
+        if (!found) {
+          throw new Error(
+            `SYSTEM_DID_KEY_ID "${envKeyId}" not found in DID document for "${didString}". ` +
+              `Available verification methods: ${verificationMethods.map((vm) => vm.id).join(', ') || 'none'}`,
+          );
+        }
+        resolvedKeyId = envKeyId;
+        logger.info({ did: didString, keyId: resolvedKeyId }, 'Using explicitly configured key ID');
       }
-    } catch (error) {
-      logger.error({ error: error instanceof Error ? error.message : error }, 'IDR scheme registration failed');
-      throw error;
+
+      // 5. Record DID in database
+      await prisma.did.upsert({
+        where: { id: SYSTEM_DID_ID },
+        update: {
+          did: didString,
+          name: process.env.SYSTEM_DID_NAME || 'System Default DID',
+          description:
+            process.env.SYSTEM_DID_DESCRIPTION || 'System-wide default DID for the UNTP reference implementation',
+          keyId: resolvedKeyId,
+          status: DidStatus.ACTIVE,
+          isDefault: true,
+          serviceInstanceId: SYSTEM_VC_SERVICE_ID,
+        },
+        create: {
+          id: SYSTEM_DID_ID,
+          tenantId: SYSTEM_TENANT_ID,
+          did: didString,
+          type: DidType.DEFAULT,
+          method: DidMethod.DID_WEB,
+          name: process.env.SYSTEM_DID_NAME || 'System Default DID',
+          description:
+            process.env.SYSTEM_DID_DESCRIPTION || 'System-wide default DID for the UNTP reference implementation',
+          keyId: resolvedKeyId,
+          status: DidStatus.ACTIVE,
+          isDefault: true,
+          serviceInstanceId: SYSTEM_VC_SERVICE_ID,
+        },
+      });
+      didOutcome = 'seeded';
+
+      logger.info({ did: didString, keyId: resolvedKeyId }, 'Default DID seeded and linked to VC service instance');
+    } else if (didConfig && !vcSeeded) {
+      logger.warn('Skipping default DID seed: VC service instance was not seeded (required for DID creation)');
+    } else if (!didConfig) {
+      logger.warn({ error: didConfigError }, 'DID configuration not available; skipping default DID seed');
     }
-  } else if (idrSeeded) {
-    logger.info({ adapterType: idrAdapterType }, 'Non-Pyx IDR adapter — skipping scheme registration');
+
+    // ── Seed core data model configs ────────────────────────────────────────────
+    // Static UUIDs ensure idempotent seeding — if the record already exists, skip.
+    // Left at its default 'skipped' outcome until the first row is
+    // confirmed (created, or found already present) — not before the loop
+    // starts, which would report 'partial' even when zero rows had been
+    // touched (Moderate finding 6) — then upgraded to 'partial' after that
+    // first row and to 'seeded' once every model, including the
+    // ConformityScheme row below, is confirmed done.
+    reachedCategories.add('dataModels');
+
+    const coreDataModels = [
+      {
+        id: 'cxuj555flzqtp4ldvklv6ya39',
+        templateId: 'ctehlnyxvdpmp4kv1cxa0tj0t',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.0',
+        name: 'Digital Product Passport v0.6.0',
+        shortCode: 'dpp',
+        templateDir: 'digital_product_passport',
+      },
+      {
+        id: 'c3imzyum0txv1y9xkww88aktp',
+        templateId: 'cb6ka4fhk68m1wqeitptm24z1',
+        credentialType: 'DigitalConformityCredential',
+        version: '0.6.0',
+        name: 'Digital Conformity Credential v0.6.0',
+        shortCode: 'dcc',
+        templateDir: 'digital_conformity_credential',
+      },
+      {
+        id: 'ctfgtrsuiwv1fedo9t5swxhnk',
+        templateId: 'c62zomihgkn6iimbv7dzhr1fj',
+        credentialType: 'DigitalFacilityRecord',
+        version: '0.6.0',
+        name: 'Digital Facility Record v0.6.0',
+        shortCode: 'dfr',
+        templateDir: 'digital_facility_record',
+      },
+      {
+        id: 'cz9raijqcay5nzmq59geoggrk',
+        templateId: 'cv2ldbzupwtbluam7nrfqqv1e',
+        credentialType: 'DigitalIdentityAnchor',
+        version: '0.6.0',
+        name: 'Digital Identity Anchor v0.6.0',
+        shortCode: 'dia',
+        templateDir: 'digital_identity_anchor',
+      },
+      {
+        id: 'crqvpwffc0k2p4bvr8za1ii6j',
+        templateId: 'c1fx8t9k9p6q8wcaxib6e6id1',
+        credentialType: 'DigitalTraceabilityEvent',
+        version: '0.6.0',
+        name: 'Digital Traceability Event v0.6.0',
+        shortCode: 'dte',
+        templateDir: 'digital_traceability_event',
+      },
+      {
+        id: 'c1pxfzzkeb86jgeel7hrvmcle',
+        templateId: 'co3tub0ndto2lzq9l4rsnw22y',
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.1',
+        name: 'Digital Product Passport v0.6.1',
+        shortCode: 'dpp',
+        templateDir: 'digital_product_passport',
+      },
+      {
+        id: 'cttpz40pfgcfeue2wmbc3jti8',
+        templateId: 'cx5qp969tkboeem04szgwyb32',
+        credentialType: 'DigitalConformityCredential',
+        version: '0.6.1',
+        name: 'Digital Conformity Credential v0.6.1',
+        shortCode: 'dcc',
+        templateDir: 'digital_conformity_credential',
+      },
+      {
+        id: 'csrtste8ai2llop7ui8u6n11l',
+        templateId: 'c91eyblwyejyfoq1pfqsik0ty',
+        credentialType: 'DigitalFacilityRecord',
+        version: '0.6.1',
+        name: 'Digital Facility Record v0.6.1',
+        shortCode: 'dfr',
+        templateDir: 'digital_facility_record',
+      },
+      {
+        id: 'cn5u63huxvqgdwppebaxmqt9l',
+        templateId: 'c5khe5ju6ai3ptaw55r01vayo',
+        credentialType: 'DigitalIdentityAnchor',
+        version: '0.6.1',
+        name: 'Digital Identity Anchor v0.6.1',
+        shortCode: 'dia',
+        templateDir: 'digital_identity_anchor',
+      },
+      {
+        id: 'cwb7m3k0hpz9xqft6rjn2oe4s',
+        templateId: 'c8yvd2gnmr5w1kbjx4hq0zp7f',
+        credentialType: 'DigitalTraceabilityEvent',
+        version: '0.6.1',
+        name: 'Digital Traceability Event v0.6.1',
+        shortCode: 'dte',
+        templateDir: 'digital_traceability_event',
+      },
+      {
+        id: 'ca3frzta22f7lblxntvw6ukuh',
+        templateId: 'cb7bad861g78bcgovjrw98szt',
+        credentialType: 'DigitalProductPassport',
+        version: '0.7.0',
+        name: 'Digital Product Passport v0.7.0',
+        shortCode: 'dpp',
+        templateDir: 'digital_product_passport',
+      },
+      {
+        id: 'ca9ndkrc8lxmtsfzwynui40zy',
+        templateId: 'cpfsywtmlq5wthxc6w6al6e2b',
+        credentialType: 'DigitalConformityCredential',
+        version: '0.7.0',
+        name: 'Digital Conformity Credential v0.7.0',
+        shortCode: 'dcc',
+        templateDir: 'digital_conformity_credential',
+      },
+      {
+        id: 'cj3s37lt6pvh56ggspr9upt5m',
+        templateId: 'c7jafa80eu2wa35rly4eeqona',
+        credentialType: 'DigitalFacilityRecord',
+        version: '0.7.0',
+        name: 'Digital Facility Record v0.7.0',
+        shortCode: 'dfr',
+        templateDir: 'digital_facility_record',
+      },
+      {
+        id: 'cw0tzf723j1oql3u4s1r0c2g2',
+        templateId: 'ch4d269bf6szab6p955vfwj40',
+        credentialType: 'DigitalIdentityAnchor',
+        version: '0.7.0',
+        name: 'Digital Identity Anchor v0.7.0',
+        shortCode: 'dia',
+        templateDir: 'digital_identity_anchor',
+      },
+      {
+        id: 'cfhlj3bumipb74z8irp6uiuxn',
+        templateId: 'chv69r38brqzchvqc47v4qoqo',
+        credentialType: 'DigitalTraceabilityEvent',
+        version: '0.7.0',
+        name: 'Digital Traceability Event v0.7.0',
+        shortCode: 'dte',
+        templateDir: 'digital_traceability_event',
+      },
+    ];
+
+    for (const dm of coreDataModels) {
+      const exists = await prisma.dataModel.findUnique({ where: { id: dm.id } });
+      if (exists) {
+        await convergeCoreProvenance(prisma.dataModel, dm.id, exists.source);
+        dataModelsCompletedCount += 1;
+        dataModelsOutcome = 'partial';
+        logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model already exists, skipping');
+        continue;
+      }
+
+      const { schemaUrl, contextUrl } = buildUntpArtefactUrls(dm.credentialType, dm.version);
+      const websiteUrl = buildSpecificationPageUrl(dm.credentialType, dm.version);
+
+      await prisma.dataModel.create({
+        data: {
+          id: dm.id,
+          tenantId: SYSTEM_TENANT_ID,
+          name: dm.name,
+          credentialType: dm.credentialType,
+          version: dm.version,
+          isExtension: false,
+          schemaUrl,
+          contextUrl,
+          websiteUrl,
+          source: RecordSource.CORE_SEED,
+        },
+      });
+
+      dataModelsCompletedCount += 1;
+      dataModelsOutcome = 'partial';
+      logger.info({ dataModelId: dm.id, credentialType: dm.credentialType }, 'Data model created');
+    }
+
+    // ── Seed the ConformityScheme data model row ────────────────────────────────
+    // The custom-seed `conformitySchemes` processor resolves the JSON Schema URL
+    // for ingestion by looking this row up via (credentialType, version).
+    // ConformityScheme was introduced in v0.7.0, so it always resolves to the
+    // v0.7.0+ artefacts layout (schema under `untp.unece.org/artefacts`, unified
+    // context on `vocabulary.uncefact.org`).
+    const CONFORMITY_SCHEME_DATA_MODEL_ID = 'c4fxk5o3sqrm6n0u7c7akm0sb';
+    const conformitySchemeExists = await prisma.dataModel.findUnique({
+      where: { id: CONFORMITY_SCHEME_DATA_MODEL_ID },
+    });
+    if (conformitySchemeExists) {
+      await convergeCoreProvenance(prisma.dataModel, CONFORMITY_SCHEME_DATA_MODEL_ID, conformitySchemeExists.source);
+      dataModelsCompletedCount += 1;
+      logger.info(
+        { dataModelId: CONFORMITY_SCHEME_DATA_MODEL_ID, credentialType: 'ConformityScheme' },
+        'Data model already exists, skipping',
+      );
+    } else {
+      const { schemaUrl, contextUrl } = buildUntpArtefactUrls('ConformityScheme', '0.7.0');
+      const websiteUrl = buildSpecificationPageUrl('ConformityScheme', '0.7.0');
+      await prisma.dataModel.create({
+        data: {
+          id: CONFORMITY_SCHEME_DATA_MODEL_ID,
+          tenantId: SYSTEM_TENANT_ID,
+          name: 'Conformity Scheme v0.7.0',
+          credentialType: 'ConformityScheme',
+          version: '0.7.0',
+          isExtension: false,
+          schemaUrl,
+          contextUrl,
+          websiteUrl,
+          source: RecordSource.CORE_SEED,
+        },
+      });
+      dataModelsCompletedCount += 1;
+      logger.info(
+        { dataModelId: CONFORMITY_SCHEME_DATA_MODEL_ID, credentialType: 'ConformityScheme' },
+        'Data model created',
+      );
+    }
+    dataModelsOutcome = 'seeded';
+
+    // ── Seed default render templates ───────────────────────────────────────────
+    // Upload .hbs templates to the storage service and record the returned URIs.
+    // Requires the storage service to be available (skipped otherwise).
+
+    reachedCategories.add('renderTemplates');
+    if (storageSeeded && storageRegistryEntry && storageConfig) {
+      try {
+        const storageService = storageRegistryEntry.factory(
+          storageConfig as Parameters<typeof storageRegistryEntry.factory>[0],
+          logger.child({ service: 'Storage - Seed' }),
+        );
+
+        const TEMPLATES_BASE = path.resolve(scriptDir, '../src/templates');
+
+        for (const dm of coreDataModels) {
+          const exists = await prisma.renderTemplate.findUnique({ where: { id: dm.templateId } });
+          if (exists) {
+            await convergeCoreProvenance(prisma.renderTemplate, dm.templateId, exists.source);
+            logger.info(
+              { templateId: dm.templateId, credentialType: dm.credentialType },
+              'Template already exists, skipping',
+            );
+            continue;
+          }
+
+          const templatePath = path.join(TEMPLATES_BASE, `v${dm.version}`, dm.templateDir, 'template.hbs');
+          if (!fs.existsSync(templatePath)) {
+            logger.warn({ templatePath, credentialType: dm.credentialType }, 'Template file not found, skipping');
+            templatesSkippedFiles.push(`${dm.credentialType} v${dm.version} (${templatePath})`);
+            continue;
+          }
+
+          const templateContent = fs.readFileSync(templatePath, 'utf-8');
+
+          // Named before the upload, and cleared only once the database
+          // row commits, so a failure anywhere in between (including the
+          // database write itself) is reported against the item that was
+          // mid flight rather than silently dropped (Moderate finding 8).
+          renderTemplateInterruptedItem = `${dm.credentialType} v${dm.version}`;
+
+          // Upload template to storage via the seeded storage service adapter
+          const storageRecord = await storageService.storeBinary(
+            templateContent,
+            `${dm.shortCode}-template.hbs`,
+            'text/html',
+          );
+
+          // Counted as soon as the external upload succeeds, not only
+          // after the database row is written below: an upload that
+          // succeeds and is then followed by a failed database write is a
+          // real orphaned side effect, not nothing having happened, so the
+          // interrupted-run summary must already see it as progress
+          // (Major finding 4).
+          templatesCreatedCount += 1;
+
+          await prisma.renderTemplate.create({
+            data: {
+              id: dm.templateId,
+              tenantId: SYSTEM_TENANT_ID,
+              dataModelId: dm.id,
+              name: `${dm.name} Default Template`,
+              storageUrl: storageRecord.uri,
+              digestMultibase:
+                storageRecord.digestMultibase ??
+                (
+                  await MultibaseDigest.fromText(templateContent, { algorithm: 'sha2-256', base: 'base58btc' })
+                ).toString(),
+              isDefault: true,
+              renderMethodType: RenderMethodType.RenderTemplate2024,
+              inline: false,
+              mediaType: 'text/html',
+              storageExternalId: storageRecord.externalId,
+              storageBucket: storageRecord.bucket,
+              storageContentType: 'text/html',
+              storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
+              source: RecordSource.CORE_SEED,
+            },
+          });
+
+          renderTemplateInterruptedItem = null;
+          logger.info(
+            { templateId: dm.templateId, uri: storageRecord.uri, credentialType: dm.credentialType },
+            'Template uploaded and seeded',
+          );
+        }
+        renderTemplatesOutcome = templatesSkippedFiles.length > 0 ? 'partial' : 'seeded';
+      } catch (error) {
+        // The loop can be interrupted after some templates already
+        // uploaded successfully (a real side effect), some already
+        // recorded as missing files, or while an item's upload was in
+        // flight (`renderTemplateInterruptedItem` still set, whether that
+        // upload itself is what threw or a later database write did); any
+        // of those means the category only partially completed, not that
+        // nothing happened. Without the last condition, an item whose
+        // storeBinary call throws before templatesCreatedCount increments
+        // left the outcome 'skipped' while partialDetails.renderTemplates
+        // still named that item — outcome and details disagreeing about
+        // whether the run touched this category.
+        renderTemplatesOutcome =
+          templatesCreatedCount > 0 || templatesSkippedFiles.length > 0 || renderTemplateInterruptedItem
+            ? 'partial'
+            : 'skipped';
+        logger.warn(
+          { error: error instanceof Error ? error.message : error },
+          'Render template seed did not complete; skipping. See the attached error for the cause.',
+        );
+      }
+    } else {
+      logger.warn('Skipping render template seed: storage service was not seeded');
+    }
+
+    // ── Run custom seed (deployer-provided data) ──────────────────────────────
+    // Environment variables:
+    //   SKIP_CUSTOM_SEED=true   - Skip custom seed (deployer-provided data from /app/seed/custom/)
+    reachedCategories.add('customSeed');
+    if (process.env.SKIP_CUSTOM_SEED !== 'true') {
+      const { runCustomSeed, CustomSeedPartialProgressError } = await import('./custom-seed');
+
+      // Configuration-level problems (unparseable YAML, a schema
+      // violation, reference errors, render templates requested with no
+      // storage service configured) are thrown as typed errors rather
+      // than terminating the process directly, so they reach this catch
+      // and the summary this function already builds, instead of
+      // bypassing `main()` and `seed-cli.ts`'s disconnect entirely
+      // (Blocker finding 1).
+      try {
+        const customSeedResult = await runCustomSeed({
+          logger: logger.child({ module: 'custom-seed' }),
+          prisma,
+          systemTenantId: SYSTEM_TENANT_ID,
+          customSeedDir: '/app/seed/custom',
+          storageService:
+            storageSeeded && storageRegistryEntry && storageConfig
+              ? storageRegistryEntry.factory(
+                  storageConfig as Parameters<typeof storageRegistryEntry.factory>[0],
+                  logger.child({ service: 'Storage - Custom Seed' }),
+                )
+              : null,
+          storageServiceInstanceId: SYSTEM_STORAGE_SERVICE_ID,
+        });
+        if (!customSeedResult.ran) {
+          customSeedOutcome = 'skipped';
+        } else if (customSeedResult.conformityFailed > 0) {
+          // Individual conformity-scheme failures do not throw; the
+          // custom seed logs and counts them, then returns successfully.
+          // Reported as 'partial' rather than unconditionally upgraded to
+          // 'seeded', so an acknowledged failure is not overstated as a
+          // clean run (Major finding 5).
+          customSeedOutcome = 'partial';
+          customSeedPartialDetail = `${customSeedResult.conformityFailed} conformity scheme reconciliation(s) failed`;
+        } else {
+          customSeedOutcome = 'seeded';
+        }
+      } catch (error) {
+        if (error instanceof CustomSeedPartialProgressError) {
+          // A template was already uploaded, or the transaction already
+          // committed, before the failure — a real side effect, not
+          // nothing having happened.
+          customSeedOutcome = 'partial';
+          customSeedPartialDetail = error.message;
+        }
+        throw error;
+      }
+    } else {
+      customSeedOutcome = 'skipped';
+      logger.info('Skipping custom seed (SKIP_CUSTOM_SEED is set)');
+    }
+
+    // ── Register identifier schemes with IDR service ────────────────────────────
+    // In the dev environment, the RI operates the Pyx IDR — register seeded schemes.
+    if (idrSeeded && idrAdapterType === 'PYX_IDR') {
+      try {
+        const { PyxIdentityResolverAdapter } = await import('@uncefact/untp-ri-services/server');
+        const pyxAdapter = new PyxIdentityResolverAdapter(
+          idrConfig as ConstructorParameters<typeof PyxIdentityResolverAdapter>[0],
+          logger.child({ service: 'IDR - Seed' }),
+        );
+
+        // Fetch seeded schemes grouped by registrar namespace
+        const schemes = await prisma.identifierScheme.findMany({
+          where: { tenantId: SYSTEM_TENANT_ID },
+          include: { registrar: true, qualifiers: { orderBy: { order: 'asc' } } },
+        });
+
+        // Group by registrar namespace
+        const grouped = new Map<string, typeof schemes>();
+        for (const scheme of schemes) {
+          const ns = scheme.registrar.namespace;
+          if (!grouped.has(ns)) grouped.set(ns, []);
+          grouped.get(ns)!.push(scheme);
+        }
+
+        for (const [namespace, nsSchemes] of grouped) {
+          const applicationIdentifiers = nsSchemes.flatMap((s) => {
+            const primary = {
+              title: s.name,
+              label: s.primaryKey,
+              shortcode: s.primaryKey,
+              ai: s.primaryKey,
+              type: 'I' as const,
+              regex: s.validationPattern,
+              qualifiers: s.qualifiers.map((q) => q.key),
+            };
+            const quals = s.qualifiers.map((q) => ({
+              title: q.description,
+              label: q.key,
+              shortcode: q.key,
+              ai: q.key,
+              type: 'Q' as const,
+              regex: q.validationPattern,
+            }));
+            return [primary, ...quals];
+          });
+
+          try {
+            await pyxAdapter.registerSchemes([{ namespace, applicationIdentifiers }]);
+            logger.info({ namespace, count: applicationIdentifiers.length }, 'Registered schemes with IDR');
+          } catch (error) {
+            const status = (error as { context?: { httpStatus?: number } })?.context?.httpStatus;
+            const message = error instanceof Error ? error.message : String(error);
+
+            if (status === 409) {
+              // Not registered, and the existing namespace's contents are
+              // unverified against what this run would have sent, so the
+              // category cannot be reported fully seeded on the strength
+              // of this namespace alone (Moderate finding 7).
+              conflictedNamespaces.push(namespace);
+              logger.warn(
+                { namespace },
+                'IDR returned a conflict for this namespace, skipping registration. Pyx IDR 4.0 upserts on registration and is not expected to return a conflict; inspect the existing namespace in the IDR before changing it. See the custom seed operations documentation.',
+              );
+            } else if (status === 400 || status === 422) {
+              failedNamespaces.push(namespace);
+              logger.error(
+                { namespace, error: message },
+                'IDR scheme registration validation error — skipping namespace',
+              );
+            } else {
+              // Fatal: auth errors (401/403), server errors (5xx), network errors
+              throw error;
+            }
+          }
+        }
+
+        if (failedNamespaces.length > 0 || conflictedNamespaces.length > 0) {
+          idrOutcome = 'partial';
+          logger.warn(
+            { failedNamespaces, conflictedNamespaces },
+            'IDR scheme registration completed with failures — some namespaces were not registered or not verified',
+          );
+        } else {
+          logger.info('IDR scheme registration complete');
+        }
+      } catch (error) {
+        // The service instance itself already seeded successfully before
+        // registration was attempted; a fatal registration failure (an
+        // auth error, a server error) is a real, incomplete outcome for
+        // the category as a whole, not the "fully seeded" `idrSeeded`
+        // alone would otherwise imply.
+        idrOutcome = 'partial';
+        idrRegistrationFatalError = error instanceof Error ? error.message : String(error);
+        logger.error({ error: idrRegistrationFatalError }, 'IDR scheme registration failed');
+        throw error;
+      }
+    } else if (idrSeeded) {
+      logger.info({ adapterType: idrAdapterType }, 'Non-Pyx IDR adapter — skipping scheme registration');
+    }
+  } catch (error) {
+    // A failure here happened after preflight passed: some categories may
+    // already have been seeded and others never reached. The summary
+    // reflects exactly that state (ADR-043 decision 6 holds on a mid-run
+    // failure too, not only on the default-mode preflight abort and on
+    // success), and the original error still propagates so seed-cli.ts
+    // exits non-zero; this does not swallow it.
+    const summary = buildOutcomeSummary(
+      allowPartial ? 'partial' : 'default',
+      preflight.missingByCategory,
+      currentCategoryOutcomes(),
+      currentPartialDetails(),
+      preflight.otherIssuesByCategory,
+      currentNotRunCategories(),
+    );
+    logger.error({ summary, err: error }, 'Seed failed partway through; the summary reflects what did complete');
+    throw error;
   }
 
-  logger.info(
-    'Seed complete: system tenant' +
-      (defaultDid ? ', default DID' : '') +
-      ', data models' +
-      (templatesSeeded ? ', render templates' : '') +
-      ', custom seed' +
-      (idrSeeded ? ', IDR service instance' : '') +
-      (storageSeeded ? ', storage service instance' : '') +
-      (vcSeeded ? ', VC service instance' : '') +
-      ' upserted',
+  // One structured summary on every exit path, success included (ADR-043
+  // decision 6), naming what ran, what only partially ran and how, what
+  // was skipped, and the variables responsible, so an operator reads the
+  // same record confirming a good deployment as one diagnosing a bad one.
+  const summary = buildOutcomeSummary(
+    allowPartial ? 'partial' : 'default',
+    preflight.missingByCategory,
+    currentCategoryOutcomes(),
+    currentPartialDetails(),
+    preflight.otherIssuesByCategory,
+    currentNotRunCategories(),
   );
+
+  if (summary.categoriesPartial.length > 0 || summary.categoriesSkipped.length > 0) {
+    logger.warn({ summary }, 'Seed complete with categories skipped or incomplete');
+  } else {
+    logger.info({ summary }, 'Seed complete');
+  }
 }
 
-main()
-  .catch((e) => {
-    logger.error({ err: e }, 'Seed failed');
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// This module never invokes main() itself. `seed-cli.ts` is the executable
+// entrypoint (imports `main` and `prisma` from here and runs them); a test
+// driving `main()` directly against the rig owns its own control flow and
+// must not have this file call `process.exit` out from under it.

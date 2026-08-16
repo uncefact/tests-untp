@@ -24,9 +24,19 @@ export type ResolvedDataEncryptionKey = {
   deprecatedName: 'absent' | 'source' | 'duplicate';
 };
 
+/**
+ * A whitespace-only value has no legitimate meaning here, the same rule
+ * `seed-preflight.ts`'s `normalizeEnvValue` applies; duplicated rather than
+ * imported because `seed-preflight.ts` already imports this module, and a
+ * cross-import back would be circular.
+ */
+function normalizeWhitespaceOnly(value: string | undefined): string | undefined {
+  return value !== undefined && value.trim() !== '' ? value : undefined;
+}
+
 export function resolveDataEncryptionKey(env: NodeJS.ProcessEnv = process.env): ResolvedDataEncryptionKey {
-  const dataKey = env.DATA_ENCRYPTION_KEY || undefined;
-  const serviceKey = env.SERVICE_ENCRYPTION_KEY || undefined;
+  const dataKey = normalizeWhitespaceOnly(env.DATA_ENCRYPTION_KEY);
+  const serviceKey = normalizeWhitespaceOnly(env.SERVICE_ENCRYPTION_KEY);
 
   if (dataKey && serviceKey && dataKey !== serviceKey) {
     throw new Error(

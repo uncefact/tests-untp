@@ -35,6 +35,6 @@ export default defineConfig({
   schema: './schema.prisma',
   migrations: {
     path: './migrations',
-    seed: 'npx tsx seed.ts',
+    seed: 'npx tsx prisma/seed-cli.ts',
   },
 });

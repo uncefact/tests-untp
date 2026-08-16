@@ -35,7 +35,7 @@ const mockExit = jest.spyOn(process, 'exit').mockImplementation((() => {
 
 import fs from 'fs';
 import { parse as parseYaml } from 'yaml';
-import { runCustomSeed } from '../custom-seed';
+import { runCustomSeed, CustomSeedFatalError, CustomSeedPartialProgressError } from '../custom-seed';
 import { ingestConformityScheme } from '../../src/lib/cvc/index.js';
 
 const ingestMockFn = ingestConformityScheme as jest.Mock;
@@ -167,8 +167,9 @@ describe('runCustomSeed', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(false);
       const deps = createDeps();
 
-      await runCustomSeed(deps);
+      const result = await runCustomSeed(deps);
 
+      expect(result).toEqual({ ran: false, conformityFailed: 0 });
       expect(deps.logger.info).toHaveBeenCalledWith(
         expect.objectContaining({ manifestPath: path.join(CUSTOM_SEED_DIR, 'seed.yaml') }),
         expect.stringContaining('No custom seed manifest found'),
@@ -185,8 +186,9 @@ describe('runCustomSeed', () => {
 
       const deps = createDeps();
 
-      await runCustomSeed(deps);
+      const result = await runCustomSeed(deps);
 
+      expect(result).toEqual({ ran: false, conformityFailed: 0 });
       expect(deps.logger.info).toHaveBeenCalledWith(expect.stringContaining('empty'));
       expect(deps.prisma.$transaction).not.toHaveBeenCalled();
       expect(mockExit).not.toHaveBeenCalled();
@@ -203,16 +205,22 @@ describe('runCustomSeed', () => {
 
       const deps = createDeps();
 
-      await runCustomSeed(deps);
+      const result = await runCustomSeed(deps);
 
       // Present-but-empty keys are a remove-all instruction, not an empty file.
       expect(deps.prisma.$transaction).toHaveBeenCalled();
+      expect(result).toEqual({ ran: true, conformityFailed: 0 });
       expect(mockExit).not.toHaveBeenCalled();
     });
   });
 
   describe('when YAML syntax is invalid', () => {
-    it('exits with code 1', async () => {
+    it('throws CustomSeedFatalError instead of terminating the process directly', async () => {
+      // Regression guard for the round-two review finding: runCustomSeed()
+      // must never call process.exit() itself, because a real exit would
+      // abandon main() before its summary-and-rethrow catch (and, in the
+      // real CLI, seed-cli.ts's disconnect) ever run. Throwing lets the
+      // caller decide, the same as every other mid-run failure.
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       (fs.readFileSync as jest.Mock).mockReturnValue('bad yaml');
       (parseYaml as jest.Mock).mockImplementation(() => {
@@ -222,10 +230,16 @@ describe('runCustomSeed', () => {
       });
 
       const deps = createDeps();
+      let caught: unknown;
+      try {
+        await runCustomSeed(deps);
+      } catch (error) {
+        caught = error;
+      }
 
-      await expect(runCustomSeed(deps)).rejects.toThrow('process.exit');
-
-      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(caught).toBeInstanceOf(CustomSeedFatalError);
+      expect((caught as Error).message).toMatch(/Failed to parse custom seed YAML/);
+      expect(mockExit).not.toHaveBeenCalled();
       expect(deps.logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ line: 3, col: 5 }),
         expect.stringContaining('Failed to parse'),
@@ -234,7 +248,7 @@ describe('runCustomSeed', () => {
   });
 
   describe('when Phase 1 validation fails (invalid CUID)', () => {
-    it('exits with code 1', async () => {
+    it('throws CustomSeedFatalError instead of terminating the process directly', async () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       (fs.readFileSync as jest.Mock).mockReturnValue('');
       (parseYaml as jest.Mock).mockReturnValue({
@@ -248,10 +262,16 @@ describe('runCustomSeed', () => {
       });
 
       const deps = createDeps();
+      let caught: unknown;
+      try {
+        await runCustomSeed(deps);
+      } catch (error) {
+        caught = error;
+      }
 
-      await expect(runCustomSeed(deps)).rejects.toThrow('process.exit');
-
-      expect(mockExit).toHaveBeenCalledWith(1);
+      expect(caught).toBeInstanceOf(CustomSeedFatalError);
+      expect((caught as Error).message).toMatch(/failed schema validation/);
+      expect(mockExit).not.toHaveBeenCalled();
       expect(deps.logger.error).toHaveBeenCalled();
     });
   });
@@ -301,10 +321,64 @@ describe('runCustomSeed', () => {
         storageService: null, // No storage service!
       });
 
-      await expect(runCustomSeed(deps)).rejects.toThrow('process.exit');
-
-      expect(mockExit).toHaveBeenCalledWith(1);
+      await expect(runCustomSeed(deps)).rejects.toBeInstanceOf(CustomSeedFatalError);
+      expect(mockExit).not.toHaveBeenCalled();
       expect(deps.logger.error).toHaveBeenCalledWith(expect.stringContaining('storage service'));
+    });
+  });
+
+  describe('when the database transaction fails after a template was already uploaded to storage', () => {
+    it('throws CustomSeedPartialProgressError, not a plain error implying nothing happened', async () => {
+      // The orphaned storage object is a real side effect the caller's
+      // outcome tracking must see; a plain rethrow here would report
+      // customSeed as 'skipped' despite that upload having happened.
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue('');
+
+      const manifestData = {
+        registrars: [],
+        dataModels: [],
+        renderTemplates: [
+          {
+            id: IDS.renderTemplate1,
+            name: 'Test Template',
+            file: 'template.hbs',
+            dataModelId: IDS.dataModel1,
+            renderMethodType: 'RenderTemplate2024',
+            isDefault: false,
+            inline: null,
+            mediaType: null,
+            mediaQuery: null,
+          },
+        ],
+      };
+      (parseYaml as jest.Mock).mockReturnValue(manifestData);
+
+      const mockPrisma = createMockPrisma();
+      (mockPrisma.dataModel.findMany as jest.Mock).mockImplementation((query: Record<string, unknown>) => {
+        const where = query?.where as Record<string, unknown> | undefined;
+        if (where?.isExtension === false || where?.source !== undefined) return Promise.resolve([]);
+        return Promise.resolve([{ id: IDS.dataModel1 }]);
+      });
+      const transactionFailure = new Error('connection reset');
+      (mockPrisma.$transaction as jest.Mock).mockRejectedValue(transactionFailure);
+
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.realpathSync as unknown as jest.Mock).mockImplementation((p: string) => p);
+
+      const storeBinary = jest.fn().mockResolvedValue({ uri: 'https://storage.example/blob', digestMultibase: 'z1' });
+      const deps = createDeps({ prisma: mockPrisma, storageService: { storeBinary } });
+
+      let caught: unknown;
+      try {
+        await runCustomSeed(deps);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(storeBinary).toHaveBeenCalledTimes(1);
+      expect(caught).toBeInstanceOf(CustomSeedPartialProgressError);
+      expect((caught as Error).cause).toBe(transactionFailure);
     });
   });
 
@@ -389,14 +463,18 @@ describe('runCustomSeed', () => {
       );
     });
 
-    it('skips an entry whose version has no ConformityScheme DataModel row', async () => {
+    it('skips an entry whose version has no ConformityScheme DataModel row, and reports it via the return value rather than throwing', async () => {
       setupManifest([{ url: 'https://example.com/scheme', version: '9.9.9' }]);
       const deps = createDeps();
       const ingestMock = ingestMockFn;
       (deps.prisma.dataModel.findFirst as jest.Mock).mockResolvedValue(null);
 
-      await runCustomSeed(deps);
+      // processConformitySchemes() acknowledges this failure and counts it
+      // rather than throwing (a real, if partial, completion — the caller
+      // must not treat this the same as a fully successful run).
+      const result = await runCustomSeed(deps);
 
+      expect(result).toEqual({ ran: true, conformityFailed: 1 });
       expect(ingestMock).not.toHaveBeenCalled();
       expect(deps.logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ version: '9.9.9' }),
@@ -572,7 +650,7 @@ describe('runCustomSeed', () => {
       });
     }
 
-    it('exits when a manifest id collides with a core-seeded row', async () => {
+    it('throws CustomSeedFatalError when a manifest id collides with a core-seeded row', async () => {
       setupRegistrarManifest();
       const deps = createDeps();
       (deps.prisma.registrar.findMany as jest.Mock).mockImplementation((query: Record<string, unknown>) => {
@@ -581,9 +659,8 @@ describe('runCustomSeed', () => {
         return Promise.resolve([]);
       });
 
-      await expect(runCustomSeed(deps)).rejects.toThrow('process.exit');
-
-      expect(mockExit).toHaveBeenCalledWith(1);
+      await expect(runCustomSeed(deps)).rejects.toBeInstanceOf(CustomSeedFatalError);
+      expect(mockExit).not.toHaveBeenCalled();
       expect(deps.logger.error).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('core-seeded'));
     });
 

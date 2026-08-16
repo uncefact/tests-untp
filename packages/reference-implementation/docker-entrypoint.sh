@@ -51,7 +51,7 @@ if [ "${SKIP_SEED:-false}" = "false" ]; then
     # prefixing with `node` (as the previous yarn-1 invocation did)
     # makes node try to parse the shell script as JavaScript and
     # fail with "SyntaxError: missing ) after argument list".
-    /app/node_modules/.bin/tsx seed.ts
+    /app/node_modules/.bin/tsx seed-cli.ts
     echo "Database seed completed"
 else
     echo "Skipping database seed (SKIP_SEED is set)"

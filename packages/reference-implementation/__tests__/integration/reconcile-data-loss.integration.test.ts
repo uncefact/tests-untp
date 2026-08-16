@@ -195,11 +195,17 @@ registrars:
       },
     });
 
+    // A configuration-level problem (here, a manifest id colliding with a
+    // core-seeded row) is a typed CustomSeedFatalError, not a direct
+    // process.exit(1): the process is terminated exclusively by
+    // seed-cli.ts, never from inside the custom seed itself, so the
+    // failure still reaches main()'s summary (Blocker finding 1).
     const exitSpy = jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
       throw new Error(`process.exit(${code})`);
     }) as never);
     try {
-      await expect(runManifest(FULL_MANIFEST)).rejects.toThrow('process.exit(1)');
+      await expect(runManifest(FULL_MANIFEST)).rejects.toThrow(/belongs to a core-seeded row/);
+      expect(exitSpy).not.toHaveBeenCalled();
     } finally {
       exitSpy.mockRestore();
     }
@@ -322,11 +328,14 @@ dataModels:
     schemaUrl: https://example.com/hijack.json
     contextUrl: https://example.com/hijack-context.jsonld
 `;
+    // See the earlier collision test's comment: this is a typed
+    // CustomSeedFatalError, not a direct process.exit(1) (Blocker finding 1).
     const exitSpy = jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
       throw new Error(`process.exit(${code})`);
     }) as never);
     try {
-      await expect(runManifest(manifest)).rejects.toThrow('process.exit(1)');
+      await expect(runManifest(manifest)).rejects.toThrow(/belongs to a core-seeded row/);
+      expect(exitSpy).not.toHaveBeenCalled();
     } finally {
       exitSpy.mockRestore();
     }
