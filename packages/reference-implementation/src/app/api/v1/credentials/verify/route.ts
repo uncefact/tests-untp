@@ -1,12 +1,25 @@
+import { TextDecoder } from 'node:util';
 import { NextResponse } from 'next/server';
 import { apiLogger } from '@/lib/api/logger';
 import { ValidationError } from '@/lib/api/validation';
 import { withPublicRoute } from '@/lib/api/with-public-route';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
-import { decryptCredential, isEncryptedEnvelope, VcVerifyError } from '@uncefact/untp-ri-services';
+import {
+  decryptCredential,
+  hasValidEnvelopeStructure,
+  isEncryptedEnvelope,
+  VcVerifyError,
+} from '@uncefact/untp-ri-services';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import { validatePublicUrl } from '@uncefact/untp-ri-services/server';
+import {
+  resolveDocument,
+  ResolverError,
+  ResolverHttpError,
+  ResolverTimedOutError,
+  ResolverTooLargeError,
+} from '@uncefact/untp-utils/resolvers';
+import { UrlValidationError } from '@uncefact/untp-utils/node';
 import type { EnvelopedVerifiableCredential, VerifyResult } from '@uncefact/untp-ri-services';
 import { decodeJwt } from 'jose';
 
@@ -35,9 +48,16 @@ function getMaxCredentialSize(): number {
  *
  *       This is an unauthenticated endpoint — no bearer token is required.
  *
- *       SSRF protection: the URI hostname is resolved via DNS and the
- *       resolved IP is checked against private/reserved ranges. Set
- *       `VERIFY_ALLOW_PRIVATE_URLS=true` to bypass (development only).
+ *       Decryption happens server-side, so a `decryptionKey` travels in the
+ *       request body. Production deployments must serve this endpoint over
+ *       HTTPS so the key is protected in transit.
+ *
+ *       SSRF protection: the URI is fetched through a guarded resolver that
+ *       validates the hostname against private/reserved ranges on every
+ *       redirect hop and pins the connection to the validated address, so
+ *       neither a redirect nor a DNS change between check and connect can
+ *       reach a private network. Set `VERIFY_ALLOW_PRIVATE_URLS=true` to
+ *       bypass (development only).
  *     tags:
  *       - Credentials
  *     security: []
@@ -121,9 +141,24 @@ function getMaxCredentialSize(): number {
  *                   enum:
  *                     - INVALID_RESPONSE
  *                     - DECRYPTION_REQUIRED
+ *                     - ENVELOPE_INVALID
  *                     - DECRYPTION_FAILED
- *                     - HASH_MISMATCH
+ *                     - DECRYPTED_NOT_JSON
+ *                     - DIGEST_MISMATCH
  *                     - UNSUPPORTED_CREDENTIAL_TYPE
+ *                   description: |
+ *                     `DECRYPTION_REQUIRED`: the credential is encrypted and no
+ *                     `decryptionKey` was supplied.
+ *                     `ENVELOPE_INVALID`: the stored encrypted envelope is
+ *                     structurally corrupted (wrong IV or auth-tag length);
+ *                     re-supplying the key will not help.
+ *                     `DECRYPTION_FAILED`: the decryption key does not match
+ *                     the credential. This is almost always a wrong key, but
+ *                     AES-GCM cannot distinguish a wrong key from ciphertext
+ *                     tampered at valid lengths.
+ *                     `DECRYPTED_NOT_JSON`: decryption succeeded but the
+ *                     content is not valid JSON, so the stored credential is
+ *                     corrupted.
  *       502:
  *         description: Upstream service error
  *         content:
@@ -199,52 +234,88 @@ export const POST = withPublicRoute(async (req) => {
     throw new ValidationError('decryptionKey must be a 64-character hex string');
   }
 
-  // ── SSRF protection: block private/reserved network addresses ──────
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
-    try {
-      await validatePublicUrl(parsedUri);
-    } catch (e) {
-      throw new ValidationError(
-        e instanceof Error ? e.message : 'uri must not point to a private or reserved network address',
-      );
-    }
-  }
-
   // ── Step 2: Fetch credential from storage URI ──────────────────────
+  // The guarded resolver validates the hostname against private/reserved
+  // ranges on every redirect hop and pins the connection to the validated
+  // address, closing the redirect-following and DNS-rebinding gaps a
+  // validate-then-fetch sequence leaves open. VERIFY_ALLOW_PRIVATE_URLS=true
+  // (development only) falls back to a plain fetch so private storage hosts
+  // in local compose setups keep working.
   logger.info({ uri: body.uri }, 'Fetching credential from storage');
 
-  let fetchResponse: Response;
-  try {
-    fetchResponse = await fetch(body.uri, { signal: AbortSignal.timeout(10_000) });
-  } catch (e: unknown) {
-    const message =
-      e instanceof Error && e.name === 'TimeoutError'
-        ? 'Failed to fetch credential: request timed out'
-        : 'Failed to fetch credential: network error';
-    logger.warn({ uri: body.uri, error: message }, 'Credential fetch failed');
-    return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
-  }
-
-  if (!fetchResponse.ok) {
-    const message = `Failed to fetch credential: storage returned ${fetchResponse.status}`;
-    logger.warn({ uri: body.uri, status: fetchResponse.status }, 'Credential fetch failed');
-    return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
-  }
-
-  let responseText: string;
-  try {
-    responseText = await fetchResponse.text();
-  } catch (e: unknown) {
-    logger.warn({ uri: body.uri, err: e }, 'Failed to read credential response body');
-    return NextResponse.json({ error: 'Failed to read credential response', code: 'UPSTREAM_ERROR' }, { status: 502 });
-  }
-
   const maxSize = getMaxCredentialSize();
-  if (responseText.length > maxSize) {
-    return NextResponse.json(
-      { error: `Credential response exceeds maximum size of ${maxSize} bytes`, code: 'UPSTREAM_ERROR' },
-      { status: 502 },
-    );
+  let responseText: string;
+
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS === 'true') {
+    let fetchResponse: Response;
+    try {
+      fetchResponse = await fetch(body.uri, { signal: AbortSignal.timeout(10_000) });
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error && e.name === 'TimeoutError'
+          ? 'Failed to fetch credential: request timed out'
+          : 'Failed to fetch credential: network error';
+      logger.warn({ uri: body.uri, error: message }, 'Credential fetch failed');
+      return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
+    }
+
+    if (!fetchResponse.ok) {
+      const message = `Failed to fetch credential: storage returned ${fetchResponse.status}`;
+      logger.warn({ uri: body.uri, status: fetchResponse.status }, 'Credential fetch failed');
+      return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
+    }
+
+    try {
+      responseText = await fetchResponse.text();
+    } catch (e: unknown) {
+      logger.warn({ uri: body.uri, err: e }, 'Failed to read credential response body');
+      return NextResponse.json(
+        { error: 'Failed to read credential response', code: 'UPSTREAM_ERROR' },
+        { status: 502 },
+      );
+    }
+
+    if (responseText.length > maxSize) {
+      return NextResponse.json(
+        { error: `Credential response exceeds maximum size of ${maxSize} bytes`, code: 'UPSTREAM_ERROR' },
+        { status: 502 },
+      );
+    }
+  } else {
+    try {
+      const resolved = await resolveDocument(body.uri, { maxResponseBytes: maxSize, totalTimeoutMs: 10_000 });
+      responseText = new TextDecoder().decode(resolved.body);
+    } catch (e: unknown) {
+      if (e instanceof UrlValidationError) {
+        throw new ValidationError(e.message);
+      }
+      if (e instanceof ResolverTooLargeError) {
+        return NextResponse.json(
+          { error: `Credential response exceeds maximum size of ${maxSize} bytes`, code: 'UPSTREAM_ERROR' },
+          { status: 502 },
+        );
+      }
+      if (e instanceof ResolverHttpError) {
+        const message = `Failed to fetch credential: storage returned ${e.status}`;
+        logger.warn({ uri: body.uri, status: e.status }, 'Credential fetch failed');
+        return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
+      }
+      if (e instanceof ResolverTimedOutError) {
+        logger.warn({ uri: body.uri }, 'Credential fetch timed out');
+        return NextResponse.json(
+          { error: 'Failed to fetch credential: request timed out', code: 'UPSTREAM_ERROR' },
+          { status: 502 },
+        );
+      }
+      if (e instanceof ResolverError) {
+        logger.warn({ uri: body.uri, err: e }, 'Credential fetch failed');
+        return NextResponse.json(
+          { error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' },
+          { status: 502 },
+        );
+      }
+      throw e;
+    }
   }
 
   let fetchedData: unknown;
@@ -272,19 +343,53 @@ export const POST = withPublicRoute(async (req) => {
       );
     }
 
+    // Structural validity must be checked before decryption: Node's AES-GCM
+    // throws the same error for a wrong-length IV/tag as for a wrong key, so
+    // corruption is only distinguishable from a key mismatch up front.
+    if (!hasValidEnvelopeStructure(fetchedData)) {
+      logger.warn({ uri: body.uri }, 'Encrypted envelope is structurally invalid');
+      return NextResponse.json(
+        {
+          error: 'The stored credential data is corrupted and cannot be decrypted. Re-entering the key will not help.',
+          code: 'ENVELOPE_INVALID',
+        },
+        { status: 422 },
+      );
+    }
+
     logger.info('Decrypting credential');
+    let decryptedString: string;
     try {
-      const decryptedString = decryptCredential({
+      decryptedString = decryptCredential({
         cipherText: fetchedData.cipherText,
         key: body.decryptionKey,
         iv: fetchedData.iv,
         tag: fetchedData.tag,
         type: fetchedData.type,
       });
-      credential = JSON.parse(decryptedString);
     } catch (e: unknown) {
       logger.warn({ uri: body.uri, err: e }, 'Credential decryption failed');
-      return NextResponse.json({ error: 'Failed to decrypt credential', code: 'DECRYPTION_FAILED' }, { status: 422 });
+      return NextResponse.json(
+        {
+          error: 'The decryption key does not match this credential. Check the key and try again.',
+          code: 'DECRYPTION_FAILED',
+        },
+        { status: 422 },
+      );
+    }
+
+    try {
+      credential = JSON.parse(decryptedString);
+    } catch {
+      logger.warn({ uri: body.uri }, 'Decrypted credential is not valid JSON');
+      return NextResponse.json(
+        {
+          error:
+            'The credential was decrypted but its content is not valid JSON; the stored credential data is corrupted.',
+          code: 'DECRYPTED_NOT_JSON',
+        },
+        { status: 422 },
+      );
     }
   } else {
     credential = fetchedData as Record<string, unknown>;

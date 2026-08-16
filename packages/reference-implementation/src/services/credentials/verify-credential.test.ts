@@ -1,4 +1,4 @@
-import { verifyCredential } from './verify-credential';
+import { verifyCredential, VerifyCredentialError } from './verify-credential';
 
 describe('verifyCredential', () => {
   const mockFetch = jest.fn();
@@ -82,7 +82,7 @@ describe('verifyCredential', () => {
     await expect(verifyCredential({ uri: 'https://example.com/cred' })).rejects.toThrow('uri is required');
   });
 
-  it('throws on 422 processing error with code', async () => {
+  it('throws a typed error carrying code and status on 422 processing errors', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 422,
@@ -92,12 +92,39 @@ describe('verifyCredential', () => {
       }),
     });
 
-    await expect(verifyCredential({ uri: 'https://example.com/cred', hash: 'abc' })).rejects.toThrow(
-      'Credential digest does not match (DIGEST_MISMATCH)',
+    const error = await verifyCredential({ uri: 'https://example.com/cred', hash: 'abc' }).then(
+      () => {
+        throw new Error('expected verifyCredential to reject');
+      },
+      (e) => e,
     );
+    expect(error).toBeInstanceOf(VerifyCredentialError);
+    expect(error.message).toBe('Credential digest does not match');
+    expect(error.code).toBe('DIGEST_MISMATCH');
+    expect(error.status).toBe(422);
   });
 
-  it('throws on 502 upstream error with code', async () => {
+  it('exposes DECRYPTION_REQUIRED so the verify page can branch to the key prompt', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        error: 'Credential is encrypted but no decryptionKey was provided',
+        code: 'DECRYPTION_REQUIRED',
+      }),
+    });
+
+    const error = await verifyCredential({ uri: 'https://example.com/cred' }).then(
+      () => {
+        throw new Error('expected verifyCredential to reject');
+      },
+      (e) => e,
+    );
+    expect(error).toBeInstanceOf(VerifyCredentialError);
+    expect(error.code).toBe('DECRYPTION_REQUIRED');
+  });
+
+  it('throws a typed error carrying code and status on 502 upstream errors', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 502,
@@ -107,9 +134,34 @@ describe('verifyCredential', () => {
       }),
     });
 
-    await expect(verifyCredential({ uri: 'https://example.com/cred' })).rejects.toThrow(
-      'Upstream service unavailable (UPSTREAM_ERROR)',
+    const error = await verifyCredential({ uri: 'https://example.com/cred' }).then(
+      () => {
+        throw new Error('expected verifyCredential to reject');
+      },
+      (e) => e,
     );
+    expect(error).toBeInstanceOf(VerifyCredentialError);
+    expect(error.message).toBe('Upstream service unavailable');
+    expect(error.code).toBe('UPSTREAM_ERROR');
+    expect(error.status).toBe(502);
+  });
+
+  it('throws a typed error with undefined code when the response has none', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'decryptionKey must be a 64-character hex string' }),
+    });
+
+    const error = await verifyCredential({ uri: 'https://example.com/cred', decryptionKey: 'zz' }).then(
+      () => {
+        throw new Error('expected verifyCredential to reject');
+      },
+      (e) => e,
+    );
+    expect(error).toBeInstanceOf(VerifyCredentialError);
+    expect(error.code).toBeUndefined();
+    expect(error.status).toBe(400);
   });
 
   it('throws on 500 server error', async () => {

@@ -43,9 +43,11 @@ jest.mock('@/lib/api/with-public-route', () => {
 const mockResolveVcService = jest.fn();
 const mockDecryptCredential = jest.fn();
 const mockIsEncryptedEnvelope = jest.fn();
+const mockHasValidEnvelopeStructure = jest.fn();
 const mockDecodeJwt = jest.fn();
 const mockMultibaseDigestVerify = jest.fn();
 const mockMultibaseDigestFromString = jest.fn((_input: string) => ({ verify: mockMultibaseDigestVerify }));
+const mockResolveDocument = jest.fn();
 
 jest.mock('@/lib/services/resolve-vc-service', () => ({
   resolveVcService: (...args: unknown[]) => mockResolveVcService(...args),
@@ -56,6 +58,7 @@ jest.mock('@uncefact/untp-ri-services', () => {
   return {
     decryptCredential: (...args: unknown[]) => mockDecryptCredential(...args),
     isEncryptedEnvelope: (...args: unknown[]) => mockIsEncryptedEnvelope(...args),
+    hasValidEnvelopeStructure: (...args: unknown[]) => mockHasValidEnvelopeStructure(...args),
     VcVerifyError: actual.VcVerifyError,
   };
 });
@@ -66,13 +69,46 @@ jest.mock('@uncefact/untp-utils/multibase-digest', () => ({
   },
 }));
 
+// The route does `instanceof` checks against these classes, so the classes
+// created here (which the route receives via the module mock) are the same
+// identities the tests construct below.
+jest.mock('@uncefact/untp-utils/resolvers', () => {
+  class ResolverError extends Error {}
+  class ResolverHttpError extends ResolverError {
+    status: number;
+    constructor(url: string, status: number) {
+      super(`${url} returned status ${status}.`);
+      this.status = status;
+    }
+  }
+  class ResolverTooLargeError extends ResolverError {
+    limit: number;
+    constructor(url: string, limit: number) {
+      super(`Response body for ${url} exceeds ${limit}-byte limit.`);
+      this.limit = limit;
+    }
+  }
+  class ResolverTimedOutError extends ResolverError {
+    constructor(url: string, timeoutMs: number) {
+      super(`Timed out fetching ${url} after ${timeoutMs}ms.`);
+    }
+  }
+  return {
+    resolveDocument: (...args: unknown[]) => mockResolveDocument(...args),
+    ResolverError,
+    ResolverHttpError,
+    ResolverTooLargeError,
+    ResolverTimedOutError,
+  };
+});
+
+jest.mock('@uncefact/untp-utils/node', () => {
+  class UrlValidationError extends Error {}
+  return { UrlValidationError };
+});
+
 jest.mock('jose', () => ({
   decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
-}));
-
-const mockValidatePublicUrl = jest.fn();
-jest.mock('@uncefact/untp-ri-services/server', () => ({
-  validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
 }));
 
 jest.mock('@/lib/api/logger', () => ({
@@ -86,11 +122,17 @@ import { ServiceResolutionError } from '@/lib/api/errors';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { POST } from './route';
 
+const { ResolverError, ResolverHttpError, ResolverTooLargeError, ResolverTimedOutError } = jest.requireMock(
+  '@uncefact/untp-utils/resolvers',
+);
+const { UrlValidationError } = jest.requireMock('@uncefact/untp-utils/node');
+
 // ── Fixtures ──────────────────────────────────────────────────────────
 
 const VALID_URI = 'https://storage.example.com/credentials/abc123';
 const VALID_HASH = 'a'.repeat(64);
 const VALID_KEY = 'b'.repeat(64);
+const MAX_SIZE = 10_485_760;
 
 const ENVELOPED_CREDENTIAL = {
   '@context': ['https://www.w3.org/ns/credentials/v2'],
@@ -129,17 +171,19 @@ function createBadJsonRequest(): Request {
   } as unknown as Request;
 }
 
-function createFetchResponse(body: unknown, opts?: { ok?: boolean; status?: number; textThrows?: boolean }) {
+/** Makes the guarded resolver return the given document (JSON-encoded unless a string). */
+function mockStorageDocument(body: unknown) {
+  const text = typeof body === 'string' ? body : JSON.stringify(body);
+  mockResolveDocument.mockResolvedValue({ body: new TextEncoder().encode(text) });
+}
+
+function createFetchResponse(body: unknown, opts?: { ok?: boolean; status?: number }) {
   const ok = opts?.ok ?? true;
   const status = opts?.status ?? (ok ? 200 : 500);
   return {
     ok,
     status,
-    text: opts?.textThrows
-      ? async () => {
-          throw new Error('read error');
-        }
-      : async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
   };
 }
 
@@ -154,7 +198,7 @@ describe('POST /api/v1/credentials/verify', () => {
     mockDecodeJwt.mockReturnValue(DECODED_JWT);
     mockMultibaseDigestVerify.mockResolvedValue(true);
     mockIsEncryptedEnvelope.mockReturnValue(false);
-    mockValidatePublicUrl.mockResolvedValue(undefined);
+    mockHasValidEnvelopeStructure.mockReturnValue(true);
     delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
   });
 
@@ -209,10 +253,12 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.error).toBe('decryptionKey must be a 64-character hex string');
   });
 
-  // ── SSRF Protection (400) ────────────────────────────────────────
+  // ── SSRF Protection (guarded fetch) ───────────────────────────────
 
-  it('returns 400 when validatePublicUrl rejects the URI', async () => {
-    mockValidatePublicUrl.mockRejectedValue(new Error('uri must not point to a private or reserved network address'));
+  it('returns 400 when the guarded resolver rejects the URI as private', async () => {
+    mockResolveDocument.mockRejectedValue(
+      new UrlValidationError('uri must not point to a private or reserved network address'),
+    );
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(400);
@@ -220,33 +266,34 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.error).toBe('uri must not point to a private or reserved network address');
   });
 
-  it('calls validatePublicUrl with parsed URL', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+  it('fetches via the guarded resolver with the size cap, not plain fetch', async () => {
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
-    await POST(createFakeRequest({ uri: VALID_URI }));
-
-    expect(mockValidatePublicUrl).toHaveBeenCalledTimes(1);
-    const calledUrl = mockValidatePublicUrl.mock.calls[0][0];
-    expect(calledUrl).toBeInstanceOf(URL);
-    expect(calledUrl.href).toBe(VALID_URI);
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(200);
+    expect(mockResolveDocument).toHaveBeenCalledWith(VALID_URI, {
+      maxResponseBytes: MAX_SIZE,
+      totalTimeoutMs: 10_000,
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('skips validatePublicUrl when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
+  it('uses plain fetch and skips the guarded resolver when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
     process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(200);
-    expect(mockValidatePublicUrl).not.toHaveBeenCalled();
+    expect(mockResolveDocument).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   // ── Upstream Errors (502) ─────────────────────────────────────────
 
-  it('returns 502 when fetch times out', async () => {
-    const timeoutError = Object.assign(new Error('Timeout'), { name: 'TimeoutError' });
-    mockFetch.mockImplementation(() => Promise.reject(timeoutError));
+  it('returns 502 when the guarded fetch times out', async () => {
+    mockResolveDocument.mockRejectedValue(new ResolverTimedOutError(VALID_URI, 10_000));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(502);
@@ -255,8 +302,8 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('UPSTREAM_ERROR');
   });
 
-  it('returns 502 when fetch fails with network error', async () => {
-    mockFetch.mockRejectedValue(new Error('fetch failed'));
+  it('returns 502 when the guarded fetch fails with a network error', async () => {
+    mockResolveDocument.mockRejectedValue(new ResolverError('socket hang up'));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(502);
@@ -266,7 +313,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('returns 502 when storage returns non-2xx', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(null, { ok: false, status: 404 }));
+    mockResolveDocument.mockRejectedValue(new ResolverHttpError(VALID_URI, 404));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(502);
@@ -275,13 +322,8 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('UPSTREAM_ERROR');
   });
 
-  it('returns 502 when response exceeds size limit', async () => {
-    const hugeText = 'x'.repeat(10_485_761); // 10 MB + 1 byte
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => hugeText,
-    });
+  it('returns 502 when the response exceeds the size limit', async () => {
+    mockResolveDocument.mockRejectedValue(new ResolverTooLargeError(VALID_URI, MAX_SIZE));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(502);
@@ -290,30 +332,85 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('UPSTREAM_ERROR');
   });
 
-  it('returns 502 when response.text() throws', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => {
-        throw new Error('stream error');
-      },
-    });
+  it('rethrows unrecognised resolver failures as a 500', async () => {
+    mockResolveDocument.mockRejectedValue(new Error('unexpected'));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
-    expect(res.status).toBe(502);
-    const json = await res.json();
-    expect(json.error).toBe('Failed to read credential response');
-    expect(json.code).toBe('UPSTREAM_ERROR');
+    expect(res.status).toBe(500);
+  });
+
+  describe('development bypass (VERIFY_ALLOW_PRIVATE_URLS=true) plain-fetch path', () => {
+    beforeEach(() => {
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    });
+
+    it('returns 502 when fetch times out', async () => {
+      const timeoutError = Object.assign(new Error('Timeout'), { name: 'TimeoutError' });
+      mockFetch.mockImplementation(() => Promise.reject(timeoutError));
+
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+      expect(res.status).toBe(502);
+      const json = await res.json();
+      expect(json.error).toBe('Failed to fetch credential: request timed out');
+      expect(json.code).toBe('UPSTREAM_ERROR');
+    });
+
+    it('returns 502 when fetch fails with network error', async () => {
+      mockFetch.mockRejectedValue(new Error('fetch failed'));
+
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+      expect(res.status).toBe(502);
+      const json = await res.json();
+      expect(json.error).toBe('Failed to fetch credential: network error');
+      expect(json.code).toBe('UPSTREAM_ERROR');
+    });
+
+    it('returns 502 when storage returns non-2xx', async () => {
+      mockFetch.mockResolvedValue(createFetchResponse(null, { ok: false, status: 404 }));
+
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+      expect(res.status).toBe(502);
+      const json = await res.json();
+      expect(json.error).toBe('Failed to fetch credential: storage returned 404');
+      expect(json.code).toBe('UPSTREAM_ERROR');
+    });
+
+    it('returns 502 when response exceeds size limit', async () => {
+      const hugeText = 'x'.repeat(MAX_SIZE + 1);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: async () => hugeText,
+      });
+
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+      expect(res.status).toBe(502);
+      const json = await res.json();
+      expect(json.error).toContain('exceeds maximum size');
+      expect(json.code).toBe('UPSTREAM_ERROR');
+    });
+
+    it('returns 502 when response.text() throws', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: async () => {
+          throw new Error('stream error');
+        },
+      });
+
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+      expect(res.status).toBe(502);
+      const json = await res.json();
+      expect(json.error).toBe('Failed to read credential response');
+      expect(json.code).toBe('UPSTREAM_ERROR');
+    });
   });
 
   // ── Credential Processing (422) ───────────────────────────────────
 
   it('returns 422 when response is not valid JSON', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => 'not-json{{{',
-    });
+    mockStorageDocument('not-json{{{');
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(422);
@@ -323,7 +420,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('returns 422 when credential is encrypted but no decryption key provided', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
+    mockStorageDocument(ENCRYPTED_DATA);
     mockIsEncryptedEnvelope.mockReturnValue(true);
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -333,8 +430,22 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('DECRYPTION_REQUIRED');
   });
 
-  it('returns 422 when decryption fails', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
+  it('returns 422 ENVELOPE_INVALID when the envelope is structurally corrupted, without attempting decryption', async () => {
+    mockStorageDocument(ENCRYPTED_DATA);
+    mockIsEncryptedEnvelope.mockReturnValue(true);
+    mockHasValidEnvelopeStructure.mockReturnValue(false);
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY }));
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.code).toBe('ENVELOPE_INVALID');
+    expect(json.error).toContain('corrupted');
+    expect(json.error).toContain('Re-entering the key will not help');
+    expect(mockDecryptCredential).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 DECRYPTION_FAILED with a key-mismatch message when decryption fails', async () => {
+    mockStorageDocument(ENCRYPTED_DATA);
     mockIsEncryptedEnvelope.mockReturnValue(true);
     mockDecryptCredential.mockImplementation(() => {
       throw new Error('decryption failure');
@@ -343,23 +454,39 @@ describe('POST /api/v1/credentials/verify', () => {
     const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY }));
     expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.error).toBe('Failed to decrypt credential');
+    expect(json.error).toBe('The decryption key does not match this credential. Check the key and try again.');
     expect(json.code).toBe('DECRYPTION_FAILED');
   });
 
-  it('returns 422 when decrypted output is not valid JSON', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENCRYPTED_DATA));
+  it('returns 422 DECRYPTED_NOT_JSON when decrypted output is not valid JSON', async () => {
+    mockStorageDocument(ENCRYPTED_DATA);
     mockIsEncryptedEnvelope.mockReturnValue(true);
     mockDecryptCredential.mockReturnValue('not-valid-json{{{');
 
     const res = await POST(createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY }));
     expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.code).toBe('DECRYPTION_FAILED');
+    expect(json.code).toBe('DECRYPTED_NOT_JSON');
+    expect(json.error).toContain('not valid JSON');
+  });
+
+  it('verifies the digest against the decrypted credential bytes, not the encrypted envelope', async () => {
+    mockStorageDocument(ENCRYPTED_DATA);
+    mockIsEncryptedEnvelope.mockReturnValue(true);
+    mockDecryptCredential.mockReturnValue(JSON.stringify(ENVELOPED_CREDENTIAL));
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    const res = await POST(
+      createFakeRequest({ uri: VALID_URI, decryptionKey: VALID_KEY, digestMultibase: 'zQmSomeDigest' }),
+    );
+    expect(res.status).toBe(200);
+
+    const verifiedBytes = mockMultibaseDigestVerify.mock.calls[0][0] as Uint8Array;
+    expect(Buffer.from(verifiedBytes).toString('utf8')).toBe(JSON.stringify(ENVELOPED_CREDENTIAL));
   });
 
   it('returns 422 when digestMultibase does not match', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockMultibaseDigestVerify.mockResolvedValueOnce(false);
 
     const res = await POST(createFakeRequest({ uri: VALID_URI, digestMultibase: 'zNOMATCH' }));
@@ -370,7 +497,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('returns 422 when legacy hex hash does not match', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     // VALID_HASH is `a`.repeat(64); the real sha-256 of the JSON credential
     // will not equal that, so the legacy path's comparison fails.
     const res = await POST(createFakeRequest({ uri: VALID_URI, hash: VALID_HASH }));
@@ -382,7 +509,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
   it('returns 422 when credential is not an EnvelopedVerifiableCredential', async () => {
     const plainCredential = { type: 'SomeOtherType', id: 'urn:uuid:123' };
-    mockFetch.mockResolvedValue(createFetchResponse(plainCredential));
+    mockStorageDocument(plainCredential);
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(422);
@@ -394,7 +521,7 @@ describe('POST /api/v1/credentials/verify', () => {
   // ── Verification Outcomes (200) ───────────────────────────────────
 
   it('returns verified: true for successful verification', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -408,7 +535,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('returns verified: false with error details when verification fails', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     const verificationError = { type: 'status', message: 'Credential revoked' };
     mockVcService.verify.mockResolvedValue({ verified: false, error: verificationError });
 
@@ -424,7 +551,7 @@ describe('POST /api/v1/credentials/verify', () => {
   // ── Edge Cases ────────────────────────────────────────────────────
 
   it('skips decryption for unencrypted credentials', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -433,7 +560,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('skips digest check when neither digestMultibase nor hash is provided', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -442,7 +569,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('omits decodedCredential and adds warning when JWT decode fails', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
     mockDecodeJwt.mockImplementation(() => {
       throw new Error('invalid JWT');
@@ -458,7 +585,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
   it('adds warning when credential.id is not a string', async () => {
     const credNoId = { ...ENVELOPED_CREDENTIAL, id: 42 };
-    mockFetch.mockResolvedValue(createFetchResponse(credNoId));
+    mockStorageDocument(credNoId);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -470,7 +597,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
   it('adds warning when credential.id does not start with data:application/vc+jwt,', async () => {
     const credBadId = { ...ENVELOPED_CREDENTIAL, id: 'urn:uuid:123' };
-    mockFetch.mockResolvedValue(createFetchResponse(credBadId));
+    mockStorageDocument(credBadId);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -481,7 +608,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('resolves VC service with SYSTEM_TENANT_ID', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     await POST(createFakeRequest({ uri: VALID_URI }));
@@ -490,7 +617,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('includes decodedCredential for enveloped credentials', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -506,7 +633,7 @@ describe('POST /api/v1/credentials/verify', () => {
       ...ENVELOPED_CREDENTIAL,
       type: ['VerifiableCredential', 'EnvelopedVerifiableCredential'],
     };
-    mockFetch.mockResolvedValue(createFetchResponse(arrayTypeCredential));
+    mockStorageDocument(arrayTypeCredential);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -518,7 +645,7 @@ describe('POST /api/v1/credentials/verify', () => {
   // ── Service Errors ────────────────────────────────────────────────
 
   it('returns 500 when VC service resolution fails', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockResolveVcService.mockRejectedValue(new ServiceResolutionError('VC', SYSTEM_TENANT_ID));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -529,7 +656,7 @@ describe('POST /api/v1/credentials/verify', () => {
 
   it('returns 502 when VC service returns an error during verification', async () => {
     const { VcVerifyError } = jest.requireActual('@uncefact/untp-ri-services');
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockRejectedValue(new VcVerifyError('HTTP 404: Not Found', 404));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -540,7 +667,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('returns 500 when vcService.verify() throws unexpectedly', async () => {
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockRejectedValue(new Error('VCKit connection refused'));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
