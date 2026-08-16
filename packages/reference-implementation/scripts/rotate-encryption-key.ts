@@ -12,14 +12,11 @@
  * Usage (from packages/reference-implementation, source checkout):
  *   pnpm rotate:encryption-key
  *
- * Usage (inside the published Docker image, which ships no pnpm; the SKIP_
- * variables stop the entrypoint's seed, whose own key validation fails by
- * design while the database is still under the old key, and both keys are
- * passed explicitly because the compose file does not forward
- * OUTGOING_DATA_ENCRYPTION_KEY):
- *   export DATA_ENCRYPTION_KEY='<new>' OUTGOING_DATA_ENCRYPTION_KEY='<previous>'
+ * Usage (inside the published Docker image, which ships no pnpm; both keys
+ * arrive from .env via compose, and the SKIP_ variables stop the
+ * entrypoint's seed, whose own key validation fails by design while the
+ * database is still under the old key):
  *   docker compose run --rm -e SKIP_MIGRATIONS=true -e SKIP_SEED=true \
- *     -e DATA_ENCRYPTION_KEY -e OUTGOING_DATA_ENCRYPTION_KEY \
  *     ri node_modules/.bin/tsx scripts/rotate-encryption-key.ts
  *
  * Requires DATA_ENCRYPTION_KEY (the NEW key), OUTGOING_DATA_ENCRYPTION_KEY

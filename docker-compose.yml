@@ -111,6 +111,9 @@ services:
       # .env.example), which the quick start copies.
       DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-}
       SERVICE_ENCRYPTION_KEY: ${SERVICE_ENCRYPTION_KEY:-}
+      # Set only for the duration of a key rotation; see the Encryption Key
+      # Rotation page. The application itself never reads it.
+      OUTGOING_DATA_ENCRYPTION_KEY: ${OUTGOING_DATA_ENCRYPTION_KEY:-}
       # Verification URLs
       DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003/verify
       DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential

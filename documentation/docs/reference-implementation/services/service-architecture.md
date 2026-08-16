@@ -55,7 +55,7 @@ Once resolved, the Reference Implementation looks up the appropriate adapter in 
 
 ## Encryption at rest
 
-When a tenant registers a service instance, the Reference Implementation encrypts the configuration and stores it in the database. Service configurations contain sensitive information such as API keys and authentication tokens; these are encrypted at rest using the `DATA_ENCRYPTION_KEY` (formerly `SERVICE_ENCRYPTION_KEY`, which is still read as a deprecated fallback) and only decrypted at runtime when the service adapter is instantiated. The same key also encrypts the decryption keys of encrypted credentials before they are persisted on the credential record.
+When a tenant registers a service instance, the Reference Implementation encrypts the configuration and stores it in the database. Service configurations contain sensitive information such as API keys and authentication tokens; these are encrypted at rest using the `DATA_ENCRYPTION_KEY` (formerly `SERVICE_ENCRYPTION_KEY`, which is still read as a deprecated fallback) and only decrypted at runtime when the service adapter is instantiated. The same key also encrypts the decryption keys of encrypted credentials before they are persisted on the credential record. The key's operational contract (generation, backup pairing, retention, recovery) is documented in [Key Management and Recovery](../operations/key-management).
 
 ## Service Types
 

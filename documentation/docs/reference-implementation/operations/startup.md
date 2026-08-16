@@ -101,7 +101,7 @@ Before the application accepts its first request, it validates the active `DATA_
 
 Without this check, a `DATA_ENCRYPTION_KEY` that does not match the key data was encrypted under only surfaces once a real request tries to decrypt something — for example a `ConfigDecryptionError` when a service instance resolves. Validating at startup turns that into an immediate, loud failure instead of an intermittent one discovered by end users.
 
-If startup fails this check, verify `DATA_ENCRYPTION_KEY` matches the key the application was previously running with, and restore the previous key. Moving data onto a new key is a deliberate offline procedure, never an in-place variable change; see [Encryption Key Rotation](./encryption-key-rotation).
+If startup fails this check, verify `DATA_ENCRYPTION_KEY` matches the key the application was previously running with, and restore the previous key. The backup pairing, retention, and recovery contract for this key lives in [Key Management and Recovery](./key-management). Moving data onto a new key is a deliberate offline procedure, never an in-place variable change; see [Encryption Key Rotation](./encryption-key-rotation).
 
 ### HTTP User-Agent Override Validation
 

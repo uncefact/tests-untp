@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 6
 title: Encryption Audit
 ---
 
@@ -10,7 +10,7 @@ The Reference Implementation [encrypts two kinds of data at rest](../services/se
 Run it:
 
 - before rotating `DATA_ENCRYPTION_KEY`, to confirm the current key decrypts everything the rotation will re-encrypt (see [Encryption Key Rotation](./encryption-key-rotation));
-- after restoring a database backup, to confirm the restored data and the configured key still match;
+- after restoring a database backup, to confirm the restored data and the configured key still match (use the [stopped-writers form](#running-with-the-application-stopped) below, as the [recovery procedure](./key-management#recovery) directs);
 - during incident triage, when decryption errors suggest a key or data problem and you need the full extent rather than the one row a request tripped over.
 
 ## Running the audit
@@ -21,11 +21,26 @@ From a source checkout, in `packages/reference-implementation`:
 pnpm audit:encryption
 ```
 
-Inside the published Docker image (which ships no pnpm):
+Inside the published Docker image (which ships no pnpm), against the running application (live triage):
 
 ```bash
 docker compose exec -w /app ri node_modules/.bin/tsx scripts/audit-encryption.ts
 ```
+
+### Running with the application stopped
+
+Before a [rotation](./encryption-key-rotation), after a [restore](./key-management#recovery), and in any state where writers must stay stopped, the audit runs as a one-off container instead. The key under test is whatever `DATA_ENCRYPTION_KEY` holds in `.env`, exactly as for the serving application, so the command needs no key arguments. The `SKIP_` variables stop the image's entrypoint running migrations and the seed first; the entrypoint otherwise writes to the database before the audit has gated anything, and against a database the configured key cannot yet read the seed's own key validation fails outright. The empty `SERVICE_ENCRYPTION_KEY` override neutralises a stale deprecated alias the compose file would otherwise forward (the audit refuses to run while the two names disagree):
+
+```bash
+docker compose run --rm \
+  -e SKIP_MIGRATIONS=true -e SKIP_SEED=true \
+  -e SERVICE_ENCRYPTION_KEY= \
+  ri node_modules/.bin/tsx scripts/audit-encryption.ts
+```
+
+To audit under a key other than the one in `.env` (verifying a historical backup's key, for example), forward it for this one run by name-only `-e DATA_ENCRYPTION_KEY` with the value loaded from your secret store by command substitution (`DATA_ENCRYPTION_KEY="$(...)" docker compose run ... -e DATA_ENCRYPTION_KEY ...`); never type the literal key into the command, which records it in shell history.
+
+On a source checkout, `pnpm audit:encryption` needs no entrypoint handling, but a stale `SERVICE_ENCRYPTION_KEY` must likewise be unset or overridden.
 
 The command needs `DATA_ENCRYPTION_KEY` and a database target: a pre-set `RI_DATABASE_URL` is honoured as given, and the `RI_POSTGRES_*` variables are used to construct one only when it is absent (the same rule the application and the backfill follow).
 
