@@ -151,15 +151,9 @@ services:
       # OpenTelemetry - see docs/observability.md
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
       DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
-    healthcheck:
-      # IPv4 literal, unlike the localhost probe on vckit-api: this image sets
-      # HOSTNAME=0.0.0.0, so the server listens on IPv4 only, and BusyBox wget
-      # resolves localhost to ::1 first.
-      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3003/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # No healthcheck here. The image carries its own HEALTHCHECK, so the probe
+    # ships with the container rather than being repeated by every consumer.
+    # Add a healthcheck: block back here to override it for this deployment.
     depends_on:
       keycloak:
         condition: service_started
