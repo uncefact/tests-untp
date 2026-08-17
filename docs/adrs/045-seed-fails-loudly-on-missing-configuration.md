@@ -1,8 +1,9 @@
-# ADR: The seed fails loudly when configuration for a category it was asked to seed is missing
+# ADR-045: The seed fails loudly when configuration for a category it was asked to seed is missing
 
 - **Date:** 2026-08-16
 - **Status:** accepted
 - **Update (2026-08-16):** the summary decision 6 describes is also emitted on a mid-run failure (a category whose configuration resolved but whose own write then failed), not only on the default-mode preflight abort and on success. It also distinguishes a category that completed only some of its work (for example, some but not all render template files found) from one that fully seeded, reporting the former under a `categoriesPartial` bucket with the specifics named, rather than folding it into `categoriesSeeded`. The summary also now covers the system tenant, the core data models, and the custom seed, not only the categories a missing environment variable can gate.
+- **Update (2026-08-17):** the Context below lists registrars and identifier schemes among the categories `prisma/seed.ts` creates. It creates neither. Both come from the seed manifest the custom seed reads at `/app/seed/custom`, which is optional and gated on that file being present, so a deployment mounting nothing there gets neither and cannot create an identifier. The decision this ADR records is unaffected; only its inventory of what the core seed creates was wrong. The Context section itself is left as written, per this repository's rule that an ADR body is the historical record.
 - **Update (2026-08-16):** decision 2 is tightened. A missing required environment variable always triggers the fail-loud posture, even when the same category also contains an invalid value or names an unrecognised adapter type: the presence of a missing variable is decided independently of any other problem in the category, so a second, unrelated mistake can never downgrade an absent variable out of the fail-loud posture. An invalid value with nothing missing keeps its original behaviour (`'other'`, not fail-loud).
 
 ## Context

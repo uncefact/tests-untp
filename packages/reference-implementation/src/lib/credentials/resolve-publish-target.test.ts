@@ -128,7 +128,7 @@ describe('resolvePublishTarget', () => {
 
   it('does not fall through to another entity type when the chosen reference does not resolve', async () => {
     // Publishing under a facility because the product reference missed would
-    // be a silent substitution of subject (ADR-043).
+    // be a silent substitution of subject (ADR-044).
     mockFindIdentifiersByValue.mockResolvedValue([]);
 
     const result = await resolvePublishTarget(

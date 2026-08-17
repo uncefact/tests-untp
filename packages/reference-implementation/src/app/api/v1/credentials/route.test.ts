@@ -1036,7 +1036,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('warns ENTITY_LINK_FAILED even when publishing was not requested', async () => {
-      // Entity linking is enrichment in its own right (ADR-043 decision 4), so
+      // Entity linking is enrichment in its own right (ADR-044 decision 4), so
       // the warning does not belong to the publish branch.
       setupPublishingHappyPath();
       mockIssueCredential.mockResolvedValue({
@@ -1122,7 +1122,7 @@ describe('POST /api/v1/credentials', () => {
     it('warns PUBLISH_IDR_UNAVAILABLE and still returns the credential when no IDR service resolves', async () => {
       setupPublishingHappyPath();
       // Previously this threw and destroyed the response for a credential that
-      // had already been signed and stored (ADR-043 decision 2).
+      // had already been signed and stored (ADR-044 decision 2).
       mockResolveIdrService.mockRejectedValue(new Error('No service instance available for IDR'));
 
       const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
@@ -1204,7 +1204,7 @@ describe('POST /api/v1/credentials', () => {
       await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
 
       // Scheme, then registrar, then tenant/system default, matching the
-      // identifier-links route (ADR-043).
+      // identifier-links route (ADR-044).
       expect(mockResolveIdrService).toHaveBeenCalledWith('tenant-1', 'idr-scheme-1', null);
 
       // buildPublishLinks called with storage response, link title, and options.

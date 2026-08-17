@@ -5,7 +5,7 @@ import { resolveDataEncryptionKey } from '../src/lib/encryption/resolve-data-enc
 /**
  * Pure, env-only resolution of what the seed can and cannot configure,
  * decided before the seed writes anything or calls any external service
- * (ADR-043, decision 3). This module answers one question per category:
+ * (ADR-045, decision 3). This module answers one question per category:
  * is its required configuration present? It does not attempt a category's
  * actual work (no database writes, no HTTP calls, no adapter construction
  * beyond a schema parse), so `seed.ts` still owns resolving and executing
@@ -71,7 +71,7 @@ export function normalizeEnvValue(value: string | undefined): string | undefined
  * Only an issue that means "this field was never supplied" counts as a
  * missing environment variable. Every other zod failure (a value present
  * but the wrong shape) is a configuration mistake, not an absence, and
- * ADR-043 decision 2 keeps those in today's warn-and-skip behaviour rather
+ * ADR-045 decision 2 keeps those in today's warn-and-skip behaviour rather
  * than the fail-loud posture.
  */
 function isMissingIssue(issue: z.ZodIssue): boolean {
@@ -287,7 +287,7 @@ function applyGate(own: CategoryResult, gate: CategoryResult, gateName: Category
  * Resolves every category's configuration from `env` and reports which are
  * missing required variables. Categories are resolved independently of
  * their gates first (so every missing variable is visible in one pass, per
- * ADR-043 decision 4), then gating is applied (encryption gates idr,
+ * ADR-045 decision 4), then gating is applied (encryption gates idr,
  * storage and vc; vc gates did; storage gates renderTemplates).
  */
 export function runSeedPreflight(env: NodeJS.ProcessEnv = process.env): SeedPreflightResult {
@@ -323,7 +323,7 @@ export function runSeedPreflight(env: NodeJS.ProcessEnv = process.env): SeedPref
 /**
  * One structured summary emitted exactly once on every seed exit path,
  * a successful completion, a mid-run failure, or the default-mode
- * preflight abort alike (ADR-043 decision 6). A category that completed
+ * preflight abort alike (ADR-045 decision 6). A category that completed
  * only some of its work (for example, some but not all render templates
  * uploaded because a template file was missing) is reported under
  * `categoriesPartial` rather than `categoriesSeeded`, with what was
@@ -368,7 +368,7 @@ export type CategoryOutcome = 'seeded' | 'partial' | 'skipped';
 
 /**
  * Builds the one structured summary `seed.ts`'s `main()` emits on every
- * exit path (ADR-043 decision 6): a successful completion, a mid-run
+ * exit path (ADR-045 decision 6): a successful completion, a mid-run
  * failure, and (separately, via `SeedConfigurationError`) the default-mode
  * preflight abort all report through this same shape. Exported and pure
  * (no logging, no I/O) so its contents can be unit-tested directly against
@@ -416,7 +416,7 @@ export function buildOutcomeSummary(
 
 /**
  * Thrown when the seed aborts in default mode because a category it was
- * asked to seed is missing required configuration (ADR-043 decision 1 and
+ * asked to seed is missing required configuration (ADR-045 decision 1 and
  * 3). Carries the same summary the seed would otherwise have logged on
  * success, so the aggregate failure and a healthy run report identically.
  */

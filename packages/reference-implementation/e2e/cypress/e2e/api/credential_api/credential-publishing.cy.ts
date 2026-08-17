@@ -198,7 +198,7 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
   });
 
   // A publish that cannot happen must still return the credential, with a
-  // warning naming the unmet prerequisite (ADR-043).
+  // warning naming the unmet prerequisite (ADR-044).
   it('returns the credential with a named publish warning when the identifier is not registered', () => {
     cy.request({
       method: 'POST',

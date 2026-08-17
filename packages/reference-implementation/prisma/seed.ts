@@ -92,7 +92,7 @@ export const prisma = new PrismaClient();
 
 export async function main() {
   // Resolve every category's configuration from the environment before
-  // writing anything or calling any external service (ADR-043 decision 3).
+  // writing anything or calling any external service (ADR-045 decision 3).
   // A category with missing required variables fails the whole run by
   // default; SEED_ALLOW_PARTIAL=true opts back into seeding whatever is
   // configured and skipping the rest (decision 5).
@@ -115,13 +115,13 @@ export async function main() {
     // (seed-cli.ts) already serialises the whole error, which pino's
     // default err serializer expands to include every own property —
     // logging it again here would print the same summary twice for one
-    // run, which is exactly what ADR-043 decision 6 rules out.
+    // run, which is exactly what ADR-045 decision 6 rules out.
     throw new SeedConfigurationError(summary);
   }
 
   // Every category's outcome is tracked here, hoisted above the try block
   // below, so a mid-run failure can still build an honest summary from
-  // whatever state was established before the throw (ADR-043 decision 6).
+  // whatever state was established before the throw (ADR-045 decision 6).
   // Each is set at the point in the run where its real-world side effect
   // happened (not inferred afterwards from an end-of-block boolean), so a
   // category interrupted partway through — a DID created upstream but not
@@ -1037,7 +1037,7 @@ export async function main() {
   } catch (error) {
     // A failure here happened after preflight passed: some categories may
     // already have been seeded and others never reached. The summary
-    // reflects exactly that state (ADR-043 decision 6 holds on a mid-run
+    // reflects exactly that state (ADR-045 decision 6 holds on a mid-run
     // failure too, not only on the default-mode preflight abort and on
     // success), and the original error still propagates so seed-cli.ts
     // exits non-zero; this does not swallow it.
@@ -1053,7 +1053,7 @@ export async function main() {
     throw error;
   }
 
-  // One structured summary on every exit path, success included (ADR-043
+  // One structured summary on every exit path, success included (ADR-045
   // decision 6), naming what ran, what only partially ran and how, what
   // was skipped, and the variables responsible, so an operator reads the
   // same record confirming a good deployment as one diagnosing a bad one.

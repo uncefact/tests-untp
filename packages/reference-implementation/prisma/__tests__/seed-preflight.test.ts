@@ -157,7 +157,7 @@ describe('runSeedPreflight', () => {
   });
 
   it('a missing required variable always wins as missing, even when another field in the same category is also invalid', () => {
-    // ADR-043 decision 2, tightened: a second, independent mistake in the
+    // ADR-045 decision 2, tightened: a second, independent mistake in the
     // same category (a mistyped SYSTEM_VC_BASE_URL) must never downgrade
     // an absent SYSTEM_VC_API_KEY out of the fail-loud posture. Making a
     // deployment's configuration worse (adding the typo on top of the
@@ -209,7 +209,7 @@ describe('runSeedPreflight', () => {
 
   it('does not abort preflight on a divergent encryption key alone (no other category missing)', () => {
     // hasMissing stays false because 'other' is not the fail-loud status
-    // (ADR-043 decision 2); the divergence is still surfaced later, when
+    // (ADR-045 decision 2); the divergence is still surfaced later, when
     // main() calls resolveDataEncryptionKey() itself.
     const env = fullEnv();
     env.DATA_ENCRYPTION_KEY = 'key-one';

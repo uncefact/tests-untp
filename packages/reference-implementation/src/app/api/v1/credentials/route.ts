@@ -299,7 +299,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   if (publishingOptions.publish === true && refs) {
     // Publishing resolves its target from the credential's own identifier
-    // (ADR-043): the scheme, registrar and IDR instance all hang off
+    // (ADR-044): the scheme, registrar and IDR instance all hang off
     // Identifier, so a missing master-data record no longer decides whether a
     // credential is discoverable. Every failure below names the unmet
     // prerequisite and what the caller does about it, and nothing throws: the

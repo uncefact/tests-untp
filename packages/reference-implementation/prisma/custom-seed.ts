@@ -34,7 +34,7 @@ const TRANSACTION_MAX_WAIT = 10_000;
  * validation failure, or render templates requested with no storage
  * service configured). `runCustomSeed()` throws rather than calling
  * `process.exit()` itself, so this reaches `main()`'s own summary-and-exit
- * handling (ADR-043 decision 6) the same way any other mid-run failure
+ * handling (ADR-045 decision 6) the same way any other mid-run failure
  * does, instead of terminating the process before a summary is built.
  */
 export class CustomSeedFatalError extends Error {

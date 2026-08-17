@@ -14,7 +14,7 @@ export type ResolvedIdrService = ResolvedService<IIdentityResolverService>;
  * 3. System default: tenant's primary IDR service instance (or system-wide default)
  *
  * Both the credentials route and the identifier links route pass the full
- * chain (scheme, then registrar, then tenant or system default); see ADR-043.
+ * chain (scheme, then registrar, then tenant or system default); see ADR-044.
  */
 export async function resolveIdrService(
   tenantId: string,
