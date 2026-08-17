@@ -37,7 +37,7 @@ The correlation ID is the `x-correlation-id` request header when the caller prov
 
 The correlation ID is also returned in the `x-correlation-id` response header, so callers can use it to correlate their own logs with the Reference Implementation's logs, and it is forwarded as `x-correlation-id` on outbound calls to the configured UNTP services (storage, identity resolver, and verifiable credential services), so one ID traces a request across service boundaries in a log aggregator. Calls to third-party hosts, such as resolving a `did:web` document from its own domain, deliberately carry no correlation header.
 
-When a request fails with an error that has no specific mapping, the response body's `error` message includes the correlation ID: "An unexpected error has occurred. If the issue persists, please contact support and quote correlation id \"<id>\"." This gives a caller who cannot inspect server logs the identifier to quote in a support request. A failure that occurs before a route handler runs, such as a fault during authentication or tenant resolution, is reported with this same message rather than the underlying error text.
+When a request fails with an error that has no specific mapping, the response body's `error` message includes the correlation ID, reading `An unexpected error has occurred. If the issue persists, please contact support and quote correlation id "<id>".` This gives a caller who cannot inspect server logs the identifier to quote in a support request. A failure that occurs before a route handler runs, such as a fault during authentication or tenant resolution, is reported with this same message rather than the underlying error text.
 
 ### Service Names
 
