@@ -169,9 +169,9 @@ sequenceDiagram
 DELETE /api/v1/services/{id}
 ```
 
-Permanently deletes a service instance owned by the tenant. System defaults cannot be deleted.
+Permanently deletes a service instance owned by the tenant. A system default is visible to the tenant (see [Get a service instance](#get-a-service-instance)), but deleting one is rejected with a `403 Forbidden`, before any reference check runs.
 
-If the instance is referenced by other records (DIDs, registrars, or identifier schemes), the request is rejected with a `409 Conflict` unless `force=true` is set. When forced, the foreign keys on referencing records are set to `null`.
+If the caller's own DIDs, registrars, or identifier schemes reference the instance, the request is rejected with a `409 Conflict` unless `force=true` is set. The counts in the response cover only the caller's own referencing records. When forced, the foreign keys on referencing records are set to `null`.
 
 | Parameter | Type   | Default | Description                                                                                                                       |
 | --------- | ------ | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -186,8 +186,11 @@ sequenceDiagram
     Client->>RI: DELETE /api/v1/services/{id}
     RI->>DB: Fetch service instance
     DB-->>RI: Existing record
+    alt instance is a system default
+        RI-->>Client: 403 Forbidden
+    end
     alt force ≠ true
-        RI->>DB: Count references (DIDs, registrars, schemes)
+        RI->>DB: Count caller's own references (DIDs, registrars, schemes)
         DB-->>RI: Reference counts
         alt references exist
             RI-->>Client: 409 Conflict (details of referencing records)
