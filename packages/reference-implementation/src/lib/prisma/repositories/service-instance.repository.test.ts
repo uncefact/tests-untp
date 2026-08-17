@@ -522,6 +522,23 @@ describe('service-instance.repository', () => {
       expect(result).toEqual({ dids: 3, registrars: 1, schemes: 2 });
     });
 
+    it('scopes every count to the calling tenant, so a shared instance never reports another tenant to it', async () => {
+      // These counts reach the caller in the body of the 409 this check
+      // produces, and a system-provisioned instance resolves for every tenant.
+      // An unscoped count tells one tenant how many records another tenant holds.
+      (prisma.did.count as jest.Mock).mockResolvedValue(0);
+      (prisma.registrar.count as jest.Mock).mockResolvedValue(0);
+      (prisma.identifierScheme.count as jest.Mock).mockResolvedValue(0);
+
+      await countServiceInstanceReferences('system-instance', 'tenant-b');
+
+      for (const counter of [prisma.did.count, prisma.registrar.count, prisma.identifierScheme.count]) {
+        expect((counter as jest.Mock).mock.calls[0][0].where).toEqual(
+          expect.objectContaining({ tenantId: 'tenant-b' }),
+        );
+      }
+    });
+
     it('returns zeros when no references exist', async () => {
       (prisma.did.count as jest.Mock).mockResolvedValue(0);
       (prisma.registrar.count as jest.Mock).mockResolvedValue(0);

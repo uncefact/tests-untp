@@ -78,7 +78,7 @@ describe('credential.repository', () => {
     it.each(['organisationId', 'facilityId', 'productId'])(
       'retries without entity links when %s vanished, so a stored credential is never lost',
       async (column) => {
-        // ADR-043: the credential is already signed and stored externally by
+        // ADR-044: the credential is already signed and stored externally by
         // this point, so an entity that disappeared mid-request must not fail
         // the write. The retry drops only the links and says so.
         const created = { ...SEED_CREDENTIALS[0], organisationId: null, facilityId: null, productId: null };

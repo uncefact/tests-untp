@@ -73,7 +73,7 @@ A credential on its own is just a file at a URL. To make it useful, it needs to 
 
 This is where the [Identity Resolver](./identifiers#what-are-links) comes in. When a credential is published, the Reference Implementation registers a link with the Identity Resolver that connects the entity's identifier (e.g., a GS1 GTIN) to the credential's storage URL. Now anyone who resolves that identifier can find the credential.
 
-Publishing is optional and requires the credential's primary entity (product, facility, or organisation) to have a configured [identifier scheme](./identifiers#what-is-an-identifier-scheme) with an IDR service.
+Publishing is optional and resolves from the credential's own identifier, which must belong to an [identifier scheme](./identifiers#what-is-an-identifier-scheme) reachable through an IDR service.
 
 ### CVC Compliance (Conformity Credentials Only)
 
@@ -242,6 +242,8 @@ The IDR entry's `description` field is taken from the linked primary entity's `d
 
 **Human verification link**: When publishing without an explicit `humanVerificationUrl`, the published link set includes a link to this Reference Implementation's own verify page. The base is derived from the `RI_APP_URL` environment variable, which is parsed as a URL with `/verify` appended to its path (any query or fragment is dropped, a base path is preserved, and a trailing slash is trimmed); for the default `http://localhost:3003` the link is `http://localhost:3003/verify`. `RI_APP_URL` is configured in the RI's environment (the shipped `.env.example` and Docker Compose files default it to `http://localhost:3003`) and is the same base URL that backs the OIDC post-logout redirect (see [Identity provider requirements](../authentication/idp-requirements)). Supplying `humanVerificationUrl` overrides the default, for deployments that host verification elsewhere.
 
+A supplied `humanVerificationUrl` keeps its own query string and fragment, but the RI strips five reserved parameter names from it before adding its own verification payload: `uri`, `digestMultibase`, `hash`, `decryptionKey`, and `q`. The RI's own verify page reads those parameters directly, so a supplied URL that already used one of them would otherwise shadow the payload. `machineVerificationUrl` is not processed this way. It is published exactly as supplied, with no query-string handling.
+
 The published link does **not** carry the credential's decryption key. The key is not registered on the Identity Resolver; it is shared out of band, so access to an encrypted credential does not travel with its discovery link (regardless of whether a given resolver is publicly readable). A credential stored encrypted (the storage default) therefore needs its decryption key supplied out of band to verify, and the published link alone verifies a credential stored unencrypted. The issuing tenant can retrieve that decryption key from the credential's [Get a Credential](#get-a-credential) response and share it through a channel of its choosing. This differs from a link shared directly as a single-link capability, which may embed the key (see [the verify page](../verify-page#decryption)).
 
 `RI_APP_URL` is validated when the application starts (see [Startup](../operations/startup#base-url-validation)), so a deployment that could not build a safe default link fails at boot rather than at request time. Omitting `humanVerificationUrl` is always a valid request; supplying it overrides the default for deployments that host verification elsewhere.
@@ -276,7 +278,7 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 | `credentialPayload` | object | Yes | Full credential payload conforming to the UNTP schema for the specified type and version |
 | `credentialType` | string | Yes | Registered data model type (e.g., `DigitalProductPassport`) |
 | `version` | string | Yes | Registered data model version (e.g., `0.6.1`) |
-| `storageOptions.serviceInstanceId` | string | No | Explicit storage service instance |
+| `storageOptions.serviceInstanceId` | string | No | Explicit storage service instance. If provided, it must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404 |
 | `storageOptions.encrypt` | boolean | No | Whether to encrypt (default: `true`) |
 | `publishingOptions.publish` | boolean | No | Whether to publish to IDR |
 | `publishingOptions.linkType` | string | No | Link relation type |

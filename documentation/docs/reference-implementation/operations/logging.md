@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 title: Logging
 ---
 
@@ -24,6 +24,7 @@ Each log entry automatically includes the following fields where available:
 | `tenantId` | The tenant the request is scoped to |
 | `service` | The name of the service or adapter producing the log (e.g., `DID - VCKitDid`, `Storage - UncefactStorage`) |
 | `route` | The API route handling the request (e.g., `/api/v1/credentials`) |
+| `path` | The raw request pathname (e.g., `/api/v1/credentials/123`), attached automatically to the entry and completion logs by the shared request-logging middleware, distinct from the handler-supplied `route` pattern |
 | `method` | The HTTP method (GET, POST, etc.) |
 | `status` | The HTTP response status code (on completion) |
 | `durationMs` | How long the request took to process in milliseconds (on completion) |
@@ -35,6 +36,8 @@ Every request is assigned a correlation ID. This ID is included in every log ent
 The correlation ID is the `x-correlation-id` request header when the caller provides one. An inbound value is validated before it is trusted: it must be at most 128 characters of letters, digits, hyphens, and underscores, and anything else is replaced. Without a valid caller ID, a request carrying an `X-Amzn-Trace-Id` header (as AWS load balancers set) has its Root token adopted, joining these logs to ALB access logs and X-Ray, and otherwise a random UUID is generated.
 
 The correlation ID is also returned in the `x-correlation-id` response header, so callers can use it to correlate their own logs with the Reference Implementation's logs, and it is forwarded as `x-correlation-id` on outbound calls to the configured UNTP services (storage, identity resolver, and verifiable credential services), so one ID traces a request across service boundaries in a log aggregator. Calls to third-party hosts, such as resolving a `did:web` document from its own domain, deliberately carry no correlation header.
+
+When a request fails with an error that has no specific mapping, the response body's `error` message includes the correlation ID, reading `An unexpected error has occurred. If the issue persists, please contact support and quote correlation id "<id>".` This gives a caller who cannot inspect server logs the identifier to quote in a support request. A failure that occurs before a route handler runs, such as a fault during authentication or tenant resolution, is reported with this same message rather than the underlying error text.
 
 ### Service Names
 
@@ -87,6 +90,6 @@ An invalid path in `LOG_REDACT_PATHS` fails logger construction, which stops the
 
 ## Output Format
 
-In production, logs are emitted as structured JSON — one JSON object per line. This format is compatible with log aggregation tools such as CloudWatch, Datadog, ELK, and similar platforms.
+Logs are emitted as structured JSON, one JSON object per line, in every environment including development. This format is compatible with log aggregation tools such as CloudWatch, Datadog, ELK, and similar platforms.
 
-In development, logs are formatted for human readability with colour coding and readable timestamps.
+Pretty-printed, colourised output with readable timestamps is available by passing `pretty: true` to `createLogger()`, but the Reference Implementation does not set this option anywhere, so no environment currently receives it.

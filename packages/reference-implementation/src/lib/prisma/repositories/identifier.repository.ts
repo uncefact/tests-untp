@@ -117,7 +117,7 @@ export async function createIdentifier(input: CreateIdentifierInput): Promise<Id
  * (schemeId, value, tenantId), so one value can legitimately exist under two
  * schemes (a GTIN and an internal code that coincide). Publishing must not
  * guess between them, so the caller decides what an ambiguous result means
- * (ADR-043). Passing `schemeId` narrows to the exact identifier when the
+ * (ADR-044). Passing `schemeId` narrows to the exact identifier when the
  * caller named the scheme to publish under.
  */
 export async function findIdentifiersByValue(

@@ -173,6 +173,8 @@ Permanently deletes a service instance owned by the tenant. A system default is 
 
 If the caller's own DIDs, registrars, or identifier schemes reference the instance, the request is rejected with a `409 Conflict` unless `force=true` is set. The counts in the response cover only the caller's own referencing records. When forced, the foreign keys on referencing records are set to `null`.
 
+This check does not cover render templates. A [render template](./render-templates) can store a storage service instance ID for the credentials it renders, but that reference is not counted or protected here. Deleting a storage service instance that a render template depends on succeeds, with or without `force`, and leaves the render template pointing at a storage service instance that no longer exists.
+
 | Parameter | Type   | Default | Description                                                                                                                       |
 | --------- | ------ | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `force`   | string | `false` | Accepts exactly `true` or `false`. Any other value is rejected with a 400 naming the parameter, rather than being read as `false` |

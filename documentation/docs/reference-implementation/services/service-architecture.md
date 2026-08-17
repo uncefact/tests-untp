@@ -42,16 +42,16 @@ flowchart TD
     Specified -->|No| TenantDefault{"Tenant has a default\nfor this service type?"}
     TenantDefault -->|Yes| UseTenant["Resolve tenant's default instance"]
     TenantDefault -->|No| UseSystem["Resolve system service instance"]
-    ResolveID --> Lookup["Look up adapter in registry"]
-    UseTenant --> Lookup
-    UseSystem --> Lookup
-    Lookup --> Decrypt["Decrypt service configuration"]
-    Decrypt --> Validate["Validate configuration against adapter schema"]
+    ResolveID --> Decrypt["Decrypt service configuration"]
+    UseTenant --> Decrypt
+    UseSystem --> Decrypt
+    Decrypt --> Lookup["Look up adapter in registry"]
+    Lookup --> Validate["Validate configuration against adapter schema"]
     Validate --> Instantiate["Instantiate adapter"]
     Instantiate --> Execute["Execute operation against external service"]
 ```
 
-Once resolved, the Reference Implementation looks up the appropriate adapter in the registry, decrypts and validates the configuration against the adapter's schema, and instantiates the service adapter.
+Once resolved, the Reference Implementation decrypts the service instance's configuration, looks up the appropriate adapter in the registry, validates the configuration against the adapter's schema, and instantiates the service adapter.
 
 ## Encryption at rest
 

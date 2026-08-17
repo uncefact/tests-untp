@@ -7,7 +7,7 @@ import { main as runSeedMain, prisma as seedPrisma, logger as seedLogger } from 
 import { SeedConfigurationError, type SeedRunSummary } from '../../prisma/seed-preflight';
 
 /**
- * Drives the real seed's decision path (ADR-043) — `main()` from
+ * Drives the real seed's decision path (ADR-045) — `main()` from
  * `prisma/seed.ts`, the same function the CLI entrypoint calls — directly
  * against the rig database, with a deliberately incomplete environment.
  *
@@ -105,7 +105,7 @@ async function withFreshSeedModule<T>(
   });
 }
 
-describe('seed.ts: fails loudly on missing configuration (ADR-043)', () => {
+describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
   const prisma = createRigClient();
 
   beforeEach(async () => {
@@ -305,7 +305,7 @@ describe('seed.ts: fails loudly on missing configuration (ADR-043)', () => {
     // A placeholder DATA_ENCRYPTION_KEY outside local development is an
     // operational failure the preflight does not check for (it only checks
     // the variable is present), so it throws from inside main() itself,
-    // after the tenant has already been upserted. ADR-043 decision 2 keeps
+    // after the tenant has already been upserted. ADR-045 decision 2 keeps
     // this failure's own behaviour unchanged; this test only checks that
     // the summary the seed builds around it is honest and that the
     // original error is not swallowed.
@@ -360,7 +360,7 @@ describe('seed.ts: fails loudly on missing configuration (ADR-043)', () => {
     );
 
     // The tenant upsert ran before the throw and is not rolled back (the
-    // seed is not transactional; ADR-043's consequences section says so).
+    // seed is not transactional; ADR-045's consequences section says so).
     expect(await prisma.tenant.count({ where: { id: SYSTEM_TENANT_ID } })).toBe(1);
     expect(await prisma.serviceInstance.count()).toBe(0);
   });

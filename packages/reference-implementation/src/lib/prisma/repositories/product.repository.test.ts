@@ -522,6 +522,7 @@ describe('product.repository', () => {
 
       expect(mockTx.product.findFirst).toHaveBeenCalledWith({
         where: { id: PRODUCT_ID, tenantId: TENANT_ID },
+        include: { secondaryIdentifiers: { select: { identifierId: true } } },
       });
       expect(mockTx.product.update).toHaveBeenCalledWith({
         where: { id: PRODUCT_ID },
@@ -547,6 +548,60 @@ describe('product.repository', () => {
 
       await expect(result).rejects.toThrow(ValidationError);
       await expect(result).rejects.toThrow('Secondary identifiers must not contain duplicates');
+      expect(mockTx.product.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ValidationError when a primary-only update matches an existing stored secondary identifier', async () => {
+      // The overlap check must cover the request's *effective* state, not
+      // only fields the request happens to touch: a primary-only update
+      // that is never checked against the product's currently stored
+      // secondaries would silently persist the forbidden
+      // primary-also-secondary state (no database constraint enforces it).
+      mockTx.product.findFirst.mockResolvedValue({
+        ...PRODUCT_WITH_RELATIONS,
+        secondaryIdentifiers: [{ identifierId: SECONDARY_ID_1 }],
+      });
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, { primaryIdentifierId: SECONDARY_ID_1 });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Primary identifier cannot also be a secondary identifier');
+      expect(mockTx.product.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ValidationError when a secondary-only update names the stored primary identifier', async () => {
+      // The mirror of the primary-only case above, and the reason the check reads the
+      // request's effective state from both sides. Every other fixture here leaves
+      // primaryIdentifierId null, so without this the `existing.primaryIdentifierId`
+      // side of effectivePrimaryId is never exercised with a real value and a swap of
+      // the two ternaries would pass the suite.
+      mockTx.product.findFirst.mockResolvedValue({
+        ...PRODUCT_WITH_RELATIONS,
+        primaryIdentifierId: SECONDARY_ID_1,
+        secondaryIdentifiers: [],
+      });
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, { secondaryIdentifierIds: [SECONDARY_ID_1] });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Primary identifier cannot also be a secondary identifier');
+      expect(mockTx.product.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ValidationError when one request sets a primary that its own secondary list contains', async () => {
+      // Both fields supplied, so neither side falls back to the stored record.
+      mockTx.product.findFirst.mockResolvedValue(PRODUCT_WITH_RELATIONS);
+      mockTx.identifier.findFirst.mockResolvedValue({ id: SECONDARY_ID_1, tenantId: TENANT_ID });
+
+      const result = updateProduct(PRODUCT_ID, TENANT_ID, {
+        primaryIdentifierId: SECONDARY_ID_1,
+        secondaryIdentifierIds: [SECONDARY_ID_1],
+      });
+
+      await expect(result).rejects.toThrow(ValidationError);
+      await expect(result).rejects.toThrow('Primary identifier cannot also be a secondary identifier');
       expect(mockTx.product.update).not.toHaveBeenCalled();
     });
 

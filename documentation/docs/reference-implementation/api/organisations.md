@@ -28,7 +28,7 @@ Identifiers are managed through the [Identifiers API](./identifiers) and linked 
 
 ### Location
 
-The optional `location` field accepts any JSON object; no shape validation is currently applied. The UNTP location field shapes are described in the [Location](../master-data/#location) section of the master data documentation, but the Reference Implementation does not yet validate submitted values against them.
+The optional `location` field accepts any JSON object. No shape validation is applied. The UNTP location field shapes are described in the [Location](../master-data/#location) section of the master data documentation, but the Reference Implementation does not yet validate submitted values against them.
 
 ### Tenant Scoping
 
@@ -43,6 +43,8 @@ POST /api/v1/organisations
 ```
 
 Creates one or more organisations in bulk. The request body must be a non-empty array of organisation objects — each must include a non-empty `name`. Optional fields include `description` (non-empty if provided), `location`, `primaryIdentifierId`, and `secondaryIdentifierIds` (each entry must be a non-empty identifier ID, and the array must not contain duplicates). Unknown keys on any item are ignored.
+
+A `primaryIdentifierId` that is already the primary identifier of another organisation is rejected with 409 Conflict.
 
 ```mermaid
 sequenceDiagram
@@ -59,6 +61,10 @@ sequenceDiagram
         end
     end
     RI->>DB: Insert organisation records
+    alt primaryIdentifierId already claimed by another organisation
+        DB-->>RI: Unique constraint violation
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Created records
     RI-->>Client: 201 Created (array of organisations)
 ```
@@ -99,12 +105,14 @@ PATCH /api/v1/organisations/{id}
 
 Updates one or more fields of an existing organisation. At least one recognised field must be provided; unknown keys are ignored.
 
+A `primaryIdentifierId` that is already the primary identifier of another organisation is rejected with 409 Conflict.
+
 | Updatable Field | Description |
 |-----------------|-------------|
 | `name` | Organisation name (must be non-empty if provided) |
 | `description` | Free-text description (must be non-empty if provided; set to `null` to clear) |
 | `location` | Any JSON object is accepted; the UNTP location field shapes (see [Location](../master-data/#location)) are not currently validated |
-| `primaryIdentifierId` | ID of the primary identifier (set to `null` to clear) |
+| `primaryIdentifierId` | ID of the primary identifier (non-empty if provided; set to `null` to clear) |
 | `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing; an empty array clears all secondary identifiers; the array must not contain duplicates) |
 
 ---

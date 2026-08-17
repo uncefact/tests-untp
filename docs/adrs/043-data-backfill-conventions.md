@@ -1,4 +1,4 @@
-# ADR: Data-backfill conventions
+# ADR-043: Data-backfill conventions
 
 - **Date:** 2026-08-16
 - **Status:** accepted

@@ -26,7 +26,7 @@ The following environment variables configure the connection between the Referen
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `SYSTEM_STORAGE_BASE_URL` | Base URL of the storage service | Yes | `http://localhost:3334` |
-| `SYSTEM_STORAGE_API_KEY` | Authentication token for the storage service API | Yes | `test123` |
+| `SYSTEM_STORAGE_API_KEY` | Authentication token for the storage service API | No | `test123` |
 | `SYSTEM_STORAGE_ADAPTER_TYPE` | Must be set to `UNCEFACT_STORAGE` | Yes | `UNCEFACT_STORAGE` |
 | `SYSTEM_STORAGE_SERVICE_NAME` | Display name for this service instance | No | `System Default Storage` |
 | `SYSTEM_STORAGE_SERVICE_DESCRIPTION` | Description for this service instance | No | — |

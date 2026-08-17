@@ -17,7 +17,7 @@ When using the Docker Compose configuration from the [Reference Implementation r
 
 ## Supported Version
 
-The supported version of VCKit is `sha-325b7e3`.
+The supported version of VCKit is `1.2.1`.
 
 ## Multi-Tenancy
 
@@ -46,7 +46,7 @@ When creating or updating a VCKit service instance via the [Services API](../../
 |-------|------|----------|---------|-------------|
 | `baseUrl` | `string` (URL) | Yes | — | Base URL of the VCKit instance (e.g., `http://vckit-api:3332`) |
 | `apiKey` | `string` | Yes | — | Authentication token for the VCKit API. **Sensitive** — masked in API responses. |
-| `apiVersion` | `string` | Yes | `1.0.0` | API version to use when communicating with VCKit |
+| `apiVersion` | `string` | No | `1.0.0` | API version to use when communicating with VCKit |
 
 **Example:**
 

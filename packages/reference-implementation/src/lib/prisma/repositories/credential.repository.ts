@@ -33,7 +33,7 @@ export type ListCredentialsOptions = {
 /**
  * Creates a new credential record.
  *
- * Entity links are optional enrichment (ADR-043): the server picks the entity
+ * Entity links are optional enrichment (ADR-044): the server picks the entity
  * on the caller's behalf, and by the time this runs the credential has already
  * been signed and stored externally, so an entity that vanished between the
  * lookup and this write must not destroy work that succeeded. A foreign-key
@@ -41,7 +41,7 @@ export type ListCredentialsOptions = {
  * them and reported through `entityLinkFailed` (a credential carries at most
  * one entity link, since the publish target is a single chosen reference); every other database failure,
  * including a violation on `tenantId`, stays fatal and is translated by
- * ADR-036's mapping. This is the carve-out ADR-043 makes to ADR-042, which
+ * ADR-036's mapping. This is the carve-out ADR-044 makes to ADR-042, which
  * otherwise routes a vanished server-selected dependency to the sanitised
  * server-failure path.
  */

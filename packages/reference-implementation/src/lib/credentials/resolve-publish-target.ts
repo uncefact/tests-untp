@@ -6,7 +6,7 @@ const logger = apiLogger.child({ module: 'resolve-publish-target' });
 
 /**
  * Everything the IDR publish call needs, read from the identifier rather than
- * from a matched master-data record (ADR-043). The scheme, registrar and IDR
+ * from a matched master-data record (ADR-044). The scheme, registrar and IDR
  * service instance all hang off `Identifier`, so an entity is not required for
  * a credential to be discoverable.
  */
@@ -31,7 +31,7 @@ export type ResolvePublishTargetResult =
  * facility, then organisation, without falling through to another type when
  * the chosen one does not resolve. Publishing a credential under a different
  * subject than the payload leads with would be a silent substitution, and no
- * warning makes that safe (ADR-043).
+ * warning makes that safe (ADR-044).
  */
 function chooseReference(refs: ExtractedRefs): { id: string } | undefined {
   return refs.products[0] ?? refs.facilities[0] ?? refs.organisations[0];

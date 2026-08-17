@@ -33,7 +33,7 @@ export type IssueCredentialResult = {
   /**
    * True when the matched entity vanished before the credential row was
    * written, so the credential was stored without its entity links. Advisory
-   * enrichment only (ADR-043): the caller is told, and issuance still succeeds.
+   * enrichment only (ADR-044): the caller is told, and issuance still succeeds.
    */
   entityLinkFailed: boolean;
 };

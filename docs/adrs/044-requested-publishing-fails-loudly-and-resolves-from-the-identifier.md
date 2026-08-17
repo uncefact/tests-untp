@@ -1,4 +1,4 @@
-# ADR-043: A requested publish fails loudly and resolves from the identifier
+# ADR-044: A requested publish fails loudly and resolves from the identifier
 
 - **Date:** 2026-08-16
 - **Status:** accepted

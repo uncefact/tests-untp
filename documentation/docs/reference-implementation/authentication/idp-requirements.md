@@ -40,7 +40,7 @@ Service accounts authenticate via Bearer tokens obtained from the IDP using the 
 |-------|----------|---------|
 | `sub` | Yes | Unique service account identifier |
 | `aud` | Yes | Token audience — must match `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE` |
-| `azp` | No | Authorised party — logged for audit purposes |
+| `azp` | No | Authorised party — captured on the request context for handlers to use |
 | Group claim | Yes ([closed mode](./tenant-modes#closed-mode) only) | Tenant identifier |
 
 The `aud` claim is validated on every service account request. If it does not match the configured `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE`, the token is rejected. See the provider-specific sections below for how to configure the audience.
@@ -54,14 +54,14 @@ See [Tenant Modes](./tenant-modes) for how service accounts are associated with 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `AUTH_OIDC_PROVIDER` | Must be set to `keycloak` | Yes | `keycloak` |
-| `AUTH_OIDC_ISSUER` | Keycloak realm issuer URL (e.g., `http://localhost:8080/realms/untp-reference-implementation`) | Yes | — |
+| `AUTH_OIDC_ISSUER` | Keycloak realm issuer URL (e.g., `http://localhost:8080/realms/ri-local`) | Yes | — |
 | `AUTH_OIDC_CLIENT_ID` | OAuth2 client ID configured in Keycloak | Yes | `ri-app` |
 | `AUTH_OIDC_CLIENT_SECRET` | OAuth2 client secret | Yes | — |
 | `AUTH_OIDC_AUTHORIZATION_URL` | Browser-facing authorisation URL override | No | — |
 | `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE` | Expected audience claim in service account tokens — must match the audience mapper configured on the service account client | Yes | `ri-api` |
 | `AUTH_SECRET` | Secret used to encrypt sessions (generate with `openssl rand -base64 32`) | Yes | — |
 | `AUTH_TRUST_HOST` | Set to `true` when the Reference Implementation runs behind a reverse proxy or in a containerised environment where the host header may differ from the actual origin | No | — |
-| `RI_APP_URL` | Public base URL of the Reference Implementation. Backs the OIDC post-logout redirect and the default human verification link when publishing credentials | Yes | `http://localhost:3003` |
+| `RI_APP_URL` | Public base URL of the Reference Implementation. Backs the OIDC post-logout redirect and the default human verification link when publishing credentials | Yes | None. The process refuses to start without it, and the check runs at boot |
 
 `AUTH_OIDC_AUTHORIZATION_URL` is needed when Keycloak's issuer URL is only reachable from within Docker (e.g., `http://keycloak:8080/...`) but the browser needs a different URL (e.g., `http://localhost:8080/...`). If the issuer URL is reachable from both the server and the browser, this variable is not needed.
 
@@ -128,7 +128,7 @@ The Docker Compose configuration includes two service accounts assigned to separ
 | `AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE` | Zitadel project resource ID — required for service account token validation | Yes | — |
 | `AUTH_SECRET` | Secret used to encrypt sessions (generate with `openssl rand -base64 32`) | Yes | — |
 | `AUTH_TRUST_HOST` | Set to `true` when the Reference Implementation runs behind a reverse proxy or in a containerised environment where the host header may differ from the actual origin | No | — |
-| `RI_APP_URL` | Public base URL of the Reference Implementation. Backs the OIDC post-logout redirect and the default human verification link when publishing credentials | Yes | `http://localhost:3003` |
+| `RI_APP_URL` | Public base URL of the Reference Implementation. Backs the OIDC post-logout redirect and the default human verification link when publishing credentials | Yes | None. The process refuses to start without it, and the check runs at boot |
 
 ### IDP Configuration
 

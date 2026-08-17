@@ -1,11 +1,13 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: API Pagination
 ---
 
 # API Pagination
 
 List endpoints return results in pages. A client controls its page with the `limit` (page size) and `offset` (records to skip) query parameters.
+
+Both parameters must be digit strings representable as an exact safe integer. A value that is not a whole number, is negative where not allowed, or is too large to represent exactly (above `Number.MAX_SAFE_INTEGER`) is rejected with a `400` naming the requirement, rather than being silently rounded or truncated.
 
 ## Maximum page size
 

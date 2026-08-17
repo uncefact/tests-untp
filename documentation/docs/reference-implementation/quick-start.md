@@ -28,7 +28,7 @@ docker compose up -d --build
 
 This starts the Reference Implementation along with all of its dependencies — the database, identity provider, verifiable credential service, storage service, and identity resolver service.
 
-On first start, the Reference Implementation automatically applies database migrations and seeds system default records (the system tenant, identifier schemes, data models, service instances, render templates, and more). See [Startup](./operations/startup) for the full details of what happens during this process.
+On first start, the Reference Implementation automatically applies database migrations, converts existing rows to the formats the current version writes, and seeds system default records (the system tenant, data models, service instances, render templates, and more). Registrars and identifier schemes are not among them. They come from a seed manifest you mount at `/app/seed/custom`, so a stack started without one has no identifier schemes and cannot create an identifier until you supply some. See [Startup](./operations/startup) for the full details of what happens during this process, and [Custom Seed](./operations/custom-seed) for supplying your own manifest.
 
 ## Access the API
 
@@ -50,7 +50,7 @@ The Docker Compose stack starts the following services. Each is an independent c
 | VCKit Database | `db` | `localhost:5432` | PostgreSQL database for VCKit (key material, DIDs, credential metadata) |
 | Storage Service | `storage-service` | `http://localhost:3334` | Stores credentials, render templates, and other binary data |
 | Identity Resolver | `identity-resolver-service` | `http://localhost:3000` | Resolves identifiers to linked resources such as credentials |
-| Object Store | `identity-resolver-service-object-store` | `http://localhost:9000` | MinIO instance used by the identity resolver and storage service for persistent storage |
+| Object Store | `identity-resolver-service-object-store` | `http://localhost:9000` | MinIO instance used by the identity resolver for persistent storage |
 | Reference Implementation Database | `ri-db` | `localhost:5433` | PostgreSQL database for the Reference Implementation |
 
 ## Stop the Stack
