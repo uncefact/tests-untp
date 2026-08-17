@@ -344,9 +344,13 @@ export async function updateProduct(
   input: UpdateProductInput,
 ): Promise<ProductWithRelations> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    // Ownership check
+    // Ownership check. The stored secondary identifier IDs come back with it: a
+    // primary-only update still needs them to validate against, since the overlap
+    // rule below covers the request's effective state, not only the fields the
+    // request happens to touch.
     const existing = await tx.product.findFirst({
       where: { id, tenantId },
+      include: { secondaryIdentifiers: { select: { identifierId: true } } },
     });
 
     if (!existing) {
@@ -389,12 +393,23 @@ export async function updateProduct(
       await validateIdentifierOwnership(tx, input.primaryIdentifierId, tenantId);
     }
 
-    // Validate secondary identifiers and check for overlap with primary
-    if (input.secondaryIdentifierIds !== undefined) {
+    // The primary identifier must never also be a secondary one. A primary-only
+    // update whose new primary matches an existing stored secondary identifier
+    // must be rejected exactly like the reverse (a secondary-only update matching
+    // the existing primary); no database constraint enforces this, so both
+    // directions are checked here.
+    if (input.primaryIdentifierId !== undefined || input.secondaryIdentifierIds !== undefined) {
       const effectivePrimaryId =
         input.primaryIdentifierId !== undefined ? input.primaryIdentifierId : existing.primaryIdentifierId;
-      validateNoPrimarySecondaryOverlap(effectivePrimaryId, input.secondaryIdentifierIds);
+      const effectiveSecondaryIds =
+        input.secondaryIdentifierIds !== undefined
+          ? input.secondaryIdentifierIds
+          : existing.secondaryIdentifiers.map((si) => si.identifierId);
+      validateNoPrimarySecondaryOverlap(effectivePrimaryId, effectiveSecondaryIds);
+    }
 
+    // Validate secondary identifiers belong to tenant, then replace them
+    if (input.secondaryIdentifierIds !== undefined) {
       for (const secId of input.secondaryIdentifierIds) {
         await validateIdentifierOwnership(tx, secId, tenantId);
       }
