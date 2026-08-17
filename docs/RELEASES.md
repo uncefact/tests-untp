@@ -19,8 +19,12 @@ The decision behind this layout is recorded in
    normal PR). For example, for `@uncefact/untp-utils`:
 
    ```bash
-   pnpm --filter '@uncefact/untp-utils' version --no-git-tag-version <patch|minor|major>
+   pnpm --filter '@uncefact/untp-utils' exec npm version --no-git-tag-version <patch|minor|major>
    ```
+
+   Note the `exec npm version` rather than a bare `pnpm version`. With `--filter`,
+   pnpm resolves `version` to a `version` script in the package and fails with
+   `None of the selected packages has a "version" script`.
 
    Open a PR titled `chore(release): @uncefact/untp-utils v<X.Y.Z>` and
    include the changelog entry for this release.

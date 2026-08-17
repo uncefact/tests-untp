@@ -47,6 +47,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Only a tag push publishes a versioned image, so only a tag push needs the
+      # check. Without it a tag pushed ahead of its version bump would publish an
+      # image labelled with a version the tree does not carry.
+      - name: Verify tag/package version match
+        if: startsWith(github.ref, 'refs/tags/reference-implementation-v')
+        run: node scripts/check-tag-version-match.mjs reference-implementation-v packages/reference-implementation
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
