@@ -110,7 +110,14 @@ jest.mock('@uncefact/untp-ri-services', () => ({
   // The real implementation, so the warning-pointer assertions below exercise
   // the actual rewriting rather than a stub of it.
   remapWarningPointers: jest.requireActual('@uncefact/untp-ri-services').remapWarningPointers,
+  // The real class, because the route classifies a publish failure by
+  // instanceof and reads the upstream status off the instance. A hand-shaped
+  // stand-in lets the route read a field the real error never carries, which
+  // is how the two drifted apart previously.
+  IdrPublishError: jest.requireActual('@uncefact/untp-ri-services').IdrPublishError,
 }));
+
+const { IdrPublishError: RealIdrPublishError } = jest.requireActual('@uncefact/untp-ri-services');
 
 // Repository mocks
 const mockUpdateCredentialPublished = jest.fn();
@@ -1063,10 +1070,12 @@ describe('POST /api/v1/credentials', () => {
 
     it('distinguishes a resolver rejection from an unconfirmed publish, and never leaks the upstream body', async () => {
       setupPublishingHappyPath();
-      const rejection = Object.assign(new Error('HTTP 409: {"detail":"duplicate response for /gtin/095"}'), {
-        name: 'IdrPublishError',
-        details: { httpStatus: 409 },
-      });
+      const rejection = new RealIdrPublishError(
+        'gtin',
+        '09520123456788',
+        409,
+        '{"detail":"duplicate response for /gtin/095"}',
+      );
       mockPublishLinks.mockRejectedValueOnce(rejection);
 
       let res = await POST(
@@ -1097,10 +1106,7 @@ describe('POST /api/v1/credentials', () => {
 
       // A resolver 5xx may still have committed, so it is unknown, not refused.
       mockPublishLinks.mockRejectedValueOnce(
-        Object.assign(new Error('HTTP 503: upstream unavailable'), {
-          name: 'IdrPublishError',
-          details: { httpStatus: 503 },
-        }),
+        new RealIdrPublishError('gtin', '09520123456788', 503, 'upstream unavailable'),
       );
       res = await POST(
         createFakeRequest(validBody({ publishingOptions: { publish: true } })),
