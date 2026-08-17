@@ -18,7 +18,7 @@ numbers follow semantic versioning. The package ships via the
 - **cache:** bound `createInMemoryTtlCache` with an optional `maxEntries`, evicting expired entries first then least-recently-used ([#891](https://github.com/uncefact/tests-untp/pull/891)) ([0d7bfc42f](https://github.com/uncefact/tests-untp/commit/0d7bfc42f))
 - **conformity-vocabulary:** add the sub-entry with a scheme parser and claim validator ([#667](https://github.com/uncefact/tests-untp/pull/667)) ([d94ac72ac](https://github.com/uncefact/tests-untp/commit/d94ac72ac))
 - **conformity-vocabulary:** add `parseConformityCatalogue` and extract shared parser helpers ([#684](https://github.com/uncefact/tests-untp/pull/684)) ([779e0ecf4](https://github.com/uncefact/tests-untp/commit/779e0ecf4))
-- **conformity-vocabulary:** throw `ConformitySchemeError` subclasses instead of returning coded outcomes (ADR-035) ([#683](https://github.com/uncefact/tests-untp/pull/683)) ([711090e55](https://github.com/uncefact/tests-untp/commit/711090e55))
+- **conformity-vocabulary:** throw `ConformityVocabularyError` subclasses instead of returning coded outcomes (ADR-035) ([#683](https://github.com/uncefact/tests-untp/pull/683)) ([711090e55](https://github.com/uncefact/tests-untp/commit/711090e55))
 - **http-headers:** add the `./http-headers` sub-entry and send a `User-Agent` on every guarded fetch, overridable per call or by environment ([#891](https://github.com/uncefact/tests-untp/pull/891)) ([0d7bfc42f](https://github.com/uncefact/tests-untp/commit/0d7bfc42f))
 - **multibase-digest:** add the `fromText` and `fromHex` static factories ([#655](https://github.com/uncefact/tests-untp/pull/655)) ([8c04d01cb](https://github.com/uncefact/tests-untp/commit/8c04d01cb))
 - **node:** add the `./node` sub-entry with the `validatePublicUrl` SSRF guard ([#674](https://github.com/uncefact/tests-untp/pull/674)) ([d0fb379e9](https://github.com/uncefact/tests-untp/commit/d0fb379e9))
@@ -33,12 +33,12 @@ numbers follow semantic versioning. The package ships via the
 
 - **conformity-vocabulary:** validate every conformity topic each criterion declares ([#700](https://github.com/uncefact/tests-untp/pull/700)) ([e6a5b8c33](https://github.com/uncefact/tests-untp/commit/e6a5b8c33))
 - **conformity-vocabulary:** align v0.7.0 DCC conformity topic extraction and validation with the published spec artefacts ([#752](https://github.com/uncefact/tests-untp/pull/752)) ([c16b87235](https://github.com/uncefact/tests-untp/commit/c16b87235))
-- **conformity-vocabulary:** resolve warning pointers against the submitted credential ([#919](https://github.com/uncefact/tests-untp/pull/919)) ([c978d8443](https://github.com/uncefact/tests-untp/commit/c978d8443))
 - **validation:** guard JSON-LD `@context` and JSON Schema fetches against SSRF ([#733](https://github.com/uncefact/tests-untp/pull/733)) ([479065749](https://github.com/uncefact/tests-untp/commit/479065749))
 - **validation:** surface SSRF rejections from JSON-LD expansion on the native error cause chain ([#838](https://github.com/uncefact/tests-untp/pull/838)) ([a76c30ebd](https://github.com/uncefact/tests-untp/commit/a76c30ebd))
 
 ### Miscellaneous
 
+- document that `validateConformityClaim`'s warning pointers are relative to the claim, so a consumer that synthesises the claim rather than taking it as a sub-document maps each field to its own source path instead of assuming a prefix ([#919](https://github.com/uncefact/tests-untp/pull/919)) ([c978d8443](https://github.com/uncefact/tests-untp/commit/c978d8443))
 - rename the `./schema-loaders` subpath to `./loaders`, and the `make*` factories to `create*`. Neither name shipped in a release, so no published import path changes ([227049ff7](https://github.com/uncefact/tests-untp/commit/227049ff7))
 
 ### Notes
