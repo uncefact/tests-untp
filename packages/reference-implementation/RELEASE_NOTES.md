@@ -1,5 +1,93 @@
 # UNTP Reference Implementation release notes
 
+## 0.4.0 - 2026-08-17
+
+v0.3 made the Reference Implementation an API-first, multi-tenant application. v0.4 is about making it safe to run in front of real data and predictable to integrate against.
+
+The headline changes: the secrets it stores are now protected at rest. The API tells you when a request is wrong instead of guessing what you meant. A deployment that is misconfigured fails when it starts, rather than halfway through the first request that happens to need the missing piece. The custom seed manifest became the source of truth for the rows it describes, so taking an entry out of it now removes the row. And credential publishing changed how it finds what to publish against, reporting failures through codes that name the reason rather than one code covering everything. The sections below cover these and the rest.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.4.0`, `:latest`)
+- Upgrading from v0.3: this release renames an environment variable, adds three database migrations, and changes several API behaviours you may be relying on. Read the [v0.4 migration guide](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.4) before you upgrade.
+- Back up first: v0.4 encrypts credential decryption keys under your encryption key, so from this release a database backup is only restorable alongside the key that wrote it. See [Key Management and Recovery](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/key-management).
+
+### Credential decryption keys are encrypted at rest
+
+When you store a credential privately, the Reference Implementation holds the key needed to decrypt it. Until now that key sat in the database in plaintext, so anyone with read access to the database could recover the contents of every privately stored credential. In v0.4 the key is wrapped in an AES-256-GCM envelope before it is written, under the same key that already protected service instance configurations.
+
+The API surface is unchanged. The credentials endpoints still return the plaintext key to callers who are entitled to it, unwrapping it on read. Private credentials issued before the upgrade keep their plaintext keys and keep working, because the read path still recognises them. A one-off, operator-run backfill brings those older rows under encryption when you are ready. See the [decryption keys backfill](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/backfills/decryption-keys).
+
+Because that key now guards credential contents as well as service configuration, it was renamed from `SERVICE_ENCRYPTION_KEY` to `DATA_ENCRYPTION_KEY` to reflect what it actually protects. The old name still works and logs a deprecation warning, so the rename is not a prerequisite for upgrading.
+
+### A misconfigured deployment fails at startup
+
+In v0.3 a deployment could start with configuration missing and only discover the problem later, on whichever request first needed it. That turned a configuration mistake into an intermittent runtime error, often in front of a user. v0.4 checks the things it cannot work without before it serves anything.
+
+The application now refuses to start when `RI_APP_URL` is unset, is not an `http(s)` URL, or carries a username or password. It refuses to start when the configured encryption key cannot decrypt an existing stored envelope, which catches a uniformly wrong or rotated key immediately instead of on the first request touching encrypted data. It refuses to start on the placeholder key shipped in `.env.example` unless `DEPLOYMENT_ENVIRONMENT` says the deployment is local. And the seed now fails the whole boot when a service category it was asked to configure is missing its environment variables, where it previously warned and quietly skipped that category. Set `SEED_ALLOW_PARTIAL=true` to restore the old behaviour, for deployments where a partial configuration is what you want. See [Startup](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/startup).
+
+### The API rejects what it cannot honour
+
+Request validation moved to the route boundary across nearly every resource: credentials, DIDs, products, organisations, facilities, registrars, identifiers and their links, identifier schemes, data models, services, render templates, and the conformity vocabulary browse endpoints. A malformed request is now answered with a 400 naming the field and the rule it broke, before anything is written, signed, or published.
+
+That means some requests v0.3 accepted are now refused. v0.3 stored, coerced, or silently ignored a whitespace-only name, a URL with embedded credentials or a scheme other than `http(s)`, a malformed BCP 47 language tag, a duplicate entry in an identifier list, and a string where a boolean belongs. Each of those is now a clear rejection. The migration guide covers the classes of request that changed.
+
+Pagination changed in the same spirit. Asking for a page larger than the maximum used to be silently reduced to the maximum, so a client asking for 500 records got 100 back with nothing to say why. Every list endpoint now returns a 400 stating the bound. Operators who need a different ceiling can set `API_MAX_PAGE_LIMIT`. See [API pagination](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/api-pagination).
+
+### Errors name what went wrong
+
+A conflict or a missing record used to escape some routes as a 500 carrying raw database text, which told the caller nothing useful and told them more than they should see about the internals. Database errors are now mapped to the right status across every write repository: a duplicate is a 409, a bad reference is a 400, a missing row is a 404, each with a message written for the person reading it.
+
+Two multi-tenancy defects on service instances are closed in the same spirit. A system default instance is readable by every tenant, and a tenant could delete one, removing it for everybody; that now returns a 403. The reference counts in the delete conflict response were counted across all tenants, so the message reported how many of other tenants' records pointed at the instance; those counts are now the caller's own. The Swagger surface also publishes real error examples rather than bare schema references, so an integrator can see the shape of each failure before they meet it.
+
+Failures inside the authentication and tenant-resolution pipeline now return the same documented JSON error envelope as every other route, rather than falling through to a plain-text 500. Every response carries a correlation id you can quote when reporting a problem, and that id now propagates across service boundaries, so a single request can be followed through the Reference Implementation and into the services it calls. When a credential payload fails JSON-LD expansion or schema validation, the response says which one failed and why, instead of reporting a generic validation failure.
+
+### Publishing resolves from the credential's own identifier
+
+Publishing a credential to an identity resolver used to work backwards from the master data record the credential referenced, reading the scheme off that entity. If the link to master data was missing or incomplete, the publish was skipped and reported with a single warning code that did not say which prerequisite was unmet.
+
+Worse, two of those failures threw after the credential had been signed and stored, so the caller got an error back and never learned the id of a credential that now existed.
+
+v0.4 resolves the publishing target from the credential's own identifier instead, which is the thing the credential is actually about. Publishing no longer depends on the master data link at all, so a credential whose identifier exists without a master data record, or whose match is a secondary identifier, now publishes where it previously could not. Issuance always returns the credential it created, and a publish that cannot proceed is reported as a warning on that response rather than as an error that discards it. When a publish genuinely cannot proceed, the response names the specific reason and says what to do about it. Callers relying on the old single code will need to update. The migration guide has the mapping.
+
+Two consequences are worth planning for. An identifier value registered under two schemes no longer resolves silently to whichever one the entity match happened to pick, so the caller names it with the new `publishingOptions.identifierSchemeId`. And the identity resolver instance is now chosen from the scheme, then the registrar, then the tenant or system default, matching what the identifier links route already did, so a credential whose registrar carries a resolver instance may publish somewhere different than before.
+
+Publishing also gained access roles on published links, a default human verification link pointing at this deployment's own verify page when you do not supply one, and validation that rejects a verification URL that is not a well-formed `http(s)` address before the credential is signed.
+
+### Seed data reconciles against a manifest
+
+The custom seed added rows and updated them, but never removed them. Taking an entry out of the manifest had no effect at all, so the database drifted from the file that was supposed to describe it.
+
+In v0.4 the manifest is the source of truth for the rows it owns, so removing an entry removes the row. Registrars, identifier schemes, scheme qualifiers, data models, and render templates gained a provenance marker recording whether the core seed, the custom seed, or a person created them, and reconciliation only deletes what the custom seed itself established. Everything of those five kinds that existed before this release is marked as user-created and survives. A deletion that would cascade into data the manifest does not own stops that pass with an explanatory error and rolls back its writes.
+
+Conformity schemes are the exception, and the one to check before upgrading. They carry their own separate provenance model rather than the new marker, so a scheme seeded before this release that the manifest no longer lists is evicted on the first boot, taking its profiles with it. Review the `conformitySchemes` section of your manifest against what is in the database first. The [migration guide](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.4) covers this.
+
+Seeded conformity schemes also stopped being frozen after their first ingest. Schemes seeded from a URL are re-fetched on a configurable cadence, and file-seeded schemes refresh at boot, so a corrected scheme reaches the deployment without manual intervention. See [Custom seed](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/custom-seed).
+
+### The verify page asks for the decryption key
+
+A verify link for a privately stored credential does not carry the decryption key, because putting it in the URL would defeat the point of storing the credential privately. Until now, following such a link showed an error and left the recipient stuck.
+
+The verify page now asks for the key. The recipient pastes the key they were given out of band, and the page verifies and renders the credential. The key is held only in memory for that page, never written to the URL, browser history, or storage, and it is cleared when the page is restored from the browser's back-forward cache. When a wrong key is entered the form comes back with the value intact so it can be corrected. When the credential is structurally unusable the page says so rather than inviting a retry that cannot help. The page's date row also moved onto the right data model, and every credential is affected. It was labelled "Issue date" and read `issuanceDate`, a VC Data Model 1.1 property. UNTP credentials follow VC Data Model 2.0, which replaced that field with `validFrom` and `validUntil`, so credentials the bridges build do not carry the field the page was reading. When it was absent the date library treated the missing value as the current time, so the page showed today's date as the credential's issue date, a fabricated value rather than an awkwardly formatted one.
+
+The page now reads `validFrom`, and the label changed to "Valid from" so it describes the value actually being shown. The date renders as the credential's UTC calendar date in ISO 8601, so two people reading the same credential in different timezones see the same value, and the row is omitted when a credential carries no parseable `validFrom` rather than inventing one. `Valid until` is not displayed yet. See the [verify page](https://uncefact.github.io/tests-untp/docs/reference-implementation/verify-page).
+
+### Tools for the operator who holds the keys
+
+Encryption at rest is only as good as the operational story around it, so v0.4 ships the commands that story needs. A read-only audit reports what is encrypted, what is still plaintext, and whether the configured key can read it, without changing anything. A rotation command re-encrypts every stored envelope onto a new key. A backfill wraps the decryption keys of credentials issued before this release. Each has a documented procedure covering the preflight that aborts on a wrong key, what the run reports, and how to recover.
+
+Deliberately, the backfill and the rotation are not run automatically at boot. Both rewrite data under a key, and a run against the wrong key cannot be undone from the data it leaves behind, so a human confirms the key first. The digest conversion backfill still runs automatically, because a wrong run there is recoverable from the data itself. See [Encryption audit](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/encryption-audit), [Encryption key rotation](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/encryption-key-rotation), and [Backfills](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/backfills/).
+
+### What leaves the server, and what it will fetch
+
+Sensitive fields are redacted from logs by default rather than by remembering to. Decryption keys, API keys, authorisation headers, tokens, and passwords no longer reach the log output, and an operator can add their own paths with `LOG_REDACT_PATHS`. See [Logging](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/logging).
+
+Remote JSON-LD contexts and JSON Schemas are fetched through a guarded resolver that refuses private and loopback addresses, caps response size and redirect hops, and re-checks the address on every hop, so a credential cannot make the server fetch something it should not reach. Those documents are also cached now, which removes a network round trip from every issuance and verification, with the lifetime and cache size configurable. See [Step 4: Application Start](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/startup#step-4-application-start) for the cache and User-Agent settings and what startup validates.
+
+### Smaller changes
+
+- **Identifier uniqueness is scoped to the tenant.** Two tenants can now register the same identifier value against a shared system scheme. Previously the second one failed on a database constraint it could neither see nor resolve.
+- **The image carries its own health check.** The probe used to live only in the shipped Compose file, where it targeted `localhost`. BusyBox wget resolves that to the IPv6 loopback first while the container listens on IPv4 only, so it never passed and the container was reported unhealthy however well it was running. It is now a `HEALTHCHECK` in the image against `127.0.0.1`, so anything running the image gets a working check without configuring one, and the Compose file no longer repeats it. Kubernetes ignores Docker health checks and still needs its own probes against `/api/health`.
+- **OpenTelemetry filesystem auto-instrumentation is off by default**, which removes a large volume of low-value spans from traces.
+
 ## 0.3.0 - 2026-06-02
 
 This is the largest change to the Reference Implementation since its inception.

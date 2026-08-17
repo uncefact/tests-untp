@@ -194,6 +194,18 @@ EXPOSE 3003
 ENV PORT=3003
 ENV HOSTNAME="0.0.0.0"
 
+# Probe 127.0.0.1, not localhost. HOSTNAME above makes the server listen on IPv4
+# only, while BusyBox wget resolves localhost to ::1 first, so a localhost probe
+# never connects.
+#
+# The start period is a courtesy for an empty or small database, not a coverage
+# guarantee. The entrypoint's migrate, backfill and seed steps run before the
+# server listens and their duration grows with the credential and render
+# template tables, so any deployment with real data should widen start-period
+# and retries with a compose or orchestrator override.
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+  CMD wget --quiet --spider http://127.0.0.1:3003/api/health || exit 1
+
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "packages/reference-implementation/server.js"]
 
