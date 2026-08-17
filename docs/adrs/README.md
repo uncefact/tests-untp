@@ -22,6 +22,8 @@ Where `NNN` is a zero-padded sequence number assigned at creation time (next fre
 
 Use lowercase, hyphen-separated slugs. Keep them short but descriptive.
 
+Two branches opened at the same time can each take what looks like the next free number, and the collision only appears once both merge. When that happens the one that merged first keeps the number, and the others are renumbered to the next free ones, so the earliest decision keeps the identifier anyone has already cited. Renumbering means moving the file and updating every citation of it, code comments included, so each citation still resolves to the decision it was written about. Give every ADR's heading its own number (`# ADR-NNN: ...`) rather than a bare `# ADR:`, so a collision is visible in the file rather than only in a directory listing.
+
 ## Status lifecycle
 
 Every ADR has a status field that follows this lifecycle:
