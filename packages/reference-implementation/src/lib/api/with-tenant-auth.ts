@@ -124,7 +124,7 @@ async function handleClosedMode(
         { method, path, userId: session.user.id, durationMs: Date.now() - start },
         'Unauthorised — session token refresh failed',
       );
-      return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 });
+      return NextResponse.json({ error: 'Session expired. Please sign in again' }, { status: 401 });
     }
 
     if (!session.group_claim) {
@@ -189,7 +189,7 @@ async function handleClosedMode(
         { method, path, error: validationResult.error, durationMs: Date.now() - start },
         'Unauthorised — invalid bearer token',
       );
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
     const payload = validationResult.payload;
@@ -238,7 +238,7 @@ async function handleClosedMode(
   }
 
   apiLogger.warn({ method, path, durationMs: Date.now() - start }, 'Unauthorised — no session or bearer token');
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
 }
 
 async function handleOpenMode(
@@ -293,7 +293,7 @@ async function handleOpenMode(
         { method, path, sub, durationMs: Date.now() - start },
         'Unauthorised — service account user resolution failed',
       );
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
     return executeHandler(
@@ -313,7 +313,7 @@ async function handleOpenMode(
   }
 
   apiLogger.warn({ method, path, durationMs: Date.now() - start }, 'Unauthorised — no session or service account');
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
 }
 
 /**

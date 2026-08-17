@@ -234,7 +234,7 @@ describe('middleware', () => {
       await (middleware as any)(req);
 
       expect(mockNextResponseJson).toHaveBeenCalledWith(
-        { error: 'Unauthorized', message: 'Authentication required' },
+        { error: 'Unauthorised', message: 'Authentication required' },
         expect.objectContaining({ status: 401 }),
       );
     });
