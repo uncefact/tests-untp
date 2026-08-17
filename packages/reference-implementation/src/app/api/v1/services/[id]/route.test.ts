@@ -10,7 +10,8 @@ jest.mock('next/server', () => ({
 
 // Mock withTenantAuth to mirror handleRouteError behaviour
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, ConflictError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
+  const { NotFoundError, ForbiddenError, ConflictError, errorMessage, ServiceRegistryError } =
+    jest.requireActual('@/lib/api/errors');
   const { ValidationError } = jest.requireActual('@/lib/api/validation');
   const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
 
@@ -26,6 +27,12 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
         } catch (e: unknown) {
           if (e instanceof ValidationError) {
             return jsonResponse({ error: (e as Error).message }, { status: 400 });
+          }
+          // Ordered as handleRouteError orders them: Forbidden ahead of
+          // NotFound, so the mock cannot answer 404 where the real mapper
+          // answers 403.
+          if (e instanceof ForbiddenError) {
+            return jsonResponse({ error: (e as Error).message }, { status: 403 });
           }
           if (e instanceof NotFoundError) {
             return jsonResponse({ error: (e as Error).message }, { status: 404 });
@@ -63,7 +70,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   updateServiceInstance: (id: string, tenantId: string, input: unknown) =>
     mockUpdateServiceInstance(id, tenantId, input),
   deleteServiceInstance: (id: string, tenantId: string) => mockDeleteServiceInstance(id, tenantId),
-  countServiceInstanceReferences: (id: string) => mockCountServiceInstanceReferences(id),
+  countServiceInstanceReferences: (id: string, tenantId: string) => mockCountServiceInstanceReferences(id, tenantId),
 }));
 
 // ---------------------------------------------------------------------------
@@ -113,6 +120,7 @@ jest.mock('@/lib/api/logger', () => ({
 // ---------------------------------------------------------------------------
 
 import { GET, PATCH, DELETE } from './route';
+import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -508,8 +516,39 @@ describe('DELETE /api/v1/services/:id', () => {
     expect(res.status).toBe(204);
     expect((res as unknown as { body: unknown }).body).toBeNull();
     expect(mockGetServiceInstanceById).toHaveBeenCalledWith('svc-123', 'org-1');
-    expect(mockCountServiceInstanceReferences).toHaveBeenCalledWith('svc-123');
+    expect(mockCountServiceInstanceReferences).toHaveBeenCalledWith('svc-123', 'org-1');
     expect(mockDeleteServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1');
+  });
+
+  // The lookup admits system defaults so every tenant can read them, but only
+  // the owning tenant may delete. Refusing after the count would hand a
+  // non-owner the number of records referencing a shared instance, which for a
+  // system default is other tenants' data.
+  it('refuses a system-default instance with 403 before counting anything', async () => {
+    mockGetServiceInstanceById.mockResolvedValue({ ...MOCK_INSTANCE, tenantId: SYSTEM_TENANT_ID });
+
+    const req = createFakeRequest({ method: 'DELETE' });
+    const res = await DELETE(req, createContext('svc-123') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toContain('system default');
+    expect(json.error).not.toMatch(/\d/);
+    expect(mockCountServiceInstanceReferences).not.toHaveBeenCalled();
+    expect(mockDeleteServiceInstance).not.toHaveBeenCalled();
+  });
+
+  it('refuses a system-default instance even with force=true, without deleting', async () => {
+    mockGetServiceInstanceById.mockResolvedValue({ ...MOCK_INSTANCE, tenantId: SYSTEM_TENANT_ID });
+
+    const req = createFakeRequest({
+      method: 'DELETE',
+      url: 'http://localhost/api/v1/services/svc-123?force=true',
+    });
+    const res = await DELETE(req, createContext('svc-123') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(403);
+    expect(mockDeleteServiceInstance).not.toHaveBeenCalled();
   });
 
   it('returns 409 when references exist and force is not set', async () => {
@@ -574,7 +613,7 @@ describe('DELETE /api/v1/services/:id', () => {
     const res = await DELETE(req, createContext('svc-123') as unknown as Parameters<typeof DELETE>[1]);
 
     expect(res.status).toBe(204);
-    expect(mockCountServiceInstanceReferences).toHaveBeenCalledWith('svc-123');
+    expect(mockCountServiceInstanceReferences).toHaveBeenCalledWith('svc-123', 'org-1');
   });
 
   it('returns 404 when instance not found', async () => {

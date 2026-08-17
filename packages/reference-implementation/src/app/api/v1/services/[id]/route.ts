@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, ConflictError } from '@/lib/api/errors';
+import { NotFoundError, ConflictError, ForbiddenError } from '@/lib/api/errors';
 import { assertPublicUrl, ValidationError, parseRequestBody, parseQueryParams } from '@/lib/api/validation';
 import { deleteServiceQuerySchema, updateServiceRequestSchema } from '@/lib/api/request-schemas/service';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
@@ -279,7 +279,24 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
- *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
+ *         description: >-
+ *           Forbidden - either the authenticated principal has no resolvable
+ *           tenant assignment, or the instance is a system default, which is
+ *           readable by every tenant but deletable by none. The refusal is
+ *           returned before any reference check, so no counts accompany it
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               systemDefaultInstance:
+ *                 summary: The instance is a system default, readable by every tenant and deletable by none
+ *                 value:
+ *                   error: Service instance is a system default and cannot be deleted by a tenant
+ *               noTenantForUser:
+ *                 summary: The authenticated user maps to no tenant
+ *                 value:
+ *                   error: No tenant found for user
  *       404:
  *         description: Service instance not found
  *         content:
@@ -287,7 +304,9 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
- *         description: Conflict - service instance is referenced by other records
+ *         description: >-
+ *           Conflict - the caller's own DIDs, registrars or identifier schemes
+ *           reference this instance. The counts name only the caller's records
  *         content:
  *           application/json:
  *             schema:
@@ -309,9 +328,19 @@ export const DELETE = withTenantAuth(async (req, { tenantId, params }) => {
     throw new NotFoundError('Service instance not found');
   }
 
+  // The lookup above admits system defaults, which every tenant can read, but
+  // deleteServiceInstance only ever removes the caller's own rows. Refuse here,
+  // ahead of the reference check, so a caller who cannot delete the instance
+  // never receives a count of the records referencing it. A 403 rather than a
+  // 404 because GET returns this same instance to this same caller, so denying
+  // its existence would contradict what they have already been shown.
+  if (existing.tenantId !== tenantId) {
+    throw new ForbiddenError('Service instance is a system default and cannot be deleted by a tenant');
+  }
+
   if (!force) {
     logger.info({ serviceInstanceId: id }, 'Checking for referencing records');
-    const refs = await countServiceInstanceReferences(id);
+    const refs = await countServiceInstanceReferences(id, tenantId);
     const total = refs.dids + refs.registrars + refs.schemes;
 
     if (total > 0) {

@@ -16,13 +16,20 @@ const UNAUTHORISED_REF = '#/components/responses/UnauthorisedResponse';
 const FORBIDDEN_REF = '#/components/responses/TenantAssignmentForbiddenResponse';
 
 /**
- * `POST /dids` documents a combined 403: the tenant-assignment case shared
- * with every route, plus a business rule the handler itself enforces
- * (a tenant may not claim the system VC service's root DID). Referencing the
- * shared component alone would delete half of that contract, so this
- * operation keeps an inline response and is checked for both causes instead.
+ * Some operations document a combined 403: the tenant-assignment case shared
+ * with every route, plus a business rule the handler itself enforces.
+ * Referencing the shared component alone would delete half of that contract,
+ * so these operations keep an inline response and are checked for both causes.
+ * Each entry names a phrase that must appear for the operation's own rule,
+ * so an inline 403 cannot quietly drop it and still pass.
  */
-const COMBINED_FORBIDDEN_OPERATIONS = new Set(['post /dids']);
+const COMBINED_FORBIDDEN_OPERATIONS = new Map([
+  // A tenant may not claim the system VC service's root DID.
+  ['post /dids', 'root DID'],
+  // A tenant may not delete a system-default service instance, and is refused
+  // before the reference count so the counts never reach a non-owner.
+  ['delete /services/{id}', 'system default'],
+]);
 
 // This exemption can only go stale in the safe direction: an entry for a route
 // that changed simply stops matching. Nothing detects that an operation has
@@ -184,10 +191,11 @@ describe('shared auth responses', () => {
       }
 
       const forbidden = responses?.['403'];
-      if (COMBINED_FORBIDDEN_OPERATIONS.has(id)) {
+      const ownRulePhrase = COMBINED_FORBIDDEN_OPERATIONS.get(id);
+      if (ownRulePhrase !== undefined) {
         // Both causes must survive: the shared wording plus its own rule.
         expect(forbidden?.description).toContain('no resolvable tenant assignment');
-        expect(forbidden?.description).toContain('root DID');
+        expect(forbidden?.description).toContain(ownRulePhrase);
         // Staying inline costs this operation the component's body shape, so
         // the schema it carries is asserted here instead.
         expect(forbidden?.content?.['application/json']?.schema?.$ref).toBe('#/components/schemas/ErrorResponse');
