@@ -36,6 +36,8 @@ Pagination changed in the same spirit. Asking for a page larger than the maximum
 
 A conflict or a missing record used to escape some routes as a 500 carrying raw database text, which told the caller nothing useful and told them more than they should see about the internals. Database errors are now mapped to the right status across every write repository: a duplicate is a 409, a bad reference is a 400, a missing row is a 404, each with a message written for the person reading it.
 
+Two multi-tenancy defects on service instances are closed in the same spirit. A system default instance is readable by every tenant, and a tenant could delete one, removing it for everybody; that now returns a 403. The reference counts in the delete conflict response were counted across all tenants, so the message reported how many of other tenants' records pointed at the instance; those counts are now the caller's own. The Swagger surface also publishes real error examples rather than bare schema references, so an integrator can see the shape of each failure before they meet it.
+
 Failures inside the authentication and tenant-resolution pipeline now return the same documented JSON error envelope as every other route, rather than falling through to a plain-text 500. Every response carries a correlation id you can quote when reporting a problem, and that id now propagates across service boundaries, so a single request can be followed through the Reference Implementation and into the services it calls. When a credential payload fails JSON-LD expansion or schema validation, the response says which one failed and why, instead of reporting a generic validation failure.
 
 ### Publishing resolves from the credential's own identifier

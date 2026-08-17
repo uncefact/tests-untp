@@ -356,10 +356,22 @@ such as `https://gs1.org` comes back as `https://gs1.org/`.
 - **Authentication and tenant-resolution failures return the documented envelope.** These
   previously fell through to a plain-text 500. They now return the same
   `{ "error": ... }` shape as every other route, with a correlation id.
-- **Not-found messages changed wording.** Several 404 messages dropped their
-  `or access denied` tail, and one data model message became
-  `Parent data model configuration not found`. Status codes are unchanged, so code that
-  matches on message text breaks silently. Match on the status code instead.
+- **Error message wording changed on many routes.** Several 404 messages dropped their
+  `or access denied` tail, one data model message became
+  `Parent data model configuration not found`, and the identifier scheme routes now say
+  `Identifier scheme not found` rather than `Scheme not found`. On the authentication path,
+  `Unauthorized` became `Unauthorised` and `Session expired - please sign in again` became
+  `Session expired. Please sign in again`, which reaches every authenticated route. Status
+  codes are unchanged throughout, so code that matches on message text breaks silently.
+  Match on the status code instead.
+- **Deleting a service instance is stricter, and its conflict counts are now yours alone.**
+  A system default service instance is readable by every tenant, and on v0.3 a tenant could
+  delete one, which removed it for everybody. `DELETE /api/v1/services/{id}` now refuses with
+  a 403 before it checks anything else. Separately, the reference counts in the 409 body were
+  counted across all tenants, so the message told a caller how many of other tenants' DIDs,
+  registrars, and identifier schemes pointed at the instance. Those counts are now scoped to
+  the caller's own records, so expect smaller numbers than v0.3 reported for a shared
+  instance.
 - **`x-correlation-id` is validated on the way in.** A supplied value is accepted only if
   it is at most 128 characters of `A-Z`, `a-z`, `0-9`, `_`, or `-`. A value failing that
   rule is replaced with a generated id. If your tracing depends on the id you send being
