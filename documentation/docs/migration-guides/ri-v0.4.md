@@ -384,7 +384,7 @@ such as `https://gs1.org` comes back as `https://gs1.org/`.
 
 This is the largest behaviour change in the release for anyone calling
 `POST /api/v1/credentials` with `publishingOptions.publish: true`. The reasoning is
-recorded in ADR 043, "A requested publish fails loudly and resolves from the identifier".
+recorded in ADR 044, "A requested publish fails loudly and resolves from the identifier".
 
 **A requested publish no longer destroys the response.** On v0.3, two failures during
 publishing threw after the credential had already been signed, stored, and written to the
