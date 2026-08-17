@@ -1,5 +1,6 @@
 import { createSwaggerSpec } from 'next-swagger-doc';
 import { generateOpenAPISchemas } from './schemas';
+import { attachErrorExamples, UNAUTHORISED_EXAMPLES, TENANT_FORBIDDEN_EXAMPLES } from './error-examples';
 
 export const getApiDocs = async (): Promise<Record<string, unknown>> => {
   // Generate schemas from Zod definitions
@@ -31,6 +32,11 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' },
+                // Operations reference this component rather than declaring
+                // their own 401, and a Reference Object cannot carry sibling
+                // properties in OpenAPI 3.0, so the examples for all of them
+                // live here.
+                examples: UNAUTHORISED_EXAMPLES,
               },
             },
           },
@@ -39,6 +45,7 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' },
+                examples: TENANT_FORBIDDEN_EXAMPLES,
               },
             },
           },
@@ -75,5 +82,10 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
       ],
     },
   });
+
+  // Runs after the JSDoc blocks are assembled, because the responses it
+  // decorates are declared in those blocks rather than here.
+  attachErrorExamples(spec as Record<string, unknown>);
+
   return spec as Record<string, unknown>;
 };

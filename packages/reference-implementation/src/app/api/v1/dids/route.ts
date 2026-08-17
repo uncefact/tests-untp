@@ -103,6 +103,15 @@ function assertSupported<T extends string>(field: string, value: T, supported: r
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               rootDidForSystemDomain:
+ *                 summary: The alias would claim the system VC service's own domain
+ *                 value:
+ *                   error: Cannot create a root DID for the system VC service domain "vckit.example.com"
+ *               noTenantForUser:
+ *                 summary: The authenticated user maps to no tenant
+ *                 value:
+ *                   error: No tenant found for user
  *       409:
  *         description: |
  *           Conflict. Any of:

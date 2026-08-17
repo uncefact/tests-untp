@@ -41,7 +41,7 @@ const logger = apiLogger.child({ route: '/api/v1/schemes/[id]' });
  *       403:
  *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
- *         description: Scheme not found
+ *         description: Identifier scheme not found
  *         content:
  *           application/json:
  *             schema:
@@ -231,7 +231,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       403:
  *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       404:
- *         description: Scheme not found
+ *         description: Identifier scheme not found
  *         content:
  *           application/json:
  *             schema:
