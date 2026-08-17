@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-0.4.0 docs-doc-page docs-doc-id-migration-guides/ri-v0.4" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.4.0">
+<title data-rh="true">Reference Implementation v0.4 | UN Transparency Protocol</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.4"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="0.4.0"><meta data-rh="true" name="docusaurus_tag" content="docs-default-0.4.0"><meta data-rh="true" name="docsearch:version" content="0.4.0"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-0.4.0"><meta data-rh="true" property="og:title" content="Reference Implementation v0.4 | UN Transparency Protocol"><meta data-rh="true" name="description" content="Back up the Reference Implementation database, and record the encryption key the"><meta data-rh="true" property="og:description" content="Back up the Reference Implementation database, and record the encryption key the"><link data-rh="true" rel="icon" href="/tests-untp/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.4"><link data-rh="true" rel="alternate" href="https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.4" hreflang="en"><link data-rh="true" rel="alternate" href="https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.4" hreflang="x-default"><link rel="stylesheet" href="/tests-untp/assets/css/styles.e15dbfa8.css">
+<script src="/tests-untp/assets/js/runtime~main.1590f534.js" defer="defer"></script>
+<script src="/tests-untp/assets/js/main.0799ec5b.js" defer="defer"></script>
+</head>
+<body class="navigation-with-keyboard">
+<script>!function(){function t(t){document.documentElement.setAttribute("data-theme",t)}var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();t(null!==e?e:"light")}(),function(){try{const n=new URLSearchParams(window.location.search).entries();for(var[t,e]of n)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_foOH" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="navbar navbar--fixed-top"><div class="navbar__inner"><div class="navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/tests-untp/"><div class="navbar__logo"><img src="/tests-untp/img/logo.svg" alt="UNTP Test Suite Logo" class="themedComponent_rRUu themedComponent--light_yJNY"><img src="/tests-untp/img/logo.svg" alt="UNTP Test Suite Logo" class="themedComponent_rRUu themedComponent--dark_g86C"></div><b class="navbar__title text--truncate">TP</b></a><div class="navbar__item dropdown dropdown--hoverable"><a class="navbar__link" aria-haspopup="true" aria-expanded="false" role="button" href="/tests-untp/docs/introduction/">0.4.0</a><ul class="dropdown__menu"><li><a class="dropdown__link" href="/tests-untp/docs/next/migration-guides/ri-v0.4">Next</a></li><li><a aria-current="page" class="dropdown__link dropdown__link--active" href="/tests-untp/docs/migration-guides/ri-v0.4">0.4.0</a></li><li><a class="dropdown__link" href="/tests-untp/docs/0.3.0/introduction/">0.3.0</a></li><li><a class="dropdown__link" href="/tests-untp/docs/0.2.0/introduction/">0.2.0</a></li><li><a class="dropdown__link" href="/tests-untp/docs/0.1.0/introduction/">0.1.0</a></li></ul></div></div><div class="navbar__items navbar__items--right"><a class="navbar__item navbar__link" href="/tests-untp/docs/introduction">Introduction</a><a class="navbar__item navbar__link" href="/tests-untp/docs/reference-implementation/overview">Getting started</a><a class="navbar__item navbar__link" href="/tests-untp/docs/reference-implementation/overview">Tools and support</a><a href="https://untp.unece.org/docs/implementations/ext/" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">Extensions</a><a href="https://github.com/uncefact/tests-untp" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">Contribute</a><a href="https://join.slack.com/t/uncefact/shared_invite/zt-1d7hd0js1-sS1Xgk8DawQD9VgRvy1QHQ" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link navbar-slack-link"><svg class="icon icon-slack"><use xlink:href="#slack"></use></svg><span class="menu-item-name">Slack</span></a><a href="https://github.com/uncefact/tests-untp" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link navbar-github-link"><svg class="icon"><use xlink:href="#github"></use></svg><span class="menu-item-name">Github</span></a><div class="navbarSearchContainer_nWhl"></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="main-wrapper mainWrapper_p4Uk"><div class="docsWrapper_zzH4"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_nEjB" type="button"></button><div class="docRoot_IS89"><aside class="theme-doc-sidebar-container docSidebarContainer_j6PE"><div class="sidebarViewport_QGiH"><div class="sidebar_amKf"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_Lr0L"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/tests-untp/docs/introduction/">Introduction</a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/tests-untp/docs/reference-implementation/overview">Reference Implementation</a></div></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/tests-untp/docs/test-suites/">Test Suites</a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="menu__link menu__link--sublist menu__link--active" href="/tests-untp/docs/migration-guides/">Migration Guides</a><button aria-label="Collapse sidebar category &#x27;Migration Guides&#x27;" aria-expanded="true" type="button" class="clean-btn menu__caret"></button></div><ul style="display:block;overflow:visible;height:auto" class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/tests-untp/docs/migration-guides/ri-v0.4">Reference Implementation v0.4</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/tests-untp/docs/migration-guides/v0.7.0">UNTP v0.7.0</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/tests-untp/docs/migration-guides/v0.6.0">UNTP v0.6.0</a></li></ul></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/tests-untp/docs/version-mapping/">Version Mapping</a></li></ul></nav></div></div></aside><main class="docMainContainer_KGQ1"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_ptgT"><div class="docItemContainer_QxLs"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_ip57" aria-label="Breadcrumbs"><ul class="breadcrumbs" itemscope="" itemtype="https://schema.org/BreadcrumbList"><li class="breadcrumbs__item"><a aria-label="Home page" class="breadcrumbs__link" href="/tests-untp/"><svg viewBox="0 0 24 24" class="breadcrumbHomeIcon_u_fy"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill="currentColor"></path></svg></a></li><li itemscope="" itemprop="itemListElement" itemtype="https://schema.org/ListItem" class="breadcrumbs__item"><a class="breadcrumbs__link" itemprop="item" href="/tests-untp/docs/migration-guides/"><span itemprop="name">Migration Guides</span></a><meta itemprop="position" content="1"></li><li itemscope="" itemprop="itemListElement" itemtype="https://schema.org/ListItem" class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link" itemprop="name">Reference Implementation v0.4</span><meta itemprop="position" content="2"></li></ul></nav><span class="theme-doc-version-badge badge badge--secondary">Version: 0.4.0</span><div class="tocCollapsible__RLb theme-doc-toc-mobile tocMobile_V8Vi"><button type="button" class="clean-btn tocCollapsibleButton_PyHn">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>Reference Implementation v0.4</h1></header><div class="theme-admonition theme-admonition-info admonition_bpVr alert alert--info"><div class="admonitionHeading_gjAf"><span class="admonitionIcon_AzRN"><svg viewBox="0 0 14 16"><path fill-rule="evenodd" d="M7 2.3c3.14 0 5.7 2.56 5.7 5.7s-2.56 5.7-5.7 5.7A5.71 5.71 0 0 1 1.3 8c0-3.14 2.56-5.7 5.7-5.7zM7 1C3.14 1 0 4.14 0 8s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7zm1 3H6v5h2V4zm0 6H6v2h2v-2z"></path></svg></span>info</div><div class="admonitionContent_dJCs"><p>UNTP and its reference implementation are pre-release. Interfaces, schemas and data models can change between versions without a deprecation period, so treat anything built against them as provisional.</p></div></div>
+<div class="theme-admonition theme-admonition-warning admonition_bpVr alert alert--warning"><div class="admonitionHeading_gjAf"><span class="admonitionIcon_AzRN"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path></svg></span>Before you upgrade</div><div class="admonitionContent_dJCs"><p>Back up the Reference Implementation database, and record the encryption key the
+deployment currently runs with (<code>SERVICE_ENCRYPTION_KEY</code> in earlier versions).</p><p>Losing that key already meant losing every service instance configuration. From this
+release it also means <strong>losing every credential decryption key stored as an encrypted
+envelope</strong>.</p><p>The credentials themselves are not in this database. They sit in the storage service, and
+their ciphertext survives a lost key untouched. What is lost is the Reference
+Implementation&#x27;s ability to hand out the key that opens them. Verification still works for
+anyone who supplies a credential&#x27;s key themselves, so a recipient who was given one out of
+band is unaffected. But the deployment can no longer produce that key, and where no copy was
+kept anywhere else, the credential&#x27;s contents become unrecoverable in practice. From v0.4 a
+key that cannot read the stored data also stops the application booting, so a lost key is an
+outage as well as a loss of access.</p><p>Private credentials created before this release still hold their decryption key in
+plaintext. Run the <a href="/tests-untp/docs/migration-guides/ri-v0.4#backfill-the-decryption-keys-of-existing-credentials">backfill below</a>
+after upgrading to bring them under encryption.</p><p>Store the key with the same care as the database backups. Once a backup holds any
+encrypted envelope, it cannot be recovered without its matching key. The full pairing,
+retention, and recovery contract lives in
+<a href="/tests-untp/docs/reference-implementation/operations/key-management">Key Management and Recovery</a>.</p></div></div>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="overview">Overview<a class="hash-link" aria-label="Direct link to Overview" title="Direct link to Overview" href="/tests-untp/docs/migration-guides/ri-v0.4#overview">​</a></h2>
+<p>v0.4 changes application behaviour in several ways that affect an upgrade. The five most
+consequential are these. Database migrations, seeded conformity schemes, remote document
+fetching, and two credential data model corrections have their own sections below.</p>
+<ul>
+<li>It encrypts the per-credential decryption key for private credentials before it is
+persisted, closing the gap where anyone with read access to the database could recover
+those keys. The environment variable holding the encryption key is renamed from
+<code>SERVICE_ENCRYPTION_KEY</code> to <code>DATA_ENCRYPTION_KEY</code>, and a one-off operator-run backfill
+encrypts the keys of private credentials created by earlier versions.</li>
+<li>It validates <code>RI_APP_URL</code>, the encryption key, and the variables each seeded service
+category needs, and refuses to boot when any of them is missing or wrong. Some
+deployments that started on v0.3 will not start on v0.4 until their configuration is
+corrected.</li>
+<li>It validates API requests at the route boundary. Requests that v0.3 accepted, coerced, or
+silently ignored are now rejected with a 400, and page limits above the maximum are
+rejected rather than quietly reduced.</li>
+<li>It makes the custom seed manifest the source of truth for the rows it owns. Changing an
+entry already updated its row in v0.3. What is new is that removing an entry now deletes
+the row.</li>
+<li>It reworks credential publishing. The target now resolves from the credential&#x27;s own
+identifier rather than from the master data record it references, a requested publish that
+cannot proceed no longer throws away the credential it just created, <code>PUBLISH_SKIPPED</code> is
+replaced by codes naming the specific unmet prerequisite, and the identity resolver
+instance is chosen from the scheme, then the registrar, then the default. Callers branching
+on <code>PUBLISH_SKIPPED</code> stop matching anything, and callers whose identifier value exists
+under two schemes must now name the scheme.</li>
+</ul>
+<p>Work through <a href="/tests-untp/docs/migration-guides/ri-v0.4#before-you-upgrade">Before you upgrade</a> first. Several of the changes below
+cause a failed boot or a data deletion on the first run if the deployment is not checked
+beforehand.</p>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="before-you-upgrade">Before you upgrade<a class="hash-link" aria-label="Direct link to Before you upgrade" title="Direct link to Before you upgrade" href="/tests-untp/docs/migration-guides/ri-v0.4#before-you-upgrade">​</a></h2>
+<ol>
+<li>
+<p><strong>Back up the database and record the key it pairs with.</strong> See
+<a href="/tests-untp/docs/reference-implementation/operations/key-management#backups-pair-with-the-key">Key Management and Recovery</a>.</p>
+</li>
+<li>
+<p><strong>Plan for a clean cutover, not a rolling one.</strong> A v0.4 instance encrypts the decryption
+key of every credential it stores, and a v0.3 instance has no unwrap step, so a v0.3
+replica reading a credential that v0.4 stored hands the caller the raw envelope JSON in
+place of the key. Stop the v0.3 instances before v0.4 starts serving, or freeze credential
+issuance for as long as both versions are live.</p>
+</li>
+<li>
+<p><strong>Confirm the configured encryption key can read the data already stored.</strong> From v0.4 a
+key that cannot decrypt existing data stops the application at startup rather than
+failing on the first request that needs it, so check before you deploy. The audit ships
+with v0.4, so run it from the v0.4 checkout or image while your v0.3 deployment is still
+the one serving.</p>
+<p>Take care which invocation you use. <code>docker compose exec</code> targets the running v0.3
+container, where the script does not exist. <code>docker compose run</code> uses the v0.4 image, but
+it goes through the entrypoint, so set both skip flags or it will migrate, backfill, and
+seed your live v0.3 database as a side effect of the check:</p>
+<div class="language-bash codeBlockContainer_X4I_ theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_Z5Yf"><pre tabindex="0" class="prism-code language-bash codeBlock_RqMe thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_szST"><span class="token-line" style="color:#393A34"><span class="token plain">docker compose run --rm -e SKIP_MIGRATIONS=true -e SKIP_SEED=true \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">  ri npx tsx scripts/audit-encryption.ts</span><br></span></code></pre><div class="buttonGroup_GSZl"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_p3xI" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_F2so"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_qezl"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
+<p>Do not recreate or exec into the serving container to do this. See
+<a href="/tests-untp/docs/reference-implementation/operations/encryption-audit#running-the-audit">Running the audit</a>
+and
+<a href="/tests-untp/docs/reference-implementation/operations/encryption-audit#reading-the-report">Reading the report</a>.</p>
+<p>The audit is the exhaustive check. The startup validation described later decrypts a
+single stored envelope, which catches a uniformly wrong key but will not find one bad row
+among many.</p>
+</li>
+<li>
+<p><strong>If your deployment sets both <code>RI_DATABASE_URL</code> and the <code>RI_POSTGRES_*</code> parts, make them
+agree.</strong> v0.3 rebuilt the URL from the five parts and overwrote anything already in
+<code>RI_DATABASE_URL</code>. v0.4 honours <code>RI_DATABASE_URL</code> as set. A deployment carrying a stale or
+host-side value in that variable will connect somewhere new on first boot, and the three
+migrations and the seed will be applied there. See
+<a href="/tests-untp/docs/reference-implementation/operations/database">Database</a>.</p>
+</li>
+<li>
+<p><strong>Review <code>seed.yaml</code> against the database.</strong> From this release, an entry removed from
+the manifest deletes its row. Anything you rely on that the manifest no longer lists
+must be added back to the manifest before the first post-upgrade boot. Pay particular
+attention to <code>conformitySchemes</code>, where a removal cascades to profiles and criteria and
+has no safeguard to stop it. See
+<a href="/tests-untp/docs/migration-guides/ri-v0.4#the-custom-seed-manifest-is-now-the-source-of-truth">The custom seed manifest is now the source of truth</a>.</p>
+</li>
+<li>
+<p><strong>Check that every service category you ask the seed to configure has its environment
+variables set.</strong> A category with missing variables now fails the whole boot instead of
+being skipped with a warning. See
+<a href="/tests-untp/docs/migration-guides/ri-v0.4#startup-now-fails-on-invalid-configuration">Startup now fails on invalid configuration</a>.</p>
+</li>
+<li>
+<p><strong>Check <code>RI_APP_URL</code> is set to the deployment&#x27;s public base URL</strong>, as a valid <code>http(s)</code>
+URL with no username or password. The application will not start without it.</p>
+</li>
+<li>
+<p><strong>Check where your JSON-LD contexts and JSON Schemas are hosted.</strong> Any that resolve to a
+private, loopback, or link-local address will stop being fetched. Move them to a publicly
+resolvable address before upgrading. See
+<a href="/tests-untp/docs/migration-guides/ri-v0.4#remote-documents-are-fetched-through-a-guarded-resolver">Remote documents are fetched through a guarded resolver</a>.</p>
+</li>
+<li>
+<p><strong>Check your API clients</strong> for the four behaviours most likely to break silently:
+requests asking for a page larger than 100 records, code that reads the credentials list
+without a <code>limit</code> and expects every record back, code that branches on the
+<code>PUBLISH_SKIPPED</code> warning code, and code that matches on the text of 404 messages.
+Each is covered under <a href="/tests-untp/docs/migration-guides/ri-v0.4#api-behaviour-changes">API behaviour changes</a>.</p>
+</li>
+</ol>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="environment-variables">Environment variables<a class="hash-link" aria-label="Direct link to Environment variables" title="Direct link to Environment variables" href="/tests-untp/docs/migration-guides/ri-v0.4#environment-variables">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="service_encryption_key-is-renamed-to-data_encryption_key"><code>SERVICE_ENCRYPTION_KEY</code> is renamed to <code>DATA_ENCRYPTION_KEY</code><a class="hash-link" aria-label="Direct link to service_encryption_key-is-renamed-to-data_encryption_key" title="Direct link to service_encryption_key-is-renamed-to-data_encryption_key" href="/tests-untp/docs/migration-guides/ri-v0.4#service_encryption_key-is-renamed-to-data_encryption_key">​</a></h3>
+<p>The name changed to reflect its broadened role. It now protects service instance
+configurations and credential decryption keys.</p>
+<ul>
+<li>Keeping only <code>SERVICE_ENCRYPTION_KEY</code> set continues to work and logs a deprecation
+warning. Rename the variable at your convenience. Removal of the fallback is tracked
+in <a href="https://github.com/uncefact/tests-untp/issues/721" target="_blank" rel="noopener noreferrer">#721</a>.</li>
+<li>Setting both names to the same value works and logs a reminder to remove the old name.</li>
+<li>Setting both names to <strong>different values fails before anything encrypted is
+written</strong> (on the standard Docker path this surfaces at startup, when the seed
+resolves the key). The two names are aliases for the same active key, so two
+different values have no valid meaning, and proceeding would split the encrypted
+data across keys. Moving data to a new key is a separate maintenance task, covered in
+<a href="/tests-untp/docs/reference-implementation/operations/encryption-key-rotation">Encryption Key Rotation</a>. In
+particular, do not copy the placeholder <code>DATA_ENCRYPTION_KEY</code> from <code>.env.example</code>
+into an existing deployment that still has its real <code>SERVICE_ENCRYPTION_KEY</code>. Rename
+your existing variable instead, keeping its value.</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="new-variables">New variables<a class="hash-link" aria-label="Direct link to New variables" title="Direct link to New variables" href="/tests-untp/docs/migration-guides/ri-v0.4#new-variables">​</a></h3>
+<p>All of these are optional and have working defaults. They do not all report a bad value the
+same way.</p>
+<p><code>CVC_REFRESH_INTERVAL_HOURS</code>, <code>RI_HTTP_USER_AGENT</code>, <code>CACHE_MAX_ENTRIES</code>, and
+<code>LOG_REDACT_PATHS</code> are validated at startup, and an invalid value stops the boot with a
+message naming the variable. <code>API_MAX_PAGE_LIMIT</code>, <code>CONTEXT_CACHE_TTL_MS</code>, and
+<code>SCHEMA_CACHE_TTL_MS</code> fall back to their default and log a warning instead, so check the
+startup log if one of them does not appear to be taking effect. <code>SEED_ALLOW_PARTIAL</code> is
+matched against the exact string <code>true</code> and anything else counts as unset, silently, so a
+typo such as <code>True</code> leaves the seed failing on missing configuration with nothing pointing
+at the typo. <code>OUTGOING_DATA_ENCRYPTION_KEY</code> is validated only when the
+<code>rotate:encryption-key</code> command runs, not at startup.</p>
+<table><thead><tr><th>Variable</th><th>Default</th><th>What it controls</th></tr></thead><tbody><tr><td><code>API_MAX_PAGE_LIMIT</code></td><td><code>100</code></td><td>The largest page a list endpoint will return. A request above it is rejected with a 400.</td></tr><tr><td><code>SEED_ALLOW_PARTIAL</code></td><td>unset</td><td>When <code>true</code>, restores the v0.3 behaviour of skipping a service category whose environment variables are missing instead of failing the boot.</td></tr><tr><td><code>CVC_REFRESH_INTERVAL_HOURS</code></td><td><code>24</code></td><td>How often URL-seeded conformity schemes are re-fetched from their source. Maximum 500.</td></tr><tr><td><code>RI_HTTP_USER_AGENT</code></td><td>built-in</td><td>The <code>User-Agent</code> sent on outbound fetches of remote JSON-LD contexts and JSON Schemas.</td></tr><tr><td><code>CONTEXT_CACHE_TTL_MS</code></td><td><code>3600000</code></td><td>How long a fetched JSON-LD context is reused. <code>0</code> disables caching.</td></tr><tr><td><code>SCHEMA_CACHE_TTL_MS</code></td><td><code>3600000</code></td><td>How long a fetched JSON Schema is reused. <code>0</code> disables caching.</td></tr><tr><td><code>CACHE_MAX_ENTRIES</code></td><td><code>1000</code></td><td>How many entries each document cache retains.</td></tr><tr><td><code>LOG_REDACT_PATHS</code></td><td>unset</td><td>Extra comma-separated log redaction paths, merged with the built-in defaults.</td></tr><tr><td><code>OUTGOING_DATA_ENCRYPTION_KEY</code></td><td>unset</td><td>The previous key, set only while running the <code>rotate:encryption-key</code> maintenance command. Remove it once the rotation is verified.</td></tr></tbody></table>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="startup-now-fails-on-invalid-configuration">Startup now fails on invalid configuration<a class="hash-link" aria-label="Direct link to Startup now fails on invalid configuration" title="Direct link to Startup now fails on invalid configuration" href="/tests-untp/docs/migration-guides/ri-v0.4#startup-now-fails-on-invalid-configuration">​</a></h2>
+<p>On v0.3 a deployment could start with configuration missing and only discover the problem on
+whichever request first needed it. v0.4 checks these before serving anything, so a
+configuration mistake surfaces as a failed boot with a message naming the variable rather
+than as an intermittent runtime error.</p>
+<p>The application refuses to start when:</p>
+<ul>
+<li><strong><code>RI_APP_URL</code> is unset, is not a valid <code>http(s)</code> URL, or carries a username or
+password.</strong> On v0.3 this variable was read only to build the identity provider&#x27;s
+end-session redirect on logout, and an unset value meant that redirect was silently
+skipped. It is now required at boot, and it also supplies the default human verification
+link attached to a published credential that does not carry its own. The shipped
+<code>.env.example</code> and Docker Compose files already default it for local development.</li>
+<li><strong>The configured encryption key cannot decrypt one existing stored envelope.</strong> The check
+decrypts a single envelope, so it catches a uniformly wrong or prematurely rotated key at
+startup instead of on the first request that touches encrypted data. It does not prove
+every stored envelope is readable. Run the
+<a href="/tests-untp/docs/reference-implementation/operations/encryption-audit">encryption audit</a> before
+upgrading for the exhaustive check.</li>
+<li><strong>The placeholder key from <code>.env.example</code> is configured</strong> and <code>DEPLOYMENT_ENVIRONMENT</code>
+is anything other than <code>local</code>.</li>
+<li><strong>A service category the seed was asked to configure is missing its environment
+variables.</strong> On v0.3 the seed warned and skipped that category, and the container still
+started. It now fails the seed, and because the container entrypoint runs the seed before
+the application, the container does not come up. Set <code>SEED_ALLOW_PARTIAL=true</code> to seed
+what is configured and skip the rest with a warning, which is the v0.3 behaviour.</li>
+<li><strong><code>CVC_REFRESH_INTERVAL_HOURS</code>, <code>RI_HTTP_USER_AGENT</code>, <code>CACHE_MAX_ENTRIES</code>, or
+<code>LOG_REDACT_PATHS</code> holds an invalid value.</strong> The other new variables are more forgiving,
+as described above.</li>
+</ul>
+<p>See <a href="/tests-untp/docs/reference-implementation/operations/startup">Startup</a>.</p>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="database-migrations">Database migrations<a class="hash-link" aria-label="Direct link to Database migrations" title="Direct link to Database migrations" href="/tests-untp/docs/migration-guides/ri-v0.4#database-migrations">​</a></h2>
+<p>Three migrations ship in this release. On the standard Docker path they are applied
+automatically at boot, before the application starts, so the upgrade applies them for you.</p>
+<table><thead><tr><th>Migration</th><th>What it does</th></tr></thead><tbody><tr><td><code>20260610000000_tenant_scope_identifier_uniqueness</code></td><td>Replaces the unique index on <code>Identifier(schemeId, value)</code> with one on <code>Identifier(schemeId, value, tenantId)</code>.</td></tr><tr><td><code>20260812000000_record_source_provenance</code></td><td>Adds a <code>source</code> column (<code>CORE_SEED</code>, <code>CUSTOM_SEED</code>, <code>USER</code>) to <code>Registrar</code>, <code>IdentifierScheme</code>, <code>SchemeQualifier</code>, <code>DataModel</code>, and <code>RenderTemplate</code>.</td></tr><tr><td><code>20260813000000_seed_entry_kind</code></td><td>Adds a nullable <code>seedEntryKind</code> column (<code>URL</code>, <code>FILE</code>) to <code>ConformityScheme</code>.</td></tr></tbody></table>
+<p><strong>Identifier uniqueness is now scoped to the tenant.</strong> Before this migration an identifier
+value was unique per scheme across the whole instance, so once any tenant registered a
+value against a shared system-seeded scheme, another tenant registering the same value
+failed on a database constraint it could not see or resolve. Two tenants can now register
+the same identifier against a shared scheme. If you were relying on that global uniqueness
+as a cross-tenant duplicate check, it no longer holds.</p>
+<p><strong>Existing rows of those five kinds are safe by default.</strong> Every row that predates the
+provenance migration is marked <code>USER</code>, which the custom seed reconcile never deletes. They
+come under manifest management only when the seed next upserts them.</p>
+<p>Conformity schemes are not covered by that marker. They carry their own separate provenance
+(<code>UNTP</code>, <code>SYSTEM_SEED</code>, <code>TENANT_IMPORTED</code>), which predates this release, so a scheme seeded
+before the upgrade is eligible for eviction from the first v0.4 boot. See
+<a href="/tests-untp/docs/migration-guides/ri-v0.4#seeded-conformity-schemes-now-refresh">Seeded conformity schemes now refresh</a>.</p>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="seed-behaviour-changes">Seed behaviour changes<a class="hash-link" aria-label="Direct link to Seed behaviour changes" title="Direct link to Seed behaviour changes" href="/tests-untp/docs/migration-guides/ri-v0.4#seed-behaviour-changes">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="the-custom-seed-manifest-is-now-the-source-of-truth">The custom seed manifest is now the source of truth<a class="hash-link" aria-label="Direct link to The custom seed manifest is now the source of truth" title="Direct link to The custom seed manifest is now the source of truth" href="/tests-untp/docs/migration-guides/ri-v0.4#the-custom-seed-manifest-is-now-the-source-of-truth">​</a></h3>
+<p>On v0.3 the custom seed only ever inserted or updated. Removing an entry from <code>seed.yaml</code>
+left the row in place, so the database drifted from the file that was supposed to describe
+it. From this release, whenever a manifest section key is present, reconciliation deletes
+every manifest-owned row of that type that the manifest no longer lists. An explicitly
+empty section, such as <code>registrars: []</code>, deletes every manifest-owned row of that type.</p>
+<p>Two safeguards limit what this can reach:</p>
+<ul>
+<li>Only rows the custom seed itself established are eligible. Rows created through the UI or
+the API, and every row that existed before the provenance migration, are marked <code>USER</code>
+and are never deleted by reconciliation.</li>
+<li>A deletion that would cascade into data the manifest does not own, such as identifiers
+registered against a scheme being removed, stops that pass with an explanatory error and
+rolls back its writes.</li>
+</ul>
+<p>That rollback is not quite all-or-nothing, so read the error the seed prints rather than
+assuming nothing happened. Render template files are uploaded to the storage service before
+the transaction runs, so a rolled-back run can leave an uploaded template object in storage
+with no database row. Those are harmless and can be cleaned up by hand. Conformity scheme
+reconciliation runs after the main transaction has already committed, so a failure there
+leaves the registrars, data models, and render templates from the main pass in place.</p>
+<p>Conformity schemes reconcile the same way, and with one fewer safeguard. A
+<code>conformitySchemes</code> entry removed from the manifest deletes that scheme&#x27;s row on the next
+boot, cascading to its profiles and to any criteria no other profile still references, and
+there is no cascade block to stop it. A <code>file</code> entry that cannot be read is skipped for that
+boot with an error logged, leaving the previous row in place, so a transient read failure
+never deletes anything.</p>
+<p>Review <code>seed.yaml</code> against the database before your first post-upgrade boot, and add back
+anything you rely on that the manifest no longer lists. After that boot, check the seed log
+for adoption warnings: a manifest entry whose id matches a row you created by hand brings
+that row under manifest management, which makes it deletable by a later reconcile.</p>
+<p>See <a href="/tests-untp/docs/reference-implementation/operations/custom-seed">Custom seed</a>.</p>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="seeded-conformity-schemes-now-refresh">Seeded conformity schemes now refresh<a class="hash-link" aria-label="Direct link to Seeded conformity schemes now refresh" title="Direct link to Seeded conformity schemes now refresh" href="/tests-untp/docs/migration-guides/ri-v0.4#seeded-conformity-schemes-now-refresh">​</a></h3>
+<p>On v0.3 a seeded conformity scheme was ingested once and then frozen, because a row matching
+an existing source was skipped on every later run. Schemes seeded from a URL are now
+re-fetched from their source on a cadence set by <code>CVC_REFRESH_INTERVAL_HOURS</code>, and
+file-seeded schemes refresh at boot. If you edited a seeded scheme directly in the database
+expecting it to stay as you left it, that edit is now overwritten from the source.</p>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="api-behaviour-changes">API behaviour changes<a class="hash-link" aria-label="Direct link to API behaviour changes" title="Direct link to API behaviour changes" href="/tests-untp/docs/migration-guides/ri-v0.4#api-behaviour-changes">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="page-limits-are-rejected-not-clamped">Page limits are rejected, not clamped<a class="hash-link" aria-label="Direct link to Page limits are rejected, not clamped" title="Direct link to Page limits are rejected, not clamped" href="/tests-untp/docs/migration-guides/ri-v0.4#page-limits-are-rejected-not-clamped">​</a></h3>
+<p>On v0.3 a <code>limit</code> above the maximum was silently reduced to the maximum, so a client asking
+for 500 records received 100 with nothing in the response to say why. Every list endpoint
+now returns a 400 naming the bound.</p>
+<div class="codeBlockContainer_X4I_ theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_Z5Yf"><pre tabindex="0" class="prism-code language-text codeBlock_RqMe thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_szST"><span class="token-line" style="color:#393A34"><span class="token plain">GET /api/v1/products?limit=500</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">400 { &quot;error&quot;: &quot;limit: must not exceed the maximum of 100&quot; }</span><br></span></code></pre><div class="buttonGroup_GSZl"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_p3xI" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_F2so"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_qezl"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
+<p>Either lower the requested limit and page through the results, or raise the ceiling for the
+whole deployment with <code>API_MAX_PAGE_LIMIT</code>. See
+<a href="/tests-untp/docs/reference-implementation/operations/api-pagination">API pagination</a>.</p>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="the-credentials-list-is-now-bounded-when-limit-is-omitted">The credentials list is now bounded when <code>limit</code> is omitted<a class="hash-link" aria-label="Direct link to the-credentials-list-is-now-bounded-when-limit-is-omitted" title="Direct link to the-credentials-list-is-now-bounded-when-limit-is-omitted" href="/tests-untp/docs/migration-guides/ri-v0.4#the-credentials-list-is-now-bounded-when-limit-is-omitted">​</a></h3>
+<p><code>GET /api/v1/credentials</code> without a <code>limit</code> ran its query unbounded and returned every
+matching credential in the tenant, while the response&#x27;s <code>pagination.limit</code> field still
+reported the default. It is now bounded to the default page size, 20 records, like every other list endpoint. The call still succeeds, so nothing signals the change except the smaller result
+set. If you relied on a single call returning everything, page through the results with
+<code>limit</code> and <code>offset</code> instead.</p>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="request-validation-moved-to-the-route-boundary">Request validation moved to the route boundary<a class="hash-link" aria-label="Direct link to Request validation moved to the route boundary" title="Direct link to Request validation moved to the route boundary" href="/tests-untp/docs/migration-guides/ri-v0.4#request-validation-moved-to-the-route-boundary">​</a></h3>
+<p>Validation now happens before anything is written, signed, or published, across
+credentials, DIDs, products, organisations, facilities, registrars, identifiers and their
+links, identifier schemes, data models, services, render templates, and the conformity
+vocabulary browse endpoints (<code>/api/v1/cvc/schemes</code>, <code>/cvc/profiles</code>, <code>/cvc/criteria</code>). A
+rejected request returns a 400 naming the field and the rule it broke.</p>
+<p>Requests that v0.3 accepted and v0.4 rejects include:</p>
+<ul>
+<li>Whitespace-only names and descriptions where a value is required, such as <code>&quot; &quot;</code>, which
+v0.3 stored as sent. Empty strings and <code>null</code> were already rejected on those fields.</li>
+<li>URLs that are not well-formed absolute <code>http(s)</code> addresses, and URLs carrying a username
+or password, on registrars, data models, identifier links, services, and the verification
+URLs supplied when publishing a credential.</li>
+<li>Malformed BCP 47 language tags in <code>hreflang</code>, such as <code>en_US</code> with an underscore, where
+any non-empty string was previously accepted.</li>
+<li>Duplicate entries in identifier lists such as <code>secondaryIdentifierIds</code>.</li>
+<li>An <code>accessRole</code> outside the six UNTP access roles on identifier link registration and
+update, where any string was previously accepted. The accepted values are
+<code>untp:accessRole#Anonymous</code>, <code>#Customer</code>, <code>#Regulator</code>, <code>#Recycler</code>, <code>#Auditor</code>, and
+<code>#Owner</code>.</li>
+<li>A string where a boolean belongs. <code>storageOptions.encrypt</code> is now type-checked, which
+closes a bug where the string <code>&quot;false&quot;</code> was treated as a request to encrypt.</li>
+<li>Query parameters that are not exactly the value they claim to be. <code>?force=TRUE</code> on
+<code>DELETE /api/v1/services/{id}</code> previously matched nothing and silently behaved as
+<code>false</code>, and it is now a 400. Malformed integers such as <code>limit=1abc</code>, previously parsed as
+<code>1</code>, are rejected, as are repeated query keys.</li>
+</ul>
+<p>Values are validated but not canonicalised on registrars, data models, and service
+configuration, so what you send there is what is stored. Two fields are the exception. The
+verification URLs supplied when publishing a credential, and the <code>href</code> on an identifier
+link registration, are stored in their canonical form rather than as you sent them, which
+closes a gap where two URL parsers could disagree about where a string points. A bare origin
+such as <code>https://gs1.org</code> comes back as <code>https://gs1.org/</code>.</p>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="error-responses">Error responses<a class="hash-link" aria-label="Direct link to Error responses" title="Direct link to Error responses" href="/tests-untp/docs/migration-guides/ri-v0.4#error-responses">​</a></h3>
+<ul>
+<li><strong>Database conflicts return the right status.</strong> A unique-constraint or foreign-key
+violation that escaped as a 500 carrying raw database text now returns a 409, a 400, or a
+404 with a message written for the caller. If your error handling matched on a generic
+500 or scraped ORM text out of the body, switch to matching the status code.</li>
+<li><strong>Authentication and tenant-resolution failures return the documented envelope.</strong> These
+previously fell through to a plain-text 500. They now return the same
+<code>{ &quot;error&quot;: ... }</code> shape as every other route, with a correlation id.</li>
+<li><strong>Error message wording changed on many routes.</strong> Several 404 messages dropped their
+<code>or access denied</code> tail, one data model message became
+<code>Parent data model configuration not found</code>, and the identifier scheme routes now say
+<code>Identifier scheme not found</code> rather than <code>Scheme not found</code>. On the authentication path,
+<code>Unauthorized</code> became <code>Unauthorised</code> and <code>Session expired - please sign in again</code> became
+<code>Session expired. Please sign in again</code>, which reaches every authenticated route. Status
+codes are unchanged throughout, so code that matches on message text breaks silently.
+Match on the status code instead.</li>
+<li><strong>Deleting a service instance is stricter, and its conflict counts are now yours alone.</strong>
+A system default service instance is readable by every tenant, and on v0.3 a tenant could
+delete one, which removed it for everybody. <code>DELETE /api/v1/services/{id}</code> now refuses with
+a 403 before it checks anything else. Separately, the reference counts in the 409 body were
+counted across all tenants, so the message told a caller how many of other tenants&#x27; DIDs,
+registrars, and identifier schemes pointed at the instance. Those counts are now scoped to
+the caller&#x27;s own records, so expect smaller numbers than v0.3 reported for a shared
+instance.</li>
+<li><strong><code>x-correlation-id</code> is validated on the way in.</strong> A supplied value is accepted only if
+it is at most 128 characters of <code>A-Z</code>, <code>a-z</code>, <code>0-9</code>, <code>_</code>, or <code>-</code>. A value failing that
+rule is replaced with a generated id. If your tracing depends on the id you send being
+echoed back, check it against that rule. Separately, when no <code>x-correlation-id</code> is
+supplied, the correlation id falls back to the <code>Root</code> token parsed out of an inbound
+<code>X-Amzn-Trace-Id</code> header, where v0.3 used that header&#x27;s whole raw value including its
+<code>Root=...;Parent=...</code> structure.</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="credential-publishing">Credential publishing<a class="hash-link" aria-label="Direct link to Credential publishing" title="Direct link to Credential publishing" href="/tests-untp/docs/migration-guides/ri-v0.4#credential-publishing">​</a></h3>
+<p>This is the largest behaviour change in the release for anyone calling
+<code>POST /api/v1/credentials</code> with <code>publishingOptions.publish: true</code>. The reasoning is
+recorded in ADR 044, &quot;A requested publish fails loudly and resolves from the identifier&quot;.</p>
+<p><strong>A requested publish no longer destroys the response.</strong> On v0.3, two failures during
+publishing threw after the credential had already been signed, stored, and written to the
+database, so the caller got an error and never learned the id of a credential that now
+existed. An unresolvable identity resolver service instance was one, deliberately treated
+as fatal. A matched master data entity vanishing between lookup and insert was the other,
+failing the credential&#x27;s foreign key write. Both are now warnings on a 201 response, so
+issuance always returns the credential it created. If your client treats a non-2xx from
+this route as proof that no credential was created, that assumption was already unsafe on
+v0.3 and this release removes the cases that made it wrong.</p>
+<p><strong>Publishing resolves from the identifier, not from a matched entity.</strong> Everything a
+publish needs hangs off the identifier record, so gating it on master data matching made an
+enrichment concern decide whether a credential was discoverable. A credential whose
+identifier exists without any master data record, or whose match is a secondary identifier,
+now publishes where it previously could not. Entity linking continues as best-effort
+enrichment and never blocks a publish. <code>ENTITY_LINK_FAILED</code> covers only the narrow case
+where a matched entity vanished before the credential row was written.</p>
+<p><strong>Ambiguous identifiers must now be disambiguated by the caller.</strong> An identifier value is
+unique only within a scheme, so a value registered under two schemes has no single publish
+target. v0.3 let the entity match pick one silently. v0.4 returns
+<code>PUBLISH_IDENTIFIER_AMBIGUOUS</code> naming the colliding schemes, and the caller chooses with a
+new <code>publishingOptions.identifierSchemeId</code> option.</p>
+<p><strong>The identity resolver instance is chosen differently.</strong> It now resolves scheme first,
+then registrar, then the tenant or system default, matching what
+<code>POST /identifiers/{id}/links</code> already did. v0.3&#x27;s credentials route consulted only the
+scheme-level override. If your registrar carries an identity resolver instance and your
+scheme does not, credentials that previously went to the system default now publish to the
+registrar&#x27;s resolver instead.</p>
+<p><strong><code>PUBLISH_SKIPPED</code> no longer exists.</strong> On v0.3 it was the single code reported whenever a
+publish could not proceed, covering several unrelated causes, and one of its three messages
+was unreachable. It is replaced by codes that name the specific unmet prerequisite, each
+now carrying the <code>remediation</code> field that the warning schema already defined but nothing
+populated on v0.3:</p>
+<table><thead><tr><th>New code</th><th>Meaning</th></tr></thead><tbody><tr><td><code>PUBLISH_REFERENCE_MISSING</code></td><td>The credential carries no identifier to publish against.</td></tr><tr><td><code>PUBLISH_IDENTIFIER_UNKNOWN</code></td><td>The credential&#x27;s identifier is not registered.</td></tr><tr><td><code>PUBLISH_IDENTIFIER_AMBIGUOUS</code></td><td>The identifier value is registered under more than one scheme for this tenant.</td></tr><tr><td><code>PUBLISH_TARGET_UNRESOLVED</code></td><td>The identifier lookup itself failed, so whether a target exists could not be determined.</td></tr><tr><td><code>PUBLISH_SCHEME_INCOMPLETE</code></td><td>The resolved scheme is missing the configuration publishing needs.</td></tr><tr><td><code>PUBLISH_IDR_UNAVAILABLE</code></td><td>No identity resolver service instance was available.</td></tr><tr><td><code>PUBLISH_LINKS_UNBUILDABLE</code></td><td>The links to publish could not be constructed.</td></tr><tr><td><code>IDR_PUBLISH_UNCONFIRMED</code></td><td>The resolver could not be reached or did not answer, so the publish may or may not have committed.</td></tr><tr><td><code>ENTITY_LINK_FAILED</code></td><td>Advisory only. A matched master data entity vanished before the credential row was written.</td></tr></tbody></table>
+<p>Code that branches on <code>PUBLISH_SKIPPED</code> to detect an unfinished publish will stop matching
+anything and silently treat every publish failure as a success.</p>
+<p><code>IDR_PUBLISH_FAILED</code> also narrowed. On v0.3 it covered every failure of the publish call,
+including a rejection, a timeout, and a network error. It now fires only when the resolver
+returns a 4xx explicitly rejecting the links. The cases where the resolver could not be
+reached or did not answer are reported as the new <code>IDR_PUBLISH_UNCONFIRMED</code>, because those
+may have committed upstream and must not be retried blindly. <code>REFS_EXTRACTION_FAILED</code> and
+<code>DB_STATUS_UPDATE_FAILED</code> are unchanged.</p>
+<p>Three defaults also changed for callers who omit them.</p>
+<ul>
+<li>Publishing without <code>publishingOptions.humanVerificationUrl</code> now stamps the published link
+with this deployment&#x27;s own verify page, derived from <code>RI_APP_URL</code>, where v0.3 omitted the
+human verification link entirely.</li>
+<li>Publishing without <code>publishingOptions.linkType</code> now uses the resolved identity resolver
+instance&#x27;s configured <code>defaultLinkType</code>. On v0.3 the fallback was the hardcoded
+<code>gs1:sustainabilityInfo</code>, which is not one of the values a service instance&#x27;s
+<code>defaultLinkType</code> can hold, so this changes the published link type for every caller who
+omits it, not only for some. Pass <code>publishingOptions.linkType</code> explicitly to keep the
+value you had.</li>
+<li>The published link&#x27;s description gained a final fallback, for the case where there is no
+matched entity to supply one. A matched entity&#x27;s description, or failing that its name,
+still wins exactly as it did on v0.3, so a credential that matches an entity publishes the
+same description as before. Only a publish with no entity behind it now falls through to
+the link title, which itself defaults to the data model&#x27;s name.</li>
+</ul>
+<p>One limitation this rework does not close. A registrar or identifier scheme created at
+runtime through the API is saved in the Reference Implementation&#x27;s own database but is never
+registered with the upstream identity resolver, so publishing against it fails with
+<code>IDR_PUBLISH_FAILED</code> carrying a 404 that names the namespace. Register the namespace and its
+application identifiers directly against the resolver, or include them in the seed, which is
+how the bundled resolver gets its namespaces. This is tracked in
+<a href="https://github.com/uncefact/tests-untp/issues/750" target="_blank" rel="noopener noreferrer">#750</a> for a later release.</p>
+<p>One unrelated correction rode in with this work. A stored decryption key that cannot be read
+no longer echoes the operator&#x27;s encryption-key diagnostic and the failing row&#x27;s id back to
+the caller. That path now returns the same sanitised 500 as every other unhandled failure.</p>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="remote-documents-are-fetched-through-a-guarded-resolver">Remote documents are fetched through a guarded resolver<a class="hash-link" aria-label="Direct link to Remote documents are fetched through a guarded resolver" title="Direct link to Remote documents are fetched through a guarded resolver" href="/tests-untp/docs/migration-guides/ri-v0.4#remote-documents-are-fetched-through-a-guarded-resolver">​</a></h3>
+<p>Remote JSON-LD contexts and JSON Schemas referenced by a credential are now fetched through
+a resolver that refuses private, loopback, and link-local addresses, caps the response size
+and the number of redirect hops, and re-checks the address on each hop. There is no opt-out
+for these fetches. If your credentials reference a context or schema hosted on a private
+address, those fetches now fail. Host those documents on a publicly resolvable address
+before upgrading.</p>
+<p>The private-address checks applied elsewhere are a separate mechanism with a shared switch.
+<code>VERIFY_ALLOW_PRIVATE_URLS=true</code>, which already existed in v0.3, relaxes the public-address
+check on every caller-supplied URL the API accepts, across registrars, data models, service
+configuration, identifier links, and the verification URLs supplied when publishing, as well
+as the fetch of the stored credential document on the verify path. It exists so that local
+Docker Compose setups with private-address services keep working, and it should not be set
+in a deployment reachable from outside. It does not affect the context and schema fetches
+above, which stay guarded either way.</p>
+<p>Fetched documents are also cached in memory, so a corrected context or schema is picked up
+on the next cache expiry rather than the next request. Tune this with
+<code>CONTEXT_CACHE_TTL_MS</code>, <code>SCHEMA_CACHE_TTL_MS</code>, and <code>CACHE_MAX_ENTRIES</code>, or set a TTL of <code>0</code>
+to disable caching.</p>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="untp-v070-data-model-corrections">UNTP v0.7.0 data model corrections<a class="hash-link" aria-label="Direct link to UNTP v0.7.0 data model corrections" title="Direct link to UNTP v0.7.0 data model corrections" href="/tests-untp/docs/migration-guides/ri-v0.4#untp-v070-data-model-corrections">​</a></h2>
+<p>Two bridges were corrected against the published v0.7.0 artefacts. Both change what the
+Reference Implementation reads out of credentials you have already issued.</p>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="dia-registertype-is-now-lowercase">DIA <code>registerType</code> is now lowercase<a class="hash-link" aria-label="Direct link to dia-registertype-is-now-lowercase" title="Direct link to dia-registertype-is-now-lowercase" href="/tests-untp/docs/migration-guides/ri-v0.4#dia-registertype-is-now-lowercase">​</a></h3>
+<p>The published v0.7.0 code list uses lowercase values (<code>business</code>, <code>facility</code>, <code>land</code>,
+<code>product</code>), where v0.6.x used capitalised ones. The v0.7.0 Digital Identity Anchor bridge
+was writing and reading the capitalised form, which the v0.7.0 list does not contain. It now
+matches the published list.</p>
+<p>This is a fix rather than a break. A v0.7.0 DIA authored elsewhere, conforming to the
+published code list, carried <code>business</code>, and v0.3 looked for <code>Business</code>, so its
+organisation, facility, or product reference went unrecognised and no entity link was made.
+Those credentials link correctly from v0.4.</p>
+<p>Digital Identity Anchors this deployment issued before the upgrade keep their entity links.
+A credential&#x27;s links are resolved once, when it is issued, and stored on the credential row,
+and nothing re-derives them on read. What those credentials do carry is the old capitalised
+value in their stored payload, which does not conform to the v0.7.0 code list, so anything
+downstream reading <code>registerType</code> out of them sees a value the specification does not
+define. Reissuing is the only way to correct that.</p>
+<h3 class="anchor anchorWithStickyNavbar_ywN1" id="dcc-conformity-claims-are-validated-with-a-scheme-alone">DCC conformity claims are validated with a scheme alone<a class="hash-link" aria-label="Direct link to DCC conformity claims are validated with a scheme alone" title="Direct link to DCC conformity claims are validated with a scheme alone" href="/tests-untp/docs/migration-guides/ri-v0.4#dcc-conformity-claims-are-validated-with-a-scheme-alone">​</a></h3>
+<p>On v0.3, conformity vocabulary validation ran only when the credential subject named both a
+<code>referenceScheme</code> and a <code>referenceProfile</code>. A credential naming a scheme but no profile was
+skipped entirely and produced no conformity warnings. v0.4 requires only the scheme, so those
+credentials are now validated at the scheme level and can raise warnings they never raised
+before, including <code>conformity-profile.not-specified</code>.</p>
+<p>The treatment of a criterion&#x27;s <code>conformityTopic</code> also changed. v0.3 flagged every criterion
+that declared no topic. v0.4 distinguishes a topic field that is absent from one that is
+present but empty, and skips the topic check for the absent case, so a different set of
+payloads receives the missing-topic warning. This is a deliberate leniency held while a
+divergence between the published specification and schema stands, recorded in ADR 038.</p>
+<p>The <code>pointer</code> on a conformity warning also changed. On v0.3 it addressed an internal
+projection of the extracted claim, so it did not resolve against anything the caller sent or
+received. It is now remapped onto the submitted credential, and omitted entirely when it
+cannot be resolved. A client reading <code>warning.pointer</code> will see different values, and
+sometimes no field at all, for the same credential.</p>
+<p>These changes apply when a credential is issued, which is the only point conformity claims
+are validated. Stored credentials are not revalidated. The practical effect is that the same
+payload submitted before and after the upgrade can come back with different warnings, so
+re-baseline any test or monitoring assertion that matches on them.</p>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="other-changes-worth-knowing">Other changes worth knowing<a class="hash-link" aria-label="Direct link to Other changes worth knowing" title="Direct link to Other changes worth knowing" href="/tests-untp/docs/migration-guides/ri-v0.4#other-changes-worth-knowing">​</a></h2>
+<ul>
+<li><strong><code>RI_DATABASE_URL</code> is now honoured verbatim.</strong> On v0.3 the five <code>RI_POSTGRES_*</code> parts
+silently overwrote an explicitly set <code>RI_DATABASE_URL</code> whenever all five were present. If
+your deployment set both, and the <code>RI_POSTGRES_*</code> values were the ones actually in use,
+the application now connects to whatever <code>RI_DATABASE_URL</code> names instead. Check that the
+two agree before upgrading. See <a href="/tests-untp/docs/reference-implementation/operations/database">Database</a>.</li>
+<li><strong>Sensitive fields are redacted from logs by default</strong>, including decryption keys, API
+keys, authorisation headers, tokens, and passwords. If you scrape logs for any of these,
+those fields are now absent. See <a href="/tests-untp/docs/reference-implementation/operations/logging">Logging</a>.</li>
+<li><strong>The verify page now asks for a decryption key</strong> when a verify link points at a
+privately stored credential and carries no key, where it previously showed an error. See
+the <a href="/tests-untp/docs/reference-implementation/verify-page">verify page</a>.</li>
+<li><strong>The verify page&#x27;s date row changed field, label, and format</strong>, and every credential is
+affected. It was labelled <code>Issue date</code> and read <code>issuanceDate</code>, a VC Data Model 1.1
+property. UNTP credentials follow VC Data Model 2.0, which replaced that field with
+<code>validFrom</code> and <code>validUntil</code>, so credentials the bridges build do not carry it. When it was
+absent the date library treated the missing value as the current time, so the page showed
+today&#x27;s date as the credential&#x27;s issue date. The page now reads <code>validFrom</code> under a <code>Valid from</code> label,
+renders it as the credential&#x27;s UTC calendar date in ISO 8601 so readers in different
+timezones see the same value, and omits the row when there is no parseable <code>validFrom</code>
+rather than inventing one. <code>Valid until</code> is not shown yet. If you screenshot, scrape, or
+assert on the verify page, both the label and the value have changed. Making the format
+operator-configurable is tracked in
+<a href="https://github.com/uncefact/tests-untp/issues/881" target="_blank" rel="noopener noreferrer">#881</a>.</li>
+<li><strong>The application navigation is hidden.</strong> The sidebar and public header do not render, so
+the configuration pages are reachable only by typing their URL, for example
+<code>/configuration/dids</code>. The pages themselves are unchanged.</li>
+<li><strong>OpenTelemetry filesystem auto-instrumentation is off by default.</strong> If you relied on
+filesystem spans in traces, they are no longer emitted.</li>
+<li><strong>The image now carries its own health check, and the broken one is fixed.</strong> On v0.3 the
+probe lived only in the shipped Compose file and used <code>http://localhost:3003/api/health</code>.
+The container listens on IPv4 only, and BusyBox wget tries the IPv6 loopback first, so that
+probe never passed and the container was reported unhealthy however well it was running.
+The probe now ships in the image as a <code>HEALTHCHECK</code> against
+<code>http://127.0.0.1:3003/api/health</code>, and the Compose file no longer repeats it. Anything
+that runs the image gets a working check without configuring one, so you can drop your own
+probe from a Compose file or manifest derived from ours, or keep it as a deliberate
+override. Two caveats. The probe&#x27;s
+40-second start period is not sized to your data: the entrypoint runs migrations, the
+digest backfill, and the seed before the server listens, and on a large database that can
+outlast the start period plus its three retries, at which point the container reports
+unhealthy while it is still starting correctly. Nothing kills it for that under plain
+Docker or Compose, but an orchestrator that replaces unhealthy tasks will, so widen
+<code>start_period</code> and <code>retries</code> with an override sized to your database. And Kubernetes
+ignores a Docker <code>HEALTHCHECK</code> entirely: use a <code>startupProbe</code> against <code>/api/health</code> sized
+the same way, then a cheap liveness probe. <code>/api/health</code> returns 200 unconditionally
+without checking the database or any dependency, so it tells you the HTTP server is
+accepting connections and nothing more. That is a meaningful signal here, because the
+server only starts listening once migrations, backfill, and seed have finished, but do not
+read it as proof the API can serve. It sits outside the authenticated <code>/api/v1</code> prefix.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="backfill-the-decryption-keys-of-existing-credentials">Backfill the decryption keys of existing credentials<a class="hash-link" aria-label="Direct link to Backfill the decryption keys of existing credentials" title="Direct link to Backfill the decryption keys of existing credentials" href="/tests-untp/docs/migration-guides/ri-v0.4#backfill-the-decryption-keys-of-existing-credentials">​</a></h2>
+<p>Private credentials created by earlier versions still hold their decryption key in
+plaintext, so until this has run the confidentiality improvement covers only newly issued
+ones. Run it once to bring the existing rows under encryption at rest. Nothing breaks while
+you wait, because the read path still recognises legacy plaintext keys and those credentials
+keep working either way.</p>
+<p>Unlike the backfills that run automatically when the container starts, this one is
+deliberately manual. Wrapping keys under a wrong <code>DATA_ENCRYPTION_KEY</code> would be
+unrecoverable, so a human confirms the key before anything is rewritten.</p>
+<p>Where it sits in the upgrade:</p>
+<ol>
+<li>Complete steps 1 and 2 of <a href="/tests-untp/docs/migration-guides/ri-v0.4#before-you-upgrade">Before you upgrade</a>, the database backup
+and the encryption audit, if you have not already.</li>
+<li>Run the backfill, once any older instances that could still write plaintext keys
+have stopped. Re-running after they are gone is safe and converges.</li>
+</ol>
+<p>Renaming <code>SERVICE_ENCRYPTION_KEY</code> to <code>DATA_ENCRYPTION_KEY</code> can happen before or after this
+step. The application and the backfill resolve the active key the same way whichever name
+holds it, so the backfill does not depend on the rename having been done.</p>
+<p>The commands for a source checkout and for the Docker image, the preflight that aborts
+on a wrong key, when <code>--force</code> applies, and what the run reports are in the
+<a href="/tests-untp/docs/reference-implementation/operations/backfills/decryption-keys">decryption keys backfill reference</a>.</p>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="rollback">Rollback<a class="hash-link" aria-label="Direct link to Rollback" title="Direct link to Rollback" href="/tests-untp/docs/migration-guides/ri-v0.4#rollback">​</a></h2>
+<p>After the upgrade has written any encrypted key (a newly issued credential, or a
+completed backfill), rolling back to an earlier application version returns the raw
+envelope JSON in place of those credentials&#x27; decryption keys, because earlier versions
+have no unwrap step. Plan the upgrade as forward-only once credentials have been
+issued, or restore the paired database backup when rolling back.</p>
+<p>The three database migrations are additive or constraint-widening, so the schema itself
+does not block a rollback. The identifier uniqueness migration widens a constraint, which
+means rows created under v0.4 could violate the narrower v0.3 constraint if it were
+reinstated.</p>
+<h2 class="anchor anchorWithStickyNavbar_ywN1" id="key-rotation">Key rotation<a class="hash-link" aria-label="Direct link to Key rotation" title="Direct link to Key rotation" href="/tests-untp/docs/migration-guides/ri-v0.4#key-rotation">​</a></h2>
+<p>Existing envelopes are readable only under the key that wrote them, so changing
+<code>DATA_ENCRYPTION_KEY</code> in place makes them unreadable. To move data onto a new key,
+follow the <a href="/tests-untp/docs/reference-implementation/operations/encryption-key-rotation">Encryption Key Rotation</a>
+procedure, which re-encrypts every stored envelope with the <code>rotate:encryption-key</code>
+maintenance command.</p></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col"><a href="https://github.com/uncefact/tests-untp/tree/next/documentation/versioned_docs/version-0.4.0/migration-guides/ri-v0.4.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_brtI" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_vjIE"></div></div></footer></article><nav class="pagination-nav docusaurus-mt-lg" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/tests-untp/docs/migration-guides/"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Migration Guides</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/tests-untp/docs/migration-guides/v0.7.0"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">UNTP v0.7.0</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_sLGj thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#overview">Overview</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#before-you-upgrade">Before you upgrade</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#environment-variables">Environment variables</a><ul><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#service_encryption_key-is-renamed-to-data_encryption_key"><code>SERVICE_ENCRYPTION_KEY</code> is renamed to <code>DATA_ENCRYPTION_KEY</code></a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#new-variables">New variables</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#startup-now-fails-on-invalid-configuration">Startup now fails on invalid configuration</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#database-migrations">Database migrations</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#seed-behaviour-changes">Seed behaviour changes</a><ul><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#the-custom-seed-manifest-is-now-the-source-of-truth">The custom seed manifest is now the source of truth</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#seeded-conformity-schemes-now-refresh">Seeded conformity schemes now refresh</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#api-behaviour-changes">API behaviour changes</a><ul><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#page-limits-are-rejected-not-clamped">Page limits are rejected, not clamped</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#the-credentials-list-is-now-bounded-when-limit-is-omitted">The credentials list is now bounded when <code>limit</code> is omitted</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#request-validation-moved-to-the-route-boundary">Request validation moved to the route boundary</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#error-responses">Error responses</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#credential-publishing">Credential publishing</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#remote-documents-are-fetched-through-a-guarded-resolver">Remote documents are fetched through a guarded resolver</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#untp-v070-data-model-corrections">UNTP v0.7.0 data model corrections</a><ul><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#dia-registertype-is-now-lowercase">DIA <code>registerType</code> is now lowercase</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#dcc-conformity-claims-are-validated-with-a-scheme-alone">DCC conformity claims are validated with a scheme alone</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#other-changes-worth-knowing">Other changes worth knowing</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#backfill-the-decryption-keys-of-existing-credentials">Backfill the decryption keys of existing credentials</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#rollback">Rollback</a></li><li><a class="table-of-contents__link toc-highlight" href="/tests-untp/docs/migration-guides/ri-v0.4#key-rotation">Key rotation</a></li></ul></div></div></div></div></main></div></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="row footer__links"><div class="col footer__col"><div class="footer__title">Docs</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/tests-untp/docs/introduction">Introduction</a></li><li class="footer__item"><a class="footer__link-item" href="/tests-untp/docs/reference-implementation/overview">Getting Started</a></li></ul></div><div class="col footer__col"><div class="footer__title">Test Suites and Tools</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/tests-untp/docs/reference-implementation/overview">Reference Implementation</a></li><li class="footer__item"><a class="footer__link-item" href="/tests-untp/docs/test-suites">Test Suites</a></li><li class="footer__item"><a href="https://test.uncefact.org/untp-playground" target="_blank" rel="noopener noreferrer" class="footer__link-item">UNTP Playground<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_Bob8"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div><div class="col footer__col"><div class="footer__title">UN Transparency Protocol</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://untp.unece.org" target="_blank" rel="noopener noreferrer" class="footer__link-item">UNTP Specification<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_Bob8"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li><li class="footer__item"><a href="https://join.slack.com/t/uncefact/shared_invite/zt-1d7hd0js1-sS1Xgk8DawQD9VgRvy1QHQ" target="_blank" rel="noopener noreferrer" class="footer__link-item">Slack Channel<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_Bob8"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div><div class="col footer__col"><div class="footer__title">More</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://github.com/uncefact/tests-untp" target="_blank" rel="noopener noreferrer" class="footer__link-item">GitHub<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_Bob8"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div></div><div class="footer__bottom text--center"><div class="footer__copyright">© United Nations Economic Commission for Europe</div></div></div></footer><svg width="0" height="0" class="hidden"><symbol xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" id="github"><path d="M12.04 0a12.035 12.035 0 0 0-3.731 23.479h.28c.257.012.508-.074.703-.241.237-.207.37-.508.36-.822v-1.304a.491.491 0 0 0-.19-.331.501.501 0 0 0-.41-.1c-2.699.581-3.27-1.104-3.3-1.214a4.654 4.654 0 0 0-1.736-2.197l-.15-.11a.732.732 0 0 1 .381-.07c.508.076.94.41 1.143.883a3.009 3.009 0 0 0 4.012 1.163c.151-.067.262-.2.301-.361.04-.46.24-.893.562-1.224a.501.501 0 0 0 .15-.531.491.491 0 0 0-.421-.351c-2.377-.271-4.814-1.103-4.814-5.205a4.012 4.012 0 0 1 1.063-2.789.491.491 0 0 0 .09-.521 3.57 3.57 0 0 1 .01-2.417A5.586 5.586 0 0 1 8.871 6.89c.123.085.279.107.42.06.897-.239 1.821-.36 2.749-.36a10.34 10.34 0 0 1 2.758.36.461.461 0 0 0 .411-.06c.731-.593 1.6-.99 2.527-1.153a3.55 3.55 0 0 1 0 2.387.481.481 0 0 0 .1.521 4.012 4.012 0 0 1 1.054 2.758c0 4.112-2.437 4.935-4.824 5.196a.491.491 0 0 0-.421.35c-.06.189 0 .394.15.522.449.469.672 1.11.612 1.755v3.19c-.005.315.131.616.37.822.304.23.7.302 1.064.19A12.035 12.035 0 0 0 12.04 0Z"></path></symbol><symbol xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33.057 33.057" id="search"><g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-width="1.5"><path d="M21.723 7.934a9.75 9.721-45 0 1-.02 13.769 9.75 9.721-45 0 1-13.769.02 9.75 9.721-45 0 1 .021-13.768 9.75 9.721-45 0 1 13.768-.02z"></path><path d="M10.481 20.942V25" transform="rotate(-45 17.925 7.425)"></path></g></symbol><symbol xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" id="slack"><g fill-rule="nonzero"><path d="M22.17 16.701h-7.34c-1.01 0-1.83-.815-1.83-1.82 0-1.005.82-1.82 1.83-1.82h7.34c1.01 0 1.83.815 1.83 1.82 0 1.005-.82 1.82-1.83 1.82ZM14.83 11.073c-1.01 0-1.83-.815-1.83-1.82V1.954c-.05-.68.286-1.332.871-1.687a1.839 1.839 0 0 1 1.908 0c.585.355.922 1.007.871 1.687v7.3a1.825 1.825 0 0 1-1.82 1.819ZM9.17 11.073H1.83c-1.01 0-1.83-.815-1.83-1.82 0-1.005.82-1.82 1.83-1.82h7.34c1.01 0 1.83.815 1.83 1.82 0 1.005-.82 1.82-1.83 1.82ZM9.17 24c-1.01 0-1.83-.815-1.83-1.82v-7.299c-.05-.68.286-1.332.871-1.687a1.839 1.839 0 0 1 1.908 0c.585.355.922 1.007.871 1.687v7.3A1.825 1.825 0 0 1 9.17 24ZM2.22 17.517A2.214 2.214 0 0 1 0 15.319a2.264 2.264 0 0 1 2.27-2.257h1.48c.405.005.73.333.73.735v1.472a2.254 2.254 0 0 1-2.26 2.248ZM10.27 4.59H8.78a2.254 2.254 0 0 1-2.26-2.248c-.003-.586.23-1.15.647-1.564A2.216 2.216 0 0 1 8.74.134 2.264 2.264 0 0 1 11 2.392v1.471c0 .401-.327.726-.73.726ZM15.26 24A2.264 2.264 0 0 1 13 21.743V20.27c0-.4.327-.726.73-.726h1.49a2.254 2.254 0 0 1 2.26 2.247c.003.587-.23 1.15-.647 1.564A2.216 2.216 0 0 1 15.26 24ZM21.73 11.073h-1.48a.738.738 0 0 1-.73-.736V8.865a2.254 2.254 0 0 1 2.26-2.247c1.222 0 2.214.982 2.22 2.198a2.264 2.264 0 0 1-2.27 2.257Z"></path></g></symbol></svg></div>
+</body>
+</html>
