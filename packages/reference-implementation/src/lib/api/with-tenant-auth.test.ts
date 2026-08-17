@@ -157,7 +157,7 @@ describe('withTenantAuth — open mode, session path', () => {
     const res = await wrapped(fakeRequest(), emptyRouteContext);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+    expect(await res.json()).toEqual({ error: 'Unauthorised' });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -280,7 +280,7 @@ describe('withTenantAuth — open mode, service account path', () => {
     const res = await wrapped(req, emptyRouteContext);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+    expect(await res.json()).toEqual({ error: 'Unauthorised' });
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -402,7 +402,7 @@ describe('withTenantAuth — closed mode, session path', () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual(
       expect.objectContaining({
-        error: 'Session expired — please sign in again',
+        error: 'Session expired. Please sign in again',
       }),
     );
     expect(handler).not.toHaveBeenCalled();
@@ -455,7 +455,7 @@ describe('withTenantAuth — closed mode, session path', () => {
     const res = await wrapped(fakeRequest(), emptyRouteContext);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+    expect(await res.json()).toEqual({ error: 'Unauthorised' });
   });
 });
 

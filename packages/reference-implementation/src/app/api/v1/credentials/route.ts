@@ -22,7 +22,7 @@ import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { resolvePublishTarget } from '@/lib/credentials/resolve-publish-target';
 import { getDidByDid, findConformitySchemeByCanonicalId } from '@/lib/prisma/repositories';
-import { buildPublishLinks, remapWarningPointers } from '@uncefact/untp-ri-services';
+import { buildPublishLinks, remapWarningPointers, IdrPublishError } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
 import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
 
@@ -429,15 +429,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
             // A 4xx is the resolver stating it did not accept the links. A 5xx,
             // or a failure of the call itself, may still have committed upstream,
             // so it is reported as unknown rather than as a refusal.
-            // The upstream status is in details.httpStatus; the error's own
-            // statusCode is this service's 502 for any upstream failure.
-            const status = (error as { details?: { httpStatus?: number } })?.details?.httpStatus;
-            const rejected =
-              error instanceof Error &&
-              error.name === 'IdrPublishError' &&
-              typeof status === 'number' &&
-              status >= 400 &&
-              status < 500;
+            // The upstream status rides on ServiceError's `context`, which is
+            // where IdrPublishError puts it; the error's own statusCode is this
+            // service's 502 for any upstream failure. Read it through an
+            // instanceof rather than a cast, so a future rename of the field
+            // fails the build instead of silently reclassifying every failure.
+            const status = error instanceof IdrPublishError ? error.context?.httpStatus : undefined;
+            const rejected = typeof status === 'number' && status >= 400 && status < 500;
             warnings.push(
               rejected
                 ? {

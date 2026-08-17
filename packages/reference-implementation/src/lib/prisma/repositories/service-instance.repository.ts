@@ -225,16 +225,22 @@ export async function deleteServiceInstance(id: string, tenantId: string): Promi
 }
 
 /**
- * Counts records that reference a given service instance.
+ * Counts the given tenant's records that reference a service instance.
  * Used for pre-delete referential integrity checks.
+ *
+ * Every count is scoped to `tenantId`. These numbers reach the caller in the
+ * pre-delete conflict message, so an unscoped count reports how many of other
+ * tenants' records point at the instance. That matters most for a system
+ * default, which every tenant can read and therefore attempt to delete.
  */
 export async function countServiceInstanceReferences(
   id: string,
+  tenantId: string,
 ): Promise<{ dids: number; registrars: number; schemes: number }> {
   const [dids, registrars, schemes] = await Promise.all([
-    prisma.did.count({ where: { serviceInstanceId: id } }),
-    prisma.registrar.count({ where: { idrServiceInstanceId: id } }),
-    prisma.identifierScheme.count({ where: { idrServiceInstanceId: id } }),
+    prisma.did.count({ where: { serviceInstanceId: id, tenantId } }),
+    prisma.registrar.count({ where: { idrServiceInstanceId: id, tenantId } }),
+    prisma.identifierScheme.count({ where: { idrServiceInstanceId: id, tenantId } }),
   ]);
 
   return { dids, registrars, schemes };

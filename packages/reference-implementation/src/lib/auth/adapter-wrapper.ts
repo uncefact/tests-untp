@@ -1,5 +1,9 @@
 import type { Adapter, AdapterUser } from 'next-auth/adapters';
-import type { PrismaClient } from '@prisma/client';
+// From the generated client, not from `@prisma/client`. The schema sets a
+// custom `output`, so the package is a stub that exports no types and this
+// file was the only one importing from it; every sibling, `prisma.ts`
+// included, imports from the generated location.
+import type { PrismaClient } from '@/lib/prisma/generated';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
 
 const logger = createLogger().child({ module: 'adapter-wrapper' });

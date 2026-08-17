@@ -103,7 +103,7 @@ export default auth(async (req) => {
         // sub is required for the service account flow to work
         if (!payload.sub) {
           return NextResponse.json(
-            { error: 'Unauthorized', message: 'Token missing required "sub" claim' },
+            { error: 'Unauthorised', message: 'Token missing required "sub" claim' },
             { status: 401, headers: { 'x-correlation-id': correlationId } },
           );
         }
@@ -133,7 +133,7 @@ export default auth(async (req) => {
 
       // User is unauthorised
       return NextResponse.json(
-        { error: 'Unauthorized', message: 'Authentication required' },
+        { error: 'Unauthorised', message: 'Authentication required' },
         { status: 401, headers: { 'x-correlation-id': correlationId } },
       );
     }

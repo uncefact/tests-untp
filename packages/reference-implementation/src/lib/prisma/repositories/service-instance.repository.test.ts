@@ -500,16 +500,25 @@ describe('service-instance.repository', () => {
   });
 
   describe('countServiceInstanceReferences', () => {
-    it('counts references across all related models', async () => {
+    // Every count carries the tenant condition. These numbers reach the caller
+    // in the pre-delete 409, so an unscoped count reports how many of other
+    // tenants' records point at the instance.
+    it('counts references across all related models, scoped to the tenant', async () => {
       (prisma.did.count as jest.Mock).mockResolvedValue(3);
       (prisma.registrar.count as jest.Mock).mockResolvedValue(1);
       (prisma.identifierScheme.count as jest.Mock).mockResolvedValue(2);
 
-      const result = await countServiceInstanceReferences('instance-1');
+      const result = await countServiceInstanceReferences('instance-1', 'tenant-1');
 
-      expect(prisma.did.count).toHaveBeenCalledWith({ where: { serviceInstanceId: 'instance-1' } });
-      expect(prisma.registrar.count).toHaveBeenCalledWith({ where: { idrServiceInstanceId: 'instance-1' } });
-      expect(prisma.identifierScheme.count).toHaveBeenCalledWith({ where: { idrServiceInstanceId: 'instance-1' } });
+      expect(prisma.did.count).toHaveBeenCalledWith({
+        where: { serviceInstanceId: 'instance-1', tenantId: 'tenant-1' },
+      });
+      expect(prisma.registrar.count).toHaveBeenCalledWith({
+        where: { idrServiceInstanceId: 'instance-1', tenantId: 'tenant-1' },
+      });
+      expect(prisma.identifierScheme.count).toHaveBeenCalledWith({
+        where: { idrServiceInstanceId: 'instance-1', tenantId: 'tenant-1' },
+      });
       expect(result).toEqual({ dids: 3, registrars: 1, schemes: 2 });
     });
 
@@ -518,7 +527,7 @@ describe('service-instance.repository', () => {
       (prisma.registrar.count as jest.Mock).mockResolvedValue(0);
       (prisma.identifierScheme.count as jest.Mock).mockResolvedValue(0);
 
-      const result = await countServiceInstanceReferences('instance-1');
+      const result = await countServiceInstanceReferences('instance-1', 'tenant-1');
 
       expect(result).toEqual({ dids: 0, registrars: 0, schemes: 0 });
     });
