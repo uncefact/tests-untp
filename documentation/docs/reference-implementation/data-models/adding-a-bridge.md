@@ -70,6 +70,8 @@ If the extractor logic hasn't changed from the previous version, import and reus
 
 The version spec pairs the builder and extractor together. Create an `index.ts` in the version directory that imports both functions and exports a named spec constant.
 
+If the credential type carries a conformity claim (currently Digital Conformity Credential), also write a conformity claim extractor and wire it into the spec as `conformityClaimExtractor`, or `conformityClaimProvenanceExtractor` if it also records where each projected value came from. A version spec that omits both fields gets no CVC validation for that version, silently: the bridge returns `null` from `extractConformityClaim` and `extractConformityClaimWithProvenance` rather than raising an error.
+
 If reusing functions from a previous version, the delta pattern makes this straightforward — import the previous version's functions and override only what changed.
 
 ### 5. Register in the bridge registry

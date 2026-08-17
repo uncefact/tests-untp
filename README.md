@@ -100,7 +100,7 @@ To run the documentation site outside Docker:
 
 ```bash
 cd documentation
-pnpm install
+pnpm install --ignore-workspace
 pnpm start
 ```
 
@@ -122,7 +122,7 @@ The reference implementation is instrumented with OpenTelemetry. To run the loca
 E2E tests use Cypress and support both local Docker Compose and deployed instances. Each app owns its own E2E suite:
 
 - [`packages/reference-implementation/e2e/`](packages/reference-implementation/e2e/README.md) for the reference implementation.
-- [`packages/untp-playground/e2e/`](packages/untp-playground/e2e/README.md) for the playground.
+- [`packages/untp-playground/e2e/`](packages/untp-playground/e2e/) for the playground.
 
 See each suite's README for setup, local testing, deployed instance prerequisites, and tenant mode configuration.
 

@@ -8,6 +8,7 @@ This is a monorepo for the UNTP (UN Transparency Protocol) test suite and refere
 - **Reference Implementation**: Web UI for issuing/verifying UNTP credentials (`packages/reference-implementation/`)
 - **Services Package**: Core business logic, credential processing, EPCIS events, DID management, and external service adapters
 - **Components Package**: Shared React component library
+- **UNTP Utils**: Shared utility primitives (multibase digests, conformity vocabulary parsing, artefact helpers) consumed by the other packages
 - **UNTP Playground**: Credential validation tool
 - **Test Suites**: Technical and semantic interoperability testing
 
@@ -55,7 +56,7 @@ pnpm start                          # Start RI dev server (hot reload)
 pnpm start:untp-playground          # Start playground on port 4001
 pnpm build:services                 # Rebuild services after changes
 pnpm build:components               # Rebuild components after changes
-pnpm build                          # Full build (services + components + test-suite)
+pnpm build                          # Full build (utils + services + components + reference implementation + playground)
 ```
 
 ### Testing
@@ -124,6 +125,7 @@ tests-untp/
 ├── packages/
 │   ├── services/                       # Core logic (TypeScript library)
 │   ├── components/                     # React component library
+│   ├── untp-utils/                     # Shared utility primitives library
 │   ├── reference-implementation/       # Next.js reference implementation (and e2e/)
 │   ├── untp-playground/                # Validation tool (and e2e/)
 │   └── untp-test-suite/                # CLI test suite
@@ -156,8 +158,8 @@ External integrations use interfaces + implementations:
 - Identity scheme handling (GS1)
 
 ### Reference Implementation Architecture
-- **Database**: Prisma ORM with entities: User, Organization, Did, Credential, ServiceInstance, Service, Adapter
-- **API Routes**: `/src/app/api/v1/` - `/dids`, `/credentials`, `/auth`
+- **Database**: Prisma ORM. See `packages/reference-implementation/prisma/schema.prisma` for the full model list (users, tenants, DIDs, credentials, service instances, identifiers and schemes, organisations, facilities, products, data models, render templates, and conformity records)
+- **API Routes**: `/src/app/api/v1/` - credentials, cvc, data-models, dids, facilities, identifiers, organisations, products, registrars, render-templates, schemes, services. Auth is unversioned, at `/api/auth/[...nextauth]`
 - **Auth**: Keycloak via NextAuth.js with organization-level branding
 - **Config**: Tenant configuration via database (replacing legacy app-config.json)
 
@@ -231,7 +233,7 @@ Each package has its own `tsconfig.json` (no centralized config)
 - No changes needed for local development defaults
 
 ### Version Management
-- All packages share same version (Lerna managed)
+- Each publishable package releases independently via its own tag-triggered workflow (see `docs/adrs/031-per-package-tag-triggered-npm-release.md`)
 - See `RELEASE_MANAGEMENT_GUIDE.md` for release process
 - Use conventional commits (see `CONTRIBUTING.md`)
 

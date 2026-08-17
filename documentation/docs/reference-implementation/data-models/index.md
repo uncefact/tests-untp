@@ -11,12 +11,14 @@ This creates a mapping problem. A product identifier might sit at a different pa
 
 ## What bridges do
 
-Each UNTP core data model type and version has a corresponding bridge that exposes two operations:
+Each UNTP core data model type and version has a corresponding bridge that exposes four operations:
 
 | Method | Direction | Purpose |
 |--------|-----------|---------|
 | `buildSubject` | Entities → Credential subject | Populates a credential payload from entity data |
-| `extractRefs` | Credential subject → Refs | Pulls entity identifiers and conformity references out of a credential |
+| `extractRefs` | Credential subject → Refs | Pulls entity identifiers out of a credential for database linking and IDR publishing |
+| `extractConformityClaim` | Credential subject → Conformity claim | Extracts the conformity claim for CVC validation. Returns `null` for credential types that carry no conformity claim |
+| `extractConformityClaimWithProvenance` | Credential subject → Conformity claim + source map | Same as `extractConformityClaim`, plus a map from each claim value back to the subject path it came from, so a validation warning can point at the submitted credential |
 
 These are synchronous, stateless functions — they receive data in and return data out, with no configuration or side effects.
 
@@ -32,11 +34,11 @@ The web UI for entity-driven credential issuance is not yet implemented. The bri
 
 ### Extraction
 
-The bridge's `extractRefs` method reads the credential subject and extracts identifiers for the entities it references. Extraction happens once during credential issuance and the results are used for multiple purposes:
+The bridge's `extractRefs` method reads the credential subject and extracts identifiers for the entities it references. The bridge's `extractConformityClaim` and `extractConformityClaimWithProvenance` methods run separately, projecting the credential subject's conformity data into a `ConformityClaim`. Extraction happens once during credential issuance and the results are used for multiple purposes:
 
-- **CVC validation** — extracted conformity references (schemes, standards, regulations, criteria) are compared against the available conformity vocabulary profiles to verify that all required criteria are present in the credential's attestations. This produces advisory warnings, never blocking errors.
-- **Database linking** — the extracted entity identifiers (organisation, facility, product) are matched against existing database records, creating relationships between the credential and the entities it describes
-- **IDR publishing** — extracted entity identifiers are used to publish links via the [identity resolver service](../services/identity-resolver-service/index.md), making the credential discoverable by the entity's identifier
+- **CVC validation** — the extracted conformity claim (scheme, profile, criteria) is compared against the available conformity vocabulary profiles to verify that all required criteria are present in the credential's attestations. This produces advisory warnings, never blocking errors.
+- **Database linking** — the entity identifiers `extractRefs` returns (organisation, facility, product) are matched against existing database records, creating relationships between the credential and the entities it describes
+- **IDR publishing** — the entity identifiers `extractRefs` returns are used to publish links via the [identity resolver service](../services/identity-resolver-service/index.md), making the credential discoverable by the entity's identifier
 
 Extraction is API-driven: it happens automatically during the issuance flow, not through user interaction.
 

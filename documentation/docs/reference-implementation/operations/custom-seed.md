@@ -5,7 +5,7 @@ title: Custom Seed
 
 # Custom Seed
 
-The Reference Implementation ships with a set of [default seed data](./startup.md#step-3-database-seed) — registrars, identifier schemes, data models, render templates, and service instances. These defaults cover common UNTP use cases out of the box.
+The Reference Implementation seeds a set of [default records](./startup.md#step-3-database-seed) on startup: data models, render templates, and service instances. Registrars and identifier schemes are not among them. They come from the manifest described here, so an instance has the registrars and schemes its deployer supplies and no others.
 
 Deployers who need additional data — custom registrars, identifier schemes, data models, render templates, or conformity schemes — can supply a YAML manifest via a Docker volume mount, without modifying the source code or rebuilding the image.
 
@@ -52,7 +52,7 @@ Setting `SKIP_CUSTOM_SEED=true` prevents the custom seed from running even if a 
 
 Every entity in the manifest requires an `id` field in **CUID v1** format. CUIDs (Collision-resistant Unique Identifiers) are used throughout the Reference Implementation as primary keys.
 
-A CUID v1 looks like: `clxyz1234567890abcdef` — a 25-character lowercase string starting with `c`.
+A CUID v1 looks like: `cxuj555flzqtp4ldvklv6ya39` — a 25-character lowercase string starting with `c`.
 
 To generate CUIDs for your manifest, use any CUID v1 library or online generator:
 
@@ -60,7 +60,7 @@ To generate CUIDs for your manifest, use any CUID v1 library or online generator
 node -e "const s='cdefghijklmnopqrstuvwxyz',t=Date.now().toString(36),r=()=>Math.random().toString(36).slice(2);console.log('c'+t+r()+r())"
 ```
 
-Each ID must be unique across the entire manifest. If an ID matches a record already in the database owned by the system tenant, it will be updated (upserted). If it matches a record owned by a different tenant, validation will fail.
+Each ID must be unique across the entire manifest. If an ID matches a system-tenant record created through the API/UI, or one already managed by a previous custom seed run, it is adopted and updated (upserted). If it matches a system-tenant record created by the core seed, validation fails (see [Core seed protection](#phase-2-referential-integrity)). If it matches a record owned by a different tenant, validation also fails.
 
 ## Manifest Structure
 
@@ -79,19 +79,19 @@ A registrar represents an identifier-issuing authority (e.g. GS1, a national bus
 
 ```yaml
 registrars:
-  - id: "clxyz1234567890abcdef"
+  - id: "clxyz1234567890abcdefghij"
     name: "My Registrar"
     namespace: "my-registrar.example.com"
     url: "https://my-registrar.example.com"              # optional
-    idrServiceInstanceId: "clxyz0000000000000001"         # optional — links to an IDR service instance
+    idrServiceInstanceId: "clxyz00000000000000000001"     # optional — links to an IDR service instance
     identifierSchemes:
-      - id: "clxyz1234567890scheme1"
+      - id: "clxyz1234567890scheme1abc"
         name: "Product ID"
         primaryKey: "01"
         validationPattern: "^\\d{14}$"
         linkTemplate: "https://id.example.com/01/{value}"
         qualifiers:                                       # optional
-          - id: "clxyz1234567890qual01"
+          - id: "clxyz1234567890qual01abcd"
             key: "10"
             description: "Batch or lot number"
             validationPattern: "^[\\x21-\\x22\\x25-\\x2F\\x30-\\x39\\x41-\\x5A\\x61-\\x7A]{1,20}$"
@@ -134,7 +134,7 @@ Data models define credential types. Custom data models **must** reference a cor
 
 ```yaml
 dataModels:
-  - id: "clxyz1234567890model1"
+  - id: "clxyz1234567890model1abcd"
     name: "Australian DPP v1.0"
     credentialType: "DigitalProductPassport"
     version: "1.0.0"
@@ -183,10 +183,10 @@ Render templates define how credentials are displayed. Each template references 
 
 ```yaml
 renderTemplates:
-  - id: "clxyz1234567890templ1"
+  - id: "clxyz1234567890templ1abcd"
     name: "AU DPP Default Template"
     file: "templates/au-dpp.hbs"
-    dataModelId: "clxyz1234567890model1"
+    dataModelId: "clxyz1234567890model1abcd"
     renderMethodType: "RenderTemplate2024"
     isDefault: true                                  # optional, defaults to false
     inline: false                                    # optional
@@ -249,25 +249,27 @@ my-seed/
   seed.yaml
   templates/
     au-dpp.hbs
+  schemes/
+    au-fallback-scheme.json
 ```
 
 `seed.yaml`:
 
 ```yaml
 registrars:
-  - id: "clxyz1234567890abreg1"
+  - id: "clxyz1234567890abreg1abcd"
     name: "Australian Business Register"
     namespace: "abr.gov.au"
     url: "https://abr.gov.au"
     identifierSchemes:
-      - id: "clxyz1234567890abnsc"
+      - id: "clxyz1234567890abnscabcde"
         name: "Australian Business Number"
         primaryKey: "abn"
         validationPattern: "^\\d{11}$"
         linkTemplate: "https://abr.business.gov.au/ABN/View?abn={value}"
 
 dataModels:
-  - id: "clxyz1234567890aumod"
+  - id: "clxyz1234567890aumodabcde"
     name: "AU Digital Product Passport"
     credentialType: "DigitalProductPassport"
     version: "1.0.0"
@@ -277,10 +279,10 @@ dataModels:
     websiteUrl: "https://example.com/docs/au-dpp"
 
 renderTemplates:
-  - id: "clxyz1234567890autpl"
+  - id: "clxyz1234567890autplabcde"
     name: "AU DPP Template"
     file: "templates/au-dpp.hbs"
-    dataModelId: "clxyz1234567890aumod"
+    dataModelId: "clxyz1234567890aumodabcde"
     renderMethodType: "RenderTemplate2024"
     isDefault: true
 
@@ -365,9 +367,10 @@ A deletion that would take data the manifest does not own down with it fails the
 - an identifier scheme whose qualifiers include any not created by this manifest
 - an identifier scheme with registered identifiers (identifier values created through the API that link registrations depend on)
 - a data model with render templates or extensions not created by this manifest
-- the `ConformityScheme` data model entry, while seeded conformity schemes of its version are still in the database. That entry supplies the JSON Schema the ingestion pipeline validates scheme documents against, so deleting it would leave those schemes unable to be re-ingested or refreshed. Remove the schemes first (drop them from `conformitySchemes`), then the data model entry.
 
 To proceed, keep the manifest entry, or migrate or delete the blocking data first.
+
+The `ConformityScheme` data model entry, which supplies the JSON Schema the ingestion pipeline validates scheme documents against, is always core-seeded. It can never be claimed or deleted by the manifest (see [Core seed protection](#phase-2-referential-integrity)), so a scheme's schema binding can never be stranded by a custom-seed removal.
 
 ### Render template storage objects
 

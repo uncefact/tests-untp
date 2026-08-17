@@ -32,7 +32,7 @@ Identifiers are managed through the [Identifiers API](./identifiers) and linked 
 
 ### Location
 
-The optional `location` field stores a structured JSON object describing the geographical position of the facility. See [Location](../master-data/#location) for the field structure.
+The optional `location` field accepts any JSON object. No shape validation is applied. The UNTP location field shapes are described in the [Location](../master-data/#location) section of the master data documentation, but the Reference Implementation does not yet validate submitted values against them.
 
 ### Tenant Scoping
 
@@ -50,6 +50,8 @@ Creates one or more facilities in bulk. The request body must be a non-empty arr
 
 **Optional fields must be omitted to skip them — do not send them as a JSON `null`.** There is no clear-on-create semantics (nothing yet exists to clear), so an explicit `null` on any optional field is rejected with a 400 for the whole request, the same as any other malformed value. This is a real behaviour change for `location`: it was previously accepted silently, with no different effect than omitting the field (the write skipped the column either way, leaving it unset) — that silent equivalence is gone, and `location: null` is now a 400.
 
+A `primaryIdentifierId` that is already the primary identifier of another facility is rejected with 409 Conflict.
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -65,6 +67,10 @@ sequenceDiagram
         end
     end
     RI->>DB: Insert facility records
+    alt primaryIdentifierId already claimed by another facility
+        DB-->>RI: Unique constraint violation
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Created records
     RI-->>Client: 201 Created (array of facilities)
 ```
@@ -105,6 +111,8 @@ PATCH /api/v1/facilities/{id}
 ```
 
 Updates one or more fields of an existing facility. At least one recognised field is required — a body with none of the fields below (or only unrecognised keys) is rejected with a 400; unrecognised keys are otherwise ignored.
+
+A `primaryIdentifierId` that is already the primary identifier of another facility is rejected with 409 Conflict.
 
 | Updatable Field | Description |
 |-----------------|-------------|

@@ -154,15 +154,23 @@ sequenceDiagram
         RI-->>Client: 403 Forbidden
     end
     RI->>DB: Check for duplicate alias on service instance
-    alt duplicate exists
+    alt duplicate alias exists
         RI-->>Client: 409 Conflict
     end
     RI->>VC: Create DID (type, method, alias)
+    alt provider reports alias already in use
+        RI-->>Client: 409 Conflict
+    end
     VC-->>RI: DID identifier + key ID
     RI->>DB: Save DID record (status: ACTIVE or UNVERIFIED)
+    alt a DID record with this DID already exists
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Created record
     RI-->>Client: 201 Created (DID)
 ```
+
+A 409 response can happen for three reasons. The alias may already be in use on the same service instance. The resulting DID identifier may already have a record in the database. Or the upstream provider may report the alias as already in use, which happens when the provider holds a DID that this deployment's database has no record of, for example after a database reset that did not also reset the provider.
 
 ---
 
@@ -277,6 +285,8 @@ sequenceDiagram
 
 The VC service resolves the DID by fetching the DID document from wherever it is hosted. For managed DIDs, the VC service itself is the host. For self-managed DIDs, this is the location where the tenant has published their [DID document](#hosting-the-did-document-didweb).
 
+Retrieving the document can fail with a 502. For managed DIDs, this happens when the verifiable credential service itself does not return the document. For self-managed DIDs, it happens when the tenant's own hosting location does not return it. This is distinct from the 404 returned when the DID record itself cannot be found.
+
 ---
 
 ### Verify a DID
@@ -350,6 +360,8 @@ Importing a `did:webvh` identifier is rejected because `method` is restricted to
 | `name` | Human-readable name (cannot be empty or only whitespace if provided) |
 | `description` | Description of the DID's purpose (cannot be empty or only whitespace if provided) |
 
+The `did` column is globally unique across all tenants. Importing a DID that already has a record, whether owned by this tenant or another, is rejected with a 409.
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -363,6 +375,9 @@ sequenceDiagram
         RI-->>Client: 404 Not Found
     end
     RI->>DB: Save DID record (type: SELF_MANAGED, status: UNVERIFIED)
+    alt a DID record with this DID already exists
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Created record
     RI-->>Client: 201 Created (DID)
 ```

@@ -109,7 +109,8 @@ packages/reference-implementation/
 ### Testing
 
 ```bash
-pnpm test          # Run all RI tests
+pnpm test              # Run all RI tests
+pnpm test:integration  # Run the Postgres-backed integration suite (needs a running Docker daemon)
 ```
 
 See the root [README](../../README.md) for E2E testing instructions.

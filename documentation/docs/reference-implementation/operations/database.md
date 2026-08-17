@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 title: Database
 ---
 
@@ -19,14 +19,14 @@ The database connection can be configured either as a single connection string o
 |----------|----------|-------------|---------|
 | `RI_DATABASE_URL` | No | A complete PostgreSQL connection string. Takes precedence over the `RI_POSTGRES_*` variables below when set. | — |
 | `RI_POSTGRES_HOST` | Yes, if `RI_DATABASE_URL` is not set | Database hostname | — |
-| `RI_POSTGRES_PORT` | No | Database port | `5432` |
-| `RI_POSTGRES_USER` | No | Database user | `postgres` |
-| `RI_POSTGRES_PASSWORD` | No | Database password | `postgres` |
-| `RI_POSTGRES_DB` | No | Database name | `ri` |
+| `RI_POSTGRES_PORT` | No, in the container | Database port | `5432` |
+| `RI_POSTGRES_USER` | No, in the container | Database user | `postgres` |
+| `RI_POSTGRES_PASSWORD` | No, in the container | Database password | `postgres` |
+| `RI_POSTGRES_DB` | No, in the container | Database name | `ri` |
 
 Set `RI_DATABASE_URL` directly when the connection string carries options the `RI_POSTGRES_*` parts cannot express, or when a secrets manager already supplies one. When it is set, the Reference Implementation uses it as given and does not construct a URL from the other variables.
 
-The user and password defaults are the container entrypoint's fallbacks for quick local starts. Set explicit credentials in any real deployment, and see [Minimum Privileges](#minimum-privileges) for the account to provision.
+The port, user, password, and database defaults above are the container entrypoint's fallbacks for quick local starts, applied only when `RI_POSTGRES_HOST` is set and `RI_DATABASE_URL` is not. Outside the container, for example running `pnpm prisma migrate dev`, `pnpm prisma studio`, or `next build`/`next start` directly, there is no partial defaulting: set either a full `RI_DATABASE_URL` or all five `RI_POSTGRES_*` variables, or the command fails with "No database target configured". Set explicit credentials in any real deployment, and see [Minimum Privileges](#minimum-privileges) for the account to provision.
 
 ## Minimum Privileges
 

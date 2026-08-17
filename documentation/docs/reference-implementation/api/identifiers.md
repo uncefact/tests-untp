@@ -91,7 +91,7 @@ Because links exist on both the local database (as audit records) and the upstre
 POST /api/v1/schemes
 ```
 
-Creates a new identifier scheme with optional nested qualifiers. The scheme is associated with a registrar and scoped to the authenticated tenant. Required text fields must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
+Creates a new identifier scheme with optional nested qualifiers. The scheme is associated with a registrar and scoped to the authenticated tenant. Required text fields must contain at least one non-whitespace character. A whitespace-only value is rejected with a 400. The exception is `validationPattern`, which only needs to compile as a regular expression, so a whitespace-only pattern is accepted. A `primaryKey` that already exists for the registrar is rejected with a 409.
 
 | Required Field | Description |
 |----------------|-------------|
@@ -125,6 +125,10 @@ sequenceDiagram
         end
     end
     RI->>DB: Insert scheme with qualifiers
+    alt primaryKey already exists for the registrar
+        DB-->>RI: Unique constraint violation
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Created record (with qualifiers and registrar)
     RI-->>Client: 201 Created
 ```
@@ -145,6 +149,8 @@ Returns identifier schemes for the authenticated tenant (including system defaul
 | `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
 
+A repeated query parameter is rejected with a 400.
+
 ---
 
 ### Get an identifier scheme
@@ -163,7 +169,7 @@ Retrieves a specific identifier scheme by its database ID. The response includes
 PATCH /api/v1/schemes/{id}
 ```
 
-Updates one or more fields of an existing identifier scheme. At least one updatable field must be provided. Text fields must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400. System-default schemes cannot be updated; only schemes owned by the authenticated tenant can be.
+Updates one or more fields of an existing identifier scheme. At least one updatable field must be provided. Text fields must contain at least one non-whitespace character. A whitespace-only value is rejected with a 400. The exception is `validationPattern`, which only needs to compile as a regular expression, so a whitespace-only pattern is accepted. System-default schemes cannot be updated. Only schemes owned by the authenticated tenant can be updated. Qualifier keys must be unique within the submitted array, and a duplicate key is rejected with a 400. A `primaryKey` that already exists for the registrar, or a qualifier `key` that already exists for the scheme, is rejected with a 409.
 
 | Updatable Field | Description |
 |-----------------|-------------|
@@ -182,7 +188,7 @@ Updates one or more fields of an existing identifier scheme. At least one updata
 DELETE /api/v1/schemes/{id}
 ```
 
-Permanently deletes an identifier scheme. Only schemes owned by the authenticated tenant can be deleted — system defaults are protected.
+Permanently deletes an identifier scheme. Only schemes owned by the authenticated tenant can be deleted — system defaults are protected. If the scheme still has identifiers attached, the identifier-to-scheme relationship is `onDelete: Restrict`, so the delete is rejected with a 409 and nothing is removed.
 
 ```mermaid
 sequenceDiagram
@@ -196,6 +202,10 @@ sequenceDiagram
         RI-->>Client: 404 Not Found
     end
     RI->>DB: Delete scheme
+    alt scheme has identifiers (onDelete: Restrict blocks the delete)
+        DB-->>RI: Foreign key violation
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Deleted
     RI-->>Client: 204 No Content
 ```
@@ -208,7 +218,7 @@ sequenceDiagram
 POST /api/v1/identifiers
 ```
 
-Creates a new identifier after validating its value against the scheme's `validationPattern`. The scheme must exist and be accessible to the authenticated tenant (either tenant-owned or a system default). The value must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
+Creates a new identifier after validating its value against the scheme's `validationPattern`. The scheme must exist and be accessible to the authenticated tenant (either tenant-owned or a system default). The value must contain at least one non-whitespace character. A whitespace-only value is rejected with a 400. A value that already exists for the scheme is rejected with a 409.
 
 | Required Field | Description |
 |----------------|-------------|
@@ -232,6 +242,10 @@ sequenceDiagram
         RI-->>Client: 400 Bad Request
     end
     RI->>DB: Insert identifier
+    alt value already exists for the scheme
+        DB-->>RI: Unique constraint violation
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Created record (with scheme)
     RI-->>Client: 201 Created
 ```
@@ -249,8 +263,10 @@ Returns identifiers for the authenticated tenant with optional filtering. Result
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `schemeId` | string | — | Filter by identifier scheme ID |
-| `limit` | integer | `20` | Maximum results per page. A value above the maximum is rejected with a 400 that names the maximum |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | Maximum results per page. A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
+
+A repeated query parameter is rejected with a 400.
 
 ---
 
@@ -270,7 +286,7 @@ Retrieves a specific identifier by its database ID. The response includes the fu
 PATCH /api/v1/identifiers/{id}
 ```
 
-Updates the value of an existing identifier. The new value is re-validated against the scheme's `validationPattern`, and must contain at least one non-whitespace character; a whitespace-only value is rejected with a 400.
+Updates the value of an existing identifier. The new value is re-validated against the scheme's `validationPattern`, and must contain at least one non-whitespace character. A whitespace-only value is rejected with a 400. A new value that already exists for the scheme is rejected with a 409.
 
 | Updatable Field | Description |
 |-----------------|-------------|
@@ -360,8 +376,10 @@ Returns link registration audit records for a specific identifier. The identifie
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | integer | `20` | Maximum results per page. A value above the [configured maximum](../operations/api-pagination#maximum-page-size) is rejected with a 400 that names the maximum |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | Maximum results per page. A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip |
+
+A repeated query parameter is rejected with a 400.
 
 ---
 

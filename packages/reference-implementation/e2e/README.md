@@ -24,14 +24,16 @@ No `.env.e2e` file is needed — all defaults in `cypress.config.ts` and `cypres
 
 Ensure you have completed the [prerequisites](../../../README.md#prerequisites) in the root README before running.
 
+> **Important**: The standard `docker-compose.yml` stack's `ri-db` service and this E2E stack's `e2e-ri-db` service both bind to host port 5433. Stop the standard stack (or its `ri-db` service) before starting the E2E stack below, otherwise the E2E stack fails to bind that port and does not start.
+
 ```bash
 # Start the E2E stack (the `ri` profile activates the RI app + its dependencies)
 docker compose -f docker-compose.e2e.yml --profile ri up -d --build
 
 # Run tests (from repo root)
-yarn test:e2e:ri             # Headless (default: open mode)
-yarn test:e2e:ri:open        # Explicit open mode
-yarn test:e2e:ri:open-ui     # Interactive UI
+pnpm test:e2e:ri             # Headless (default: open mode)
+pnpm test:e2e:ri:open        # Explicit open mode
+pnpm test:e2e:ri:open-ui     # Interactive UI
 
 # Teardown; use -v to remove volumes for a clean DB next time
 docker compose -f docker-compose.e2e.yml --profile ri down -v
@@ -41,9 +43,11 @@ docker compose -f docker-compose.e2e.yml --profile ri down -v
 
 ### Closed mode (local)
 
+Both `-f` flags must be passed together on every compose invocation for closed mode, including any later ad-hoc command such as restarting a single service. Dropping the `docker-compose.e2e-closed.yml` override reverts `TENANT_MODE` to open.
+
 ```bash
 docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri up -d --build
-yarn test:e2e:ri:closed
+pnpm test:e2e:ri:closed
 docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri down -v
 ```
 
@@ -75,20 +79,20 @@ To run E2E tests against deployed instances of the RI and Playground (e.g. stagi
 
 ### Setup
 
-1. Copy the example env file and fill in your deployment values:
+1. Create `packages/reference-implementation/e2e/.env.e2e` and set your deployment's URLs, credentials, and DB connection using the variables listed in [Environment Variables](#environment-variables) below:
 
    ```bash
-   cp packages/reference-implementation/e2e/.env.e2e.example packages/reference-implementation/e2e/.env.e2e
+   touch packages/reference-implementation/e2e/.env.e2e
    # Edit .env.e2e with your deployment's URLs, credentials, and DB connection
    ```
 
 2. Run the tests (from repo root):
 
    ```bash
-   yarn test:e2e:ri              # Uses E2E_TENANT_MODE from .env.e2e
-   yarn test:e2e:ri:open         # Explicit open mode
-   yarn test:e2e:ri:closed       # Explicit closed mode
-   yarn test:e2e:playground      # Playground E2E (runs from packages/untp-playground/e2e/)
+   pnpm test:e2e:ri              # Uses E2E_TENANT_MODE from .env.e2e
+   pnpm test:e2e:ri:open         # Explicit open mode
+   pnpm test:e2e:ri:closed       # Explicit closed mode
+   pnpm test:e2e:playground      # Playground E2E (runs from packages/untp-playground/e2e/)
    ```
 
 ### Test Data Safety
@@ -116,20 +120,20 @@ In closed mode, the tenant is determined by the IDP group claim. Test users must
 
 ### Environment Variables
 
-All variables are documented in [`.env.e2e.example`](.env.e2e.example). Key variables:
+All variables and their defaults are set in [`cypress.config.ts`](./cypress.config.ts). Key variables:
 
-| Variable                         | Purpose                                             | Default                       |
-| -------------------------------- | --------------------------------------------------- | ----------------------------- |
-| `CYPRESS_BASE_URL`               | RI application URL                                  | `http://localhost:3003`       |
-| `E2E_IDP_PROVIDER`               | `keycloak` or `zitadel`                             | `keycloak`                    |
-| `E2E_IDP_BASE_URL`               | Identity provider URL                               | `http://localhost:8081`       |
-| `E2E_IDP_AUDIENCE`               | Zitadel project ID (Zitadel only)                   | —                             |
-| `E2E_TENANT_MODE`                | `open` or `closed`                                  | `open`                        |
-| `E2E_DB_HOST`                    | PostgreSQL host                                     | `localhost`                   |
-| `E2E_DB_PORT`                    | PostgreSQL port                                     | `5433`                        |
-| `E2E_USER2_PASSWORD`             | Second test user password (if different from first) | (same as `E2E_USER_PASSWORD`) |
-| `E2E_DB_SSL_REJECT_UNAUTHORIZED` | Reject self-signed DB certs                         | `true`                        |
-| `VERIFY_ALLOW_PRIVATE_URLS`      | SSRF validation (`false` for deployed)              | `true`                        |
+| Variable                         | Purpose                                             | Default                 |
+| -------------------------------- | --------------------------------------------------- | ----------------------- |
+| `CYPRESS_BASE_URL`               | RI application URL                                  | `http://localhost:3003` |
+| `E2E_IDP_PROVIDER`               | `keycloak` or `zitadel`                             | `keycloak`              |
+| `E2E_IDP_BASE_URL`               | Identity provider URL                               | `http://localhost:8081` |
+| `E2E_IDP_AUDIENCE`               | Zitadel project ID (Zitadel only)                   | —                       |
+| `E2E_TENANT_MODE`                | `open` or `closed`                                  | `open`                  |
+| `E2E_DB_HOST`                    | PostgreSQL host                                     | `localhost`             |
+| `E2E_DB_PORT`                    | PostgreSQL port                                     | `5433`                  |
+| `E2E_USER2_PASSWORD`             | Second test user password (if different from first) | (empty)                 |
+| `E2E_DB_SSL_REJECT_UNAUTHORIZED` | Reject self-signed DB certs                         | `true`                  |
+| `VERIFY_ALLOW_PRIVATE_URLS`      | SSRF validation (`false` for deployed)              | `true`                  |
 
 ### did:web and HTTPS
 

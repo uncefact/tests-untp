@@ -80,6 +80,12 @@ Not all routes require authentication. The following are publicly accessible wit
 - **Credential verification API** (`/api/v1/credentials/verify`) — accepts a credential URL and returns the verification result
 - **Verify page** (`/verify`) — a web UI for verifying credentials, intended for end users and specification readers following links to example credentials. See [Verify Page](../verify-page) for details.
 
+## Error Responses
+
+Guarded routes document a failed authentication or authorisation check as an `ErrorResponse` body, `{ error: string, code?: string }`, in their Swagger `401` and `403` responses.
+
+A request that is rejected before it reaches a route handler, because it carries no session cookie or bearer token, or because a bearer token is missing its `sub` claim, gets a slightly different body from the authentication middleware: `{ error: string, message: string }`. This shape carries the same `error` field but adds a `message` field that the `ErrorResponse` schema does not define.
+
 ## IDP Configuration
 
 See [IDP Requirements](./idp-requirements) for supported providers and their configuration.

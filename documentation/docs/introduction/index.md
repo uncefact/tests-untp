@@ -9,7 +9,7 @@ import Disclaimer from './../\_disclaimer.mdx';
 
 The [UN Transparency Protocol (UNTP)](https://uncefact.github.io/spec-untp/) Test Suite is a comprehensive set of tools for implementing, testing, and demonstrating the UNTP specification. It provides everything needed to issue UNTP-compliant verifiable credentials, validate them against the specification, and verify conformance across technical and semantic dimensions.
 
-The repository comprises four primary components:
+The repository comprises three primary components, each extensible to meet the specific needs of industries or value chain actors:
 
 ## Reference Implementation
 

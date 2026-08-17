@@ -86,11 +86,13 @@ Products are scoped to the authenticated tenant. Each tenant manages its own pro
 POST /api/v1/products
 ```
 
-Creates one or more products in bulk. The request body is an array of product objects — each must include a `name` and a `level`. Optional fields include `description`, `parentId`, `producedByOrganisationId`, `manufacturingFacilityId`, `primaryIdentifierId`, and `secondaryIdentifierIds`.
+Creates one or more products in bulk. The request body is an array of product objects — each must include a `name` and a `level`. Optional fields include `description`, `parentId`, `producedByOrganisationId`, `manufacturingFacilityId`, `primaryIdentifierId`, and `secondaryIdentifierIds` (each entry must be a non-empty identifier ID, and the array must not contain duplicates).
 
 The [hierarchy rules](#product-hierarchy) are enforced for each item. If any item violates the rules, the entire request is rejected.
 
 Omit an optional field to skip it rather than sending it as `null`. There is nothing to clear on a product that does not exist yet, so an explicit `null` on create is rejected with a 400.
+
+A `primaryIdentifierId` that is already the primary identifier of another product is rejected with 409 Conflict.
 
 ```mermaid
 sequenceDiagram
@@ -117,6 +119,10 @@ sequenceDiagram
         end
     end
     RI->>DB: Insert product records
+    alt primaryIdentifierId already claimed by another product
+        DB-->>RI: Unique constraint violation
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Created records
     RI-->>Client: 201 Created (array of products)
 ```
@@ -161,15 +167,17 @@ PATCH /api/v1/products/{id}
 
 Updates one or more fields of an existing product. The product `level` is **immutable** — if provided in the request body, it is silently stripped. At least one updatable field must be provided.
 
+A `primaryIdentifierId` that is already the primary identifier of another product is rejected with 409 Conflict.
+
 | Updatable Field | Description |
 |-----------------|-------------|
 | `name` | Product name (must be non-empty if provided) |
-| `description` | Free-text description (set to `null` to clear) |
-| `parentId` | Parent product ID (subject to [hierarchy rules](#product-hierarchy); set to `null` to clear) |
-| `producedByOrganisationId` | ID of the producing organisation (set to `null` to clear) |
-| `manufacturingFacilityId` | ID of the manufacturing facility (set to `null` to clear) |
-| `primaryIdentifierId` | ID of the primary identifier (set to `null` to clear) |
-| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing; send an empty array to clear them all, or omit the field to leave them unchanged) |
+| `description` | Free-text description (non-empty if provided; set to `null` to clear) |
+| `parentId` | Parent product ID (subject to [hierarchy rules](#product-hierarchy); non-empty if provided; set to `null` to clear) |
+| `producedByOrganisationId` | ID of the producing organisation (non-empty if provided; set to `null` to clear) |
+| `manufacturingFacilityId` | ID of the manufacturing facility (non-empty if provided; set to `null` to clear) |
+| `primaryIdentifierId` | ID of the primary identifier (non-empty if provided; set to `null` to clear) |
+| `secondaryIdentifierIds` | Array of secondary identifier IDs (replaces existing; each entry must be non-empty and unique within the array; send an empty array to clear them all, or omit the field to leave them unchanged) |
 
 ---
 

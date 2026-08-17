@@ -99,7 +99,7 @@ Returns data models visible to the authenticated tenant, including system-provis
 | `credentialType` | string | — | Filter by credential type (e.g., `DigitalProductPassport`) |
 | `version` | string | — | Filter by version (e.g., `0.6.0`) |
 | `isExtension` | string | — | Filter by extension status (`true` or `false`) |
-| `limit` | integer | `20` | Maximum results per page. A value above the maximum is rejected with a 400 naming the maximum. |
+| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
 | `offset` | integer | `0` | Number of results to skip (must be non-negative) |
 
 Each parameter is a single value. Supplying the same one twice is rejected with a 400 naming it.
@@ -130,6 +130,8 @@ The `parentConfigId` must reference an existing UNTP core data model (`isExtensi
 
 The parent must also be one the tenant can see, meaning its own data model or a system-provisioned one. A `parentConfigId` naming a model that does not exist and one naming another tenant's model both return the same 404, so the response does not reveal whether that id exists elsewhere.
 
+A `name` that collides with an existing data model for the same tenant, credential type, version, and extension status is rejected with a 409 Conflict.
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -150,6 +152,9 @@ sequenceDiagram
         RI-->>Client: 400 Bad Request
     end
     RI->>DB: Insert data model (isExtension=true)
+    alt name already exists for this credential type, version, and extension status
+        RI-->>Client: 409 Conflict
+    end
     DB-->>RI: Created record
     RI-->>Client: 201 Created (data model)
 ```
@@ -178,6 +183,8 @@ Only the following fields can be updated: `name`, `schemaUrl`, `contextUrl`, `we
 
 At least one recognised field must be provided; unrecognised keys are ignored.
 
+Renaming to a `name` that collides with another data model for the same tenant, credential type, version, and extension status is rejected with a 409 Conflict.
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -193,6 +200,9 @@ sequenceDiagram
     RI->>DB: Fetch and update data model
     alt not found
         RI-->>Client: 404 Not Found
+    end
+    alt name already exists for this credential type, version, and extension status
+        RI-->>Client: 409 Conflict
     end
     DB-->>RI: Updated record
     RI-->>Client: 200 OK (updated data model)

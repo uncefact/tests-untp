@@ -9,7 +9,7 @@ The [overview](./index.md) describes what data model bridges do — map between 
 
 ## Design Philosophy
 
-The Reference Implementation never constructs or reads credential subjects directly. Instead, it goes through a **bridge** — a pair of functions that know how to build and extract data for a specific UNTP data model type and version. Each bridge encapsulates the structural knowledge of where entities sit within that version's credential subject.
+The Reference Implementation never constructs or reads credential subjects directly. Instead, it goes through a **bridge** that knows how to build and extract data for a specific UNTP data model type and version. Each bridge encapsulates the structural knowledge of where entities sit within that version's credential subject.
 
 Because the UNTP specification evolves, the same credential type can have different structures across versions. Rather than maintaining separate, complete implementations for each version, bridges use a **delta pattern** — each version only carries what changed from its predecessor. When nothing changed, a version is a single-line re-export. When a field moved or a new structure was introduced, only the affected function is overridden.
 
@@ -17,12 +17,13 @@ This means adding support for a new UNTP version is proportional to what actuall
 
 ## How Bridges Are Composed
 
-Each bridge is composed from two standalone functions — a **builder** and an **extractor** — that are paired together:
+Each bridge is composed from standalone functions that are paired together: a **builder**, an **extractor**, and, for credential types that carry a conformity claim, a pair of **conformity claim extractors**.
 
 - The **builder** receives entity data (organisation, facility, product, conformity selections) and returns a credential subject in the correct structure for that type and version.
-- The **extractor** receives a credential subject and returns the entity identifiers and conformity references it contains.
+- The **extractor** receives a credential subject and returns the entity identifiers it contains, for database linking and IDR publishing.
+- The **conformity claim extractors** receive a credential subject and project its conformity data into a `ConformityClaim` for CVC validation. `extractConformityClaimWithProvenance` also returns a source map, from each value in the claim back to the subject path it came from, so a validation warning can point at the submitted credential. These are only wired up for credential types that carry a conformity claim (currently Digital Conformity Credential `0.7.0`); bridges without them return `null` from both methods.
 
-These two functions are co-located in a version directory within the [services package](https://github.com/uncefact/tests-untp/tree/next/packages/services) (`@uncefact/untp-ri-services`). For example, the Digital Product Passport bridge for version `0.6.0` lives in `data-model-bridges/data-models/dpp/versions/v060/` and contains a builder, an extractor, and an index file that pairs them.
+The builder and extractor are co-located in a version directory within the [services package](https://github.com/uncefact/tests-untp/tree/next/packages/services) (`@uncefact/untp-ri-services`), alongside the conformity claim extractors where a version has them. For example, the Digital Product Passport bridge for version `0.6.0` lives in `data-model-bridges/data-models/dpp/versions/v060/` and contains a builder, an extractor, and an index file that pairs them.
 
 ## The Delta Pattern
 
@@ -62,7 +63,7 @@ sequenceDiagram
     participant DB as Database
     participant IDR as Identity Resolver
 
-    UI->>API: GET /data-models/{id}/form-config
+    UI->>API: GET /api/v1/data-models/{id}/form-config
     API-->>UI: Entity picker configuration
     UI->>API: Fetch entities from picker endpoints
     API-->>UI: Available entities

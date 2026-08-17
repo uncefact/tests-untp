@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 6
 title: Key Management and Recovery
 ---
 
@@ -21,7 +21,7 @@ Keys do not travel between environments. Supplying a key other than a backup's p
 
 A database backup without its paired key is not a recovery artefact. Stored envelopes carry no key identifier, and the serving application holds exactly one active key, so losing the key makes every stored envelope permanently unreadable: every service instance configuration, and every credential decryption key that has been wrapped. Credential rows created before v0.4 keep their stored keys in plaintext until the [backfill](./backfills/decryption-keys) wraps them, so they, like credentials stored unencrypted, do not depend on the key and survive its loss.
 
-For every backup, record which key opens it: the backup's identity (timestamp or version), its source environment, the secret-store version of the paired key, and, when a backup sits on one side of a [rotation](./encryption-key-rotation), which side. Record the secret-store reference, never the raw key, and keep raw key material out of logs and tickets.
+For every backup, record which key opens it: the backup's identity (timestamp or version), its source environment, the secret-store version of the paired key, and, when a backup sits on one side of a [rotation](./encryption-key-rotation), which side. Also record the audit's suspect and corrupted row ids for that backup, so a later recovery can tell a pre-existing finding apart from new corruption. Record the secret-store reference, never the raw key, and keep raw key material out of logs and tickets.
 
 Retire a key only when every retained backup taken under it has itself been retired. A completed rotation moves the live database to the new key; every retained backup still opens only under whichever key was active when it was taken, which after several rotations spans several key generations. A retired-too-early key turns those backups into dead weight even though the rotation succeeded. A recorded key is recoverable when its secret-store version can actually be retrieved; verify that periodically by retrieving it, rather than by decrypting something from every backup.
 

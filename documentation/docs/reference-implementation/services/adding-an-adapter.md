@@ -42,6 +42,8 @@ packages/services/src/
 
 A new adapter would follow the same structure — create a new directory under the relevant `adapters/` folder.
 
+DID-capable adapters, such as the VCKit DID adapter under `did-manager/adapters/`, are a different case. DID management is not its own service type: it reuses a Verifiable Credential service instance's configuration rather than taking its own. A DID-capable adapter implements `IDidService` instead of one of the three interfaces below, and it registers in `packages/services/src/registry/did-adapter-registry.ts` rather than the main adapter registry. Use the existing VCKit DID adapter as a reference for this case.
+
 ## Steps
 
 1. **Create the adapter directory** under the relevant service type's `adapters/` folder (e.g., `packages/services/src/storage/adapters/my-storage/`)
@@ -59,7 +61,7 @@ A new adapter would follow the same structure — create a new directory under t
 
 5. **Create the factory function** — a function that takes the validated configuration and returns an instance of your adapter.
 
-6. **Register the adapter** — add a new adapter type constant and register the entry in the adapter registry (`packages/services/src/registry.ts`). Once registered, tenants can select the new adapter type when registering service instances through the API.
+6. **Register the adapter** — add a new adapter type constant and register the entry in the adapter registry (`packages/services/src/registry/registry.ts`). Once registered, tenants can select the new adapter type when registering service instances through the API.
 
 7. **Write tests** — add unit tests for the adapter covering configuration validation, each operation the adapter supports, and error handling.
 
