@@ -7,6 +7,6 @@ This directory contains the source code for the services that are used by the ap
 Build the project and run the tests with the following command:
 
 ```bash
-$ yarn run build
-$ yarn run test
+$ pnpm build
+$ pnpm test
 ```

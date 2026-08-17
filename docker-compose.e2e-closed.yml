@@ -1,7 +1,7 @@
 # Docker Compose override for closed mode E2E tests.
 # Usage:
 #   docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri up -d --build
-#   yarn test:e2e:ri:closed
+#   pnpm test:e2e:ri:closed
 #   docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri down -v
 services:
   app:

@@ -61,13 +61,13 @@ Follow the [Prerequisites section](../../README.md#prerequisites) in the root RE
 
    ```bash
    # From the repository root directory
-   yarn install
+   pnpm install
    ```
 
 2. **Build the package**:
    ```bash
    cd packages/untp-test-suite
-   yarn build
+   pnpm build
    ```
 
 After building, you can use the CLI commands with `npx` to pick up the local build.
@@ -214,8 +214,8 @@ the same tests with the same test runner, in a browser environment.
 
 ```bash
 cd packages/untp-test-suite
-yarn build:browser
-yarn browser-test
+pnpm build:browser
+pnpm browser-test
 ```
 
 2. Open `http://localhost:8080` in your browser

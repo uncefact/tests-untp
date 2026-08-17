@@ -5,7 +5,7 @@ Shared utility primitives for UNTP packages and consumers.
 ## Installation
 
 ```bash
-yarn add @uncefact/untp-utils
+npm install @uncefact/untp-utils
 ```
 
 ## Sub-entries
