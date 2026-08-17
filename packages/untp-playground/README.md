@@ -3,7 +3,7 @@
 ## Getting Started
 
 ```bash
-yarn dev
+pnpm dev
 ```
 
 Open [http://localhost:3000/](http://localhost:3000/) with your browser to see the result.
@@ -27,17 +27,17 @@ We use Jest for testing.
 To run tests:
 
 ```bash
-yarn test
+pnpm test
 ```
 
 To run tests in watch mode:
 
 ```bash
-yarn test:watch
+pnpm test:watch
 ```
 
 To generate coverage report:
 
 ```bash
-yarn test:coverage
+pnpm test:coverage
 ```
