@@ -88,7 +88,7 @@ describe('LinkSetTestResults', () => {
     expect(screen.getByText('Schema Validation')).toBeInTheDocument();
     // The pending stub explains itself, so grey reads as "not built yet" rather than "stuck".
     expect(screen.getByTestId('linkset-validation-note')).toHaveTextContent(
-      'not yet run — link set validation arrives in a later release',
+      'not yet run: link set validation is coming in v0.4',
     );
   });
 

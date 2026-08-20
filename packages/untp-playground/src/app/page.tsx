@@ -4,9 +4,9 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ArtefactUploader, type ArtefactSource } from '@/components/ArtefactUploader';
+import { UPLOADER_FAMILIES } from '@/lib/uploaderFamilies';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { EmptyState } from '@/components/EmptyState';
-import { LinkSetResolver } from '@/components/LinkSetResolver';
 import { LinkSetTestResults } from '@/components/LinkSetTestResults';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
@@ -27,14 +27,19 @@ import {
 import { newId } from '@/lib/id';
 import { linkSetKey, linkSetTitle } from '@/lib/linkSetCollection';
 import { schemeContentHash, schemeTitle } from '@/lib/schemeCollection';
-import { decodeEnvelopedCredential, detectArtefact, isEnvelopedProof } from '@/lib/credentialService';
+import {
+  acceptedArtefactFamilies,
+  decodeEnvelopedCredential,
+  isEnvelopedProof,
+  isLinkSetShaped,
+} from '@/lib/credentialService';
 import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, StoredLinkSet, StoredScheme, TestStep } from '@/types';
 import { useError } from '@/contexts/ErrorContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Link2, Loader2, Server } from 'lucide-react';
-import { ArtefactKind, permittedCredentialTypes, TestCaseStatus } from '../../constants';
+import { ArtefactKind, permittedCredentialTypes, TestCaseStatus, type TabId } from '../../constants';
 
 /**
  * Quiet per-tab meta (final hi-fi, canvas section 08): a muted tabular-nums instance count, a
@@ -90,7 +95,7 @@ export default function Home() {
   const scheme = useArtefactCollection<StoredScheme, TestStep[]>();
   const linkSet = useArtefactCollection<StoredLinkSet, TestStep[]>();
   const [fileCount, setFileCount] = useState(0);
-  const [activeTab, setActiveTab] = useState('credentials');
+  const [activeTab, setActiveTab] = useState<TabId>('credentials');
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
   const shouldDisplayUploadDetailBtn = errors && errors.length > 0;
@@ -121,7 +126,7 @@ export default function Home() {
     [scheme.state.items],
   );
 
-  // Shared ingestion for both link set entry points (file upload via detection, resolver via the
+  // Shared ingestion for both link set entry points (file upload on the Link Sets tab, resolve via the
   // Link Sets tab). Identity is the resolver URL, else the filename (#811), so re-resolving the
   // same identifier replaces the card in place even when the response body changed.
   const ingestLinkSet = (payload: Record<string, unknown>, source?: ArtefactSource) => {
@@ -134,91 +139,100 @@ export default function Home() {
     }
   };
 
+  // The tab declares intent (#676): an upload validates as the active tab's family, with no
+  // cross-family routing and no auto-switching. Detection only labels cards.
+  const handleCredentialUpload = (rawArtefact: any, source?: ArtefactSource) => {
+    const normalizedCredential = rawArtefact.verifiableCredential || rawArtefact;
+    const error = validateNormalizedCredential(normalizedCredential);
+
+    if (error) {
+      dispatchError([error]);
+      return;
+    }
+
+    const isEnveloped = isEnvelopedProof(normalizedCredential);
+    const decodedCredential = isEnveloped ? decodeEnvelopedCredential(normalizedCredential) : normalizedCredential;
+
+    const credentialType = credentialGroupType(decodedCredential);
+
+    if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
+      // The unclassified-artefact message names every accepted family, read from the detection
+      // layer so a new family appears here automatically (#676).
+      const acceptedFamiliesText = acceptedArtefactFamilies().join(', ');
+      dispatchError([
+        {
+          keyword: 'required',
+          instancePath: '/type',
+          params: {
+            missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
+            receivedValue: normalizedCredential,
+            allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+            solution: `Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential'), or add the artefact on its own tab. The Playground accepts: ${acceptedFamiliesText}.`,
+          },
+          message: `The credential type is missing or invalid. The Playground accepts: ${acceptedFamiliesText}.`,
+        },
+      ]);
+      return;
+    }
+
+    const stored: StoredCredential = { original: normalizedCredential, decoded: decodedCredential, source };
+    const { outcome } = credential.dispatch((state) =>
+      upsert(state, { payload: stored, contentHash: credentialContentHash(stored.decoded), mintInstanceId: newId }),
+    );
+    if (outcome.kind === 'replaced') {
+      toast.success(`Replaced ${credentialTitle(stored)}`);
+    }
+  };
+
+  const handleSchemeUpload = (rawArtefact: any, source?: ArtefactSource) => {
+    const stored: StoredScheme = { original: rawArtefact, decoded: rawArtefact, source };
+    const { outcome } = scheme.dispatch((state) =>
+      upsert(state, { payload: stored, contentHash: schemeContentHash(stored.decoded), mintInstanceId: newId }),
+    );
+    if (outcome.kind === 'replaced') {
+      toast.success(`Replaced ${schemeTitle(stored)}`);
+    }
+  };
+
+  const handleLinkSetUpload = (rawArtefact: any, source?: ArtefactSource) => {
+    // The link set family's only structural gate this phase: an RFC 9264 document has a top-level
+    // linkset array. Anything else fails as a link set (the tab declared the intent), with the
+    // accepted families named from the detection layer.
+    if (!isLinkSetShaped(rawArtefact)) {
+      toast.error(
+        `That document is not a link set (no RFC 9264 "linkset" array). The Playground accepts: ${acceptedArtefactFamilies().join(
+          ', ',
+        )}. Add each on its own tab.`,
+      );
+      return;
+    }
+    ingestLinkSet(rawArtefact, source);
+  };
+
+  const uploadHandlers: Record<TabId, (rawArtefact: any, source?: ArtefactSource) => void> = {
+    credentials: handleCredentialUpload,
+    schemes: handleSchemeUpload,
+    linksets: handleLinkSetUpload,
+  };
+
   const handleArtefactUpload = async (rawArtefact: any, source?: ArtefactSource) => {
     try {
-      const detected = detectArtefact(rawArtefact?.verifiableCredential ?? rawArtefact);
-
-      if (detected?.kind === ArtefactKind.LINK_SET) {
-        // Dropped files route by detection, like schemes have since #677: the filename is a stable
-        // identity. A link set fetched through the generic URL row is NOT ingested: that path has
-        // no ?linkType=all normalisation and only knows the post-redirect URL, so ingesting it
-        // would mint a second, differently-keyed card for an identifier the resolver flow already
-        // owns (ADR-046). Point the user at the Resolve input instead. #676 tab-scopes the
-        // uploader properly.
-        if (source?.kind === 'url') {
-          toast.error('That URL returned an identity-resolver link set. Resolve it from the Link Sets tab instead.');
-          return;
-        }
-        ingestLinkSet(rawArtefact, source);
-        return;
-      }
-
-      if (detected?.kind === ArtefactKind.SCHEME) {
-        const stored: StoredScheme = { original: rawArtefact, decoded: rawArtefact, source };
-        const { outcome } = scheme.dispatch((state) =>
-          upsert(state, { payload: stored, contentHash: schemeContentHash(stored.decoded), mintInstanceId: newId }),
-        );
-        if (outcome.kind === 'replaced') {
-          toast.success(`Replaced ${schemeTitle(stored)}`);
-        }
-        return;
-      }
-
-      const normalizedCredential = rawArtefact.verifiableCredential || rawArtefact;
-      const error = validateNormalizedCredential(normalizedCredential);
-
-      if (error) {
-        dispatchError([error]);
-        return;
-      }
-
-      const isEnveloped = isEnvelopedProof(normalizedCredential);
-      const decodedCredential = isEnveloped ? decodeEnvelopedCredential(normalizedCredential) : normalizedCredential;
-
-      const credentialType = credentialGroupType(decodedCredential);
-
-      if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
-        dispatchError([
-          {
-            keyword: 'required',
-            instancePath: '/type',
-            params: {
-              missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
-              receivedValue: normalizedCredential,
-              allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
-              solution: "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential').",
-            },
-            message: `The credential type is missing or invalid.`,
-          },
-        ]);
-        return;
-      }
-
-      const stored: StoredCredential = { original: normalizedCredential, decoded: decodedCredential, source };
-      const { outcome } = credential.dispatch((state) =>
-        upsert(state, { payload: stored, contentHash: credentialContentHash(stored.decoded), mintInstanceId: newId }),
-      );
-      if (outcome.kind === 'replaced') {
-        toast.success(`Replaced ${credentialTitle(stored)}`);
-      }
+      uploadHandlers[activeTab](rawArtefact, source);
     } catch (error) {
       console.error(error);
       toast.error('Failed to process artefact');
     }
   };
 
-  // The shared sidebar (uploader + sample downloads), rendered once beside the tab panels.
-  // Per-tab copy lands in #676. For now the same uploader serves every family.
+  // The whole sidebar is tab-scoped (#676): heading, dropzone subtitle, divider, URL placeholder
+  // and verb, helper copy, and the sample download all follow the active tab.
   const sidebar = (
     <div className='flex flex-col space-y-8'>
-      <div>
-        <h2 className='text-xl font-semibold mb-6'>Add new artefact</h2>
-        <ArtefactUploader onArtefactUpload={handleArtefactUpload} setFileCount={setFileCount} />
-      </div>
-      {/* The resolver input belongs to the Link Sets tab: a resolver URL names an identifier, not
-          a document, so it cannot share the generic fetch row above. Full tab-scoped uploader copy
-          is #676. */}
-      {activeTab === 'linksets' && <LinkSetResolver onResolved={(payload, source) => ingestLinkSet(payload, source)} />}
+      <ArtefactUploader
+        family={UPLOADER_FAMILIES[activeTab]}
+        onArtefactUpload={handleArtefactUpload}
+        setFileCount={setFileCount}
+      />
       {shouldDisplayUploadDetailBtn && (
         <div>
           <Button onClick={() => setIsDetailsOpen(true)}>View Upload Detail</Button>
@@ -226,7 +240,7 @@ export default function Home() {
       )}
       <div>
         <h2 className='text-xl font-semibold mb-6'>Download test files</h2>
-        <DownloadCredential />
+        <DownloadCredential family={activeTab} />
       </div>
     </div>
   );
@@ -240,7 +254,14 @@ export default function Home() {
             <ReportActions />
           </SectionHeader>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs
+            value={activeTab}
+            // Radix types the callback as string; ignore any value outside the TabId tables so a
+            // future trigger without table entries cannot crash the sidebar render.
+            onValueChange={(value) => {
+              if (value in UPLOADER_FAMILIES) setActiveTab(value as TabId);
+            }}
+          >
             <TabsList>
               <TabsTrigger value='credentials'>
                 Credentials

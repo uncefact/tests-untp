@@ -15,15 +15,16 @@ describe('DownloadCredential', () => {
     (global.URL.createObjectURL as jest.Mock).mockReturnValue('blob:test-url');
   });
 
-  it('renders one button per sample artefact', () => {
-    render(<DownloadCredential />);
+  it('renders only the active family sample (#676)', () => {
+    render(<DownloadCredential family='credentials' />);
 
     expect(screen.getByRole('button', { name: /test credential \(dpp\)/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /conformity scheme/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /conformity scheme/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /test link set/i })).not.toBeInTheDocument();
   });
 
   it('fetches the DPP sample on click', async () => {
-    render(<DownloadCredential />);
+    render(<DownloadCredential family='credentials' />);
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /test credential \(dpp\)/i }));
@@ -40,7 +41,7 @@ describe('DownloadCredential', () => {
   });
 
   it('fetches the ConformityScheme sample on click', async () => {
-    render(<DownloadCredential />);
+    render(<DownloadCredential family='schemes' />);
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /conformity scheme/i }));
@@ -51,11 +52,23 @@ describe('DownloadCredential', () => {
     });
   });
 
+  it('fetches the Link Set sample on click', async () => {
+    render(<DownloadCredential family='linksets' />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /test link set/i }));
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith('/samples/sample-link-set.json');
+    });
+  });
+
   it('logs the failed sample name on error', async () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
     (global.fetch as jest.Mock).mockRejectedValue(new Error('Download failed'));
 
-    render(<DownloadCredential />);
+    render(<DownloadCredential family='credentials' />);
     await fireEvent.click(screen.getByRole('button', { name: /test credential \(dpp\)/i }));
 
     expect(consoleSpy).toHaveBeenCalledWith(

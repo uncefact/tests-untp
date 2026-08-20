@@ -15,8 +15,8 @@ import { CONFORMITY_SCHEME_E2E_VERSIONS } from '../fixtures/conformity-schemes-e
 
 const SCHEME_GROUP_HEADER = 'scheme-group-header';
 
-// Scheme results render in the Conformity Schemes tab panel, which is hidden while the default
-// Credentials tab is active. Switch to that tab before interacting with the scheme results.
+// The tab declares intent (#676): a scheme upload must happen on the Conformity Schemes tab, and
+// the results render in that tab's panel. Switch before uploading.
 const openSchemesTab = () => cy.contains('[role="tab"]', 'Conformity Schemes').click();
 
 CONFORMITY_SCHEME_E2E_VERSIONS.forEach((spec) => {
@@ -26,8 +26,8 @@ CONFORMITY_SCHEME_E2E_VERSIONS.forEach((spec) => {
     });
 
     it('valid sample reaches success on every pipeline step', () => {
-      cy.uploadCredential(spec.validSample);
       openSchemesTab();
+      cy.uploadCredential(spec.validSample);
       cy.get(`[data-testid="${SCHEME_GROUP_HEADER}"]`).click();
 
       cy.checkValidationStatus('Version Detection', 'success');
@@ -39,8 +39,8 @@ CONFORMITY_SCHEME_E2E_VERSIONS.forEach((spec) => {
       it(`rejects: ${invalidCase.name} (fails at ${invalidCase.failsAt})`, () => {
         const malformed = invalidCase.mutate(JSON.parse(JSON.stringify(spec.validSample)));
 
-        cy.uploadCredential(malformed);
         openSchemesTab();
+        cy.uploadCredential(malformed);
         cy.get(`[data-testid="${SCHEME_GROUP_HEADER}"]`).click();
 
         cy.checkValidationStatus(invalidCase.failsAt, 'failure');

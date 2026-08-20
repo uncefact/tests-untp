@@ -4,6 +4,11 @@ export enum ArtefactKind {
   LINK_SET = 'link-set',
 }
 
+// The Playground's artefact tabs. The closed union keeps every per-tab table (uploader copy,
+// upload handlers, sample downloads) exhaustive at compile time, so a new tab cannot ship
+// without an entry in each (#676).
+export type TabId = 'credentials' | 'schemes' | 'linksets';
+
 export enum SchemeType {
   CONFORMITY_SCHEME = 'ConformityScheme',
 }

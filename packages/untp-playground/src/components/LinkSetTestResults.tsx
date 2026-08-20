@@ -123,7 +123,7 @@ function LinkSetCard({ item, onRemove }: { item: LinkSetSlot; onRemove: () => vo
                 <span>{step.name}</span>
                 {step.status === TestCaseStatus.PENDING && (
                   <span className='text-xs text-muted-foreground' data-testid='linkset-validation-note'>
-                    not yet run — link set validation arrives in a later release
+                    not yet run: link set validation is coming in v0.4
                   </span>
                 )}
               </div>
