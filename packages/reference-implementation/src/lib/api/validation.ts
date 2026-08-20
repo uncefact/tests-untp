@@ -6,7 +6,16 @@
  */
 
 import { z } from 'zod';
-import { validatePublicUrl } from '@uncefact/untp-ri-services/server';
+import {
+  InvalidUrlError,
+  PrivateAddressError,
+  PrivateHostnameError,
+  ResolutionEmptyError,
+  ResolutionFailedError,
+  UnsupportedSchemeError,
+  UrlValidationError,
+  validatePublicUrl,
+} from '@uncefact/untp-utils/node';
 
 export class ValidationError extends Error {
   /**
@@ -195,23 +204,27 @@ export function assertHttpUrl(url: string, paramName: string): URL {
  * or reserved network address (SSRF protection).
  */
 export async function assertPublicUrl(url: string, paramName: string): Promise<void> {
-  let parsed: URL;
   try {
-    parsed = new URL(url);
-  } catch {
-    throw new ValidationError(`${paramName} must be a valid URL`);
-  }
-  try {
-    await validatePublicUrl(parsed);
+    await validatePublicUrl(url);
   } catch (e) {
-    if (e instanceof Error && e.message.includes('could not be resolved')) {
+    if (e instanceof InvalidUrlError) {
+      throw new ValidationError(`${paramName} must be a valid URL`);
+    }
+    if (e instanceof UnsupportedSchemeError) {
+      throw new ValidationError(`${paramName} must be an http(s) URL`);
+    }
+    if (e instanceof ResolutionFailedError || e instanceof ResolutionEmptyError) {
       throw new ValidationError(`${paramName} hostname could not be resolved`);
     }
-    if (e instanceof Error && e.message.includes('private or reserved')) {
+    if (e instanceof PrivateHostnameError || e instanceof PrivateAddressError) {
       throw new ValidationError(`${paramName} must not point to a private or reserved network address`);
     }
-    throw new ValidationError(
-      `${paramName} could not be validated: ${e instanceof Error ? e.message : 'unexpected error'}`,
-    );
+    if (e instanceof UrlValidationError) {
+      throw new ValidationError(`${paramName} could not be validated: ${e.message}`);
+    }
+    // A rejection outside the guard's error hierarchy is a programming
+    // error, not a caller mistake; rethrow so it surfaces as a 500 rather
+    // than a validation-shaped 400.
+    throw e;
   }
 }

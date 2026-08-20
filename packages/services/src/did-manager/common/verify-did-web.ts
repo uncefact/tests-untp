@@ -1,3 +1,9 @@
+import {
+  PrivateAddressError,
+  PrivateHostnameError,
+  UrlValidationError,
+  validatePublicUrl,
+} from '@uncefact/untp-utils/node';
 import { httpFetch } from '../../http/client.js';
 import type { DidDocument, DidVerificationCheck, MethodVerificationResult } from '../types.js';
 import { DidVerificationCheckName } from '../types.js';
@@ -6,23 +12,18 @@ import { didWebToUrl } from './utils.js';
 const C = DidVerificationCheckName;
 
 /**
- * Blocks resolution of private and localhost URLs to prevent SSRF attacks.
- */
-function isPrivateUrl(urlString: string): boolean {
-  try {
-    const { hostname } = new URL(urlString);
-    return /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.|localhost$|::1$|\[::1\]$)/i.test(hostname);
-  } catch {
-    return true; // Malformed URLs are blocked
-  }
-}
-
-/**
  * did:web method-specific verification.
  *
  * Runs two checks:
  *   1. RESOLVE — fetch the DID document from the resolution URL
  *   2. HTTPS   — verify the final response URL (after redirects) is HTTPS
+ *
+ * The resolution URL is validated with the canonical SSRF guard before any
+ * request is made; see `validatePublicUrl` in `@uncefact/untp-utils/node`
+ * for the rejection classes. The subsequent fetch connects via the hostname
+ * rather than the validated IP: a pinned-fetch path that closes the DNS
+ * rebinding window already exists in `@uncefact/untp-utils/resolvers`, and
+ * this call site does not yet use it.
  *
  * @see https://w3c-ccg.github.io/did-method-web/
  * @see https://www.w3.org/TR/did-1.0/
@@ -33,12 +34,18 @@ export async function verifyDidWeb(did: string): Promise<MethodVerificationResul
 
   const url = didWebToUrl(did);
 
-  if (isPrivateUrl(url)) {
-    checks.push({
-      name: C.RESOLVE,
-      passed: false,
-      message: 'Private or localhost URLs are not permitted for DID resolution',
-    });
+  try {
+    await validatePublicUrl(url);
+  } catch (error) {
+    // Only the guard's own error hierarchy is a verification outcome;
+    // anything else is a programming error and must surface as one rather
+    // than masquerade as a failed check.
+    if (!(error instanceof UrlValidationError)) throw error;
+    const message =
+      error instanceof PrivateHostnameError || error instanceof PrivateAddressError
+        ? 'Private or localhost URLs are not permitted for DID resolution'
+        : `DID resolution URL rejected: ${error.message}`;
+    checks.push({ name: C.RESOLVE, passed: false, message });
     checks.push({ name: C.HTTPS, passed: false, message: 'Could not verify HTTPS (resolution blocked)' });
     return { document, checks };
   }

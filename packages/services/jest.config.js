@@ -18,6 +18,11 @@ const jestConfig = {
     // mock it per-file via jest.mock. This shim avoids Jest crashing during
     // module resolution when an adapter that depends on untp-utils is loaded.
     '^@uncefact/untp-utils/multibase-digest$': '<rootDir>/__tests__/mocks/multibase-digest.ts',
+    // The /node sub-entry is mapped to its TypeScript source rather than the
+    // ESM build so tests can `jest.requireActual` it (the DNS-free paths of
+    // the SSRF guard run for real in verify-did-web's tests); ts-jest
+    // transforms it like this package's own sources.
+    '^@uncefact/untp-utils/node$': '<rootDir>/../untp-utils/src/node/index.ts',
     '^@uncefact/untp-utils/resolvers$': '<rootDir>/../untp-utils/build/resolvers/index.js',
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
     '^@uncefact/untp-utils/conformity-vocabulary$': '<rootDir>/../untp-utils/build/conformity-vocabulary/index.js',

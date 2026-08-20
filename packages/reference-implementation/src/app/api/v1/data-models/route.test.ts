@@ -43,9 +43,12 @@ const mockListDataModels = jest.fn();
 const mockCreateDataModel = jest.fn();
 
 const mockValidatePublicUrl = jest.fn();
-jest.mock('@uncefact/untp-ri-services/server', () => ({
+jest.mock('@uncefact/untp-utils/node', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/node'),
   validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
 }));
+
+import { PrivateAddressError } from '@uncefact/untp-utils/node';
 
 jest.mock('@/lib/prisma/repositories', () => ({
   listDataModels: (tenantId: string, opts: unknown) => mockListDataModels(tenantId, opts),
@@ -838,9 +841,7 @@ describe('POST /api/v1/data-models', () => {
   });
 
   it('returns 400 when schemaUrl points to a private address', async () => {
-    mockValidatePublicUrl.mockRejectedValueOnce(
-      new Error('uri must not point to a private or reserved network address'),
-    );
+    mockValidatePublicUrl.mockRejectedValueOnce(new PrivateAddressError('127.0.0.1', ['127.0.0.1']));
 
     const req = createFakeRequest({
       body: {
@@ -863,7 +864,7 @@ describe('POST /api/v1/data-models', () => {
     mockValidatePublicUrl
       .mockResolvedValueOnce(undefined) // schemaUrl passes
       .mockResolvedValueOnce(undefined) // contextUrl passes
-      .mockRejectedValueOnce(new Error('uri must not point to a private or reserved network address'));
+      .mockRejectedValueOnce(new PrivateAddressError('127.0.0.1', ['127.0.0.1']));
 
     const req = createFakeRequest({
       body: { ...VALID_BODY, websiteUrl: 'http://169.254.169.254/spec' },
@@ -896,7 +897,7 @@ describe('POST /api/v1/data-models', () => {
   it('returns 400 when contextUrl points to a private address', async () => {
     mockValidatePublicUrl
       .mockResolvedValueOnce(undefined) // schemaUrl passes
-      .mockRejectedValueOnce(new Error('uri must not point to a private or reserved network address')); // contextUrl fails
+      .mockRejectedValueOnce(new PrivateAddressError('127.0.0.1', ['127.0.0.1'])); // contextUrl fails
 
     const req = createFakeRequest({
       body: {
