@@ -1,5 +1,20 @@
+// `validatePublicUrl` performs DNS resolution for hostnames, which tests must
+// not depend on. The default mock treats every URL as public; the SSRF cases
+// call through to the real implementation, which classifies IP literals and
+// known-private hostnames without touching DNS.
+const actualNode = jest.requireActual('@uncefact/untp-utils/node');
+const mockValidatePublicUrl = jest.fn();
+jest.mock('@uncefact/untp-utils/node', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/node'),
+  validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
+}));
+
 import { verifyDidWeb } from './verify-did-web';
 import { DidVerificationCheckName } from '../types';
+
+function useRealGuardOnce(): void {
+  mockValidatePublicUrl.mockImplementationOnce((url: string) => actualNode.validatePublicUrl(url));
+}
 
 const C = DidVerificationCheckName;
 
@@ -61,6 +76,8 @@ const validDidDocument = {
 describe('verifyDidWeb', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
+    mockValidatePublicUrl.mockReset();
+    mockValidatePublicUrl.mockResolvedValue({ address: '203.0.113.10', family: 4 });
   });
 
   afterEach(() => {
@@ -144,29 +161,88 @@ describe('verifyDidWeb', () => {
 
   describe('SSRF protection', () => {
     it('blocks localhost URLs', async () => {
+      useRealGuardOnce();
       const result = await verifyDidWeb('did:web:localhost');
       expect(result.document).toBeNull();
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('blocks 127.x.x.x URLs', async () => {
+      useRealGuardOnce();
       const result = await verifyDidWeb('did:web:127.0.0.1');
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
+      expect(resolveCheck?.message).toContain('not permitted');
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('blocks 10.x.x.x URLs', async () => {
+      useRealGuardOnce();
       const result = await verifyDidWeb('did:web:10.0.0.1');
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
+      expect(resolveCheck?.message).toContain('not permitted');
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('blocks 192.168.x.x URLs', async () => {
+      useRealGuardOnce();
       const result = await verifyDidWeb('did:web:192.168.1.1');
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
+      expect(resolveCheck?.message).toContain('not permitted');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('blocks the cloud metadata literal (missed by the previous in-package guard)', async () => {
+      useRealGuardOnce();
+      const result = await verifyDidWeb('did:web:169.254.169.254');
+      const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
+      expect(resolveCheck?.passed).toBe(false);
+      expect(resolveCheck?.message).toContain('not permitted');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('blocks an IPv6 unique-local literal (missed by the previous in-package guard)', async () => {
+      useRealGuardOnce();
+      const result = await verifyDidWeb('did:web:%5Bfd12%3A3456%3A789a%3A%3A1%5D');
+      const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
+      expect(resolveCheck?.passed).toBe(false);
+      expect(resolveCheck?.message).toContain('not permitted');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('maps a private-hostname rejection to the not-permitted message', async () => {
+      mockValidatePublicUrl.mockRejectedValueOnce(new actualNode.PrivateHostnameError('intranet.internal'));
+      const result = await verifyDidWeb('did:web:intranet.internal');
+      const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
+      expect(resolveCheck?.passed).toBe(false);
+      expect(resolveCheck?.message).toContain('not permitted');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('rethrows errors outside the guard hierarchy instead of reporting a failed check', async () => {
+      const bug = new TypeError('validatePublicUrl exploded');
+      mockValidatePublicUrl.mockRejectedValueOnce(bug);
+      await expect(verifyDidWeb('did:web:example.com')).rejects.toBe(bug);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('surfaces a non-private guard failure with the structured error message', async () => {
+      mockValidatePublicUrl.mockRejectedValueOnce(
+        new actualNode.ResolutionFailedError('nonexistent.example.com', new Error('ENOTFOUND')),
+      );
+      const result = await verifyDidWeb('did:web:nonexistent.example.com');
+      const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
+      expect(resolveCheck?.passed).toBe(false);
+      expect(resolveCheck?.message).toContain('DID resolution URL rejected');
+      const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
+      expect(httpsCheck?.passed).toBe(false);
+      expect(httpsCheck?.message).toBe('Could not verify HTTPS (resolution blocked)');
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 });

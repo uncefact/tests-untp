@@ -1,7 +1,18 @@
 const mockValidatePublicUrl = jest.fn();
-jest.mock('@uncefact/untp-ri-services/server', () => ({
+jest.mock('@uncefact/untp-utils/node', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/node'),
   validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
 }));
+
+import {
+  InvalidUrlError,
+  PrivateAddressError,
+  PrivateHostnameError,
+  ResolutionEmptyError,
+  ResolutionFailedError,
+  UnsupportedSchemeError,
+  UrlValidationError,
+} from '@uncefact/untp-utils/node';
 
 import { z } from 'zod';
 import {
@@ -195,21 +206,39 @@ describe('assertPublicUrl', () => {
   });
 
   it('throws ValidationError for an invalid URL string', async () => {
+    mockValidatePublicUrl.mockRejectedValue(new InvalidUrlError('not-a-url', new TypeError('Invalid URL')));
+
     await expect(assertPublicUrl('not-a-url', 'schemaUrl')).rejects.toThrow(ValidationError);
     await expect(assertPublicUrl('not-a-url', 'schemaUrl')).rejects.toThrow(/must be a valid URL/);
   });
 
-  it('throws ValidationError when validatePublicUrl rejects (private address)', async () => {
-    mockValidatePublicUrl.mockRejectedValue(new Error('uri must not point to a private or reserved network address'));
+  it('throws ValidationError for a non-http(s) scheme', async () => {
+    mockValidatePublicUrl.mockRejectedValue(new UnsupportedSchemeError('ftp', ['http', 'https']));
 
-    await expect(assertPublicUrl('http://127.0.0.1/test', 'schemaUrl')).rejects.toThrow(ValidationError);
-    await expect(assertPublicUrl('http://127.0.0.1/test', 'schemaUrl')).rejects.toThrow(
+    await expect(assertPublicUrl('ftp://example.com/file', 'schemaUrl')).rejects.toThrow(ValidationError);
+    await expect(assertPublicUrl('ftp://example.com/file', 'schemaUrl')).rejects.toThrow(/must be an http\(s\) URL/);
+  });
+
+  it('throws ValidationError when a resolved address is private', async () => {
+    mockValidatePublicUrl.mockRejectedValue(new PrivateAddressError('internal.example.com', ['10.0.0.5']));
+
+    await expect(assertPublicUrl('http://internal.example.com/test', 'schemaUrl')).rejects.toThrow(ValidationError);
+    await expect(assertPublicUrl('http://internal.example.com/test', 'schemaUrl')).rejects.toThrow(
+      /must not point to a private or reserved network address/,
+    );
+  });
+
+  it('throws ValidationError when the hostname itself is private', async () => {
+    mockValidatePublicUrl.mockRejectedValue(new PrivateHostnameError('localhost'));
+
+    await expect(assertPublicUrl('http://localhost/test', 'schemaUrl')).rejects.toThrow(ValidationError);
+    await expect(assertPublicUrl('http://localhost/test', 'schemaUrl')).rejects.toThrow(
       /must not point to a private or reserved network address/,
     );
   });
 
   it('throws ValidationError when hostname cannot be resolved', async () => {
-    mockValidatePublicUrl.mockRejectedValue(new Error('uri hostname could not be resolved'));
+    mockValidatePublicUrl.mockRejectedValue(new ResolutionFailedError('nonexistent.invalid', new Error('ENOTFOUND')));
 
     await expect(assertPublicUrl('https://nonexistent.invalid/test', 'schemaUrl')).rejects.toThrow(ValidationError);
     await expect(assertPublicUrl('https://nonexistent.invalid/test', 'schemaUrl')).rejects.toThrow(
@@ -217,13 +246,30 @@ describe('assertPublicUrl', () => {
     );
   });
 
-  it('wraps unexpected errors from validatePublicUrl in ValidationError', async () => {
-    mockValidatePublicUrl.mockRejectedValue(new TypeError('Unexpected internal error'));
+  it('throws ValidationError when the resolver returns no addresses', async () => {
+    mockValidatePublicUrl.mockRejectedValue(new ResolutionEmptyError('empty.example.com'));
+
+    await expect(assertPublicUrl('https://empty.example.com/test', 'schemaUrl')).rejects.toThrow(ValidationError);
+    await expect(assertPublicUrl('https://empty.example.com/test', 'schemaUrl')).rejects.toThrow(
+      /hostname could not be resolved/,
+    );
+  });
+
+  it('wraps an unrecognised UrlValidationError subclass in ValidationError', async () => {
+    class FutureError extends UrlValidationError {}
+    mockValidatePublicUrl.mockRejectedValue(new FutureError({ code: 'url.future', message: 'Some new rejection.' }));
 
     await expect(assertPublicUrl('https://example.com/test', 'schemaUrl')).rejects.toThrow(ValidationError);
     await expect(assertPublicUrl('https://example.com/test', 'schemaUrl')).rejects.toThrow(
-      /schemaUrl could not be validated: Unexpected internal error/,
+      /schemaUrl could not be validated: Some new rejection./,
     );
+  });
+
+  it('rethrows errors outside the guard hierarchy instead of relabelling them as validation failures', async () => {
+    const bug = new TypeError('Unexpected internal error');
+    mockValidatePublicUrl.mockRejectedValue(bug);
+
+    await expect(assertPublicUrl('https://example.com/test', 'schemaUrl')).rejects.toBe(bug);
   });
 
   it('resolves without throwing for a valid public URL', async () => {

@@ -132,6 +132,21 @@ describe('validatePublicUrl', () => {
       await expect(validatePublicUrl('https://example.com/')).rejects.toBeInstanceOf(ResolutionEmptyError);
     });
 
+    it('rejects a record whose address does not parse as an IP', async () => {
+      lookup.mockResolvedValue([{ address: 'not-an-ip-address', family: 4 }] as never);
+      await expect(validatePublicUrl('https://example.com/')).rejects.toThrow(ResolutionFailedError);
+    });
+
+    it('rejects a record whose claimed family contradicts its address', async () => {
+      lookup.mockResolvedValue([{ address: '10.0.0.1', family: 6 }] as never);
+      await expect(validatePublicUrl('https://example.com/')).rejects.toThrow(ResolutionFailedError);
+    });
+
+    it('requires family agreement even when the address itself is public', async () => {
+      lookup.mockResolvedValue([{ address: '93.184.216.34', family: 0 }] as never);
+      await expect(validatePublicUrl('https://example.com/')).rejects.toThrow(ResolutionFailedError);
+    });
+
     it('passes the family option through to dns.lookup with all: true', async () => {
       lookup.mockResolvedValue([{ address: '1.1.1.1', family: 4 }] as never);
       await validatePublicUrl('https://example.com/', { family: 4 });

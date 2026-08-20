@@ -49,9 +49,12 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 });
 
 const mockValidatePublicUrl = jest.fn();
-jest.mock('@uncefact/untp-ri-services/server', () => ({
+jest.mock('@uncefact/untp-utils/node', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/node'),
   validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
 }));
+
+import { PrivateAddressError } from '@uncefact/untp-utils/node';
 
 const mockGetDataModelById = jest.fn();
 const mockUpdateDataModel = jest.fn();
@@ -322,9 +325,7 @@ describe('PATCH /api/v1/data-models/:id', () => {
   });
 
   it('returns 400 when schemaUrl points to a private address', async () => {
-    mockValidatePublicUrl.mockRejectedValueOnce(
-      new Error('uri must not point to a private or reserved network address'),
-    );
+    mockValidatePublicUrl.mockRejectedValueOnce(new PrivateAddressError('127.0.0.1', ['127.0.0.1']));
 
     const req = createFakeRequest({ method: 'PATCH', body: { schemaUrl: 'http://127.0.0.1/schema.json' } });
     const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);

@@ -24,6 +24,9 @@ const jestConfig = {
     '^@uncefact/untp-ri-services/key-provider$': '<rootDir>/../services/build/key-provider/index.js',
     '^@uncefact/untp-ri-services$': '<rootDir>/../services/build/index.js',
     '^@uncefact/untp-utils/multibase-digest$': '<rootDir>/src/__mocks__/uncefact/multibase-digest.ts',
+    // Mapped to TypeScript source (not the ESM build) so tests can
+    // `jest.requireActual` the canonical SSRF guard's error classes.
+    '^@uncefact/untp-utils/node$': '<rootDir>/../untp-utils/src/node/index.ts',
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
     '^@uncefact/untp-utils/loaders$': '<rootDir>/../untp-utils/build/loaders/index.js',
     '^@uncefact/untp-utils/cache$': '<rootDir>/../untp-utils/build/cache/index.js',

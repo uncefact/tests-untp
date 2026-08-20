@@ -58,7 +58,7 @@ const DEFAULT_ALLOWED_SCHEMES: readonly string[] = ['http', 'https'];
  * @throws {InvalidUrlError} `url` is not a parseable URL.
  * @throws {UnsupportedSchemeError} the URL's scheme is not allowed.
  * @throws {PrivateHostnameError} the hostname names a private resource.
- * @throws {ResolutionFailedError} DNS resolution rejected.
+ * @throws {ResolutionFailedError} DNS resolution rejected, or the resolver returned an unparseable or family-contradictory record.
  * @throws {ResolutionEmptyError} DNS resolution returned no records.
  * @throws {PrivateAddressError} any resolved record is private.
  */
@@ -108,14 +108,26 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
   const privateRecords: string[] = [];
   let firstPublicRecord: ResolvedAddress | null = null;
   for (const record of records) {
-    if (record.family !== 4 && record.family !== 6) {
-      throw new ResolutionFailedError(hostname, new Error(`unsupported address family ${record.family}`));
+    // Derive the record's family from the address string itself rather than
+    // trusting `record.family` (typed as a bare `number`, and DNS resolvers
+    // have shipped bugs that misreport it). A record whose address does not
+    // parse as an IP at all, or whose derived family disagrees with the
+    // resolver's claim, is contradictory metadata and is rejected outright
+    // rather than silently reconciled.
+    const derivedFamily = isIP(record.address);
+    if ((derivedFamily !== 4 && derivedFamily !== 6) || derivedFamily !== record.family) {
+      throw new ResolutionFailedError(
+        hostname,
+        new Error(
+          `resolver returned a contradictory or unparseable record: ${record.address} (family ${record.family})`,
+        ),
+      );
     }
-    const isPrivate = record.family === 4 ? isPrivateIpv4(record.address) : isPrivateIpv6(record.address);
+    const isPrivate = derivedFamily === 4 ? isPrivateIpv4(record.address) : isPrivateIpv6(record.address);
     if (isPrivate) {
       privateRecords.push(record.address);
     } else if (!firstPublicRecord) {
-      firstPublicRecord = { address: record.address, family: record.family };
+      firstPublicRecord = { address: record.address, family: derivedFamily };
     }
   }
 

@@ -64,6 +64,37 @@ describe('isPrivateIpv6', () => {
     expect(isPrivateIpv6('::ffff:1.1.1.1')).toBe(false);
   });
 
+  it.each([
+    ['::7f00:1'], // IPv4-compatible wrapping 127.0.0.1
+    ['::a9fe:a9fe'], // IPv4-compatible wrapping 169.254.169.254
+    ['::5db8:d822'], // IPv4-compatible wrapping a public address: still deprecated, non-routing space
+    ['::127.0.0.1'], // dotted spelling of the compatible form (ipaddr.js rewrites it to mapped)
+    ['::93.184.216.34'], // dotted compatible wrapping a public address
+    ['::1.1.1.1%lo0'], // zone-indexed dotted compatible (ipaddr.js rewrites this spelling too)
+    ['::93.184.216.34%eth0'], // zone-indexed dotted compatible wrapping a public address
+  ])('rejects the deprecated IPv4-compatible form %s regardless of the embedded address', (addr) => {
+    expect(isPrivateIpv6(addr)).toBe(true);
+  });
+
+  it('treats the hex-group mapped form the same as the dotted mapped form', () => {
+    // `URL.hostname` canonicalises `[::ffff:127.0.0.1]` to `[::ffff:7f00:1]`,
+    // so the hex-group encoding is the one URL-derived callers present.
+    expect(isPrivateIpv6('::ffff:7f00:1')).toBe(true);
+    expect(isPrivateIpv6('::ffff:101:101')).toBe(false); // 1.1.1.1
+    // Control: the zone-suffix handling must not start denying mapped-public.
+    expect(isPrivateIpv6('::ffff:1.1.1.1')).toBe(false);
+  });
+
+  it.each([
+    ['4000::1'], // unallocated, outside 2000::/3
+    ['fe00::1'], // reserved, outside 2000::/3
+    ['101::1'], // unallocated, outside 2000::/3
+    ['100:0:0:1::1'], // discard-only 100::/64 sibling space
+    ['3ffe::1'], // decommissioned 6bone block inside 2000::/3
+  ])('rejects the reserved or unallocated address %s that ipaddr.js has no named range for', (addr) => {
+    expect(isPrivateIpv6(addr)).toBe(true);
+  });
+
   it('returns false for non-IPv6 input', () => {
     expect(isPrivateIpv6('not an ip')).toBe(false);
     expect(isPrivateIpv6('10.0.0.1')).toBe(false);

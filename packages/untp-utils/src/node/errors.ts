@@ -43,7 +43,12 @@ export class PrivateHostnameError extends UrlValidationError {
   }
 }
 
-/** DNS resolution rejected (`ENOTFOUND`, `EAI_AGAIN`, etc.). */
+/**
+ * DNS resolution rejected (`ENOTFOUND`, `EAI_AGAIN`, etc.), or the resolver
+ * returned a record whose address is unparseable or contradicts its claimed
+ * family; contradictory resolver metadata is treated as a failed resolution
+ * rather than silently reconciled.
+ */
 export class ResolutionFailedError extends UrlValidationError {
   constructor(hostname: string, cause: unknown) {
     super({

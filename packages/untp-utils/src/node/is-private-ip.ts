@@ -2,11 +2,16 @@ import { isIPv4, isIPv6 } from 'node:net';
 import ipaddr from 'ipaddr.js';
 
 /**
- * The single `ipaddr.js` range category that represents a publicly routable
- * unicast address. Anything else (loopback, link-local, private, multicast,
- * unique-local, reserved, 6to4, teredo, etc.) is rejected. An allowlist is
- * safer than enumerating disallowed buckets: new range names introduced by
- * future `ipaddr.js` versions default to "block" rather than "allow".
+ * The single `ipaddr.js` range category that can represent a publicly
+ * routable unicast address. Anything else (loopback, link-local, private,
+ * multicast, unique-local, reserved, 6to4, teredo, etc.) is rejected. An
+ * allowlist is safer than enumerating disallowed buckets: new range names
+ * introduced by future `ipaddr.js` versions default to "block" rather than
+ * "allow". For IPv4 this category alone is sufficient (IANA's special-purpose
+ * registry is small and enumerated in full); for IPv6 it is not, because
+ * `range()` also reports it as a fallback for unallocated space, so
+ * {@link isPrivateIpv6} additionally gates on the `2000::/3` Global Unicast
+ * block before trusting it.
  */
 const PUBLIC_RANGE = 'unicast';
 
@@ -79,10 +84,14 @@ export function isPrivateIpv4(address: string): boolean {
 }
 
 /**
- * Returns `true` if `address` is an IPv6 address string that does not fall in
- * the public unicast range. IPv4-mapped addresses (`::ffff:a.b.c.d`) are
- * additionally re-checked against {@link isPrivateIpv4} so an IPv4 private
- * address tunnelled as IPv6 cannot bypass the predicate.
+ * Returns `true` if `address` is an IPv6 address string that is not a
+ * genuine public Global Unicast address. This is a default-deny predicate:
+ * an address is treated as public only when it is both inside the allocated
+ * `2000::/3` Global Unicast block and not one of the named special-purpose
+ * ranges within it; every other address, including reserved or unallocated
+ * space `ipaddr.js` has no name for, is denied. IPv4-mapped addresses
+ * (`::ffff:a.b.c.d`) are re-checked against {@link isPrivateIpv4}, and the
+ * deprecated IPv4-compatible form (`::a.b.c.d`) is rejected outright.
  *
  * Fails closed on parser drift, mirroring {@link isPrivateIpv4}.
  *
@@ -93,14 +102,72 @@ export function isPrivateIpv4(address: string): boolean {
  */
 export function isPrivateIpv6(address: string): boolean {
   if (!isIPv6(address)) return false;
+  // The dotted IPv4-compatible spelling (`::a.b.c.d`) is rewritten by
+  // `ipaddr.js` into the IPv4-mapped byte layout before parsing, which would
+  // route it to the mapped (accept-if-public) branch below instead of the
+  // compatible (always-deny) branch. Deny the textual form up front so both
+  // spellings of the deprecated compatible form classify identically.
+  // The optional %zone suffix mirrors ipaddr.js's own deprecatedTransitional
+  // grammar; without it, a zone-indexed spelling (`::a.b.c.d%eth0`) would
+  // still reach the rewrite.
+  if (/^::\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(%[0-9a-z]+)?$/i.test(address)) return true;
   try {
     const parsed = ipaddr.parse(address);
     if (parsed.kind() !== 'ipv6') return true; // Defensive: parser/version skew. Fail closed.
     const v6 = parsed as ipaddr.IPv6;
-    if (v6.isIPv4MappedAddress()) {
-      return isPrivateIpv4(v6.toIPv4Address().toString());
+    const bytes = v6.toByteArray();
+
+    // Both embedded-IPv4 forms encode the IPv4 address in the last 4 bytes
+    // with the first 10 bytes zero, differing only in bytes 10-11 (0x0000
+    // for IPv4-compatible, 0xffff for IPv4-mapped). Extracting directly from
+    // the byte array, rather than trusting `::ffff:` textual matching or
+    // `isIPv4MappedAddress()` (which recognises only the mapped form), means
+    // neither encoding can bypass classification through this predicate.
+    // - IPv4-mapped (`::ffff:a.b.c.d`) is a real IPv4 destination tunnelled
+    //   through IPv6, so the embedded address is re-checked against
+    //   {@link isPrivateIpv4} and accepted if public.
+    // - IPv4-compatible (`::a.b.c.d`, RFC 4291 section 2.5.5.1) is
+    //   deprecated, IANA-reserved space that does not route, so it is
+    //   rejected unconditionally regardless of the embedded address (the
+    //   dotted spelling is denied textually above, before `ipaddr.js`
+    //   rewrites it to the mapped layout). This
+    //   also covers `::` (unspecified) and `::1` (loopback), which take
+    //   this same form.
+    const embedsIpv4 = bytes.slice(0, 10).every((byte) => byte === 0) && bytes[10] === bytes[11];
+    if (embedsIpv4 && bytes[10] === 0xff) {
+      return isPrivateIpv4(bytes.slice(12).join('.'));
     }
-    return v6.range() !== PUBLIC_RANGE;
+    if (embedsIpv4 && bytes[10] === 0x00) {
+      return true;
+    }
+
+    // `3ffe::/16` is the decommissioned 6bone experimental block: it sits
+    // inside `2000::/3` (top byte `0x3f`) so the Global Unicast gate below
+    // would otherwise let it through, and `ipaddr.js` has no named range
+    // for it, so `range()` reports the 'unicast' fallback for it too. It is
+    // IANA-reserved and does not route; deny it explicitly.
+    if (bytes[0] === 0x3f && bytes[1] === 0xfe) {
+      return true;
+    }
+
+    // Default-deny: `range()` reports the 'unicast' fallback for any
+    // address matching none of `ipaddr.js`'s named special ranges, so it is
+    // not by itself a positive "allocated and routable" signal. `4000::1`,
+    // `fe00::1`, and `101::1` are all unallocated or IANA-reserved space,
+    // and all report `range() === 'unicast'`, so treating that alone as
+    // "public" fails open. Requiring the address to also fall inside the
+    // allocated Global Unicast block `2000::/3` (top 3 bits `001`) closes
+    // that gap while `range()` still excludes the named special-purpose
+    // ranges nested inside that block (documentation `2001:db8::/32`,
+    // teredo `2001::/32`, 6to4 `2002::/16`, benchmarking `2001:2::/48`).
+    //
+    // This is not a claim of complete IANA-allocation tracking: it denies
+    // everything outside `2000::/3`, everything `ipaddr.js` special-cases
+    // within it, and the explicitly-listed `3ffe::/16` above. It does not
+    // enumerate every IANA reservation inside `2000::/3` and cannot prove
+    // an address is *currently* routed.
+    const isAllocatedGlobalUnicast = (bytes[0] & 0xe0) === 0x20;
+    return !(isAllocatedGlobalUnicast && v6.range() === PUBLIC_RANGE);
   } catch {
     return true; // Fail closed: cannot prove the address is public, so treat as private.
   }

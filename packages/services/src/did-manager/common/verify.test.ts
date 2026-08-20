@@ -1,3 +1,12 @@
+// This suite exercises the verification flow above the SSRF guard; the guard
+// itself performs DNS resolution for hostnames, so it is mocked as
+// always-public here. Guard behaviour is covered by verify-did-web.test.ts
+// and the canonical suite in @uncefact/untp-utils.
+jest.mock('@uncefact/untp-utils/node', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/node'),
+  validatePublicUrl: jest.fn().mockResolvedValue({ address: '203.0.113.10', family: 4 }),
+}));
+
 import { verifyDid } from './verify';
 import { DidVerificationCheckName } from '../types';
 import { DidInputError, DidMethodNotSupportedError } from '../errors';
