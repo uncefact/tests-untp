@@ -82,7 +82,7 @@ The [verify endpoint](#verify-a-did) runs the following checks in order. All che
 
 | Check | Description |
 |-------|-------------|
-| **Resolve** | Fetches the DID document from the URL the DID identifier resolves to (e.g., `https://example.com/.well-known/did.json` for `did:web:example.com`). Fails if the document cannot be retrieved or returns a non-success HTTP status. |
+| **Resolve** | Fetches the DID document from the URL the DID identifier resolves to (e.g., `https://example.com/.well-known/did.json` for `did:web:example.com`). Fails if the document cannot be retrieved or returns a non-success HTTP status. The fetch is bounded: the response body is capped at 1 MiB, the request is subject to a 10-second timeout, at most 3 redirects are followed, and every redirect hop must resolve to a publicly routable address. Exceeding a bound fails the check. |
 | **HTTPS** | Confirms the DID document was served over HTTPS. Checks the final URL after any redirects; if a redirect lands on an insecure connection, this check fails. |
 | **Structure** | Validates the retrieved DID document against the [DID Document](https://www.w3.org/TR/did-core/) schema. Fails if required fields are missing or malformed. |
 | **Identity match** | Confirms that the `id` field in the DID document matches the DID identifier. Fails if they differ (e.g., the document was served from the wrong location). |

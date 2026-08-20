@@ -12,10 +12,18 @@ import {
 
 const undiciFetch = jest.fn();
 let lastAgentClose: jest.Mock = jest.fn(() => Promise.resolve());
+// Constructor options of every Agent created during a test, in creation
+// order. The `connect.lookup` inside is the IP pin under test.
+let agentOptions: unknown[] = [];
+// The FakeAgent instances themselves, so tests can assert the dispatcher
+// passed to fetch IS the pinned agent, not merely that a pinned agent exists.
+let agentInstances: FakeAgent[] = [];
 
 class FakeAgent {
   close: jest.Mock;
-  constructor() {
+  constructor(options?: unknown) {
+    agentOptions.push(options);
+    agentInstances.push(this);
     this.close = jest.fn(() => Promise.resolve());
     lastAgentClose = this.close;
   }
@@ -69,6 +77,8 @@ function resolvedAddress(address = '1.1.1.1', family: 4 | 6 = 4) {
 
 describe('resolveDocument', () => {
   beforeEach(() => {
+    agentOptions = [];
+    agentInstances = [];
     undiciFetch.mockReset();
     validatePublicUrl.mockReset();
   });
@@ -114,6 +124,20 @@ describe('resolveDocument', () => {
     });
   });
 
+  describe('outbound headers', () => {
+    it('sends only Accept-free defaults with a User-Agent and no correlation header', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: 'ok' }) as never);
+
+      await resolveDocument('https://example.com/doc');
+
+      const headers = (undiciFetch.mock.calls[0][1] as { headers: Record<string, string> }).headers;
+      const names = Object.keys(headers).map((name) => name.toLowerCase());
+      expect(names).toContain('user-agent');
+      expect(names).not.toContain('x-correlation-id');
+    });
+  });
+
   describe('HTTP errors', () => {
     it('throws ResolverHttpError for a 4xx response with status attached', async () => {
       validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
@@ -124,6 +148,20 @@ describe('resolveDocument', () => {
       )) as ResolverHttpError;
       expect(error).toBeInstanceOf(ResolverHttpError);
       expect(error.status).toBe(404);
+      expect(error.url).toBe('https://example.com/missing');
+    });
+
+    it('carries the failing hop URL, not the original, when a redirect ends in an HTTP error', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch
+        .mockResolvedValueOnce(
+          makeResponse({ status: 301, headers: { location: 'https://example.com/moved' }, body: null }) as never,
+        )
+        .mockResolvedValueOnce(makeResponse({ status: 404, ok: false, body: 'gone' }) as never);
+
+      const error = (await resolveDocument('https://example.com/start').catch((e: unknown) => e)) as ResolverHttpError;
+      expect(error).toBeInstanceOf(ResolverHttpError);
+      expect(error.url).toBe('https://example.com/moved');
     });
 
     it('throws ResolverHttpError for a 5xx response', async () => {
@@ -200,6 +238,43 @@ describe('resolveDocument', () => {
       expect(result.finalUrl).toBe('https://example.com/next');
       expect(new TextDecoder().decode(result.body)).toBe('final');
       expect(undiciFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('pins each hop connection to the address validatePublicUrl resolved', async () => {
+      validatePublicUrl
+        .mockResolvedValueOnce({ address: '203.0.113.10', family: 4 } as never)
+        .mockResolvedValueOnce({ address: '2606:4700:4700::1111', family: 6 } as never);
+      undiciFetch
+        .mockResolvedValueOnce(
+          makeResponse({ status: 301, headers: { location: 'https://example.com/next' }, body: null }) as never,
+        )
+        .mockResolvedValueOnce(makeResponse({ body: 'final' }) as never);
+
+      await resolveDocument('https://example.com/start');
+
+      expect(agentOptions).toHaveLength(2);
+      // Each hop's request must be dispatched through the agent that holds
+      // that hop's pin; constructing a pinned agent and fetching without it
+      // would satisfy the lookup assertions alone.
+      expect(undiciFetch.mock.calls[0][1]).toMatchObject({ dispatcher: agentInstances[0] });
+      expect(undiciFetch.mock.calls[1][1]).toMatchObject({ dispatcher: agentInstances[1] });
+      const pins = await Promise.all(
+        agentOptions.map(
+          (options) =>
+            new Promise((resolve, reject) => {
+              const lookup = (
+                options as {
+                  connect: { lookup: (host: string, opts: object, cb: (err: unknown, addrs: unknown) => void) => void };
+                }
+              ).connect.lookup;
+              lookup('example.com', {}, (err: unknown, addresses: unknown) => (err ? reject(err) : resolve(addresses)));
+            }),
+        ),
+      );
+      // Each hop's lookup must return exactly the address its own
+      // validatePublicUrl call resolved, never a fresh DNS answer.
+      expect(pins[0]).toEqual([{ address: '203.0.113.10', family: 4 }]);
+      expect(pins[1]).toEqual([{ address: '2606:4700:4700::1111', family: 6 }]);
     });
 
     it('re-validates each redirect target through validatePublicUrl', async () => {

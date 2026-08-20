@@ -23,7 +23,9 @@ const jestConfig = {
     // the SSRF guard run for real in verify-did-web's tests); ts-jest
     // transforms it like this package's own sources.
     '^@uncefact/untp-utils/node$': '<rootDir>/../untp-utils/src/node/index.ts',
-    '^@uncefact/untp-utils/resolvers$': '<rootDir>/../untp-utils/build/resolvers/index.js',
+    // Mapped to a CJS stub (not the ESM build) so suites that transitively
+    // import the resolver can load; see the stub's header for the contract.
+    '^@uncefact/untp-utils/resolvers$': '<rootDir>/__tests__/mocks/resolvers.ts',
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
     '^@uncefact/untp-utils/conformity-vocabulary$': '<rootDir>/../untp-utils/build/conformity-vocabulary/index.js',
     '^@uncefact/untp-utils$': '<rootDir>/../untp-utils/build/index.js',

@@ -89,7 +89,11 @@ describe('resolveJsonDocument', () => {
   it('throws ResolverInvalidJsonError when the body is not valid JSON', async () => {
     resolveDocument.mockResolvedValue({ body: encode('not json'), finalUrl: 'https://ex.test/doc' } as never);
 
-    await expect(resolveJsonDocument('https://ex.test/doc')).rejects.toBeInstanceOf(ResolverInvalidJsonError);
+    const error = (await resolveJsonDocument('https://ex.test/doc').catch(
+      (e: unknown) => e,
+    )) as ResolverInvalidJsonError;
+    expect(error).toBeInstanceOf(ResolverInvalidJsonError);
+    expect(error.url).toBe('https://ex.test/doc');
   });
 
   it('propagates resolveDocument errors (SSRF guard, HTTP, timeout) unchanged', async () => {
