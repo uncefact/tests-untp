@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** proposed
+- **Update (2026-08-20):** the playground instance is now in force, built with #811 and recorded in [ADR-048](./048-playground-docs-are-an-independent-docs-instance.md); the reference-implementation docs remain in the original instance and the test-suite and guides instances remain proposed.
 
 ## Context
 

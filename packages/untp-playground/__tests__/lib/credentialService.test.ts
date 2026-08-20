@@ -238,3 +238,19 @@ describe('credentialService', () => {
     });
   });
 });
+
+describe('detectArtefact link set branch (#811)', () => {
+  const { detectArtefact: realDetectArtefact, isLinkSetShaped } = jest.requireActual('@/lib/credentialService');
+
+  it('detects an RFC 9264 link set by its linkset array', () => {
+    expect(realDetectArtefact({ linkset: [] })).toEqual({ kind: 'link-set' });
+    expect(isLinkSetShaped({ linkset: [{ anchor: 'https://id.example.org/01/1' }] })).toBe(true);
+  });
+
+  it('does not treat a non-array linkset member or other documents as a link set', () => {
+    expect(isLinkSetShaped({ linkset: 'not-an-array' })).toBe(false);
+    expect(isLinkSetShaped({ type: ['ConformityScheme'] })).toBe(false);
+    expect(isLinkSetShaped(null)).toBe(false);
+    expect(realDetectArtefact({ type: ['ConformityScheme'] })).toEqual({ kind: 'scheme', type: 'ConformityScheme' });
+  });
+});

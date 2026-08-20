@@ -13,6 +13,7 @@ import { ArtefactUploader } from '@/components/ArtefactUploader';
 import { SchemeTestResults } from '@/components/SchemeTestResults';
 import { TestResults } from '@/components/TestResults';
 import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
+import { resolveLinkSet } from '@/lib/resolveLinkSet';
 import Home from '@/app/page';
 import { mockCredential } from '../mocks/vc';
 import { ArtefactKind, permittedCredentialTypes, TestCaseStatus } from '../../constants';
@@ -61,6 +62,14 @@ jest.mock('@/components/TestResults', () => ({
 
 jest.mock('@/components/SchemeTestResults', () => ({
   SchemeTestResults: jest.fn(() => <div data-testid='mock-scheme-test-results'>Scheme Test Results</div>),
+}));
+
+jest.mock('@/components/LinkSetTestResults', () => ({
+  LinkSetTestResults: jest.fn(() => <div data-testid='mock-linkset-results'>Link Set Results</div>),
+}));
+
+jest.mock('@/lib/resolveLinkSet', () => ({
+  resolveLinkSet: jest.fn(),
 }));
 
 jest.mock('@/components/ArtefactUploader', () => ({
@@ -817,5 +826,143 @@ describe('Tabbed artefact surface (#809)', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('credentials-tab-verifying')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('Link Sets family (#811)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-uploader'
+          onClick={() =>
+            onArtefactUpload(
+              { linkset: [{ anchor: 'https://id.example.org/01/1' }] },
+              { kind: 'file', filename: 'linkset.json' },
+            )
+          }
+        >
+          Upload
+        </button>
+      ),
+    );
+  });
+
+  it('refuses a link set fetched through the generic URL row, pointing at the Resolve input', async () => {
+    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.LINK_SET });
+    // The generic uploader's URL path reports a url source; it has no ?linkType=all normalisation
+    // and only knows the post-redirect URL, so ingesting it would mint a second identity (ADR-046).
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-uploader'
+          onClick={() =>
+            onArtefactUpload({ linkset: [] }, { kind: 'url', url: 'https://cdn.example.org/tokens/abc/linkset.json' })
+          }
+        >
+          Upload
+        </button>
+      ),
+    );
+
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-uploader'));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Resolve it from the Link Sets tab'));
+    });
+    expect(screen.getByRole('tab', { name: 'Link Sets' })).toBeInTheDocument();
+    expect(screen.getByText('No link sets yet')).toBeInTheDocument();
+  });
+
+  it('routes a link-set-shaped file to the Link Sets family and counts it on the tab', async () => {
+    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.LINK_SET });
+
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-uploader'));
+
+    expect(await screen.findByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
+    expect(screen.queryByText('No link sets yet')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mock-linkset-results')).toBeInTheDocument();
+  });
+
+  it('shows the resolver input only on the Link Sets tab', async () => {
+    render(<Home />);
+
+    expect(screen.queryByTestId('linkset-resolver-input')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    expect(screen.getByTestId('linkset-resolver-input')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Credentials' }));
+    expect(screen.queryByTestId('linkset-resolver-input')).not.toBeInTheDocument();
+  });
+
+  it('resolves a link set from the resolver input and adds an instance', async () => {
+    (resolveLinkSet as jest.Mock).mockResolvedValue({
+      ok: true,
+      payload: { linkset: [] },
+      requestUrl: 'https://r.example.org/01/1?linkType=all',
+      finalUrl: 'https://r.example.org/01/1?linkType=all',
+    });
+
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    await userEvent.type(screen.getByTestId('linkset-resolver-input'), 'https://r.example.org/01/1');
+    fireEvent.click(screen.getByTestId('linkset-resolver-resolve'));
+
+    expect(await screen.findByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
+    expect(resolveLinkSet).toHaveBeenCalledWith('https://r.example.org/01/1');
+    expect(screen.getByTestId('mock-linkset-results')).toBeInTheDocument();
+  });
+
+  it('replaces in place when the same resolver URL is resolved twice, even when the redirect target drifts', async () => {
+    // Same identifier, but the resolver redirects to a different per-request URL each time: the
+    // stable requestUrl must key the instance, so the second resolve replaces rather than appends.
+    (resolveLinkSet as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        payload: { linkset: [] },
+        requestUrl: 'https://r.example.org/01/1?linkType=all',
+        finalUrl: 'https://cdn.example.org/tokens/first/linkset.json',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        payload: { linkset: [] },
+        requestUrl: 'https://r.example.org/01/1?linkType=all',
+        finalUrl: 'https://cdn.example.org/tokens/second/linkset.json',
+      });
+
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    await userEvent.type(screen.getByTestId('linkset-resolver-input'), 'https://r.example.org/01/1');
+    fireEvent.click(screen.getByTestId('linkset-resolver-resolve'));
+    expect(await screen.findByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('linkset-resolver-input'), 'https://r.example.org/01/1');
+    fireEvent.click(screen.getByTestId('linkset-resolver-resolve'));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Replaced'));
+    });
+    expect(screen.getByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
+  });
+
+  it('surfaces a resolver failure instead of adding a card', async () => {
+    (resolveLinkSet as jest.Mock).mockResolvedValue({
+      ok: false,
+      error: 'not-a-link-set',
+      message: 'The resolver responded, but not with a link set (no RFC 9264 "linkset" array).',
+    });
+
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    await userEvent.type(screen.getByTestId('linkset-resolver-input'), 'https://r.example.org/not-a-linkset');
+    fireEvent.click(screen.getByTestId('linkset-resolver-resolve'));
+
+    expect(await screen.findByTestId('linkset-resolver-error')).toHaveTextContent('not with a link set');
+    expect(screen.getByRole('tab', { name: 'Link Sets' })).toBeInTheDocument();
+    expect(screen.getByText('No link sets yet')).toBeInTheDocument();
   });
 });

@@ -21,6 +21,11 @@ const SAMPLES: SampleArtefact[] = [
     path: '/samples/sample-conformity-scheme-v0.7.0.json',
     fileName: 'sample-conformity-scheme-v0.7.0.json',
   },
+  {
+    label: 'Test Link Set',
+    path: '/samples/sample-link-set.json',
+    fileName: 'sample-link-set.json',
+  },
 ];
 
 export function DownloadCredential() {

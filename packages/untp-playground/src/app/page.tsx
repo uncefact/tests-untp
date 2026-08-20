@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import { ArtefactUploader, type ArtefactSource } from '@/components/ArtefactUploader';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { EmptyState } from '@/components/EmptyState';
+import { LinkSetResolver } from '@/components/LinkSetResolver';
+import { LinkSetTestResults } from '@/components/LinkSetTestResults';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
 import { ReportActions } from '@/components/ReportActions';
@@ -23,10 +25,11 @@ import {
   instanceStatus,
 } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
+import { linkSetKey, linkSetTitle } from '@/lib/linkSetCollection';
 import { schemeContentHash, schemeTitle } from '@/lib/schemeCollection';
 import { decodeEnvelopedCredential, detectArtefact, isEnvelopedProof } from '@/lib/credentialService';
 import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
-import type { PermittedCredentialType, StoredCredential, StoredScheme, TestStep } from '@/types';
+import type { PermittedCredentialType, StoredCredential, StoredLinkSet, StoredScheme, TestStep } from '@/types';
 import { useError } from '@/contexts/ErrorContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -85,17 +88,17 @@ function TabMeta({
 export default function Home() {
   const credential = useArtefactCollection<StoredCredential, TestStep[]>();
   const scheme = useArtefactCollection<StoredScheme, TestStep[]>();
+  const linkSet = useArtefactCollection<StoredLinkSet, TestStep[]>();
   const [fileCount, setFileCount] = useState(0);
+  const [activeTab, setActiveTab] = useState('credentials');
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
   const shouldDisplayUploadDetailBtn = errors && errors.length > 0;
 
-  // Whether each family has instances loaded. Both credentialsCount and schemesCount drive their
-  // family's empty state and tab count, consistently (#845). linkSetsCount drives only the Link
-  // Sets tab count; its empty state stays unconditional until #811 adds real data.
+  // Whether each family has instances loaded: drives that family's empty state and tab count.
   const credentialsCount = credential.state.items.length;
   const schemesCount = scheme.state.items.length;
-  const linkSetsCount = 0; // Link Sets family lands in #811.
+  const linkSetsCount = linkSet.state.items.length;
 
   // Cross-tab signals for the tab meta: a family with any failing instance shows a red dot from
   // any tab, and the Credentials tab shows a spinner while any credential is still verifying
@@ -104,6 +107,7 @@ export default function Home() {
     (item) => instanceStatus(item.result) === TestCaseStatus.FAILURE,
   );
   const schemesFailing = scheme.state.items.some((item) => instanceStatus(item.result) === TestCaseStatus.FAILURE);
+  const linkSetsFailing = linkSet.state.items.some((item) => instanceStatus(item.result) === TestCaseStatus.FAILURE);
   const credentialsVerifying = credential.state.items.some((item) => !credentialIsTerminal(item.result ?? []));
 
   // Recomputed only when the instances change (add, replace, remove, or a result commit), so an
@@ -117,9 +121,37 @@ export default function Home() {
     [scheme.state.items],
   );
 
+  // Shared ingestion for both link set entry points (file upload via detection, resolver via the
+  // Link Sets tab). Identity is the resolver URL, else the filename (#811), so re-resolving the
+  // same identifier replaces the card in place even when the response body changed.
+  const ingestLinkSet = (payload: Record<string, unknown>, source?: ArtefactSource) => {
+    const stored: StoredLinkSet = { original: payload, decoded: payload, source };
+    const { outcome } = linkSet.dispatch((state) =>
+      upsert(state, { payload: stored, contentHash: linkSetKey(source), mintInstanceId: newId }),
+    );
+    if (outcome.kind === 'replaced') {
+      toast.success(`Replaced ${linkSetTitle(stored)}`);
+    }
+  };
+
   const handleArtefactUpload = async (rawArtefact: any, source?: ArtefactSource) => {
     try {
       const detected = detectArtefact(rawArtefact?.verifiableCredential ?? rawArtefact);
+
+      if (detected?.kind === ArtefactKind.LINK_SET) {
+        // Dropped files route by detection, like schemes have since #677: the filename is a stable
+        // identity. A link set fetched through the generic URL row is NOT ingested: that path has
+        // no ?linkType=all normalisation and only knows the post-redirect URL, so ingesting it
+        // would mint a second, differently-keyed card for an identifier the resolver flow already
+        // owns (ADR-046). Point the user at the Resolve input instead. #676 tab-scopes the
+        // uploader properly.
+        if (source?.kind === 'url') {
+          toast.error('That URL returned an identity-resolver link set. Resolve it from the Link Sets tab instead.');
+          return;
+        }
+        ingestLinkSet(rawArtefact, source);
+        return;
+      }
 
       if (detected?.kind === ArtefactKind.SCHEME) {
         const stored: StoredScheme = { original: rawArtefact, decoded: rawArtefact, source };
@@ -183,6 +215,10 @@ export default function Home() {
         <h2 className='text-xl font-semibold mb-6'>Add new artefact</h2>
         <ArtefactUploader onArtefactUpload={handleArtefactUpload} setFileCount={setFileCount} />
       </div>
+      {/* The resolver input belongs to the Link Sets tab: a resolver URL names an identifier, not
+          a document, so it cannot share the generic fetch row above. Full tab-scoped uploader copy
+          is #676. */}
+      {activeTab === 'linksets' && <LinkSetResolver onResolved={(payload, source) => ingestLinkSet(payload, source)} />}
       {shouldDisplayUploadDetailBtn && (
         <div>
           <Button onClick={() => setIsDetailsOpen(true)}>View Upload Detail</Button>
@@ -204,7 +240,7 @@ export default function Home() {
             <ReportActions />
           </SectionHeader>
 
-          <Tabs defaultValue='credentials'>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value='credentials'>
                 Credentials
@@ -221,7 +257,7 @@ export default function Home() {
               </TabsTrigger>
               <TabsTrigger value='linksets'>
                 Link Sets
-                <TabMeta family='linksets' count={linkSetsCount} />
+                <TabMeta family='linksets' count={linkSetsCount} failing={linkSetsFailing} />
               </TabsTrigger>
             </TabsList>
 
@@ -254,13 +290,15 @@ export default function Home() {
                 </TabsContent>
 
                 <TabsContent value='linksets' forceMount>
-                  {/* Provisional Link Sets empty state. The final copy is an open decision in
-                      #809 and is settled with the Link Sets family in #811. */}
-                  <EmptyState
-                    icon={<Link2 size={28} />}
-                    title='No link sets yet'
-                    guidance='Add a link set from the panel on the right. Drop a JSON file or resolve from an identity resolver service. Each link set you add appears here and in the generated report.'
-                  />
+                  {linkSetsCount === 0 ? (
+                    <EmptyState
+                      icon={<Link2 size={28} />}
+                      title='No link sets yet'
+                      guidance='Add a link set from the panel on the right. Drop a JSON file or resolve from an identity resolver service. Each link set you add appears here.'
+                    />
+                  ) : (
+                    <LinkSetTestResults collection={linkSet.state} dispatch={linkSet.dispatch} />
+                  )}
                 </TabsContent>
               </div>
               <div className='md:w-1/3'>{sidebar}</div>

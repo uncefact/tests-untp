@@ -302,3 +302,13 @@ aside[class^="theme-doc-sidebar-container"] {
   bottom: 1.3rem;
 }
 
+
+// Each docs instance shows only its own version dropdown (ADR-048). The docs plugin marks pages
+// with plugin-id-<id> on the html element; non-docs pages carry neither class and keep the
+// default instance's dropdown.
+html:not(.plugin-id-playground) .navbar-version-dropdown-playground {
+  display: none;
+}
+html.plugin-id-playground .navbar-version-dropdown-default {
+  display: none;
+}

@@ -75,6 +75,8 @@ export function SchemeTestResults({ collection, dispatch }: SchemeTestResultsPro
     }
   }, [collection.items]);
 
+  // Schemes confirm removal with a dialog; link sets remove immediately with a toast + Undo. The
+  // split is deliberate (per-family contract, see LinkSetTestResults), not an inconsistency to fix.
   const confirmRemoval = () => {
     if (!pendingRemoval) return;
     dispatch((state) => remove(state, pendingRemoval.instanceId));

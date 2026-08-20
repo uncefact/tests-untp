@@ -1,6 +1,7 @@
 export enum ArtefactKind {
   CREDENTIAL = 'credential',
   SCHEME = 'scheme',
+  LINK_SET = 'link-set',
 }
 
 export enum SchemeType {
@@ -101,6 +102,7 @@ export enum TestCaseStepId {
   CONTEXT_VALIDATION = 'context',
   SCHEME_VERSION_DETECTION = 'scheme-version-detection',
   SCHEME_SCHEMA_VALIDATION = 'scheme-schema-validation',
+  LINKSET_SCHEMA_VALIDATION = 'linkset-schema-validation',
 }
 
 const commonContextUrls = [
@@ -121,3 +123,11 @@ export const allowedExtensionValue = {
 // every client-side `/api/*` caller prefix it consistently. The fallback
 // empty string keeps local dev (where the var is unset) working.
 export const API_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+// The docs page explaining how the playground identifies UNTP credential links in a link set.
+// The playground's docs are their own independently versioned docs instance on the documentation
+// site; operators point this at the deployed page, and the fallback is the same page in the
+// repository so the link is never dead.
+export const CREDENTIAL_LINKS_DOCS_URL =
+  process.env.NEXT_PUBLIC_CREDENTIAL_LINKS_DOCS_URL ||
+  'https://github.com/uncefact/tests-untp/blob/next/documentation/docs-playground/identifying-untp-credential-links.md';
