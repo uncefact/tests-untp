@@ -254,3 +254,19 @@ describe('detectArtefact link set branch (#811)', () => {
     expect(realDetectArtefact({ type: ['ConformityScheme'] })).toEqual({ kind: 'scheme', type: 'ConformityScheme' });
   });
 });
+
+describe('acceptedArtefactFamilies (#676)', () => {
+  const { acceptedArtefactFamilies } = jest.requireActual('@/lib/credentialService');
+  const { ArtefactKind } = jest.requireActual('../../constants');
+
+  it('derives one label per ArtefactKind member, so a new family cannot be silently omitted', () => {
+    const labels = acceptedArtefactFamilies();
+    expect(labels).toHaveLength(Object.values(ArtefactKind).length);
+    expect(new Set(labels).size).toBe(labels.length);
+    labels.forEach((label: unknown) => expect(typeof label).toBe('string'));
+  });
+
+  it('names the three current families in detection-layer order', () => {
+    expect(acceptedArtefactFamilies()).toEqual(['Verifiable Credential', 'Conformity Scheme', 'Link Set']);
+  });
+});

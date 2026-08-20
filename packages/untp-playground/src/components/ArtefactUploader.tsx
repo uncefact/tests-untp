@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useError } from '@/contexts/ErrorContext';
 import { fetchErrorMessage } from '@/lib/fetchErrorMessages';
+import { resolveLinkSet } from '@/lib/resolveLinkSet';
 import { jwtDecode } from 'jwt-decode';
 import { Loader2, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -12,14 +13,30 @@ import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { API_BASE_PATH } from '../../constants';
 
-const MAX_FETCH_BYTES = 10 * 1_048_576;
-
 export type ArtefactSource = { kind: 'file'; filename: string } | { kind: 'url'; url: string };
 
+/**
+ * The active tab's uploader copy and URL behaviour (#676). The two physical inputs (dropzone and
+ * URL row) are identical on every tab; everything the user reads, and which flow the URL row
+ * drives, follows the family. `urlMode: 'resolve'` sends the URL through the link set resolver
+ * (`?linkType=all` normalisation, linkset Accept profile) instead of the generic document fetch.
+ */
+export interface UploaderFamilyConfig {
+  heading: string;
+  dropzoneSubtitle: string;
+  divider: string;
+  urlPlaceholder: string;
+  urlAction: 'Fetch' | 'Resolve';
+  urlMode: 'fetch' | 'resolve';
+  helper: string;
+}
+
 export function ArtefactUploader({
+  family,
   onArtefactUpload,
   setFileCount,
 }: {
+  family: UploaderFamilyConfig;
   onArtefactUpload: (artefact: unknown, source: ArtefactSource) => void;
   setFileCount: (count: number) => void;
 }) {
@@ -84,6 +101,8 @@ export function ArtefactUploader({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleFiles,
+    // The extension superset is accepted on every tab; only the displayed subtitle narrows (#676
+    // open decision). Narrowing per tab would reject a mis-named but valid document for no gain.
     accept: {
       'application/json': ['.json'],
       'application/ld+json': ['.jsonld'],
@@ -101,6 +120,18 @@ export function ArtefactUploader({
     setFetchError(null);
     setIsFetching(true);
     try {
+      if (family.urlMode === 'resolve') {
+        const result = await resolveLinkSet(trimmed);
+        if (!result.ok) {
+          setFetchError(result.message);
+          return;
+        }
+        setFileCount(1);
+        onArtefactUpload(result.payload, { kind: 'url', url: result.requestUrl });
+        setUrlInput('');
+        return;
+      }
+
       const response = await fetch(`${API_BASE_PATH}/api/fetch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -125,16 +156,20 @@ export function ArtefactUploader({
 
       setFileCount(1);
       onArtefactUpload(parsed, { kind: 'url', url: payload.finalUrl });
+      setUrlInput('');
     } catch (err) {
-      console.log('Error fetching artefact:', err);
+      console.error('ArtefactUploader: URL submission failed', err);
       setFetchError('Could not reach the URL. Check the address and try again.');
     } finally {
       setIsFetching(false);
     }
-  }, [urlInput, onArtefactUpload, resetErrors, setFileCount]);
+  }, [urlInput, family.urlMode, onArtefactUpload, resetErrors, setFileCount]);
 
   return (
     <div className='space-y-3'>
+      <h2 className='text-xl font-semibold' data-testid='uploader-heading'>
+        {family.heading}
+      </h2>
       <Card
         {...getRootProps()}
         className='p-8 min-h-[200px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors flex flex-col items-center justify-center gap-3'
@@ -151,8 +186,8 @@ export function ArtefactUploader({
             <p className='text-center font-medium' data-testid='credential-upload-drag-text'>
               Drag and drop, or click to select
             </p>
-            <p className='text-center text-xs text-muted-foreground font-mono'>
-              Verifiable Credential (JSON / JWT) · Conformity Scheme (JSON-LD)
+            <p className='text-center text-xs text-muted-foreground font-mono' data-testid='uploader-dropzone-subtitle'>
+              {family.dropzoneSubtitle}
             </p>
           </>
         )}
@@ -160,7 +195,7 @@ export function ArtefactUploader({
 
       <div className='flex items-center gap-3 text-xs text-muted-foreground'>
         <div className='flex-1 border-t border-border' aria-hidden='true' />
-        <span>or paste a URL</span>
+        <span data-testid='uploader-divider'>{family.divider}</span>
         <div className='flex-1 border-t border-border' aria-hidden='true' />
       </div>
 
@@ -173,7 +208,7 @@ export function ArtefactUploader({
       >
         <Input
           type='url'
-          placeholder='https://example.org/credential.json'
+          placeholder={family.urlPlaceholder}
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
           disabled={isFetching}
@@ -182,11 +217,13 @@ export function ArtefactUploader({
         />
         <Button
           type='submit'
-          disabled={isFetching || urlInput.trim().length === 0}
+          // Enabled on an empty input so a click (or Enter) reaches the 'Enter a URL first.'
+          // branch, per the #676 criterion; disabled only while a request is in flight.
+          disabled={isFetching}
           data-testid='artefact-url-fetch'
           className='min-w-20'
         >
-          {isFetching ? <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' /> : 'Fetch'}
+          {isFetching ? <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' /> : family.urlAction}
         </Button>
       </form>
 
@@ -196,9 +233,8 @@ export function ArtefactUploader({
         </p>
       )}
 
-      <p className='text-xs text-muted-foreground'>
-        Accepts a verifiable credential or a conformity scheme (JSON-LD), from a file or a URL. Pasted URLs are fetched
-        and the type and version are detected automatically. Maximum response size {MAX_FETCH_BYTES / 1_048_576} MB.
+      <p className='text-xs text-muted-foreground' data-testid='uploader-helper'>
+        {family.helper}
       </p>
     </div>
   );

@@ -17,7 +17,7 @@ export const LINK_SET_FAMILY_LABEL = 'Link Set';
 
 /**
  * Instance key: the source URL, else the filename. For resolved link sets the source URL is the
- * normalised request URL (LinkSetResolver stores it, never the post-redirect target, ADR-046);
+ * normalised request URL (the uploader's resolve mode stores it, never the post-redirect target, ADR-046);
  * for uploads it is the filename.
  */
 export function linkSetKey(source: ArtefactSource | undefined): string {

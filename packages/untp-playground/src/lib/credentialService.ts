@@ -2,6 +2,21 @@ import type { Credential } from '@/types/credential';
 import { jwtDecode } from 'jwt-decode';
 import { ArtefactKind, CredentialType, SchemeType, UNTP_CONTEXT_DOMAINS } from '../../constants';
 
+/**
+ * Display label per accepted artefact family. Keyed by ArtefactKind so adding a family without a
+ * label is a compile error, and every consumer of the accepted-family list (the unclassified
+ * upload errors) picks the new family up automatically (#676).
+ */
+const ARTEFACT_FAMILY_LABELS: Record<ArtefactKind, string> = {
+  [ArtefactKind.CREDENTIAL]: 'Verifiable Credential',
+  [ArtefactKind.SCHEME]: 'Conformity Scheme',
+  [ArtefactKind.LINK_SET]: 'Link Set',
+};
+
+export function acceptedArtefactFamilies(): string[] {
+  return Object.values(ArtefactKind).map((kind) => ARTEFACT_FAMILY_LABELS[kind]);
+}
+
 export type DetectedArtefact =
   | { kind: ArtefactKind.SCHEME; type: SchemeType.CONFORMITY_SCHEME }
   | { kind: ArtefactKind.CREDENTIAL; type: CredentialType }

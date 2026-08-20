@@ -6,7 +6,6 @@ import {
   isEnvelopedProof,
   detectCredentialType,
   detectVersion,
-  detectArtefact,
 } from '@/lib/credentialService';
 import { detectExtension, validateCredentialSchema } from '@/lib/schemaValidation';
 import { ArtefactUploader } from '@/components/ArtefactUploader';
@@ -29,9 +28,12 @@ jest.mock('sonner', () => ({
 jest.mock('@/lib/credentialService', () => ({
   isEnvelopedProof: jest.fn(),
   decodeEnvelopedCredential: jest.fn(),
-  detectArtefact: jest.fn(),
   detectCredentialType: jest.fn(),
   detectVersion: jest.fn(),
+  // Real implementations: the tab-intent routing (#676) reads the link set shape and the accepted
+  // family list, and mocking those would fake the very contract under test.
+  isLinkSetShaped: jest.requireActual('@/lib/credentialService').isLinkSetShaped,
+  acceptedArtefactFamilies: jest.requireActual('@/lib/credentialService').acceptedArtefactFamilies,
 }));
 
 jest.mock('@/lib/schemaValidation', () => ({
@@ -90,7 +92,9 @@ jest.mock('@/components/ArtefactUploader', () => ({
 }));
 
 jest.mock('@/components/DownloadCredential', () => ({
-  DownloadCredential: () => <div data-testid='mock-download'>Download</div>,
+  DownloadCredential: jest.fn(({ family }: { family: string }) => (
+    <div data-testid='mock-download'>download:{family}</div>
+  )),
 }));
 
 jest.mock('@/components/GenerateReportDialog', () => ({
@@ -192,9 +196,10 @@ describe('Home Component', () => {
             missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
             receivedValue: mockCredential.verifiableCredential,
             allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
-            solution: "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential').",
+            solution:
+              "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential'), or add the artefact on its own tab. The Playground accepts: Verifiable Credential, Conformity Scheme, Link Set.",
           },
-          message: `The credential type is missing or invalid.`,
+          message: `The credential type is missing or invalid. The Playground accepts: Verifiable Credential, Conformity Scheme, Link Set.`,
         },
       ]);
     });
@@ -334,8 +339,9 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('replaces a family empty state with its results once an artefact loads', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
     render(<Home />);
+    // The tab declares intent (#676): scheme uploads happen on the Conformity Schemes tab.
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
 
     expect(screen.getByText('No conformity schemes yet')).toBeInTheDocument();
 
@@ -348,7 +354,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('loads two distinct schemes as separate instances instead of overwriting', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
     // Identity is the content hash, so each upload must carry distinct content to be a new instance.
     let marker = 0;
     (ArtefactUploader as jest.Mock).mockImplementation(
@@ -362,6 +367,8 @@ describe('Tabbed artefact surface (#809)', () => {
       ),
     );
     render(<Home />);
+    // The tab declares intent (#676): scheme uploads happen on the Conformity Schemes tab.
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
 
     const uploader = screen.getByTestId('mock-uploader');
     fireEvent.click(uploader);
@@ -372,7 +379,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('replaces in place when the same scheme content is uploaded twice', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
     // Identical content each click -> same content hash -> the second upload replaces the first.
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (artefact: any) => void }) => (
@@ -385,6 +391,8 @@ describe('Tabbed artefact surface (#809)', () => {
       ),
     );
     render(<Home />);
+    // The tab declares intent (#676): scheme uploads happen on the Conformity Schemes tab.
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
 
     const uploader = screen.getByTestId('mock-uploader');
     fireEvent.click(uploader);
@@ -398,10 +406,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('loads two distinct credentials as separate instances instead of overwriting (#810)', async () => {
-    // detectArtefact is left unset here (undefined => not a scheme), but earlier tests in this
-    // block set it to the SCHEME kind and jest.clearAllMocks() does not reset a mockReturnValue,
-    // so it is reset explicitly to route this upload to the credential branch.
-    (detectArtefact as jest.Mock).mockReturnValue(undefined);
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
@@ -436,7 +440,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('replaces in place when the same credential content is uploaded twice (#810)', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue(undefined);
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
@@ -477,7 +480,6 @@ describe('Tabbed artefact surface (#809)', () => {
     // two uploads with distinct envelopes must still collapse to one instance.
     const decodedCredential = { type: ['VerifiableCredential', 'DigitalProductPassport'], id: 'shared-content' };
 
-    (detectArtefact as jest.Mock).mockReturnValue(undefined);
     (isEnvelopedProof as jest.Mock).mockReturnValue(true);
     (decodeEnvelopedCredential as jest.Mock).mockReturnValue(decodedCredential);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
@@ -536,7 +538,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('shows a red failing dot on the Conformity Schemes tab when one of several schemes fails, without switching tabs', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
     // Two distinct schemes, so the dot must fire on "any instance failing", not "all failing".
     let marker = 0;
     (ArtefactUploader as jest.Mock).mockImplementation(
@@ -578,13 +579,16 @@ describe('Tabbed artefact surface (#809)', () => {
     ));
 
     render(<Home />);
+    // The tab declares intent (#676): scheme uploads happen on the Conformity Schemes tab.
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
     fireEvent.click(screen.getByTestId('mock-uploader'));
     fireEvent.click(screen.getByTestId('mock-uploader'));
 
     expect(screen.queryByTestId('schemes-tab-failing-dot')).not.toBeInTheDocument();
     fireEvent.click(await screen.findByTestId('mock-scheme-fail'));
 
-    // The default tab (Credentials) is still active; the failing dot must be visible cross-tab.
+    // Uploads now happen on the Schemes tab; switch away to prove the dot is visible cross-tab.
+    await userEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
     expect(screen.getByRole('tab', { name: /Credentials/ })).toHaveAttribute('data-state', 'active');
     expect(await screen.findByTestId('schemes-tab-failing-dot')).toBeInTheDocument();
     // The dot itself is aria-hidden; the state must still reach assistive tech as text.
@@ -592,7 +596,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('does not show a failing dot for a warning-only scheme instance', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
     mockSchemeArtefactUploader();
     (SchemeTestResults as jest.Mock).mockImplementation(({ collection, dispatch }: any) => (
       <button
@@ -614,6 +617,8 @@ describe('Tabbed artefact surface (#809)', () => {
     ));
 
     render(<Home />);
+    // The tab declares intent (#676): scheme uploads happen on the Conformity Schemes tab.
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
     fireEvent.click(screen.getByTestId('mock-uploader'));
     fireEvent.click(await screen.findByTestId('mock-scheme-warn'));
 
@@ -623,7 +628,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('clears the schemes tab meta entirely when the last instance is removed', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.SCHEME, type: 'ConformityScheme' });
     mockSchemeArtefactUploader();
     (SchemeTestResults as jest.Mock).mockImplementation(({ collection, dispatch }: any) => (
       <div>
@@ -656,6 +660,8 @@ describe('Tabbed artefact surface (#809)', () => {
     ));
 
     render(<Home />);
+    // The tab declares intent (#676): scheme uploads happen on the Conformity Schemes tab.
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
     fireEvent.click(screen.getByTestId('mock-uploader'));
     fireEvent.click(await screen.findByTestId('mock-scheme-fail'));
     expect(await screen.findByTestId('schemes-tab-failing-dot')).toBeInTheDocument();
@@ -670,7 +676,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('shows a spinner on the Credentials tab while a credential verifies, and clears it when the run settles', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue(undefined);
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
@@ -737,7 +742,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('shows a red failing dot on the Credentials tab when a credential instance fails', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue(undefined);
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
@@ -771,7 +775,6 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 
   it('keeps the spinner while a committed step is still in progress', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue(undefined);
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
@@ -829,140 +832,148 @@ describe('Tabbed artefact surface (#809)', () => {
   });
 });
 
-describe('Link Sets family (#811)', () => {
+describe('Link Sets family (#811, tab-intent routing #676)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
-        <button
-          data-testid='mock-uploader'
-          onClick={() =>
-            onArtefactUpload(
-              { linkset: [{ anchor: 'https://id.example.org/01/1' }] },
-              { kind: 'file', filename: 'linkset.json' },
-            )
-          }
-        >
-          Upload
-        </button>
+        <div>
+          <button
+            data-testid='mock-upload-linkset-file'
+            onClick={() =>
+              onArtefactUpload(
+                { linkset: [{ anchor: 'https://id.example.org/01/1' }] },
+                { kind: 'file', filename: 'linkset.json' },
+              )
+            }
+          >
+            Upload link set file
+          </button>
+          <button
+            data-testid='mock-upload-not-a-linkset'
+            onClick={() =>
+              onArtefactUpload({ type: ['VerifiableCredential'] }, { kind: 'file', filename: 'credential.json' })
+            }
+          >
+            Upload non link set
+          </button>
+          <button
+            data-testid='mock-upload-scheme-doc'
+            onClick={() =>
+              onArtefactUpload({ type: ['ConformityScheme'] }, { kind: 'file', filename: 'scheme.jsonld' })
+            }
+          >
+            Upload scheme document
+          </button>
+          <button
+            data-testid='mock-resolve-linkset'
+            onClick={() =>
+              // What the uploader's resolve mode hands the page after a successful resolve: the
+              // link set payload with the normalised request URL as the source (#676).
+              onArtefactUpload({ linkset: [] }, { kind: 'url', url: 'https://r.example.org/01/1?linkType=all' })
+            }
+          >
+            Resolve link set
+          </button>
+        </div>
       ),
     );
   });
 
-  it('refuses a link set fetched through the generic URL row, pointing at the Resolve input', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.LINK_SET });
-    // The generic uploader's URL path reports a url source; it has no ?linkType=all normalisation
-    // and only knows the post-redirect URL, so ingesting it would mint a second identity (ADR-046).
-    (ArtefactUploader as jest.Mock).mockImplementation(
-      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
-        <button
-          data-testid='mock-uploader'
-          onClick={() =>
-            onArtefactUpload({ linkset: [] }, { kind: 'url', url: 'https://cdn.example.org/tokens/abc/linkset.json' })
-          }
-        >
-          Upload
-        </button>
-      ),
-    );
-
+  it('passes the active tab family to the uploader and the download component', async () => {
     render(<Home />);
-    fireEvent.click(screen.getByTestId('mock-uploader'));
 
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Resolve it from the Link Sets tab'));
-    });
-    expect(screen.getByRole('tab', { name: 'Link Sets' })).toBeInTheDocument();
-    expect(screen.getByText('No link sets yet')).toBeInTheDocument();
+    const uploaderFamily = () => (ArtefactUploader as jest.Mock).mock.lastCall?.[0]?.family;
+    expect(uploaderFamily()).toMatchObject({ heading: 'Add a credential', urlMode: 'fetch' });
+    expect(screen.getByTestId('mock-download')).toHaveTextContent('download:credentials');
+
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
+    // urlMode matters as much as the copy: 'resolve' here would silently route a pasted scheme
+    // URL through the link set resolver instead of the generic document fetch.
+    expect(uploaderFamily()).toMatchObject({ heading: 'Add a conformity scheme', urlMode: 'fetch' });
+    expect(screen.getByTestId('mock-download')).toHaveTextContent('download:schemes');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    expect(uploaderFamily()).toMatchObject({ heading: 'Add a link set', urlMode: 'resolve' });
+    expect(screen.getByTestId('mock-download')).toHaveTextContent('download:linksets');
   });
 
-  it('routes a link-set-shaped file to the Link Sets family and counts it on the tab', async () => {
-    (detectArtefact as jest.Mock).mockReturnValue({ kind: ArtefactKind.LINK_SET });
-
+  it('ingests a link-set file uploaded on the Link Sets tab and counts it on the tab', async () => {
     render(<Home />);
-    fireEvent.click(screen.getByTestId('mock-uploader'));
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
 
     expect(await screen.findByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
     expect(screen.queryByText('No link sets yet')).not.toBeInTheDocument();
     expect(screen.getByTestId('mock-linkset-results')).toBeInTheDocument();
   });
 
-  it('shows the resolver input only on the Link Sets tab', async () => {
+  it('rejects a non-link-set document on the Link Sets tab, naming every accepted family', async () => {
     render(<Home />);
-
-    expect(screen.queryByTestId('linkset-resolver-input')).not.toBeInTheDocument();
-
     await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
-    expect(screen.getByTestId('linkset-resolver-input')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('mock-upload-not-a-linkset'));
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Credentials' }));
-    expect(screen.queryByTestId('linkset-resolver-input')).not.toBeInTheDocument();
-  });
-
-  it('resolves a link set from the resolver input and adds an instance', async () => {
-    (resolveLinkSet as jest.Mock).mockResolvedValue({
-      ok: true,
-      payload: { linkset: [] },
-      requestUrl: 'https://r.example.org/01/1?linkType=all',
-      finalUrl: 'https://r.example.org/01/1?linkType=all',
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('not a link set (no RFC 9264 "linkset" array)'));
     });
-
-    render(<Home />);
-    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
-    await userEvent.type(screen.getByTestId('linkset-resolver-input'), 'https://r.example.org/01/1');
-    fireEvent.click(screen.getByTestId('linkset-resolver-resolve'));
-
-    expect(await screen.findByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
-    expect(resolveLinkSet).toHaveBeenCalledWith('https://r.example.org/01/1');
-    expect(screen.getByTestId('mock-linkset-results')).toBeInTheDocument();
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Verifiable Credential, Conformity Scheme, Link Set'),
+    );
+    expect(screen.getByRole('tab', { name: 'Link Sets' })).toBeInTheDocument();
+    expect(screen.getByText('No link sets yet')).toBeInTheDocument();
   });
 
-  it('replaces in place when the same resolver URL is resolved twice, even when the redirect target drifts', async () => {
-    // Same identifier, but the resolver redirects to a different per-request URL each time: the
-    // stable requestUrl must key the instance, so the second resolve replaces rather than appends.
-    (resolveLinkSet as jest.Mock)
-      .mockResolvedValueOnce({
-        ok: true,
-        payload: { linkset: [] },
-        requestUrl: 'https://r.example.org/01/1?linkType=all',
-        finalUrl: 'https://cdn.example.org/tokens/first/linkset.json',
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        payload: { linkset: [] },
-        requestUrl: 'https://r.example.org/01/1?linkType=all',
-        finalUrl: 'https://cdn.example.org/tokens/second/linkset.json',
-      });
+  it('validates a link-set-shaped document as a credential when uploaded on the Credentials tab', async () => {
+    // AC (#676): the tab declares intent — no cross-family routing, no auto-switching.
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
 
     render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+
+    await waitFor(() => {
+      expect(mockDispatchError).toHaveBeenCalled();
+    });
+    // Stays on Credentials, nothing lands in the Link Sets family.
+    expect(screen.getByRole('tab', { name: /Credentials/ })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByRole('tab', { name: 'Link Sets' })).toBeInTheDocument();
+  });
+
+  it('validates a scheme document as a credential when dropped on the Credentials tab, without switching', async () => {
+    // AC (#676): a Conformity Scheme document on the Credentials tab fails the credential
+    // pipeline there, with no auto-switch, no scheme card, and the widened family-naming error.
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload-scheme-doc'));
+
+    await waitFor(() => {
+      expect(mockDispatchError).toHaveBeenCalledWith([
+        expect.objectContaining({
+          message: expect.stringContaining('Verifiable Credential, Conformity Scheme, Link Set'),
+        }),
+      ]);
+    });
+    expect(screen.getByRole('tab', { name: /Credentials/ })).toHaveAttribute('data-state', 'active');
+    // No scheme card was created: the Schemes tab still shows no count.
+    expect(screen.queryByRole('tab', { name: /Conformity Schemes\s*1/ })).not.toBeInTheDocument();
+  });
+
+  it('replaces in place when the same resolver URL is resolved twice, even when the response drifted', async () => {
+    render(<Home />);
     await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
-    await userEvent.type(screen.getByTestId('linkset-resolver-input'), 'https://r.example.org/01/1');
-    fireEvent.click(screen.getByTestId('linkset-resolver-resolve'));
+
+    fireEvent.click(screen.getByTestId('mock-resolve-linkset'));
     expect(await screen.findByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
 
-    await userEvent.type(screen.getByTestId('linkset-resolver-input'), 'https://r.example.org/01/1');
-    fireEvent.click(screen.getByTestId('linkset-resolver-resolve'));
+    fireEvent.click(screen.getByTestId('mock-resolve-linkset'));
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Replaced'));
     });
     expect(screen.getByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
-  });
-
-  it('surfaces a resolver failure instead of adding a card', async () => {
-    (resolveLinkSet as jest.Mock).mockResolvedValue({
-      ok: false,
-      error: 'not-a-link-set',
-      message: 'The resolver responded, but not with a link set (no RFC 9264 "linkset" array).',
-    });
-
-    render(<Home />);
-    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
-    await userEvent.type(screen.getByTestId('linkset-resolver-input'), 'https://r.example.org/not-a-linkset');
-    fireEvent.click(screen.getByTestId('linkset-resolver-resolve'));
-
-    expect(await screen.findByTestId('linkset-resolver-error')).toHaveTextContent('not with a link set');
-    expect(screen.getByRole('tab', { name: 'Link Sets' })).toBeInTheDocument();
-    expect(screen.getByText('No link sets yet')).toBeInTheDocument();
   });
 });
