@@ -18,3 +18,9 @@ export interface StoredScheme {
   decoded: Record<string, any>;
   source?: ArtefactSource;
 }
+
+export interface StoredLinkSet {
+  original: any;
+  decoded: Record<string, any>;
+  source?: ArtefactSource;
+}

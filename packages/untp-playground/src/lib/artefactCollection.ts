@@ -2,8 +2,9 @@
  * Pure operations for the shared per-instance artefact model (ADR-041).
  *
  * Framework-free and family-agnostic: `P` is the family payload, `R` the family result, both
- * opaque here. Identity is the content hash: identical content is one instance, different content
- * is a separate one. Id minting is injected so the operations stay pure and deterministic under
+ * opaque here. `contentHash` is a generic identity key: credentials and schemes pass a content
+ * hash (identical content is one instance), link sets pass their normalised resolver request URL
+ * (ADR-046) — do not assume every family hashes content. Id minting is injected so the operations stay pure and deterministic under
  * test. The React layer supplies real minters.
  */
 
@@ -68,6 +69,25 @@ export function remove<P, R>(
   const items = state.items.slice();
   items.splice(index, 1);
   return { state: { items }, removed: true };
+}
+
+/**
+ * Reinsert a previously removed slot at its old position, for a single-level undo. A no-op when a
+ * slot with the same instanceId or content key is already present (the user re-uploaded before
+ * undoing), so undo never duplicates an instance. An out-of-range index clamps to the end.
+ */
+export function restore<P, R>(
+  state: CollectionState<P, R>,
+  slot: ArtefactSlot<P, R>,
+  index: number,
+): { state: CollectionState<P, R>; restored: boolean } {
+  const duplicate = state.items.some(
+    (item) => item.instanceId === slot.instanceId || item.contentHash === slot.contentHash,
+  );
+  if (duplicate) return { state, restored: false };
+  const items = state.items.slice();
+  items.splice(Math.max(0, Math.min(index, items.length)), 0, slot);
+  return { state: { items }, restored: true };
 }
 
 /**

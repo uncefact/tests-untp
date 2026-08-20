@@ -62,7 +62,21 @@ const config: Config = {
     ],
   ],
 
-  plugins: ['docusaurus-plugin-sass'],
+  plugins: [
+    'docusaurus-plugin-sass',
+    [
+      '@docusaurus/plugin-content-docs',
+      // The UNTP Playground's documentation is its own docs instance so it can be versioned
+      // independently of the reference implementation docs that live in the main instance.
+      {
+        id: 'playground',
+        path: 'docs-playground',
+        routeBasePath: 'playground/docs',
+        sidebarPath: './sidebars-playground.ts',
+        editUrl: ({ versionDocsDirPath, docPath }) => `${editUrl}/${versionDocsDirPath}/${docPath}`,
+      },
+    ],
+  ],
 
   themes: ['@docusaurus/theme-mermaid'],
 
@@ -110,8 +124,18 @@ const config: Config = {
           className: 'navbar-github-link',
           position: 'right',
         },
+        // One version dropdown per docs instance (the playground instance versions independently,
+        // ADR-048). The navbar is global, so custom.scss scopes each dropdown to its own
+        // instance's pages via the html classes the docs plugin sets (plugin-id-default /
+        // plugin-id-playground); non-docs pages show the default instance's dropdown.
         {
           type: 'docsVersionDropdown',
+          className: 'navbar-version-dropdown-default',
+        },
+        {
+          type: 'docsVersionDropdown',
+          docsPluginId: 'playground',
+          className: 'navbar-version-dropdown-playground',
         },
       ],
     },

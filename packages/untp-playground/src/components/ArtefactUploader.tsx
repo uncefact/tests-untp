@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useError } from '@/contexts/ErrorContext';
+import { fetchErrorMessage } from '@/lib/fetchErrorMessages';
 import { jwtDecode } from 'jwt-decode';
 import { Loader2, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -110,7 +111,7 @@ export function ArtefactUploader({
         | { ok: false; error: string; message: string };
 
       if (!payload.ok) {
-        setFetchError(messageForError(payload.error, payload.message));
+        setFetchError(fetchErrorMessage(payload.error, payload.message));
         return;
       }
 
@@ -201,25 +202,4 @@ export function ArtefactUploader({
       </p>
     </div>
   );
-}
-
-function messageForError(code: string, fallback: string): string {
-  switch (code) {
-    case 'invalid-url':
-      return 'That is not a valid URL.';
-    case 'blocked':
-      return 'That URL is blocked. Only https URLs to public hosts are allowed.';
-    case 'not-found':
-      return 'The URL returned 404. Check the address.';
-    case 'timeout':
-      return 'The URL did not respond in time.';
-    case 'too-large':
-      return `That response is larger than ${MAX_FETCH_BYTES / 1_048_576} MB.`;
-    case 'too-many-redirects':
-      return 'The URL redirected too many times.';
-    case 'network':
-      return 'Could not reach the URL. Check the address and try again.';
-    default:
-      return fallback;
-  }
 }

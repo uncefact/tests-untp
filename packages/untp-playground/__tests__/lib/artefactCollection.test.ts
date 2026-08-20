@@ -1,4 +1,12 @@
-import { emptyCollection, matchTarget, upsert, remove, beginRun, commitResult } from '@/lib/artefactCollection';
+import {
+  emptyCollection,
+  matchTarget,
+  upsert,
+  remove,
+  restore,
+  beginRun,
+  commitResult,
+} from '@/lib/artefactCollection';
 import type { CollectionState } from '@/types/artefact';
 
 // Test doubles for the opaque family payload P and result R.
@@ -156,5 +164,46 @@ describe('beginRun and commitResult (stale-write guard)', () => {
     const removed = remove(running, 'i-1').state;
     const { applied } = commitResult(removed, { instanceId: 'i-1', runId: 'r1', result: { steps: 3, done: true } });
     expect(applied).toBe(false);
+  });
+});
+
+describe('restore (single-level undo)', () => {
+  it('reinserts a removed slot at its old position', () => {
+    const { state } = seed(
+      { payload: { name: 'a' }, contentHash: 'ha' },
+      { payload: { name: 'b' }, contentHash: 'hb' },
+      { payload: { name: 'c' }, contentHash: 'hc' },
+    );
+    const slot = state.items[1];
+    const afterRemove = remove(state, slot.instanceId).state;
+
+    const { state: restored, restored: didRestore } = restore(afterRemove, slot, 1);
+
+    expect(didRestore).toBe(true);
+    expect(restored.items.map((item) => item.payload.name)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('clamps an out-of-range index to the end', () => {
+    const { state } = seed({ payload: { name: 'a' }, contentHash: 'ha' });
+    const slot = state.items[0];
+    const afterRemove = remove(state, slot.instanceId).state;
+
+    const { state: restored } = restore(afterRemove, slot, 99);
+
+    expect(restored.items).toHaveLength(1);
+    expect(restored.items[0].payload.name).toBe('a');
+  });
+
+  it('is a no-op when the same content key was re-added before the undo', () => {
+    const { state, mintId } = seed({ payload: { name: 'a' }, contentHash: 'ha' });
+    const slot = state.items[0];
+    const afterRemove = remove(state, slot.instanceId).state;
+    const reAdded = upsert(afterRemove, { payload: { name: 'a2' }, contentHash: 'ha', mintInstanceId: mintId }).state;
+
+    const { state: restored, restored: didRestore } = restore(reAdded, slot, 0);
+
+    expect(didRestore).toBe(false);
+    expect(restored.items).toHaveLength(1);
+    expect(restored.items[0].payload.name).toBe('a2');
   });
 });

@@ -103,3 +103,81 @@ describe('POST /api/fetch', () => {
     expect(json.error).toBe('invalid-url');
   });
 });
+
+describe('POST /api/fetch accept selector (#811)', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.clearAllMocks();
+  });
+
+  it('sends the link set Accept profile when accept is "linkset"', async () => {
+    mockedLookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{"linkset":[]}', { status: 200, headers: { 'content-type': 'application/linkset+json' } }),
+      );
+    global.fetch = fetchMock;
+
+    const response = await POST(
+      makeRequest({ url: 'https://resolver.example.org/01/1?linkType=all', accept: 'linkset' }),
+    );
+    expect(response.status).toBe(200);
+    const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers.Accept).toContain('application/linkset+json');
+  });
+
+  it('defaults to the JSON Accept profile when accept is omitted', async () => {
+    mockedLookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    global.fetch = fetchMock;
+
+    await POST(makeRequest({ url: 'https://example.com/x.json' }));
+    const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers.Accept).toBe('application/json, application/ld+json, */*;q=0.1');
+  });
+
+  it.each([null, 123, ''])('rejects a non-string or empty accept selector (%p) without fetching', async (accept) => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+
+    const response = await POST(makeRequest({ url: 'https://example.com/x.json', accept }));
+    const json = await response.json();
+    expect(response.status).toBe(400);
+    expect(json.ok).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockedLookup).not.toHaveBeenCalled();
+  });
+
+  it.each(['toString', 'constructor', '__proto__', 'hasOwnProperty'])(
+    'rejects the prototype-property selector %p before any network activity',
+    async (accept) => {
+      const fetchMock = jest.fn();
+      global.fetch = fetchMock;
+
+      const response = await POST(makeRequest({ url: 'https://example.com/x.json', accept }));
+      const json = await response.json();
+      expect(response.status).toBe(400);
+      expect(json.ok).toBe(false);
+      // The closed selector's contract: no DNS lookup and no fetch for an unknown value.
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(mockedLookup).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects an unknown accept selector without fetching', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+
+    const response = await POST(makeRequest({ url: 'https://example.com/x.json', accept: 'text/anything' }));
+    const json = await response.json();
+    expect(response.status).toBe(400);
+    expect(json.ok).toBe(false);
+    expect(json.message).toContain('accept');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

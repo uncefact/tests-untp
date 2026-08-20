@@ -1,0 +1,31 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://resolver.example.org/01/09520123456788",
+      "https://test.uncefact.org/voc/untp/dpp": [
+        {
+          "href": "https://untp-playground.uncefact.org/samples/sample-digital-product-passport-v0.7.0.json",
+          "type": "application/vc+ld+json",
+          "title": "Digital Product Passport",
+          "hreflang": ["en"]
+        }
+      ],
+      "https://test.uncefact.org/voc/untp/dcc": [
+        {
+          "href": "https://credentials.example.org/conformity/dcc-batch-114.json",
+          "type": "application/vc+jwt",
+          "title": "Digital Conformity Credential",
+          "hreflang": ["en"]
+        }
+      ],
+      "pip": [
+        {
+          "href": "https://products.example.org/09520123456788",
+          "type": "text/html",
+          "title": "Product information page",
+          "hreflang": ["en"]
+        }
+      ]
+    }
+  ]
+}

@@ -14,10 +14,22 @@ type FetchResponse =
   | { ok: true; body: string; contentType: string | null; finalUrl: string }
   | { ok: false; error: FetchError; message: string };
 
+/**
+ * Closed, server-validated Accept selector (#811, #817). Callers name a profile; the server owns
+ * the header string. A caller-supplied Accept header would open a request-header surface the SSRF
+ * guard was not designed for, so unknown selector values are rejected rather than passed through.
+ */
+const ACCEPT_PROFILES = {
+  json: 'application/json, application/ld+json, */*;q=0.1',
+  linkset: 'application/linkset+json, application/json;q=0.5, */*;q=0.1',
+} as const;
+
+type AcceptProfile = keyof typeof ACCEPT_PROFILES;
+
 export async function POST(request: Request): Promise<NextResponse<FetchResponse>> {
-  let parsed: { url?: unknown };
+  let parsed: { url?: unknown; accept?: unknown };
   try {
-    parsed = (await request.json()) as { url?: unknown };
+    parsed = (await request.json()) as { url?: unknown; accept?: unknown };
   } catch {
     return NextResponse.json(
       { ok: false, error: 'invalid-url', message: 'Request body must be JSON.' },
@@ -32,11 +44,25 @@ export async function POST(request: Request): Promise<NextResponse<FetchResponse
     );
   }
 
-  const result = await fetchWithGuards(parsed.url);
+  const accept = parsed.accept === undefined ? 'json' : parsed.accept;
+  // Object.hasOwn, not `in`: prototype names ('toString', '__proto__') must 400 like any other
+  // unknown selector, before any DNS lookup or fetch.
+  if (typeof accept !== 'string' || !Object.hasOwn(ACCEPT_PROFILES, accept)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'invalid-url',
+        message: `Unknown "accept" selector. Allowed values: ${Object.keys(ACCEPT_PROFILES).join(', ')}.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const result = await fetchWithGuards(parsed.url, accept as AcceptProfile);
   return NextResponse.json(result, { status: result.ok ? 200 : statusForError(result.error) });
 }
 
-async function fetchWithGuards(initialUrl: string): Promise<FetchResponse> {
+async function fetchWithGuards(initialUrl: string, accept: AcceptProfile = 'json'): Promise<FetchResponse> {
   let currentUrl = initialUrl;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -71,7 +97,7 @@ async function fetchWithGuards(initialUrl: string): Promise<FetchResponse> {
         method: 'GET',
         redirect: 'manual',
         signal: controller.signal,
-        headers: { Accept: 'application/json, application/ld+json, */*;q=0.1' },
+        headers: { Accept: ACCEPT_PROFILES[accept] },
       });
 
       if (response.status >= 300 && response.status < 400) {

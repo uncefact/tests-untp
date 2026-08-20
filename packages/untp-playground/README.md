@@ -16,7 +16,7 @@ Drop a credential JSON or JWT file, or paste a URL, on the Credentials tab to va
 
 A tab's label shows a count of its loaded instances, and a small red dot next to the count if any of them has failed. The Credentials tab also shows a spinner while any credential is still being validated, so background progress on an inactive tab stays visible without switching to it. A tab with no loaded instances shows no count.
 
-The Link Sets tab is a placeholder for a future release and does not yet accept uploads.
+On the Link Sets tab, resolve an identity resolver URL to fetch its link set (the request automatically carries `?linkType=all` unless the URL already specifies a `linkType`). Each resolved link set is a card identified by the exact URL requested, so re-resolving the same URL replaces its card in place rather than adding a duplicate. Expanding a card lists the links that identify as UNTP credentials (by relation type or verifiable-credential media type) and counts the rest without listing them. Removing a card is immediate, with a toast offering a single-level Undo rather than a confirm dialog. Schema validation of a resolved link set is not yet implemented: every card shows its validation step as pending.
 
 ## Deployment
 

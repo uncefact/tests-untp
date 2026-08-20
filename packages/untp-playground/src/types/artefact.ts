@@ -2,9 +2,10 @@
  * Shared per-instance artefact model (ADR-041).
  *
  * A family-agnostic ordered collection of validated artefact instances. It owns the instances,
- * their opaque results, and the per-run write token that guards stale writes. Identity is the
- * content hash of the artefact, so identical content is one instance and different content is a
- * separate one, regardless of filename, URL, or any document id. `P` is the family payload and
+ * their opaque results, and the per-run write token that guards stale writes. `contentHash` is a
+ * generic identity key each family supplies: credentials and schemes pass a content hash
+ * (identical content is one instance), link sets pass their normalised resolver request URL or
+ * filename (ADR-046), so do not assume the key is always a hash. `P` is the family payload and
  * `R` the family result, both opaque here. Schemes (#677) are the first consumer; credentials
  * (#810) and link sets (#811) reuse it.
  *
