@@ -21,6 +21,11 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *       Status changes only when verification runs to completion and returns a result; a pre-verification
  *       failure (the DEFAULT-type guard, or a DID whose format or method cannot be parsed) leaves the DID's
  *       current status unchanged.
+ *
+ *       Resolution of the DID document is bounded: the response body is capped at 1 MiB, the fetch is
+ *       subject to a 10-second timeout from connection onwards, at most 3 redirects are followed, and every hop must resolve to a
+ *       publicly routable address. A document that exceeds a bound fails the resolve check with a message
+ *       naming the limit.
  *     tags:
  *       - DIDs
  *     parameters:

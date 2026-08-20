@@ -9,29 +9,56 @@ jest.mock('@uncefact/untp-utils/node', () => ({
   validatePublicUrl: (...args: unknown[]) => mockValidatePublicUrl(...args),
 }));
 
+// The pinned transport is mocked wholesale: its own guard, pinning, redirect
+// and size behaviour is covered by @uncefact/untp-utils' resolver suite, and
+// its ESM build cannot be loaded by this package's CJS test runner. The
+// factory's error classes stand in for the real hierarchy; production code
+// resolves the same mocked module, so instanceof checks line up.
+const mockResolveJsonDocument = jest.fn();
+jest.mock('@uncefact/untp-utils/resolvers', () => {
+  class ResolverError extends Error {}
+  class ResolverHttpError extends ResolverError {
+    readonly status: number;
+    readonly url: string;
+    constructor(url: string, status: number) {
+      super(`${url} returned status ${status}.`);
+      this.status = status;
+      this.url = url;
+    }
+  }
+  class ResolverInvalidJsonError extends ResolverError {
+    readonly url: string;
+    constructor(url: string) {
+      super(`Response body for ${url} is not valid JSON.`);
+      this.url = url;
+    }
+  }
+  return {
+    ResolverError,
+    ResolverHttpError,
+    ResolverInvalidJsonError,
+    resolveJsonDocument: (...args: unknown[]) => mockResolveJsonDocument(...args),
+  };
+});
+
 import { verifyDidWeb } from './verify-did-web';
 import { DidVerificationCheckName } from '../types';
+
+const { ResolverError, ResolverHttpError, ResolverInvalidJsonError } = jest.requireMock(
+  '@uncefact/untp-utils/resolvers',
+);
+
+const C = DidVerificationCheckName;
 
 function useRealGuardOnce(): void {
   mockValidatePublicUrl.mockImplementationOnce((url: string) => actualNode.validatePublicUrl(url));
 }
 
-const C = DidVerificationCheckName;
-
-function createMockResponse(
-  data: unknown,
-  ok = true,
-  status = 200,
-  responseUrl = 'https://example.com/.well-known/did.json',
-): Response {
-  return {
-    ok,
-    status,
-    statusText: ok ? 'OK' : 'Error',
-    url: responseUrl,
-    json: jest.fn().mockResolvedValue(data),
-    text: jest.fn().mockResolvedValue(JSON.stringify(data)),
-  } as unknown as Response;
+function resolvedDoc(
+  json: unknown,
+  finalUrl = 'https://example.com/org/abc/did.json',
+): { json: unknown; finalUrl: string } {
+  return { json, finalUrl };
 }
 
 const validDidDocument = {
@@ -75,27 +102,24 @@ const validDidDocument = {
 
 describe('verifyDidWeb', () => {
   beforeEach(() => {
-    global.fetch = jest.fn();
+    mockResolveJsonDocument.mockReset();
     mockValidatePublicUrl.mockReset();
     mockValidatePublicUrl.mockResolvedValue({ address: '203.0.113.10', family: 4 });
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  it('resolves a valid did:web document', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(validDidDocument));
+  it('resolves a valid did:web document over the pinned transport', async () => {
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument));
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
     expect(result.document).toEqual(validDidDocument);
     const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
     expect(resolveCheck?.passed).toBe(true);
+    expect(mockResolveJsonDocument).toHaveBeenCalledWith('https://example.com/org/abc/did.json');
   });
 
   it('returns RESOLVE failure for HTTP error', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(null, false, 404));
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverHttpError('https://example.com/org/abc/did.json', 404));
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
@@ -103,10 +127,74 @@ describe('verifyDidWeb', () => {
     const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
     expect(resolveCheck?.passed).toBe(false);
     expect(resolveCheck?.message).toContain('HTTP 404');
+    // The error carries the final URL, so the HTTPS verdict is still stated.
+    const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
+    expect(httpsCheck?.passed).toBe(true);
+    expect(httpsCheck?.message).toBeUndefined();
+  });
+
+  it('fails the HTTPS check when an HTTP error arrives over an insecure final URL', async () => {
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverHttpError('http://example.com/org/abc/did.json', 404));
+
+    const result = await verifyDidWeb('did:web:example.com:org:abc');
+
+    const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
+    expect(httpsCheck?.passed).toBe(false);
+    expect(httpsCheck?.message).toContain('insecure connection');
+  });
+
+  it('reports invalid JSON as a resolution failure while still judging HTTPS on the final URL', async () => {
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverInvalidJsonError('https://example.com/org/abc/did.json'));
+
+    const result = await verifyDidWeb('did:web:example.com:org:abc');
+
+    expect(result.document).toBeNull();
+    const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
+    expect(resolveCheck?.passed).toBe(false);
+    expect(resolveCheck?.message).toContain('not valid JSON');
+    const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
+    expect(httpsCheck?.passed).toBe(true);
+  });
+
+  it('maps a redirect-hop private rejection to the same not-permitted outcome as the pre-fetch guard', async () => {
+    mockResolveJsonDocument.mockRejectedValueOnce(
+      new actualNode.PrivateAddressError('internal.example.com', ['10.0.0.5']),
+    );
+
+    const result = await verifyDidWeb('did:web:example.com:org:abc');
+
+    const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
+    expect(resolveCheck?.passed).toBe(false);
+    expect(resolveCheck?.message).toBe('Private or localhost URLs are not permitted for DID resolution');
+    const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
+    expect(httpsCheck?.passed).toBe(false);
+    expect(httpsCheck?.message).toBe('Could not verify HTTPS (resolution failed)');
+  });
+
+  it('maps a redirect-hop private-hostname rejection to the same not-permitted outcome', async () => {
+    mockResolveJsonDocument.mockRejectedValueOnce(new actualNode.PrivateHostnameError('intranet.internal'));
+
+    const result = await verifyDidWeb('did:web:example.com:org:abc');
+
+    const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
+    expect(resolveCheck?.passed).toBe(false);
+    expect(resolveCheck?.message).toBe('Private or localhost URLs are not permitted for DID resolution');
+  });
+
+  it('maps a non-private redirect-hop guard rejection to a resolution failure', async () => {
+    mockResolveJsonDocument.mockRejectedValueOnce(
+      new actualNode.ResolutionFailedError('gone.example.com', new Error('ENOTFOUND')),
+    );
+
+    const result = await verifyDidWeb('did:web:example.com:org:abc');
+
+    const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
+    expect(resolveCheck?.passed).toBe(false);
+    expect(resolveCheck?.message).toContain('Resolution failed');
   });
 
   it('returns RESOLVE failure for network error', async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverError('Network error'));
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
@@ -117,8 +205,8 @@ describe('verifyDidWeb', () => {
   });
 
   it('passes HTTPS check when final response URL is HTTPS', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
-      createMockResponse(validDidDocument, true, 200, 'https://example.com/org/abc/did.json'),
+    mockResolveJsonDocument.mockResolvedValueOnce(
+      resolvedDoc(validDidDocument, 'https://example.com/org/abc/did.json'),
     );
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
@@ -129,9 +217,7 @@ describe('verifyDidWeb', () => {
   });
 
   it('fails HTTPS check when response was downgraded to HTTP', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(
-      createMockResponse(validDidDocument, true, 200, 'http://example.com/org/abc/did.json'),
-    );
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument, 'http://example.com/org/abc/did.json'));
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
@@ -141,7 +227,7 @@ describe('verifyDidWeb', () => {
   });
 
   it('fails HTTPS check when resolution fails (no response to verify)', async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('fail'));
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverError('fail'));
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
@@ -151,7 +237,7 @@ describe('verifyDidWeb', () => {
   });
 
   it('returns exactly two checks (RESOLVE and HTTPS)', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(validDidDocument));
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument));
 
     const result = await verifyDidWeb('did:web:example.com:org:abc');
 
@@ -167,7 +253,7 @@ describe('verifyDidWeb', () => {
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('blocks 127.x.x.x URLs', async () => {
@@ -176,7 +262,7 @@ describe('verifyDidWeb', () => {
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('blocks 10.x.x.x URLs', async () => {
@@ -185,7 +271,7 @@ describe('verifyDidWeb', () => {
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('blocks 192.168.x.x URLs', async () => {
@@ -194,7 +280,7 @@ describe('verifyDidWeb', () => {
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('blocks the cloud metadata literal (missed by the previous in-package guard)', async () => {
@@ -203,7 +289,7 @@ describe('verifyDidWeb', () => {
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('blocks an IPv6 unique-local literal (missed by the previous in-package guard)', async () => {
@@ -212,7 +298,7 @@ describe('verifyDidWeb', () => {
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('maps a private-hostname rejection to the not-permitted message', async () => {
@@ -221,14 +307,20 @@ describe('verifyDidWeb', () => {
       const resolveCheck = result.checks.find((c) => c.name === C.RESOLVE);
       expect(resolveCheck?.passed).toBe(false);
       expect(resolveCheck?.message).toContain('not permitted');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
     });
 
     it('rethrows errors outside the guard hierarchy instead of reporting a failed check', async () => {
       const bug = new TypeError('validatePublicUrl exploded');
       mockValidatePublicUrl.mockRejectedValueOnce(bug);
       await expect(verifyDidWeb('did:web:example.com')).rejects.toBe(bug);
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
+    });
+
+    it('rethrows transport errors outside the resolver hierarchy instead of reporting a failed check', async () => {
+      const bug = new TypeError('resolveJsonDocument exploded');
+      mockResolveJsonDocument.mockRejectedValueOnce(bug);
+      await expect(verifyDidWeb('did:web:example.com')).rejects.toBe(bug);
     });
 
     it('surfaces a non-private guard failure with the structured error message', async () => {
@@ -242,7 +334,7 @@ describe('verifyDidWeb', () => {
       const httpsCheck = result.checks.find((c) => c.name === C.HTTPS);
       expect(httpsCheck?.passed).toBe(false);
       expect(httpsCheck?.message).toBe('Could not verify HTTPS (resolution blocked)');
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockResolveJsonDocument).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,26 +7,49 @@ jest.mock('@uncefact/untp-utils/node', () => ({
   validatePublicUrl: jest.fn().mockResolvedValue({ address: '203.0.113.10', family: 4 }),
 }));
 
+// The pinned transport is mocked for the same reason (and because its ESM
+// build cannot load under this package's CJS test runner); transport-level
+// behaviour is covered by verify-did-web.test.ts and the resolver suite.
+const mockResolveJsonDocument = jest.fn();
+jest.mock('@uncefact/untp-utils/resolvers', () => {
+  class ResolverError extends Error {}
+  class ResolverHttpError extends ResolverError {
+    readonly status: number;
+    readonly url: string;
+    constructor(url: string, status: number) {
+      super(`${url} returned status ${status}.`);
+      this.status = status;
+      this.url = url;
+    }
+  }
+  class ResolverInvalidJsonError extends ResolverError {
+    readonly url: string;
+    constructor(url: string) {
+      super(`Response body for ${url} is not valid JSON.`);
+      this.url = url;
+    }
+  }
+  return {
+    ResolverError,
+    ResolverHttpError,
+    ResolverInvalidJsonError,
+    resolveJsonDocument: (...args: unknown[]) => mockResolveJsonDocument(...args),
+  };
+});
+
+const { ResolverError: MockResolverError } = jest.requireMock('@uncefact/untp-utils/resolvers');
+
 import { verifyDid } from './verify';
 import { DidVerificationCheckName } from '../types';
 import { DidInputError, DidMethodNotSupportedError } from '../errors';
 
 // -- Helpers -----------------------------------------------------------------
 
-function createMockResponse(
-  data: unknown,
-  ok = true,
-  status = 200,
-  responseUrl = 'https://example.com/.well-known/did.json',
-): Response {
-  return {
-    ok,
-    status,
-    statusText: ok ? 'OK' : 'Error',
-    url: responseUrl,
-    json: jest.fn().mockResolvedValue(data),
-    text: jest.fn().mockResolvedValue(JSON.stringify(data)),
-  } as unknown as Response;
+function resolvedDoc(
+  json: unknown,
+  finalUrl = 'https://example.com/org/abc/did.json',
+): { json: unknown; finalUrl: string } {
+  return { json, finalUrl };
 }
 
 const C = DidVerificationCheckName;
@@ -74,15 +97,11 @@ const validDidDocument = {
 
 describe('verifyDid', () => {
   beforeEach(() => {
-    global.fetch = jest.fn();
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
+    mockResolveJsonDocument.mockReset();
   });
 
   it('returns verified=true for a valid DID document (all checks pass)', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(validDidDocument));
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument));
 
     const result = await verifyDid('did:web:example.com:org:abc', {
       providerKeys: [{ kid: 'abc123def456' }],
@@ -95,7 +114,7 @@ describe('verifyDid', () => {
 
   it('returns structure failure when document is missing required fields', async () => {
     const badDoc = { id: 'did:web:example.com:org:abc' }; // missing @context
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(badDoc));
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(badDoc));
 
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
@@ -107,7 +126,7 @@ describe('verifyDid', () => {
 
   it('returns identity_match failure for id mismatch', async () => {
     const mismatchDoc = { ...validDidDocument, id: 'did:web:other.com' };
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(mismatchDoc));
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(mismatchDoc));
 
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
@@ -118,7 +137,7 @@ describe('verifyDid', () => {
   });
 
   it('skips jsonld_validity check (expansion disabled)', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(validDidDocument));
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument));
 
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
@@ -128,7 +147,7 @@ describe('verifyDid', () => {
   });
 
   it('handles resolution failure gracefully', async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+    mockResolveJsonDocument.mockRejectedValueOnce(new MockResolverError('Network error'));
 
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
@@ -143,7 +162,7 @@ describe('verifyDid', () => {
   });
 
   it('fails HTTPS check when resolution fails (no response to inspect)', async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+    mockResolveJsonDocument.mockRejectedValueOnce(new MockResolverError('Network error'));
 
     const result = await verifyDid('did:web:example.com:org:abc', { providerKeys: [] });
 
@@ -153,7 +172,7 @@ describe('verifyDid', () => {
   });
 
   it('passes key_material check with message when providerKeys is empty', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(validDidDocument));
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument));
 
     const result = await verifyDid('did:web:example.com:org:abc', {
       providerKeys: [],
@@ -166,7 +185,7 @@ describe('verifyDid', () => {
   });
 
   it('runs key_material check when providerKeys provided and keys match', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(validDidDocument));
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument));
 
     const result = await verifyDid('did:web:example.com:org:abc', {
       providerKeys: [{ kid: 'abc123def456' }],
@@ -178,7 +197,7 @@ describe('verifyDid', () => {
   });
 
   it('returns key_material failure when keys do not match', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse(validDidDocument));
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument));
 
     const result = await verifyDid('did:web:example.com:org:abc', {
       providerKeys: [{ kid: 'non-existent-key' }],

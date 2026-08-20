@@ -22,9 +22,14 @@ export class ResolverNetworkError extends ResolverError {
   }
 }
 
-/** The remote returned a non-success HTTP status. */
+/**
+ * The remote returned a non-success HTTP status. `url` is the URL of the hop
+ * that produced the status (the end of the redirect chain), exposed so
+ * callers can still report on the final URL of a failed resolution.
+ */
 export class ResolverHttpError extends ResolverError {
   readonly status: number;
+  readonly url: string;
   constructor(url: string, status: number) {
     super({
       code: 'resolver.http-error',
@@ -33,6 +38,7 @@ export class ResolverHttpError extends ResolverError {
       expected: '2xx',
     });
     this.status = status;
+    this.url = url;
   }
 }
 
@@ -91,8 +97,13 @@ export class ResolverRedirectMissingLocationError extends ResolverError {
   }
 }
 
-/** The response body was fetched but could not be parsed as JSON. */
+/**
+ * The response body was fetched but could not be parsed as JSON. `url` is
+ * the final URL the body was fetched from (after redirect chasing), exposed
+ * so callers can still report on the final URL of a failed resolution.
+ */
 export class ResolverInvalidJsonError extends ResolverError {
+  readonly url: string;
   constructor(url: string, cause: unknown) {
     super({
       code: 'resolver.invalid-json',
@@ -101,5 +112,6 @@ export class ResolverInvalidJsonError extends ResolverError {
       expected: 'a JSON document',
       cause,
     });
+    this.url = url;
   }
 }
