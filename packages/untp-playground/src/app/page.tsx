@@ -15,7 +15,13 @@ import { TestResults } from '@/components/TestResults';
 import { TestReportProvider } from '@/contexts/TestReportContext';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
 import { upsert } from '@/lib/artefactCollection';
-import { credentialContentHash, credentialGroupType, credentialTitle } from '@/lib/credentialCollection';
+import {
+  credentialContentHash,
+  credentialGroupType,
+  credentialIsTerminal,
+  credentialTitle,
+  instanceStatus,
+} from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { schemeContentHash, schemeTitle } from '@/lib/schemeCollection';
 import { decodeEnvelopedCredential, detectArtefact, isEnvelopedProof } from '@/lib/credentialService';
@@ -24,8 +30,57 @@ import type { PermittedCredentialType, StoredCredential, StoredScheme, TestStep 
 import { useError } from '@/contexts/ErrorContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Link2, Server } from 'lucide-react';
-import { ArtefactKind, permittedCredentialTypes } from '../../constants';
+import { FileText, Link2, Loader2, Server } from 'lucide-react';
+import { ArtefactKind, permittedCredentialTypes, TestCaseStatus } from '../../constants';
+
+/**
+ * Quiet per-tab meta (final hi-fi, canvas section 08): a muted tabular-nums instance count, a
+ * small red dot before it when any instance in the family is failing, and a spinner (with the
+ * count tinted to the in-progress colour) while the family is still verifying — wired up for
+ * Credentials only, per the ticket and handoff. Renders nothing while the family is empty, so an
+ * empty tab carries no meta at all.
+ */
+function TabMeta({
+  family,
+  count,
+  failing = false,
+  verifying = false,
+}: {
+  family: string;
+  count: number;
+  failing?: boolean;
+  verifying?: boolean;
+}) {
+  if (count === 0) return null;
+  return (
+    // blue-700, not the StatusIcon spinner's blue-500: the tinted count is 12px text and must
+    // clear WCAG 1.4.3's 4.5:1 on the white background (blue-500 is ~3.7:1; the handoff's
+    // running-meta colour hsl(217 72% 42%) and blue-700 both clear it).
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs tabular-nums ${
+        verifying ? 'text-blue-700' : 'text-muted-foreground'
+      }`}
+    >
+      {failing && (
+        <>
+          <span
+            data-testid={`${family}-tab-failing-dot`}
+            aria-hidden='true'
+            className='h-1.5 w-1.5 rounded-full bg-red-500'
+          />
+          <span className='sr-only'>failing</span>
+        </>
+      )}
+      {verifying && (
+        <>
+          <Loader2 data-testid={`${family}-tab-verifying`} aria-hidden='true' className='h-3 w-3 animate-spin' />
+          <span className='sr-only'>verifying</span>
+        </>
+      )}
+      {count}
+    </span>
+  );
+}
 
 export default function Home() {
   const credential = useArtefactCollection<StoredCredential, TestStep[]>();
@@ -41,6 +96,15 @@ export default function Home() {
   const credentialsCount = credential.state.items.length;
   const schemesCount = scheme.state.items.length;
   const linkSetsCount = 0; // Link Sets family lands in #811.
+
+  // Cross-tab signals for the tab meta: a family with any failing instance shows a red dot from
+  // any tab, and the Credentials tab shows a spinner while any credential is still verifying
+  // (a fresh instance with no result yet counts as verifying — its pipeline is about to run).
+  const credentialsFailing = credential.state.items.some(
+    (item) => instanceStatus(item.result) === TestCaseStatus.FAILURE,
+  );
+  const schemesFailing = scheme.state.items.some((item) => instanceStatus(item.result) === TestCaseStatus.FAILURE);
+  const credentialsVerifying = credential.state.items.some((item) => !credentialIsTerminal(item.result ?? []));
 
   // Recomputed only when the instances change (add, replace, remove, or a result commit), so an
   // unrelated re-render does not create a fresh array and re-run the report-reset effect.
@@ -144,19 +208,20 @@ export default function Home() {
             <TabsList>
               <TabsTrigger value='credentials'>
                 Credentials
-                {credentialsCount > 0 && (
-                  <span className='text-xs tabular-nums text-muted-foreground'>{credentialsCount}</span>
-                )}
+                <TabMeta
+                  family='credentials'
+                  count={credentialsCount}
+                  failing={credentialsFailing}
+                  verifying={credentialsVerifying}
+                />
               </TabsTrigger>
               <TabsTrigger value='schemes'>
                 Conformity Schemes
-                {schemesCount > 0 && <span className='text-xs tabular-nums text-muted-foreground'>{schemesCount}</span>}
+                <TabMeta family='schemes' count={schemesCount} failing={schemesFailing} />
               </TabsTrigger>
               <TabsTrigger value='linksets'>
                 Link Sets
-                {linkSetsCount > 0 && (
-                  <span className='text-xs tabular-nums text-muted-foreground'>{linkSetsCount}</span>
-                )}
+                <TabMeta family='linksets' count={linkSetsCount} />
               </TabsTrigger>
             </TabsList>
 
