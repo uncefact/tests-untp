@@ -64,12 +64,30 @@ function isJsonJwe(candidate: Record<string, unknown>): boolean {
  * field encoding rules below mirror that predicate (it uses Buffer, and the Playground's adoption
  * of the shared packages is epic #824).
  */
+const NIST_AES_WIDTHS = new Set(['128', '192', '256']);
+
+function stripSeparator(value: string): string {
+  return value.startsWith('-') || value.startsWith('_') ? value.slice(1) : value;
+}
+
 function isPermittedEnvelopeAlgorithm(type: string): boolean {
   // Whole-token rule: 'aes', optionally a NIST key width (128/192/256, the widths AES defines),
   // then letter-led suffix segments ('gcm', 'cbc'). A stray or sub-128 number anywhere fails, so
-  // 'aes-64', 'aes-999-x' and 'aes garbage' never classify.
-  const match = /^aes(?:[-_]?(128|192|256))?(?:[-_]?[a-z][a-z0-9]*)*$/i.exec(type.trim());
-  return match !== null;
+  // 'aes-64', 'aes-999-x' and 'aes garbage' never classify. Parsed linearly rather than with an
+  // ambiguous repeated group: the value is untrusted resolver data, so the check must not be
+  // vulnerable to backtracking blowup.
+  const token = type.trim().toLowerCase();
+  if (token.length > 64 || !token.startsWith('aes')) return false;
+  let rest = stripSeparator(token.slice(3));
+  const digits = /^\d+/.exec(rest)?.[0];
+  if (digits !== undefined) {
+    if (!NIST_AES_WIDTHS.has(digits)) return false;
+    rest = stripSeparator(rest.slice(digits.length));
+  }
+  if (rest === '') return true;
+  // Suffix segments: letter-led alphanumerics, each further segment behind a mandatory separator
+  // (unambiguous, so the regex cannot backtrack).
+  return /^[a-z][a-z0-9]*(?:[-_][a-z][a-z0-9]*)*$/.test(rest);
 }
 
 // Standard base64 (the envelope contract's encoding, distinct from JOSE's base64url). A length of

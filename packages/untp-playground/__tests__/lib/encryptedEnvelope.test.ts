@@ -69,6 +69,26 @@ describe('isEncryptedEnvelope', () => {
       { cipherText: 'SGVsbG8=', iv: 'nLUYsnXBY8bbXY45', tag: '7j0RRSoEIm2FAo52m1pyow==', type: 'AES128CBC' },
       true,
     ],
+    [
+      'a pathological aesa token stays linear and rejects',
+      {
+        cipherText: 'SGVsbG8=',
+        iv: 'nLUYsnXBY8bbXY45',
+        tag: '7j0RRSoEIm2FAo52m1pyow==',
+        type: 'aesa' + 'a'.repeat(50) + '!',
+      },
+      false,
+    ],
+    [
+      'over-long tokens reject outright',
+      {
+        cipherText: 'SGVsbG8=',
+        iv: 'nLUYsnXBY8bbXY45',
+        tag: '7j0RRSoEIm2FAo52m1pyow==',
+        type: 'aes-' + 'gcm-'.repeat(30) + 'x',
+      },
+      false,
+    ],
     ['malformed base64 fields', { cipherText: 'a', iv: 'b', tag: 'c', type: 'aes-256-gcm' }, false],
     [
       'JSON-serialised JWE with a decodable protected header',
