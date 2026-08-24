@@ -55,6 +55,24 @@ export interface LinkedCredentialRow {
   href: string;
   /** Whether the link identifies as a UNTP credential link (see isUntpCredentialLink). */
   credential: boolean;
+  /**
+   * Whether the target declares itself encrypted before fetch. The UNTP Identity Resolver
+   * specification's Secure Targets section has the linkset carry the encryption method for an
+   * encrypted target (example `"encryptionMethod": "AES-128"`), so the signal is a non-empty
+   * `encryptionMethod` that is not "none", accepted as the spec's string form or RFC 9264's
+   * array-of-strings extension form. `accessRole` alone is authorisation, not encryption (this
+   * repository attaches it to unencrypted links too), so it does not mark the target. Like the
+   * relation rule this is a hint, not a guarantee; decryption itself is #813.
+   */
+  encrypted: boolean;
+}
+
+function declaresEncryption(target: object): boolean {
+  const raw = (target as { encryptionMethod?: unknown }).encryptionMethod;
+  const values = Array.isArray(raw) ? raw : [raw];
+  return values.some(
+    (value) => typeof value === 'string' && value.trim().length > 0 && value.trim().toLowerCase() !== 'none',
+  );
 }
 
 /**
@@ -130,6 +148,7 @@ export function linkedCredentialRows(decoded: Record<string, unknown>): LinkedCr
           label,
           href,
           credential: isUntpCredentialLink(relation, typeof type === 'string' ? type : undefined),
+          encrypted: declaresEncryption(target),
         });
       }
     }

@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 
 import { ArtefactUploader, type ArtefactSource } from '@/components/ArtefactUploader';
 import { UPLOADER_FAMILIES } from '@/lib/uploaderFamilies';
+import { isEncryptedEnvelope } from '@/lib/encryptedEnvelope';
+import { emptyUrlBindings, recordUrlBinding, type UrlBindings } from '@/lib/urlBindings';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { EmptyState } from '@/components/EmptyState';
 import { LinkSetTestResults } from '@/components/LinkSetTestResults';
@@ -96,6 +98,10 @@ export default function Home() {
   const linkSet = useArtefactCollection<StoredLinkSet, TestStep[]>();
   const [fileCount, setFileCount] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>('credentials');
+  // Which credential instance each URL's latest accepted ingestion produced (#812); the link set
+  // rows read their state through this rather than matching sources, because content-hash
+  // identity can append or re-source instances underneath a URL. See urlBindings.ts.
+  const [urlBindings, setUrlBindings] = useState<UrlBindings>(emptyUrlBindings);
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
   const shouldDisplayUploadDetailBtn = errors && errors.length > 0;
@@ -141,13 +147,39 @@ export default function Home() {
 
   // The tab declares intent (#676): an upload validates as the active tab's family, with no
   // cross-family routing and no auto-switching. Detection only labels cards.
-  const handleCredentialUpload = (rawArtefact: any, source?: ArtefactSource) => {
-    const normalizedCredential = rawArtefact.verifiableCredential || rawArtefact;
+  // Returns the ingestion outcome so a caller driving a row (the link set Verify, #812) can gate
+  // its own feedback and bind to the produced instance; rejections surface through dispatchError
+  // either way.
+  const handleCredentialUpload = (
+    rawArtefact: any,
+    source?: ArtefactSource,
+  ): { accepted: false; encrypted?: true } | { accepted: true; instanceId: string } => {
+    // A fetched body can legally parse to null; guard before property access so it reaches the
+    // validator's own null handling instead of throwing (#812).
+    const normalizedCredential = (rawArtefact && rawArtefact.verifiableCredential) || rawArtefact;
+    // One encrypted classifier for every entry point (link set Verify, URL fetch, file upload):
+    // an encrypted envelope is named as encrypted on the error surface, never walked into the
+    // pipeline as an unclassified credential. Runs on the NORMALISED document, so a wrapper's
+    // inner credential is judged rather than the wrapper. Decryption is the locked-card work (#813).
+    if (isEncryptedEnvelope(normalizedCredential)) {
+      dispatchError([
+        {
+          keyword: 'encrypted',
+          instancePath: '',
+          params: {
+            receivedValue: source?.kind === 'url' ? source.url : 'the uploaded file',
+            solution: 'Provide the decrypted credential, or wait for in-browser decryption, which is coming in v0.4.',
+          },
+          message: 'This credential is encrypted, so it cannot be validated yet.',
+        },
+      ]);
+      return { accepted: false, encrypted: true };
+    }
     const error = validateNormalizedCredential(normalizedCredential);
 
     if (error) {
       dispatchError([error]);
-      return;
+      return { accepted: false };
     }
 
     const isEnveloped = isEnvelopedProof(normalizedCredential);
@@ -172,16 +204,24 @@ export default function Home() {
           message: `The credential type is missing or invalid. The Playground accepts: ${acceptedFamiliesText}.`,
         },
       ]);
-      return;
+      return { accepted: false };
     }
 
     const stored: StoredCredential = { original: normalizedCredential, decoded: decodedCredential, source };
     const { outcome } = credential.dispatch((state) =>
       upsert(state, { payload: stored, contentHash: credentialContentHash(stored.decoded), mintInstanceId: newId }),
     );
-    if (outcome.kind === 'replaced') {
+    if (source?.kind === 'url') {
+      // Both the requested URL and the post-redirect final URL name this ingestion, so a link set
+      // row finds its instance whichever form it holds.
+      setUrlBindings((bindings) => recordUrlBinding(bindings, [source.url, source.requestedUrl], outcome.instanceId));
+    }
+    if (outcome.kind === 'replaced' && !(source?.kind === 'url' && source.via === 'link-set')) {
+      // The link set row narrates its own outcome; a second Replaced toast for the same click
+      // would double-report.
       toast.success(`Replaced ${credentialTitle(stored)}`);
     }
+    return { accepted: true, instanceId: outcome.instanceId };
   };
 
   const handleSchemeUpload = (rawArtefact: any, source?: ArtefactSource) => {
@@ -217,6 +257,13 @@ export default function Home() {
 
   const handleArtefactUpload = async (rawArtefact: any, source?: ArtefactSource) => {
     try {
+      // No family can do anything with ciphertext: gate encrypted envelopes before the tab
+      // routing, so a JWE dropped on Conformity Schemes is named honestly instead of persisting
+      // a string as a scheme card.
+      if (isEncryptedEnvelope(rawArtefact)) {
+        handleCredentialUpload(rawArtefact, source);
+        return;
+      }
       uploadHandlers[activeTab](rawArtefact, source);
     } catch (error) {
       console.error(error);
@@ -318,7 +365,17 @@ export default function Home() {
                       guidance='Add a link set from the panel on the right. Drop a JSON file or resolve from an identity resolver service. Each link set you add appears here.'
                     />
                   ) : (
-                    <LinkSetTestResults collection={linkSet.state} dispatch={linkSet.dispatch} />
+                    <LinkSetTestResults
+                      collection={linkSet.state}
+                      dispatch={linkSet.dispatch}
+                      // A row's Verify routes the fetched document through the same ingestion as a
+                      // Credentials-tab upload (identity and dedupe per #810), with a link-set
+                      // provenance source; the rows read the credentials collection back to show
+                      // verifying/verified state without switching tabs (#812).
+                      credentialItems={credential.state.items}
+                      urlBindings={urlBindings}
+                      onVerifyCredential={handleCredentialUpload}
+                    />
                   )}
                 </TabsContent>
               </div>

@@ -111,8 +111,13 @@ describe('linkedCredentialRows', () => {
       ],
     });
     expect(rows).toEqual([
-      { label: 'Digital Product Passport', href: 'https://x.example.org/dpp.json', credential: false },
-      { label: 'application/json', href: 'https://x.example.org/dcc.json', credential: false },
+      {
+        label: 'Digital Product Passport',
+        href: 'https://x.example.org/dpp.json',
+        credential: false,
+        encrypted: false,
+      },
+      { label: 'application/json', href: 'https://x.example.org/dcc.json', credential: false, encrypted: false },
     ]);
   });
 
@@ -121,7 +126,7 @@ describe('linkedCredentialRows', () => {
       linkset: [{ rel: [{ href: 'https://x.example.org/creds/dte-88.json' }] }],
     });
     expect(rows).toEqual([
-      { label: 'dte-88.json', href: 'https://x.example.org/creds/dte-88.json', credential: false },
+      { label: 'dte-88.json', href: 'https://x.example.org/creds/dte-88.json', credential: false, encrypted: false },
     ]);
   });
 
@@ -143,5 +148,23 @@ describe('linkedCredentialRows empty href (RFC 9264 self-reference)', () => {
       linkset: [{ anchor: 'https://id.example.org/01/1', describedby: [{ href: '' }] }],
     });
     expect(rows).toEqual([]);
+  });
+});
+
+describe('encrypted target signal (#812, UNTP Secure Targets)', () => {
+  const rowsFor = (target: Record<string, unknown>) =>
+    linkedCredentialRows({ linkset: [{ dpp: [{ href: 'https://x.example.org/c.json', ...target }] }] });
+
+  it.each([
+    ['spec string form', { encryptionMethod: 'AES-128' }, true],
+    ['RFC 9264 array form', { encryptionMethod: ['AES-128'] }, true],
+    ['none is not encryption', { encryptionMethod: 'none' }, false],
+    ['whitespace only', { encryptionMethod: '   ' }, false],
+    ['empty array', { encryptionMethod: [] }, false],
+    ['accessRole alone is authorisation, not encryption', { accessRole: ['untp:accessRole#Owner'] }, false],
+    ['the retired boolean flag', { encrypted: true }, false],
+    ['non-string member', { encryptionMethod: [42] }, false],
+  ])('%s -> encrypted %s', (_name, target, expected) => {
+    expect(rowsFor(target)[0].encrypted).toBe(expected);
   });
 });

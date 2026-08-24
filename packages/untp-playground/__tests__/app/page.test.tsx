@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import {
@@ -11,6 +11,7 @@ import { detectExtension, validateCredentialSchema } from '@/lib/schemaValidatio
 import { ArtefactUploader } from '@/components/ArtefactUploader';
 import { SchemeTestResults } from '@/components/SchemeTestResults';
 import { TestResults } from '@/components/TestResults';
+import { LinkSetTestResults } from '@/components/LinkSetTestResults';
 import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
 import { resolveLinkSet } from '@/lib/resolveLinkSet';
 import Home from '@/app/page';
@@ -975,5 +976,329 @@ describe('Link Sets family (#811, tab-intent routing #676)', () => {
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Replaced'));
     });
     expect(screen.getByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
+  });
+});
+
+describe('verify from a link set (#812)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+  });
+
+  // The link set panel renders its results component only once a link set exists, so each test
+  // ingests one through the uploader mock first.
+  const ingestLinkSetButton = () => {
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() => onArtefactUpload({ linkset: [] }, { kind: 'file', filename: 'linkset.json' })}
+        >
+          Upload link set
+        </button>
+      ),
+    );
+  };
+
+  it('wires the credentials collection and its ingestion into the link set surface', async () => {
+    ingestLinkSetButton();
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+
+    const props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    expect(props.credentialItems).toEqual([]);
+    expect(typeof props.onVerifyCredential).toBe('function');
+  });
+
+  it('enqueues a verified linked credential into Credentials without leaving the Link Sets tab', async () => {
+    ingestLinkSetButton();
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+
+    const props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    await act(async () => {
+      props.onVerifyCredential(
+        { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+        { kind: 'url', url: 'https://x.example.org/creds/dpp.json', via: 'link-set' },
+      );
+    });
+    expect(mockDispatchError).not.toHaveBeenCalled();
+
+    // A new instance lands on the Credentials tab (count 1, with the live verifying spinner from
+    // #809 in the tab meta) while Link Sets stays active.
+    const credentialsTab = await screen.findByRole('tab', { name: /Credentials.*1/ });
+    expect(credentialsTab).toHaveTextContent('verifying');
+    expect(screen.getByRole('tab', { name: /Link Sets/ })).toHaveAttribute('data-state', 'active');
+
+    // The instance carries the link-set provenance source for the running subtitle (#812).
+    const updated = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    expect(updated.credentialItems).toHaveLength(1);
+    expect(updated.credentialItems[0].payload.source).toEqual({
+      kind: 'url',
+      url: 'https://x.example.org/creds/dpp.json',
+      via: 'link-set',
+    });
+  });
+});
+
+describe('link-set ingestion acceptance contract (#812 review findings)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+  });
+
+  const ingest = () => {
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() => onArtefactUpload({ linkset: [] }, { kind: 'file', filename: 'linkset.json' })}
+        >
+          u
+        </button>
+      ),
+    );
+  };
+
+  it('rejects a null document without throwing, so the row can report honestly', async () => {
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() => onArtefactUpload({ linkset: [] }, { kind: 'file', filename: 'linkset.json' })}
+        >
+          u
+        </button>
+      ),
+    );
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+
+    const props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    let outcome: { accepted: boolean } | undefined;
+    await act(async () => {
+      outcome = props.onVerifyCredential(null, {
+        kind: 'url',
+        url: 'https://x.example.org/null.json',
+        via: 'link-set',
+      });
+    });
+
+    expect(outcome).toEqual({ accepted: false });
+    expect(mockDispatchError).toHaveBeenCalled();
+    // Nothing landed in the credentials collection.
+    expect((LinkSetTestResults as jest.Mock).mock.lastCall?.[0].credentialItems).toEqual([]);
+  });
+
+  it('rejects a forbidden credential type with an explicit refusal, never undefined', async () => {
+    (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
+    ingest();
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+
+    const props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    let outcome: { accepted: boolean } | undefined;
+    await act(async () => {
+      outcome = props.onVerifyCredential(
+        { type: ['SomethingElse'] },
+        { kind: 'url', url: 'https://x.example.org/other.json', via: 'link-set' },
+      );
+    });
+
+    expect(outcome).toEqual({ accepted: false });
+    expect(mockDispatchError).toHaveBeenCalled();
+  });
+
+  it('returns the produced instance id when the document is accepted, and binds its URL', async () => {
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() => onArtefactUpload({ linkset: [] }, { kind: 'file', filename: 'linkset.json' })}
+        >
+          u
+        </button>
+      ),
+    );
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+
+    const props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    let outcome: { accepted: boolean; instanceId?: string } | undefined;
+    await act(async () => {
+      outcome = props.onVerifyCredential(
+        { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+        { kind: 'url', url: 'https://x.example.org/dpp.json', via: 'link-set' },
+      );
+    });
+
+    expect(outcome?.accepted).toBe(true);
+    expect(typeof outcome?.instanceId).toBe('string');
+    expect(mockDispatchError).not.toHaveBeenCalled();
+
+    // The page registered the URL binding, and the rows receive it on the next render.
+    const updated = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    expect(updated.urlBindings.get('https://x.example.org/dpp.json')).toBe(outcome?.instanceId);
+  });
+});
+
+describe('encrypted envelopes at ingestion (#812, every entry point)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+  });
+
+  const envelope = {
+    cipherText: 'SGVsbG8=',
+    iv: 'nLUYsnXBY8bbXY45',
+    tag: '7j0RRSoEIm2FAo52m1pyow==',
+    type: 'aes-256-gcm',
+  };
+
+  it('reports an encrypted envelope from a link set Verify in the details drawer and flags the outcome', async () => {
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() => onArtefactUpload({ linkset: [] }, { kind: 'file', filename: 'linkset.json' })}
+        >
+          u
+        </button>
+      ),
+    );
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+
+    const props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    let outcome: { accepted: boolean; encrypted?: boolean } | undefined;
+    await act(async () => {
+      outcome = props.onVerifyCredential(envelope, {
+        kind: 'url',
+        url: 'https://documents.example.org/enc.json',
+        via: 'link-set',
+      });
+    });
+
+    expect(outcome).toEqual({ accepted: false, encrypted: true });
+    expect(mockDispatchError).toHaveBeenCalledWith([
+      expect.objectContaining({
+        keyword: 'encrypted',
+        message: 'This credential is encrypted, so it cannot be validated yet.',
+      }),
+    ]);
+    // Nothing entered the credentials collection.
+    expect((LinkSetTestResults as jest.Mock).mock.lastCall?.[0].credentialItems).toEqual([]);
+  });
+
+  it('reports the same encrypted warning for an upload on the Credentials tab', async () => {
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-envelope'
+          onClick={() => onArtefactUpload(envelope, { kind: 'file', filename: 'enc.json' })}
+        >
+          u
+        </button>
+      ),
+    );
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload-envelope'));
+
+    await waitFor(() => {
+      expect(mockDispatchError).toHaveBeenCalledWith([
+        expect.objectContaining({
+          keyword: 'encrypted',
+          message: 'This credential is encrypted, so it cannot be validated yet.',
+        }),
+      ]);
+    });
+    // Stays out of the pipeline: no credential count appears on the tab.
+    expect(screen.queryByRole('tab', { name: /Credentials.*1/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('encrypted envelopes never route into another family (#812 follow-up)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+  });
+
+  const envelope = {
+    cipherText: 'SGVsbG8=',
+    iv: 'nLUYsnXBY8bbXY45',
+    tag: '7j0RRSoEIm2FAo52m1pyow==',
+    type: 'aes-256-gcm',
+  };
+  const b64u = (value: string) => btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+  const uploadOn = (artefact: any) => {
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (a: any, s: any) => void }) => (
+        <button data-testid='mock-upload' onClick={() => onArtefactUpload(artefact, { kind: 'file', filename: 'f' })}>
+          u
+        </button>
+      ),
+    );
+  };
+
+  it('names a compact JWE dropped on the Conformity Schemes tab encrypted instead of persisting a scheme card', async () => {
+    const jwe = `${b64u('{"alg":"ECDH-ES","enc":"A256GCM"}')}..${b64u('iv')}.${b64u('ct')}.`;
+    uploadOn(jwe);
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
+    fireEvent.click(screen.getByTestId('mock-upload'));
+
+    await waitFor(() => {
+      expect(mockDispatchError).toHaveBeenCalledWith([expect.objectContaining({ keyword: 'encrypted' })]);
+    });
+    // No scheme card: the Schemes tab still shows no count.
+    expect(screen.queryByRole('tab', { name: /Conformity Schemes\s*1/ })).not.toBeInTheDocument();
+  });
+
+  it('classifies a wrapped encrypted envelope by its inner document', async () => {
+    uploadOn({ verifiableCredential: envelope });
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload'));
+
+    await waitFor(() => {
+      expect(mockDispatchError).toHaveBeenCalledWith([expect.objectContaining({ keyword: 'encrypted' })]);
+    });
+  });
+
+  it('accepts a genuine credential that merely carries ciphertext and header claims', async () => {
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    uploadOn({
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      type: ['VerifiableCredential', 'DigitalProductPassport'],
+      issuer: 'did:example:issuer',
+      ciphertext: 'a public claim value',
+      header: { label: 'claim metadata' },
+    });
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload'));
+
+    expect(await screen.findByRole('tab', { name: /Credentials.*1/ })).toBeInTheDocument();
+    expect(mockDispatchError).not.toHaveBeenCalled();
   });
 });

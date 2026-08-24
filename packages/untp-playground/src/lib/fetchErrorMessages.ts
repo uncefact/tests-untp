@@ -19,8 +19,15 @@ export function fetchErrorMessage(code: string, fallback: string): string {
       return `That response is larger than ${MAX_FETCH_MB} MB.`;
     case 'too-many-redirects':
       return 'The URL redirected too many times.';
-    case 'network':
+    case 'network': {
+      // The proxy folds upstream HTTP failures into 'network'; a 403/500 means the URL WAS
+      // reached and answered with an error, which is a different problem from unreachability.
+      const status = /Upstream returned (\d{3})/.exec(fallback)?.[1];
+      if (status) {
+        return `The URL returned ${status}. Check the address and whether the document is publicly accessible.`;
+      }
       return 'Could not reach the URL. Check the address and try again.';
+    }
     default:
       return fallback;
   }

@@ -2,18 +2,22 @@
 
 import { SourceCaption } from '@/components/SourceCaption';
 import { StatusIcon } from '@/components/StatusIcon';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { beginRun, commitResult, remove, restore } from '@/lib/artefactCollection';
 import { linkedCredentialRows, linkSetSubtitle, linkSetTitle } from '@/lib/linkSetCollection';
 
 import { linkSetValidationSteps } from '@/lib/linkSetValidation';
 import { newId } from '@/lib/id';
+import { fetchLinkedCredential } from '@/lib/fetchLinkedCredential';
+import { resolveBoundInstance, type UrlBindings } from '@/lib/urlBindings';
+import type { LinkedCredentialRow } from '@/lib/linkSetCollection';
 import type { ArtefactSlot, CollectionState } from '@/types/artefact';
-import type { StoredLinkSet, TestStep } from '@/types';
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import type { ArtefactSource, StoredCredential, StoredLinkSet, TestStep } from '@/types';
+import { ChevronDown, ChevronRight, Loader2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CREDENTIAL_LINKS_DOCS_URL, TestCaseStatus } from '../../constants';
+import { CREDENTIAL_LINKS_DOCS_URL, TERMINAL_STATUSES, TestCaseStatus } from '../../constants';
 
 type LinkSetCollection = CollectionState<StoredLinkSet, TestStep[]>;
 type LinkSetDispatch = <Res extends { state: LinkSetCollection }>(
@@ -21,12 +25,58 @@ type LinkSetDispatch = <Res extends { state: LinkSetCollection }>(
 ) => Res;
 type LinkSetSlot = ArtefactSlot<StoredLinkSet, TestStep[]>;
 
+type CredentialSlot = ArtefactSlot<StoredCredential, TestStep[]>;
+
 interface LinkSetTestResultsProps {
   collection: LinkSetCollection;
   dispatch: LinkSetDispatch;
+  /** Credentials-tab instances, read-only: each linked row derives its state from them (#812). */
+  credentialItems: CredentialSlot[];
+  /** Which instance each URL's latest accepted ingestion produced (page-owned; see urlBindings.ts). */
+  urlBindings: UrlBindings;
+  /**
+   * Routes a fetched linked credential into the credentials pipeline (page.tsx owns ingestion).
+   * Returns the outcome; a rejection has already been dispatched to the error surface, so the row
+   * only gates its own feedback on it.
+   */
+  onVerifyCredential: (
+    rawArtefact: unknown,
+    source: ArtefactSource,
+  ) => { accepted: false; encrypted?: true } | { accepted: true; instanceId: string };
 }
 
-export function LinkSetTestResults({ collection, dispatch }: LinkSetTestResultsProps) {
+export function LinkSetTestResults({
+  collection,
+  dispatch,
+  credentialItems,
+  urlBindings,
+  onVerifyCredential,
+}: LinkSetTestResultsProps) {
+  // In-flight fetches live at the list level, keyed by href, so collapsing a card (which unmounts
+  // its rows) cannot lose the flag and allow a second overlapping fetch of the same target.
+  const [fetchingHrefs, setFetchingHrefs] = useState<ReadonlySet<string>>(new Set());
+  // Fallback encrypted signal (#812): resolvers do not always carry the Secure Targets metadata,
+  // so a Verify that fetches an encrypted envelope records the discovery here and the row keeps
+  // its Encrypted tag from then on. List-level for the same unmount reason as fetchingHrefs.
+  const [discoveredEncryptedHrefs, setDiscoveredEncryptedHrefs] = useState<ReadonlySet<string>>(new Set());
+  // Discovery is empirical, so it follows the evidence in both directions: an accepted plaintext
+  // ingest clears the discovery, or a settled row could show Verified beside a stale Encrypted tag.
+  const setDiscoveredEncrypted = (href: string, discovered: boolean) =>
+    setDiscoveredEncryptedHrefs((current) => {
+      if (current.has(href) === discovered) return current;
+      const next = new Set(current);
+      if (discovered) next.add(href);
+      else next.delete(href);
+      return next;
+    });
+  const setHrefFetching = (href: string, fetching: boolean) => {
+    setFetchingHrefs((current) => {
+      const next = new Set(current);
+      if (fetching) next.add(href);
+      else next.delete(href);
+      return next;
+    });
+  };
   // Settle every fresh instance immediately with the stubbed step list: schema validation has not
   // landed yet (#811), so there is no async pipeline to run. Committing the result straight away
   // is what keeps a landed link set removable and its card out of the mid-run spinner state.
@@ -69,13 +119,47 @@ export function LinkSetTestResults({ collection, dispatch }: LinkSetTestResultsP
   return (
     <section className='space-y-4' data-testid='linkset-results'>
       {collection.items.map((item) => (
-        <LinkSetCard key={item.instanceId} item={item} onRemove={() => handleRemove(item)} />
+        <LinkSetCard
+          key={item.instanceId}
+          item={item}
+          onRemove={() => handleRemove(item)}
+          credentialItems={credentialItems}
+          urlBindings={urlBindings}
+          onVerifyCredential={onVerifyCredential}
+          fetchingHrefs={fetchingHrefs}
+          setHrefFetching={setHrefFetching}
+          discoveredEncryptedHrefs={discoveredEncryptedHrefs}
+          setDiscoveredEncrypted={setDiscoveredEncrypted}
+        />
       ))}
     </section>
   );
 }
 
-function LinkSetCard({ item, onRemove }: { item: LinkSetSlot; onRemove: () => void }) {
+function LinkSetCard({
+  item,
+  onRemove,
+  credentialItems,
+  urlBindings,
+  onVerifyCredential,
+  fetchingHrefs,
+  setHrefFetching,
+  discoveredEncryptedHrefs,
+  setDiscoveredEncrypted,
+}: {
+  item: LinkSetSlot;
+  onRemove: () => void;
+  credentialItems: CredentialSlot[];
+  urlBindings: UrlBindings;
+  onVerifyCredential: (
+    rawArtefact: unknown,
+    source: ArtefactSource,
+  ) => { accepted: false; encrypted?: true } | { accepted: true; instanceId: string };
+  fetchingHrefs: ReadonlySet<string>;
+  setHrefFetching: (href: string, fetching: boolean) => void;
+  discoveredEncryptedHrefs: ReadonlySet<string>;
+  setDiscoveredEncrypted: (href: string, discovered: boolean) => void;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const linkSet = item.payload;
   const steps = item.result ?? [];
@@ -138,14 +222,17 @@ function LinkSetCard({ item, onRemove }: { item: LinkSetSlot; onRemove: () => vo
                   with hundreds of links and an unbounded card would swallow the page. */}
               <div className='mt-2 max-h-80 space-y-2 overflow-y-auto pr-1'>
                 {credentialRows.map((row, index) => (
-                  <div
+                  <LinkedCredentialRowView
                     key={`${row.href}-${index}`}
-                    className='rounded-md border p-3'
-                    data-testid='linked-credential-row'
-                  >
-                    <p className='truncate text-sm font-medium'>{row.label}</p>
-                    <p className='truncate font-mono text-xs text-muted-foreground'>{row.href}</p>
-                  </div>
+                    row={row}
+                    credentialItems={credentialItems}
+                    urlBindings={urlBindings}
+                    onVerifyCredential={onVerifyCredential}
+                    isFetching={fetchingHrefs.has(row.href)}
+                    setFetching={(fetching) => setHrefFetching(row.href, fetching)}
+                    discoveredEncrypted={discoveredEncryptedHrefs.has(row.href)}
+                    setDiscoveredEncrypted={(discovered) => setDiscoveredEncrypted(row.href, discovered)}
+                  />
                 ))}
               </div>
             </div>
@@ -179,5 +266,134 @@ function LinkSetCard({ item, onRemove }: { item: LinkSetSlot; onRemove: () => vo
         <Trash2 className='h-4 w-4' />
       </button>
     </Card>
+  );
+}
+
+/**
+ * One linked-credential row (#812). Its state derives from the page's URL bindings (the instance
+ * this href's latest accepted ingestion produced), so the note survives card collapse and
+ * re-render, follows a re-fetch from either entry point, and fails open to the Verify button when
+ * the bound instance was removed. Nothing is fetched until Verify is clicked (targets may be
+ * large, gated or encrypted). While the fetch itself runs the row shows a plain "Fetching..."
+ * phase: no credential exists yet to group, hash or count, so the "Verifying in Credentials" note
+ * and the tab activity begin at accepted ingestion (settled deviation from the ticket's
+ * click-instant wording, recorded on the PR).
+ */
+function LinkedCredentialRowView({
+  row,
+  credentialItems,
+  urlBindings,
+  onVerifyCredential,
+  isFetching,
+  setFetching,
+  discoveredEncrypted,
+  setDiscoveredEncrypted,
+}: {
+  row: LinkedCredentialRow;
+  credentialItems: CredentialSlot[];
+  urlBindings: UrlBindings;
+  onVerifyCredential: (
+    rawArtefact: unknown,
+    source: ArtefactSource,
+  ) => { accepted: false; encrypted?: true } | { accepted: true; instanceId: string };
+  isFetching: boolean;
+  setFetching: (fetching: boolean) => void;
+  discoveredEncrypted: boolean;
+  setDiscoveredEncrypted: (discovered: boolean) => void;
+}) {
+  const instance = resolveBoundInstance(urlBindings, row.href, credentialItems);
+  const steps = instance?.result ?? [];
+  const settled = steps.length > 0 && steps.every((step) => TERMINAL_STATUSES.includes(step.status));
+  const failed = settled && steps.some((step) => step.status === TestCaseStatus.FAILURE);
+
+  const handleVerify = async () => {
+    setFetching(true);
+    try {
+      const result = await fetchLinkedCredential(row.href);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      const outcome = onVerifyCredential(result.credential, { kind: 'url', url: row.href, via: 'link-set' });
+      if (outcome.accepted) {
+        // A plaintext accept is fresh evidence: drop any earlier encrypted discovery for this href.
+        setDiscoveredEncrypted(false);
+        toast.success(`Verifying ${row.label} in the Credentials tab`);
+      } else if (outcome.encrypted) {
+        // The link metadata did not declare encryption, but the body did: keep the discovery on
+        // the row so the tag shows without re-fetching. Ingestion has already put the warning in
+        // the details drawer.
+        setDiscoveredEncrypted(true);
+        toast.info('This credential appears to be encrypted. Decryption arrives in a later release.');
+      } else {
+        // The rejection details are already on the error surface (View Upload Detail); the toast
+        // keeps the row's own feedback honest instead of announcing a verification that never began.
+        toast.error('That link did not return an accepted credential. Open View Upload Detail for the reason.');
+      }
+    } catch (err) {
+      // Ingestion is called raw here (not through the uploader's guarded wrapper), so a throw
+      // anywhere in the pipeline chain must not vanish as an unhandled rejection.
+      console.error('LinkedCredentialRowView: verify failed', err);
+      toast.error('Could not process that credential. Check the link and try again.');
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const verifyAction = (label: string) => (
+    <Button
+      type='button'
+      variant='outline'
+      size='sm'
+      className='shrink-0'
+      onClick={(e) => {
+        e.stopPropagation();
+        void handleVerify();
+      }}
+      data-testid={label === 'Verify' ? 'linked-credential-verify' : 'linked-credential-verify-again'}
+    >
+      {label}
+    </Button>
+  );
+
+  return (
+    <div className='flex items-center justify-between gap-3 rounded-md border p-3' data-testid='linked-credential-row'>
+      <div className='min-w-0'>
+        <p className='truncate text-sm font-medium'>
+          {row.label}
+          {(row.encrypted || discoveredEncrypted) && (
+            <span
+              className='ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800'
+              data-testid='linked-credential-encrypted'
+            >
+              Encrypted
+            </span>
+          )}
+        </p>
+        <p className='truncate font-mono text-xs text-muted-foreground'>{row.href}</p>
+      </div>
+      {isFetching ? (
+        <span
+          className='flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground'
+          data-testid='linked-credential-fetching'
+        >
+          <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+          Fetching...
+        </span>
+      ) : instance ? (
+        <span className='flex shrink-0 items-center gap-3'>
+          <span
+            className='text-xs text-muted-foreground'
+            data-testid={`linked-credential-${!settled ? 'verifying' : failed ? 'failed' : 'verified'}`}
+          >
+            {!settled ? 'Verifying in Credentials tab' : failed ? 'Failed in Credentials tab' : 'Verified'}
+          </span>
+          {/* A settled row can re-fetch (the target may have drifted); a running one cannot. */}
+          {settled && verifyAction('Verify again')}
+        </span>
+      ) : (
+        verifyAction('Verify')
+      )}
+    </div>
   );
 }

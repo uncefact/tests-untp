@@ -510,3 +510,44 @@ describe('Confetti behaviour, gated per (instanceId, runId)', () => {
     expect(confetti).not.toHaveBeenCalled();
   });
 });
+
+describe('Link-set provenance subtitle (#812)', () => {
+  it('subtitles a running link-set-verified instance with its provenance, then reverts on settle', async () => {
+    // Hold the pipeline open so the mid-run subtitle is observable, then release it.
+    let releaseVerification: (value: { verified: boolean }) => void = () => {};
+    (verifyCredential as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        releaseVerification = resolve;
+      }),
+    );
+
+    render(
+      <Harness
+        credentials={[
+          makeStored({ id: 'a' }, { kind: 'url', url: 'https://x.example.org/creds/dpp.json', via: 'link-set' }),
+        ]}
+      />,
+    );
+
+    expect(await screen.findByText('Verifying... · from link set')).toBeInTheDocument();
+
+    await act(async () => {
+      releaseVerification({ verified: true });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Verifying... · from link set')).not.toBeInTheDocument();
+    });
+    // Settled: the normal subtitle (host · version · issuer) takes over.
+    expect(screen.getByText(/x\.example\.org/)).toBeInTheDocument();
+  });
+
+  it('never shows the provenance subtitle for a plain URL upload', async () => {
+    render(<Harness credentials={[makeStored({ id: 'a' }, { kind: 'url', url: 'https://x.example.org/c.json' })]} />);
+
+    // Anchor on the rendered instance first; an immediate absence check could pass before the
+    // card exists at all (panel finding).
+    expect(await screen.findByText(/x\.example\.org/)).toBeInTheDocument();
+    expect(screen.queryByText('Verifying... · from link set')).not.toBeInTheDocument();
+  });
+});
