@@ -562,7 +562,7 @@ describe('encrypted discovery fallback (#812)', () => {
         type: 'aes-256-gcm',
       },
     });
-    mockOnVerifyCredential.mockReturnValue({ accepted: false, encrypted: true });
+    mockOnVerifyCredential.mockReturnValue({ accepted: true, instanceId: 'inst-enc', encrypted: true });
     render(<Harness initial={[{ payload: storedLinkSet(urlSource) }]} />);
     expandCard();
 
@@ -574,7 +574,7 @@ describe('encrypted discovery fallback (#812)', () => {
     fireEvent.click(within(dppRow).getByTestId('linked-credential-verify'));
     await waitFor(() => {
       expect(toast.info).toHaveBeenCalledWith(
-        'This credential appears to be encrypted. Decryption arrives in a later release.',
+        'This credential is encrypted. Enter its key on the Credentials tab to decrypt and verify it.',
       );
     });
     expect(toast.error).not.toHaveBeenCalled();
@@ -601,7 +601,7 @@ describe('encrypted discovery fallback (#812)', () => {
         type: 'aes-256-gcm',
       },
     });
-    mockOnVerifyCredential.mockReturnValueOnce({ accepted: false, encrypted: true });
+    mockOnVerifyCredential.mockReturnValueOnce({ accepted: true, instanceId: 'inst-enc', encrypted: true });
     render(<Harness initial={[{ payload: storedLinkSet(urlSource) }]} />);
     expandCard();
     const rows = screen.getAllByTestId('linked-credential-row');
@@ -815,5 +815,32 @@ describe('secondary resolver panel rulings (#974 r2)', () => {
     await act(async () => {
       releaseVerify({ ok: false, message: 'done' });
     });
+  });
+});
+
+describe('already-decrypted re-verify feedback (#813)', () => {
+  it('toasts the honest already-decrypted message and clears any discovery, with no key prompt', async () => {
+    const urlSource = { kind: 'url' as const, url: 'https://r.example.org/01/1?linkType=all' };
+    (fetchLinkedCredential as jest.Mock).mockResolvedValue({
+      ok: true,
+      credential: {
+        cipherText: 'SGVsbG8=',
+        iv: 'nLUYsnXBY8bbXY45',
+        tag: '7j0RRSoEIm2FAo52m1pyow==',
+        type: 'aes-256-gcm',
+      },
+    });
+    mockOnVerifyCredential.mockReturnValue({ accepted: true, instanceId: 'inst-dec', alreadyDecrypted: true });
+    render(<Harness initial={[{ payload: storedLinkSet(urlSource) }]} />);
+    fireEvent.click(screen.getByTestId('linkset-card-header'));
+
+    fireEvent.click(screen.getAllByTestId('linked-credential-verify')[0]);
+
+    await waitFor(() => {
+      expect(toast.info).toHaveBeenCalledWith(
+        'This credential was already decrypted and verified on the Credentials tab.',
+      );
+    });
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });

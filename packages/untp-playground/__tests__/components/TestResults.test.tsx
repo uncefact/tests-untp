@@ -1,9 +1,14 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect, useRef } from 'react';
 import { TestResults, confettiConfig } from '@/components/TestResults';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
-import { upsert } from '@/lib/artefactCollection';
+import {
+  beginRun as beginRunLib,
+  commitResult as commitResultLib,
+  replacePayload,
+  upsert,
+} from '@/lib/artefactCollection';
 import { credentialContentHash } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { validateContext } from '@/lib/contextValidation';
@@ -11,6 +16,16 @@ import { detectExtension, validateCredentialSchema, validateExtension } from '@/
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
+import { decryptCredential as decryptCredentialLib } from '@/lib/decryptCredential';
+import { credentialGroupType as realCredentialGroupType } from '@/lib/credentialCollection';
+
+// utils is automocked in this suite; the harness's admission mirror needs the real gate.
+const { isPermittedCredentialType: realIsPermittedCredentialType } = jest.requireActual('@/lib/utils');
+import {
+  decodeEnvelopedCredential as realDecodeEnvelopedCredential,
+  isEnvelopedProof as realIsEnvelopedProof,
+} from '@/lib/credentialService';
+import { TestCaseStatus, TestCaseStepId } from '../../constants';
 import type { StoredCredential, TestStep } from '@/types';
 import confetti from 'canvas-confetti';
 import { VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
@@ -18,6 +33,10 @@ import { VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 jest.mock('@/lib/verificationService');
 jest.mock('@/lib/schemaValidation');
 jest.mock('@/lib/vcdm-validation');
+jest.mock('@/lib/decryptCredential', () => ({
+  ...jest.requireActual('@/lib/decryptCredential'),
+  decryptCredential: jest.fn(),
+}));
 jest.mock('@/lib/utils');
 jest.mock('@/lib/contextValidation');
 jest.mock('canvas-confetti');
@@ -61,12 +80,48 @@ function Harness({ credentials }: { credentials: StoredCredential[] }) {
     if (seeded.current) return;
     seeded.current = true;
     for (const c of credentials) {
-      collection.dispatch((state) =>
+      const { outcome } = collection.dispatch((state) =>
         upsert(state, { payload: c, contentHash: credentialContentHash(c.decoded), mintInstanceId: newId }),
       );
+      // Mirror page.tsx ingestion (#813): locked instances arrive with their terminal WARNING
+      // Decryption step already seeded.
+      if (c.encryptedEnvelope) {
+        const lockedSteps: TestStep[] = [
+          { id: TestCaseStepId.DECRYPTION, name: 'Decryption', status: TestCaseStatus.WARNING } as TestStep,
+        ];
+        const { runId } = collection.dispatch((state) => beginRunLib(state, outcome.instanceId, lockedSteps, newId));
+        if (runId) {
+          collection.dispatch((state) =>
+            commitResultLib(state, { instanceId: outcome.instanceId, runId, result: lockedSteps }),
+          );
+        }
+      }
     }
   }, [credentials, collection]);
-  return <TestResults collection={collection.state} dispatch={collection.dispatch} />;
+  // Mirror the page's decrypt admission (#813): shape gate, enveloped decode, permitted type,
+  // then replace-in-place. Collision paths are unit-tested against the page itself.
+  const handleDecrypted = (item: any, credential: unknown): boolean => {
+    try {
+      const normalized = (credential as any)?.verifiableCredential || credential;
+      if (typeof normalized !== 'object' || normalized === null || Array.isArray(normalized)) return false;
+      const decoded = realIsEnvelopedProof(normalized) ? realDecodeEnvelopedCredential(normalized) : normalized;
+      const type = realCredentialGroupType(decoded);
+      if (!type || !realIsPermittedCredentialType(type)) return false;
+      const stored: StoredCredential = {
+        original: normalized,
+        decoded,
+        source: item.payload.source,
+        decryptedFromEnvelope: true,
+      };
+      collection.dispatch((state) =>
+        replacePayload(state, item.instanceId, stored, credentialContentHash(stored.decoded)),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  return <TestResults collection={collection.state} dispatch={collection.dispatch} onDecrypted={handleDecrypted} />;
 }
 
 const expandInstance = () => userEvent.click(screen.getByTestId('credential-instance-header'));
@@ -549,5 +604,133 @@ describe('Link-set provenance subtitle (#812)', () => {
     // card exists at all (panel finding).
     expect(await screen.findByText(/x\.example\.org/)).toBeInTheDocument();
     expect(screen.queryByText('Verifying... · from link set')).not.toBeInTheDocument();
+  });
+});
+
+describe('Locked encrypted instances (#813)', () => {
+  const envelope = {
+    cipherText: 'SGVsbG8=',
+    iv: 'nLUYsnXBY8bbXY45',
+    tag: '7j0RRSoEIm2FAo52m1pyow==',
+    type: 'aes-256-gcm',
+  };
+  const lockedStored = (source?: StoredCredential['source']): StoredCredential => ({
+    original: envelope as any,
+    decoded: envelope as any,
+    source,
+    encryptedEnvelope: true,
+  });
+
+  it('lists a locked instance under the Encrypted group with the amber tag, no pipeline, and removability', async () => {
+    render(<Harness credentials={[lockedStored({ kind: 'file', filename: 'enc.json' })]} />);
+
+    expect(await screen.findByRole('heading', { level: 3, name: 'Encrypted credential' })).toBeInTheDocument();
+    expect(screen.getByTestId('credential-encrypted-tag')).toHaveTextContent('Encrypted');
+    // No validation pipeline ran for the locked instance.
+    expect(verifyCredential).not.toHaveBeenCalled();
+    // Terminal synthetic step keeps it removable.
+    fireEvent.click(screen.getByTestId('credential-instance-header'));
+    expect(screen.getByTestId('decrypt-panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Remove Encrypted credential/ })).toBeInTheDocument();
+  });
+
+  it('unlocks on decrypt: pipeline runs over the decrypted document with a leading successful Decryption step', async () => {
+    (decryptCredentialLib as jest.Mock).mockResolvedValue({
+      ok: true,
+      credential: {
+        '@context': [VCDM_CONTEXT_URLS.v2, 'https://vocabulary.uncefact.org/untp/dpp/0.6.0/context.jsonld'],
+        type: ['VerifiableCredential', 'DigitalProductPassport'],
+        issuer: { id: 'did:web:acme.example' },
+        id: 'urn:decrypted:1',
+      },
+    });
+    render(<Harness credentials={[lockedStored({ kind: 'url', url: 'https://x.example.org/enc.json' })]} />);
+
+    fireEvent.click(await screen.findByTestId('credential-instance-header'));
+    fireEvent.change(screen.getByTestId('decrypt-key-input'), { target: { value: 'a'.repeat(64) } });
+    fireEvent.click(screen.getByTestId('decrypt-submit'));
+
+    // The locked group dissolves into the real type group and the pipeline runs. The row mounts
+    // EXPANDED (no second click: the decrypt panel is visually replaced by the card body), with
+    // the Decryption step leading the list.
+    expect(await screen.findByRole('heading', { level: 3, name: 'Digital Product Passport' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 3, name: 'Encrypted credential' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Decryption')).toBeInTheDocument();
+    const stepLabels = screen.getAllByText(/Decryption|Proof Type Detection/).map((el) => el.textContent);
+    expect(stepLabels[0]).toBe('Decryption');
+    await waitFor(() => {
+      expect(verifyCredential).toHaveBeenCalled();
+    });
+  });
+
+  it('runs no Decryption step for an ordinary unencrypted credential', async () => {
+    render(<Harness credentials={[makeStored({ id: 'plain' }, { kind: 'file', filename: 'plain.json' })]} />);
+
+    fireEvent.click(await screen.findByTestId('credential-instance-header'));
+    await waitFor(() => {
+      expect(screen.getByText('Proof Type Detection')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Decryption')).not.toBeInTheDocument();
+  });
+});
+
+describe('Locked instances: review-finding hardening (#813)', () => {
+  const envelope = {
+    cipherText: 'SGVsbG8=',
+    iv: 'nLUYsnXBY8bbXY45',
+    tag: '7j0RRSoEIm2FAo52m1pyow==',
+    type: 'aes-256-gcm',
+  };
+  const lockedStored = (name: string): StoredCredential => ({
+    original: { ...envelope, marker: name } as any,
+    decoded: { ...envelope, marker: name } as any,
+    source: { kind: 'file', filename: name },
+    encryptedEnvelope: true,
+  });
+
+  it('pluralises the locked group and shows the amber tag as its collapsed rollup', async () => {
+    render(<Harness credentials={[lockedStored('one.json'), lockedStored('two.json')]} />);
+
+    expect(await screen.findByRole('heading', { level: 3, name: 'Encrypted credentials' })).toBeInTheDocument();
+    // Collapse the group: the rollup slot shows the amber tag, never a pass icon.
+    fireEvent.click(screen.getByTestId('Encrypted-group-header'));
+    expect(await screen.findByTestId('encrypted-group-tag')).toHaveTextContent('Encrypted');
+    expect(screen.queryByTestId('status-icon-success-Encrypted')).not.toBeInTheDocument();
+  });
+
+  it('unlocks an envelope whose plaintext is itself an enveloped credential via the real decode path', async () => {
+    // This suite deliberately keeps credentialService unmocked, so build a REAL enveloped form:
+    // decodeEnvelopedCredential jwt-decodes the data: URL's payload.
+    const inner = {
+      '@context': [VCDM_CONTEXT_URLS.v2, 'https://vocabulary.uncefact.org/untp/dpp/0.6.0/context.jsonld'],
+      type: ['VerifiableCredential', 'DigitalProductPassport'],
+      issuer: { id: 'did:web:acme.example' },
+      id: 'urn:inner:1',
+    };
+    const b64u = (value: string) => Buffer.from(value).toString('base64url');
+    const jwt = `${b64u('{"alg":"none"}')}.${b64u(JSON.stringify(inner))}.`;
+    const enveloped = { type: 'EnvelopedVerifiableCredential', id: `data:application/vc+jwt,${jwt}` };
+    (decryptCredentialLib as jest.Mock).mockResolvedValue({ ok: true, credential: enveloped });
+
+    render(<Harness credentials={[lockedStored('env.json')]} />);
+    fireEvent.click(await screen.findByTestId('credential-instance-header'));
+    fireEvent.change(screen.getByTestId('decrypt-key-input'), { target: { value: 'a'.repeat(64) } });
+    fireEvent.click(screen.getByTestId('decrypt-submit'));
+
+    expect(await screen.findByRole('heading', { level: 3, name: 'Digital Product Passport' })).toBeInTheDocument();
+  });
+
+  it('keeps the lock and shows a message when the decrypted content is not credential-shaped', async () => {
+    (decryptCredentialLib as jest.Mock).mockResolvedValue({ ok: true, credential: 'a bare string' });
+    render(<Harness credentials={[lockedStored('junk.json')]} />);
+
+    fireEvent.click(await screen.findByTestId('credential-instance-header'));
+    fireEvent.change(screen.getByTestId('decrypt-key-input'), { target: { value: 'a'.repeat(64) } });
+    fireEvent.click(screen.getByTestId('decrypt-submit'));
+
+    expect(await screen.findByTestId('decrypt-error')).toHaveTextContent(
+      'Decryption succeeded, but the content is not a credential this Playground can validate',
+    );
+    expect(screen.getByRole('heading', { level: 3, name: 'Encrypted credential' })).toBeInTheDocument();
   });
 });

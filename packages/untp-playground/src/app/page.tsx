@@ -7,7 +7,7 @@ import { ArtefactUploader, type ArtefactSource } from '@/components/ArtefactUplo
 import { UPLOADER_FAMILIES } from '@/lib/uploaderFamilies';
 import { isEncryptedEnvelope } from '@/lib/encryptedEnvelope';
 import { resolveLinkSet } from '@/lib/resolveLinkSet';
-import { emptyUrlBindings, recordUrlBinding, type UrlBindings } from '@/lib/urlBindings';
+import { emptyUrlBindings, recordUrlBinding, remapUrlBindings, type UrlBindings } from '@/lib/urlBindings';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { EmptyState } from '@/components/EmptyState';
 import { LinkSetTestResults } from '@/components/LinkSetTestResults';
@@ -19,7 +19,8 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { TestResults } from '@/components/TestResults';
 import { TestReportProvider } from '@/contexts/TestReportContext';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
-import { upsert } from '@/lib/artefactCollection';
+import { admitDecrypted, beginRun, commitResult, replacePayload, upsert } from '@/lib/artefactCollection';
+import type { ArtefactSlot, CollectionState } from '@/types/artefact';
 import {
   credentialContentHash,
   credentialGroupType,
@@ -42,7 +43,7 @@ import { useError } from '@/contexts/ErrorContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Link2, Loader2, Server } from 'lucide-react';
-import { ArtefactKind, permittedCredentialTypes, TestCaseStatus, type TabId } from '../../constants';
+import { ArtefactKind, permittedCredentialTypes, TestCaseStatus, TestCaseStepId, type TabId } from '../../constants';
 
 /**
  * Quiet per-tab meta (final hi-fi, canvas section 08): a muted tabular-nums instance count, a
@@ -103,6 +104,11 @@ export default function Home() {
   // rows read their state through this rather than matching sources, because content-hash
   // identity can append or re-source instances underneath a URL. See urlBindings.ts.
   const [urlBindings, setUrlBindings] = useState<UrlBindings>(emptyUrlBindings);
+  // Which decrypted instance each envelope (by its content hash) produced (#813): a re-verify of
+  // the same ciphertext rebinds to the decrypted instance instead of appending a second locked
+  // card. Session-level like the URL bindings, failing open when the instance is gone; a Map
+  // because a plaintext can have many envelope aliases (each encryption mints a fresh IV).
+  const [envelopeAliases, setEnvelopeAliases] = useState<ReadonlyMap<string, string>>(new Map());
   const { dispatchError, errors, setIsDetailsOpen } = useError();
 
   const shouldDisplayUploadDetailBtn = errors && errors.length > 0;
@@ -125,7 +131,13 @@ export default function Home() {
   // Recomputed only when the instances change (add, replace, remove, or a result commit), so an
   // unrelated re-render does not create a fresh array and re-run the report-reset effect.
   const credentialInstances = useMemo(
-    () => credential.state.items.map((item) => ({ credential: item.payload, steps: item.result ?? [] })),
+    () =>
+      credential.state.items
+        // A locked instance is ciphertext nobody has validated; its synthetic WARNING step would
+        // read as a pass to the report's terminal gate, so it must never reach generateReport
+        // until decryption replaces it with the real credential (#813).
+        .filter((item) => !item.payload.encryptedEnvelope)
+        .map((item) => ({ credential: item.payload, steps: item.result ?? [] })),
     [credential.state.items],
   );
   const schemeInstances = useMemo(
@@ -158,6 +170,81 @@ export default function Home() {
     ingestLinkSet(result.payload, { kind: 'url', url: result.requestUrl });
   };
 
+  // The locked instance's synthetic terminal step (#813): amber, removable, no spinner, and the
+  // report provider filters these instances out entirely.
+  const lockedSteps = (): TestStep[] => [
+    {
+      id: TestCaseStepId.DECRYPTION,
+      name: 'Decryption',
+      status: TestCaseStatus.WARNING,
+      details: { encrypted: true },
+    },
+  ];
+
+  // Decrypt success (#813): the decrypted plaintext is untrusted and must pass the same admission
+  // gates as an upload (shape, wrapper, enveloped decode, permitted type) before anything is
+  // replaced; a rejection stays on the decrypt panel, never the error drawer. On a content-hash
+  // collision with an already-loaded twin, the decrypting slot keeps its identity and provenance:
+  // a settled twin's finished result is absorbed behind a leading Decryption step (no rerun), a
+  // running twin is dropped and the pipeline reruns, and the twin's URL bindings are remapped.
+  const handleDecryptedCredential = (
+    item: ArtefactSlot<StoredCredential, TestStep[]>,
+    decryptedContent: any,
+  ): boolean => {
+    try {
+      const normalized = (decryptedContent && decryptedContent.verifiableCredential) || decryptedContent;
+      if (validateNormalizedCredential(normalized)) return false;
+      const isEnveloped = isEnvelopedProof(normalized);
+      const decoded = isEnveloped ? decodeEnvelopedCredential(normalized) : normalized;
+      const credentialType = credentialGroupType(decoded);
+      if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) return false;
+
+      const stored: StoredCredential = {
+        original: normalized,
+        decoded,
+        source: item.payload.source,
+        decryptedFromEnvelope: true,
+      };
+      const newHash = credentialContentHash(decoded);
+      const envelopeHash = item.contentHash;
+      // One atomic transition: the twin lookup runs against the collection's CURRENT state, never
+      // this render's closure, and the absorb/replace lands in the same dispatch.
+      const { outcome } = credential.dispatch((state: CollectionState<StoredCredential, TestStep[]>) =>
+        admitDecrypted<StoredCredential, TestStep[]>(state, {
+          instanceId: item.instanceId,
+          payload: stored,
+          contentHash: newHash,
+          leadingStep: { id: TestCaseStepId.DECRYPTION, name: 'Decryption', status: TestCaseStatus.SUCCESS },
+          isTerminal: (result) => credentialIsTerminal(result ?? []),
+          leadsWithDecryption: (result) => result[0]?.id === TestCaseStepId.DECRYPTION,
+          mintRunId: newId,
+        }),
+      );
+      if (outcome.kind === 'missing') return true; // removed mid-decrypt; the panel is unmounting
+      if (outcome.twinId) {
+        const twinId = outcome.twinId;
+        // Every registry that pointed at the removed twin follows the survivor.
+        setUrlBindings((bindings) => remapUrlBindings(bindings, twinId, item.instanceId));
+        setEnvelopeAliases((aliases) => {
+          const next = new Map(aliases);
+          for (const [hash, id] of next) {
+            if (id === twinId) next.set(hash, item.instanceId);
+          }
+          return next.set(envelopeHash, item.instanceId);
+        });
+        if (outcome.kind === 'absorbed') {
+          toast.success(`Merged with the already-loaded ${credentialTitle(stored)}`);
+        }
+        return true;
+      }
+      setEnvelopeAliases((aliases) => new Map(aliases).set(envelopeHash, item.instanceId));
+      return true;
+    } catch (err) {
+      console.error('handleDecryptedCredential: decrypted content could not be admitted', err);
+      return false;
+    }
+  };
+
   // The tab declares intent (#676): an upload validates as the active tab's family, with no
   // cross-family routing and no auto-switching. Detection only labels cards.
   // Returns the ingestion outcome so a caller driving a row (the link set Verify, #812) can gate
@@ -166,27 +253,56 @@ export default function Home() {
   const handleCredentialUpload = (
     rawArtefact: any,
     source?: ArtefactSource,
-  ): { accepted: false; encrypted?: true } | { accepted: true; instanceId: string } => {
+  ): { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true } => {
     // A fetched body can legally parse to null; guard before property access so it reaches the
     // validator's own null handling instead of throwing (#812).
     const normalizedCredential = (rawArtefact && rawArtefact.verifiableCredential) || rawArtefact;
     // One encrypted classifier for every entry point (link set Verify, URL fetch, file upload):
-    // an encrypted envelope is named as encrypted on the error surface, never walked into the
-    // pipeline as an unclassified credential. Runs on the NORMALISED document, so a wrapper's
-    // inner credential is judged rather than the wrapper. Decryption is the locked-card work (#813).
+    // an encrypted envelope becomes a LOCKED instance on the Credentials tab (#813), keyed by the
+    // envelope's content hash like any other document, with the decrypt panel as its body. Runs
+    // on the NORMALISED document, so a wrapper's inner credential is judged rather than the
+    // wrapper.
     if (isEncryptedEnvelope(normalizedCredential)) {
-      dispatchError([
-        {
-          keyword: 'encrypted',
-          instancePath: '',
-          params: {
-            receivedValue: source?.kind === 'url' ? source.url : 'the uploaded file',
-            solution: 'Provide the decrypted credential, or wait for in-browser decryption, which is coming in v0.4.',
-          },
-          message: 'This credential is encrypted, so it cannot be validated yet.',
-        },
-      ]);
-      return { accepted: false, encrypted: true };
+      const envelopeHash = credentialContentHash(normalizedCredential);
+      // A known envelope whose decrypted instance is still loaded: rebind instead of relocking.
+      const aliasTarget = envelopeAliases.get(envelopeHash);
+      // Liveness is checked against the collection's CURRENT state (an identity dispatch reads
+      // it), not this render's closure.
+      const aliasInstance = aliasTarget
+        ? credential.dispatch((state: { items: ArtefactSlot<StoredCredential, TestStep[]>[] }) => ({
+            state,
+            found: state.items.find((item) => item.instanceId === aliasTarget),
+          })).found
+        : undefined;
+      if (aliasInstance && !aliasInstance.payload.encryptedEnvelope) {
+        if (source?.kind === 'url') {
+          setUrlBindings((bindings) =>
+            recordUrlBinding(bindings, [source.url, source.requestedUrl], aliasInstance.instanceId),
+          );
+        }
+        return { accepted: true, instanceId: aliasInstance.instanceId, alreadyDecrypted: true };
+      }
+      const stored: StoredCredential = {
+        original: normalizedCredential,
+        decoded: normalizedCredential,
+        source,
+        encryptedEnvelope: true,
+      };
+      const { outcome } = credential.dispatch((state) =>
+        upsert(state, { payload: stored, contentHash: envelopeHash, mintInstanceId: newId }),
+      );
+      // Seed the terminal WARNING result in the same tick, so a locked instance is amber,
+      // removable, and outside the verifying spinner from its first paint.
+      const { runId } = credential.dispatch((state) => beginRun(state, outcome.instanceId, lockedSteps(), newId));
+      if (runId) {
+        credential.dispatch((state) =>
+          commitResult(state, { instanceId: outcome.instanceId, runId, result: lockedSteps() }),
+        );
+      }
+      if (source?.kind === 'url') {
+        setUrlBindings((bindings) => recordUrlBinding(bindings, [source.url, source.requestedUrl], outcome.instanceId));
+      }
+      return { accepted: true, instanceId: outcome.instanceId, encrypted: true };
     }
     const error = validateNormalizedCredential(normalizedCredential);
 
@@ -354,7 +470,11 @@ export default function Home() {
                       guidance='Add a credential from the panel on the right. Drop a JSON / JWT file or paste a URL. Each credential you add appears here and in the generated report.'
                     />
                   ) : (
-                    <TestResults collection={credential.state} dispatch={credential.dispatch} />
+                    <TestResults
+                      collection={credential.state}
+                      dispatch={credential.dispatch}
+                      onDecrypted={handleDecryptedCredential}
+                    />
                   )}
                 </TabsContent>
 
