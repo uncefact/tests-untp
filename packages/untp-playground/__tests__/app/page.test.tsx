@@ -1302,3 +1302,77 @@ describe('encrypted envelopes never route into another family (#812 follow-up)',
     expect(mockDispatchError).not.toHaveBeenCalled();
   });
 });
+
+describe('secondary resolver resolution (#974)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const mountLinkSets = async () => {
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (a: any, s: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() => onArtefactUpload({ linkset: [] }, { kind: 'file', filename: 'linkset.json' })}
+        >
+          u
+        </button>
+      ),
+    );
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+    return (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+  };
+
+  it('resolves a secondary link exactly like the resolve input: request-URL identity, new card', async () => {
+    (resolveLinkSet as jest.Mock).mockResolvedValue({
+      ok: true,
+      payload: { linkset: [] },
+      requestUrl: 'https://r2.example.org/01/9?linkType=all',
+      finalUrl: 'https://cdn.example.org/x.json',
+    });
+    const props = await mountLinkSets();
+
+    await act(async () => {
+      await props.onResolveSecondary('https://r2.example.org/01/9');
+    });
+
+    expect(resolveLinkSet).toHaveBeenCalledWith('https://r2.example.org/01/9');
+    // Two cards now: the uploaded one and the secondary resolution.
+    expect(await screen.findByRole('tab', { name: /Link Sets\s*2/ })).toBeInTheDocument();
+    // Identity is the normalised REQUEST URL (ADR-046), never the post-redirect finalUrl.
+    const collection = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0].collection;
+    const added = collection.items.find(
+      (item: any) => item.payload.source?.url === 'https://r2.example.org/01/9?linkType=all',
+    );
+    expect(added.contentHash).toBe('https://r2.example.org/01/9?linkType=all');
+    expect(added.payload.source).toEqual({ kind: 'url', url: 'https://r2.example.org/01/9?linkType=all' });
+
+    // Re-resolving the same URL replaces in place rather than duplicating.
+    await act(async () => {
+      await props.onResolveSecondary('https://r2.example.org/01/9');
+    });
+    expect(screen.getByRole('tab', { name: /Link Sets\s*2/ })).toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Replaced'));
+  });
+
+  it('surfaces a failed secondary resolution as an error toast without adding a card', async () => {
+    (resolveLinkSet as jest.Mock).mockResolvedValue({
+      ok: false,
+      error: 'not-a-link-set',
+      message: 'The resolver responded, but not with a link set (no RFC 9264 "linkset" array).',
+    });
+    const props = await mountLinkSets();
+
+    await act(async () => {
+      await props.onResolveSecondary('https://r2.example.org/x');
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'The resolver responded, but not with a link set (no RFC 9264 "linkset" array).',
+    );
+    expect(screen.getByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
+  });
+});
