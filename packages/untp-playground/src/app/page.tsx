@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { ArtefactUploader, type ArtefactSource } from '@/components/ArtefactUploader';
 import { UPLOADER_FAMILIES } from '@/lib/uploaderFamilies';
 import { isEncryptedEnvelope } from '@/lib/encryptedEnvelope';
+import { resolveLinkSet } from '@/lib/resolveLinkSet';
 import { emptyUrlBindings, recordUrlBinding, type UrlBindings } from '@/lib/urlBindings';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { EmptyState } from '@/components/EmptyState';
@@ -143,6 +144,18 @@ export default function Home() {
     if (outcome.kind === 'replaced') {
       toast.success(`Replaced ${linkSetTitle(stored)}`);
     }
+  };
+
+  // A secondary resolver link's Resolve (#974) is the resolve input's flow verbatim: the same
+  // normalisation and the request-URL identity (ADR-046), so the target lands as its own card and
+  // a re-resolve replaces it in place.
+  const handleResolveSecondary = async (href: string) => {
+    const result = await resolveLinkSet(href);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    ingestLinkSet(result.payload, { kind: 'url', url: result.requestUrl });
   };
 
   // The tab declares intent (#676): an upload validates as the active tab's family, with no
@@ -375,6 +388,7 @@ export default function Home() {
                       credentialItems={credential.state.items}
                       urlBindings={urlBindings}
                       onVerifyCredential={handleCredentialUpload}
+                      onResolveSecondary={handleResolveSecondary}
                     />
                   )}
                 </TabsContent>

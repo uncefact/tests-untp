@@ -65,6 +65,8 @@ export interface LinkedCredentialRow {
    * relation rule this is a hint, not a guarantee; decryption itself is #813.
    */
   encrypted: boolean;
+  /** Whether the link points at a secondary identity resolver (see isSecondaryResolverLink, #974). */
+  secondary: boolean;
 }
 
 function declaresEncryption(target: object): boolean {
@@ -98,16 +100,35 @@ const VC_MEDIA_TYPES = ['application/vc+jwt', 'application/vc+ld+json'];
  * is a product heuristic, not an RFC equivalence: RFC 9264 identifies extension relations by
  * their whole URI, and validation after fetch is what confirms the content either way.
  */
+function mediaTypeEssence(targetMediaType: string | undefined): string | undefined {
+  return typeof targetMediaType === 'string' ? targetMediaType.split(';')[0].trim().toLowerCase() : undefined;
+}
+
+function relationName(relation: string): string {
+  const trimmed = relation.replace(/[/#:]+$/, '');
+  const separator = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('#'), trimmed.lastIndexOf(':'));
+  return (separator === -1 ? trimmed : trimmed.slice(separator + 1)).toLowerCase();
+}
+
 export function isUntpCredentialLink(relation: string, targetMediaType: string | undefined): boolean {
-  const mediaType =
-    typeof targetMediaType === 'string' ? targetMediaType.split(';')[0].trim().toLowerCase() : undefined;
+  const mediaType = mediaTypeEssence(targetMediaType);
   if (mediaType && VC_MEDIA_TYPES.includes(mediaType)) return true;
   if (mediaType === 'text/html') return false;
 
-  const trimmed = relation.replace(/[/#:]+$/, '');
-  const separator = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('#'), trimmed.lastIndexOf(':'));
-  const relationName = separator === -1 ? trimmed : trimmed.slice(separator + 1);
-  return UNTP_CREDENTIAL_LINK_RELATIONS.includes(relationName.toLowerCase());
+  return UNTP_CREDENTIAL_LINK_RELATIONS.includes(relationName(relation));
+}
+
+/**
+ * A link to a secondary identity resolver (#974): the UNTP Identity Resolver specification's
+ * Secondary Resolvers section has a resolver return "a link to a secondary resolver service"
+ * under the `idr` link type with an `application/linkset+json` target, delegating across
+ * granularity (a coarse scheme handing off to the resolver that holds item-level links). The
+ * relation accepts the same bare/CURIE/URI-qualified forms as the credential relations; the
+ * media type must be the link set type, so an `idr`-named link to anything else stays an
+ * other link.
+ */
+export function isSecondaryResolverLink(relation: string, targetMediaType: string | undefined): boolean {
+  return relationName(relation) === 'idr' && mediaTypeEssence(targetMediaType) === 'application/linkset+json';
 }
 
 /**
@@ -144,11 +165,14 @@ export function linkedCredentialRows(decoded: Record<string, unknown>): LinkedCr
           (typeof type === 'string' && type.length > 0 && type) ||
           finalPathSegment(href) ||
           href;
+        const mediaType = typeof type === 'string' ? type : undefined;
+        const secondary = isSecondaryResolverLink(relation, mediaType);
         rows.push({
           label,
           href,
-          credential: isUntpCredentialLink(relation, typeof type === 'string' ? type : undefined),
+          credential: !secondary && isUntpCredentialLink(relation, mediaType),
           encrypted: declaresEncryption(target),
+          secondary,
         });
       }
     }

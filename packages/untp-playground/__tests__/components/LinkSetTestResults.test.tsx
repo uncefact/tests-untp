@@ -34,11 +34,19 @@ const LINK_SET = {
         { href: 'https://x.example.org/creds/dcc.json', type: 'application/vc+jwt', encryptionMethod: 'AES-128' },
       ],
       pip: [{ href: 'https://products.example.org/1', type: 'text/html', title: 'Product page' }],
+      idr: [
+        {
+          href: 'https://resolver.item.example.org/01/1/21/serial',
+          type: 'application/linkset+json',
+          title: 'Item-level resolver',
+        },
+      ],
     },
   ],
 };
 
 const mockOnVerifyCredential = jest.fn();
+const mockOnResolveSecondary = jest.fn(async () => {});
 
 function Harness({
   initial,
@@ -80,6 +88,7 @@ function Harness({
         credentialItems={credentialItems}
         urlBindings={urlBindings}
         onVerifyCredential={mockOnVerifyCredential}
+        onResolveSecondary={mockOnResolveSecondary}
       />
     </>
   );
@@ -631,5 +640,180 @@ describe('encrypted discovery fallback (#812)', () => {
       expect(toast.error).toHaveBeenCalledWith('The URL returned 404. Check the address.');
     });
     expect(screen.getAllByTestId('linked-credential-encrypted')).toHaveLength(1);
+  });
+});
+
+describe('secondary resolver rows (#974)', () => {
+  const urlSource = { kind: 'url' as const, url: 'https://r.example.org/01/1?linkType=all' };
+  const expandCard = () => fireEvent.click(screen.getByTestId('linkset-card-header'));
+
+  beforeEach(() => {
+    mockOnVerifyCredential.mockReturnValue({ accepted: true, instanceId: 'inst-new' });
+  });
+
+  it('lists the secondary resolver with a Resolve action, outside credential rows and the other-links count', () => {
+    render(<Harness initial={[{ payload: storedLinkSet(urlSource) }]} />);
+    expandCard();
+
+    const section = screen.getByTestId('secondary-resolvers');
+    expect(section).toHaveTextContent('Secondary resolvers · 1');
+    expect(within(section).getByTestId('secondary-resolver-resolve')).toBeInTheDocument();
+    expect(section).toHaveTextContent('Item-level resolver');
+    // Credential rows unchanged; the pip page stays the only other link.
+    expect(screen.getAllByTestId('linked-credential-row')).toHaveLength(2);
+    expect(screen.getByTestId('other-links-note')).toHaveTextContent('1 other link');
+    expect(mockOnResolveSecondary).not.toHaveBeenCalled();
+  });
+
+  it('resolves the secondary link through the page flow on click, with a visible Resolving phase', async () => {
+    let release: () => void = () => {};
+    mockOnResolveSecondary.mockReturnValue(new Promise<void>((resolve) => (release = resolve)));
+    render(<Harness initial={[{ payload: storedLinkSet(urlSource) }]} />);
+    expandCard();
+
+    fireEvent.click(screen.getByTestId('secondary-resolver-resolve'));
+    expect(screen.getByTestId('secondary-resolver-resolving')).toHaveTextContent('Resolving...');
+    expect(mockOnResolveSecondary).toHaveBeenCalledWith('https://resolver.item.example.org/01/1/21/serial');
+
+    await act(async () => {
+      release();
+    });
+    expect(screen.getByTestId('secondary-resolver-resolve')).toBeInTheDocument();
+  });
+
+  it('reports a throwing resolve and returns the row to its Resolve action', async () => {
+    jest.spyOn(console, 'error').mockImplementation();
+    mockOnResolveSecondary.mockRejectedValueOnce(new Error('boom'));
+    render(<Harness initial={[{ payload: storedLinkSet(urlSource) }]} />);
+    expandCard();
+
+    fireEvent.click(screen.getByTestId('secondary-resolver-resolve'));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Could not resolve that link set. Check the link and try again.');
+    });
+    expect(screen.getByTestId('secondary-resolver-resolve')).toBeInTheDocument();
+  });
+});
+
+describe('secondary resolver section rendering (#974 review findings)', () => {
+  const urlSource = { kind: 'url' as const, url: 'https://r.example.org/01/1?linkType=all' };
+  const expandCard = () => fireEvent.click(screen.getByTestId('linkset-card-header'));
+
+  it('renders no Secondary resolvers section when the link set has none', () => {
+    const withoutIdr = {
+      linkset: [
+        {
+          anchor: 'https://id.example.org/01/1',
+          'https://test.uncefact.org/voc/untp/dpp': [{ href: 'https://x.example.org/creds/dpp.json' }],
+        },
+      ],
+    };
+    render(<Harness initial={[{ payload: { original: withoutIdr, decoded: withoutIdr, source: urlSource } }]} />);
+    expandCard();
+
+    expect(screen.queryByTestId('secondary-resolvers')).not.toBeInTheDocument();
+  });
+
+  it('renders two secondary resolvers as independent rows with their own Resolve actions', () => {
+    const twoIdr = {
+      linkset: [
+        {
+          anchor: 'https://id.example.org/01/1',
+          idr: [
+            { href: 'https://resolver-a.example.org/01/1', type: 'application/linkset+json', title: 'Resolver A' },
+            { href: 'https://resolver-b.example.org/01/1', type: 'application/linkset+json', title: 'Resolver B' },
+          ],
+        },
+      ],
+    };
+    render(<Harness initial={[{ payload: { original: twoIdr, decoded: twoIdr, source: urlSource } }]} />);
+    expandCard();
+
+    expect(screen.getByTestId('secondary-resolvers')).toHaveTextContent('Secondary resolvers · 2');
+    expect(screen.getAllByTestId('secondary-resolver-resolve')).toHaveLength(2);
+
+    // Clicking one row's Resolve puts only that row into the Resolving phase.
+    let release: () => void = () => {};
+    mockOnResolveSecondary.mockReturnValue(new Promise<void>((resolve) => (release = resolve)));
+    fireEvent.click(screen.getAllByTestId('secondary-resolver-resolve')[0]);
+    expect(screen.getAllByTestId('secondary-resolver-resolving')).toHaveLength(1);
+    expect(screen.getAllByTestId('secondary-resolver-resolve')).toHaveLength(1);
+    expect(mockOnResolveSecondary).toHaveBeenCalledWith('https://resolver-a.example.org/01/1');
+    release();
+  });
+});
+
+describe('secondary resolver panel rulings (#974 r2)', () => {
+  const urlSource = { kind: 'url' as const, url: 'https://r.example.org/01/1?linkType=all' };
+  const expandCard = () => fireEvent.click(screen.getByTestId('linkset-card-header'));
+
+  it('gives repeated generic titles distinct accessible names via the href', () => {
+    const twoSame = {
+      linkset: [
+        {
+          idr: [
+            {
+              href: 'https://resolver-a.example.org/01/1',
+              type: 'application/linkset+json',
+              title: 'Secondary Identity Resolver',
+            },
+            {
+              href: 'https://resolver-b.example.org/01/1',
+              type: 'application/linkset+json',
+              title: 'Secondary Identity Resolver',
+            },
+          ],
+        },
+      ],
+    };
+    render(<Harness initial={[{ payload: { original: twoSame, decoded: twoSame, source: urlSource } }]} />);
+    expandCard();
+
+    expect(
+      screen.getByRole('button', { name: 'Resolve Secondary Identity Resolver (https://resolver-a.example.org/01/1)' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Resolve Secondary Identity Resolver (https://resolver-b.example.org/01/1)' }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not cross-lock a Verify and a Resolve that share an href', async () => {
+    const sharedHref = 'https://shared.example.org/01/1';
+    const doc = {
+      linkset: [
+        {
+          'untp:dpp': [{ href: sharedHref, type: 'application/vc+ld+json' }],
+          idr: [{ href: sharedHref, type: 'application/linkset+json', title: 'Same-href resolver' }],
+        },
+      ],
+    };
+    let releaseResolve: () => void = () => {};
+    mockOnResolveSecondary.mockReturnValue(new Promise<void>((resolve) => (releaseResolve = resolve)));
+    let releaseVerify: (value: unknown) => void = () => {};
+    (fetchLinkedCredential as jest.Mock).mockReturnValue(new Promise((resolve) => (releaseVerify = resolve)));
+
+    render(<Harness initial={[{ payload: { original: doc, decoded: doc, source: urlSource } }]} />);
+    expandCard();
+
+    // Start the Resolve: only the secondary row goes busy; the credential row keeps Verify.
+    fireEvent.click(screen.getByTestId('secondary-resolver-resolve'));
+    expect(screen.getByTestId('secondary-resolver-resolving')).toBeInTheDocument();
+    expect(screen.getByTestId('linked-credential-verify')).toBeEnabled();
+
+    // Start the Verify too: both operations are in flight independently.
+    fireEvent.click(screen.getByTestId('linked-credential-verify'));
+    expect(screen.getByTestId('linked-credential-fetching')).toBeInTheDocument();
+    expect(screen.getByTestId('secondary-resolver-resolving')).toBeInTheDocument();
+
+    // Settling one leaves the other in flight.
+    await act(async () => {
+      releaseResolve();
+    });
+    expect(screen.getByTestId('secondary-resolver-resolve')).toBeInTheDocument();
+    expect(screen.getByTestId('linked-credential-fetching')).toBeInTheDocument();
+    await act(async () => {
+      releaseVerify({ ok: false, message: 'done' });
+    });
   });
 });

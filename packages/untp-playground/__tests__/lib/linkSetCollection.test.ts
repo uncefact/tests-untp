@@ -116,8 +116,15 @@ describe('linkedCredentialRows', () => {
         href: 'https://x.example.org/dpp.json',
         credential: false,
         encrypted: false,
+        secondary: false,
       },
-      { label: 'application/json', href: 'https://x.example.org/dcc.json', credential: false, encrypted: false },
+      {
+        label: 'application/json',
+        href: 'https://x.example.org/dcc.json',
+        credential: false,
+        encrypted: false,
+        secondary: false,
+      },
     ]);
   });
 
@@ -126,7 +133,13 @@ describe('linkedCredentialRows', () => {
       linkset: [{ rel: [{ href: 'https://x.example.org/creds/dte-88.json' }] }],
     });
     expect(rows).toEqual([
-      { label: 'dte-88.json', href: 'https://x.example.org/creds/dte-88.json', credential: false, encrypted: false },
+      {
+        label: 'dte-88.json',
+        href: 'https://x.example.org/creds/dte-88.json',
+        credential: false,
+        encrypted: false,
+        secondary: false,
+      },
     ]);
   });
 
@@ -166,5 +179,35 @@ describe('encrypted target signal (#812, UNTP Secure Targets)', () => {
     ['non-string member', { encryptionMethod: [42] }, false],
   ])('%s -> encrypted %s', (_name, target, expected) => {
     expect(rowsFor(target)[0].encrypted).toBe(expected);
+  });
+});
+
+describe('secondary resolver links (#974)', () => {
+  const rows = (relation: string, target: Record<string, unknown>) =>
+    linkedCredentialRows({ linkset: [{ [relation]: [{ href: 'https://r2.example.org/01/1', ...target }] }] });
+
+  it.each([
+    ['bare idr', 'idr', { type: 'application/linkset+json' }, true],
+    ['CURIE form', 'untp:idr', { type: 'application/linkset+json' }, true],
+    ['URI-qualified form', 'https://test.uncefact.org/voc/untp/idr', { type: 'application/linkset+json' }, true],
+    ['media type with parameters', 'idr', { type: 'application/linkset+json; profile=x' }, true],
+    ['idr relation without the link set media type', 'idr', { type: 'text/html' }, false],
+    ['idr relation with no media type', 'idr', {}, false],
+    ['link set media type under another relation', 'pip', { type: 'application/linkset+json' }, false],
+    ['uppercase relation and media type', 'IDR', { type: 'APPLICATION/LINKSET+JSON' }, true],
+  ])('%s -> secondary %s', (_name, relation, target, expected) => {
+    expect(rows(relation, target)[0].secondary).toBe(expected);
+  });
+
+  it('drops an empty-href idr self-reference entirely: neither listed nor counted', () => {
+    // Deliberate policy (#974 review): the open card already IS that resource; a self Resolve
+    // would only replay the resolve input's replace-in-place.
+    expect(rows('idr', { href: '', type: 'application/linkset+json' })).toEqual([]);
+  });
+
+  it('a secondary resolver link is not a credential row even under a credential-ish name', () => {
+    const [row] = rows('idr', { type: 'application/linkset+json' });
+    expect(row.secondary).toBe(true);
+    expect(row.credential).toBe(false);
   });
 });

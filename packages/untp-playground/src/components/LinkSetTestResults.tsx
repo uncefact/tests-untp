@@ -43,6 +43,12 @@ interface LinkSetTestResultsProps {
     rawArtefact: unknown,
     source: ArtefactSource,
   ) => { accepted: false; encrypted?: true } | { accepted: true; instanceId: string };
+  /**
+   * Resolves a secondary identity resolver link as a new link set card (#974): the same flow as
+   * submitting the URL through the resolve input, owned by the page so identity and replace
+   * semantics stay ADR-046's.
+   */
+  onResolveSecondary: (href: string) => Promise<void>;
 }
 
 export function LinkSetTestResults({
@@ -51,9 +57,13 @@ export function LinkSetTestResults({
   credentialItems,
   urlBindings,
   onVerifyCredential,
+  onResolveSecondary,
 }: LinkSetTestResultsProps) {
-  // In-flight fetches live at the list level, keyed by href, so collapsing a card (which unmounts
-  // its rows) cannot lose the flag and allow a second overlapping fetch of the same target.
+  // In-flight fetches live at the list level, keyed by operation plus href ("verify:<href>" /
+  // "resolve:<href>"), so collapsing a card (which unmounts its rows) cannot lose the flag, a
+  // second overlapping fetch of the same target is prevented, and a Verify and a Resolve of one
+  // href cannot cross-lock each other (they are different operations with different Accept
+  // profiles).
   const [fetchingHrefs, setFetchingHrefs] = useState<ReadonlySet<string>>(new Set());
   // Fallback encrypted signal (#812): resolvers do not always carry the Secure Targets metadata,
   // so a Verify that fetches an encrypted envelope records the discovery here and the row keeps
@@ -126,6 +136,7 @@ export function LinkSetTestResults({
           credentialItems={credentialItems}
           urlBindings={urlBindings}
           onVerifyCredential={onVerifyCredential}
+          onResolveSecondary={onResolveSecondary}
           fetchingHrefs={fetchingHrefs}
           setHrefFetching={setHrefFetching}
           discoveredEncryptedHrefs={discoveredEncryptedHrefs}
@@ -142,6 +153,7 @@ function LinkSetCard({
   credentialItems,
   urlBindings,
   onVerifyCredential,
+  onResolveSecondary,
   fetchingHrefs,
   setHrefFetching,
   discoveredEncryptedHrefs,
@@ -155,6 +167,7 @@ function LinkSetCard({
     rawArtefact: unknown,
     source: ArtefactSource,
   ) => { accepted: false; encrypted?: true } | { accepted: true; instanceId: string };
+  onResolveSecondary: (href: string) => Promise<void>;
   fetchingHrefs: ReadonlySet<string>;
   setHrefFetching: (href: string, fetching: boolean) => void;
   discoveredEncryptedHrefs: ReadonlySet<string>;
@@ -169,7 +182,10 @@ function LinkSetCard({
   // a verifiable-credential media type). Other links are counted, not listed: the playground
   // validates credentials, and the docs page explains how the split is decided.
   const credentialRows = allRows.filter((row) => row.credential);
-  const otherLinkCount = allRows.length - credentialRows.length;
+  // Secondary resolvers are listed with their own Resolve action (#974), so they are neither
+  // credential rows nor part of the unlisted other-links count.
+  const secondaryRows = allRows.filter((row) => row.secondary);
+  const otherLinkCount = allRows.length - credentialRows.length - secondaryRows.length;
 
   // Pending steps mean "validation not yet available", not "still running": there is no live
   // pipeline this phase, so the card shows the quiet pending state rather than a spinner.
@@ -228,10 +244,30 @@ function LinkSetCard({
                     credentialItems={credentialItems}
                     urlBindings={urlBindings}
                     onVerifyCredential={onVerifyCredential}
-                    isFetching={fetchingHrefs.has(row.href)}
-                    setFetching={(fetching) => setHrefFetching(row.href, fetching)}
+                    isFetching={fetchingHrefs.has(`verify:${row.href}`)}
+                    setFetching={(fetching) => setHrefFetching(`verify:${row.href}`, fetching)}
                     discoveredEncrypted={discoveredEncryptedHrefs.has(row.href)}
                     setDiscoveredEncrypted={(discovered) => setDiscoveredEncrypted(row.href, discovered)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          {secondaryRows.length > 0 && (
+            <div className='pt-2' data-testid='secondary-resolvers'>
+              <p className='text-xs font-semibold text-muted-foreground'>
+                Secondary resolvers · {secondaryRows.length}
+              </p>
+              {/* The heading carries the total, so the row list can scroll: a resolver can answer
+                  with many delegations and an unbounded card would swallow the page. */}
+              <div className='mt-2 max-h-80 space-y-2 overflow-y-auto pr-1'>
+                {secondaryRows.map((row, index) => (
+                  <SecondaryResolverRowView
+                    key={`${row.href}-${index}`}
+                    row={row}
+                    onResolveSecondary={onResolveSecondary}
+                    isFetching={fetchingHrefs.has(`resolve:${row.href}`)}
+                    setFetching={(fetching) => setHrefFetching(`resolve:${row.href}`, fetching)}
                   />
                 ))}
               </div>
@@ -393,6 +429,72 @@ function LinkedCredentialRowView({
         </span>
       ) : (
         verifyAction('Verify')
+      )}
+    </div>
+  );
+}
+
+/**
+ * One secondary-resolver row (#974): a link the UNTP Identity Resolver specification's Secondary
+ * Resolvers section defines (`idr` relation, link set target), with a Resolve action that loads
+ * the target as its own card exactly as the resolve input would. Nothing resolves without the
+ * click, which is also what bounds a delegation chain: each hop is explicit, and a re-resolve of
+ * an already-loaded URL replaces its card in place rather than duplicating it.
+ */
+function SecondaryResolverRowView({
+  row,
+  onResolveSecondary,
+  isFetching,
+  setFetching,
+}: {
+  row: LinkedCredentialRow;
+  onResolveSecondary: (href: string) => Promise<void>;
+  isFetching: boolean;
+  setFetching: (fetching: boolean) => void;
+}) {
+  const handleResolve = async () => {
+    setFetching(true);
+    try {
+      await onResolveSecondary(row.href);
+    } catch (err) {
+      console.error('SecondaryResolverRowView: resolve failed', err);
+      toast.error('Could not resolve that link set. Check the link and try again.');
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  return (
+    <div className='flex items-center justify-between gap-3 rounded-md border p-3' data-testid='secondary-resolver-row'>
+      <div className='min-w-0'>
+        <p className='truncate text-sm font-medium'>{row.label}</p>
+        <p className='truncate font-mono text-xs text-muted-foreground'>{row.href}</p>
+      </div>
+      {isFetching ? (
+        <span
+          className='flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground'
+          data-testid='secondary-resolver-resolving'
+        >
+          <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+          Resolving...
+        </span>
+      ) : (
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className='shrink-0'
+          // The href keeps repeated titles distinguishable for assistive tech: resolvers routinely
+          // reuse a generic title across delegation links.
+          aria-label={`Resolve ${row.label} (${row.href})`}
+          onClick={(e) => {
+            e.stopPropagation();
+            void handleResolve();
+          }}
+          data-testid='secondary-resolver-resolve'
+        >
+          Resolve
+        </Button>
       )}
     </div>
   );
