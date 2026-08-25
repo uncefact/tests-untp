@@ -22,6 +22,10 @@ One exception: resolvers often list a credential's human viewing page beside the
 
 The specification is explicit that the link relation and media type indicate the intended content, not a guarantee of it. The Playground follows the same rule: identification decides what is listed as a credential link, and the actual content is validated when the credential is fetched and run through the validation pipeline.
 
+## Encrypted targets
+
+A credential link carries an Encrypted tag when its target declares a non-empty `encryptionMethod` other than `none`, the Secure Targets attribute the specification registers for an encrypted target. An `accessRole` on its own is authorisation, not encryption, so it does not mark the target. Like the relation and media-type signals, this is a hint rather than a guarantee. Verify still fetches a tagged target, and a body that turns out to be an encrypted envelope is reported as encrypted rather than validated; the Playground does not yet decrypt. The check also works the other way: when a link carries no encryption metadata but Verify fetches an encrypted envelope, the row gains the Encrypted tag from that discovery.
+
 ## Everything else
 
 Links that match neither signal (a `pip` product information page, a retailer list, another resolver) are counted on the card as other links. They are not errors; they are resources outside what the Playground validates. A self-referential entry (RFC 9264 allows an empty `href` meaning the link set document itself) points at nothing outside the link set, so it is not counted at all.

@@ -16,4 +16,16 @@ describe('fetchErrorMessage', () => {
   it('returns the fallback for an unknown code', () => {
     expect(fetchErrorMessage('something-new', 'the fallback text')).toBe('the fallback text');
   });
+
+  it('surfaces the upstream HTTP status folded into the network code', () => {
+    expect(fetchErrorMessage('network', 'Upstream returned 403 for https://x.example.org/a.json.')).toBe(
+      'The URL returned 403. Check the address and whether the document is publicly accessible.',
+    );
+  });
+
+  it('keeps the unreachable copy for a network failure without an upstream status', () => {
+    expect(fetchErrorMessage('network', 'fetch failed')).toBe(
+      'Could not reach the URL. Check the address and try again.',
+    );
+  });
 });

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useError } from '@/contexts/ErrorContext';
+import { isEncryptedEnvelope } from '@/lib/encryptedEnvelope';
 import { fetchErrorMessage } from '@/lib/fetchErrorMessages';
 import { resolveLinkSet } from '@/lib/resolveLinkSet';
 import { jwtDecode } from 'jwt-decode';
@@ -13,7 +14,11 @@ import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { API_BASE_PATH } from '../../constants';
 
-export type ArtefactSource = { kind: 'file'; filename: string } | { kind: 'url'; url: string };
+// Re-exported so existing importers keep working; the declaration lives with the stored-artefact
+// types, which is the single source of truth for the source shape.
+import type { ArtefactSource } from '@/types';
+
+export type { ArtefactSource } from '@/types';
 
 /**
  * The active tab's uploader copy and URL behaviour (#676). The two physical inputs (dropzone and
@@ -69,7 +74,13 @@ export function ArtefactUploader({
             const text = e.target?.result as string;
             let json;
 
-            if (file.name.endsWith('.jwt') || file.name.endsWith('.txt')) {
+            if (file.name.toLowerCase().endsWith('.jwt') || file.name.toLowerCase().endsWith('.txt')) {
+              if (isEncryptedEnvelope(text)) {
+                // A compact JWE is not decodable as a JWT; hand the raw string to ingestion so
+                // the shared encrypted classifier reports it instead of a generic JWT error.
+                onArtefactUpload(text, { kind: 'file', filename: file.name });
+                return;
+              }
               try {
                 json = jwtDecode(text);
               } catch (jwtError) {
@@ -150,12 +161,27 @@ export function ArtefactUploader({
       try {
         parsed = JSON.parse(payload.body);
       } catch {
-        setFetchError('The URL returned content that is not valid JSON.');
+        // A non-JSON body can still be an encrypted envelope (a compact JWE): hand it to
+        // ingestion, whose shared classifier names it encrypted on the error surface (#812).
+        if (isEncryptedEnvelope(payload.body)) {
+          onArtefactUpload(payload.body, { kind: 'url', url: payload.finalUrl, requestedUrl: trimmed });
+          setUrlInput('');
+          return;
+        }
+        // Resolvers redirect a bare identifier URL to their default link, which is typically the
+        // human viewing page; name the next step instead of a bare parse error (#812). Compare
+        // the MIME essence, not a prefix, so text/htmlfoo does not count and xhtml does.
+        const essence = payload.contentType?.split(';', 1)[0].trim().toLowerCase();
+        setFetchError(
+          essence === 'text/html' || essence === 'application/xhtml+xml'
+            ? 'The URL returned a web page, not a JSON document. If this is an identity resolver link, resolve it on the Link Sets tab.'
+            : 'The URL returned content that is not valid JSON.',
+        );
         return;
       }
 
       setFileCount(1);
-      onArtefactUpload(parsed, { kind: 'url', url: payload.finalUrl });
+      onArtefactUpload(parsed, { kind: 'url', url: payload.finalUrl, requestedUrl: trimmed });
       setUrlInput('');
     } catch (err) {
       console.error('ArtefactUploader: URL submission failed', err);

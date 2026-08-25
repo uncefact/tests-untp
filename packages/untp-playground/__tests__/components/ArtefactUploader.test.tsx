@@ -164,6 +164,7 @@ describe('ArtefactUploader component', () => {
       expect(mockOnArtefactUpload).toHaveBeenCalledWith(returnValue, {
         kind: 'url',
         url: 'https://example.org/scheme.jsonld',
+        requestedUrl: 'https://example.org/scheme.jsonld',
       });
     });
     expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -260,6 +261,7 @@ describe('ArtefactUploader component', () => {
       expect(mockOnArtefactUpload).toHaveBeenCalledWith(returnValue, {
         kind: 'url',
         url: 'https://example.org/scheme.jsonld',
+        requestedUrl: 'https://example.org/scheme.jsonld',
       });
     });
   });
@@ -289,5 +291,162 @@ describe('ArtefactUploader component', () => {
       expect(screen.getByTestId('artefact-url-error')).toHaveTextContent(/blocked/i);
     });
     expect(mockOnArtefactUpload).not.toHaveBeenCalled();
+  });
+
+  it('hands a .jwt file containing a compact JWE to ingestion raw, instead of a JWT decode error', async () => {
+    const b64u = (value: string) => btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const jwe = `${b64u('{"alg":"ECDH-ES","enc":"A256GCM"}')}..${b64u('iv')}.${b64u('ct')}.`;
+    render(
+      <ArtefactUploader family={credentialsFamily} onArtefactUpload={mockOnArtefactUpload} setFileCount={() => {}} />,
+    );
+    const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
+    const jweFile = new File([jwe], 'encrypted.jwt', { type: 'text/plain' });
+
+    await act(async () => {
+      fireEvent.change(inputElement as Element, { target: { files: [jweFile] } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await waitFor(() => {
+      expect(mockOnArtefactUpload).toHaveBeenCalledWith(jwe, { kind: 'file', filename: 'encrypted.jwt' });
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('points an HTML response at the Link Sets tab (a resolver redirected to its viewing page)', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        body: '<html>verify page</html>',
+        contentType: 'text/html; charset=utf-8',
+        finalUrl: 'https://verify.example.org/?q=x',
+      }),
+    });
+
+    render(
+      <ArtefactUploader family={credentialsFamily} onArtefactUpload={mockOnArtefactUpload} setFileCount={() => {}} />,
+    );
+    fireEvent.change(screen.getByTestId('artefact-url-input'), {
+      target: { value: 'https://resolver.example.org/01/1' },
+    });
+    fireEvent.click(screen.getByTestId('artefact-url-fetch'));
+
+    expect(await screen.findByTestId('artefact-url-error')).toHaveTextContent(
+      'The URL returned a web page, not a JSON document. If this is an identity resolver link, resolve it on the Link Sets tab.',
+    );
+    expect(mockOnArtefactUpload).not.toHaveBeenCalled();
+  });
+
+  it('keeps the plain not-JSON message for a non-HTML body', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        body: 'plain text',
+        contentType: 'text/plain',
+        finalUrl: 'https://x.example.org/f.txt',
+      }),
+    });
+
+    render(
+      <ArtefactUploader family={credentialsFamily} onArtefactUpload={mockOnArtefactUpload} setFileCount={() => {}} />,
+    );
+    fireEvent.change(screen.getByTestId('artefact-url-input'), { target: { value: 'https://x.example.org/f.txt' } });
+    fireEvent.click(screen.getByTestId('artefact-url-fetch'));
+
+    expect(await screen.findByTestId('artefact-url-error')).toHaveTextContent(
+      'The URL returned content that is not valid JSON.',
+    );
+  });
+
+  it('forwards a compact JWE fetched by URL to ingestion instead of a not-JSON error', async () => {
+    const b64u = (value: string) => btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const jwe = `${b64u('{"alg":"ECDH-ES","enc":"A256GCM"}')}..${b64u('iv')}.${b64u('ct')}.`;
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        body: jwe,
+        contentType: 'application/jose',
+        finalUrl: 'https://x.example.org/c.jwt',
+      }),
+    });
+
+    render(
+      <ArtefactUploader family={credentialsFamily} onArtefactUpload={mockOnArtefactUpload} setFileCount={() => {}} />,
+    );
+    fireEvent.change(screen.getByTestId('artefact-url-input'), { target: { value: 'https://x.example.org/c.jwt' } });
+    fireEvent.click(screen.getByTestId('artefact-url-fetch'));
+
+    await waitFor(() => {
+      expect(mockOnArtefactUpload).toHaveBeenCalledWith(jwe, {
+        kind: 'url',
+        url: 'https://x.example.org/c.jwt',
+        requestedUrl: 'https://x.example.org/c.jwt',
+      });
+    });
+    expect(screen.queryByTestId('artefact-url-error')).not.toBeInTheDocument();
+  });
+
+  it('does not call a text/htmlfoo response a web page', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, body: 'x', contentType: 'text/htmlfoo', finalUrl: 'https://x.example.org/f' }),
+    });
+
+    render(
+      <ArtefactUploader family={credentialsFamily} onArtefactUpload={mockOnArtefactUpload} setFileCount={() => {}} />,
+    );
+    fireEvent.change(screen.getByTestId('artefact-url-input'), { target: { value: 'https://x.example.org/f' } });
+    fireEvent.click(screen.getByTestId('artefact-url-fetch'));
+
+    expect(await screen.findByTestId('artefact-url-error')).toHaveTextContent(
+      'The URL returned content that is not valid JSON.',
+    );
+  });
+
+  it('treats application/xhtml+xml as a web page', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        body: '<html/>',
+        contentType: 'application/xhtml+xml',
+        finalUrl: 'https://x.example.org/p',
+      }),
+    });
+
+    render(
+      <ArtefactUploader family={credentialsFamily} onArtefactUpload={mockOnArtefactUpload} setFileCount={() => {}} />,
+    );
+    fireEvent.change(screen.getByTestId('artefact-url-input'), { target: { value: 'https://x.example.org/p' } });
+    fireEvent.click(screen.getByTestId('artefact-url-fetch'));
+
+    expect(await screen.findByTestId('artefact-url-error')).toHaveTextContent('The URL returned a web page');
+  });
+
+  it('routes an uppercase .JWT file through the JOSE branch', async () => {
+    const b64u = (value: string) => btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const jwt = `${b64u('{"alg":"none"}')}.${b64u('{"vc":3}')}.`;
+    render(
+      <ArtefactUploader family={credentialsFamily} onArtefactUpload={mockOnArtefactUpload} setFileCount={() => {}} />,
+    );
+    const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
+    const file = new File([jwt], 'CREDENTIAL.JWT', { type: 'text/plain' });
+
+    await act(async () => {
+      fireEvent.change(inputElement as Element, { target: { files: [file] } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await waitFor(() => {
+      expect(mockOnArtefactUpload).toHaveBeenCalledWith({ vc: 3 }, { kind: 'file', filename: 'CREDENTIAL.JWT' });
+    });
   });
 });

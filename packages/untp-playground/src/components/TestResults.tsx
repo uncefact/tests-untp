@@ -459,6 +459,12 @@ function CredentialInstanceRow({ item, onRemove }: { item: CredentialSlot; onRem
   // Removability tracks a terminal result, not the run token, so a freshly queued slot is not
   // briefly removable in the render before its run begins.
   const removable = credentialIsTerminal(steps);
+  // A credential queued from a link set's Verify carries its provenance while running (#812);
+  // once the pipeline settles it reads like any other instance.
+  const subtitle =
+    !removable && stored.source?.kind === 'url' && stored.source.via === 'link-set'
+      ? 'Verifying... · from link set'
+      : credentialSubtitle(stored);
 
   return (
     <div className='group relative overflow-hidden rounded-md border'>
@@ -472,7 +478,7 @@ function CredentialInstanceRow({ item, onRemove }: { item: CredentialSlot; onRem
           {isExpanded ? <ChevronDown className='h-4 w-4 shrink-0' /> : <ChevronRight className='h-4 w-4 shrink-0' />}
           <div className='flex min-w-0 flex-col'>
             <h4 className='truncate font-medium'>{title}</h4>
-            <span className='truncate text-xs text-gray-500'>{credentialSubtitle(stored)}</span>
+            <span className='truncate text-xs text-gray-500'>{subtitle}</span>
           </div>
         </div>
         <StatusIcon status={status} testId={item.instanceId} />
