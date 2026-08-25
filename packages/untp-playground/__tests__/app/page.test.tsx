@@ -1344,7 +1344,9 @@ describe('secondary resolver resolution (#974)', () => {
     expect(await screen.findByRole('tab', { name: /Link Sets\s*2/ })).toBeInTheDocument();
     // Identity is the normalised REQUEST URL (ADR-046), never the post-redirect finalUrl.
     const collection = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0].collection;
-    const added = collection.items.find((item: any) => item.payload.source?.url?.startsWith('https://r2.example.org'));
+    const added = collection.items.find(
+      (item: any) => item.payload.source?.url === 'https://r2.example.org/01/9?linkType=all',
+    );
     expect(added.contentHash).toBe('https://r2.example.org/01/9?linkType=all');
     expect(added.payload.source).toEqual({ kind: 'url', url: 'https://r2.example.org/01/9?linkType=all' });
 
