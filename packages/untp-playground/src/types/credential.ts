@@ -14,6 +14,16 @@ export type ArtefactSource =
   | { kind: 'url'; url: string; requestedUrl?: string; via?: 'link-set' };
 
 export interface StoredCredential {
+  /**
+   * The instance is a still-encrypted envelope awaiting its key (#813): the card renders the
+   * locked decrypt panel instead of a pipeline, until decryption replaces the payload.
+   */
+  encryptedEnvelope?: true;
+  /**
+   * The instance was decrypted in the browser this session (#813): its pipeline gains a leading
+   * successful Decryption step.
+   */
+  decryptedFromEnvelope?: true;
   original: any;
   decoded: Credential;
   source?: ArtefactSource;

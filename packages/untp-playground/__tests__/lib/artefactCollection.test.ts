@@ -6,6 +6,8 @@ import {
   restore,
   beginRun,
   commitResult,
+  replacePayload,
+  absorbTwin,
 } from '@/lib/artefactCollection';
 import type { CollectionState } from '@/types/artefact';
 
@@ -205,5 +207,76 @@ describe('restore (single-level undo)', () => {
     expect(didRestore).toBe(false);
     expect(restored.items).toHaveLength(1);
     expect(restored.items[0].payload.name).toBe('a2');
+  });
+});
+
+describe('replacePayload (#813)', () => {
+  it('replaces the payload in place, keeps the instance id, and clears the run state', () => {
+    let state = { items: [] } as any;
+    ({ state } = upsert(state, { payload: 'envelope', contentHash: 'h1', mintInstanceId: () => 'id-1' }));
+    // Give the slot a REAL live run so the reset is observable (a discarded beginRun would leave
+    // runId null and make this assertion unfalsifiable).
+    ({ state } = beginRun(state, 'id-1', ['step'] as any, () => 'run-1'));
+    expect(state.items[0].runId).toBe('run-1');
+
+    const { state: next, replaced } = replacePayload(state, 'id-1', 'decrypted', 'h2');
+    expect(replaced).toBe(true);
+    expect(next.items).toHaveLength(1);
+    expect(next.items[0]).toEqual({
+      instanceId: 'id-1',
+      contentHash: 'h2',
+      payload: 'decrypted',
+      runId: null,
+      result: undefined,
+    });
+  });
+
+  it('is a no-op on an unknown instance', () => {
+    const state = { items: [] } as any;
+    const { state: next, replaced } = replacePayload(state, 'missing', 'p', 'h');
+    expect(replaced).toBe(false);
+    expect(next).toBe(state);
+  });
+
+  it('replaces plainly even when another instance shares the new hash: twin handling belongs to admitDecrypted', () => {
+    let state = { items: [] } as any;
+    ({ state } = upsert(state, { payload: 'plaintext', contentHash: 'h-shared', mintInstanceId: () => 'id-plain' }));
+    ({ state } = upsert(state, { payload: 'envelope', contentHash: 'h-env', mintInstanceId: () => 'id-locked' }));
+
+    const { state: next, replaced } = replacePayload(state, 'id-locked', 'decrypted', 'h-shared');
+    expect(replaced).toBe(true);
+    expect(next.items).toHaveLength(2);
+  });
+});
+
+describe('absorbTwin (#813 collision merge)', () => {
+  it('keeps the decrypting slot with the twin result and removes the twin in one transition', () => {
+    let state = { items: [] } as any;
+    ({ state } = upsert(state, { payload: 'plaintext', contentHash: 'h-shared', mintInstanceId: () => 'id-twin' }));
+    ({ state } = upsert(state, { payload: 'envelope', contentHash: 'h-env', mintInstanceId: () => 'id-locked' }));
+
+    const { state: next, absorbed } = absorbTwin(
+      state,
+      'id-locked',
+      'id-twin',
+      'decrypted',
+      'h-shared',
+      ['decryption-success', 'twin-step'] as any,
+      () => 'run-merged',
+    );
+    expect(absorbed).toBe(true);
+    expect(next.items).toHaveLength(1);
+    expect(next.items[0]).toEqual({
+      instanceId: 'id-locked',
+      contentHash: 'h-shared',
+      payload: 'decrypted',
+      runId: 'run-merged',
+      result: ['decryption-success', 'twin-step'],
+    });
+  });
+
+  it('fails open when either slot is missing', () => {
+    const state = { items: [] } as any;
+    expect(absorbTwin(state, 'a', 'b', 'p', 'h', [] as any, () => 'r').absorbed).toBe(false);
   });
 });

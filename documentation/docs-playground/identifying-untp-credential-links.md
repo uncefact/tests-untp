@@ -24,7 +24,7 @@ The specification is explicit that the link relation and media type indicate the
 
 ## Encrypted targets
 
-A credential link carries an Encrypted tag when its target declares a non-empty `encryptionMethod` other than `none`, the Secure Targets attribute the specification registers for an encrypted target. An `accessRole` on its own is authorisation, not encryption, so it does not mark the target. Like the relation and media-type signals, this is a hint rather than a guarantee. Verify still fetches a tagged target, and a body that turns out to be an encrypted envelope is reported as encrypted rather than validated; the Playground does not yet decrypt. The check also works the other way: when a link carries no encryption metadata but Verify fetches an encrypted envelope, the row gains the Encrypted tag from that discovery.
+A credential link carries an Encrypted tag when its target declares a non-empty `encryptionMethod` other than `none`, the Secure Targets attribute the specification registers for an encrypted target. An `accessRole` on its own is authorisation, not encryption, so it does not mark the target. Like the relation and media-type signals, this is a hint rather than a guarantee. Verify still fetches a tagged target, and a body that turns out to be an encrypted envelope is accepted as a locked instance on the Credentials tab, where entering its decryption key decrypts it in the browser. The check also works the other way: when a link carries no encryption metadata but Verify fetches an encrypted envelope, the row gains the Encrypted tag from that discovery.
 
 ## Secondary resolvers
 

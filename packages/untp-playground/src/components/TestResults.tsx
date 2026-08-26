@@ -12,9 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
+import { beginRun, commitResult, remove, replacePayload } from '@/lib/artefactCollection';
 import { validateContext } from '@/lib/contextValidation';
 import {
+  credentialContentHash,
   credentialGroupLabel,
   credentialGroupType,
   credentialIsTerminal,
@@ -23,7 +24,7 @@ import {
   instanceStatus,
   worstStatus,
 } from '@/lib/credentialCollection';
-import { isEnvelopedProof } from '@/lib/credentialService';
+import { decodeEnvelopedCredential, isEnvelopedProof } from '@/lib/credentialService';
 import { newId } from '@/lib/id';
 import { detectExtension, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
@@ -45,6 +46,8 @@ import {
   VCProofType,
 } from '../../constants';
 import ValidationDetailsSheet from './ValidationDetailsSheet';
+import { DecryptCredential } from './DecryptCredential';
+import type { EncryptedCredentialEnvelope } from '@/lib/decryptCredential';
 
 type CredentialCollection = CollectionState<StoredCredential, TestStep[]>;
 type CredentialDispatch = <Res extends { state: CredentialCollection }>(
@@ -55,6 +58,8 @@ type CredentialSlot = ArtefactSlot<StoredCredential, TestStep[]>;
 interface TestResultsProps {
   collection: CredentialCollection;
   dispatch: CredentialDispatch;
+  /** Admits a decrypted plaintext through the page's upload gates; false keeps the card locked. */
+  onDecrypted: (item: CredentialSlot, credential: unknown) => boolean;
 }
 
 export const confettiConfig = {
@@ -73,7 +78,13 @@ function initialSteps(stored: StoredCredential): TestStep[] {
   const vcdmVersion = detectVcdmVersion(stored.decoded);
   const isUnsupportedVCDMVersion = vcdmVersion === VCDMVersion.UNKNOWN;
 
-  const steps: TestStep[] = [
+  const steps: TestStep[] = [];
+  if (stored.decryptedFromEnvelope) {
+    // Decrypted this session (#813): the pipeline leads with the already-successful Decryption
+    // step so the card records how the document was obtained.
+    steps.push({ id: TestCaseStepId.DECRYPTION, name: 'Decryption', status: TestCaseStatus.SUCCESS });
+  }
+  steps.push(
     {
       id: TestCaseStepId.PROOF_TYPE,
       name: 'Proof Type Detection',
@@ -94,7 +105,7 @@ function initialSteps(stored: StoredCredential): TestStep[] {
       name: 'JSON-LD Document Expansion and Context Validation',
       status: TestCaseStatus.PENDING,
     },
-  ];
+  );
 
   if (detectExtension(stored.decoded)) {
     steps.push({
@@ -107,7 +118,7 @@ function initialSteps(stored: StoredCredential): TestStep[] {
   return steps;
 }
 
-export function TestResults({ collection, dispatch }: TestResultsProps) {
+export function TestResults({ collection, dispatch, onDecrypted }: TestResultsProps) {
   // Confetti fires once per (instance, run) so it does not re-fire on unrelated re-renders.
   const confettiShownRef = useRef<Set<string>>(new Set());
   const [pendingRemoval, setPendingRemoval] = useState<CredentialSlot | null>(null);
@@ -117,6 +128,10 @@ export function TestResults({ collection, dispatch }: TestResultsProps) {
   useEffect(() => {
     for (const item of collection.items) {
       if (item.runId === null && item.result === undefined) {
+        // A locked instance's terminal WARNING result is seeded at ingestion; this guard only
+        // defends against a future path that recreates a lock without one, and above all keeps
+        // the pipeline off ciphertext (#813).
+        if (item.payload.encryptedEnvelope) continue;
         const { runId } = dispatch((state) => beginRun(state, item.instanceId, initialSteps(item.payload), newId));
         if (runId) void runCredentialPipeline(item.instanceId, runId, item.payload, dispatch);
       }
@@ -150,20 +165,37 @@ export function TestResults({ collection, dispatch }: TestResultsProps) {
       permittedCredentialTypes
         .map((type) => ({
           type,
-          instances: collection.items.filter((item) => credentialGroupType(item.payload.decoded) === type),
+          instances: collection.items.filter(
+            (item) => !item.payload.encryptedEnvelope && credentialGroupType(item.payload.decoded) === type,
+          ),
         }))
         .filter((group) => group.instances.length > 0),
+    [collection.items],
+  );
+  // Locked instances have no detectable type until decrypted, so they list under their own
+  // heading rather than vanishing from the typed groups (#813).
+  const lockedInstances = useMemo(
+    () => collection.items.filter((item) => item.payload.encryptedEnvelope),
     [collection.items],
   );
 
   return (
     <section className='space-y-4' data-testid='credential-results'>
+      {lockedInstances.length > 0 && (
+        <CredentialTypeGroup
+          type='Encrypted'
+          instances={lockedInstances}
+          onRemove={(item) => setPendingRemoval(item)}
+          onDecrypted={onDecrypted}
+        />
+      )}
       {groups.map((group) => (
         <CredentialTypeGroup
           key={group.type}
           type={group.type}
           instances={group.instances}
           onRemove={(item) => setPendingRemoval(item)}
+          onDecrypted={onDecrypted}
         />
       ))}
 
@@ -413,10 +445,12 @@ function CredentialTypeGroup({
   type,
   instances,
   onRemove,
+  onDecrypted,
 }: {
   type: string;
   instances: CredentialSlot[];
   onRemove: (item: CredentialSlot) => void;
+  onDecrypted: (item: CredentialSlot, credential: unknown) => boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -435,13 +469,30 @@ function CredentialTypeGroup({
           <span className='text-xs tabular-nums text-muted-foreground'>{instances.length}</span>
         </div>
         {/* The rollup summarises the group only while it is collapsed; once expanded, each instance
-            row shows its own status, so the group-level icon would be redundant. */}
-        {!isExpanded && <StatusIcon status={rollup} testId={type} />}
+            row shows its own status, so the group-level icon would be redundant. The locked group
+            shows the amber tag instead: its WARNING steps would bucket as a pass icon, and nothing
+            in a locked group has been verified (#813). */}
+        {!isExpanded &&
+          (type === 'Encrypted' ? (
+            <span
+              className='rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800'
+              data-testid='encrypted-group-tag'
+            >
+              Encrypted
+            </span>
+          ) : (
+            <StatusIcon status={rollup} testId={type} />
+          ))}
       </div>
       {isExpanded && (
         <div className='mt-4 space-y-2 pl-6'>
           {instances.map((item) => (
-            <CredentialInstanceRow key={item.instanceId} item={item} onRemove={() => onRemove(item)} />
+            <CredentialInstanceRow
+              key={item.instanceId}
+              item={item}
+              onRemove={() => onRemove(item)}
+              onDecrypted={(credential) => onDecrypted(item, credential)}
+            />
           ))}
         </div>
       )}
@@ -449,11 +500,24 @@ function CredentialTypeGroup({
   );
 }
 
-function CredentialInstanceRow({ item, onRemove }: { item: CredentialSlot; onRemove: () => void }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+function CredentialInstanceRow({
+  item,
+  onRemove,
+  onDecrypted,
+}: {
+  item: CredentialSlot;
+  onRemove: () => void;
+  onDecrypted: (credential: unknown) => boolean;
+}) {
   const stored = item.payload;
   const steps = item.result ?? [];
-  const title = credentialTitle(stored);
+  const locked = stored.encryptedEnvelope === true;
+  // A freshly decrypted row mounts expanded while its pipeline runs, so the decrypt panel is
+  // visually replaced by the card body rather than collapsing on the group move (#813).
+  const [isExpanded, setIsExpanded] = useState(
+    () => stored.decryptedFromEnvelope === true && !credentialIsTerminal(item.result ?? []),
+  );
+  const title = locked ? 'Encrypted credential' : credentialTitle(stored);
   const status = instanceStatus(item.result);
   // A queued or mid-pipeline instance offers no remove control until its pipeline settles (#810 AC).
   // Removability tracks a terminal result, not the run token, so a freshly queued slot is not
@@ -461,8 +525,11 @@ function CredentialInstanceRow({ item, onRemove }: { item: CredentialSlot; onRem
   const removable = credentialIsTerminal(steps);
   // A credential queued from a link set's Verify carries its provenance while running (#812);
   // once the pipeline settles it reads like any other instance.
-  const subtitle =
-    !removable && stored.source?.kind === 'url' && stored.source.via === 'link-set'
+  const subtitle = locked
+    ? stored.source?.kind === 'url' && stored.source.via === 'link-set'
+      ? 'Awaiting key · from link set'
+      : 'Awaiting key'
+    : !removable && stored.source?.kind === 'url' && stored.source.via === 'link-set'
       ? 'Verifying... · from link set'
       : credentialSubtitle(stored);
 
@@ -481,14 +548,30 @@ function CredentialInstanceRow({ item, onRemove }: { item: CredentialSlot; onRem
             <span className='truncate text-xs text-gray-500'>{subtitle}</span>
           </div>
         </div>
-        <StatusIcon status={status} testId={item.instanceId} />
+        {locked ? (
+          // The status slot carries the amber Encrypted tag while locked (#813); the icon returns
+          // with the pipeline once decryption succeeds.
+          <span
+            className='rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800'
+            data-testid='credential-encrypted-tag'
+          >
+            Encrypted
+          </span>
+        ) : (
+          <StatusIcon status={status} testId={item.instanceId} />
+        )}
       </div>
       {isExpanded && (
         <div className='space-y-2 px-3 pb-3 pl-9'>
           {stored.source && <SourceCaption source={stored.source} />}
-          {steps.map((step) => (
-            <TestStepItem key={step.id} step={step} />
-          ))}
+          {locked ? (
+            <DecryptCredential
+              envelope={stored.decoded as unknown as EncryptedCredentialEnvelope}
+              onDecrypted={onDecrypted}
+            />
+          ) : (
+            steps.map((step) => <TestStepItem key={step.id} step={step} />)
+          )}
         </div>
       )}
       {removable && (

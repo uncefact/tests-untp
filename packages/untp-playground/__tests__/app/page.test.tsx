@@ -13,8 +13,10 @@ import { SchemeTestResults } from '@/components/SchemeTestResults';
 import { TestResults } from '@/components/TestResults';
 import { LinkSetTestResults } from '@/components/LinkSetTestResults';
 import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
+import { newId } from '@/lib/id';
 import { resolveLinkSet } from '@/lib/resolveLinkSet';
 import Home from '@/app/page';
+import { TestReportProvider } from '@/contexts/TestReportContext';
 import { mockCredential } from '../mocks/vc';
 import { ArtefactKind, permittedCredentialTypes, TestCaseStatus } from '../../constants';
 
@@ -43,6 +45,16 @@ jest.mock('@/lib/schemaValidation', () => ({
 }));
 
 const mockDispatchError = jest.fn();
+
+jest.mock('@/contexts/TestReportContext', () => {
+  const actual = jest.requireActual('@/contexts/TestReportContext');
+  return {
+    ...actual,
+    // Wrapped (not replaced) so the provider still renders its children; the jest.fn lets tests
+    // assert what instances the report surface receives (#813 report-exclusion contract).
+    TestReportProvider: jest.fn(actual.TestReportProvider),
+  };
+});
 
 jest.mock('@/contexts/ErrorContext', () => ({
   useError: jest.fn(() => ({
@@ -1172,7 +1184,7 @@ describe('encrypted envelopes at ingestion (#812, every entry point)', () => {
     type: 'aes-256-gcm',
   };
 
-  it('reports an encrypted envelope from a link set Verify in the details drawer and flags the outcome', async () => {
+  it('lands an encrypted envelope from a link set Verify as a locked instance with a binding', async () => {
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
         <button
@@ -1189,7 +1201,7 @@ describe('encrypted envelopes at ingestion (#812, every entry point)', () => {
     await screen.findByTestId('mock-linkset-results');
 
     const props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
-    let outcome: { accepted: boolean; encrypted?: boolean } | undefined;
+    let outcome: { accepted: boolean; instanceId?: string; encrypted?: boolean } | undefined;
     await act(async () => {
       outcome = props.onVerifyCredential(envelope, {
         kind: 'url',
@@ -1198,18 +1210,17 @@ describe('encrypted envelopes at ingestion (#812, every entry point)', () => {
       });
     });
 
-    expect(outcome).toEqual({ accepted: false, encrypted: true });
-    expect(mockDispatchError).toHaveBeenCalledWith([
-      expect.objectContaining({
-        keyword: 'encrypted',
-        message: 'This credential is encrypted, so it cannot be validated yet.',
-      }),
-    ]);
-    // Nothing entered the credentials collection.
-    expect((LinkSetTestResults as jest.Mock).mock.lastCall?.[0].credentialItems).toEqual([]);
+    // #813: the envelope lands as a LOCKED instance rather than a refusal.
+    expect(outcome?.accepted).toBe(true);
+    expect(outcome?.encrypted).toBe(true);
+    expect(mockDispatchError).not.toHaveBeenCalled();
+    const updated = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    expect(updated.credentialItems).toHaveLength(1);
+    expect(updated.credentialItems[0].payload.encryptedEnvelope).toBe(true);
+    expect(updated.urlBindings.get('https://documents.example.org/enc.json')).toBe(outcome?.instanceId);
   });
 
-  it('reports the same encrypted warning for an upload on the Credentials tab', async () => {
+  it('lands an encrypted upload on the Credentials tab as a locked instance', async () => {
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
         <button
@@ -1223,16 +1234,9 @@ describe('encrypted envelopes at ingestion (#812, every entry point)', () => {
     render(<Home />);
     fireEvent.click(screen.getByTestId('mock-upload-envelope'));
 
-    await waitFor(() => {
-      expect(mockDispatchError).toHaveBeenCalledWith([
-        expect.objectContaining({
-          keyword: 'encrypted',
-          message: 'This credential is encrypted, so it cannot be validated yet.',
-        }),
-      ]);
-    });
-    // Stays out of the pipeline: no credential count appears on the tab.
-    expect(screen.queryByRole('tab', { name: /Credentials.*1/ })).not.toBeInTheDocument();
+    // #813: a locked instance counts on the tab; nothing goes to the error drawer.
+    expect(await screen.findByRole('tab', { name: /Credentials.*1/ })).toBeInTheDocument();
+    expect(mockDispatchError).not.toHaveBeenCalled();
   });
 });
 
@@ -1261,28 +1265,26 @@ describe('encrypted envelopes never route into another family (#812 follow-up)',
     );
   };
 
-  it('names a compact JWE dropped on the Conformity Schemes tab encrypted instead of persisting a scheme card', async () => {
+  it('routes a compact JWE dropped on the Conformity Schemes tab to a locked credential instance, never a scheme card', async () => {
     const jwe = `${b64u('{"alg":"ECDH-ES","enc":"A256GCM"}')}..${b64u('iv')}.${b64u('ct')}.`;
     uploadOn(jwe);
     render(<Home />);
     await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
     fireEvent.click(screen.getByTestId('mock-upload'));
 
-    await waitFor(() => {
-      expect(mockDispatchError).toHaveBeenCalledWith([expect.objectContaining({ keyword: 'encrypted' })]);
-    });
-    // No scheme card: the Schemes tab still shows no count.
+    // The envelope becomes a locked CREDENTIAL instance; no scheme card, no drawer error.
+    expect(await screen.findByRole('tab', { name: /Credentials.*1/ })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /Conformity Schemes\s*1/ })).not.toBeInTheDocument();
+    expect(mockDispatchError).not.toHaveBeenCalled();
   });
 
-  it('classifies a wrapped encrypted envelope by its inner document', async () => {
+  it('classifies a wrapped encrypted envelope by its inner document, landing it locked', async () => {
     uploadOn({ verifiableCredential: envelope });
     render(<Home />);
     fireEvent.click(screen.getByTestId('mock-upload'));
 
-    await waitFor(() => {
-      expect(mockDispatchError).toHaveBeenCalledWith([expect.objectContaining({ keyword: 'encrypted' })]);
-    });
+    expect(await screen.findByRole('tab', { name: /Credentials.*1/ })).toBeInTheDocument();
+    expect(mockDispatchError).not.toHaveBeenCalled();
   });
 
   it('accepts a genuine credential that merely carries ciphertext and header claims', async () => {
@@ -1374,5 +1376,215 @@ describe('secondary resolver resolution (#974)', () => {
       'The resolver responded, but not with a link set (no RFC 9264 "linkset" array).',
     );
     expect(screen.getByRole('tab', { name: /Link Sets\s*1/ })).toBeInTheDocument();
+  });
+});
+
+describe('locked instances stay out of the report (#813 review finding)', () => {
+  it('excludes a locked instance from the report provider input, so the report gate ignores ciphertext', async () => {
+    jest.clearAllMocks();
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (a: any, s: any) => void }) => (
+        <button
+          data-testid='mock-upload-envelope'
+          onClick={() =>
+            onArtefactUpload(
+              { cipherText: 'SGVsbG8=', iv: 'nLUYsnXBY8bbXY45', tag: '7j0RRSoEIm2FAo52m1pyow==', type: 'aes-256-gcm' },
+              { kind: 'file', filename: 'enc.json' },
+            )
+          }
+        >
+          u
+        </button>
+      ),
+    );
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload-envelope'));
+
+    // The instance is on the tab...
+    expect(await screen.findByRole('tab', { name: /Credentials.*1/ })).toBeInTheDocument();
+    // ...but the report provider never receives it: ciphertext must not become a report entry.
+    const lastProps = (TestReportProvider as jest.Mock).mock.lastCall?.[0];
+    expect(lastProps.credentialInstances).toEqual([]);
+  });
+});
+
+describe('decrypt admission, collision and re-verify identity (#813 panel rulings)', () => {
+  const envelope = {
+    cipherText: 'SGVsbG8=',
+    iv: 'nLUYsnXBY8bbXY45',
+    tag: '7j0RRSoEIm2FAo52m1pyow==',
+    type: 'aes-256-gcm',
+  };
+  const dpp = (id: string) => ({
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiableCredential', 'DigitalProductPassport'],
+    issuer: 'did:example:issuer',
+    id,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (a: any, s: any) => void }) => (
+        <div>
+          <button
+            data-testid='mock-upload-envelope'
+            onClick={() => onArtefactUpload(envelope, { kind: 'url', url: 'https://x.example.org/enc.json' })}
+          >
+            env
+          </button>
+          <button
+            data-testid='mock-upload-plain'
+            onClick={() => onArtefactUpload(dpp('urn:same'), { kind: 'file', filename: 'plain.json' })}
+          >
+            plain
+          </button>
+        </div>
+      ),
+    );
+  });
+
+  const testResultsProps = () => (TestResults as jest.Mock).mock.lastCall?.[0];
+
+  it('rejects a decrypted document with an unpermitted type without touching the collection', async () => {
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload-envelope'));
+    await screen.findByRole('tab', { name: /Credentials.*1/ });
+    (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
+
+    const props = testResultsProps();
+    const locked = props.collection.items[0];
+    let accepted: boolean | undefined;
+    await act(async () => {
+      accepted = props.onDecrypted(locked, dpp('urn:reject'));
+    });
+
+    expect(accepted).toBe(false);
+    expect(testResultsProps().collection.items[0].payload.encryptedEnvelope).toBe(true);
+    // The rejection stays on the panel, never the drawer.
+    expect(mockDispatchError).not.toHaveBeenCalled();
+  });
+
+  it('absorbs a settled twin on collision: identity, bindings and a leading Decryption step', async () => {
+    render(<Home />);
+    // Load the plaintext twin and settle it manually through the collection.
+    fireEvent.click(screen.getByTestId('mock-upload-plain'));
+    await screen.findByRole('tab', { name: /Credentials.*1/ });
+    let props = testResultsProps();
+    const twin = props.collection.items[0];
+    await act(async () => {
+      const { runId } = props.dispatch((state: any) => beginRun(state, twin.instanceId, [], newId));
+      props.dispatch((state: any) =>
+        commitResult(state, {
+          instanceId: twin.instanceId,
+          runId,
+          result: [{ id: 'proof-type', name: 'Proof Type Detection', status: 'success' }],
+        }),
+      );
+    });
+
+    // Load the envelope (binds its URL to the locked instance), then decrypt to the SAME content.
+    fireEvent.click(screen.getByTestId('mock-upload-envelope'));
+    await screen.findByRole('tab', { name: /Credentials.*2/ });
+    props = testResultsProps();
+    const locked = props.collection.items.find((i: any) => i.payload.encryptedEnvelope);
+    let accepted: boolean | undefined;
+    await act(async () => {
+      accepted = props.onDecrypted(locked, dpp('urn:same'));
+    });
+
+    expect(accepted).toBe(true);
+    props = testResultsProps();
+    // One instance remains: the decrypting slot's id, carrying the twin's result behind Decryption.
+    expect(props.collection.items).toHaveLength(1);
+    expect(props.collection.items[0].instanceId).toBe(locked.instanceId);
+    expect(props.collection.items[0].result[0]).toMatchObject({ id: 'decryption', status: 'success' });
+    expect(props.collection.items[0].result[1]).toMatchObject({ id: 'proof-type' });
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Merged with the already-loaded'));
+    // Binding remap is pinned at the unit layer (remapUrlBindings); the collection state above is
+    // the page-level observable contract.
+  });
+
+  it('rebinds a re-verified known envelope to its decrypted instance instead of relocking', async () => {
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload-envelope'));
+    await screen.findByRole('tab', { name: /Credentials.*1/ });
+    let props = testResultsProps();
+    const locked = props.collection.items[0];
+    await act(async () => {
+      props.onDecrypted(locked, dpp('urn:decrypted'));
+    });
+
+    // Re-ingest the SAME envelope through the uploader: no second locked card, the decrypted
+    // instance stays, and the fresh URL binds to it.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('mock-upload-envelope'));
+    });
+
+    const items = testResultsProps().collection.items;
+    expect(items).toHaveLength(1);
+    expect(items[0].instanceId).toBe(locked.instanceId);
+    expect(items[0].payload.encryptedEnvelope).toBeUndefined();
+    expect(items[0].payload.decryptedFromEnvelope).toBe(true);
+  });
+});
+
+describe('alias remap across a decrypt collision (#813 follow-up blocker)', () => {
+  it('re-verifying an older envelope after its instance was merged rebinds to the survivor', async () => {
+    jest.clearAllMocks();
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    const envelope1 = {
+      cipherText: 'SGVsbG8=',
+      iv: 'nLUYsnXBY8bbXY45',
+      tag: '7j0RRSoEIm2FAo52m1pyow==',
+      type: 'aes-256-gcm',
+    };
+    const envelope2 = { ...envelope1, iv: 'AAAAAAAAAAAAAAAB' };
+    const plaintext = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      type: ['VerifiableCredential', 'DigitalProductPassport'],
+      issuer: 'did:example:issuer',
+      id: 'urn:same-plaintext',
+    };
+    let upload: (a: any, s: any) => any = () => {};
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (a: any, s: any) => any }) => {
+        upload = onArtefactUpload;
+        return <div data-testid='mock-uploader-live' />;
+      },
+    );
+    render(<Home />);
+    const props = () => (TestResults as jest.Mock).mock.lastCall?.[0];
+
+    // Envelope 1 -> locked A -> decrypt.
+    await act(async () => upload(envelope1, { kind: 'file', filename: 'e1.json' }));
+    const lockedA = props().collection.items[0];
+    await act(async () => {
+      props().onDecrypted(lockedA, plaintext);
+    });
+
+    // Envelope 2 (same plaintext, new IV) -> locked B -> decrypt: collision drops/absorbs A.
+    await act(async () => upload(envelope2, { kind: 'file', filename: 'e2.json' }));
+    const lockedB = props().collection.items.find((i: any) => i.payload.encryptedEnvelope);
+    await act(async () => {
+      props().onDecrypted(lockedB, plaintext);
+    });
+    expect(props().collection.items).toHaveLength(1);
+    const survivor = props().collection.items[0].instanceId;
+
+    // Re-ingest envelope 1: its alias must have followed the merge, so no new locked card.
+    await act(async () => upload(envelope1, { kind: 'file', filename: 'e1-again.json' }));
+    expect(props().collection.items).toHaveLength(1);
+    expect(props().collection.items[0].instanceId).toBe(survivor);
+    expect(props().collection.items[0].payload.encryptedEnvelope).toBeUndefined();
   });
 });

@@ -42,3 +42,12 @@ export function resolveBoundInstance<P, R>(
   if (!instanceId) return undefined;
   return items.find((item) => item.instanceId === instanceId);
 }
+
+/** Returns new bindings with every URL that pointed at fromId now pointing at toId (#813 merge). */
+export function remapUrlBindings(bindings: UrlBindings, fromId: InstanceId, toId: InstanceId): UrlBindings {
+  const next = new Map(bindings);
+  for (const [url, instanceId] of next) {
+    if (instanceId === fromId) next.set(url, toId);
+  }
+  return next;
+}

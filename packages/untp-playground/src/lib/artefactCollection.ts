@@ -126,3 +126,89 @@ export function commitResult<P, R>(
   items[index] = { ...items[index], result: args.result };
   return { state: { items }, applied: true };
 }
+
+/**
+ * Replaces a slot's payload in place and clears its run state (#813): the instance identity
+ * survives (bindings keep pointing at it) while the result and run token reset, so the standard
+ * begin-a-run-when-unstarted effect starts the pipeline over the new payload. Returns the state
+ * unchanged when the instance is not present.
+ */
+export function replacePayload<P, R>(
+  state: CollectionState<P, R>,
+  instanceId: InstanceId,
+  payload: P,
+  contentHash: string,
+): { state: CollectionState<P, R>; replaced: boolean } {
+  const index = state.items.findIndex((item) => item.instanceId === instanceId);
+  if (index === -1) return { state, replaced: false };
+  const items = [...state.items];
+  items[index] = { instanceId, contentHash, payload, runId: null, result: undefined };
+  return { state: { items }, replaced: true };
+}
+
+/**
+ * Decrypt-collision merge for a COMPLETED twin (#813): the locked slot that was just decrypted
+ * keeps its identity, provenance and position, adopts the twin's finished result (the caller
+ * prepends the successful Decryption step), and the twin is removed in the same transition so
+ * one-slot-per-hash never breaks even transiently. Fails open (absorbed: false, state unchanged)
+ * when either slot is missing.
+ */
+export function absorbTwin<P, R>(
+  state: CollectionState<P, R>,
+  instanceId: InstanceId,
+  twinInstanceId: InstanceId,
+  payload: P,
+  contentHash: string,
+  result: R,
+  mintRunId: () => RunId,
+): { state: CollectionState<P, R>; absorbed: boolean } {
+  const index = state.items.findIndex((item) => item.instanceId === instanceId);
+  const twinIndex = state.items.findIndex((item) => item.instanceId === twinInstanceId);
+  if (index === -1 || twinIndex === -1) return { state, absorbed: false };
+  const items = state.items.filter((item) => item.instanceId !== twinInstanceId);
+  const newIndex = items.findIndex((item) => item.instanceId === instanceId);
+  items[newIndex] = { instanceId, contentHash, payload, runId: mintRunId(), result };
+  return { state: { items }, absorbed: true };
+}
+
+/**
+ * Applies a successful decrypt atomically (#813): looks the content-hash twin up in the CURRENT
+ * state (never a render closure), then either absorbs a settled twin (the decrypting slot keeps
+ * its identity and adopts the twin's finished result behind the given leading step, the twin
+ * removed in the same transition) or replaces in place, dropping a still-running twin whose work
+ * is not worth preserving. The caller remaps URL bindings and envelope aliases from `twinId`.
+ */
+export function admitDecrypted<P, R extends unknown[]>(
+  state: CollectionState<P, R>,
+  args: {
+    instanceId: InstanceId;
+    payload: P;
+    contentHash: string;
+    leadingStep: R[number];
+    isTerminal: (result: R | undefined) => boolean;
+    leadsWithDecryption: (result: R) => boolean;
+    mintRunId: () => RunId;
+  },
+): {
+  state: CollectionState<P, R>;
+  outcome: { kind: 'absorbed' | 'replaced'; twinId?: InstanceId } | { kind: 'missing' };
+} {
+  const { instanceId, payload, contentHash, leadingStep, isTerminal, leadsWithDecryption, mintRunId } = args;
+  const index = state.items.findIndex((item) => item.instanceId === instanceId);
+  if (index === -1) return { state, outcome: { kind: 'missing' } };
+  const twin = state.items.find((item) => item.instanceId !== instanceId && item.contentHash === contentHash);
+
+  if (twin && twin.result !== undefined && isTerminal(twin.result)) {
+    // A twin that was itself decrypted earlier already leads with a Decryption step; do not stack a second.
+    const result = (leadsWithDecryption(twin.result) ? [...twin.result] : [leadingStep, ...twin.result]) as R;
+    const items = state.items.filter((item) => item.instanceId !== twin.instanceId);
+    const newIndex = items.findIndex((item) => item.instanceId === instanceId);
+    items[newIndex] = { instanceId, contentHash, payload, runId: mintRunId(), result };
+    return { state: { items }, outcome: { kind: 'absorbed', twinId: twin.instanceId } };
+  }
+
+  const items = state.items.filter((item) => item.instanceId === instanceId || item.instanceId !== twin?.instanceId);
+  const newIndex = items.findIndex((item) => item.instanceId === instanceId);
+  items[newIndex] = { instanceId, contentHash, payload, runId: null, result: undefined };
+  return { state: { items }, outcome: { kind: 'replaced', twinId: twin?.instanceId } };
+}

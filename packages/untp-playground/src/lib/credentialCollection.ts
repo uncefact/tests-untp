@@ -54,6 +54,8 @@ export function credentialTypeLabel(type: string): string {
  * Record, Anchor, Event), so a simple suffix is correct for the grouped types.
  */
 export function credentialGroupLabel(type: string, count: number): string {
+  // The locked group (#813) is not a credential type; its label pluralises the noun, not the tag.
+  if (type === 'Encrypted') return count === 1 ? 'Encrypted credential' : 'Encrypted credentials';
   const label = credentialTypeLabel(type);
   return count === 1 ? label : `${label}s`;
 }

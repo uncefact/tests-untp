@@ -42,7 +42,7 @@ interface LinkSetTestResultsProps {
   onVerifyCredential: (
     rawArtefact: unknown,
     source: ArtefactSource,
-  ) => { accepted: false; encrypted?: true } | { accepted: true; instanceId: string };
+  ) => { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true };
   /**
    * Resolves a secondary identity resolver link as a new link set card (#974): the same flow as
    * submitting the URL through the resolve input, owned by the page so identity and replace
@@ -166,7 +166,7 @@ function LinkSetCard({
   onVerifyCredential: (
     rawArtefact: unknown,
     source: ArtefactSource,
-  ) => { accepted: false; encrypted?: true } | { accepted: true; instanceId: string };
+  ) => { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true };
   onResolveSecondary: (href: string) => Promise<void>;
   fetchingHrefs: ReadonlySet<string>;
   setHrefFetching: (href: string, fetching: boolean) => void;
@@ -331,16 +331,20 @@ function LinkedCredentialRowView({
   onVerifyCredential: (
     rawArtefact: unknown,
     source: ArtefactSource,
-  ) => { accepted: false; encrypted?: true } | { accepted: true; instanceId: string };
+  ) => { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true };
   isFetching: boolean;
   setFetching: (fetching: boolean) => void;
   discoveredEncrypted: boolean;
   setDiscoveredEncrypted: (discovered: boolean) => void;
 }) {
   const instance = resolveBoundInstance(urlBindings, row.href, credentialItems);
+  const locked = instance?.payload.encryptedEnvelope === true;
   const steps = instance?.result ?? [];
   const settled = steps.length > 0 && steps.every((step) => TERMINAL_STATUSES.includes(step.status));
   const failed = settled && steps.some((step) => step.status === TestCaseStatus.FAILURE);
+  // The bound instance is the strongest encryption evidence: locked shows the tag, and a
+  // successfully decrypted (no longer locked) instance overrides an earlier fetch-time discovery.
+  const showEncryptedTag = row.encrypted || (instance ? locked : discoveredEncrypted);
 
   const handleVerify = async () => {
     setFetching(true);
@@ -351,16 +355,20 @@ function LinkedCredentialRowView({
         return;
       }
       const outcome = onVerifyCredential(result.credential, { kind: 'url', url: row.href, via: 'link-set' });
-      if (outcome.accepted) {
+      if (outcome.accepted && outcome.alreadyDecrypted) {
+        // A known envelope rebinding to its decrypted instance: no pipeline restarted, so neither
+        // the verifying nor the key toast would be honest.
+        setDiscoveredEncrypted(false);
+        toast.info('This credential was already decrypted and verified on the Credentials tab.');
+      } else if (outcome.accepted && outcome.encrypted) {
+        // The body is an encrypted envelope: it landed as a locked instance on the Credentials
+        // tab (#813); record the discovery so the tag shows here too.
+        setDiscoveredEncrypted(true);
+        toast.info('This credential is encrypted. Enter its key on the Credentials tab to decrypt and verify it.');
+      } else if (outcome.accepted) {
         // A plaintext accept is fresh evidence: drop any earlier encrypted discovery for this href.
         setDiscoveredEncrypted(false);
         toast.success(`Verifying ${row.label} in the Credentials tab`);
-      } else if (outcome.encrypted) {
-        // The link metadata did not declare encryption, but the body did: keep the discovery on
-        // the row so the tag shows without re-fetching. Ingestion has already put the warning in
-        // the details drawer.
-        setDiscoveredEncrypted(true);
-        toast.info('This credential appears to be encrypted. Decryption arrives in a later release.');
       } else {
         // The rejection details are already on the error surface (View Upload Detail); the toast
         // keeps the row's own feedback honest instead of announcing a verification that never began.
@@ -397,7 +405,7 @@ function LinkedCredentialRowView({
       <div className='min-w-0'>
         <p className='truncate text-sm font-medium'>
           {row.label}
-          {(row.encrypted || discoveredEncrypted) && (
+          {showEncryptedTag && (
             <span
               className='ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800'
               data-testid='linked-credential-encrypted'
@@ -415,6 +423,14 @@ function LinkedCredentialRowView({
         >
           <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
           Fetching...
+        </span>
+      ) : instance && locked ? (
+        <span className='flex shrink-0 items-center gap-3'>
+          <span className='text-xs text-muted-foreground' data-testid='linked-credential-locked'>
+            Encrypted in Credentials tab
+          </span>
+          {/* Re-fetch stays available: the target may have been replaced with plaintext. */}
+          {verifyAction('Verify again')}
         </span>
       ) : instance ? (
         <span className='flex shrink-0 items-center gap-3'>

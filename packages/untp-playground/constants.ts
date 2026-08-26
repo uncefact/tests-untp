@@ -98,6 +98,7 @@ export enum TestCaseStatus {
 export const TERMINAL_STATUSES = [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING, TestCaseStatus.FAILURE];
 
 export enum TestCaseStepId {
+  DECRYPTION = 'decryption',
   PROOF_TYPE = 'proof-type',
   VCDM_VERSION = 'vcdm-version',
   VCDM_SCHEMA_VALIDATION = 'vcdm-schema-validation',
@@ -133,6 +134,12 @@ export const API_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 // The playground's docs are their own independently versioned docs instance on the documentation
 // site; operators point this at the deployed page, and the fallback is the same page in the
 // repository so the link is never dead.
+// The docs page stating which encryption methods the Playground can decrypt, with the path for
+// requesting support for others. Same operator-override pattern as the credential-links page.
+export const DECRYPTION_DOCS_URL =
+  process.env.NEXT_PUBLIC_DECRYPTION_DOCS_URL ||
+  'https://github.com/uncefact/tests-untp/blob/next/documentation/docs-playground/decrypting-encrypted-credentials.md';
+
 export const CREDENTIAL_LINKS_DOCS_URL =
   process.env.NEXT_PUBLIC_CREDENTIAL_LINKS_DOCS_URL ||
   'https://github.com/uncefact/tests-untp/blob/next/documentation/docs-playground/identifying-untp-credential-links.md';
