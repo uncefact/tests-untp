@@ -27,6 +27,7 @@ import {
 import { paginationMetaSchema } from '@/lib/api/pagination';
 import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
 import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
+import { CredentialDetailsError, CredentialDetailsStatus } from '@/lib/prisma/generated';
 import {
   conformitySchemeSummarySchema,
   conformityProfileSummarySchema,
@@ -56,7 +57,7 @@ export const credentialWarningSchema = z.object({
   code: z
     .string()
     .describe(
-      'Warning code. Publishing codes: `REFS_EXTRACTION_FAILED` (no identifier could be read from the payload), `PUBLISH_REFERENCE_MISSING` (the payload carries no identifier to publish under), `PUBLISH_SCHEME_INCOMPLETE` (the identifier resolved to a scheme missing a primary key or registrar namespace), `PUBLISH_IDENTIFIER_UNKNOWN` (no identifier registered for the value), `PUBLISH_IDENTIFIER_AMBIGUOUS` (the value exists under more than one scheme; set publishingOptions.identifierSchemeId), `PUBLISH_IDR_UNAVAILABLE` (no identity resolver service is configured), `PUBLISH_TARGET_UNRESOLVED` (the identifier lookup itself failed), `IDR_PUBLISH_FAILED` (the resolver rejected the links), `IDR_PUBLISH_UNCONFIRMED` (the resolver could not be reached, so whether the links were registered is unknown), `DB_STATUS_UPDATE_FAILED` (the links are live but the stored status was not saved). `ENTITY_LINK_FAILED` reports that the credential could not be linked to a master-data record, which does not affect publishing.',
+      'Warning code. Publishing codes: `REFS_EXTRACTION_FAILED` (no identifier could be read from the payload), `PUBLISH_REFERENCE_MISSING` (the payload carries no identifier to publish under), `PUBLISH_SCHEME_INCOMPLETE` (the identifier resolved to a scheme missing a primary key or registrar namespace), `PUBLISH_IDENTIFIER_UNKNOWN` (no identifier registered for the value), `PUBLISH_IDENTIFIER_AMBIGUOUS` (the value exists under more than one scheme; set publishingOptions.identifierSchemeId), `PUBLISH_IDR_UNAVAILABLE` (no identity resolver service is configured), `PUBLISH_TARGET_UNRESOLVED` (the identifier lookup itself failed), `IDR_PUBLISH_FAILED` (the resolver rejected the links), `IDR_PUBLISH_UNCONFIRMED` (the resolver could not be reached, so whether the links were registered is unknown), `DB_STATUS_UPDATE_FAILED` (the links are live but the stored status was not saved). `ENTITY_LINK_FAILED` reports that the credential could not be linked to a master-data record, which does not affect publishing.. `DETAILS_EXTRACTION_FAILED` means the credential was issued but its descriptive fields could not be read from it',
     ),
   message: z.string().describe('Human-readable warning message'),
   received: z.unknown().optional().describe('The value that triggered the warning, where one applies'),
@@ -74,6 +75,18 @@ export const credentialIssueResponseSchema = z.object({
   warnings: z.array(credentialWarningSchema).optional().describe('Advisory warnings (e.g. publishing failures)'),
 });
 
+/**
+ * Every descriptive field captured at issue time (#952) shares the same null
+ * reason: the credential carried none, or it has not been read yet.
+ * `extraAbsenceReason` adds a field-specific reason ahead of that shared one.
+ */
+function describeCapturedField(subject: string, extraAbsenceReason?: string): string {
+  const carriesNone = extraAbsenceReason
+    ? `the credential carries no usable value there or ${extraAbsenceReason}`
+    : 'the credential carries no usable value there';
+  return `${subject} read from the signed credential at issue time (null if ${carriesNone}; unknown rather than absent while detailsStatus is not EXTRACTED)`;
+}
+
 /** Credential resource as returned by GET /credentials and GET /credentials/:id. */
 export const credentialSchema = z.object({
   id: z.string().describe('Database ID'),
@@ -86,6 +99,46 @@ export const credentialSchema = z.object({
   organisationId: z.string().nullable().describe('ID of the linked organisation entity (null if none)'),
   facilityId: z.string().nullable().describe('ID of the linked facility entity (null if none)'),
   productId: z.string().nullable().describe('ID of the linked product entity (null if none)'),
+  name: z.string().nullable().describe(describeCapturedField('Credential name')),
+  issuerName: z.string().nullable().describe(describeCapturedField('Issuer name')),
+  issuerDid: z.string().nullable().describe(describeCapturedField('Issuer DID')),
+  subjectName: z
+    .string()
+    .nullable()
+    .describe(
+      describeCapturedField(
+        "Subject name (read where the credential's data model places it; the first subject when the credential carries several)",
+      ),
+    ),
+  subjectId: z
+    .string()
+    .nullable()
+    .describe(
+      describeCapturedField(
+        "Subject id (read where the credential's data model places it; the first subject when the credential carries several)",
+      ),
+    ),
+  validFrom: z
+    .string()
+    .datetime()
+    .nullable()
+    .describe(describeCapturedField('ISO 8601 datetime when the credential becomes valid')),
+  validUntil: z
+    .string()
+    .datetime()
+    .nullable()
+    .describe(describeCapturedField('ISO 8601 datetime when the credential expires')),
+  detailsStatus: z
+    .nativeEnum(CredentialDetailsStatus)
+    .describe(
+      'Whether the descriptive fields were read from the signed credential (EXTRACTED), have not been read yet (EXTRACTION_PENDING), or could not be read (EXTRACTION_FAILED). EXTRACTED means the read ran, so a null field there is a value the credential does not carry. Under the other two a null field is unknown rather than known to be absent',
+    ),
+  detailsError: z
+    .nativeEnum(CredentialDetailsError)
+    .nullable()
+    .describe(
+      'Why the descriptive fields could not be read, when detailsStatus is EXTRACTION_FAILED. `UNREADABLE_ENVELOPE` means the signed credential could not be decoded, `BRIDGE_ERROR` that its data model could not be read, and `DECRYPT_FAILED` that a stored credential could not be opened. Null in every other state',
+    ),
   createdAt: z.string().datetime().describe('ISO 8601 timestamp'),
   updatedAt: z.string().datetime().describe('ISO 8601 timestamp'),
 });

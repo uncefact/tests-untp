@@ -237,6 +237,7 @@ When publishing cannot complete, the credential is still issued and returned, an
 | `IDR_PUBLISH_UNCONFIRMED` | The resolver could not be reached or did not answer, so whether the links were registered is unknown. | Ask your operator to check the resolver before issuing again: a second publish of the same links is rejected as a duplicate. |
 | `DB_STATUS_UPDATE_FAILED` | The links are live on the resolver, but the stored published status could not be saved. | The credential is discoverable; only the local status is stale. |
 | `ENTITY_LINK_FAILED` | The credential could not be linked to its master-data record, which no longer exists. | Optional enrichment only; publishing and the credential itself are unaffected. |
+| `DETAILS_EXTRACTION_FAILED` | The credential's name, issuer, subject and validity dates could not be read from it, so they are not recorded against it. | The credential can be retrieved and verified as usual. Only its stored summary is missing. The warning names the correlation ID to quote to your operator, who can find the cause in the logs. |
 
 The IDR entry's `description` field is taken from the linked primary entity's `description`, falling back to the entity's `name`, and then to the link title (`publishingOptions.linkTitle`, or the data model's name) when no entity is linked, since the resolver requires a non-empty description.
 
@@ -323,7 +324,7 @@ Pagination values must be plain decimal integers, and a repeated query parameter
 GET /api/v1/credentials/{id}
 ```
 
-Retrieves a specific credential record by its database ID. The response includes the storage URI, hash, decryption key (if encrypted), credential type, published status, and linked entity IDs.
+Retrieves a specific credential record by its database ID. The response includes the storage URI, hash, decryption key (if encrypted), credential type, published status, linked entity IDs, and the descriptive fields (name, issuer, subject, validity period) read from the signed credential at issue time. See the `detailsStatus` field in the Swagger schema for what a null descriptive field means on a given row.
 
 ## Verification Endpoint
 

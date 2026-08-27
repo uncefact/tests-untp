@@ -1,8 +1,9 @@
 import { isForeignKeyViolationOn } from '@/lib/prisma/db-errors';
-import { Credential, Prisma } from '../generated';
+import { Credential, CredentialDetailsError, CredentialDetailsStatus, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
 
 /**
  * Input for creating a new credential record
@@ -17,7 +18,26 @@ export type CreateCredentialInput = {
   organisationId?: string;
   facilityId?: string;
   productId?: string;
-};
+} & CredentialDetailsInput;
+
+/**
+ * The outcome of reading a signed credential's descriptive fields (#952).
+ *
+ * The three branches are the only rows that make sense, so a half-written one
+ * cannot be expressed. Fields without `EXTRACTED` would leave a populated row
+ * claiming its details had never been read; `EXTRACTED` without fields would
+ * claim a read that never happened; and a failure carries the reason that says
+ * what a later run should do about it. Passing none of them leaves the columns
+ * null, with `detailsStatus` at its database default of `EXTRACTION_PENDING`.
+ */
+export type CredentialDetailsInput =
+  | { details: CredentialDetails; detailsStatus: typeof CredentialDetailsStatus.EXTRACTED; detailsError?: undefined }
+  | {
+      details?: undefined;
+      detailsStatus: typeof CredentialDetailsStatus.EXTRACTION_FAILED;
+      detailsError: CredentialDetailsError;
+    }
+  | { details?: undefined; detailsStatus?: undefined; detailsError?: undefined };
 
 /**
  * Options for listing credentials
@@ -55,6 +75,9 @@ export async function createCredential(
     decryptionKey: input.decryptionKey,
     credentialType: input.credentialType,
     isPublished: input.isPublished ?? false,
+    ...input.details,
+    detailsStatus: input.detailsStatus,
+    detailsError: input.detailsError,
   };
 
   try {
