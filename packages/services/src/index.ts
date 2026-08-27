@@ -147,6 +147,7 @@ export { decodeCredential } from './verifiable-credential/common/decode-credenti
 // ── Data model bridges ──────────────────────────────────────────────────────
 export type {
   IDataModelBridge,
+  SubjectSummary,
   ExtractedRefs,
   ConformityRefs,
   ConformityInput,

@@ -195,6 +195,8 @@ export type UNTPVerifiableCredential = {
   type: VCType;
   /** Unique identifier for this credential (URI) */
   id: string;
+  /** Human-readable name for the credential (required from UNTP 0.7.0) */
+  name?: string;
   /** The party that issued this credential */
   issuer: CredentialIssuer;
   /** The subject(s) of the credential - single object for DPP/DFR/DCC, array for DTE */

@@ -1,5 +1,6 @@
 export type {
   IDataModelBridge,
+  SubjectSummary,
   ExtractedRefs,
   ConformityRefs,
   ConformityInput,

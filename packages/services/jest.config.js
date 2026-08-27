@@ -23,6 +23,10 @@ const jestConfig = {
     // the SSRF guard run for real in verify-did-web's tests); ts-jest
     // transforms it like this package's own sources.
     '^@uncefact/untp-utils/node$': '<rootDir>/../untp-utils/src/node/index.ts',
+    // /common is mapped to its TypeScript source for the same reason as /node:
+    // these are dependency-free helpers that should run for real in tests, and
+    // ts-jest transforms them like this package's own sources.
+    '^@uncefact/untp-utils/common$': '<rootDir>/../untp-utils/src/common/index.ts',
     // Mapped to a CJS stub (not the ESM build) so suites that transitively
     // import the resolver can load; see the stub's header for the contract.
     '^@uncefact/untp-utils/resolvers$': '<rootDir>/__tests__/mocks/resolvers.ts',
