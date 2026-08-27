@@ -1,9 +1,18 @@
 /**
- * Returns `value` if it is a non-empty string, otherwise `undefined`.
- * Useful inside parsers that emit a structured failure separately when a
- * required field is missing or malformed, so the type check and the
- * failure-emission policy stay decoupled.
+ * Returns `value` trimmed if it is a string with non-whitespace content,
+ * otherwise `undefined`.
+ *
+ * Surrounding whitespace is never meaningful in the values this reads (names,
+ * identifiers, labels), and a whitespace-only string carries no more
+ * information than an absent one, so both collapse to `undefined`.
+ *
+ * `undefined` rather than `null` because this reports what a document does
+ * not contain. Recording that absence as a stored or transmitted value is a
+ * separate decision, made by the caller at the boundary where a read becomes
+ * a row or a response.
  */
 export function asNonEmptyString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
