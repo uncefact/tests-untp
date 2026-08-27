@@ -9,6 +9,10 @@
       "types": "./build/index.d.ts",
       "default": "./build/index.js"
     },
+    "./common": {
+      "types": "./build/common/index.d.ts",
+      "default": "./build/common/index.js"
+    },
     "./artefacts": {
       "types": "./build/artefacts/index.d.ts",
       "default": "./build/artefacts/index.js"
@@ -71,6 +75,9 @@
       ],
       "http-headers": [
         "./build/http-headers/index.d.ts"
+      ],
+      "common": [
+        "./build/common/index.d.ts"
       ]
     }
   },

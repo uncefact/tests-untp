@@ -1,4 +1,5 @@
 import type { IDataModelBridge, VersionSpec } from './types.js';
+import { extractGenericSubjectSummary } from './primitives/subject-summary.js';
 
 export function makeBridge(spec: VersionSpec): IDataModelBridge {
   return {
@@ -7,6 +8,11 @@ export function makeBridge(spec: VersionSpec): IDataModelBridge {
     },
     extractRefs(subject) {
       return spec.extractor(subject);
+    },
+    extractSubjectSummary(subject) {
+      return spec.subjectSummaryExtractor
+        ? spec.subjectSummaryExtractor(subject)
+        : extractGenericSubjectSummary(subject);
     },
     extractConformityClaim(subject) {
       if (spec.conformityClaimExtractor) return spec.conformityClaimExtractor(subject);

@@ -72,6 +72,38 @@ describe('makeBridge', () => {
 
     expect(typeof bridge.buildSubject).toBe('function');
     expect(typeof bridge.extractRefs).toBe('function');
+    expect(typeof bridge.extractSubjectSummary).toBe('function');
+  });
+
+  describe('extractSubjectSummary', () => {
+    it('applies the generic top-level id and name rule when the spec has no override', () => {
+      const spec: VersionSpec = { builder: jest.fn(), extractor: jest.fn() };
+
+      expect(makeBridge(spec).extractSubjectSummary({ id: 'https://example.com/s/1', name: 'Widget' })).toEqual({
+        id: 'https://example.com/s/1',
+        name: 'Widget',
+      });
+    });
+
+    it('returns nulls for missing top-level fields and does not fall back to a nested product', () => {
+      const spec: VersionSpec = { builder: jest.fn(), extractor: jest.fn() };
+
+      expect(
+        makeBridge(spec).extractSubjectSummary({
+          product: { id: 'https://example.com/p/1', name: 'Nested' },
+        }),
+      ).toEqual({ id: undefined, name: undefined });
+    });
+
+    it('delegates to spec.subjectSummaryExtractor when set', () => {
+      const subjectSummaryExtractor = jest.fn().mockReturnValue({ id: 'override-id', name: 'override-name' });
+      const spec: VersionSpec = { builder: jest.fn(), extractor: jest.fn(), subjectSummaryExtractor };
+
+      const result = makeBridge(spec).extractSubjectSummary(mockSubject);
+
+      expect(subjectSummaryExtractor).toHaveBeenCalledWith(mockSubject);
+      expect(result).toEqual({ id: 'override-id', name: 'override-name' });
+    });
   });
 
   describe('conformity claim provenance', () => {

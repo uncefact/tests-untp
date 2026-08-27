@@ -72,6 +72,8 @@ The version spec pairs the builder and extractor together. Create an `index.ts` 
 
 If the credential type carries a conformity claim (currently Digital Conformity Credential), also write a conformity claim extractor and wire it into the spec as `conformityClaimExtractor`, or `conformityClaimProvenanceExtractor` if it also records where each projected value came from. A version spec that omits both fields gets no CVC validation for that version, silently: the bridge returns `null` from `extractConformityClaim` and `extractConformityClaimWithProvenance` rather than raising an error.
 
+Also check where this version's schema puts the subject's own `id` and display name. Read the schema rather than the builder for this one: issuance captures these fields from the payload a caller submitted, which the builder may have had no part in producing. Most versions need no action here, because a version spec that omits `subjectSummaryExtractor` falls back to reading the credential subject's top-level `id` and `name`, which is where most schemas put them. Set `subjectSummaryExtractor` only when this version's schema nests those fields inside a sub-object (as DPP `0.6.x` and DFR `0.6.x` do) or names the display field something other than `name` (as DIA `0.7.0`'s `registeredName` does). It receives the subject as the credential carries it, so a version whose subject can be an array also decides there which element a library row describes; the default is the first.
+
 If reusing functions from a previous version, the delta pattern makes this straightforward — import the previous version's functions and override only what changed.
 
 ### 5. Register in the bridge registry

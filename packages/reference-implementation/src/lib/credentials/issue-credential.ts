@@ -1,16 +1,23 @@
-import type {
-  CredentialPayload,
-  ExtractedRefs,
-  IVerifiableCredentialService,
-  IStorageService,
-  StorageRecord,
+import {
+  decodeCredential,
+  type CredentialPayload,
+  type EnvelopedVerifiableCredential,
+  type ExtractedRefs,
+  type IDataModelBridge,
+  type UNTPVerifiableCredential,
+  type IVerifiableCredentialService,
+  type IStorageService,
+  type StorageRecord,
 } from '@uncefact/untp-ri-services';
 import type { ResolvedService } from '@/lib/services/resolve-service';
 import { createCredential } from '@/lib/prisma/repositories';
+import { CredentialDetailsError, CredentialDetailsStatus } from '@/lib/prisma/generated';
 import { protectDecryptionKey } from './decryption-key-protection';
 import { resolvePrimaryEntity } from '@/lib/entities/resolve-primary-entity';
 import type { PrimaryEntityResult } from '@/lib/entities/resolve-primary-entity';
 import { apiLogger } from '@/lib/api/logger';
+import { extractCredentialDetails } from './extract-credential-details';
+import type { CredentialDetailsInput } from '@/lib/prisma/repositories/credential.repository';
 
 const logger = apiLogger.child({ module: 'issue-credential' });
 
@@ -24,6 +31,7 @@ export type IssueCredentialInput = {
   storageOptions: {
     encrypt?: boolean;
   };
+  bridge: IDataModelBridge;
 };
 
 export type IssueCredentialResult = {
@@ -36,15 +44,75 @@ export type IssueCredentialResult = {
    * enrichment only (ADR-044): the caller is told, and issuance still succeeds.
    */
   entityLinkFailed: boolean;
+  /**
+   * True when the signed credential's descriptive fields could not be read,
+   * so the row carries no name, issuer, subject or dates and records why.
+   * Advisory enrichment only, on the same terms as {@link entityLinkFailed}:
+   * the caller is told, and issuance still succeeds.
+   */
+  detailsExtractionFailed: boolean;
 };
 
+/**
+ * What reading a signed credential's descriptive fields produced.
+ *
+ * A failure never stops issuance. The credential has been signed by this
+ * point, and these fields are enrichment for a later list view, so losing
+ * them must not destroy a credential that exists. This is the rule ADR-044
+ * already applies to entity links. The row records that the read failed and
+ * why, and the caller is told through {@link IssueCredentialResult}.
+ */
+type DetailsCapture = CredentialDetailsInput & { failed: boolean };
+
+function readCredentialDetails(
+  signedCredential: EnvelopedVerifiableCredential,
+  bridge: IDataModelBridge,
+): DetailsCapture {
+  let decoded: UNTPVerifiableCredential;
+  try {
+    const payload = decodeCredential(signedCredential);
+    if (payload === null || typeof payload !== 'object') {
+      throw new Error('decoded payload is not an object');
+    }
+    decoded = payload;
+  } catch (error) {
+    // The signing adapter produced an envelope this service cannot read back,
+    // which is an inconsistency between the two rather than a caller fault.
+    logger.error({ err: error }, 'Signed credential could not be decoded; descriptive fields not read');
+    return {
+      detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED,
+      detailsError: CredentialDetailsError.UNREADABLE_ENVELOPE,
+      failed: true,
+    };
+  }
+
+  try {
+    return {
+      details: extractCredentialDetails(decoded, bridge),
+      detailsStatus: CredentialDetailsStatus.EXTRACTED,
+      failed: false,
+    };
+  } catch (error) {
+    // A bridge that throws is a defect in that data model version, so the
+    // reason names the bridge: re-reading after a fix is what resolves it.
+    logger.error({ err: error }, 'Data-model bridge threw while reading the credential subject');
+    return {
+      detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED,
+      detailsError: CredentialDetailsError.BRIDGE_ERROR,
+      failed: true,
+    };
+  }
+}
+
 export async function issueCredential(input: IssueCredentialInput): Promise<IssueCredentialResult> {
-  const { tenantId, credentialPayload, credentialType, refs, vcService, storageService, storageOptions } = input;
+  const { tenantId, credentialPayload, credentialType, refs, vcService, storageService, storageOptions, bridge } =
+    input;
 
   const shouldEncrypt = storageOptions.encrypt !== false;
 
   logger.info({ tenantId, vcInstanceId: vcService.instanceId }, 'Signing credential');
   const signedCredential = await vcService.service.sign(credentialPayload);
+  const { failed: detailsExtractionFailed, ...details } = readCredentialDetails(signedCredential, bridge);
 
   logger.info({ tenantId, storageInstanceId: storageService.instanceId, shouldEncrypt }, 'Storing credential');
   const storageResponse = await storageService.service.store(signedCredential, shouldEncrypt);
@@ -63,6 +131,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     organisationId: primaryEntity.organisationId,
     facilityId: primaryEntity.facilityId,
     productId: primaryEntity.productId,
+    ...details,
   });
 
   logger.info({ tenantId, credentialId: credentialRecord.id }, 'Credential issued and stored');
@@ -79,5 +148,6 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     storageResponse,
     primaryEntity,
     entityLinkFailed,
+    detailsExtractionFailed,
   };
 }

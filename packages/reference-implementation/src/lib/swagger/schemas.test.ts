@@ -1,5 +1,6 @@
 import { ServiceType, AdapterType } from '@uncefact/untp-ri-services';
 import { generateOpenAPISchemas } from './schemas';
+import { CredentialDetailsStatus } from '@/lib/prisma/generated';
 
 /**
  * Minimal shape for navigating the generated OpenAPI JSON schema in these
@@ -13,6 +14,7 @@ type JsonSchemaObject = {
   items?: JsonSchemaObject;
   nullable?: boolean;
   enum?: string[];
+  description?: string;
 };
 
 /**
@@ -458,5 +460,30 @@ describe('generateOpenAPISchemas — Product component', () => {
     expect(parent?.properties).not.toHaveProperty('secondaryIdentifiers');
     expect(parent?.properties).not.toHaveProperty('producedByOrganisation');
     expect(parent?.properties).not.toHaveProperty('manufacturingFacility');
+  });
+});
+
+describe('generateOpenAPISchemas — Credential descriptive fields (#952)', () => {
+  const credential = (generateOpenAPISchemas() as Record<string, JsonSchemaObject>).Credential;
+
+  it('documents detailsStatus with exactly the Prisma enum members', () => {
+    // Derived from the enum rather than restated, so a renamed member cannot
+    // leave the published contract describing a value the database no longer
+    // stores. Fails if the two ever disagree in either direction.
+    expect(credential.properties?.detailsStatus?.enum?.sort()).toEqual(Object.values(CredentialDetailsStatus).sort());
+  });
+
+  it('documents every captured field as nullable', () => {
+    for (const field of ['name', 'issuerName', 'issuerDid', 'subjectName', 'subjectId', 'validFrom', 'validUntil']) {
+      expect(credential.properties?.[field]?.nullable).toBe(true);
+    }
+  });
+
+  it('documents that subject fields are read where the data model places them, and which subject is described', () => {
+    for (const field of ['subjectName', 'subjectId']) {
+      const description = credential.properties?.[field]?.description ?? '';
+      expect(description).toContain("read where the credential's data model places it");
+      expect(description).toContain('the first subject when the credential carries several');
+    }
   });
 });

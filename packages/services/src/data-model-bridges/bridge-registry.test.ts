@@ -1,4 +1,5 @@
 import { getBridge } from './bridge-registry.js';
+import { createBridgeEntities, createFacility, createOrganisation, createProduct } from './__fixtures__/entities.js';
 
 describe('bridge-registry', () => {
   describe('getBridge', () => {
@@ -38,6 +39,54 @@ describe('bridge-registry', () => {
 
     it('returns undefined for an unknown version', () => {
       expect(getBridge('DigitalProductPassport', '999.0.0')).toBeUndefined();
+    });
+
+    it.each(['0.6.0', '0.6.1'])(
+      'DPP %s extracts product.id and product.name from a builder-produced subject',
+      (version) => {
+        const bridge = getBridge('DigitalProductPassport', version)!;
+        const subject = bridge.buildSubject(
+          createBridgeEntities({
+            product: createProduct({ id: 'did:web:example.com:product:1', name: 'My Product' }),
+          }),
+        );
+
+        expect(bridge.extractSubjectSummary(subject)).toEqual({
+          id: 'did:web:example.com:product:1',
+          name: 'My Product',
+        });
+      },
+    );
+
+    it.each(['0.6.0', '0.6.1'])(
+      'DFR %s extracts facility.id and facility.name from a builder-produced subject',
+      (version) => {
+        const bridge = getBridge('DigitalFacilityRecord', version)!;
+        const subject = bridge.buildSubject(
+          createBridgeEntities({
+            facility: createFacility({ id: 'did:web:example.com:facility:1', name: 'My Facility' }),
+          }),
+        );
+
+        expect(bridge.extractSubjectSummary(subject)).toEqual({
+          id: 'did:web:example.com:facility:1',
+          name: 'My Facility',
+        });
+      },
+    );
+
+    it('DIA 0.7.0 extracts id and registeredName from a builder-produced subject', () => {
+      const bridge = getBridge('DigitalIdentityAnchor', '0.7.0')!;
+      const subject = bridge.buildSubject(
+        createBridgeEntities({
+          organisation: createOrganisation({ id: 'did:web:example.com:org:1', name: 'ACME Corp' }),
+        }),
+      );
+
+      expect(bridge.extractSubjectSummary(subject)).toEqual({
+        id: 'did:web:example.com:org:1',
+        name: 'ACME Corp',
+      });
     });
 
     it.each([

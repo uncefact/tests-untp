@@ -28,6 +28,21 @@ enum DidStatus {
   VERIFICATION_FAILED
 }
 
+enum CredentialDetailsStatus {
+  EXTRACTED
+  EXTRACTION_PENDING
+  EXTRACTION_FAILED
+}
+
+/// Why a credential's descriptive fields could not be read (#952). Recorded
+/// beside EXTRACTION_FAILED so a later run can tell what is worth retrying:
+/// a code fix for a bad envelope or bridge, a restored key for a decrypt.
+enum CredentialDetailsError {
+  UNREADABLE_ENVELOPE
+  BRIDGE_ERROR
+  DECRYPT_FAILED
+}
+
 enum ServiceType {
   IDR
   STORAGE
@@ -130,6 +145,15 @@ model Credential {
   organisationId  String?
   facilityId      String?
   productId       String?
+  name            String?
+  issuerName      String?
+  issuerDid       String?
+  subjectName     String?
+  subjectId       String?
+  validFrom       DateTime?
+  validUntil      DateTime?
+  detailsStatus   CredentialDetailsStatus @default(EXTRACTION_PENDING)
+  detailsError    CredentialDetailsError?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

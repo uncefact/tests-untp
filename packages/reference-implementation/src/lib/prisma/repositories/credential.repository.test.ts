@@ -137,6 +137,88 @@ describe('credential.repository', () => {
       ).rejects.toBe(other);
       expect(mockCredential.create).toHaveBeenCalledTimes(1);
     });
+
+    it('writes captured descriptive fields on the first create', async () => {
+      const details = {
+        name: 'Wool Passport',
+        issuerName: 'Example Issuer',
+        issuerDid: 'did:web:issuer.example',
+        subjectName: 'Merino batch',
+        subjectId: 'https://example.com/product/1',
+        validFrom: new Date('2024-01-15T00:00:00.000Z'),
+        validUntil: new Date('2025-01-15T00:00:00.000Z'),
+      };
+      // What the row must carry: the bundle flattened onto its columns.
+      const captured = { ...details, detailsStatus: 'EXTRACTED' as const };
+      mockCredential.create.mockResolvedValue({ ...SEED_CREDENTIALS[0], ...captured });
+
+      await createCredential({
+        tenantId: TENANT_ID,
+        storageUri: 'https://storage.example/credential-new',
+        digestMultibase: 'zNew',
+        credentialType: 'DigitalProductPassport',
+        organisationId: 'org-1',
+        details,
+        detailsStatus: 'EXTRACTED',
+      });
+
+      expect(mockCredential.create).toHaveBeenCalledTimes(1);
+      expect(mockCredential.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({
+          ...captured,
+          organisationId: 'org-1',
+        }),
+      );
+    });
+
+    it('writes the failure reason when the details could not be read', async () => {
+      mockCredential.create.mockResolvedValue(SEED_CREDENTIALS[0]);
+
+      await createCredential({
+        tenantId: TENANT_ID,
+        storageUri: 'https://storage.example/credential-new',
+        digestMultibase: 'zNew',
+        credentialType: 'DigitalProductPassport',
+        detailsStatus: 'EXTRACTION_FAILED',
+        detailsError: 'UNREADABLE_ENVELOPE',
+      });
+
+      expect(mockCredential.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({ detailsStatus: 'EXTRACTION_FAILED', detailsError: 'UNREADABLE_ENVELOPE' }),
+      );
+    });
+
+    it('keeps captured descriptive fields on the entity-link retry', async () => {
+      const details = {
+        name: 'Wool Passport',
+        issuerName: 'Example Issuer',
+        issuerDid: 'did:web:issuer.example',
+        subjectName: 'Merino batch',
+        subjectId: 'https://example.com/product/1',
+        validFrom: new Date('2024-01-15T00:00:00.000Z'),
+        validUntil: new Date('2025-01-15T00:00:00.000Z'),
+      };
+      // What the row must carry: the bundle flattened onto its columns.
+      const captured = { ...details, detailsStatus: 'EXTRACTED' as const };
+      mockCredential.create
+        .mockRejectedValueOnce(prismaError('P2003', 'Foreign key constraint failed on the field: `organisationId`'))
+        .mockResolvedValueOnce({ ...SEED_CREDENTIALS[0], ...captured });
+
+      await createCredential({
+        tenantId: TENANT_ID,
+        storageUri: 'https://storage.example/credential-new',
+        digestMultibase: 'zNew',
+        credentialType: 'DigitalProductPassport',
+        organisationId: 'org-1',
+        details,
+        detailsStatus: 'EXTRACTED',
+      });
+
+      expect(mockCredential.create).toHaveBeenCalledTimes(2);
+      expect(mockCredential.create.mock.calls[0][0].data).toEqual(expect.objectContaining(captured));
+      expect(mockCredential.create.mock.calls[1][0].data).toEqual(expect.objectContaining(captured));
+      expect(mockCredential.create.mock.calls[1][0].data).not.toHaveProperty('organisationId');
+    });
   });
 
   describe('updateCredentialPublished', () => {

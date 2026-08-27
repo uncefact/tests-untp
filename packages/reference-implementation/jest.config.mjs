@@ -27,6 +27,7 @@ const jestConfig = {
     // Mapped to TypeScript source (not the ESM build) so tests can
     // `jest.requireActual` the canonical SSRF guard's error classes.
     '^@uncefact/untp-utils/node$': '<rootDir>/../untp-utils/src/node/index.ts',
+    '^@uncefact/untp-utils/common$': '<rootDir>/../untp-utils/src/common/index.ts',
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
     '^@uncefact/untp-utils/loaders$': '<rootDir>/../untp-utils/build/loaders/index.js',
     '^@uncefact/untp-utils/cache$': '<rootDir>/../untp-utils/build/cache/index.js',

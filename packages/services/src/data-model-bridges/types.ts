@@ -3,6 +3,9 @@ import type { ConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary
 // Bridge-specific CredentialSubject (object-only, NOT the VC payload union)
 export type CredentialSubject = Record<string, unknown>;
 
+/** A credential's subject as carried: one subject, or several. */
+export type CredentialSubjectInput = CredentialSubject | CredentialSubject[];
+
 // ── Entity types ──────────────────────────────────────────────────────────────
 
 export type EntityIdentifier = { value: string; scheme: { id?: string; name?: string } | null };
@@ -102,11 +105,31 @@ export type ExtractedRefs = {
 
 export type ConformityRefs = NonNullable<ExtractedRefs['conformity']>;
 
+// ── Subject summary (library-row reference for one credential) ────────────────
+
+export type SubjectSummary = { id: string | undefined; name: string | undefined };
+
 // ── Bridge interface ──────────────────────────────────────────────────────────
 
 export interface IDataModelBridge<TSubject extends CredentialSubject = CredentialSubject> {
   buildSubject(entities: BridgeEntities): TSubject;
   extractRefs(subject: TSubject): ExtractedRefs;
+  /**
+   * The one subject reference a library row shows for this credential. That
+   * is the subject's own id and display name as the data model represents
+   * them. Either field is `undefined` when the subject carries no non-empty
+   * string there, because that is a statement about the document. A consumer
+   * that stores or returns the summary decides how to record the absence.
+   *
+   * The subject arrives as the credential carries it. Where that is an array
+   * (as of UNTP 0.7.0, a traceability event may carry several), the summary
+   * describes its first element. A row has one subject to show, so the choice
+   * is between showing nothing and picking one, and the first is the
+   * deterministic pick. It is a display convenience rather than a claim that
+   * this subject is the principal one, because JSON-LD treats multiple values
+   * as an unordered set. The credential remains the record of the full set.
+   */
+  extractSubjectSummary(subject: TSubject | TSubject[]): SubjectSummary;
   /**
    * Extracts the conformity claim from the subject for conformity vocabulary
    * validation, or
@@ -163,12 +186,19 @@ export type ClaimSourceMap = Record<string, string>;
 
 export type SubjectBuilder = (entities: BridgeEntities) => CredentialSubject;
 export type RefsExtractor = (subject: CredentialSubject) => ExtractedRefs;
+export type SubjectSummaryExtractor = (subject: CredentialSubjectInput) => SubjectSummary;
 export type ConformityClaimExtractor = (subject: CredentialSubject) => ConformityClaim | null;
 export type ConformityClaimProvenanceExtractor = (subject: CredentialSubject) => ConformityClaimWithProvenance | null;
 
 export interface VersionSpec {
   builder: SubjectBuilder;
   extractor: RefsExtractor;
+  /**
+   * Optional. Versions whose schema puts the subject's id or display name
+   * somewhere other than top-level `id`/`name` set this. Unset versions use
+   * the generic top-level rule.
+   */
+  subjectSummaryExtractor?: SubjectSummaryExtractor;
   /** Optional; only credential types carrying a conformity claim (DCC) set this. */
   conformityClaimExtractor?: ConformityClaimExtractor;
   /**

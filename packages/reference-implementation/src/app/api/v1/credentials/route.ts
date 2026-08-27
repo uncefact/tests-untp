@@ -10,6 +10,7 @@ import { credentialIssueRequestSchema, listCredentialsQuerySchema } from '@/lib/
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { resolveAppUrl, buildVerifyUrl } from '@/lib/config/app-url.config';
 import { apiLogger } from '@/lib/api/logger';
+import { getOrMintCorrelationId } from '@uncefact/untp-ri-services/logging';
 import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
@@ -276,15 +277,26 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // ── Step 7: Issue credential ────────────────────────────────────────────
 
   logger.info({ credentialType }, 'Issuing credential');
-  const { credentialId, storageResponse, primaryEntity, entityLinkFailed } = await issueCredential({
-    tenantId,
-    credentialPayload,
-    credentialType,
-    refs: refs ?? { organisations: [], facilities: [], products: [] },
-    vcService,
-    storageService,
-    storageOptions,
-  });
+  const { credentialId, storageResponse, primaryEntity, entityLinkFailed, detailsExtractionFailed } =
+    await issueCredential({
+      tenantId,
+      credentialPayload,
+      credentialType,
+      refs: refs ?? { organisations: [], facilities: [], products: [] },
+      vcService,
+      storageService,
+      storageOptions,
+      bridge,
+    });
+
+  if (detailsExtractionFailed) {
+    warnings.push({
+      code: 'DETAILS_EXTRACTION_FAILED' as const,
+      message:
+        'The credential was issued but its name, issuer, subject and validity dates could not be read from it, so they are not recorded against it.',
+      remediation: `The credential itself is unaffected and can be retrieved and verified as usual. Only its stored summary is missing. Quote correlation ID ${getOrMintCorrelationId()} to your operator, who can find the cause in the logs.`,
+    });
+  }
 
   if (entityLinkFailed) {
     warnings.push({

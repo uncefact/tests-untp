@@ -47,3 +47,16 @@ const registry: Record<string, Record<string, IDataModelBridge>> = {
 export function getBridge(dataModelType: string, version: string): IDataModelBridge | undefined {
   return registry[dataModelType]?.[version];
 }
+
+/**
+ * Every data model and version the registry holds a bridge for.
+ *
+ * Package-internal (not re-exported from `index.ts`): it exists so a test can
+ * assert it has a case for every registered bridge, which is what stops a
+ * newly added version from going unexercised.
+ */
+export function listBridgeVersions(): Array<{ dataModelType: string; version: string }> {
+  return Object.entries(registry).flatMap(([dataModelType, versions]) =>
+    Object.keys(versions).map((version) => ({ dataModelType, version })),
+  );
+}

@@ -221,6 +221,7 @@ const stubBridge = {
   extractRefs: jest.fn().mockReturnValue({ organisations: [], facilities: [], products: [] }),
   extractConformityClaim: jest.fn().mockReturnValue(null),
   extractConformityClaimWithProvenance: jest.fn().mockReturnValue(null),
+  extractSubjectSummary: jest.fn().mockReturnValue({ id: null, name: null }),
 };
 
 const DATA_MODEL = {
@@ -830,6 +831,7 @@ describe('POST /api/v1/credentials', () => {
         vcService,
         storageService,
         storageOptions: {},
+        bridge: stubBridge,
       });
     });
 
@@ -1032,6 +1034,39 @@ describe('POST /api/v1/credentials', () => {
       expect(warning).toBeDefined();
       expect(warning?.remediation).toContain('master-data');
       // Linking is enrichment: its failure must not stop the publish.
+      expect(mockPublishLinks).toHaveBeenCalledTimes(1);
+    });
+
+    it('warns DETAILS_EXTRACTION_FAILED when the credential was issued but could not be read back', async () => {
+      setupPublishingHappyPath();
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {
+          primaryIdentifier: '09506000134352',
+          schemePrimaryKey: 'gtin',
+          schemeNamespace: 'gs1',
+          schemeIdrServiceInstanceId: 'idr-scheme-1',
+          entityName: 'Test Product',
+        },
+        entityLinkFailed: false,
+        detailsExtractionFailed: true,
+      });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      const warning = (json.warnings as Array<{ code: string; remediation?: string }>).find(
+        (w) => w.code === 'DETAILS_EXTRACTION_FAILED',
+      );
+      expect(warning).toBeDefined();
+      // The caller is given the correlation ID itself, so they can quote it
+      // without having to read it off a response header.
+      expect(warning?.remediation).toMatch(/Quote correlation ID [0-9a-f-]{8}/i);
+      // Reading the descriptive fields is enrichment: publishing carries on.
       expect(mockPublishLinks).toHaveBeenCalledTimes(1);
     });
 
