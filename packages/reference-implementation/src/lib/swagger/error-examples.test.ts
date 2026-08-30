@@ -9,12 +9,12 @@
  */
 
 import { getApiDocs } from './swagger';
-import { SHARED_STATUS_EXAMPLES } from './error-examples';
+import { PAYLOAD_TOO_LARGE_RESPONSE_REF, SHARED_STATUS_EXAMPLES, VERIFIED_ERROR_MESSAGES } from './error-examples';
 
 type MediaType = { schema?: { $ref?: string }; examples?: Record<string, { summary: string; value: unknown }> };
 type ResponseObject = { $ref?: string; description?: string; content?: Record<string, MediaType> };
 type Spec = {
-  paths?: Record<string, Record<string, { responses?: Record<string, ResponseObject> }>>;
+  paths?: Record<string, Record<string, { requestBody?: unknown; responses?: Record<string, ResponseObject> }>>;
   components?: { responses?: Record<string, ResponseObject> };
 };
 
@@ -60,6 +60,49 @@ describe('published error response examples', () => {
     for (const example of Object.values(examples!)) {
       expect(example.value).not.toHaveProperty('code');
     }
+  });
+
+  it('gives PayloadTooLargeResponse the 413 body the reader actually throws', () => {
+    const examples = spec.components?.responses?.PayloadTooLargeResponse?.content?.['application/json']?.examples;
+    expect(examples).toBeDefined();
+
+    const values = Object.values(examples!).map((e) => e.value as { error: string; code?: string });
+    expect(values).toContainEqual({
+      error: 'The request body exceeds the maximum of 5242880 bytes.',
+      code: 'REQUEST_BODY_TOO_LARGE',
+    });
+  });
+
+  it('documents 413 on every operation that accepts a request body, by reference', () => {
+    const operationsWithBody = Object.entries(spec.paths ?? {}).flatMap(([route, pathItem]) =>
+      HTTP_METHODS.flatMap((method) => {
+        const operation = pathItem[method];
+        if (!operation?.requestBody) return [];
+        return [`${method} ${route}`];
+      }),
+    );
+
+    const without413 = operationsWithBody.filter((id) => {
+      const [method, ...routeParts] = id.split(' ');
+      const route = routeParts.join(' ');
+      return spec.paths?.[route]?.[method]?.responses?.['413']?.$ref !== PAYLOAD_TOO_LARGE_RESPONSE_REF;
+    });
+
+    expect(operationsWithBody.length).toBeGreaterThan(0);
+    expect(without413).toEqual([]);
+  });
+
+  it('does not advertise 413 on an operation with no request body', () => {
+    const advertised = errorResponses(spec)
+      .filter((r) => r.status === '413')
+      .filter((r) => {
+        const [method, ...routeParts] = r.id.split(' ');
+        const route = routeParts.join(' ');
+        return spec.paths?.[route]?.[method]?.requestBody === undefined;
+      })
+      .map((r) => `${r.id} 413`);
+
+    expect(advertised).toEqual([]);
   });
 
   it.each(Object.keys(SHARED_STATUS_EXAMPLES))(
@@ -147,17 +190,21 @@ describe('published error response examples', () => {
   });
 
   it('publishes only messages the code actually throws', () => {
-    // Every quoted-message example must equal its response description, which
-    // is what makes it a quotation rather than a composition.
+    // Every quoted-message example must be a message the code throws, which is
+    // what makes it a quotation rather than a composition. A response with one
+    // cause quotes its own description; a response with several (a status a
+    // route reaches by more than one route, such as an Idempotency-Key that is
+    // in flight or held elsewhere) quotes one of the verified messages, since
+    // no single description can be all of them verbatim.
     const quoted = errorResponses(spec).filter((r) => ['404', '409'].includes(r.status));
 
     for (const { id, status, response } of quoted) {
       const examples = response.content?.['application/json']?.examples;
       if (!examples) continue;
       for (const example of Object.values(examples)) {
-        expect(`${id} ${status} ${(example.value as { error: string }).error}`).toBe(
-          `${id} ${status} ${response.description?.trim()}`,
-        );
+        const message = (example.value as { error: string }).error;
+        const isDescription = message === response.description?.trim();
+        expect(`${id} ${status} ${isDescription || VERIFIED_ERROR_MESSAGES.has(message)}`).toBe(`${id} ${status} true`);
       }
     }
   });

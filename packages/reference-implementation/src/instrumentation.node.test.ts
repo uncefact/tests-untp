@@ -9,6 +9,7 @@ const mockResolveAppUrl = jest.fn();
 const mockValidateHttpUserAgentOnBoot = jest.fn();
 const mockResolveDataEncryptionKey = jest.fn();
 const mockValidateCacheMaxEntriesOnBoot = jest.fn();
+const mockValidateMaxRequestBodyBytesOnBoot = jest.fn();
 
 jest.mock('@/lib/config/app-url.config', () => ({
   resolveAppUrl: (...args: unknown[]) => mockResolveAppUrl(...args),
@@ -18,6 +19,9 @@ jest.mock('@/lib/config/http-user-agent.config', () => ({
 }));
 jest.mock('@/lib/config/cache-max-entries.config', () => ({
   validateCacheMaxEntriesOnBoot: (...args: unknown[]) => mockValidateCacheMaxEntriesOnBoot(...args),
+}));
+jest.mock('@/lib/config/request-body-limit.config', () => ({
+  validateMaxRequestBodyBytesOnBoot: (...args: unknown[]) => mockValidateMaxRequestBodyBytesOnBoot(...args),
 }));
 jest.mock('@/lib/encryption/resolve-data-encryption-key', () => ({
   resolveDataEncryptionKey: (...args: unknown[]) => mockResolveDataEncryptionKey(...args),
@@ -58,6 +62,15 @@ describe('registerNode boot wiring', () => {
     expect(mockValidateHttpUserAgentOnBoot).toHaveBeenCalledTimes(1);
     expect(mockResolveDataEncryptionKey).toHaveBeenCalledTimes(1);
     expect(mockValidateCacheMaxEntriesOnBoot).toHaveBeenCalledTimes(1);
+    expect(mockValidateMaxRequestBodyBytesOnBoot).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails the boot when a request-body cap override is invalid', async () => {
+    mockValidateMaxRequestBodyBytesOnBoot.mockImplementation(() => {
+      throw new Error('MAX_REQUEST_BODY_BYTES must be an integer of at least 1024 when set');
+    });
+
+    await expect(registerNode()).rejects.toThrow('MAX_REQUEST_BODY_BYTES');
   });
 
   it('fails the boot when a cache entry-cap override is invalid', async () => {

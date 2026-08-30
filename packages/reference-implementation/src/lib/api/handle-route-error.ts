@@ -3,6 +3,8 @@ import {
   NotFoundError,
   ForbiddenError,
   ConflictError,
+  PayloadTooLargeError,
+  RequestBodyUnreadableError,
   UnprocessableError,
   errorMessage,
   ServiceRegistryError,
@@ -47,6 +49,14 @@ export function handlePipelineError(e: unknown): Response {
 }
 
 export function handleRouteError(e: unknown, options: HandleRouteErrorOptions = {}): Response {
+  if (e instanceof RequestBodyUnreadableError) {
+    // A body that could not be read is a bad request, the same 400 it was
+    // before the reader had its own error type. Routes that read bytes
+    // themselves (credential issuance, for its digest) reach this directly
+    // rather than through parseRequestBody.
+    logger.warn({ err: e }, 'Request body could not be read');
+    return NextResponse.json({ error: e.message }, { status: 400 });
+  }
   if (e instanceof ValidationError) {
     // The default err serialiser concatenates the messages and stacks of the
     // native cause chain (not the causes' typed fields), so a ValidationError
@@ -65,11 +75,18 @@ export function handleRouteError(e: unknown, options: HandleRouteErrorOptions = 
   }
   if (e instanceof ConflictError) {
     logger.warn({ err: e }, 'Conflict');
-    return NextResponse.json({ error: e.message }, { status: 409 });
+    const body = e.code !== undefined ? { error: e.message, code: e.code } : { error: e.message };
+    return NextResponse.json(body, { status: 409 });
+  }
+  if (e instanceof PayloadTooLargeError) {
+    logger.warn({ err: e }, 'Payload too large');
+    const body = e.code !== undefined ? { error: e.message, code: e.code } : { error: e.message };
+    return NextResponse.json(body, { status: 413 });
   }
   if (e instanceof UnprocessableError) {
     logger.warn({ err: e }, 'Unprocessable entity');
-    return NextResponse.json({ error: e.message }, { status: 422 });
+    const body = e.code !== undefined ? { error: e.message, code: e.code } : { error: e.message };
+    return NextResponse.json(body, { status: 422 });
   }
   if (e instanceof ServiceRegistryError) {
     const status = e.name === 'ServiceInstanceNotFoundError' ? 404 : 500;

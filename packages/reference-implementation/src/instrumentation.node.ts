@@ -31,6 +31,7 @@ import { resolveAppUrl } from './lib/config/app-url.config';
 import { startSeededSchemeRefreshInterval } from './lib/cvc/seeded-refresh-interval';
 import { validateHttpUserAgentOnBoot } from './lib/config/http-user-agent.config';
 import { validateCacheMaxEntriesOnBoot } from './lib/config/cache-max-entries.config';
+import { validateMaxRequestBodyBytesOnBoot } from './lib/config/request-body-limit.config';
 
 export async function registerNode(): Promise<void> {
   // Fail the boot on a missing or unusable RI_APP_URL: it backs the OIDC
@@ -42,6 +43,7 @@ export async function registerNode(): Promise<void> {
   validateHttpUserAgentOnBoot();
   // Fail the boot on an invalid CACHE_MAX_ENTRIES override; unset uses the default.
   validateCacheMaxEntriesOnBoot();
+  validateMaxRequestBodyBytesOnBoot();
   await validateEncryptionKeyOnBoot();
   startOpenTelemetry();
   // Periodic refresh of seeded conformity schemes (#728). Validates

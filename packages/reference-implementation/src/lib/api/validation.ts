@@ -5,6 +5,7 @@
  * Routes catch ValidationError and return 400.
  */
 
+import { TextDecoder } from 'node:util';
 import { z } from 'zod';
 import {
   InvalidUrlError,
@@ -16,6 +17,8 @@ import {
   UrlValidationError,
   validatePublicUrl,
 } from '@uncefact/untp-utils/node';
+import { PayloadTooLargeError, RequestBodyUnreadableError } from '@/lib/api/errors';
+import { readRequestBytes } from '@/lib/api/request-body';
 
 export class ValidationError extends Error {
   /**
@@ -36,18 +39,36 @@ export class ValidationError extends Error {
 /**
  * Parse and validate a JSON request body against a Zod schema (ADR-037).
  *
+ * A real `Request` exposes `arrayBuffer` or `body` and is read through
+ * {@link readRequestBytes}, so the configured size cap is applied before
+ * any JSON parsing. An argument that only implements `json()` takes that
+ * method instead. Route unit suites pass exactly that stub, and credential
+ * issuance hands in already-decoded text the same way so the body is not
+ * read twice (once for the digest, once for the schema). The `json()` path
+ * must stay. Collapsing parseRequestBody onto unbounded `json()` for every
+ * caller would lift the cap off every write route.
+ *
  * Malformed JSON, a literal `null` body, and any shape mismatch throw
  * ValidationError with the first issue rendered as `field.path: message`,
- * which the route error mapper returns as a 400.
+ * which the route error mapper returns as a 400. A body over the cap throws
+ * PayloadTooLargeError (413) before parsing, so an over-large malformed
+ * body reports the size rather than the syntax.
  */
 export async function parseRequestBody<Schema extends z.ZodTypeAny>(
-  req: { json: () => Promise<unknown> },
+  req: Request | { json: () => Promise<unknown> },
   schema: Schema,
 ): Promise<z.infer<Schema>> {
   let raw: unknown;
   try {
-    raw = await req.json();
-  } catch {
+    if ('arrayBuffer' in req || 'body' in req) {
+      const bytes = await readRequestBytes(req as Request);
+      raw = JSON.parse(new TextDecoder().decode(bytes));
+    } else {
+      raw = await req.json();
+    }
+  } catch (error) {
+    if (error instanceof PayloadTooLargeError || error instanceof ValidationError) throw error;
+    if (error instanceof RequestBodyUnreadableError) throw new ValidationError(error.message);
     throw new ValidationError('Invalid JSON body');
   }
   // Checked explicitly rather than left to safeParse: a schema that accepts
