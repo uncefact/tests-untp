@@ -1,4 +1,4 @@
-# ADR-046: The credential library is a new API surface
+# ADR-052: The credential library is a new API surface
 
 - **Date:** 2026-08-21
 - **Status:** accepted
