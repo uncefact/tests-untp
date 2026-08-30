@@ -11,6 +11,7 @@ import {
 } from '@uncefact/untp-ri-services';
 import type { ResolvedService } from '@/lib/services/resolve-service';
 import { createCredential } from '@/lib/prisma/repositories';
+import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
 import { CredentialDetailsError, CredentialDetailsStatus } from '@/lib/prisma/generated';
 import { protectDecryptionKey } from './decryption-key-protection';
 import { resolvePrimaryEntity } from '@/lib/entities/resolve-primary-entity';
@@ -32,6 +33,7 @@ export type IssueCredentialInput = {
     encrypt?: boolean;
   };
   bridge: IDataModelBridge;
+  idempotencyClaimId?: string;
 };
 
 export type IssueCredentialResult = {
@@ -121,7 +123,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
 
   const decryptionKey = protectDecryptionKey(storageResponse.decryptionKey);
 
-  const { credential: credentialRecord, entityLinkFailed } = await createCredential({
+  const { credential: credentialRecord, entityLinkFailed } = await createCredentialOrReportOrphan({
     tenantId,
     storageUri: storageResponse.uri,
     digestMultibase: storageResponse.digestMultibase,
@@ -132,6 +134,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     facilityId: primaryEntity.facilityId,
     productId: primaryEntity.productId,
     ...details,
+    idempotencyClaimId: input.idempotencyClaimId,
   });
 
   logger.info({ tenantId, credentialId: credentialRecord.id }, 'Credential issued and stored');
@@ -150,4 +153,29 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     entityLinkFailed,
     detailsExtractionFailed,
   };
+}
+
+/**
+ * Writes the credential row, and names what was left behind if the row cannot
+ * be written because this request's idempotency claim was reclaimed.
+ *
+ * Signing and storage have already happened by then and cannot be undone, so
+ * the artefact exists in the VC and storage services with no row referring to
+ * it. No caller is ever handed it, and the log line is what lets an operator
+ * find it (#954, ADR-051).
+ */
+async function createCredentialOrReportOrphan(
+  input: Parameters<typeof createCredential>[0] & { storageUri: string; digestMultibase: string },
+): Promise<Awaited<ReturnType<typeof createCredential>>> {
+  try {
+    return await createCredential(input);
+  } catch (error) {
+    if (error instanceof IdempotencyClaimLostError) {
+      logger.error(
+        { err: error, storageUri: input.storageUri, digestMultibase: input.digestMultibase },
+        'Idempotency claim was reclaimed before the credential row was written; the stored credential has no record',
+      );
+    }
+    throw error;
+  }
 }

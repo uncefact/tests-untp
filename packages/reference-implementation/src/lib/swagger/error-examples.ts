@@ -147,6 +147,8 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'An identifier in this request is already the primary identifier of another product',
   'An identifier scheme with this primary key already exists for the registrar',
   'An identifier with this value already exists for the scheme',
+  'A request with this Idempotency-Key is still being processed. Retry shortly.',
+  "Another request now holds this Idempotency-Key. Retry to receive that request's result.",
   'Credential not found',
   'DID not found',
   'Data model not found',
@@ -164,6 +166,7 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'The identifier is already the primary identifier of another product',
   'The identifier scheme has identifiers and cannot be deleted',
   'The registrar has schemes with identifiers and cannot be deleted',
+  'This Idempotency-Key was already used with a different request body.',
 ]);
 
 /**

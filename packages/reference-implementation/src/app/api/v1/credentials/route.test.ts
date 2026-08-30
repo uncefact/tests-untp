@@ -11,13 +11,13 @@ jest.mock('next/server', () => ({
 // Mock withTenantAuth — mirrors handleRouteError behaviour inline to avoid
 // import issues with mocked @uncefact/untp-ri-services
 jest.mock('@/lib/api/with-tenant-auth', () => {
-  const { NotFoundError, errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-  const { ServiceError } = jest.requireActual('@uncefact/untp-ri-services');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
+  // The wrapper is stubbed to skip authentication, but error mapping delegates
+  // to the real handleRouteError rather than restating it. A copy here drifts
+  // from the mapper every time a new error class is added, and the drift shows
+  // up as a route returning 500 in tests while returning the right status in
+  // production. next/server is already stubbed above, so the real mapper's
+  // NextResponse.json calls produce the same shape this suite reads.
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
 
   return {
     withTenantAuth:
@@ -25,26 +25,7 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
         try {
           return await handler(req, ctx);
         } catch (e: unknown) {
-          if (e instanceof ValidationError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 400 });
-          }
-          if (e instanceof NotFoundError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 404 });
-          }
-          if (e instanceof ServiceRegistryError) {
-            // Mirrors handleRouteError: a named missing instance is a 404,
-            // every other registry failure is a 500.
-            const status = (e as Error).name === 'ServiceInstanceNotFoundError' ? 404 : 500;
-            return jsonResponse({ error: (e as Error).message }, { status });
-          }
-          if (e instanceof ServiceError) {
-            const serviceErr = e as Error & { code?: string; statusCode?: number };
-            return jsonResponse(
-              { error: serviceErr.message, code: serviceErr.code },
-              { status: serviceErr.statusCode },
-            );
-          }
-          return jsonResponse({ error: errorMessage(e) }, { status: 500 });
+          return handleRouteError(e);
         }
       },
   };
@@ -115,6 +96,9 @@ jest.mock('@uncefact/untp-ri-services', () => ({
   // stand-in lets the route read a field the real error never carries, which
   // is how the two drifted apart previously.
   IdrPublishError: jest.requireActual('@uncefact/untp-ri-services').IdrPublishError,
+  // The real class for the same reason: handleRouteError classifies by
+  // instanceof, and an undefined stand-in makes that check throw.
+  ServiceError: jest.requireActual('@uncefact/untp-ri-services').ServiceError,
 }));
 
 const { IdrPublishError: RealIdrPublishError } = jest.requireActual('@uncefact/untp-ri-services');
@@ -124,11 +108,20 @@ const mockUpdateCredentialPublished = jest.fn();
 const mockListCredentials = jest.fn();
 const mockGetDidByDid = jest.fn();
 const mockFindConformityScheme = jest.fn();
+const mockClaimIdempotencyKey = jest.fn();
+const mockCompleteIdempotencyKey = jest.fn();
+const mockFindIdempotencyKey = jest.fn();
+const mockReleaseIdempotencyKey = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   updateCredentialPublished: (...args: unknown[]) => mockUpdateCredentialPublished(...args),
   listCredentials: (...args: unknown[]) => mockListCredentials(...args),
   getDidByDid: (...args: unknown[]) => mockGetDidByDid(...args),
   findConformitySchemeByCanonicalId: (...args: unknown[]) => mockFindConformityScheme(...args),
+  CREDENTIAL_ISSUANCE_OPERATION: 'credential.issue',
+  claimIdempotencyKey: (...args: unknown[]) => mockClaimIdempotencyKey(...args),
+  completeIdempotencyKey: (...args: unknown[]) => mockCompleteIdempotencyKey(...args),
+  findIdempotencyKey: (...args: unknown[]) => mockFindIdempotencyKey(...args),
+  releaseIdempotencyKey: (...args: unknown[]) => mockReleaseIdempotencyKey(...args),
 }));
 
 // Pass stored keys through by default; individual tests override per call
@@ -153,19 +146,61 @@ jest.mock('@/lib/api/validation', () => {
   };
 });
 
+import { IdempotencyOperation } from '@/lib/prisma/generated';
 import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
+import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createFakeRequest(body?: unknown): Request {
-  const bodyString = body !== undefined ? JSON.stringify(body) : undefined;
+function bodyBytes(bodyString: string): ArrayBuffer {
+  const buf = Buffer.from(bodyString, 'utf8');
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+}
+
+function streamingBody(encoded: string) {
+  const bytes = new Uint8Array(Buffer.from(encoded, 'utf8'));
+  return {
+    getReader() {
+      let delivered = false;
+      return {
+        async read() {
+          if (delivered) return { done: true as const, value: undefined };
+          delivered = true;
+          return { done: false as const, value: bytes };
+        },
+        async cancel() {
+          delivered = true;
+        },
+      };
+    },
+  };
+}
+
+function stubHeaders(init: Record<string, string>): Headers {
+  const store = new Map<string, string>();
+  for (const [key, value] of Object.entries(init)) {
+    store.set(key.toLowerCase(), value);
+  }
+  return {
+    get(name: string) {
+      return store.has(name.toLowerCase()) ? store.get(name.toLowerCase())! : null;
+    },
+  } as unknown as Headers;
+}
+
+function createFakeRequest(body?: unknown, extraHeaders?: Record<string, string>, rawBody?: string): Request {
+  const bodyString = rawBody ?? (body !== undefined ? JSON.stringify(body) : undefined);
+  const encoded = bodyString ?? 'not-json';
   return {
     method: 'POST',
     url: 'http://localhost/api/v1/credentials',
-    headers: new Headers({ 'Content-Type': 'application/json' }),
+    headers: stubHeaders({ 'Content-Type': 'application/json', ...extraHeaders }),
+    body: streamingBody(encoded),
+    arrayBuffer: async () => bodyBytes(encoded),
+    text: async () => encoded,
     json:
       bodyString !== undefined
         ? async () => JSON.parse(bodyString)
@@ -180,6 +215,9 @@ function createBadJsonRequest(): Request {
     method: 'POST',
     url: 'http://localhost/api/v1/credentials',
     headers: new Headers({ 'Content-Type': 'application/json' }),
+    body: streamingBody('not-json'),
+    arrayBuffer: async () => bodyBytes('not-json'),
+    text: async () => 'not-json',
     json: async () => {
       throw new SyntaxError('Unexpected token n in JSON at position 0');
     },
@@ -268,6 +306,10 @@ function setupHappyPath() {
   stubBridge.extractConformityClaimWithProvenance.mockReturnValue(null);
   mockValidateConformityClaim.mockReturnValue([]);
   mockFindConformityScheme.mockResolvedValue(null);
+  mockFindIdempotencyKey.mockResolvedValue({ outcome: 'absent' });
+  mockClaimIdempotencyKey.mockResolvedValue({ outcome: 'claimed', claimId: 'claim-1' });
+  mockCompleteIdempotencyKey.mockResolvedValue({ applied: true });
+  mockReleaseIdempotencyKey.mockResolvedValue({ applied: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -1870,6 +1912,484 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(201);
       expect(json.warnings).toEqual([expect.objectContaining({ code: 'conformity-claim.validation-error' })]);
+    });
+  });
+
+  describe('idempotency', () => {
+    const KEY = 'pipeline-retry-1';
+    const KEY_HEADER = { 'Idempotency-Key': KEY };
+    const RESPONSE_NOT_RECORDED = {
+      code: 'IDEMPOTENCY_RESPONSE_NOT_RECORDED',
+      message:
+        'The credential was issued and a retry with this key returns it, but the warnings on this response may not be repeated.',
+      remediation: 'A retry with this key returns this credential. The warnings on this response may differ.',
+    };
+
+    it('digests the raw request bytes, so equal JSON with different whitespace is a different body', async () => {
+      // The claim is keyed on the bytes as received. If the digest were taken
+      // over the parsed object, these two requests would collide as a replay
+      // and the second would silently return the first credential.
+      const compact = JSON.stringify(validBody());
+      const spaced = JSON.stringify(validBody(), null, 2);
+      await POST(
+        createFakeRequest(undefined, KEY_HEADER, compact),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      await POST(
+        createFakeRequest(undefined, KEY_HEADER, spaced),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+
+      const [first, second] = mockFindIdempotencyKey.mock.calls.map((call) => call[0].bodyDigest);
+      expect(first).not.toBe(second);
+    });
+
+    it('accepts a BOM-prefixed body and digests it differently from the same body without a BOM', async () => {
+      const body = JSON.stringify(validBody());
+      const plain = await POST(
+        createFakeRequest(undefined, KEY_HEADER, body),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const withBom = await POST(
+        createFakeRequest(undefined, KEY_HEADER, `\uFEFF${body}`),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+
+      expect(plain.status).toBe(201);
+      expect(withBom.status).toBe(201);
+      const [first, second] = mockFindIdempotencyKey.mock.calls.map((call) => call[0].bodyDigest);
+      expect(first).not.toBe(second);
+    });
+
+    it('returns 400 naming the body read, not the JSON, when the body cannot be read', async () => {
+      const req = {
+        method: 'POST',
+        url: 'http://localhost/api/v1/credentials',
+        headers: new Headers({ 'Content-Type': 'application/json', ...KEY_HEADER }),
+        body: {
+          getReader() {
+            return {
+              async read() {
+                throw new Error('stream interrupted');
+              },
+              async cancel() {},
+            };
+          },
+        },
+        arrayBuffer: async () => {
+          throw new Error('stream interrupted');
+        },
+        text: async () => {
+          throw new Error('stream interrupted');
+        },
+      } as unknown as Request;
+
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe('Could not read the request body');
+      expect(mockFindIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockResolveDataModel).not.toHaveBeenCalled();
+    });
+
+    it('does not claim when no Idempotency-Key header is supplied', async () => {
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(201);
+      expect(mockFindIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockCompleteIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockReleaseIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockIssueCredential).toHaveBeenCalledTimes(1);
+      expect(mockIssueCredential.mock.calls[0][0].idempotencyClaimId).toBeUndefined();
+    });
+
+    it('replays a stored 201 without warnings and never validates or issues', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({
+        outcome: 'replay',
+        credentialId: 'cred-original',
+        responseBody: null,
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json).toEqual({ credentialId: 'cred-original' });
+      expect(mockResolveDataModel).not.toHaveBeenCalled();
+      expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('replays a stored 201 with warnings and never validates or issues', async () => {
+      const warnings = [{ code: 'ENTITY_LINK_FAILED', message: 'gone' }];
+      mockFindIdempotencyKey.mockResolvedValue({
+        outcome: 'replay',
+        credentialId: 'cred-original',
+        responseBody: warnings,
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json).toEqual({ credentialId: 'cred-original', warnings });
+      expect(mockResolveDataModel).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('omits warnings on replay when the stored list is empty', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({
+        outcome: 'replay',
+        credentialId: 'cred-original',
+        responseBody: [],
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json).toEqual({ credentialId: 'cred-original' });
+      expect(mockResolveDataModel).not.toHaveBeenCalled();
+    });
+
+    it('rejects a mismatched body with 422 IDEMPOTENCY_KEY_MISMATCH before validation', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({ outcome: 'mismatch' });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(json).toEqual({
+        error: 'This Idempotency-Key was already used with a different request body.',
+        code: 'IDEMPOTENCY_KEY_MISMATCH',
+      });
+      expect(mockResolveDataModel).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('rejects an in-flight key with 409 IDEMPOTENCY_KEY_IN_FLIGHT before validation', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({ outcome: 'in-flight' });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(409);
+      expect(json).toEqual({
+        error: 'A request with this Idempotency-Key is still being processed. Retry shortly.',
+        code: 'IDEMPOTENCY_KEY_IN_FLIGHT',
+      });
+      expect(mockResolveDataModel).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 422 when the claim, made after validation, finds a mismatched body', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({ outcome: 'absent' });
+      mockClaimIdempotencyKey.mockResolvedValue({ outcome: 'mismatch' });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(422);
+      expect(json).toEqual({
+        error: 'This Idempotency-Key was already used with a different request body.',
+        code: 'IDEMPOTENCY_KEY_MISMATCH',
+      });
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 409 when the claim, made after validation, finds the key in flight', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({ outcome: 'absent' });
+      mockClaimIdempotencyKey.mockResolvedValue({ outcome: 'in-flight' });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(409);
+      expect(json).toEqual({
+        error: 'A request with this Idempotency-Key is still being processed. Retry shortly.',
+        code: 'IDEMPOTENCY_KEY_IN_FLIGHT',
+      });
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('replays without issuing when the claim, made after validation, finds a recorded result', async () => {
+      const warnings = [{ code: 'ENTITY_LINK_FAILED', message: 'gone' }];
+      mockFindIdempotencyKey.mockResolvedValue({ outcome: 'absent' });
+      mockClaimIdempotencyKey.mockResolvedValue({
+        outcome: 'replay',
+        credentialId: 'cred-original',
+        responseBody: warnings,
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json).toEqual({ credentialId: 'cred-original', warnings });
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+      expect(mockCompleteIdempotencyKey).not.toHaveBeenCalled();
+    });
+
+    it('appends IDEMPOTENCY_RESPONSE_UNREADABLE when a replayed response body could not be read', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({
+        outcome: 'replay',
+        credentialId: 'cred-original',
+        responseBody: null,
+        responseBodyUnreadable: true,
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-original');
+      expect(json.warnings).toEqual([expect.objectContaining({ code: 'IDEMPOTENCY_RESPONSE_UNREADABLE' })]);
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('releases the claim and still surfaces the original error when issuance fails after claim', async () => {
+      mockIssueCredential.mockRejectedValue(new Error('Signing service unavailable'));
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(mockClaimIdempotencyKey).toHaveBeenCalledTimes(1);
+      expect(mockReleaseIdempotencyKey).toHaveBeenCalledWith({ claimId: 'claim-1' });
+      expect(res.status).toBe(500);
+      expect(json.error).toContain('Signing service unavailable');
+    });
+
+    it('passes the claim id into issuance and completes once after publish with the final warnings', async () => {
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        entityLinkFailed: true,
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(mockIssueCredential).toHaveBeenCalledWith(expect.objectContaining({ idempotencyClaimId: 'claim-1' }));
+      expect(mockCompleteIdempotencyKey).toHaveBeenCalledTimes(1);
+      expect(mockCompleteIdempotencyKey).toHaveBeenCalledWith({
+        claimId: 'claim-1',
+        credentialId: 'cred-1',
+        responseBody: json.warnings,
+      });
+      expect(json.warnings).toEqual([expect.objectContaining({ code: 'ENTITY_LINK_FAILED' })]);
+    });
+
+    it('returns 409 IDEMPOTENCY_KEY_IN_FLIGHT without releasing when the claim is lost during association', async () => {
+      mockIssueCredential.mockRejectedValue(new IdempotencyClaimLostError());
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(409);
+      expect(json).toEqual({
+        error: "Another request now holds this Idempotency-Key. Retry to receive that request's result.",
+        code: 'IDEMPOTENCY_KEY_IN_FLIGHT',
+      });
+      expect(mockReleaseIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockCompleteIdempotencyKey).not.toHaveBeenCalled();
+    });
+
+    it('returns the winner finalised body when original finalisation loses the CAS', async () => {
+      const winnerWarnings = [{ code: 'IDR_PUBLISH_FAILED', message: 'from stale replayer' }];
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        entityLinkFailed: true,
+      });
+      mockCompleteIdempotencyKey.mockResolvedValue({ applied: false });
+      mockFindIdempotencyKey.mockResolvedValueOnce({ outcome: 'absent' }).mockResolvedValueOnce({
+        outcome: 'replay',
+        credentialId: 'cred-1',
+        responseBody: winnerWarnings,
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json).toEqual({ credentialId: 'cred-1', warnings: winnerWarnings });
+      expect(mockReleaseIdempotencyKey).not.toHaveBeenCalled();
+    });
+
+    it('returns 201 with IDEMPOTENCY_RESPONSE_NOT_RECORDED and keeps other warnings when complete throws', async () => {
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        entityLinkFailed: true,
+      });
+      mockCompleteIdempotencyKey.mockRejectedValueOnce(new Error('transient database error'));
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      expect(mockReleaseIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockIssueCredential).toHaveBeenCalledTimes(1);
+      expect(json.warnings).toEqual([expect.objectContaining({ code: 'ENTITY_LINK_FAILED' }), RESPONSE_NOT_RECORDED]);
+    });
+
+    it('passes publish-step warnings to complete unchanged', async () => {
+      mockResolvePublishTarget.mockResolvedValue({ outcome: 'not-found', value: '09506000134352' });
+
+      const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(mockCompleteIdempotencyKey).toHaveBeenCalledTimes(1);
+      expect(mockCompleteIdempotencyKey).toHaveBeenCalledWith({
+        claimId: 'claim-1',
+        credentialId: 'cred-1',
+        responseBody: json.warnings,
+      });
+      expect(json.warnings).toEqual([expect.objectContaining({ code: 'PUBLISH_IDENTIFIER_UNKNOWN' })]);
+    });
+
+    it('returns 400 naming the header when it is blank', async () => {
+      const req = createFakeRequest(validBody(), { 'Idempotency-Key': '   ' });
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('Idempotency-Key');
+      expect(mockFindIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 naming the header when it exceeds 255 characters after trimming', async () => {
+      const req = createFakeRequest(validBody(), { 'Idempotency-Key': 'k'.repeat(256) });
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain('Idempotency-Key');
+      expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 naming the header and the charset rule when the key contains a newline', async () => {
+      const req = createFakeRequest(validBody(), { 'Idempotency-Key': 'retry-1\nmore' });
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe('Idempotency-Key must contain only printable ASCII characters');
+      expect(mockFindIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('accepts a 255-character key and claims the trimmed value', async () => {
+      const key = 'k'.repeat(255);
+      const req = createFakeRequest(validBody(), { 'Idempotency-Key': `  ${key}  ` });
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(201);
+      expect(mockFindIdempotencyKey).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', operation: IdempotencyOperation.CREDENTIAL_ISSUE, key }),
+      );
+      expect(mockClaimIdempotencyKey).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', operation: IdempotencyOperation.CREDENTIAL_ISSUE, key }),
+      );
+    });
+
+    it('omits warnings on replay when the stored body is not an array', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({
+        outcome: 'replay',
+        credentialId: 'cred-original',
+        responseBody: { code: 'not-a-list' },
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json).toEqual({ credentialId: 'cred-original' });
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('request body size limit', () => {
+    const ORIGINAL = process.env.MAX_REQUEST_BODY_BYTES;
+
+    beforeEach(() => {
+      process.env.MAX_REQUEST_BODY_BYTES = '1024';
+    });
+
+    afterEach(() => {
+      if (ORIGINAL === undefined) {
+        delete process.env.MAX_REQUEST_BODY_BYTES;
+      } else {
+        process.env.MAX_REQUEST_BODY_BYTES = ORIGINAL;
+      }
+    });
+
+    it('issues a body under the cap', async () => {
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(201);
+      expect(mockIssueCredential).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 413 REQUEST_BODY_TOO_LARGE when Content-Length declares a body over the cap', async () => {
+      const req = createFakeRequest(validBody(), { 'Content-Length': '2048' });
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(413);
+      expect(json).toEqual({
+        error: 'The request body exceeds the maximum of 1024 bytes.',
+        code: 'REQUEST_BODY_TOO_LARGE',
+      });
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('returns 413 REQUEST_BODY_TOO_LARGE when Content-Length is absent and the body exceeds the cap', async () => {
+      const req = createFakeRequest(undefined, undefined, `{"pad":"${'x'.repeat(2000)}"}`);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(413);
+      expect(json.code).toBe('REQUEST_BODY_TOO_LARGE');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('returns 413 REQUEST_BODY_TOO_LARGE when Content-Length lies below the cap and the body exceeds it', async () => {
+      const req = createFakeRequest(undefined, { 'Content-Length': '10' }, `{"pad":"${'x'.repeat(2000)}"}`);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(413);
+      expect(json.code).toBe('REQUEST_BODY_TOO_LARGE');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
     });
   });
 });

@@ -24,6 +24,7 @@ process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
 import { decodeJwt } from 'jose';
 import { issueCredential } from './issue-credential';
 import type { IssueCredentialInput } from './issue-credential';
+import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
 import { revealDecryptionKey } from './decryption-key-protection';
 import { CredentialDetailsError, CredentialDetailsStatus } from '@/lib/prisma/generated';
 
@@ -205,6 +206,19 @@ describe('issueCredential', () => {
 
     expect(result.credentialId).toBe('cred-1');
     expect(result.entityLinkFailed).toBe(true);
+  });
+
+  it('passes the idempotency claim id through to createCredential', async () => {
+    await issueCredential(buildInput({ idempotencyClaimId: 'claim-1' }));
+
+    expect(mockCreateCredential).toHaveBeenCalledWith(expect.objectContaining({ idempotencyClaimId: 'claim-1' }));
+  });
+
+  it('lets IdempotencyClaimLostError propagate from createCredential', async () => {
+    const lost = new IdempotencyClaimLostError();
+    mockCreateCredential.mockRejectedValue(lost);
+
+    await expect(issueCredential(buildInput({ idempotencyClaimId: 'claim-1' }))).rejects.toBe(lost);
   });
 
   it('returns storage response and primary entity for publishing', async () => {
