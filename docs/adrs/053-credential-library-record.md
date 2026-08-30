@@ -79,7 +79,7 @@ Negative:
 
 ## Not decided here
 
-- How a `pending` generation is worked, claimed, and recovered after a crash. ADR-054 decides it.
+- How a `pending` generation is worked, claimed, and recovered after a crash. The async ADR in this set decides it.
 - Who holds keys for external credentials, and what the record looks like while a credential is held but unopened. The custody ADR in this set decides it; the `hasKey` state named above is defined there.
 - How a retried registration is kept from creating two records. ADR-051's idempotency claims guard it; the `Idempotency-Key` header is required on register.
 - Whether a duplicate-detection digest should also match a tenant re-registering a credential it issued itself. Open; it needs the native issuance digest computed canonically first.
