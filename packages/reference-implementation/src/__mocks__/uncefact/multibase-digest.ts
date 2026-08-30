@@ -9,6 +9,7 @@
  */
 
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 
 type HashAlgorithm = 'sha2-256' | 'sha2-512';
 type MultibaseEncoding = 'base58btc' | 'base64';
@@ -33,7 +34,9 @@ export class MultibaseDigest {
     data: Uint8Array,
     _opts: { algorithm: HashAlgorithm; base: MultibaseEncoding },
   ): Promise<MultibaseDigest> {
-    return new MultibaseDigest(`zTESTDATA${Buffer.from(data).toString('hex').slice(0, 16)}`);
+    // Hash the whole input. A prefix of the input bytes is not a hash, and
+    // two bodies that share that prefix would compare equal.
+    return new MultibaseDigest(`zTEST${createHash('sha256').update(data).digest('hex')}`);
   }
 
   static async fromText(

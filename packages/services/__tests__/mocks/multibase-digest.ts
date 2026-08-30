@@ -8,13 +8,15 @@
  * and uses the real package; only tests see this stub.
  *
  * The stub mirrors the API shape (`fromDigest`, `fromString`) and emits a
- * recognisable `z`-prefixed string derived from the input bytes, so
- * assertions can match a known fixture value. `fromString` accepts any
+ * recognisable `z`-prefixed string derived from the input bytes (hashed,
+ * so distinct inputs give distinct digests), so assertions can match a
+ * known fixture value. `fromString` accepts any
  * `z` / `m` multibase-prefixed input and throws otherwise, mirroring the
  * real library's behaviour for the validation paths the adapter exercises.
  */
 
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 
 export class MultibaseDigest {
   constructor(public readonly encoded: string) {}
@@ -45,11 +47,19 @@ export class MultibaseDigest {
     return new MultibaseDigest(encoded);
   }
 
+  /**
+   * Hashes the input rather than sampling it. A stub that returned a prefix
+   * of the data gave two inputs sharing that prefix the same digest, so any
+   * test asserting that different content digests differently passed without
+   * exercising anything.
+   */
   static async fromData(
     data: Uint8Array,
     _opts: { algorithm: 'sha2-256' | 'sha2-512'; base: 'base58btc' | 'base64' },
   ): Promise<MultibaseDigest> {
-    return new MultibaseDigest(`zTESTDATA${Buffer.from(data).toString('hex').slice(0, 16)}`);
+    return new MultibaseDigest(
+      `zTESTDATA${createHash('sha256').update(Buffer.from(data).toString('hex'), 'hex').digest('hex')}`,
+    );
   }
 
   toString(): string {
