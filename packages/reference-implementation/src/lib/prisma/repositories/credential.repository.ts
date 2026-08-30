@@ -1,6 +1,7 @@
 import { isForeignKeyViolationOn } from '@/lib/prisma/db-errors';
 import { Credential, CredentialDetailsError, CredentialDetailsStatus, Prisma } from '../generated';
 import { prisma } from '../prisma';
+import { IdempotencyClaimLostError } from './idempotency-key.repository';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
@@ -18,6 +19,12 @@ export type CreateCredentialInput = {
   organisationId?: string;
   facilityId?: string;
   productId?: string;
+  /**
+   * When set, the credential row and this claim are written in one
+   * transaction so a crash cannot leave a minted credential that a stale
+   * reclaim would issue again (#954).
+   */
+  idempotencyClaimId?: string;
 } & CredentialDetailsInput;
 
 /**
@@ -63,7 +70,9 @@ export type ListCredentialsOptions = {
  * including a violation on `tenantId`, stays fatal and is translated by
  * ADR-036's mapping. This is the carve-out ADR-044 makes to ADR-042, which
  * otherwise routes a vanished server-selected dependency to the sanitised
- * server-failure path.
+ * server-failure path. When `idempotencyClaimId` is set and the association
+ * matches no row, throws `IdempotencyClaimLostError` inside the transaction
+ * so the credential row is rolled back (#954).
  */
 export async function createCredential(
   input: CreateCredentialInput,
@@ -79,23 +88,49 @@ export async function createCredential(
     detailsStatus: input.detailsStatus,
     detailsError: input.detailsError,
   };
+  const linkedData = {
+    ...data,
+    organisationId: input.organisationId,
+    facilityId: input.facilityId,
+    productId: input.productId,
+  };
 
-  try {
-    const credential = await prisma.credential.create({
+  const persist = async (client: typeof prisma | Prisma.TransactionClient, withLinks: boolean) => {
+    const credential = await client.credential.create({
+      data: withLinks ? linkedData : data,
+    });
+    if (!input.idempotencyClaimId) {
+      return { credential };
+    }
+    const updated = await client.idempotencyKey.updateMany({
+      where: { id: input.idempotencyClaimId, credentialId: null },
       data: {
-        ...data,
-        organisationId: input.organisationId,
-        facilityId: input.facilityId,
-        productId: input.productId,
+        credentialId: credential.id,
+        resultRecordedAt: new Date(Date.now()),
       },
     });
+    if (updated.count === 0) {
+      throw new IdempotencyClaimLostError();
+    }
+    return { credential };
+  };
+
+  const run = (withLinks: boolean) => {
+    if (input.idempotencyClaimId) {
+      return prisma.$transaction((tx) => persist(tx, withLinks));
+    }
+    return persist(prisma, withLinks);
+  };
+
+  try {
+    const { credential } = await run(true);
     return { credential, entityLinkFailed: false };
   } catch (error) {
     const onEntityColumn = ['organisationId', 'facilityId', 'productId'].some((column) =>
       isForeignKeyViolationOn(error, column),
     );
     if (!onEntityColumn) throw error;
-    const credential = await prisma.credential.create({ data });
+    const { credential } = await run(false);
     return { credential, entityLinkFailed: true };
   }
 }

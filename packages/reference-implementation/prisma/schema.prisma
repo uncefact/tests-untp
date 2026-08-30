@@ -34,6 +34,18 @@ enum CredentialDetailsStatus {
   EXTRACTION_FAILED
 }
 
+/// What an idempotency claim guards (#954, ADR-051). A claim is scoped by
+/// tenant, operation and key, so one key may guard two operations
+/// independently. Adding an operation is a migration, which is deliberate:
+/// the value is written by code, never by a caller.
+enum IdempotencyOperation {
+  CREDENTIAL_ISSUE
+  /// Registering a credential received from a third party (#955). Declared
+  /// with the first operation because the scoping rule (one key may guard two
+  /// operations independently) is only testable with two values.
+  LIBRARY_REGISTER
+}
+
 /// Why a credential's descriptive fields could not be read (#952). Recorded
 /// beside EXTRACTION_FAILED so a later run can tell what is worth retrying:
 /// a code fix for a bad envelope or bridge, a restored key for a decrypt.
@@ -70,18 +82,18 @@ enum RenderMethodType {
  * Auth.js + Prisma adapter tables for OAuth + JWT sessions
  */
 model User {
-  id              String    @id @default(cuid())
-  authProviderId  String?   @unique
-  name            String?
-  email           String?   @unique
-  emailVerified   DateTime?
-  image           String?
-  tenantId        String?
+  id             String    @id @default(cuid())
+  authProviderId String?   @unique
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  tenantId       String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  accounts     Account[]
-  tenant       Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  accounts Account[]
+  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 }
 
 model Account {
@@ -108,25 +120,26 @@ model Tenant {
   name               String
   externalIdpGroupId String?  @unique
   primaryColor       String?
-  secondaryColor String?
-  logo           String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  secondaryColor     String?
+  logo               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  users              User[]
-  dids               Did[]
-  serviceInstances   ServiceInstance[]
-  registrars         Registrar[]
-  schemes            IdentifierScheme[]
-  identifiers        Identifier[]
-  linkRegistrations  LinkRegistration[]
-  organisations      OrganisationEntity[]
-  facilities         Facility[]
-  products             Product[]
-  credentials            Credential[]
-  dataModels             DataModel[]
-  renderTemplates        RenderTemplate[]
-  conformitySchemes      ConformityScheme[]
+  users             User[]
+  dids              Did[]
+  serviceInstances  ServiceInstance[]
+  registrars        Registrar[]
+  schemes           IdentifierScheme[]
+  identifiers       Identifier[]
+  linkRegistrations LinkRegistration[]
+  organisations     OrganisationEntity[]
+  facilities        Facility[]
+  products          Product[]
+  credentials       Credential[]
+  idempotencyKeys   IdempotencyKey[]
+  dataModels        DataModel[]
+  renderTemplates   RenderTemplate[]
+  conformitySchemes ConformityScheme[]
 
   @@map("Tenant")
 }
@@ -135,13 +148,13 @@ model Tenant {
  * Stores issued verifiable credentials metadata
  */
 model Credential {
-  id              String   @id @default(cuid())
+  id              String                  @id @default(cuid())
   tenantId        String
   storageUri      String
   digestMultibase String
   decryptionKey   String?
   credentialType  String
-  isPublished     Boolean  @default(false)
+  isPublished     Boolean                 @default(false)
   organisationId  String?
   facilityId      String?
   productId       String?
@@ -154,15 +167,45 @@ model Credential {
   validUntil      DateTime?
   detailsStatus   CredentialDetailsStatus @default(EXTRACTION_PENDING)
   detailsError    CredentialDetailsError?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
-  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  organisation    OrganisationEntity? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
-  facility        Facility?           @relation(fields: [facilityId], references: [id], onDelete: SetNull)
-  product         Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organisation   OrganisationEntity? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+  facility       Facility?           @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  product        Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  idempotencyKey IdempotencyKey?
 
   @@index([tenantId])
+}
+
+/**
+ * Per-tenant idempotency keys (#954, ADR-051). A claim is scoped by tenant,
+ * operation and key. Cascade on the credential frees the key that produced
+ * it, so a later reuse of that operation's key proceeds as a first request.
+ * `finalisedAt` is set once the original response has been recorded for
+ * replay; a row with a credential and no timestamp is still in flight.
+ */
+model IdempotencyKey {
+  id               String               @id @default(cuid())
+  tenantId         String
+  operation        IdempotencyOperation
+  key              String
+  bodyDigest       String
+  credentialId     String?              @unique
+  /// Set with credentialId. Ages a recorded-but-unfinalised row. An empty claim ages from createdAt (#954).
+  resultRecordedAt DateTime?
+  /// AES-256-GCM envelope of the response a later retry replays. The same
+  /// protection Credential.decryptionKey uses, so a database reader cannot
+  /// recover a replayed response (#954, ADR-051).
+  responseBody     String?
+  createdAt        DateTime             @default(now())
+  finalisedAt      DateTime?
+
+  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, operation, key])
 }
 
 /**
@@ -170,18 +213,18 @@ model Credential {
  * Supports three tiers: DEFAULT (system-wide), MANAGED, and SELF_MANAGED.
  */
 model Did {
-  id             String    @id @default(cuid())
-  tenantId       String
-  did            String    @unique
-  type           DidType
-  method         DidMethod @default(DID_WEB)
-  name           String
-  description    String?
-  keyId          String
-  status         DidStatus @default(UNVERIFIED)
-  isDefault      Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  tenantId    String
+  did         String    @unique
+  type        DidType
+  method      DidMethod @default(DID_WEB)
+  name        String
+  description String?
+  keyId       String
+  status      DidStatus @default(UNVERIFIED)
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   serviceInstanceId String?
   serviceInstance   ServiceInstance? @relation(fields: [serviceInstanceId], references: [id], onDelete: SetNull)
@@ -196,21 +239,21 @@ model Did {
  * Each instance stores AES-256-GCM encrypted configuration for its adapter.
  */
 model ServiceInstance {
-  id             String       @id @default(cuid())
-  tenantId       String
-  serviceType    ServiceType
-  adapterType    AdapterType
-  name           String
-  description    String?
-  config         String       // AES-256-GCM encrypted JSON blob
-  isPrimary      Boolean      @default(false)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id          String      @id @default(cuid())
+  tenantId    String
+  serviceType ServiceType
+  adapterType AdapterType
+  name        String
+  description String?
+  config      String // AES-256-GCM encrypted JSON blob
+  isPrimary   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  dids           Did[]
-  registrars     Registrar[]        @relation("RegistrarIdr")
-  schemes        IdentifierScheme[] @relation("SchemeIdr")
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dids       Did[]
+  registrars Registrar[]        @relation("RegistrarIdr")
+  schemes    IdentifierScheme[] @relation("SchemeIdr")
 
   @@index([tenantId, serviceType])
 }
@@ -235,18 +278,18 @@ enum RecordSource {
  * Scoped to tenants, with system defaults available to all.
  */
 model Registrar {
-  id                   String   @id @default(cuid())
+  id                   String       @id @default(cuid())
   tenantId             String
   name                 String
   namespace            String
   url                  String?
   idrServiceInstanceId String?
   source               RecordSource @default(USER)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  idrServiceInstance ServiceInstance? @relation("RegistrarIdr", fields: [idrServiceInstanceId], references: [id], onDelete: SetNull)
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  idrServiceInstance ServiceInstance?   @relation("RegistrarIdr", fields: [idrServiceInstanceId], references: [id], onDelete: SetNull)
   schemes            IdentifierScheme[]
 
   @@index([tenantId])
@@ -257,21 +300,21 @@ model Registrar {
  * Each scheme belongs to a registrar and may have qualifier definitions.
  */
 model IdentifierScheme {
-  id                   String   @id @default(cuid())
+  id                   String       @id @default(cuid())
   tenantId             String
   registrarId          String
   name                 String
   primaryKey           String
   validationPattern    String
-  linkTemplate         String   // ISO 18975 link template, e.g. "/{primaryKey}/{value}"
+  linkTemplate         String // ISO 18975 link template, e.g. "/{primaryKey}/{value}"
   idrServiceInstanceId String?
   source               RecordSource @default(USER)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  registrar          Registrar        @relation(fields: [registrarId], references: [id], onDelete: Cascade)
-  idrServiceInstance ServiceInstance? @relation("SchemeIdr", fields: [idrServiceInstanceId], references: [id], onDelete: SetNull)
+  tenant             Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  registrar          Registrar         @relation(fields: [registrarId], references: [id], onDelete: Cascade)
+  idrServiceInstance ServiceInstance?  @relation("SchemeIdr", fields: [idrServiceInstanceId], references: [id], onDelete: SetNull)
   qualifiers         SchemeQualifier[]
   identifiers        Identifier[]
 
@@ -284,15 +327,15 @@ model IdentifierScheme {
  * Each qualifier belongs to exactly one scheme.
  */
 model SchemeQualifier {
-  id                String   @id @default(cuid())
+  id                String       @id @default(cuid())
   schemeId          String
   key               String
   description       String
   validationPattern String
-  order             Int      @default(0)  // Qualifier precedence in URI (ascending)
+  order             Int          @default(0) // Qualifier precedence in URI (ascending)
   source            RecordSource @default(USER)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   scheme IdentifierScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
 
@@ -315,9 +358,9 @@ model Identifier {
   scheme            IdentifierScheme   @relation(fields: [schemeId], references: [id], onDelete: Restrict)
   linkRegistrations LinkRegistration[]
 
-  organisationPrimary     OrganisationEntity?              @relation("OrganisationPrimaryIdentifier")
-  facilityPrimary         Facility?                        @relation("FacilityPrimaryIdentifier")
-  productPrimary          Product?                         @relation("ProductPrimaryIdentifier")
+  organisationPrimary     OrganisationEntity?               @relation("OrganisationPrimaryIdentifier")
+  facilityPrimary         Facility?                         @relation("FacilityPrimaryIdentifier")
+  productPrimary          Product?                          @relation("ProductPrimaryIdentifier")
   organisationSecondaries OrganisationSecondaryIdentifier[] @relation("OrganisationSecondaryIdentifiers")
   facilitySecondaries     FacilitySecondaryIdentifier[]     @relation("FacilitySecondaryIdentifiers")
   productSecondaries      ProductSecondaryIdentifier[]      @relation("ProductSecondaryIdentifiers")
@@ -354,22 +397,22 @@ model LinkRegistration {
  * Distinct from the Tenant model which represents auth tenants.
  */
 model OrganisationEntity {
-  id                    String   @id @default(cuid())
-  tenantId              String
-  name                  String
-  description           String?
-  location              Json?
-  primaryIdentifierId   String?  @unique
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  tenantId            String
+  name                String
+  description         String?
+  location            Json?
+  primaryIdentifierId String?  @unique
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  tenant                Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  primaryIdentifier     Identifier? @relation("OrganisationPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  primaryIdentifier Identifier? @relation("OrganisationPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
 
-  secondaryIdentifiers  OrganisationSecondaryIdentifier[]
-  credentials           Credential[]
-  facilities            Facility[]
-  products              Product[]
+  secondaryIdentifiers OrganisationSecondaryIdentifier[]
+  credentials          Credential[]
+  facilities           Facility[]
+  products             Product[]
 
   @@index([tenantId])
 }
@@ -378,23 +421,23 @@ model OrganisationEntity {
  * Physical locations (factories, farms, warehouses) operated by organisations.
  */
 model Facility {
-  id                        String   @id @default(cuid())
-  tenantId                  String
-  name                      String
-  description               String?
-  location                  Json?
-  operatingOrganisationId   String?
-  primaryIdentifierId       String?  @unique
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  tenantId                String
+  name                    String
+  description             String?
+  location                Json?
+  operatingOrganisationId String?
+  primaryIdentifierId     String?  @unique
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-  tenant                    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  operatingOrganisation     OrganisationEntity? @relation(fields: [operatingOrganisationId], references: [id], onDelete: SetNull)
-  primaryIdentifier         Identifier?         @relation("FacilityPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
+  tenant                Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operatingOrganisation OrganisationEntity? @relation(fields: [operatingOrganisationId], references: [id], onDelete: SetNull)
+  primaryIdentifier     Identifier?         @relation("FacilityPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
 
-  secondaryIdentifiers      FacilitySecondaryIdentifier[]
-  credentials               Credential[]
-  products                  Product[]
+  secondaryIdentifiers FacilitySecondaryIdentifier[]
+  credentials          Credential[]
+  products             Product[]
 
   @@index([tenantId])
 }
@@ -403,60 +446,60 @@ model Facility {
  * Products at three levels per UNTP spec: Model, Batch, Serialised Item.
  */
 model Product {
-  id                        String       @id @default(cuid())
-  tenantId                  String
-  name                      String
-  description               String?
-  level                     ProductLevel
-  batchNumber               String?
-  serialNumber              String?
-  parentId                  String?
-  producedByOrganisationId       String?
-  manufacturingFacilityId   String?
-  primaryIdentifierId       String?      @unique
-  createdAt                 DateTime     @default(now())
-  updatedAt                 DateTime     @updatedAt
+  id                       String       @id @default(cuid())
+  tenantId                 String
+  name                     String
+  description              String?
+  level                    ProductLevel
+  batchNumber              String?
+  serialNumber             String?
+  parentId                 String?
+  producedByOrganisationId String?
+  manufacturingFacilityId  String?
+  primaryIdentifierId      String?      @unique
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
 
-  tenant                    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent                    Product?            @relation("ProductHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children                  Product[]           @relation("ProductHierarchy")
-  producedByOrganisation         OrganisationEntity? @relation(fields: [producedByOrganisationId], references: [id], onDelete: SetNull)
-  manufacturingFacility     Facility?           @relation(fields: [manufacturingFacilityId], references: [id], onDelete: SetNull)
-  primaryIdentifier         Identifier?         @relation("ProductPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
+  tenant                 Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent                 Product?            @relation("ProductHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children               Product[]           @relation("ProductHierarchy")
+  producedByOrganisation OrganisationEntity? @relation(fields: [producedByOrganisationId], references: [id], onDelete: SetNull)
+  manufacturingFacility  Facility?           @relation(fields: [manufacturingFacilityId], references: [id], onDelete: SetNull)
+  primaryIdentifier      Identifier?         @relation("ProductPrimaryIdentifier", fields: [primaryIdentifierId], references: [id], onDelete: SetNull)
 
-  secondaryIdentifiers      ProductSecondaryIdentifier[]
-  credentials               Credential[]
+  secondaryIdentifiers ProductSecondaryIdentifier[]
+  credentials          Credential[]
 
   @@index([tenantId])
   @@index([parentId])
 }
 
 model OrganisationSecondaryIdentifier {
-  organisationId  String
-  identifierId    String
+  organisationId String
+  identifierId   String
 
-  organisation    OrganisationEntity @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  identifier      Identifier         @relation("OrganisationSecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
+  organisation OrganisationEntity @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  identifier   Identifier         @relation("OrganisationSecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
 
   @@id([organisationId, identifierId])
 }
 
 model FacilitySecondaryIdentifier {
-  facilityId    String
-  identifierId  String
+  facilityId   String
+  identifierId String
 
-  facility      Facility   @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-  identifier    Identifier @relation("FacilitySecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
+  facility   Facility   @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  identifier Identifier @relation("FacilitySecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
 
   @@id([facilityId, identifierId])
 }
 
 model ProductSecondaryIdentifier {
-  productId     String
-  identifierId  String
+  productId    String
+  identifierId String
 
-  product       Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  identifier    Identifier @relation("ProductSecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  identifier Identifier @relation("ProductSecondaryIdentifiers", fields: [identifierId], references: [id], onDelete: Cascade)
 
   @@id([productId, identifierId])
 }
@@ -467,28 +510,28 @@ model ProductSecondaryIdentifier {
  * Extensions reference a parent config via the self-relation.
  */
 model DataModel {
-  id               String    @id @default(cuid())
-  tenantId         String?
-  tenant           Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String  @id @default(cuid())
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name             String
-  credentialType   String
-  version          String
+  name           String
+  credentialType String
+  version        String
 
-  isExtension      Boolean   @default(true)
-  parentConfigId   String?
-  parentConfig     DataModel?  @relation("ExtensionParent", fields: [parentConfigId], references: [id], onDelete: Cascade)
-  extensions       DataModel[] @relation("ExtensionParent")
+  isExtension    Boolean     @default(true)
+  parentConfigId String?
+  parentConfig   DataModel?  @relation("ExtensionParent", fields: [parentConfigId], references: [id], onDelete: Cascade)
+  extensions     DataModel[] @relation("ExtensionParent")
 
-  schemaUrl        String
-  contextUrl       String
-  websiteUrl       String?
-  source           RecordSource @default(USER)
+  schemaUrl  String
+  contextUrl String
+  websiteUrl String?
+  source     RecordSource @default(USER)
 
-  renderTemplates  RenderTemplate[]
+  renderTemplates RenderTemplate[]
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([credentialType, version, tenantId, isExtension, name])
 }
@@ -498,29 +541,29 @@ model DataModel {
  * Stores storage URLs and hashes, with an isDefault flag for tenant default selection.
  */
 model RenderTemplate {
-  id                       String                @id @default(cuid())
-  tenantId                 String
-  tenant                   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  dataModelId              String
-  dataModel                DataModel              @relation(fields: [dataModelId], references: [id], onDelete: Cascade)
+  dataModelId String
+  dataModel   DataModel @relation(fields: [dataModelId], references: [id], onDelete: Cascade)
 
   name                     String
   storageUrl               String
   digestMultibase          String
-  isDefault                Boolean   @default(false)
-  renderMethodType          RenderMethodType
-  storageServiceInstanceId  String?
-  storageExternalId         String?
-  storageBucket             String?
-  storageContentType        String?
-  inline                    Boolean?
-  mediaType                 String?
-  mediaQuery                String?
-  source                    RecordSource @default(USER)
+  isDefault                Boolean          @default(false)
+  renderMethodType         RenderMethodType
+  storageServiceInstanceId String?
+  storageExternalId        String?
+  storageBucket            String?
+  storageContentType       String?
+  inline                   Boolean?
+  mediaType                String?
+  mediaQuery               String?
+  source                   RecordSource     @default(USER)
 
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([tenantId, dataModelId])
 }
@@ -561,7 +604,7 @@ enum ConformityFetchStatus {
  * Inlines versioned profiles and criteria.
  */
 model ConformityScheme {
-  id                 String          @id @default(cuid())
+  id                 String                 @id @default(cuid())
   canonicalId        String
   name               String
   description        String?
@@ -579,10 +622,10 @@ model ConformityScheme {
   lastFetchStatus    ConformityFetchStatus
   seedEntryKind      SeedEntryKind?
   rawDocument        Json?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
   tenantId           String
-  tenant             Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   profiles           ConformityProfile[]
 
   @@unique([canonicalId, tenantId])

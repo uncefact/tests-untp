@@ -238,6 +238,8 @@ When publishing cannot complete, the credential is still issued and returned, an
 | `DB_STATUS_UPDATE_FAILED` | The links are live on the resolver, but the stored published status could not be saved. | The credential is discoverable; only the local status is stale. |
 | `ENTITY_LINK_FAILED` | The credential could not be linked to its master-data record, which no longer exists. | Optional enrichment only; publishing and the credential itself are unaffected. |
 | `DETAILS_EXTRACTION_FAILED` | The credential's name, issuer, subject and validity dates could not be read from it, so they are not recorded against it. | The credential can be retrieved and verified as usual. Only its stored summary is missing. The warning names the correlation ID to quote to your operator, who can find the cause in the logs. |
+| `IDEMPOTENCY_RESPONSE_NOT_RECORDED` | The credential was issued and a retry with this key returns it, but the warnings on this response may not be repeated. | A retry with this key returns this credential. The warnings on this response may differ. |
+| `IDEMPOTENCY_RESPONSE_UNREADABLE` | The credential was issued by an earlier request with this key, but the response recorded for it could not be read, so any warnings from that response are not repeated here. | The credential itself is unaffected. Quote the correlation ID to your operator, who can find the cause in the logs. |
 
 The IDR entry's `description` field is taken from the linked primary entity's `description`, falling back to the entity's `name`, and then to the link title (`publishingOptions.linkTitle`, or the data model's name) when no entity is linked, since the resolver requires a non-empty description.
 
@@ -294,6 +296,16 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 | `publishingOptions.accessRole` | string[] | No | UNTP access roles governing who the published links are surfaced to (e.g. `untp:accessRole#Regulator`) |
 
 Every field is shape-checked at the boundary: a missing or mistyped field is rejected with a 400 that names it, and unknown fields are ignored. The verification URLs must be well-formed HTTP(S) URLs without embedded credentials, `hreflang` entries must be well-formed [BCP 47](https://www.rfc-editor.org/rfc/rfc5646.html) language tags, and `linkType` must not be blank. Passing `null` for `storageOptions` or `publishingOptions` is rejected; omit them instead.
+
+**Request headers:**
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Idempotency-Key` | No | A non-blank string of at most 255 characters after trimming, using only printable ASCII. Keys are scoped to the authenticated tenant. |
+
+When the header is present, a retry while the original is still running, including while it publishes, is rejected with `409` and code `IDEMPOTENCY_KEY_IN_FLIGHT`. Once the original has delivered its response, the same key and the same raw request body replay that `201`, warnings included; the recorded-but-undelivered case below is the one exception to warnings coming back. A later request with the same key and a different body is rejected with `422` and code `IDEMPOTENCY_KEY_MISMATCH`. If the original never delivered a response, a retry after the configured window replays the credential it recorded, or issues afresh only when no credential was recorded. A key whose credential was later removed is free again. Omitting the header leaves issuance unchanged.
+
+A request body larger than the configured maximum is rejected with HTTP `413` and code `REQUEST_BODY_TOO_LARGE`. The message names the limit in bytes. The operator sets the bound. See [Startup](../operations/startup#request-body-size-limit).
 
 ---
 

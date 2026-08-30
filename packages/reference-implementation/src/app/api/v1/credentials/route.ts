@@ -1,3 +1,4 @@
+import { TextDecoder } from 'node:util';
 import { NextResponse } from 'next/server';
 import {
   ValidationError,
@@ -6,6 +7,15 @@ import {
   assertPublicUrl,
   assertHttpUrl,
 } from '@/lib/api/validation';
+import { ConflictError } from '@/lib/api/errors';
+import {
+  IDEMPOTENCY_KEY_HELD_ELSEWHERE_MESSAGE,
+  digestRequestBody,
+  parseIdempotencyKeyHeader,
+  throwIdempotencyClassification,
+} from '@/lib/api/idempotency';
+import { readRequestBytes } from '@/lib/api/request-body';
+import { IdempotencyOperation } from '@/lib/prisma/generated';
 import { credentialIssueRequestSchema, listCredentialsQuerySchema } from '@/lib/api/request-schemas/credential';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { resolveAppUrl, buildVerifyUrl } from '@/lib/config/app-url.config';
@@ -16,15 +26,25 @@ import { validateCredentialPayload } from '@/lib/credentials/validate-credential
 import { issueCredential } from '@/lib/credentials/issue-credential';
 import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 import { schemaLoader } from '@/lib/credentials/schema-loader';
-import { updateCredentialPublished, listCredentials } from '@/lib/prisma/repositories';
+import {
+  updateCredentialPublished,
+  listCredentials,
+  getDidByDid,
+  findConformitySchemeByCanonicalId,
+  claimIdempotencyKey,
+  completeIdempotencyKey,
+  findIdempotencyKey,
+  releaseIdempotencyKey,
+} from '@/lib/prisma/repositories';
+import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { resolvePublishTarget } from '@/lib/credentials/resolve-publish-target';
-import { getDidByDid, findConformitySchemeByCanonicalId } from '@/lib/prisma/repositories';
+import type { PrimaryEntityResult } from '@/lib/entities/resolve-primary-entity';
 import { buildPublishLinks, remapWarningPointers, IdrPublishError } from '@uncefact/untp-ri-services';
-import type { CredentialPayload, ExtractedRefs } from '@uncefact/untp-ri-services';
+import type { CredentialPayload, ExtractedRefs, StorageRecord } from '@uncefact/untp-ri-services';
 import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
 
 type CredentialWarning = {
@@ -47,266 +67,113 @@ function defaultHumanVerificationUrl(): string {
   return buildVerifyUrl(resolveAppUrl());
 }
 
-// ---------------------------------------------------------------------------
-// POST /api/v1/credentials
-// ---------------------------------------------------------------------------
+function idempotencyResponseNotRecordedWarning(): CredentialWarning {
+  return {
+    code: 'IDEMPOTENCY_RESPONSE_NOT_RECORDED',
+    message:
+      'The credential was issued and a retry with this key returns it, but the warnings on this response may not be repeated.',
+    remediation: 'A retry with this key returns this credential. The warnings on this response may differ.',
+  };
+}
+
+function idempotencyResponseUnreadableWarning(): CredentialWarning {
+  return {
+    code: 'IDEMPOTENCY_RESPONSE_UNREADABLE',
+    message:
+      'The credential was issued by an earlier request with this key, but the response recorded for it could not be read, so any warnings from that response are not repeated here.',
+    remediation: `The credential itself is unaffected. Quote correlation ID ${getOrMintCorrelationId()} to your operator, who can find the cause in the logs.`,
+  };
+}
+
+function issuanceReplayResponse(replay: {
+  credentialId: string;
+  responseBody: unknown;
+  responseBodyUnreadable?: true;
+}) {
+  const response: Record<string, unknown> = { credentialId: replay.credentialId };
+  const warnings = Array.isArray(replay.responseBody) ? [...replay.responseBody] : [];
+  if (replay.responseBodyUnreadable) {
+    warnings.push(idempotencyResponseUnreadableWarning());
+  }
+  if (warnings.length > 0) {
+    response.warnings = warnings;
+  }
+  return NextResponse.json(response, { status: 201 });
+}
+
+function issuanceIdempotencyInput(tenantId: string, key: string, bodyDigest: string) {
+  return { tenantId, operation: IdempotencyOperation.CREDENTIAL_ISSUE, key, bodyDigest };
+}
 
 /**
- * @swagger
- * /credentials:
- *   post:
- *     summary: Issue a verifiable credential
- *     description: |
- *       Validates a credential payload via JSON Schema and JSON-LD expansion,
- *       verifies that the issuer DID belongs to the authenticated tenant or is
- *       a system default DID, signs it, stores the enveloped credential
- *       (optionally encrypted), optionally publishes it to the Identity
- *       Resolver, links it to its primary entity, and returns the credential ID.
- *     tags:
- *       - Credentials
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/CredentialIssueRequest'
- *     responses:
- *       201:
- *         description: >-
- *           Credential issued. When publishing was requested and could not
- *           complete, the credential is still returned and a warning names the
- *           unmet prerequisite with a remediation; publishing never fails
- *           issuance.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/CredentialIssueResponse'
- *       400:
- *         description: >-
- *           Validation error. Request-shape failures name the offending field
- *           (missing or mistyped credentialPayload, credentialType, version,
- *           storageOptions, or publishingOptions, including a malformed
- *           verification URL or hreflang entry; unknown body fields are
- *           ignored). An unknown data model (credentialType and version pair)
- *           and an issuer DID not registered to the tenant are also 400s.
- *           Payload-validation failures carry
- *           a `code`: `SCHEMA_DOCUMENT_INVALID` or `JSONLD_DOCUMENT_INVALID`
- *           mean the payload itself is invalid and the message says what to
- *           fix; `SCHEMA_FETCH_FAILED` or `JSONLD_CONTEXT_FETCH_FAILED` mean
- *           a remote schema or `@context` could not be fetched or used,
- *           which reflects an upstream or configuration condition rather
- *           than a payload fault (the schema message names the schema URL;
- *           the context message carries the HTTP status or timeout where
- *           one applies).
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         $ref: '#/components/responses/UnauthorisedResponse'
- *       403:
- *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
- *       404:
- *         description: Service instance not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ * Compare-and-set of the final response. A lost race re-reads the winner's
+ * body so this caller never returns warnings that disagree with the row.
+ * A save failure must not fail the request: the credential already exists,
+ * so releasing the key would let a retry mint a second one (#954). The
+ * caller is told via `IDEMPOTENCY_RESPONSE_NOT_RECORDED`.
  */
-export const POST = withTenantAuth(async (req, { tenantId }) => {
-  // ── Step 1: Validate request ────────────────────────────────────────────
-
-  logger.info('Parsing and validating request body');
-  const body = await parseRequestBody(req, credentialIssueRequestSchema);
-
-  const { credentialType, version } = body;
-  // Omitted option objects stay empty objects, as they always have: an
-  // undefined publishingOptions must not change the happy-path publish and
-  // encrypt defaults downstream.
-  const storageOptions = body.storageOptions ?? {};
-  const publishingOptions = body.publishingOptions ?? {};
-
-  // ── Verification URL validation ───────────────────────────────────────
-  // Caller-supplied verification URLs are always validated as well-formed,
-  // absolute, userinfo-free http(s) URLs before issuance, so a malformed,
-  // non-http(s), or credential-bearing value is rejected up front rather than
-  // published or failing later during link construction. assertHttpUrl returns
-  // the WHATWG-canonical URL, and the canonical `href` (not the raw caller
-  // string) is what is SSRF-checked and published downstream. Validating and
-  // publishing the same canonical form closes a parser-differential SSRF gap:
-  // a value like `https://1.1.1.1\@127.0.0.1/` that this parser reads as host
-  // `1.1.1.1` cannot be re-read as `127.0.0.1` by a different parser once the
-  // canonical `href` (`https://1.1.1.1/@127.0.0.1/`) is what leaves the route.
-  // The private-address / DNS SSRF check is additionally applied unless
-  // VERIFY_ALLOW_PRIVATE_URLS relaxes it for local development.
-  const machineVerificationUrl = publishingOptions.machineVerificationUrl
-    ? assertHttpUrl(publishingOptions.machineVerificationUrl, 'publishingOptions.machineVerificationUrl').href
-    : undefined;
-  const humanVerificationUrl = publishingOptions.humanVerificationUrl
-    ? assertHttpUrl(publishingOptions.humanVerificationUrl, 'publishingOptions.humanVerificationUrl').href
-    : undefined;
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
-    if (machineVerificationUrl) {
-      await assertPublicUrl(machineVerificationUrl, 'publishingOptions.machineVerificationUrl');
-    }
-    if (humanVerificationUrl) {
-      await assertPublicUrl(humanVerificationUrl, 'publishingOptions.humanVerificationUrl');
-    }
-  }
-
-  // ── Default the human verification link (see defaultHumanVerificationUrl) ─
-  // RI_APP_URL is boot-validated (instrumentation.node.ts), so this is plain
-  // construction. The derived default is trusted operator config, so it is
-  // intentionally not SSRF-checked and a localhost RI_APP_URL is accepted in
-  // development.
-  const effectiveHumanVerificationUrl =
-    publishingOptions.publish === true && !humanVerificationUrl ? defaultHumanVerificationUrl() : humanVerificationUrl;
-
-  // ── Step 2: Resolve data model ──────────────────────────────────────────
-
-  logger.info({ credentialType, version }, 'Resolving data model');
-  const { dataModel, bridge, schemaUrls } = await resolveDataModel(tenantId, credentialType, version);
-
-  // ── Step 3: Validate payload ────────────────────────────────────────────
-
-  logger.info('Validating credential payload against schema');
-  await validateCredentialPayload(body.credentialPayload, schemaUrls, schemaLoader);
-
-  // The boundary schema keeps the payload an open object; the JSON Schema +
-  // JSON-LD pass above is what actually inspects it, so this is the one place
-  // the opaque record is asserted to the payload type the rest of the handler
-  // (and issueCredential) works with.
-  const credentialPayload = body.credentialPayload as CredentialPayload;
-
-  // ── Step 3.5: Extract entity references for publishing ──────────────────
-
-  const warnings: CredentialWarning[] = [];
-
-  let refs: ExtractedRefs | undefined;
+async function completeIssuanceIdempotencyKeyOrReplay(input: {
+  claimId: string;
+  credentialId: string;
+  warnings: CredentialWarning[];
+  tenantId: string;
+  idempotencyKey: string;
+  bodyDigest: string;
+}): Promise<ReturnType<typeof NextResponse.json> | undefined> {
   try {
-    const subject = credentialPayload.credentialSubject as Record<string, unknown>;
-    refs = bridge.extractRefs(subject);
-  } catch (error) {
-    logger.error({ err: error, credentialType }, 'Reference extraction failed');
-    if (publishingOptions.publish) {
-      warnings.push({
-        code: 'REFS_EXTRACTION_FAILED',
-        message: 'Publishing was requested but no identifier could be extracted from the credential payload.',
-        remediation:
-          "Check that the credential's subject carries the identifier fields its data model defines, such as a registeredId on the party or product.",
-      });
-    }
-  }
-
-  // ── Step 3.6: Conformity claim validation (advisory) ────────────────────
-  // For credentials carrying a conformity claim (the DCC), cross-check the
-  // claim's scheme / profile / criteria URIs against the locally cached
-  // vocabulary. Advisory only per ADR-033 §3: a mismatch never blocks
-  // issuance; it surfaces as `conformity-*` warnings on the response. Reads
-  // only the local projection (no network).
-  try {
-    const subject = credentialPayload.credentialSubject as Record<string, unknown>;
-    // The validator's pointers address the extracted claim, which is a
-    // synthesised projection the caller never sees, so they are rewritten onto
-    // the submitted credential using the paths the extractor recorded (#753).
-    // A pointer that cannot be translated is dropped rather than returned.
-    const extracted = bridge.extractConformityClaimWithProvenance(subject);
-    if (extracted) {
-      const scheme = await findConformitySchemeByCanonicalId(extracted.claim.scheme, tenantId);
-      const claimWarnings = validateConformityClaim(extracted.claim, scheme);
-      warnings.push(
-        ...remapWarningPointers(claimWarnings, extracted.sourceMap, credentialPayload, '/credentialSubject'),
+    const { applied } = await completeIdempotencyKey({
+      claimId: input.claimId,
+      credentialId: input.credentialId,
+      responseBody: input.warnings,
+    });
+    if (!applied) {
+      const winner = await findIdempotencyKey(
+        issuanceIdempotencyInput(input.tenantId, input.idempotencyKey, input.bodyDigest),
       );
+      if (winner.outcome === 'replay') {
+        return issuanceReplayResponse(winner);
+      }
+      logger.warn(
+        { credentialId: input.credentialId, idempotencyKey: input.idempotencyKey, claimId: input.claimId },
+        'The Idempotency-Key was already finalised but its stored response could not be re-read',
+      );
+      input.warnings.push(idempotencyResponseNotRecordedWarning());
     }
   } catch (error) {
-    logger.error({ err: error, credentialType }, 'Conformity claim validation failed');
-    warnings.push({
-      code: 'conformity-claim.validation-error',
-      message:
-        'Conformity claim validation could not be performed; credential was issued without conformity vocabulary checks.',
-    });
-  }
-
-  // ── Step 4: Validate issuer DID ownership ────────────────────────────────
-  // The issuer DID in the credential payload must belong to the authenticated
-  // tenant or be the system default DID. This prevents a tenant from signing
-  // credentials with a DID they do not control.
-
-  const issuer = credentialPayload.issuer;
-  const issuerDid = typeof issuer === 'string' ? issuer : issuer?.id;
-  if (!issuerDid) {
-    throw new ValidationError('credentialPayload.issuer.id is required');
-  }
-
-  logger.info({ issuerDid }, 'Validating issuer DID ownership');
-  const didRecord = await getDidByDid(issuerDid, tenantId);
-  if (!didRecord) {
-    logger.warn({ issuerDid }, 'Issuer DID not found for tenant');
-    throw new ValidationError(
-      `Issuer DID "${issuerDid}" is not registered to your tenant. ` +
-        'You can only issue credentials with a DID that belongs to your tenant or the system default DID.',
+    logger.error(
+      { err: error, credentialId: input.credentialId, idempotencyKey: input.idempotencyKey },
+      'Failed to record the Idempotency-Key final response after the credential was issued',
     );
+    input.warnings.push(idempotencyResponseNotRecordedWarning());
   }
+  return undefined;
+}
 
-  // ── Step 5: Validate DID has a VC service association ──────────────────
+type PublishIssuedCredentialInput = {
+  publishingOptions: NonNullable<import('zod').infer<typeof credentialIssueRequestSchema>['publishingOptions']>;
+  refs: ExtractedRefs | undefined;
+  tenantId: string;
+  credentialId: string;
+  warnings: CredentialWarning[];
+  storageResponse: StorageRecord;
+  dataModel: { name: string };
+  primaryEntity: PrimaryEntityResult;
+  machineVerificationUrl: string | undefined;
+  effectiveHumanVerificationUrl: string | undefined;
+};
 
-  if (!didRecord.serviceInstanceId) {
-    logger.warn({ issuerDid }, 'Issuer DID has no associated VC service instance');
-    throw new ValidationError(
-      `Issuer DID "${issuerDid}" has no associated VC service instance. ` +
-        'The DID may have lost its service association (e.g., the service instance was force-deleted). ' +
-        'Re-import or re-create the DID to restore the association.',
-    );
-  }
-
-  // ── Step 6: Resolve services ────────────────────────────────────────────
-  // The VC service is resolved from the DID's associated service instance,
-  // ensuring signing always happens on the VC service that holds the DID's
-  // key material. This works for both tenant-owned and system default DIDs.
-
-  logger.info({ vcServiceInstanceId: didRecord.serviceInstanceId }, 'Resolving VC and storage services');
-  const vcService = await resolveVcService(tenantId, didRecord.serviceInstanceId);
-  const storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
-
-  // ── Step 7: Issue credential ────────────────────────────────────────────
-
-  logger.info({ credentialType }, 'Issuing credential');
-  const { credentialId, storageResponse, primaryEntity, entityLinkFailed, detailsExtractionFailed } =
-    await issueCredential({
-      tenantId,
-      credentialPayload,
-      credentialType,
-      refs: refs ?? { organisations: [], facilities: [], products: [] },
-      vcService,
-      storageService,
-      storageOptions,
-      bridge,
-    });
-
-  if (detailsExtractionFailed) {
-    warnings.push({
-      code: 'DETAILS_EXTRACTION_FAILED' as const,
-      message:
-        'The credential was issued but its name, issuer, subject and validity dates could not be read from it, so they are not recorded against it.',
-      remediation: `The credential itself is unaffected and can be retrieved and verified as usual. Only its stored summary is missing. Quote correlation ID ${getOrMintCorrelationId()} to your operator, who can find the cause in the logs.`,
-    });
-  }
-
-  if (entityLinkFailed) {
-    warnings.push({
-      code: 'ENTITY_LINK_FAILED' as const,
-      message: 'The credential was issued but could not be linked to its master-data record, which no longer exists.',
-      remediation:
-        'Re-create the master-data record if the link matters to you. The credential itself is unaffected, and publishing does not depend on the link.',
-    });
-  }
-
+async function publishIssuedCredential({
+  publishingOptions,
+  refs,
+  tenantId,
+  credentialId,
+  warnings,
+  storageResponse,
+  dataModel,
+  primaryEntity,
+  machineVerificationUrl,
+  effectiveHumanVerificationUrl,
+}: PublishIssuedCredentialInput): Promise<void> {
   // ── Step 8: Publish to IDR ──────────────────────────────────────────────
 
   if (publishingOptions.publish === true && refs) {
@@ -486,6 +353,401 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
           }
         }
       }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/credentials
+// ---------------------------------------------------------------------------
+
+/**
+ * @swagger
+ * /credentials:
+ *   post:
+ *     summary: Issue a verifiable credential
+ *     description: |
+ *       Validates a credential payload via JSON Schema and JSON-LD expansion,
+ *       verifies that the issuer DID belongs to the authenticated tenant or is
+ *       a system default DID, signs it, stores the enveloped credential
+ *       (optionally encrypted), optionally publishes it to the Identity
+ *       Resolver, links it to its primary entity, and returns the credential ID.
+ *     tags:
+ *       - Credentials
+ *     parameters:
+ *       - in: header
+ *         name: Idempotency-Key
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: >-
+ *           A non-blank string of at most 255 characters after trimming,
+ *           using only printable ASCII. Keys are scoped to the authenticated
+ *           tenant. A retry while the original is still running, including
+ *           while it publishes, is 409. Once the original has delivered its
+ *           response, the same key and body replay it exactly, warnings
+ *           included. If the original never delivered a response, a retry
+ *           after the configured window replays the credential it recorded,
+ *           or issues afresh only when no credential was recorded. A key
+ *           whose credential was later removed is free again.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CredentialIssueRequest'
+ *     responses:
+ *       201:
+ *         description: >-
+ *           Credential issued. When publishing was requested and could not
+ *           complete, the credential is still returned and a warning names the
+ *           unmet prerequisite with a remediation; publishing never fails
+ *           issuance.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CredentialIssueResponse'
+ *       400:
+ *         description: >-
+ *           Validation error. Request-shape failures name the offending field
+ *           (missing or mistyped credentialPayload, credentialType, version,
+ *           storageOptions, or publishingOptions, including a malformed
+ *           verification URL or hreflang entry; unknown body fields are
+ *           ignored). An invalid Idempotency-Key header (blank, longer than
+ *           255 characters after trimming, or containing a character outside
+ *           printable ASCII) is a 400 that names the header. An unknown data
+ *           model (credentialType and version pair)
+ *           and an issuer DID not registered to the tenant are also 400s.
+ *           Payload-validation failures carry
+ *           a `code`: `SCHEMA_DOCUMENT_INVALID` or `JSONLD_DOCUMENT_INVALID`
+ *           mean the payload itself is invalid and the message says what to
+ *           fix; `SCHEMA_FETCH_FAILED` or `JSONLD_CONTEXT_FETCH_FAILED` mean
+ *           a remote schema or `@context` could not be fetched or used,
+ *           which reflects an upstream or configuration condition rather
+ *           than a payload fault (the schema message names the schema URL;
+ *           the context message carries the HTTP status or timeout where
+ *           one applies).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
+ *       404:
+ *         description: Service instance not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: >-
+ *           Either a request with this Idempotency-Key is still being
+ *           processed, or another request now holds the key. Retry to
+ *           receive the result. The body carries `IDEMPOTENCY_KEY_IN_FLIGHT`.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               stillProcessing:
+ *                 summary: The original request is still running
+ *                 value:
+ *                   error: A request with this Idempotency-Key is still being processed. Retry shortly.
+ *                   code: IDEMPOTENCY_KEY_IN_FLIGHT
+ *               heldElsewhere:
+ *                 summary: The key was reclaimed by another request
+ *                 value:
+ *                   error: Another request now holds this Idempotency-Key. Retry to receive that request's result.
+ *                   code: IDEMPOTENCY_KEY_IN_FLIGHT
+ *       422:
+ *         description: This Idempotency-Key was already used with a different request body.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               keyReusedWithDifferentBody:
+ *                 value:
+ *                   error: This Idempotency-Key was already used with a different request body.
+ *                   code: IDEMPOTENCY_KEY_MISMATCH
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+export const POST = withTenantAuth(async (req, { tenantId }) => {
+  const idempotencyKey = parseIdempotencyKeyHeader(req);
+
+  // ── Step 1: Read body bytes, then validate ──────────────────────────────
+  // Digest the raw bytes before parsing so a retry is classified against the
+  // stored body even when a data model or service has since become
+  // unavailable (#954). A body that cannot be read is a 400. A body over the
+  // configured cap is a 413.
+
+  const requestBytes = await readRequestBytes(req);
+  const bodyDigest = await digestRequestBody(requestBytes);
+  const rawBody = new TextDecoder().decode(requestBytes);
+
+  if (idempotencyKey !== undefined) {
+    const existing = await findIdempotencyKey(issuanceIdempotencyInput(tenantId, idempotencyKey, bodyDigest));
+    if (existing.outcome === 'mismatch' || existing.outcome === 'in-flight') {
+      throwIdempotencyClassification(existing.outcome);
+    }
+    if (existing.outcome === 'replay') {
+      return issuanceReplayResponse(existing);
+    }
+  }
+
+  logger.info('Parsing and validating request body');
+  const body = await parseRequestBody(
+    {
+      json: async () => JSON.parse(rawBody),
+    },
+    credentialIssueRequestSchema,
+  );
+
+  const { credentialType, version } = body;
+  // Omitted option objects stay empty objects, as they always have: an
+  // undefined publishingOptions must not change the happy-path publish and
+  // encrypt defaults downstream.
+  const storageOptions = body.storageOptions ?? {};
+  const publishingOptions = body.publishingOptions ?? {};
+
+  // ── Verification URL validation ───────────────────────────────────────
+  // Caller-supplied verification URLs are always validated as well-formed,
+  // absolute, userinfo-free http(s) URLs before issuance, so a malformed,
+  // non-http(s), or credential-bearing value is rejected up front rather than
+  // published or failing later during link construction. assertHttpUrl returns
+  // the WHATWG-canonical URL, and the canonical `href` (not the raw caller
+  // string) is what is SSRF-checked and published downstream. Validating and
+  // publishing the same canonical form closes a parser-differential SSRF gap:
+  // a value like `https://1.1.1.1\@127.0.0.1/` that this parser reads as host
+  // `1.1.1.1` cannot be re-read as `127.0.0.1` by a different parser once the
+  // canonical `href` (`https://1.1.1.1/@127.0.0.1/`) is what leaves the route.
+  // The private-address / DNS SSRF check is additionally applied unless
+  // VERIFY_ALLOW_PRIVATE_URLS relaxes it for local development.
+  const machineVerificationUrl = publishingOptions.machineVerificationUrl
+    ? assertHttpUrl(publishingOptions.machineVerificationUrl, 'publishingOptions.machineVerificationUrl').href
+    : undefined;
+  const humanVerificationUrl = publishingOptions.humanVerificationUrl
+    ? assertHttpUrl(publishingOptions.humanVerificationUrl, 'publishingOptions.humanVerificationUrl').href
+    : undefined;
+  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    if (machineVerificationUrl) {
+      await assertPublicUrl(machineVerificationUrl, 'publishingOptions.machineVerificationUrl');
+    }
+    if (humanVerificationUrl) {
+      await assertPublicUrl(humanVerificationUrl, 'publishingOptions.humanVerificationUrl');
+    }
+  }
+
+  // ── Default the human verification link (see defaultHumanVerificationUrl) ─
+  // RI_APP_URL is boot-validated (instrumentation.node.ts), so this is plain
+  // construction. The derived default is trusted operator config, so it is
+  // intentionally not SSRF-checked and a localhost RI_APP_URL is accepted in
+  // development.
+  const effectiveHumanVerificationUrl =
+    publishingOptions.publish === true && !humanVerificationUrl ? defaultHumanVerificationUrl() : humanVerificationUrl;
+
+  // ── Step 2: Resolve data model ──────────────────────────────────────────
+
+  logger.info({ credentialType, version }, 'Resolving data model');
+  const { dataModel, bridge, schemaUrls } = await resolveDataModel(tenantId, credentialType, version);
+
+  // ── Step 3: Validate payload ────────────────────────────────────────────
+
+  logger.info('Validating credential payload against schema');
+  await validateCredentialPayload(body.credentialPayload, schemaUrls, schemaLoader);
+
+  // The boundary schema keeps the payload an open object; the JSON Schema +
+  // JSON-LD pass above is what actually inspects it, so this is the one place
+  // the opaque record is asserted to the payload type the rest of the handler
+  // (and issueCredential) works with.
+  const credentialPayload = body.credentialPayload as CredentialPayload;
+
+  // ── Step 3.5: Extract entity references for publishing ──────────────────
+
+  const warnings: CredentialWarning[] = [];
+
+  let refs: ExtractedRefs | undefined;
+  try {
+    const subject = credentialPayload.credentialSubject as Record<string, unknown>;
+    refs = bridge.extractRefs(subject);
+  } catch (error) {
+    logger.error({ err: error, credentialType }, 'Reference extraction failed');
+    if (publishingOptions.publish) {
+      warnings.push({
+        code: 'REFS_EXTRACTION_FAILED',
+        message: 'Publishing was requested but no identifier could be extracted from the credential payload.',
+        remediation:
+          "Check that the credential's subject carries the identifier fields its data model defines, such as a registeredId on the party or product.",
+      });
+    }
+  }
+
+  // ── Step 3.6: Conformity claim validation (advisory) ────────────────────
+  // For credentials carrying a conformity claim (the DCC), cross-check the
+  // claim's scheme / profile / criteria URIs against the locally cached
+  // vocabulary. Advisory only per ADR-033 §3: a mismatch never blocks
+  // issuance; it surfaces as `conformity-*` warnings on the response. Reads
+  // only the local projection (no network).
+  try {
+    const subject = credentialPayload.credentialSubject as Record<string, unknown>;
+    // The validator's pointers address the extracted claim, which is a
+    // synthesised projection the caller never sees, so they are rewritten onto
+    // the submitted credential using the paths the extractor recorded (#753).
+    // A pointer that cannot be translated is dropped rather than returned.
+    const extracted = bridge.extractConformityClaimWithProvenance(subject);
+    if (extracted) {
+      const scheme = await findConformitySchemeByCanonicalId(extracted.claim.scheme, tenantId);
+      const claimWarnings = validateConformityClaim(extracted.claim, scheme);
+      warnings.push(
+        ...remapWarningPointers(claimWarnings, extracted.sourceMap, credentialPayload, '/credentialSubject'),
+      );
+    }
+  } catch (error) {
+    logger.error({ err: error, credentialType }, 'Conformity claim validation failed');
+    warnings.push({
+      code: 'conformity-claim.validation-error',
+      message:
+        'Conformity claim validation could not be performed; credential was issued without conformity vocabulary checks.',
+    });
+  }
+
+  // ── Step 4: Validate issuer DID ownership ────────────────────────────────
+  // The issuer DID in the credential payload must belong to the authenticated
+  // tenant or be the system default DID. This prevents a tenant from signing
+  // credentials with a DID they do not control.
+
+  const issuer = credentialPayload.issuer;
+  const issuerDid = typeof issuer === 'string' ? issuer : issuer?.id;
+  if (!issuerDid) {
+    throw new ValidationError('credentialPayload.issuer.id is required');
+  }
+
+  logger.info({ issuerDid }, 'Validating issuer DID ownership');
+  const didRecord = await getDidByDid(issuerDid, tenantId);
+  if (!didRecord) {
+    logger.warn({ issuerDid }, 'Issuer DID not found for tenant');
+    throw new ValidationError(
+      `Issuer DID "${issuerDid}" is not registered to your tenant. ` +
+        'You can only issue credentials with a DID that belongs to your tenant or the system default DID.',
+    );
+  }
+
+  // ── Step 5: Validate DID has a VC service association ──────────────────
+
+  if (!didRecord.serviceInstanceId) {
+    logger.warn({ issuerDid }, 'Issuer DID has no associated VC service instance');
+    throw new ValidationError(
+      `Issuer DID "${issuerDid}" has no associated VC service instance. ` +
+        'The DID may have lost its service association (e.g., the service instance was force-deleted). ' +
+        'Re-import or re-create the DID to restore the association.',
+    );
+  }
+
+  // ── Step 6: Resolve services ────────────────────────────────────────────
+  // The VC service is resolved from the DID's associated service instance,
+  // ensuring signing always happens on the VC service that holds the DID's
+  // key material. This works for both tenant-owned and system default DIDs.
+
+  logger.info({ vcServiceInstanceId: didRecord.serviceInstanceId }, 'Resolving VC and storage services');
+  const vcService = await resolveVcService(tenantId, didRecord.serviceInstanceId);
+  const storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
+
+  // ── Step 7: Issue credential ────────────────────────────────────────────
+
+  let claimId: string | undefined;
+  if (idempotencyKey !== undefined) {
+    const claim = await claimIdempotencyKey(issuanceIdempotencyInput(tenantId, idempotencyKey, bodyDigest));
+    if (claim.outcome === 'mismatch' || claim.outcome === 'in-flight') {
+      throwIdempotencyClassification(claim.outcome);
+    }
+    if (claim.outcome === 'replay') {
+      return issuanceReplayResponse(claim);
+    }
+    claimId = claim.claimId;
+  }
+
+  logger.info({ credentialType }, 'Issuing credential');
+  let issued: Awaited<ReturnType<typeof issueCredential>>;
+  try {
+    issued = await issueCredential({
+      tenantId,
+      credentialPayload,
+      credentialType,
+      refs: refs ?? { organisations: [], facilities: [], products: [] },
+      vcService,
+      storageService,
+      storageOptions,
+      bridge,
+      ...(claimId !== undefined ? { idempotencyClaimId: claimId } : {}),
+    });
+  } catch (error) {
+    if (error instanceof IdempotencyClaimLostError) {
+      throw new ConflictError(IDEMPOTENCY_KEY_HELD_ELSEWHERE_MESSAGE, 'IDEMPOTENCY_KEY_IN_FLIGHT');
+    }
+    if (claimId !== undefined) {
+      try {
+        const { applied } = await releaseIdempotencyKey({ claimId });
+        if (!applied) {
+          logger.warn({ claimId, idempotencyKey }, 'Issuance failed but the Idempotency-Key claim was no longer owned');
+        }
+      } catch (releaseError) {
+        logger.error({ err: releaseError, idempotencyKey }, 'Failed to release issuance idempotency key');
+      }
+    }
+    throw error;
+  }
+
+  const { credentialId, storageResponse, primaryEntity, entityLinkFailed, detailsExtractionFailed } = issued;
+
+  if (detailsExtractionFailed) {
+    warnings.push({
+      code: 'DETAILS_EXTRACTION_FAILED' as const,
+      message:
+        'The credential was issued but its name, issuer, subject and validity dates could not be read from it, so they are not recorded against it.',
+      remediation: `The credential itself is unaffected and can be retrieved and verified as usual. Only its stored summary is missing. Quote correlation ID ${getOrMintCorrelationId()} to your operator, who can find the cause in the logs.`,
+    });
+  }
+
+  if (entityLinkFailed) {
+    warnings.push({
+      code: 'ENTITY_LINK_FAILED' as const,
+      message: 'The credential was issued but could not be linked to its master-data record, which no longer exists.',
+      remediation:
+        'Re-create the master-data record if the link matters to you. The credential itself is unaffected, and publishing does not depend on the link.',
+    });
+  }
+
+  await publishIssuedCredential({
+    publishingOptions,
+    refs,
+    tenantId,
+    credentialId,
+    warnings,
+    storageResponse,
+    dataModel,
+    primaryEntity,
+    machineVerificationUrl,
+    effectiveHumanVerificationUrl,
+  });
+
+  if (claimId !== undefined) {
+    const winnerResponse = await completeIssuanceIdempotencyKeyOrReplay({
+      claimId,
+      credentialId,
+      warnings,
+      tenantId,
+      idempotencyKey: idempotencyKey as string,
+      bodyDigest,
+    });
+    if (winnerResponse !== undefined) {
+      return winnerResponse;
     }
   }
 

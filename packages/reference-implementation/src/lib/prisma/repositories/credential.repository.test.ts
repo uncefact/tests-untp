@@ -1,19 +1,35 @@
 import { createCredential, listCredentials, updateCredentialPublished } from './credential.repository';
+import { IdempotencyClaimLostError } from './idempotency-key.repository';
 import { NotFoundError } from '@/lib/api/errors';
 import { prismaError } from '../db-errors.fixtures';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
 // Mock Prisma client. Use jest.fn() inside the factory to avoid hoisting issues.
-jest.mock('../prisma', () => ({
-  prisma: {
+jest.mock('../prisma', () => {
+  const prismaMock: {
+    credential: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
+      update: jest.Mock;
+    };
+    idempotencyKey: { updateMany: jest.Mock };
+    $transaction: jest.Mock;
+  } = {
     credential: {
       create: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
       update: jest.fn(),
     },
-  },
-}));
+    idempotencyKey: {
+      updateMany: jest.fn(),
+    },
+    $transaction: jest.fn(),
+  };
+  prismaMock.$transaction.mockImplementation((cb: (tx: typeof prismaMock) => unknown) => cb(prismaMock));
+  return { prisma: prismaMock };
+});
 
 // Import the mocked prisma after jest.mock
 import { prisma } from '../prisma';
@@ -24,6 +40,12 @@ const mockCredential = prisma.credential as unknown as {
   count: jest.Mock;
   update: jest.Mock;
 };
+
+const mockIdempotencyKey = prisma.idempotencyKey as unknown as {
+  updateMany: jest.Mock;
+};
+
+const mockTransaction = prisma.$transaction as unknown as jest.Mock;
 
 describe('credential.repository', () => {
   const TENANT_ID = 'tenant-1';
@@ -217,6 +239,71 @@ describe('credential.repository', () => {
       expect(mockCredential.create).toHaveBeenCalledTimes(2);
       expect(mockCredential.create.mock.calls[0][0].data).toEqual(expect.objectContaining(captured));
       expect(mockCredential.create.mock.calls[1][0].data).toEqual(expect.objectContaining(captured));
+      expect(mockCredential.create.mock.calls[1][0].data).not.toHaveProperty('organisationId');
+    });
+
+    it('associates the idempotency claim in the same transaction as the credential row', async () => {
+      const created = { ...SEED_CREDENTIALS[0], id: 'cred-new' };
+      mockCredential.create.mockResolvedValue(created);
+      mockIdempotencyKey.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await createCredential({
+        tenantId: TENANT_ID,
+        storageUri: 'https://storage.example/credential-new',
+        digestMultibase: 'zNew',
+        credentialType: 'DigitalProductPassport',
+        idempotencyClaimId: 'claim-1',
+      });
+
+      expect(result).toEqual({ credential: created, entityLinkFailed: false });
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+      expect(mockIdempotencyKey.updateMany).toHaveBeenCalledWith({
+        where: { id: 'claim-1', credentialId: null },
+        data: { credentialId: 'cred-new', resultRecordedAt: expect.any(Date) },
+      });
+    });
+
+    it('throws IdempotencyClaimLostError inside the transaction when the association matches zero rows', async () => {
+      const created = { ...SEED_CREDENTIALS[0], id: 'cred-new' };
+      mockCredential.create.mockResolvedValue(created);
+      mockIdempotencyKey.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        createCredential({
+          tenantId: TENANT_ID,
+          storageUri: 'https://storage.example/credential-new',
+          digestMultibase: 'zNew',
+          credentialType: 'DigitalProductPassport',
+          idempotencyClaimId: 'claim-1',
+        }),
+      ).rejects.toBeInstanceOf(IdempotencyClaimLostError);
+
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+      await expect(mockTransaction.mock.calls[0][0](prisma)).rejects.toBeInstanceOf(IdempotencyClaimLostError);
+    });
+
+    it('keeps the idempotency association on the entity-link retry', async () => {
+      const created = { ...SEED_CREDENTIALS[0], id: 'cred-new', organisationId: null };
+      mockCredential.create
+        .mockRejectedValueOnce(prismaError('P2003', 'Foreign key constraint failed on the field: `organisationId`'))
+        .mockResolvedValueOnce(created);
+      mockIdempotencyKey.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await createCredential({
+        tenantId: TENANT_ID,
+        storageUri: 'https://storage.example/credential-new',
+        digestMultibase: 'zNew',
+        credentialType: 'DigitalProductPassport',
+        organisationId: 'org-1',
+        idempotencyClaimId: 'claim-1',
+      });
+
+      expect(result).toEqual({ credential: created, entityLinkFailed: true });
+      expect(mockTransaction).toHaveBeenCalledTimes(2);
+      expect(mockIdempotencyKey.updateMany).toHaveBeenCalledWith({
+        where: { id: 'claim-1', credentialId: null },
+        data: { credentialId: 'cred-new', resultRecordedAt: expect.any(Date) },
+      });
       expect(mockCredential.create.mock.calls[1][0].data).not.toHaveProperty('organisationId');
     });
   });

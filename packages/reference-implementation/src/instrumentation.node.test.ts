@@ -9,6 +9,7 @@ const mockResolveAppUrl = jest.fn();
 const mockValidateHttpUserAgentOnBoot = jest.fn();
 const mockResolveDataEncryptionKey = jest.fn();
 const mockValidateCacheMaxEntriesOnBoot = jest.fn();
+const mockValidateStaleClaimOnBoot = jest.fn();
 const mockValidateMaxRequestBodyBytesOnBoot = jest.fn();
 
 jest.mock('@/lib/config/app-url.config', () => ({
@@ -19,6 +20,9 @@ jest.mock('@/lib/config/http-user-agent.config', () => ({
 }));
 jest.mock('@/lib/config/cache-max-entries.config', () => ({
   validateCacheMaxEntriesOnBoot: (...args: unknown[]) => mockValidateCacheMaxEntriesOnBoot(...args),
+}));
+jest.mock('@/lib/config/idempotency-claim.config', () => ({
+  validateStaleClaimOnBoot: (...args: unknown[]) => mockValidateStaleClaimOnBoot(...args),
 }));
 jest.mock('@/lib/config/request-body-limit.config', () => ({
   validateMaxRequestBodyBytesOnBoot: (...args: unknown[]) => mockValidateMaxRequestBodyBytesOnBoot(...args),
@@ -62,6 +66,7 @@ describe('registerNode boot wiring', () => {
     expect(mockValidateHttpUserAgentOnBoot).toHaveBeenCalledTimes(1);
     expect(mockResolveDataEncryptionKey).toHaveBeenCalledTimes(1);
     expect(mockValidateCacheMaxEntriesOnBoot).toHaveBeenCalledTimes(1);
+    expect(mockValidateStaleClaimOnBoot).toHaveBeenCalledTimes(1);
     expect(mockValidateMaxRequestBodyBytesOnBoot).toHaveBeenCalledTimes(1);
   });
 
