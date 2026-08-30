@@ -1,3 +1,6 @@
+import { requestBodyTooLargeMessage } from '@/lib/api/request-body';
+import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config';
+
 /**
  * Example error bodies for the published OpenAPI document.
  *
@@ -68,6 +71,24 @@ export const TENANT_FORBIDDEN_EXAMPLES: Record<string, ErrorExample> = {
 };
 
 /**
+ * The 413 body `readRequestBytes` throws when the request exceeds
+ * `MAX_REQUEST_BODY_BYTES`. Quoted from `src/lib/api/request-body.ts`. The
+ * example uses the default cap so the published document does not follow
+ * whichever value the process that generated it happened to have set.
+ */
+export const PAYLOAD_TOO_LARGE_EXAMPLES: Record<string, ErrorExample> = {
+  bodyTooLarge: {
+    summary: 'The request body exceeds the configured maximum',
+    value: {
+      error: requestBodyTooLargeMessage(readMaxRequestBodyBytes({})),
+      code: 'REQUEST_BODY_TOO_LARGE',
+    },
+  },
+};
+
+export const PAYLOAD_TOO_LARGE_RESPONSE_REF = '#/components/responses/PayloadTooLargeResponse';
+
+/**
  * Bodies whose shape is identical on every route that documents the status.
  *
  * 400: `parseRequestBody` and `parseQueryParams` render the first failure as
@@ -101,7 +122,7 @@ export const SHARED_STATUS_EXAMPLES: Record<string, Record<string, ErrorExample>
 };
 
 /**
- * Messages the routes and repositories actually throw for a 404 or a 409.
+ * Messages the routes and repositories actually throw for a 404, a 409, or a 422.
  *
  * Where an operation's documented description is exactly one of these, the
  * description is quoting the thrown message, so it can be published as that
@@ -111,12 +132,13 @@ export const SHARED_STATUS_EXAMPLES: Record<string, Record<string, ErrorExample>
  * one, which is the whole point: a wrong example is worse than none, because
  * an integrator writes code against it.
  *
- * To refresh, collect the `new NotFoundError('...')` and
- * `new ConflictError('...')` arguments under `src/app/api/v1`, plus the
- * `notFound`, `conflict` and `invalidReference` values handed to
- * `mapDatabaseError` in the repositories.
+ * To refresh, collect the `new NotFoundError('...')`,
+ * `new ConflictError('...')`, and `new UnprocessableError('...')`
+ * arguments under `src/app/api/v1`, plus the `notFound`, `conflict` and
+ * `invalidReference` values handed to `mapDatabaseError` in the
+ * repositories.
  */
-const VERIFIED_ERROR_MESSAGES = new Set([
+export const VERIFIED_ERROR_MESSAGES = new Set([
   'A DID record with this DID already exists',
   'A data model with this name already exists for the credential type and version',
   'A qualifier with this key already exists for the scheme',
@@ -158,9 +180,31 @@ const AMBIGUOUS_ERROR_MESSAGES = new Set(['Service instance not found']);
 
 type MediaType = { schema?: unknown; examples?: Record<string, ErrorExample> };
 type ResponseObject = { $ref?: string; description?: string; content?: Record<string, MediaType> };
-type Operation = { responses?: Record<string, ResponseObject> };
+type Operation = { requestBody?: unknown; responses?: Record<string, ResponseObject> };
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+
+/**
+ * Attaches the shared 413 to every operation that declares a request body
+ * and does not already document that status. Auth 401/403 are referenced
+ * from each JSDoc block because they apply to the wrapper, not the body.
+ * The size cap applies to every body the API accepts, so the reference is
+ * added here rather than copied into each write-route block.
+ */
+export function attachPayloadTooLargeResponses(spec: Record<string, unknown>): void {
+  const paths = spec.paths as Record<string, Record<string, Operation>> | undefined;
+  if (!paths) return;
+
+  for (const pathItem of Object.values(paths)) {
+    for (const method of HTTP_METHODS) {
+      const operation = pathItem[method];
+      if (!operation?.requestBody) continue;
+      if (!operation.responses) operation.responses = {};
+      if (operation.responses['413'] !== undefined) continue;
+      operation.responses['413'] = { $ref: PAYLOAD_TOO_LARGE_RESPONSE_REF };
+    }
+  }
+}
 
 /**
  * The example for a response whose description quotes the message the code

@@ -354,6 +354,50 @@ describe('POST /api/v1/organisations', () => {
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
   });
+
+  describe('request body size limit', () => {
+    const ORIGINAL = process.env.MAX_REQUEST_BODY_BYTES;
+
+    beforeEach(() => {
+      process.env.MAX_REQUEST_BODY_BYTES = '1024';
+    });
+
+    afterEach(() => {
+      if (ORIGINAL === undefined) {
+        delete process.env.MAX_REQUEST_BODY_BYTES;
+      } else {
+        process.env.MAX_REQUEST_BODY_BYTES = ORIGINAL;
+      }
+    });
+
+    function oversizeRequest(): Request {
+      return {
+        method: 'POST',
+        url: 'http://localhost/api/v1/organisations',
+        headers: new Headers({ 'Content-Type': 'application/json', 'Content-Length': '2048' }),
+        body: {
+          getReader() {
+            throw new Error('body must not be read once Content-Length exceeds the cap');
+          },
+        },
+        json: async () => {
+          throw new Error('json() must not run on a capped request');
+        },
+      } as unknown as Request;
+    }
+
+    it('returns 413 REQUEST_BODY_TOO_LARGE when the body exceeds the cap, before the repository is called', async () => {
+      const res = await POST(oversizeRequest(), AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(413);
+      expect(json).toEqual({
+        error: 'The request body exceeds the maximum of 1024 bytes.',
+        code: 'REQUEST_BODY_TOO_LARGE',
+      });
+      expect(mockCreateOrganisations).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('GET /api/v1/organisations', () => {

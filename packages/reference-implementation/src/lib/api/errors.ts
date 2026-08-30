@@ -39,16 +39,46 @@ export class ForbiddenError extends Error {
 }
 
 export class ConflictError extends Error {
-  constructor(message: string) {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
     super(message);
     this.name = 'ConflictError';
+    if (code !== undefined) this.code = code;
   }
 }
 
 export class UnprocessableError extends Error {
-  constructor(message: string) {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
     super(message);
     this.name = 'UnprocessableError';
+    if (code !== undefined) this.code = code;
+  }
+}
+
+/**
+ * Thrown when the request body cannot be read at all, for example when the
+ * connection drops mid-upload. Distinct from malformed JSON: nothing has been
+ * parsed at this point, so the caller must not be pointed at their JSON. The
+ * reader raises this and the body parser renders it as the 400 it has always
+ * been.
+ */
+export class RequestBodyUnreadableError extends Error {
+  constructor() {
+    super('Could not read the request body');
+    this.name = 'RequestBodyUnreadableError';
+  }
+}
+
+export class PayloadTooLargeError extends Error {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'PayloadTooLargeError';
+    if (code !== undefined) this.code = code;
   }
 }
 

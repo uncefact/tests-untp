@@ -14,7 +14,9 @@ import {
   UrlValidationError,
 } from '@uncefact/untp-utils/node';
 
+import { TextEncoder } from 'node:util';
 import { z } from 'zod';
+import { PayloadTooLargeError } from '@/lib/api/errors';
 import {
   ValidationError,
   isNonEmptyString,
@@ -332,6 +334,98 @@ describe('parseRequestBody', () => {
     await expect(parseRequestBody(fakeRequest({ name: 'Widget', age: 'old' }), schema)).rejects.toThrow(
       'age: Expected number, received string',
     );
+  });
+
+  describe('capped real request', () => {
+    const ORIGINAL = process.env.MAX_REQUEST_BODY_BYTES;
+
+    beforeEach(() => {
+      process.env.MAX_REQUEST_BODY_BYTES = '1024';
+    });
+
+    afterEach(() => {
+      if (ORIGINAL === undefined) {
+        delete process.env.MAX_REQUEST_BODY_BYTES;
+      } else {
+        process.env.MAX_REQUEST_BODY_BYTES = ORIGINAL;
+      }
+    });
+
+    function realRequest(body: string, headers: Record<string, string> = {}): Request {
+      const bytes = new TextEncoder().encode(body);
+      let delivered = false;
+      return {
+        headers: new Headers(headers),
+        body: {
+          getReader() {
+            return {
+              async read() {
+                if (delivered) return { done: true as const, value: undefined };
+                delivered = true;
+                return { done: false as const, value: bytes };
+              },
+              async cancel() {
+                delivered = true;
+              },
+            };
+          },
+        },
+        json: async () => {
+          throw new Error('json() must not run on a capped request');
+        },
+      } as unknown as Request;
+    }
+
+    it('resolves the typed data for a valid body under the cap', async () => {
+      await expect(parseRequestBody(realRequest('{"name":"Widget","age":3}'), schema)).resolves.toEqual({
+        name: 'Widget',
+        age: 3,
+      });
+    });
+
+    it('throws PayloadTooLargeError for an over-large body before parsing, including when the body is not JSON', async () => {
+      const malformedOversize = `{${'x'.repeat(2000)}`;
+
+      await expect(parseRequestBody(realRequest(malformedOversize), schema)).rejects.toMatchObject({
+        name: 'PayloadTooLargeError',
+        message: 'The request body exceeds the maximum of 1024 bytes.',
+        code: 'REQUEST_BODY_TOO_LARGE',
+      });
+      await expect(parseRequestBody(realRequest(malformedOversize), schema)).rejects.toBeInstanceOf(
+        PayloadTooLargeError,
+      );
+    });
+
+    it('throws PayloadTooLargeError when Content-Length declares a body over the cap before reading', async () => {
+      await expect(
+        parseRequestBody(realRequest('{not-json', { 'Content-Length': '2048' }), schema),
+      ).rejects.toMatchObject({
+        name: 'PayloadTooLargeError',
+        code: 'REQUEST_BODY_TOO_LARGE',
+      });
+    });
+
+    it('throws ValidationError for malformed JSON under the cap', async () => {
+      await expect(parseRequestBody(realRequest('{not-json'), schema)).rejects.toThrow(ValidationError);
+      await expect(parseRequestBody(realRequest('{not-json'), schema)).rejects.toThrow('Invalid JSON body');
+    });
+
+    it('throws ValidationError for a literal null body under the cap', async () => {
+      await expect(parseRequestBody(realRequest('null'), schema)).rejects.toThrow(ValidationError);
+      await expect(parseRequestBody(realRequest('null'), schema)).rejects.toThrow(
+        'body: Expected object, received null',
+      );
+    });
+
+    it('throws ValidationError naming a missing required field on a small real request', async () => {
+      await expect(parseRequestBody(realRequest('{}'), schema)).rejects.toThrow('name: Required');
+    });
+
+    it('throws ValidationError naming a wrong-typed field on a small real request', async () => {
+      await expect(parseRequestBody(realRequest('{"name":"Widget","age":"old"}'), schema)).rejects.toThrow(
+        'age: Expected number, received string',
+      );
+    });
   });
 });
 

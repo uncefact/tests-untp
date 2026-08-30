@@ -1,6 +1,12 @@
 import { createSwaggerSpec } from 'next-swagger-doc';
 import { generateOpenAPISchemas } from './schemas';
-import { attachErrorExamples, UNAUTHORISED_EXAMPLES, TENANT_FORBIDDEN_EXAMPLES } from './error-examples';
+import {
+  attachErrorExamples,
+  attachPayloadTooLargeResponses,
+  PAYLOAD_TOO_LARGE_EXAMPLES,
+  TENANT_FORBIDDEN_EXAMPLES,
+  UNAUTHORISED_EXAMPLES,
+} from './error-examples';
 
 export const getApiDocs = async (): Promise<Record<string, unknown>> => {
   // Generate schemas from Zod definitions
@@ -22,10 +28,9 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
         },
       ],
       components: {
-        // The auth responses every withTenantAuth route shares. Declared once
-        // and referenced, because hand-copied blocks have already drifted into
-        // four wordings across the fleet, including an em-dash and American
-        // spellings the repository's own conventions rule out.
+        // Shared responses. Auth 401/403 are referenced from each JSDoc
+        // block. 413 is declared here and attached to every operation that
+        // accepts a request body (see attachPayloadTooLargeResponses).
         responses: {
           UnauthorisedResponse: {
             description: 'Unauthorised - missing or invalid authentication',
@@ -46,6 +51,16 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' },
                 examples: TENANT_FORBIDDEN_EXAMPLES,
+              },
+            },
+          },
+          PayloadTooLargeResponse: {
+            description:
+              'The request body is larger than the configured maximum. The message names the limit in bytes.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                examples: PAYLOAD_TOO_LARGE_EXAMPLES,
               },
             },
           },
@@ -83,8 +98,9 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
     },
   });
 
-  // Runs after the JSDoc blocks are assembled, because the responses it
-  // decorates are declared in those blocks rather than here.
+  // 413 is attached to every operation that declares a request body, then
+  // examples are filled in on the remaining inline error responses.
+  attachPayloadTooLargeResponses(spec as Record<string, unknown>);
   attachErrorExamples(spec as Record<string, unknown>);
 
   return spec as Record<string, unknown>;

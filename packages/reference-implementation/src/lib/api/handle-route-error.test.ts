@@ -21,6 +21,7 @@ import {
   NotFoundError,
   ForbiddenError,
   ConflictError,
+  PayloadTooLargeError,
   UnprocessableError,
   ServiceRegistryError,
   ServiceInstanceNotFoundError,
@@ -87,12 +88,44 @@ describe('handleRouteError', () => {
     expect(body).toEqual({ error: 'already exists' });
   });
 
+  it('includes the ConflictError code in the 409 body when present', async () => {
+    const res = handleRouteError(new ConflictError('still running', 'IDEMPOTENCY_KEY_IN_FLIGHT'));
+
+    expect(res.status).toBe(409);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'still running', code: 'IDEMPOTENCY_KEY_IN_FLIGHT' });
+  });
+
+  it('maps PayloadTooLargeError to 413', async () => {
+    const res = handleRouteError(new PayloadTooLargeError('too big'));
+
+    expect(res.status).toBe(413);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'too big' });
+  });
+
+  it('includes the PayloadTooLargeError code in the 413 body when present', async () => {
+    const res = handleRouteError(new PayloadTooLargeError('too big', 'REQUEST_BODY_TOO_LARGE'));
+
+    expect(res.status).toBe(413);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'too big', code: 'REQUEST_BODY_TOO_LARGE' });
+  });
+
   it('maps UnprocessableError to 422', async () => {
     const res = handleRouteError(new UnprocessableError('cannot process'));
 
     expect(res.status).toBe(422);
     const body = await (res as unknown as MockResponse).json();
     expect(body).toEqual({ error: 'cannot process' });
+  });
+
+  it('includes the UnprocessableError code in the 422 body when present', async () => {
+    const res = handleRouteError(new UnprocessableError('body differs', 'IDEMPOTENCY_KEY_MISMATCH'));
+
+    expect(res.status).toBe(422);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'body differs', code: 'IDEMPOTENCY_KEY_MISMATCH' });
   });
 
   // --- ServiceRegistryError sub-types ---
