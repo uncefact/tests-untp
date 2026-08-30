@@ -68,5 +68,5 @@ A response body is unreadable in the database by design, so diagnosing a stuck k
 
 - #954 for the issuance header and #955 for library registration, the two routes that share this contract.
 - Epic #950 for the library surface those routes belong to.
-- ADR-046 for the library surface's shape.
+- ADR-052 for the library surface's shape.
 - ADR-036 for how a database failure reaches the caller.
