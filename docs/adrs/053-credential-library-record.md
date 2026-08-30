@@ -1,7 +1,7 @@
 # ADR-053: A library record is a view of what we have, not a copy of it
 
 - **Date:** 2026-08-25
-- **Status:** proposed
+- **Status:** accepted
 
 ## Context
 
