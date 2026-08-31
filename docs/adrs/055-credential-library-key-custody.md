@@ -2,6 +2,7 @@
 
 - **Date:** 2026-08-31
 - **Status:** accepted
+- **Update (2026-09-01):** ADR-054 supersedes this ADR's statement that key-bearing recovery runs on the job substrate as a non-retryable task. Work that needs a caller-supplied key now runs inside the request that carried the key and is never enqueued, because the queue's payloads never carry key material. The custody rules themselves (the key is never persisted; failure names a resume code) are unchanged.
 
 ## Context
 
