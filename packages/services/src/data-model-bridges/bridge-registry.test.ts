@@ -1,4 +1,4 @@
-import { getBridge } from './bridge-registry.js';
+import { getBridge, listRegisteredVersions } from './bridge-registry.js';
 import { createBridgeEntities, createFacility, createOrganisation, createProduct } from './__fixtures__/entities.js';
 
 describe('bridge-registry', () => {
@@ -40,7 +40,24 @@ describe('bridge-registry', () => {
     it('returns undefined for an unknown version', () => {
       expect(getBridge('DigitalProductPassport', '999.0.0')).toBeUndefined();
     });
+  });
 
+  describe('listRegisteredVersions', () => {
+    it('lists every version getBridge can resolve for a registered type', () => {
+      const versions = listRegisteredVersions('DigitalProductPassport');
+
+      expect(versions).toEqual(expect.arrayContaining(['0.6.0', '0.6.1', '0.7.0']));
+      for (const version of versions) {
+        expect(getBridge('DigitalProductPassport', version)).toBeDefined();
+      }
+    });
+
+    it('returns an empty list for an unknown type rather than inventing versions', () => {
+      expect(listRegisteredVersions('UnknownType')).toEqual([]);
+    });
+  });
+
+  describe('getBridge subject extraction', () => {
     it.each(['0.6.0', '0.6.1'])(
       'DPP %s extracts product.id and product.name from a builder-produced subject',
       (version) => {

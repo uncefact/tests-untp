@@ -113,6 +113,7 @@ function buildInput(overrides: Partial<IssueCredentialInput> = {}): IssueCredent
     tenantId: TENANT_ID,
     credentialPayload: PAYLOAD,
     credentialType: 'DigitalProductPassport',
+    coreDataModelVersion: '0.6.1',
     refs: ENTITY_REFS,
     vcService: stubVcService as unknown as IssueCredentialInput['vcService'],
     storageService: stubStorageService as unknown as IssueCredentialInput['storageService'],
@@ -169,6 +170,7 @@ describe('issueCredential', () => {
         storageUri: STORAGE_RESPONSE.uri,
         digestMultibase: STORAGE_RESPONSE.digestMultibase,
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         isPublished: false,
         organisationId: undefined,
         facilityId: undefined,
@@ -342,5 +344,22 @@ describe('issueCredential', () => {
     const result = await issueCredential(buildInput());
 
     expect(result.detailsExtractionFailed).toBe(false);
+  });
+
+  it('persists the resolved data model version on the created row', async () => {
+    await issueCredential(buildInput({ coreDataModelVersion: '0.6.1' }));
+
+    expect(mockCreateCredential).toHaveBeenCalledWith(expect.objectContaining({ coreDataModelVersion: '0.6.1' }));
+  });
+
+  it('persists the parent data model version for an extension credential', async () => {
+    await issueCredential(buildInput({ credentialType: 'DigitalLivestockPassport', coreDataModelVersion: '0.6.1' }));
+
+    expect(mockCreateCredential).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentialType: 'DigitalLivestockPassport',
+        coreDataModelVersion: '0.6.1',
+      }),
+    );
   });
 });

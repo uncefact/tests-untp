@@ -29,6 +29,7 @@ describe('credential descriptive fields', () => {
         storageUri: 'https://storage.test/legacy',
         digestMultibase: 'zLegacy',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
       },
     });
 
@@ -61,6 +62,7 @@ describe('credential descriptive fields', () => {
       storageUri: 'https://storage.test/captured',
       digestMultibase: 'zCaptured',
       credentialType: 'DigitalProductPassport',
+      coreDataModelVersion: '0.6.1',
       details: captured,
       detailsStatus: CredentialDetailsStatus.EXTRACTED,
     });

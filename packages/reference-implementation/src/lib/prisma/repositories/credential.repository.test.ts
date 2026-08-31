@@ -59,6 +59,7 @@ describe('credential.repository', () => {
     digestMultibase: `z${i}`,
     decryptionKey: null,
     credentialType: 'DigitalConformityCredential',
+    coreDataModelVersion: '0.6.1',
     isPublished: false,
     organisationId: null,
     facilityId: null,
@@ -113,6 +114,7 @@ describe('credential.repository', () => {
           storageUri: 'https://storage.example/credential-new',
           digestMultibase: 'zNew',
           credentialType: 'DigitalProductPassport',
+          coreDataModelVersion: '0.6.1',
           organisationId: 'org-1',
           facilityId: 'fac-1',
           productId: 'prod-1',
@@ -139,6 +141,7 @@ describe('credential.repository', () => {
           storageUri: 'https://storage.example/credential-new',
           digestMultibase: 'zNew',
           credentialType: 'DigitalProductPassport',
+          coreDataModelVersion: '0.6.1',
           organisationId: 'org-1',
         }),
       ).rejects.toBe(fkError);
@@ -155,9 +158,26 @@ describe('credential.repository', () => {
           storageUri: 'https://storage.example/credential-new',
           digestMultibase: 'zNew',
           credentialType: 'DigitalProductPassport',
+          coreDataModelVersion: '0.6.1',
         }),
       ).rejects.toBe(other);
       expect(mockCredential.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('writes the resolved data model version on the first create', async () => {
+      mockCredential.create.mockResolvedValue({ ...SEED_CREDENTIALS[0], coreDataModelVersion: '0.6.1' });
+
+      await createCredential({
+        tenantId: TENANT_ID,
+        storageUri: 'https://storage.example/credential-new',
+        digestMultibase: 'zNew',
+        credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
+      });
+
+      expect(mockCredential.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({ coreDataModelVersion: '0.6.1' }),
+      );
     });
 
     it('writes captured descriptive fields on the first create', async () => {
@@ -179,6 +199,7 @@ describe('credential.repository', () => {
         storageUri: 'https://storage.example/credential-new',
         digestMultibase: 'zNew',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         organisationId: 'org-1',
         details,
         detailsStatus: 'EXTRACTED',
@@ -201,6 +222,7 @@ describe('credential.repository', () => {
         storageUri: 'https://storage.example/credential-new',
         digestMultibase: 'zNew',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         detailsStatus: 'EXTRACTION_FAILED',
         detailsError: 'UNREADABLE_ENVELOPE',
       });
@@ -231,6 +253,7 @@ describe('credential.repository', () => {
         storageUri: 'https://storage.example/credential-new',
         digestMultibase: 'zNew',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         organisationId: 'org-1',
         details,
         detailsStatus: 'EXTRACTED',
@@ -252,6 +275,7 @@ describe('credential.repository', () => {
         storageUri: 'https://storage.example/credential-new',
         digestMultibase: 'zNew',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         idempotencyClaimId: 'claim-1',
       });
 
@@ -274,6 +298,7 @@ describe('credential.repository', () => {
           storageUri: 'https://storage.example/credential-new',
           digestMultibase: 'zNew',
           credentialType: 'DigitalProductPassport',
+          coreDataModelVersion: '0.6.1',
           idempotencyClaimId: 'claim-1',
         }),
       ).rejects.toBeInstanceOf(IdempotencyClaimLostError);
@@ -294,6 +319,7 @@ describe('credential.repository', () => {
         storageUri: 'https://storage.example/credential-new',
         digestMultibase: 'zNew',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         organisationId: 'org-1',
         idempotencyClaimId: 'claim-1',
       });

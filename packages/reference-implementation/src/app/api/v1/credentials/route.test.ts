@@ -285,6 +285,7 @@ function setupHappyPath() {
     dataModel: DATA_MODEL,
     bridge: stubBridge,
     schemaUrls: [DATA_MODEL.schemaUrl],
+    coreDataModelVersion: '0.6.1',
   });
   mockValidateCredentialPayload.mockResolvedValue(undefined);
   mockGetDidByDid.mockResolvedValue({
@@ -869,12 +870,32 @@ describe('POST /api/v1/credentials', () => {
         tenantId: 'tenant-1',
         credentialPayload: VALID_PAYLOAD,
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         refs: { organisations: [], facilities: [], products: [] },
         vcService,
         storageService,
         storageOptions: {},
         bridge: stubBridge,
       });
+    });
+
+    it('passes the parent coreDataModelVersion through for an extension data model', async () => {
+      mockResolveDataModel.mockResolvedValue({
+        dataModel: { ...DATA_MODEL, isExtension: true, version: '1.2.0' },
+        bridge: stubBridge,
+        schemaUrls: [DATA_MODEL.schemaUrl],
+        coreDataModelVersion: '0.6.0',
+      });
+
+      const req = createFakeRequest(validBody({ credentialType: 'DigitalLivestockPassport', version: '1.2.0' }));
+      await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(mockIssueCredential).toHaveBeenCalledWith(
+        expect.objectContaining({
+          credentialType: 'DigitalLivestockPassport',
+          coreDataModelVersion: '0.6.0',
+        }),
+      );
     });
 
     it('passes storageOptions through to issueCredential', async () => {
@@ -1262,6 +1283,7 @@ describe('POST /api/v1/credentials', () => {
         dataModel: DATA_MODEL,
         bridge: failingBridge,
         schemaUrls: [DATA_MODEL.schemaUrl],
+        coreDataModelVersion: '0.6.1',
       });
 
       const req = createFakeRequest(validBody({ publishingOptions: { publish: true } }));

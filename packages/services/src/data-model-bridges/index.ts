@@ -18,5 +18,5 @@ export type {
   ConformityClaimWithProvenance,
 } from './types.js';
 
-export { getBridge } from './bridge-registry.js';
+export { getBridge, listRegisteredVersions } from './bridge-registry.js';
 export { buildContextAndTypes } from './primitives/context.js';

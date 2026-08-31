@@ -154,6 +154,7 @@ model Credential {
   digestMultibase String
   decryptionKey   String?
   credentialType  String
+  coreDataModelVersion String?
   isPublished     Boolean                 @default(false)
   organisationId  String?
   facilityId      String?

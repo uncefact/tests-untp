@@ -29,6 +29,14 @@
     "./cvc": {
       "types": "./build/cvc/index.d.ts",
       "default": "./build/cvc/index.js"
+    },
+    "./data-model-bridges": {
+      "types": "./build/data-model-bridges/index.d.ts",
+      "default": "./build/data-model-bridges/index.js"
+    },
+    "./verifiable-credential": {
+      "types": "./build/verifiable-credential/index.d.ts",
+      "default": "./build/verifiable-credential/index.js"
     }
   },
   "typesVersions": {

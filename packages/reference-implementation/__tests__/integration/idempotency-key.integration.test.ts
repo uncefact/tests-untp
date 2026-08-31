@@ -55,6 +55,7 @@ describe('idempotency key', () => {
         storageUri: 'https://storage.test/idempotent',
         digestMultibase: 'zIdempotent',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
       },
     });
   }
@@ -173,6 +174,7 @@ describe('idempotency key', () => {
       storageUri: 'https://storage.test/retry',
       digestMultibase: 'zRetry',
       credentialType: 'DigitalProductPassport',
+      coreDataModelVersion: '0.6.1',
       // No such organisation, so the first create violates the foreign key and
       // the retry runs without the entity columns.
       organisationId: 'organisation-that-does-not-exist',
@@ -197,6 +199,7 @@ describe('idempotency key', () => {
         storageUri: 'https://storage.test/doomed',
         digestMultibase: 'zDoomed',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         organisationId: 'organisation-that-does-not-exist',
         idempotencyClaimId: doomed.claimId,
       }),
@@ -224,6 +227,7 @@ describe('idempotency key', () => {
       storageUri: 'https://storage.test/winner',
       digestMultibase: 'zWinner',
       credentialType: 'DigitalProductPassport',
+      coreDataModelVersion: '0.6.1',
       idempotencyClaimId: reclaimed.claimId,
     });
 
@@ -233,6 +237,7 @@ describe('idempotency key', () => {
         storageUri: 'https://storage.test/loser',
         digestMultibase: 'zLoser',
         credentialType: 'DigitalProductPassport',
+        coreDataModelVersion: '0.6.1',
         idempotencyClaimId: original.claimId,
       }),
     ).rejects.toBeInstanceOf(IdempotencyClaimLostError);
@@ -265,6 +270,7 @@ describe('idempotency key', () => {
       storageUri: 'https://storage.test/cas',
       digestMultibase: 'zCas',
       credentialType: 'DigitalProductPassport',
+      coreDataModelVersion: '0.6.1',
       idempotencyClaimId: claimed.claimId,
     });
 
@@ -300,6 +306,7 @@ describe('idempotency key', () => {
       storageUri: 'https://storage.test/envelope',
       digestMultibase: 'zEnvelope',
       credentialType: 'DigitalProductPassport',
+      coreDataModelVersion: '0.6.1',
       idempotencyClaimId: claimed.claimId,
     });
 

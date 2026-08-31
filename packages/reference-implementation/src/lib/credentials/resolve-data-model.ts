@@ -8,6 +8,12 @@ export type ResolvedDataModel = {
   dataModel: DataModelListItem;
   bridge: IDataModelBridge;
   schemaUrls: string[];
+  /**
+   * Spec version `bridge` was resolved with. For an extension this is the
+   * parent data model's version, not the extension's own version, because
+   * that is the key the registry uses.
+   */
+  coreDataModelVersion: string;
 };
 
 export function isDccDataModel(dataModel: DataModelListItem): boolean {
@@ -32,14 +38,14 @@ export async function resolveDataModel(
     throw new ValidationError(`No data model found for ${credentialType} v${version}`);
   }
 
-  const mapperType =
+  const dataModelType =
     dataModel.isExtension && dataModel.parentConfig ? dataModel.parentConfig.credentialType : dataModel.credentialType;
-  const mapperVersion =
+  const coreDataModelVersion =
     dataModel.isExtension && dataModel.parentConfig ? dataModel.parentConfig.version : dataModel.version;
 
-  const bridge = getBridge(mapperType, mapperVersion);
+  const bridge = getBridge(dataModelType, coreDataModelVersion);
   if (!bridge) {
-    throw new ValidationError(`No bridge registered for ${mapperType} v${mapperVersion}`);
+    throw new ValidationError(`No bridge registered for ${dataModelType} v${coreDataModelVersion}`);
   }
 
   const schemaUrls: string[] = [];
@@ -48,5 +54,5 @@ export async function resolveDataModel(
   }
   schemaUrls.push(dataModel.schemaUrl);
 
-  return { dataModel, bridge, schemaUrls };
+  return { dataModel, bridge, schemaUrls, coreDataModelVersion };
 }

@@ -26,6 +26,12 @@ export type IssueCredentialInput = {
   tenantId: string;
   credentialPayload: CredentialPayload;
   credentialType: string;
+  /**
+   * Spec version the data-model bridge was resolved with. For an extension
+   * this is the parent version (`coreDataModelVersion`), so a later read can find
+   * the same bridge again.
+   */
+  coreDataModelVersion: string;
   refs: ExtractedRefs;
   vcService: ResolvedService<IVerifiableCredentialService>;
   storageService: ResolvedService<IStorageService>;
@@ -107,8 +113,17 @@ function readCredentialDetails(
 }
 
 export async function issueCredential(input: IssueCredentialInput): Promise<IssueCredentialResult> {
-  const { tenantId, credentialPayload, credentialType, refs, vcService, storageService, storageOptions, bridge } =
-    input;
+  const {
+    tenantId,
+    credentialPayload,
+    credentialType,
+    coreDataModelVersion,
+    refs,
+    vcService,
+    storageService,
+    storageOptions,
+    bridge,
+  } = input;
 
   const shouldEncrypt = storageOptions.encrypt !== false;
 
@@ -129,6 +144,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     digestMultibase: storageResponse.digestMultibase,
     decryptionKey,
     credentialType,
+    coreDataModelVersion,
     isPublished: false,
     organisationId: primaryEntity.organisationId,
     facilityId: primaryEntity.facilityId,

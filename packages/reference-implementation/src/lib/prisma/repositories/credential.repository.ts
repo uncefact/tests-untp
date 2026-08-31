@@ -15,6 +15,7 @@ export type CreateCredentialInput = {
   digestMultibase: string;
   decryptionKey?: string;
   credentialType: string;
+  coreDataModelVersion: string;
   isPublished?: boolean;
   organisationId?: string;
   facilityId?: string;
@@ -83,6 +84,7 @@ export async function createCredential(
     digestMultibase: input.digestMultibase,
     decryptionKey: input.decryptionKey,
     credentialType: input.credentialType,
+    coreDataModelVersion: input.coreDataModelVersion,
     isPublished: input.isPublished ?? false,
     ...input.details,
     detailsStatus: input.detailsStatus,
