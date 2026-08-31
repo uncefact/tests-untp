@@ -51,12 +51,22 @@ export function getBridge(dataModelType: string, version: string): IDataModelBri
 /**
  * Every data model and version the registry holds a bridge for.
  *
- * Package-internal (not re-exported from `index.ts`): it exists so a test can
- * assert it has a case for every registered bridge, which is what stops a
- * newly added version from going unexercised.
+ * Package-internal: it exists so a test can assert it has a case for every
+ * registered bridge, which is what stops a newly added version from going
+ * unexercised. Callers that need the versions of one type should use
+ * {@link listRegisteredVersions}.
  */
 export function listBridgeVersions(): Array<{ dataModelType: string; version: string }> {
   return Object.entries(registry).flatMap(([dataModelType, versions]) =>
     Object.keys(versions).map((version) => ({ dataModelType, version })),
   );
+}
+
+/**
+ * Spec versions the registry holds a bridge for under `dataModelType`.
+ * Empty when the type is not registered.
+ */
+export function listRegisteredVersions(dataModelType: string): string[] {
+  const versions = registry[dataModelType];
+  return versions === undefined ? [] : Object.keys(versions);
 }

@@ -162,7 +162,7 @@ export type {
   UntpLocation,
 } from './data-model-bridges/index.js';
 
-export { getBridge, buildContextAndTypes } from './data-model-bridges/index.js';
+export { getBridge, listRegisteredVersions, buildContextAndTypes } from './data-model-bridges/index.js';
 
 // Imported from its own module rather than the './cvc' barrel: that barrel
 // also loads the scheme-ingest chain and its multibase and resolver
