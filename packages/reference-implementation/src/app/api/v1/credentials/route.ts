@@ -556,7 +556,11 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // ── Step 2: Resolve data model ──────────────────────────────────────────
 
   logger.info({ credentialType, version }, 'Resolving data model');
-  const { dataModel, bridge, schemaUrls } = await resolveDataModel(tenantId, credentialType, version);
+  const { dataModel, bridge, schemaUrls, coreDataModelVersion } = await resolveDataModel(
+    tenantId,
+    credentialType,
+    version,
+  );
 
   // ── Step 3: Validate payload ────────────────────────────────────────────
 
@@ -685,6 +689,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       storageService,
       storageOptions,
       bridge,
+      coreDataModelVersion,
       ...(claimId !== undefined ? { idempotencyClaimId: claimId } : {}),
     });
   } catch (error) {

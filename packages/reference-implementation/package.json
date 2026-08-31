@@ -42,6 +42,7 @@
     "test:coverage": "jest --coverage",
     "audit:encryption": "npx tsx scripts/audit-encryption.ts",
     "backfill:decryption-keys": "npx tsx scripts/backfill-decryption-keys.ts",
+    "backfill:credential-details": "npx tsx scripts/backfill-credential-details.ts",
     "rotate:encryption-key": "npx tsx scripts/rotate-encryption-key.ts",
     "test:integration": "prisma generate && jest --config jest.integration.config.mjs"
   },

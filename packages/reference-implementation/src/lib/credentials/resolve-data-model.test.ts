@@ -69,6 +69,7 @@ describe('resolveDataModel', () => {
       dataModel: CORE_DATA_MODEL,
       bridge: MOCK_BRIDGE,
       schemaUrls: ['https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json'],
+      coreDataModelVersion: '0.6.1',
     });
   });
 
@@ -80,6 +81,26 @@ describe('resolveDataModel', () => {
 
     expect(mockGetBridge).toHaveBeenCalledWith('DigitalProductPassport', '0.6.1');
     expect(result.bridge).toBe(MOCK_BRIDGE);
+    expect(result.coreDataModelVersion).toBe('0.6.1');
+  });
+
+  it('returns the parent version as coreDataModelVersion when the extension version differs', async () => {
+    mockListDataModels.mockResolvedValue({
+      data: [
+        {
+          ...EXTENSION_DATA_MODEL,
+          version: '1.2.0',
+          parentConfig: { ...EXTENSION_DATA_MODEL.parentConfig, version: '0.6.0' },
+        },
+      ],
+      total: 1,
+    });
+    mockGetBridge.mockReturnValue(MOCK_BRIDGE);
+
+    const result = await resolveDataModel('tenant-1', 'DigitalLivestockPassport', '1.2.0');
+
+    expect(mockGetBridge).toHaveBeenCalledWith('DigitalProductPassport', '0.6.0');
+    expect(result.coreDataModelVersion).toBe('0.6.0');
   });
 
   it('returns core + extension schema URLs for extension data models', async () => {

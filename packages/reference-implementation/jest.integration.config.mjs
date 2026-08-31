@@ -39,6 +39,8 @@ const jestConfig = {
     '^@uncefact/untp-ri-services/server$': '<rootDir>/../services/build/server.js',
     '^@uncefact/untp-ri-services/logging$': '<rootDir>/../services/build/logging/index.js',
     '^@uncefact/untp-ri-services/encryption$': '<rootDir>/../services/build/encryption/index.js',
+    '^@uncefact/untp-ri-services/data-model-bridges$': '<rootDir>/../services/build/data-model-bridges/index.js',
+    '^@uncefact/untp-ri-services/verifiable-credential$': '<rootDir>/../services/build/verifiable-credential/index.js',
     '^@uncefact/untp-ri-services/key-provider$': '<rootDir>/../services/build/key-provider/index.js',
     '^@uncefact/untp-ri-services/cvc$': '<rootDir>/../services/build/cvc/index.js',
     '^@uncefact/untp-ri-services$': '<rootDir>/../services/build/index.js',
