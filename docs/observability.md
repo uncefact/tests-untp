@@ -38,12 +38,12 @@ When everything is healthy, the reference implementation is at `http://localhost
 2. Navigate around (any page hit produces a trace).
 3. Open Grafana at `http://localhost:3030`.
 4. Use **Explore** with the **Tempo** data source. The data source is pre-provisioned and is the default.
-5. In the search panel, set the **Service Name** filter to `reference-implementation` and click **Run query**.
+5. In the search panel, set the **Service Name** filter to your `OTEL_SERVICE_NAME` value (`reference-implementation` unless you overrode it) and click **Run query**.
 6. Recent traces appear within a minute. Click one to see the span tree.
 
 Each trace carries resource attributes:
 
-- `service.name` = `reference-implementation`
+- `service.name` = the value of `OTEL_SERVICE_NAME` (`reference-implementation` by default)
 - `service.version` = the package version from `packages/reference-implementation/package.json`
 - `deployment.environment.name` = the value of `DEPLOYMENT_ENVIRONMENT` (`local` by default)
 
@@ -69,6 +69,10 @@ The walking skeleton verifies `local-observability` end-to-end. `observability` 
 ## How the app emits
 
 The reference implementation initialises the SDK via Next.js's instrumentation hook at `packages/reference-implementation/src/instrumentation.ts`, which Next.js calls once per process at startup. The hook guards on `NEXT_RUNTIME === 'nodejs'` so the Node SDK does not get pulled into the Edge runtime bundle. The SDK uses the OTLP gRPC trace exporter; the endpoint is read from `OTEL_EXPORTER_OTLP_ENDPOINT` and defaults to `http://localhost:4317` (suitable for `pnpm dev` against the compose stack). The Docker Compose service for the reference implementation overrides this default to `http://otel-agent:4317` so containerised runs reach the sidecar through the compose network.
+
+The emitted `service.name` is read from `OTEL_SERVICE_NAME` and defaults to `reference-implementation`. The value is trimmed, and an empty or whitespace-only value counts as unset, which is what the compose file forwards when the variable is not set on the host. The application applies the resolved name after the SDK's own environment detection, so a `service.name` set only inside `OTEL_RESOURCE_ATTRIBUTES` does not rename the app. Other attributes in that variable still apply.
+
+Set `OTEL_SERVICE_NAME` when more than one thing reports into the same stack and they need to be told apart, such as a variation of the reference implementation running alongside the original. The environment is carried separately, in `deployment.environment.name`.
 
 Auto-instrumentation is provided by `@opentelemetry/auto-instrumentations-node`, which covers HTTP, fetch, Next.js, Prisma, and other common libraries. The `fs` instrumentation is disabled by default (`packages/reference-implementation/src/lib/observability/instrumentations.ts`): it turns every filesystem call Next.js and Node make internally into a span, which floods traces with high-cardinality, low-value noise.
 

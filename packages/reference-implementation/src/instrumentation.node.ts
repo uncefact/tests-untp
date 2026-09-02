@@ -17,7 +17,7 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 
 import { buildInstrumentations } from './lib/observability/instrumentations';
-import { buildResource } from './lib/observability/resource';
+import { buildResource, resolveServiceName } from './lib/observability/resource';
 import { apiLogger } from './lib/api/logger';
 import { warnOnRejectedMaxPageLimitOverride } from './lib/api/pagination';
 import { resolveDataEncryptionKey } from './lib/encryption/resolve-data-encryption-key';
@@ -81,6 +81,10 @@ async function validateEncryptionKeyOnBoot(): Promise<void> {
 function startOpenTelemetry(): void {
   const sdk = new NodeSDK({
     resource: buildResource(),
+    // Merged by the SDK after its env detector, so the resolved name (not a
+    // padded OTEL_SERVICE_NAME or a service.name from OTEL_RESOURCE_ATTRIBUTES)
+    // is what every span carries. See resolveServiceName.
+    serviceName: resolveServiceName(),
     traceExporter: new OTLPTraceExporter({
       url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://localhost:4317',
     }),

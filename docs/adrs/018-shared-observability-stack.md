@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** proposed
+- **Update (2026-09-02):** the reference implementation's `service.name` is now read from the `OTEL_SERVICE_NAME` environment variable, and falls back to `reference-implementation` when that is unset or empty (#643). The label-based segregation decided here is unchanged: environments are still told apart by the deployment environment attribute, and the dashboards' `$service` and `$environment` variables remain independent.
 
 ## Context
 

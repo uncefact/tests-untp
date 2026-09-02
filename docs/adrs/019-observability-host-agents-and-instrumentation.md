@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** proposed
+- **Update (2026-09-02):** the reference implementation reads `service.name` from `OTEL_SERVICE_NAME`, falling back to `reference-implementation`, and passes the resolved name to the Node SDK as its `serviceName` option so the SDK applies it after its own environment detection (#643). A `service.name` set only through `OTEL_RESOURCE_ATTRIBUTES` therefore does not rename the app, while the other attributes in that variable still apply. The decision that apps set these resource attributes is unchanged.
 
 ## Context
 
