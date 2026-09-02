@@ -1,5 +1,5 @@
 import { EncryptionAlgorithm } from '@uncefact/untp-ri-services/encryption';
-import { IdempotencyOperation } from '../generated';
+import { IdempotencyOperation, type Prisma } from '../generated';
 import { prisma } from '../prisma';
 import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
 import { readStaleClaimMs } from '@/lib/config/idempotency-claim.config';
@@ -44,11 +44,17 @@ export type ClaimIdempotencyKeyInput = {
 
 export type IdempotencyReplay = {
   outcome: 'replay';
-  credentialId: string;
+  /**
+   * The LibraryRecord the original request produced. A child shares its
+   * parent's id, so the value is also the id of the Credential child for
+   * CREDENTIAL_ISSUE, or of the ExternalCredential child for LIBRARY_REGISTER
+   * (#955).
+   */
+  recordId: string;
   responseBody: unknown;
   /**
    * Set when a stored response body existed but could not be read, for
-   * example after DATA_ENCRYPTION_KEY was rotated. The credential id is
+   * example after DATA_ENCRYPTION_KEY was rotated. The record id is
    * still authoritative; only the recorded body is lost, and the route
    * tells the caller so instead of replaying silently without it.
    */
@@ -69,7 +75,8 @@ export type FindIdempotencyKeyResult =
 
 export type CompleteIdempotencyKeyInput = {
   claimId: string;
-  credentialId: string;
+  /** The record id the claim links to, in whichever result column its operation uses. */
+  recordId: string;
   responseBody: unknown;
 };
 
@@ -84,7 +91,7 @@ type StoredClaim = {
   tenantId: string;
   operation: IdempotencyOperation;
   bodyDigest: string;
-  credentialId: string | null;
+  recordId: string | null;
   resultRecordedAt: Date | null;
   responseBody: string | null;
   createdAt: Date;
@@ -140,13 +147,13 @@ export async function claimIdempotencyKey(input: ClaimIdempotencyKeyInput): Prom
 /**
  * Compare-and-set of the final response on this claim (#954, ADR-051). Writes
  * `responseBody` and `finalisedAt` only while this claim still owns
- * `credentialId` and `finalisedAt` is null, so a stale replayer and the
+ * `recordId` and `finalisedAt` is null, so a stale replayer and the
  * original cannot overwrite each other. A lost race is `applied: false`;
  * the caller re-reads the winner's finalised body.
  */
 export async function completeIdempotencyKey(input: CompleteIdempotencyKeyInput): Promise<IdempotencyMutationResult> {
   const updated = await prisma.idempotencyKey.updateMany({
-    where: { id: input.claimId, credentialId: input.credentialId, finalisedAt: null },
+    where: { id: input.claimId, recordId: input.recordId, finalisedAt: null },
     data: {
       responseBody: protectResponseBody(input.responseBody),
       finalisedAt: new Date(Date.now()),
@@ -157,15 +164,37 @@ export async function completeIdempotencyKey(input: CompleteIdempotencyKeyInput)
 
 /**
  * Drops a claimed key so a failed operation can be retried. Addresses the
- * row by `claimId` and only while `credentialId` is still null, so a
- * reclaimed original cannot delete a later owner's row (#954). A
- * non-matching row is a no-op (`applied: false`).
+ * row by `claimId` and only while `recordId` is still null, so a reclaimed
+ * original cannot delete a later owner's row (#954). A non-matching row is
+ * a no-op (`applied: false`).
  */
 export async function releaseIdempotencyKey(input: ReleaseIdempotencyKeyInput): Promise<IdempotencyMutationResult> {
   const deleted = await prisma.idempotencyKey.deleteMany({
-    where: { id: input.claimId, credentialId: null },
+    where: { id: input.claimId, recordId: null },
   });
   return { applied: deleted.count > 0 };
+}
+
+/**
+ * Links a claim to the library record its operation produced, inside the
+ * caller's transaction, so the record and the association commit together
+ * (ADR-051 decision 3). Compare-and-set on `recordId` still being null: a
+ * claim another request reclaimed in the meantime matches no row, and the
+ * caller's record is rolled back with the `IdempotencyClaimLostError` this
+ * throws.
+ */
+export async function linkClaimToRecord(
+  client: Prisma.TransactionClient,
+  claimId: string,
+  recordId: string,
+): Promise<void> {
+  const updated = await client.idempotencyKey.updateMany({
+    where: { id: claimId, recordId: null },
+    data: { recordId, resultRecordedAt: new Date(Date.now()) },
+  });
+  if (updated.count === 0) {
+    throw new IdempotencyClaimLostError();
+  }
 }
 
 async function insertClaim(input: ClaimIdempotencyKeyInput): Promise<string> {
@@ -223,7 +252,7 @@ async function deleteStaleClaim(input: ClaimIdempotencyKeyInput): Promise<void> 
       tenantId: input.tenantId,
       operation: input.operation,
       key: input.key,
-      credentialId: null,
+      recordId: null,
       createdAt: { lte: staleCutoff() },
     },
   });
@@ -231,7 +260,7 @@ async function deleteStaleClaim(input: ClaimIdempotencyKeyInput): Promise<void> 
 
 /**
  * Classifies a stored row against the requested body digest. A row with a
- * credential and no `finalisedAt` is in-flight while `resultRecordedAt`
+ * recorded result and no `finalisedAt` is in-flight while `resultRecordedAt`
  * is fresh, and a replay of the recorded result once that clock is
  * stale (the original never delivered its response, so the result
  * must not be produced again). An empty claim ages from `createdAt`.
@@ -240,7 +269,8 @@ async function interpretRow(row: StoredClaim, bodyDigest: string): Promise<Inter
   if (row.bodyDigest !== bodyDigest) {
     return { outcome: 'mismatch' };
   }
-  if (row.credentialId) {
+  const recordId = row.recordId;
+  if (recordId) {
     if (row.finalisedAt == null && !isStaleRecordedClaim(row.resultRecordedAt)) {
       return { outcome: 'in-flight' };
     }
@@ -251,16 +281,16 @@ async function interpretRow(row: StoredClaim, bodyDigest: string): Promise<Inter
       // will actually receive.
       const { applied } = await completeIdempotencyKey({
         claimId: row.id,
-        credentialId: row.credentialId,
+        recordId,
         responseBody: revealed.value,
       });
       if (!applied) {
-        return readWinnerReplay(row.id, row.credentialId, revealed);
+        return readWinnerReplay(row.id, recordId, revealed);
       }
     }
     return {
       outcome: 'replay',
-      credentialId: row.credentialId,
+      recordId,
       responseBody: revealed.value,
       ...(revealed.unreadable ? { responseBodyUnreadable: true as const } : {}),
     };
@@ -273,16 +303,17 @@ async function interpretRow(row: StoredClaim, bodyDigest: string): Promise<Inter
 
 async function readWinnerReplay(
   claimId: string,
-  fallbackCredentialId: string,
+  fallbackRecordId: string,
   fallbackResponseBody: RevealedResponseBody,
 ): Promise<IdempotencyReplay> {
   const current = await prisma.idempotencyKey.findUnique({
     where: { id: claimId },
   });
-  if (!current?.credentialId) {
+  const currentRecordId = current?.recordId ?? null;
+  if (!current || !currentRecordId) {
     return {
       outcome: 'replay',
-      credentialId: fallbackCredentialId,
+      recordId: fallbackRecordId,
       responseBody: fallbackResponseBody.value,
       ...(fallbackResponseBody.unreadable ? { responseBodyUnreadable: true as const } : {}),
     };
@@ -290,7 +321,7 @@ async function readWinnerReplay(
   const revealed = revealResponseBody(current);
   return {
     outcome: 'replay',
-    credentialId: current.credentialId,
+    recordId: currentRecordId,
     responseBody: revealed.value,
     ...(revealed.unreadable ? { responseBodyUnreadable: true as const } : {}),
   };
@@ -333,7 +364,7 @@ type RevealedResponseBody = { value: unknown; unreadable?: true };
 /**
  * Recovers the stored response body. A body that cannot be read (for
  * example after DATA_ENCRYPTION_KEY was rotated) yields `unreadable` so a
- * retry still returns the credential id rather than becoming a 500, and
+ * retry still returns the record id rather than becoming a 500, and
  * the route can tell the caller the recorded body was lost. The log line
  * names the stage that failed so an operator can tell one corrupted row
  * from a key rotation that broke every row (#954, ADR-051).

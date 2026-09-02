@@ -27,7 +27,7 @@ import {
 import { paginationMetaSchema } from '@/lib/api/pagination';
 import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
 import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
-import { CredentialDetailsError, CredentialDetailsStatus } from '@/lib/prisma/generated';
+import { CredentialDetailsError, CredentialDetailsStatus, CoreCredentialType } from '@/lib/prisma/generated';
 import {
   conformitySchemeSummarySchema,
   conformityProfileSummarySchema,
@@ -94,6 +94,12 @@ export const credentialSchema = z.object({
   storageUri: z.string().describe('URI where the credential is stored'),
   digestMultibase: z.string().describe('Multibase-encoded multihash digest of the stored credential content'),
   credentialType: z.string().describe('Type of credential (e.g. DigitalProductPassport)'),
+  coreCredentialType: z
+    .nativeEnum(CoreCredentialType)
+    .nullable()
+    .describe(
+      'The UNTP core credential type the credential type resolves to (DPP, DCC, DFR, DTE or DIA), or null when that kind is unknown or unresolved, which covers an extension whose core kind is not known and a credential issued before this field existed whose recorded type resolved to no core kind',
+    ),
   decryptionKey: z.string().nullable().describe('AES-GCM decryption key (null if unencrypted)'),
   isPublished: z.boolean().describe('Whether the credential has been published to IDR'),
   organisationId: z.string().nullable().describe('ID of the linked organisation entity (null if none)'),
@@ -140,7 +146,12 @@ export const credentialSchema = z.object({
       'Why the descriptive fields could not be read, when detailsStatus is EXTRACTION_FAILED. `UNREADABLE_ENVELOPE` means the signed credential could not be decoded, `BRIDGE_ERROR` that its data model could not be read, and `DECRYPT_FAILED` that a stored credential could not be opened. Null in every other state',
     ),
   createdAt: z.string().datetime().describe('ISO 8601 timestamp'),
-  updatedAt: z.string().datetime().describe('ISO 8601 timestamp'),
+  updatedAt: z
+    .string()
+    .datetime()
+    .describe(
+      'ISO 8601 timestamp of the last change to the record or its descriptive fields; a change to the stored copy alone, such as a key rewrap, does not move it',
+    ),
 });
 
 // ============================================================================

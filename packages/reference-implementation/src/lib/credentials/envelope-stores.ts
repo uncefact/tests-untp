@@ -18,7 +18,12 @@
 import { looksEnvelopeLikeButInvalid } from './decryption-key-protection';
 
 /** The stores, in the order every operation walks them (see ENVELOPE_STORE_INFO). */
-export const ENVELOPE_STORE_IDS = ['serviceInstances', 'credentials', 'idempotencyResponses'] as const;
+export const ENVELOPE_STORE_IDS = [
+  'serviceInstances',
+  'credentials',
+  'externalCredentials',
+  'idempotencyResponses',
+] as const;
 
 export type EnvelopeStoreId = (typeof ENVELOPE_STORE_IDS)[number];
 
@@ -74,6 +79,19 @@ export const ENVELOPE_STORE_INFO: Record<EnvelopeStoreId, EnvelopeStoreInfo> = {
     valueName: 'decryption key',
     logIdField: 'credentialId',
     plaintextAllowed: true,
+    discardable: false,
+  },
+  // The receiver-side key our own storage service returned for the durable
+  // copy of a credential registered from a third party; a supplier's key is
+  // never stored (ADR-055 decision 2). This column has never held legacy
+  // plaintext, so a non-envelope value is corruption, and losing the value
+  // loses the only key that opens our copy.
+  externalCredentials: {
+    heading: 'External credential decryption keys:',
+    rowName: 'external credential',
+    valueName: 'decryption key',
+    logIdField: 'externalCredentialId',
+    plaintextAllowed: false,
     discardable: false,
   },
   // A replay body is the recorded response a retry is answered with. While

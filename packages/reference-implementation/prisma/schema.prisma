@@ -55,6 +55,75 @@ enum CredentialDetailsError {
   DECRYPT_FAILED
 }
 
+/// The UNTP core credential types, by the codes the API uses (#955). The
+/// library stores a credential's type as this code whether it is the
+/// recipient's declaration or what extraction read from the artefact, so the
+/// two compare directly; the data-model bridge registry's full names
+/// (DigitalProductPassport and so on) are one map away when a bridge is
+/// looked up.
+enum CoreCredentialType {
+  DFR
+  DCC
+  DPP
+  DTE
+  DIA
+}
+
+/// Which child table a library record's origin-specific columns live in
+/// (ADR-053 decisions 1 and 2): NATIVE for a credential this system issued
+/// (Credential), EXTERNAL for one registered from a third party
+/// (ExternalCredential).
+enum LibraryRecordOrigin {
+  NATIVE
+  EXTERNAL
+}
+
+/// What a registered external credential's durable copy turned out to hold
+/// (#955). Decides what the worker sends to the verifier and which checks can
+/// apply. CREDENTIAL is a verifiable credential in a form this system can
+/// read; today that is the W3C VCDM 2.0 enveloped (JOSE) form UNTP requires,
+/// and recognising another form is a change to the classifier, not to this
+/// enum. Only a CREDENTIAL is extracted and digest-checked. JSON_OBJECT is any
+/// other JSON object; OPAQUE is everything else (HTML, an empty body, a JSON
+/// array or primitive).
+enum ExternalContentKind {
+  CREDENTIAL
+  JSON_OBJECT
+  OPAQUE
+}
+
+/// Whether one check run concluded (#955, ADR-053 decision 3). PENDING
+/// means the in-request work settled and only the asynchronous verifier call
+/// is outstanding; COMPLETE means the checks reached a conclusion either way,
+/// so a forged or revoked credential is COMPLETE; FAILED means an operational
+/// prerequisite stopped them from concluding, with the reason in failureCode.
+enum CheckRunState {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+/// Outcome of one check within a run. NOT_RUN covers both "did not apply"
+/// and "did not execute", so an all-NOT_RUN blocking set can never read as a
+/// pass.
+enum CheckResult {
+  PASS
+  FAIL
+  NOT_RUN
+}
+
+/// Why a FAILED check run could not conclude (#955). The wire contract's
+/// closed set; STORED_COPY_UNAVAILABLE is emitted when a durable copy this
+/// system believed it held cannot be read back or no longer matches its digest.
+enum CheckRunFailureCode {
+  RETRIEVAL_FAILED
+  DECRYPTION_REQUIRED
+  DECRYPTION_FAILED
+  STORAGE_FAILED
+  VERIFICATION_UNAVAILABLE
+  STORED_COPY_UNAVAILABLE
+}
+
 enum ServiceType {
   IDR
   STORAGE
@@ -125,70 +194,136 @@ model Tenant {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  users             User[]
-  dids              Did[]
-  serviceInstances  ServiceInstance[]
-  registrars        Registrar[]
-  schemes           IdentifierScheme[]
-  identifiers       Identifier[]
-  linkRegistrations LinkRegistration[]
-  organisations     OrganisationEntity[]
-  facilities        Facility[]
-  products          Product[]
-  credentials       Credential[]
-  idempotencyKeys   IdempotencyKey[]
-  dataModels        DataModel[]
-  renderTemplates   RenderTemplate[]
-  conformitySchemes ConformityScheme[]
+  users               User[]
+  dids                Did[]
+  serviceInstances    ServiceInstance[]
+  registrars          Registrar[]
+  schemes             IdentifierScheme[]
+  identifiers         Identifier[]
+  linkRegistrations   LinkRegistration[]
+  organisations       OrganisationEntity[]
+  facilities          Facility[]
+  products            Product[]
+  libraryRecords      LibraryRecord[]
+  credentials         Credential[]
+  externalCredentials ExternalCredential[]
+  idempotencyKeys     IdempotencyKey[]
+  dataModels          DataModel[]
+  renderTemplates     RenderTemplate[]
+  conformitySchemes   ConformityScheme[]
 
   @@map("Tenant")
 }
 
 /**
- * Stores issued verifiable credentials metadata
+ * A library record (ADR-053 decision 1): identity and the fields that are
+ * the same for both origins by construction, the descriptive fields
+ * extraction reads from the signed artefact (decision 5). Each record has
+ * exactly one child row, Credential or ExternalCredential, keyed by this id
+ * and matching its origin and tenant. The write paths create both in one
+ * transaction; the migration adds deferred constraint triggers that refuse
+ * to commit a parent with no child, or a child whose parent still exists at
+ * commit, so a child never outlives its parent. Deleting the parent cascades
+ * to the child. The children's composite foreign key pins origin and tenant.
+ */
+model LibraryRecord {
+  id       String              @id @default(cuid())
+  tenantId String
+  origin   LibraryRecordOrigin
+
+  /// Descriptive fields read from the signed artefact (#952, decision 5).
+  /// Null while detailsStatus is not EXTRACTED, and null for an external
+  /// record whose artefact has not been read yet.
+  name                 String?
+  issuerName           String?
+  issuerDid            String?
+  subjectName          String?
+  subjectId            String?
+  validFrom            DateTime?
+  validUntil           DateTime?
+  /// The type the record asserts, an extension's own name when it is one
+  /// (decision 8). For a native record it is the registered data model
+  /// issuance resolved; for an external record it is read from the artefact.
+  credentialType       String?
+  /// The core kind the type resolves to (decision 8), derived once at write
+  /// time: a native record's data model core parent, or the one core name an
+  /// external record's type set contains. Null when nothing names one. For a
+  /// record extracted from an artefact, a type set naming two core kinds also
+  /// leaves this null and records EXTRACTION_FAILED with BRIDGE_ERROR.
+  coreCredentialType   CoreCredentialType?
+  /// Spec version the data-model bridge was resolved with (#953). For an
+  /// extension this is the parent version.
+  coreDataModelVersion String?
+  detailsStatus        CredentialDetailsStatus @default(EXTRACTION_PENDING)
+  detailsError         CredentialDetailsError?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  credential         Credential?
+  externalCredential ExternalCredential?
+  checkRuns          CheckRun[]
+  idempotencyKey     IdempotencyKey?
+
+  /// Targets for the children's and the claim's composite foreign keys, so a
+  /// child can only attach to a parent of its own tenant and origin, and a
+  /// claim only to a record of its own tenant. Redundant with the primary
+  /// key, which Postgres requires spelt out to reference.
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, origin])
+  @@index([tenantId])
+  @@index([tenantId, origin])
+  @@index([tenantId, coreCredentialType])
+  @@index([tenantId, issuerDid])
+}
+
+/**
+ * A credential this system issued: the native child of a LibraryRecord
+ * (ADR-053 decision 2), sharing its id. Holds what only a native credential
+ * has: where the signed artefact is stored, the key that opens it,
+ * publication state and the master-data links.
  */
 model Credential {
-  id              String                  @id @default(cuid())
+  id              String              @id
   tenantId        String
+  /// Always NATIVE (a database CHECK pins it); part of the composite foreign
+  /// key so this child can only attach to a NATIVE parent of its own tenant.
+  origin          LibraryRecordOrigin @default(NATIVE)
   storageUri      String
   digestMultibase String
   /// @encryptedAtRest The storage service's key for the private copy, protected
   /// by protectDecryptionKey (#697). Rows written before that may hold it in
   /// plaintext until backfill:decryption-keys wraps them.
   decryptionKey   String?
-  credentialType  String
-  coreDataModelVersion String?
-  isPublished     Boolean                 @default(false)
+  isPublished     Boolean             @default(false)
   organisationId  String?
   facilityId      String?
   productId       String?
-  name            String?
-  issuerName      String?
-  issuerDid       String?
-  subjectName     String?
-  subjectId       String?
-  validFrom       DateTime?
-  validUntil      DateTime?
-  detailsStatus   CredentialDetailsStatus @default(EXTRACTION_PENDING)
-  detailsError    CredentialDetailsError?
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
-  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  organisation   OrganisationEntity? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
-  facility       Facility?           @relation(fields: [facilityId], references: [id], onDelete: SetNull)
-  product        Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
-  idempotencyKey IdempotencyKey?
+  record       LibraryRecord       @relation(fields: [id, tenantId, origin], references: [id, tenantId, origin], onDelete: Cascade)
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organisation OrganisationEntity? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+  facility     Facility?           @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  product      Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
 
+  /// Prisma requires the defining side of a one-to-one relation to be unique
+  /// over the relation's fields; the primary key already makes it so.
+  @@unique([id, tenantId, origin])
+  @@index([organisationId])
+  @@index([facilityId])
+  @@index([productId])
   @@index([tenantId])
 }
 
 /**
  * Per-tenant idempotency keys (#954, ADR-051). A claim is scoped by tenant,
- * operation and key. Cascade on the credential frees the key that produced
- * it, so a later reuse of that operation's key proceeds as a first request.
+ * operation and key. Cascade on the record frees the key that produced it,
+ * so a later reuse of that operation's key proceeds as a first request.
  * `finalisedAt` is set once the original response has been recorded for
- * replay; a row with a credential and no timestamp is still in flight.
+ * replay; a row with a record and no timestamp is still in flight.
  */
 model IdempotencyKey {
   id               String               @id @default(cuid())
@@ -196,8 +331,12 @@ model IdempotencyKey {
   operation        IdempotencyOperation
   key              String
   bodyDigest       String
-  credentialId     String?              @unique
-  /// Set with credentialId. Ages a recorded-but-unfinalised row. An empty claim ages from createdAt (#954).
+  /// The library record the claim's request produced: a native credential
+  /// for CREDENTIAL_ISSUE, an external one for LIBRARY_REGISTER (#955). Null
+  /// is an empty claim. The composite foreign key pins the record to the
+  /// claim's tenant; cascade frees the key when the record is deleted.
+  recordId         String?              @unique
+  /// Set with recordId. Ages a recorded-but-unfinalised row. An empty claim ages from createdAt (#954).
   resultRecordedAt DateTime?
   /// @encryptedAtRest AES-256-GCM envelope of the response a later retry
   /// replays. The same protection Credential.decryptionKey uses, so a database
@@ -206,10 +345,132 @@ model IdempotencyKey {
   createdAt        DateTime             @default(now())
   finalisedAt      DateTime?
 
-  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: Cascade)
-  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  record LibraryRecord? @relation(fields: [recordId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, operation, key])
+  @@unique([recordId, tenantId])
+}
+
+/**
+ * A credential received from a third party: the external child of a
+ * LibraryRecord (#955, ADR-053 decision 2, ADR-055), sharing its id. Holds
+ * what only a received credential has: where it came from, what the fetch
+ * observed, the durable copy's coordinates, and the recipient's annotations.
+ * Custody (ADR-055): a supplier's key is never stored. decryptionKey is the
+ * key our own storage service returned for the protected copy, encrypted at
+ * rest exactly like Credential.decryptionKey; null means no openable copy yet.
+ */
+model ExternalCredential {
+  id           String               @id
+  tenantId     String
+  /// Always EXTERNAL (a database CHECK pins it); part of the composite
+  /// foreign key so this child can only attach to an EXTERNAL parent of its
+  /// own tenant.
+  origin       LibraryRecordOrigin  @default(EXTERNAL)
+  /// Canonical WHATWG href the credential was fetched from. Nullable because
+  /// the record contract admits later intake modes with no URL; the v1
+  /// register route requires one.
+  sourceUrl    String?
+  /// Multibase digest of the raw bytes as fetched, before any decrypt. Null
+  /// until a fetch succeeded.
+  sourceDigest String?
+  /// Whether the fetched body was an encrypted envelope. Null until a body
+  /// was observed, so a failed fetch never claims to have seen one.
+  encrypted    Boolean?
+  contentKind  ExternalContentKind?
+
+  /// The durable copy, all null until one was stored. The storage instance,
+  /// object id and bucket are recorded so a later read or deletion targets the
+  /// service that holds the copy. storageServiceInstanceId is not a foreign
+  /// key, matching Credential, which carries no reference to its instance.
+  storageUri               String?
+  storageDigestMultibase   String?
+  storageServiceInstanceId String?
+  storageExternalId        String?
+  storageBucket            String?
+  /// @encryptedAtRest AES-256-GCM envelope, under DATA_ENCRYPTION_KEY, of the
+  /// receiver-side key our own storage service returned for the durable copy
+  /// (ADR-055 decision 2). Never a supplier's key, which is used and
+  /// forgotten. Null while no openable copy exists.
+  decryptionKey            String?
+
+  /// Recipient-asserted annotations (#955, #959). annotationVersion is the
+  /// concurrency token PATCH compares against; it starts at 1.
+  displayName            String
+  declaredCredentialType CoreCredentialType
+  dateReceived           DateTime?          @db.Date
+  notes                  String?
+  annotationVersion      Int                @default(1)
+  /// A key was supplied but the source turned out to be plaintext, so it was
+  /// never applied; recorded rather than silently discarded.
+  decryptionKeyUnused    Boolean            @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  record LibraryRecord @relation(fields: [id, tenantId, origin], references: [id, tenantId, origin], onDelete: Cascade)
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([id, tenantId, origin])
+  @@index([tenantId])
+  @@index([tenantId, declaredCredentialType])
+}
+
+/**
+ * One run of the seven checks over a library record's artefact (#955,
+ * ADR-053 decision 3): acquisition (retrieval, decryption), custody integrity
+ * (digest), verification proper (proof, status, temporal) and validation
+ * (schemaConformance). The wire calls a run a "verification generation"; the
+ * table is named for what it holds, since only three of the seven checks are
+ * verification in the credential sense. A run belongs to exactly one record
+ * through one foreign key to the parent. Runs are only ever added, so a stale
+ * result can never overwrite a newer one.
+ * summary is not a column: it is derived from state and the blocking checks
+ * by one function, per the contract's derivation rule.
+ * Two constraints live in the migration as raw SQL: generation is at least
+ * 1, and a record has at most one PENDING run (a partial unique index), which
+ * is what lets a request that arrives while a run is pending join it rather
+ * than race it (#957).
+ */
+model CheckRun {
+  id         String        @id @default(cuid())
+  recordId   String
+  /// The record's tenant, carried on the run so a read is scoped by the
+  /// same key the record is, never by call-site convention.
+  tenantId   String
+  /// The contract's `verification.generation`: numbered per record from 1,
+  /// and run N supersedes run N-1. A native record's generation 1 is the
+  /// issuance assertion (ADR-053 decision 4), synthesised at read time from
+  /// the Credential row and never stored, so a native record's first row here
+  /// is generation 2, written by re-verify. An external record's generation 1
+  /// is a real row, written at register.
+  generation Int
+  state      CheckRunState
+
+  retrieval         CheckResult @default(NOT_RUN)
+  decryption        CheckResult @default(NOT_RUN)
+  digest            CheckResult @default(NOT_RUN)
+  proof             CheckResult @default(NOT_RUN)
+  status            CheckResult @default(NOT_RUN)
+  temporal          CheckResult @default(NOT_RUN)
+  schemaConformance CheckResult @default(NOT_RUN)
+
+  failureCode      CheckRunFailureCode?
+  failureMessage   String?
+  failureRetryable Boolean?
+
+  requestedAt    DateTime  @default(now())
+  completedAt    DateTime?
+  /// When the verify job for this run was last enqueued. The column and its
+  /// index exist for a reconciliation sweep that will re-enqueue PENDING rows
+  /// whose marker is stale; no sweep runs yet.
+  lastEnqueuedAt DateTime?
+
+  record LibraryRecord @relation(fields: [recordId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([recordId, generation])
+  @@index([state, lastEnqueuedAt])
 }
 
 /**

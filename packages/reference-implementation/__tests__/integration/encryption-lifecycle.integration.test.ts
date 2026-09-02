@@ -8,14 +8,20 @@
  * only a fake ever satisfied cannot pass.
  */
 import { AesGcmEncryptionAdapter, EncryptionAlgorithm } from '@uncefact/untp-ri-services/encryption';
-import { AdapterType, IdempotencyOperation, ServiceType } from '../../src/lib/prisma/generated';
+import {
+  AdapterType,
+  CoreCredentialType,
+  IdempotencyOperation,
+  LibraryRecordOrigin,
+  ServiceType,
+} from '../../src/lib/prisma/generated';
 import { auditEncryption } from '../../src/lib/credentials/audit-encryption';
 import { ENVELOPE_STORE_IDS } from '../../src/lib/credentials/envelope-stores';
 import { prismaEnvelopeStores } from '../../src/lib/credentials/prisma-envelope-stores';
 import { rotateEncryptionKey } from '../../src/lib/credentials/rotate-encryption-key';
 import { validateEncryptionKeyAtStartup } from '../../src/lib/credentials/validate-encryption-key-startup';
 import { createRigClient, truncateApplicationTables } from './rig/db';
-import { seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
+import { insertNativeCredential, seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
 
 const OUTGOING_KEY = 'a'.repeat(64);
 const ACTIVE_KEY = 'b'.repeat(64);
@@ -43,37 +49,24 @@ async function seedOneEnvelopePerStore(): Promise<void> {
       config: envelopeUnder(OUTGOING_KEY, '{"apiUrl":"https://storage.test"}'),
     },
   });
-  await prisma.credential.create({
-    data: {
-      id: 'cred-1',
-      tenantId: SYSTEM_TENANT_ID,
-      storageUri: 'https://storage.test/cred-1',
-      digestMultibase: 'zCred1',
-      credentialType: 'DigitalProductPassport',
-      decryptionKey: envelopeUnder(OUTGOING_KEY, 'native-key'),
-    },
-  });
+  await insertNativeCredential(prisma, { id: 'cred-1', decryptionKey: envelopeUnder(OUTGOING_KEY, 'native-key') });
   // A legacy plaintext key and two null values, so the real queries' filters
   // and narrowing are exercised, not only their happy shape.
-  await prisma.credential.createMany({
-    data: [
-      {
-        id: 'cred-plain',
+  await insertNativeCredential(prisma, { id: 'cred-plain', decryptionKey: 'b'.repeat(64) });
+  await insertNativeCredential(prisma, { id: 'cred-nokey', decryptionKey: null });
+  await prisma.$transaction(async (tx) => {
+    const record = await tx.libraryRecord.create({
+      data: { id: 'ext-1', tenantId: SYSTEM_TENANT_ID, origin: LibraryRecordOrigin.EXTERNAL },
+    });
+    await tx.externalCredential.create({
+      data: {
+        id: record.id,
         tenantId: SYSTEM_TENANT_ID,
-        storageUri: 'u',
-        digestMultibase: 'zPlain',
-        credentialType: 'DigitalProductPassport',
-        decryptionKey: 'b'.repeat(64),
+        displayName: 'Supplier DCC',
+        declaredCredentialType: CoreCredentialType.DCC,
+        decryptionKey: envelopeUnder(OUTGOING_KEY, 'external-key'),
       },
-      {
-        id: 'cred-nokey',
-        tenantId: SYSTEM_TENANT_ID,
-        storageUri: 'u',
-        digestMultibase: 'zNoKey',
-        credentialType: 'DigitalProductPassport',
-        decryptionKey: null,
-      },
-    ],
+    });
   });
   await prisma.idempotencyKey.create({
     data: {
@@ -92,7 +85,7 @@ async function seedOneEnvelopePerStore(): Promise<void> {
       operation: IdempotencyOperation.CREDENTIAL_ISSUE,
       key: 'k1',
       bodyDigest: 'zBody',
-      credentialId: 'cred-1',
+      recordId: 'cred-1',
       responseBody: envelopeUnder(OUTGOING_KEY, '["warning"]'),
     },
   });
@@ -141,7 +134,9 @@ describe('encryption key lifecycle across every registered store', () => {
     }
 
     // The plaintexts survive the rotation in every store.
-    const revealed = async (id: 'serviceInstances' | 'credentials' | 'idempotencyResponses') => {
+    const revealed = async (
+      id: 'serviceInstances' | 'credentials' | 'externalCredentials' | 'idempotencyResponses',
+    ) => {
       const rows: string[] = [];
       for await (const row of stores[id].rows()) {
         if (row.value.startsWith('{')) rows.push(adapter(ACTIVE_KEY).decrypt(JSON.parse(row.value)));
@@ -150,6 +145,7 @@ describe('encryption key lifecycle across every registered store', () => {
     };
     await expect(revealed('serviceInstances')).resolves.toEqual(['{"apiUrl":"https://storage.test"}']);
     await expect(revealed('credentials')).resolves.toEqual(['native-key']);
+    await expect(revealed('externalCredentials')).resolves.toEqual(['external-key']);
     await expect(revealed('idempotencyResponses')).resolves.toEqual(['["warning"]']);
 
     // A re-run converges: everything is already under the active key.
@@ -171,16 +167,7 @@ describe('encryption key lifecycle across every registered store', () => {
   it('clears a replay body that opens under neither key and keeps its claim and credential', async () => {
     const stores = prismaEnvelopeStores(prisma);
     // A claim maps to exactly one credential, so the stale claim gets its own.
-    await prisma.credential.create({
-      data: {
-        id: 'cred-2',
-        tenantId: SYSTEM_TENANT_ID,
-        storageUri: 'u',
-        digestMultibase: 'zCred2',
-        credentialType: 'DigitalProductPassport',
-        decryptionKey: envelopeUnder(OUTGOING_KEY, 'native-key-2'),
-      },
-    });
+    await insertNativeCredential(prisma, { id: 'cred-2', decryptionKey: envelopeUnder(OUTGOING_KEY, 'native-key-2') });
     await prisma.idempotencyKey.create({
       data: {
         id: 'claim-stale',
@@ -188,7 +175,7 @@ describe('encryption key lifecycle across every registered store', () => {
         operation: IdempotencyOperation.CREDENTIAL_ISSUE,
         key: 'k-stale',
         bodyDigest: 'zStale',
-        credentialId: 'cred-2',
+        recordId: 'cred-2',
         responseBody: envelopeUnder('c'.repeat(64), '["old"]'),
       },
     });
@@ -205,7 +192,7 @@ describe('encryption key lifecycle across every registered store', () => {
       clearedIds: ['claim-stale'],
     });
     await expect(prisma.idempotencyKey.findUnique({ where: { id: 'claim-stale' } })).resolves.toMatchObject({
-      credentialId: 'cred-2',
+      recordId: 'cred-2',
       responseBody: null,
     });
   });
@@ -219,10 +206,19 @@ describe('encryption key lifecycle across every registered store', () => {
       id: 'cred-1',
     });
 
-    await prisma.credential.deleteMany();
-    // Deleting the credentials cascades their claims, so leave one replay
-    // body that opens under the key with no credential behind it: it is
-    // never sampled, so there is nothing left to validate against.
+    // With the native credentials gone (a child row is only ever deleted through
+    // its library record), the external credential keys are next in the walk.
+    await prisma.libraryRecord.deleteMany({ where: { origin: LibraryRecordOrigin.NATIVE } });
+    await expect(validateEncryptionKeyAtStartup(stores, adapter(OUTGOING_KEY))).resolves.toEqual({
+      validated: true,
+      source: 'externalCredentials',
+      id: 'ext-1',
+    });
+
+    // Deleting the library records cascades their claims, so leave one replay
+    // body that opens under the key with no record behind it: it is never
+    // sampled, so there is nothing left to validate against.
+    await prisma.libraryRecord.deleteMany();
     await prisma.idempotencyKey.create({
       data: {
         id: 'claim-orphan',

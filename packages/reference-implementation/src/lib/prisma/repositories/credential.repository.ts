@@ -1,10 +1,41 @@
 import { isForeignKeyViolationOn } from '@/lib/prisma/db-errors';
-import { Credential, CredentialDetailsError, CredentialDetailsStatus, Prisma } from '../generated';
+import {
+  CredentialDetailsError,
+  CredentialDetailsStatus,
+  LibraryRecordOrigin,
+  type CoreCredentialType,
+  type Credential,
+  type LibraryRecord,
+  type Prisma,
+} from '../generated';
 import { prisma } from '../prisma';
-import { IdempotencyClaimLostError } from './idempotency-key.repository';
+import { linkClaimToRecord } from './idempotency-key.repository';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
+
+/**
+ * A native credential as its callers see it: the `Credential` child row
+ * with its library record's shared fields (the type, the extracted
+ * descriptive fields and their status) flattened onto it, so a reader does
+ * not have to know the record is two rows (ADR-053 decisions 1 and 5).
+ */
+export type CredentialRecord = Omit<Credential, 'origin'> &
+  Pick<
+    LibraryRecord,
+    | 'credentialType'
+    | 'coreCredentialType'
+    | 'coreDataModelVersion'
+    | 'name'
+    | 'issuerName'
+    | 'issuerDid'
+    | 'subjectName'
+    | 'subjectId'
+    | 'validFrom'
+    | 'validUntil'
+    | 'detailsStatus'
+    | 'detailsError'
+  >;
 
 /**
  * Input for creating a new credential record
@@ -14,16 +45,19 @@ export type CreateCredentialInput = {
   storageUri: string;
   digestMultibase: string;
   decryptionKey?: string;
+  /** The type issuance was asked for: an extension's own name when it is one. */
   credentialType: string;
+  /** The core kind the type resolves to (ADR-053 decision 8); null when unknown. */
+  coreCredentialType?: CoreCredentialType | null;
   coreDataModelVersion: string;
   isPublished?: boolean;
   organisationId?: string;
   facilityId?: string;
   productId?: string;
   /**
-   * When set, the credential row and this claim are written in one
-   * transaction so a crash cannot leave a minted credential that a stale
-   * reclaim would issue again (#954).
+   * When set, the record and this claim are written in one transaction so a
+   * crash cannot leave a minted credential that a stale reclaim would issue
+   * again (#954).
    */
   idempotencyClaimId?: string;
 } & CredentialDetailsInput;
@@ -58,8 +92,39 @@ export type ListCredentialsOptions = {
   offset?: number;
 };
 
+type CredentialWithRecord = Credential & { record: LibraryRecord };
+
+/** Flattens the parent's shared fields onto the child row. */
+export function flattenCredential(row: CredentialWithRecord): CredentialRecord {
+  // The child's origin column exists for the database's parent/child
+  // constraints; a native credential's reader gains nothing from it.
+  const { record, origin: _origin, ...credential } = row;
+  return {
+    ...credential,
+    credentialType: record.credentialType,
+    coreCredentialType: record.coreCredentialType,
+    coreDataModelVersion: record.coreDataModelVersion,
+    name: record.name,
+    issuerName: record.issuerName,
+    issuerDid: record.issuerDid,
+    subjectName: record.subjectName,
+    subjectId: record.subjectId,
+    validFrom: record.validFrom,
+    validUntil: record.validUntil,
+    detailsStatus: record.detailsStatus,
+    detailsError: record.detailsError,
+    // Both timestamps are the parent's (ADR-053 decision 1): the record was
+    // created when its parent row was, and a details backfill moves the
+    // last-modified time while a key rewrap on the child does not.
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  };
+}
+
 /**
- * Creates a new credential record.
+ * Creates a native credential: its library record and its `Credential` child
+ * in one transaction (ADR-053 decision 1), with the captured descriptive
+ * fields on the record (decision 5).
  *
  * Entity links are optional enrichment (ADR-044): the server picks the entity
  * on the caller's behalf, and by the time this runs the credential has already
@@ -73,66 +138,67 @@ export type ListCredentialsOptions = {
  * otherwise routes a vanished server-selected dependency to the sanitised
  * server-failure path. When `idempotencyClaimId` is set and the association
  * matches no row, throws `IdempotencyClaimLostError` inside the transaction
- * so the credential row is rolled back (#954).
+ * so both rows are rolled back (#954).
  */
 export async function createCredential(
   input: CreateCredentialInput,
-): Promise<{ credential: Credential; entityLinkFailed: boolean }> {
-  const data = {
+): Promise<{ credential: CredentialRecord; entityLinkFailed: boolean }> {
+  // One instant for every timestamp the two rows carry, so the record can
+  // never read as updated before it was created.
+  const now = new Date();
+  const recordData = {
     tenantId: input.tenantId,
-    storageUri: input.storageUri,
-    digestMultibase: input.digestMultibase,
-    decryptionKey: input.decryptionKey,
+    origin: LibraryRecordOrigin.NATIVE,
+    createdAt: now,
+    updatedAt: now,
     credentialType: input.credentialType,
+    coreCredentialType: input.coreCredentialType ?? null,
     coreDataModelVersion: input.coreDataModelVersion,
-    isPublished: input.isPublished ?? false,
     ...input.details,
     detailsStatus: input.detailsStatus,
     detailsError: input.detailsError,
   };
-  const linkedData = {
-    ...data,
+  const childData = {
+    tenantId: input.tenantId,
+    createdAt: now,
+    updatedAt: now,
+    storageUri: input.storageUri,
+    digestMultibase: input.digestMultibase,
+    decryptionKey: input.decryptionKey,
+    isPublished: input.isPublished ?? false,
+  };
+  const linkedChildData = {
+    ...childData,
     organisationId: input.organisationId,
     facilityId: input.facilityId,
     productId: input.productId,
   };
 
-  const persist = async (client: typeof prisma | Prisma.TransactionClient, withLinks: boolean) => {
-    const credential = await client.credential.create({
-      data: withLinks ? linkedData : data,
+  const persist = async (tx: Prisma.TransactionClient, withLinks: boolean) => {
+    const record = await tx.libraryRecord.create({ data: recordData });
+    const credential = await tx.credential.create({
+      data: { id: record.id, ...(withLinks ? linkedChildData : childData) },
     });
-    if (!input.idempotencyClaimId) {
-      return { credential };
+    if (input.idempotencyClaimId) {
+      await linkClaimToRecord(tx, input.idempotencyClaimId, record.id);
     }
-    const updated = await client.idempotencyKey.updateMany({
-      where: { id: input.idempotencyClaimId, credentialId: null },
-      data: {
-        credentialId: credential.id,
-        resultRecordedAt: new Date(Date.now()),
-      },
-    });
-    if (updated.count === 0) {
-      throw new IdempotencyClaimLostError();
-    }
-    return { credential };
+    return flattenCredential({ ...credential, record });
   };
 
-  const run = (withLinks: boolean) => {
-    if (input.idempotencyClaimId) {
-      return prisma.$transaction((tx) => persist(tx, withLinks));
-    }
-    return persist(prisma, withLinks);
-  };
+  const run = (withLinks: boolean) => prisma.$transaction((tx) => persist(tx, withLinks));
 
   try {
-    const { credential } = await run(true);
+    const credential = await run(true);
     return { credential, entityLinkFailed: false };
   } catch (error) {
     const onEntityColumn = ['organisationId', 'facilityId', 'productId'].some((column) =>
       isForeignKeyViolationOn(error, column),
     );
-    if (!onEntityColumn) throw error;
-    const { credential } = await run(false);
+    // A unique-constraint conflict is the caller's 409 (ADR-036). A foreign
+    // key that fails on anything but an entity link (the tenant, say) is a
+    // real failure and stays fatal.
+    if (!onEntityColumn) mapDatabaseError(error, { conflict: 'A credential record with this identity already exists' });
+    const credential = await run(false);
     return { credential, entityLinkFailed: true };
   }
 }
@@ -140,10 +206,12 @@ export async function createCredential(
 /**
  * Retrieves a credential by its ID
  */
-export async function getCredentialById(id: string, tenantId: string): Promise<Credential | null> {
-  return prisma.credential.findFirst({
+export async function getCredentialById(id: string, tenantId: string): Promise<CredentialRecord | null> {
+  const row = await prisma.credential.findFirst({
     where: { id, tenantId },
+    include: { record: true },
   });
+  return row ? flattenCredential(row) : null;
 }
 
 /**
@@ -151,30 +219,35 @@ export async function getCredentialById(id: string, tenantId: string): Promise<C
  * Returns matching records alongside the total count for the filter
  * criteria (via a parallel count query).
  */
-export async function listCredentials(options: ListCredentialsOptions): Promise<{ data: Credential[]; total: number }> {
+export async function listCredentials(
+  options: ListCredentialsOptions,
+): Promise<{ data: CredentialRecord[]; total: number }> {
   const { tenantId, credentialType, isPublished, limit, offset } = options;
 
   const where: Prisma.CredentialWhereInput = { tenantId };
 
   if (credentialType !== undefined) {
-    where.credentialType = credentialType;
+    where.record = { credentialType };
   }
 
   if (isPublished !== undefined) {
     where.isPublished = isPublished;
   }
 
-  const [data, total] = await Promise.all([
+  const [rows, total] = await Promise.all([
     prisma.credential.findMany({
       where,
+      include: { record: true },
       take: limit ?? DEFAULT_PAGE_LIMIT,
       skip: offset,
-      orderBy: { createdAt: 'desc' },
+      // Ordered by the timestamp the response carries, the parent's, with the
+      // id as a tie-break so a page boundary is stable.
+      orderBy: [{ record: { createdAt: 'desc' } }, { id: 'desc' }],
     }),
     prisma.credential.count({ where }),
   ]);
 
-  return { data, total };
+  return { data: rows.map(flattenCredential), total };
 }
 
 /**
@@ -184,11 +257,21 @@ export async function updateCredentialPublished(
   id: string,
   tenantId: string,
   isPublished: boolean,
-): Promise<Credential> {
+): Promise<CredentialRecord> {
   try {
-    return await prisma.credential.update({
-      where: { id, tenantId },
-      data: { isPublished },
+    return await prisma.$transaction(async (tx) => {
+      const row = await tx.credential.update({
+        where: { id, tenantId },
+        data: { isPublished },
+        include: { record: true },
+      });
+      // A publication flag is a change to the record, and the parent's
+      // updatedAt is the record's last-modified time (ADR-053 decision 1).
+      const record = await tx.libraryRecord.update({
+        where: { id_tenantId: { id: row.id, tenantId } },
+        data: { updatedAt: new Date() },
+      });
+      return flattenCredential({ ...row, record });
     });
   } catch (e) {
     mapDatabaseError(e, { notFound: 'Credential not found' });

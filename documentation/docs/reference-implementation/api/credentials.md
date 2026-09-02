@@ -315,7 +315,7 @@ A request body larger than the configured maximum is rejected with HTTP `413` an
 GET /api/v1/credentials
 ```
 
-Returns a paginated list of credentials for the authenticated tenant.
+Returns a paginated list of credentials for the authenticated tenant. Each entry carries the same fields as [Get a Credential](#get-a-credential), including `coreCredentialType`, the UNTP core credential type the credential's type resolves to.
 
 **Query parameters:**
 
@@ -336,7 +336,7 @@ Pagination values must be plain decimal integers, and a repeated query parameter
 GET /api/v1/credentials/{id}
 ```
 
-Retrieves a specific credential record by its database ID. The response includes the storage URI, hash, decryption key (if encrypted), credential type, published status, linked entity IDs, and the descriptive fields (name, issuer, subject, validity period) read from the signed credential at issue time. See the `detailsStatus` field in the Swagger schema for what a null descriptive field means on a given row.
+Retrieves a specific credential record by its database ID. The response includes the storage URI, hash, decryption key (if encrypted), credential type and the UNTP core credential type it resolves to (`coreCredentialType`, one of `DPP`, `DCC`, `DFR`, `DTE` or `DIA`, or null when that type is unknown or unresolved), published status, linked entity IDs, and the descriptive fields (name, issuer, subject, validity period) read from the signed credential at issue time. A null `coreCredentialType` covers an extension whose core type is not known, and a credential issued before this field existed whose recorded type resolved to no core type, such as one that names neither a core type nor a registered extension data model. See the `detailsStatus` field in the Swagger schema for what a null descriptive field means on a given row.
 
 ## Verification Endpoint
 

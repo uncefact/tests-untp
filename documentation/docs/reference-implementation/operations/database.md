@@ -49,6 +49,10 @@ The Docker Compose configuration in the repository provisions a dedicated `ri-db
 
 On startup, the Reference Implementation automatically applies database migrations, converts existing rows to the formats the current version writes, and seeds system default records. See [Startup](./startup) for the full sequence, what gets seeded, and how to control each step.
 
+A credential is two rows, a `LibraryRecord` parent and a child row for its origin, and the database refuses to commit a child without its parent or a delete of the child on its own. To remove a credential by hand, delete the `LibraryRecord` row and the child, its idempotency claims and its check runs go with it.
+
+A migration that fails part-way rolls back completely, and the failing statement's error is what the startup log or `prisma migrate deploy` reports. Prisma also records the attempt as a failed migration, so after correcting the data, mark it rolled back with `prisma migrate resolve --rolled-back <migration name>` before starting the application again, or the next start refuses to apply anything.
+
 ## Local Development
 
 For local development, the Prisma CLI provides useful tools:

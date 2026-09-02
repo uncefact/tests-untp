@@ -12,7 +12,7 @@ import {
 import type { ResolvedService } from '@/lib/services/resolve-service';
 import { createCredential } from '@/lib/prisma/repositories';
 import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
-import { CredentialDetailsError, CredentialDetailsStatus } from '@/lib/prisma/generated';
+import { CredentialDetailsError, CredentialDetailsStatus, type CoreCredentialType } from '@/lib/prisma/generated';
 import { protectDecryptionKey } from './decryption-key-protection';
 import { resolvePrimaryEntity } from '@/lib/entities/resolve-primary-entity';
 import type { PrimaryEntityResult } from '@/lib/entities/resolve-primary-entity';
@@ -26,6 +26,8 @@ export type IssueCredentialInput = {
   tenantId: string;
   credentialPayload: CredentialPayload;
   credentialType: string;
+  /** The core kind `credentialType` resolves to (ADR-053 decision 8); null when unknown. */
+  coreCredentialType?: CoreCredentialType | null;
   /**
    * Spec version the data-model bridge was resolved with. For an extension
    * this is the parent version (`coreDataModelVersion`), so a later read can find
@@ -144,6 +146,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     digestMultibase: storageResponse.digestMultibase,
     decryptionKey,
     credentialType,
+    coreCredentialType: input.coreCredentialType ?? null,
     coreDataModelVersion,
     isPublished: false,
     organisationId: primaryEntity.organisationId,

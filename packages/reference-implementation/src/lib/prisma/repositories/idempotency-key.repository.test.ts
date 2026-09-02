@@ -10,6 +10,8 @@ import {
   claimIdempotencyKey,
   completeIdempotencyKey,
   findIdempotencyKey,
+  IdempotencyClaimLostError,
+  linkClaimToRecord,
   releaseIdempotencyKey,
 } from './idempotency-key.repository';
 import { readStaleClaimMs } from '@/lib/config/idempotency-claim.config';
@@ -100,7 +102,7 @@ describe('idempotency-key.repository', () => {
       operation: IdempotencyOperation.CREDENTIAL_ISSUE,
       key: KEY,
       bodyDigest: DIGEST,
-      credentialId: null,
+      recordId: null,
       resultRecordedAt: null,
       responseBody: null,
       finalisedAt: null,
@@ -146,7 +148,7 @@ describe('idempotency-key.repository', () => {
 
     it('returns mismatch when the colliding row has a different body digest', async () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
-      mockKey.findUnique.mockResolvedValue(storedRow({ bodyDigest: OTHER_DIGEST, credentialId: 'cred-1' }));
+      mockKey.findUnique.mockResolvedValue(storedRow({ bodyDigest: OTHER_DIGEST, recordId: 'cred-1' }));
 
       const result = await claimIdempotencyKey(claimInput());
 
@@ -157,7 +159,7 @@ describe('idempotency-key.repository', () => {
     it('returns mismatch on a stale in-flight row with a different digest rather than reclaiming it', async () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
-        storedRow({ bodyDigest: OTHER_DIGEST, createdAt: STALE_CREATED_AT, credentialId: 'cred-1' }),
+        storedRow({ bodyDigest: OTHER_DIGEST, createdAt: STALE_CREATED_AT, recordId: 'cred-1' }),
       );
 
       const result = await claimIdempotencyKey(claimInput());
@@ -182,7 +184,7 @@ describe('idempotency-key.repository', () => {
 
     it('returns in-flight when the colliding row has a credential, no finalisedAt, and is still fresh', async () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
-      mockKey.findUnique.mockResolvedValue(storedRow({ credentialId: 'cred-1' }));
+      mockKey.findUnique.mockResolvedValue(storedRow({ recordId: 'cred-1' }));
 
       const result = await claimIdempotencyKey(claimInput());
 
@@ -195,7 +197,7 @@ describe('idempotency-key.repository', () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
         storedRow({
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           responseBody: protectBody(PLAIN_BODY),
           finalisedAt: new Date(NOW),
         }),
@@ -205,7 +207,7 @@ describe('idempotency-key.repository', () => {
 
       expect(result).toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: PLAIN_BODY,
       });
       expect(mockKey.updateMany).not.toHaveBeenCalled();
@@ -215,7 +217,7 @@ describe('idempotency-key.repository', () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
         storedRow({
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           responseBody: protectBody(PLAIN_BODY),
           resultRecordedAt: ELEVEN_MINUTES_AGO,
         }),
@@ -226,11 +228,11 @@ describe('idempotency-key.repository', () => {
 
       expect(result).toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: PLAIN_BODY,
       });
       expect(mockKey.updateMany).toHaveBeenCalledWith({
-        where: { id: CLAIM_ID, credentialId: 'cred-1', finalisedAt: null },
+        where: { id: CLAIM_ID, recordId: 'cred-1', finalisedAt: null },
         data: { responseBody: expect.any(String), finalisedAt: new Date(NOW) },
       });
       expectEnvelope(writtenResponseBody(), DISTINCTIVE);
@@ -242,11 +244,11 @@ describe('idempotency-key.repository', () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique
         .mockResolvedValueOnce(
-          storedRow({ credentialId: 'cred-1', resultRecordedAt: ELEVEN_MINUTES_AGO, responseBody: null }),
+          storedRow({ recordId: 'cred-1', resultRecordedAt: ELEVEN_MINUTES_AGO, responseBody: null }),
         )
         .mockResolvedValueOnce(
           storedRow({
-            credentialId: 'cred-1',
+            recordId: 'cred-1',
             resultRecordedAt: ELEVEN_MINUTES_AGO,
             responseBody: protectBody(winnerBody),
             finalisedAt: new Date(NOW),
@@ -258,7 +260,7 @@ describe('idempotency-key.repository', () => {
 
       expect(result).toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: winnerBody,
       });
       expect(mockKey.findUnique).toHaveBeenNthCalledWith(2, { where: { id: CLAIM_ID } });
@@ -268,7 +270,7 @@ describe('idempotency-key.repository', () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
         storedRow({
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           createdAt: ELEVEN_MINUTES_AGO,
           resultRecordedAt: NINE_MINUTES_AGO,
         }),
@@ -284,7 +286,7 @@ describe('idempotency-key.repository', () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
         storedRow({
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           createdAt: FRESH_CREATED_AT,
           resultRecordedAt: ELEVEN_MINUTES_AGO,
         }),
@@ -295,7 +297,7 @@ describe('idempotency-key.repository', () => {
 
       expect(result).toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: null,
       });
     });
@@ -316,7 +318,7 @@ describe('idempotency-key.repository', () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
         storedRow({
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           responseBody: protectBody(responseBody),
           finalisedAt: new Date(NOW),
         }),
@@ -326,7 +328,7 @@ describe('idempotency-key.repository', () => {
 
       expect(result).toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody,
       });
     });
@@ -345,7 +347,7 @@ describe('idempotency-key.repository', () => {
           tenantId: TENANT_ID,
           operation: IdempotencyOperation.CREDENTIAL_ISSUE,
           key: KEY,
-          credentialId: null,
+          recordId: null,
           createdAt: { lte: new Date(NOW - STALE_IN_FLIGHT_CLAIM_MS) },
         },
       });
@@ -376,7 +378,7 @@ describe('idempotency-key.repository', () => {
           tenantId: TENANT_ID,
           operation: IdempotencyOperation.CREDENTIAL_ISSUE,
           key: KEY,
-          credentialId: null,
+          recordId: null,
           createdAt: { lte: EXACTLY_THE_WINDOW },
         },
       });
@@ -478,14 +480,14 @@ describe('idempotency-key.repository', () => {
     });
 
     it('returns in-flight for a fresh unfinalised row that already recorded a credential', async () => {
-      mockKey.findUnique.mockResolvedValue(storedRow({ credentialId: 'cred-1' }));
+      mockKey.findUnique.mockResolvedValue(storedRow({ recordId: 'cred-1' }));
 
       await expect(findIdempotencyKey(claimInput())).resolves.toEqual({ outcome: 'in-flight' });
       expect(mockKey.updateMany).not.toHaveBeenCalled();
     });
 
     it('returns mismatch when the stored digest differs', async () => {
-      mockKey.findUnique.mockResolvedValue(storedRow({ bodyDigest: OTHER_DIGEST, credentialId: 'cred-1' }));
+      mockKey.findUnique.mockResolvedValue(storedRow({ bodyDigest: OTHER_DIGEST, recordId: 'cred-1' }));
 
       await expect(findIdempotencyKey(claimInput())).resolves.toEqual({ outcome: 'mismatch' });
     });
@@ -493,7 +495,7 @@ describe('idempotency-key.repository', () => {
     it('returns replay for a finalised row with the same digest', async () => {
       mockKey.findUnique.mockResolvedValue(
         storedRow({
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           responseBody: protectBody(PLAIN_BODY),
           finalisedAt: new Date(NOW),
         }),
@@ -501,22 +503,22 @@ describe('idempotency-key.repository', () => {
 
       await expect(findIdempotencyKey(claimInput())).resolves.toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: PLAIN_BODY,
       });
     });
 
     it('replays a stale unfinalised recorded row and marks it finalised', async () => {
-      mockKey.findUnique.mockResolvedValue(storedRow({ credentialId: 'cred-1', resultRecordedAt: ELEVEN_MINUTES_AGO }));
+      mockKey.findUnique.mockResolvedValue(storedRow({ recordId: 'cred-1', resultRecordedAt: ELEVEN_MINUTES_AGO }));
       mockKey.updateMany.mockResolvedValue({ count: 1 });
 
       await expect(findIdempotencyKey(claimInput())).resolves.toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: null,
       });
       expect(mockKey.updateMany).toHaveBeenCalledWith({
-        where: { id: CLAIM_ID, credentialId: 'cred-1', finalisedAt: null },
+        where: { id: CLAIM_ID, recordId: 'cred-1', finalisedAt: null },
         data: { responseBody: null, finalisedAt: new Date(NOW) },
       });
     });
@@ -525,11 +527,11 @@ describe('idempotency-key.repository', () => {
       const winnerBody = [{ code: 'IDR_PUBLISH_FAILED', message: 'from original' }];
       mockKey.findUnique
         .mockResolvedValueOnce(
-          storedRow({ credentialId: 'cred-1', resultRecordedAt: ELEVEN_MINUTES_AGO, responseBody: null }),
+          storedRow({ recordId: 'cred-1', resultRecordedAt: ELEVEN_MINUTES_AGO, responseBody: null }),
         )
         .mockResolvedValueOnce(
           storedRow({
-            credentialId: 'cred-1',
+            recordId: 'cred-1',
             resultRecordedAt: ELEVEN_MINUTES_AGO,
             responseBody: protectBody(winnerBody),
             finalisedAt: new Date(NOW),
@@ -539,7 +541,7 @@ describe('idempotency-key.repository', () => {
 
       await expect(findIdempotencyKey(claimInput())).resolves.toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: winnerBody,
       });
       expect(mockKey.findUnique).toHaveBeenNthCalledWith(2, { where: { id: CLAIM_ID } });
@@ -560,11 +562,11 @@ describe('idempotency-key.repository', () => {
       mockKey.updateMany.mockResolvedValue({ count: 1 });
 
       await expect(
-        completeIdempotencyKey({ claimId: CLAIM_ID, credentialId: 'cred-1', responseBody: PLAIN_BODY }),
+        completeIdempotencyKey({ claimId: CLAIM_ID, recordId: 'cred-1', responseBody: PLAIN_BODY }),
       ).resolves.toEqual({ applied: true });
 
       expect(mockKey.updateMany).toHaveBeenCalledWith({
-        where: { id: CLAIM_ID, credentialId: 'cred-1', finalisedAt: null },
+        where: { id: CLAIM_ID, recordId: 'cred-1', finalisedAt: null },
         data: { responseBody: expect.any(String), finalisedAt: new Date(NOW) },
       });
       expectEnvelope(writtenResponseBody(), DISTINCTIVE);
@@ -573,10 +575,10 @@ describe('idempotency-key.repository', () => {
     it('writes SQL-null responseBody when the body is null', async () => {
       mockKey.updateMany.mockResolvedValue({ count: 1 });
 
-      await completeIdempotencyKey({ claimId: CLAIM_ID, credentialId: 'cred-1', responseBody: null });
+      await completeIdempotencyKey({ claimId: CLAIM_ID, recordId: 'cred-1', responseBody: null });
 
       expect(mockKey.updateMany).toHaveBeenCalledWith({
-        where: { id: CLAIM_ID, credentialId: 'cred-1', finalisedAt: null },
+        where: { id: CLAIM_ID, recordId: 'cred-1', finalisedAt: null },
         data: { responseBody: null, finalisedAt: new Date(NOW) },
       });
     });
@@ -587,14 +589,14 @@ describe('idempotency-key.repository', () => {
       await expect(
         completeIdempotencyKey({
           claimId: CLAIM_ID,
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           responseBody: [{ code: 'SHOULD_NOT_LAND', message: 'late original' }],
         }),
       ).resolves.toEqual({
         applied: false,
       });
       expect(mockKey.updateMany).toHaveBeenCalledWith({
-        where: { id: CLAIM_ID, credentialId: 'cred-1', finalisedAt: null },
+        where: { id: CLAIM_ID, recordId: 'cred-1', finalisedAt: null },
         data: {
           responseBody: expect.any(String),
           finalisedAt: new Date(NOW),
@@ -610,7 +612,7 @@ describe('idempotency-key.repository', () => {
 
       await completeIdempotencyKey({
         claimId: CLAIM_ID,
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: PLAIN_BODY,
       });
 
@@ -623,7 +625,7 @@ describe('idempotency-key.repository', () => {
       mockKey.updateMany.mockResolvedValue({ count: 1 });
       await completeIdempotencyKey({
         claimId: CLAIM_ID,
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: PLAIN_BODY,
       });
       const stored = writtenResponseBody();
@@ -631,7 +633,7 @@ describe('idempotency-key.repository', () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
         storedRow({
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           responseBody: stored,
           finalisedAt: new Date(NOW),
         }),
@@ -639,7 +641,7 @@ describe('idempotency-key.repository', () => {
 
       await expect(claimIdempotencyKey(claimInput())).resolves.toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: PLAIN_BODY,
       });
     });
@@ -648,7 +650,7 @@ describe('idempotency-key.repository', () => {
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
         storedRow({
-          credentialId: 'cred-1',
+          recordId: 'cred-1',
           responseBody: envelopeUnder(FOREIGN_KEY, PLAIN_BODY),
           finalisedAt: new Date(NOW),
         }),
@@ -656,7 +658,7 @@ describe('idempotency-key.repository', () => {
 
       await expect(claimIdempotencyKey(claimInput())).resolves.toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: null,
         responseBodyUnreadable: true,
       });
@@ -668,34 +670,93 @@ describe('idempotency-key.repository', () => {
 
     it('stores SQL NULL for an absent body and replays it as null', async () => {
       mockKey.updateMany.mockResolvedValue({ count: 1 });
-      await completeIdempotencyKey({ claimId: CLAIM_ID, credentialId: 'cred-1', responseBody: null });
+      await completeIdempotencyKey({ claimId: CLAIM_ID, recordId: 'cred-1', responseBody: null });
       expect(mockKey.updateMany).toHaveBeenCalledWith({
-        where: { id: CLAIM_ID, credentialId: 'cred-1', finalisedAt: null },
+        where: { id: CLAIM_ID, recordId: 'cred-1', finalisedAt: null },
         data: { responseBody: null, finalisedAt: new Date(NOW) },
       });
 
       mockKey.create.mockRejectedValue(prismaError('P2002'));
       mockKey.findUnique.mockResolvedValue(
-        storedRow({ credentialId: 'cred-1', responseBody: null, finalisedAt: new Date(NOW) }),
+        storedRow({ recordId: 'cred-1', responseBody: null, finalisedAt: new Date(NOW) }),
       );
 
       await expect(claimIdempotencyKey(claimInput())).resolves.toEqual({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: null,
       });
       expect(mockError).not.toHaveBeenCalled();
     });
   });
 
+  describe('a LIBRARY_REGISTER claim, whose result is an external credential (#955)', () => {
+    it('replays a finalised LIBRARY_REGISTER row with the external record id as the record id', async () => {
+      mockKey.create.mockRejectedValue(prismaError('P2002'));
+      mockKey.findUnique.mockResolvedValue(
+        storedRow({
+          operation: IdempotencyOperation.LIBRARY_REGISTER,
+          recordId: 'ext-1',
+          resultRecordedAt: new Date(NOW - 1000),
+          finalisedAt: new Date(NOW),
+        }),
+      );
+
+      const result = await claimIdempotencyKey(claimInput({ operation: IdempotencyOperation.LIBRARY_REGISTER }));
+
+      expect(result).toEqual({ outcome: 'replay', recordId: 'ext-1', responseBody: null });
+      expect(mockKey.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('never treats a stale LIBRARY_REGISTER row that recorded a record as an empty claim to reclaim', async () => {
+      mockKey.create.mockRejectedValue(prismaError('P2002'));
+      mockKey.findUnique.mockResolvedValue(
+        storedRow({
+          operation: IdempotencyOperation.LIBRARY_REGISTER,
+          recordId: 'ext-1',
+          resultRecordedAt: ELEVEN_MINUTES_AGO,
+          createdAt: STALE_CREATED_AT,
+        }),
+      );
+      mockKey.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await claimIdempotencyKey(claimInput({ operation: IdempotencyOperation.LIBRARY_REGISTER }));
+
+      expect(result).toEqual({ outcome: 'replay', recordId: 'ext-1', responseBody: null });
+      expect(mockKey.deleteMany).not.toHaveBeenCalled();
+      expect(mockKey.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('linkClaimToRecord', () => {
+    it('sets the record only while the claim has recorded none', async () => {
+      mockKey.updateMany.mockResolvedValue({ count: 1 });
+
+      await linkClaimToRecord(prisma as never, CLAIM_ID, 'ext-1');
+
+      expect(mockKey.updateMany).toHaveBeenCalledWith({
+        where: { id: CLAIM_ID, recordId: null },
+        data: { recordId: 'ext-1', resultRecordedAt: new Date(NOW) },
+      });
+    });
+
+    it('throws IdempotencyClaimLostError when the claim no longer belongs to this request', async () => {
+      mockKey.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(linkClaimToRecord(prisma as never, CLAIM_ID, 'cred-1')).rejects.toBeInstanceOf(
+        IdempotencyClaimLostError,
+      );
+    });
+  });
+
   describe('releaseIdempotencyKey', () => {
-    it('deletes the claimed row while it has no credential', async () => {
+    it('deletes the claimed row while it has no record', async () => {
       mockKey.deleteMany.mockResolvedValue({ count: 1 });
 
       await expect(releaseIdempotencyKey({ claimId: CLAIM_ID })).resolves.toEqual({ applied: true });
 
       expect(mockKey.deleteMany).toHaveBeenCalledWith({
-        where: { id: CLAIM_ID, credentialId: null },
+        where: { id: CLAIM_ID, recordId: null },
       });
     });
 

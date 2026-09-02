@@ -33,6 +33,7 @@ import {
 export const PRISMA_STORE_COLUMNS: Record<EnvelopeStoreId, string> = {
   serviceInstances: 'ServiceInstance.config',
   credentials: 'Credential.decryptionKey',
+  externalCredentials: 'ExternalCredential.decryptionKey',
   idempotencyResponses: 'IdempotencyKey.responseBody',
 };
 
@@ -61,6 +62,19 @@ export type PrismaEnvelopeStoresClient = {
   credential: {
     findMany(
       args: { where: { decryptionKey: KeyFilter } & Cursor; select: { id: true; decryptionKey: true } } & Page,
+    ): Promise<Array<{ id: string; decryptionKey: string | null }>>;
+    updateMany(args: {
+      where: { id: string; decryptionKey: string };
+      data: { decryptionKey: string };
+    }): Promise<{ count: number }>;
+    findUnique(args: {
+      where: { id: string };
+      select: { id: true; decryptionKey: true };
+    }): Promise<{ id: string; decryptionKey: string | null } | null>;
+  };
+  externalCredential: {
+    findMany(
+      args: { where: { decryptionKey: { not: null } } & Cursor; select: { id: true; decryptionKey: true } } & Page,
     ): Promise<Array<{ id: string; decryptionKey: string | null }>>;
     updateMany(args: {
       where: { id: string; decryptionKey: string };
@@ -167,6 +181,42 @@ function credentials(client: PrismaEnvelopeStoresClient): EnvelopeStore {
   };
 }
 
+function externalCredentials(client: PrismaEnvelopeStoresClient): EnvelopeStore {
+  // Written encrypted from the first registration, so every keyed row is a candidate.
+  const rows = (): AsyncGenerator<StoredValue> =>
+    eachPage(async (cursor) =>
+      (
+        await client.externalCredential.findMany({
+          where: { decryptionKey: { not: null }, ...after(cursor) },
+          select: { id: true, decryptionKey: true },
+          ...page,
+        })
+      ).map((row) => ({ id: row.id, value: row.decryptionKey })),
+    );
+  return {
+    rows,
+    candidates: rows,
+    async casWrite(id, expected, next) {
+      const { count } = await client.externalCredential.updateMany({
+        where: { id, decryptionKey: expected },
+        data: { decryptionKey: next },
+      });
+      return count === 1;
+    },
+    async discard() {
+      // The recipient's only copy of the key; the store is not discardable and nothing asks.
+      throw new Error('An external credential decryption key is never discarded');
+    },
+    async readCurrent(id) {
+      const row = await client.externalCredential.findUnique({
+        where: { id },
+        select: { id: true, decryptionKey: true },
+      });
+      return current(row?.decryptionKey);
+    },
+  };
+}
+
 function idempotencyResponses(client: PrismaEnvelopeStoresClient): EnvelopeStore {
   const rows = (): AsyncGenerator<StoredValue> =>
     eachPage(async (cursor) =>
@@ -207,6 +257,7 @@ export function prismaEnvelopeStores(client: PrismaEnvelopeStoresClient): Envelo
   return {
     serviceInstances: serviceInstances(client),
     credentials: credentials(client),
+    externalCredentials: externalCredentials(client),
     idempotencyResponses: idempotencyResponses(client),
   };
 }

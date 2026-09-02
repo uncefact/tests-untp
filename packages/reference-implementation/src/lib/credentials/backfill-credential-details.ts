@@ -12,22 +12,37 @@ import {
   hasValidEnvelopeStructure,
   isEncryptedEnvelope,
 } from '@uncefact/untp-ri-services/encryption';
-import { CredentialDetailsError, CredentialDetailsStatus } from '../prisma/generated';
+import {
+  CredentialDetailsError,
+  CredentialDetailsStatus,
+  LibraryRecordOrigin,
+  type CoreCredentialType,
+} from '../prisma/generated';
 import { extractCredentialDetails } from './extract-credential-details';
+import { bridgeNameOf, coreCredentialTypeFromTypes, coreCredentialTypeOf } from '../library/core-credential-type';
 import { revealDecryptionKey } from './decryption-key-protection';
 
 const BATCH_SIZE = 100;
 
 export type BackfillFailure = {
   id: string;
-  errorClass: CredentialDetailsError;
+  /**
+   * The error class marked on a row whose extraction failed, or
+   * `WRITE_FAILED`, a report-only class for a row this pass could not write
+   * (a write error, or a row another process changed after it was read),
+   * which says nothing about the credential.
+   */
+  errorClass: CredentialDetailsError | 'WRITE_FAILED';
   message: string;
 };
 
 export type BackfillCredentialDetailsResult = {
   dryRun: boolean;
   scanned: number;
+  /** Rows whose descriptive fields were extracted and written. */
   updated: number;
+  /** Rows already extracted that only had their core kind filled in. */
+  coreKindsResolved: number;
   failed: number;
   failures: BackfillFailure[];
 };
@@ -41,12 +56,19 @@ export type BackfillCredentialDetailsOptions = {
   fetchArtifact?: (uri: string) => Promise<string>;
 };
 
-type PendingCredentialRow = {
+/**
+ * A native library record still awaiting capture, with the storage columns
+ * of its `Credential` child (ADR-053 decisions 1 and 5). `credential` is
+ * null only for a parent whose child is missing, which the write paths never
+ * produce; the row is then reported, not skipped.
+ */
+type PendingRecordRow = {
   id: string;
-  storageUri: string;
-  decryptionKey: string | null;
-  credentialType: string;
+  detailsStatus: CredentialDetailsStatus;
+  credentialType: string | null;
+  coreCredentialType: CoreCredentialType | null;
   coreDataModelVersion: string | null;
+  credential: { storageUri: string; decryptionKey: string | null } | null;
 };
 
 /**
@@ -54,21 +76,28 @@ type PendingCredentialRow = {
  * supply an in-memory fake.
  */
 export type BackfillClient = {
-  credential: {
+  libraryRecord: {
     findMany(args: {
-      where: { detailsStatus: typeof CredentialDetailsStatus.EXTRACTION_PENDING; id?: { gt: string } };
+      where: {
+        origin: typeof LibraryRecordOrigin.NATIVE;
+        OR: [{ detailsStatus: typeof CredentialDetailsStatus.EXTRACTION_PENDING }, { coreCredentialType: null }];
+        id?: { gt: string };
+      };
       select: {
         id: true;
-        storageUri: true;
-        decryptionKey: true;
+        detailsStatus: true;
         credentialType: true;
+        coreCredentialType: true;
         coreDataModelVersion: true;
+        credential: { select: { storageUri: true; decryptionKey: true } };
       };
       orderBy: { id: 'asc' };
       take: number;
-    }): Promise<PendingCredentialRow[]>;
+    }): Promise<PendingRecordRow[]>;
     updateMany(args: {
-      where: { id: string; detailsStatus: typeof CredentialDetailsStatus.EXTRACTION_PENDING };
+      where:
+        | { id: string; detailsStatus: typeof CredentialDetailsStatus.EXTRACTION_PENDING }
+        | { id: string; coreCredentialType: null };
       data: {
         name?: string | null;
         issuerName?: string | null;
@@ -77,9 +106,10 @@ export type BackfillClient = {
         subjectId?: string | null;
         validFrom?: Date | null;
         validUntil?: Date | null;
-        detailsStatus: CredentialDetailsStatus;
+        detailsStatus?: CredentialDetailsStatus;
         detailsError?: CredentialDetailsError | null;
         coreDataModelVersion?: string | null;
+        coreCredentialType?: CoreCredentialType | null;
       };
     }): Promise<{ count: number }>;
   };
@@ -89,7 +119,7 @@ function writeFailure(id: string, error: unknown): BackfillFailure {
   const message = error instanceof Error ? error.message : String(error);
   return {
     id,
-    errorClass: CredentialDetailsError.UNREADABLE_ENVELOPE,
+    errorClass: 'WRITE_FAILED',
     message: `Failed to write the row's outcome: ${message}`,
   };
 }
@@ -114,9 +144,14 @@ class RowError extends Error {
  * addresses, which that guard exists to refuse.
  *
  * Operator-run (#953, ADR-043): the job fetches every tenant's stored
- * artefact, so it is not part of startup. Re-running converges. Rows already
- * `EXTRACTED` or `EXTRACTION_FAILED` are not selected. A dry run performs the
- * same per-row work without writing.
+ * artefact, so it is not part of startup. Re-running converges for every
+ * record it can resolve, and keeps reporting the ones it cannot. A row is
+ * selected while its descriptive fields are still `EXTRACTION_PENDING`, and
+ * also, whatever its status, while its core kind is unknown, because the
+ * migration that introduced the parent row could not read the artefact and
+ * left some records with no core kind (ADR-053 decision 8). For such a row
+ * only the core kind is written; its descriptive fields and status stand. A
+ * dry run performs the same per-row work without writing.
  */
 export async function backfillCredentialDetails(
   client: BackfillClient,
@@ -128,26 +163,30 @@ export async function backfillCredentialDetails(
     dryRun,
     scanned: 0,
     updated: 0,
+    coreKindsResolved: 0,
     failed: 0,
     failures: [],
   };
 
   for await (const row of eachPendingCredentialRow(client)) {
     result.scanned += 1;
-    let outcome: Awaited<ReturnType<typeof processRow>>;
+    // Selected for an unknown core kind rather than pending fields: only the
+    // kind is written, and a failure is reported, never marked on the row.
+    const kindOnly = row.detailsStatus !== CredentialDetailsStatus.EXTRACTION_PENDING;
+    let outcome: RowOutcome;
     try {
-      outcome = await processRow(row, fetchArtifact);
+      outcome = await processRow(row, fetchArtifact, kindOnly);
     } catch (error) {
       const failure = classifyRowError(row.id, error);
       result.failed += 1;
       result.failures.push(failure);
-      if (!dryRun) {
+      if (!dryRun && !kindOnly) {
         // A marker write that itself fails must join the report rather than
         // abort the run: the batch-continuation contract (#953) covers the
         // write as much as the extraction, and an aborted run discards the
         // completion report the operator triages from.
         try {
-          await client.credential.updateMany({
+          await client.libraryRecord.updateMany({
             where: { id: row.id, detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING },
             data: {
               detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED,
@@ -163,43 +202,68 @@ export async function backfillCredentialDetails(
 
     if (!dryRun) {
       try {
-        await client.credential.updateMany({
-          where: { id: row.id, detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING },
-          data: {
-            ...outcome.details,
-            detailsStatus: CredentialDetailsStatus.EXTRACTED,
-            detailsError: null,
-            coreDataModelVersion: outcome.coreDataModelVersion,
-          },
-        });
+        const { count } =
+          outcome.kind === 'core-kind'
+            ? await client.libraryRecord.updateMany({
+                where: { id: row.id, coreCredentialType: null },
+                data: { coreCredentialType: outcome.coreCredentialType },
+              })
+            : await client.libraryRecord.updateMany({
+                where: { id: row.id, detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING },
+                data: {
+                  ...outcome.details,
+                  detailsStatus: CredentialDetailsStatus.EXTRACTED,
+                  detailsError: null,
+                  coreDataModelVersion: outcome.coreDataModelVersion,
+                  coreCredentialType: outcome.coreCredentialType,
+                },
+              });
+        if (count === 0) {
+          // The row no longer matched: another run or an operator changed it
+          // since it was read. Nothing of ours landed, so it is not counted
+          // as a change, and the report says so.
+          result.failed += 1;
+          result.failures.push({
+            id: row.id,
+            errorClass: 'WRITE_FAILED',
+            message: 'The record changed after it was read and was not written; re-run to pick it up',
+          });
+          continue;
+        }
       } catch (writeError) {
-        // The row stays EXTRACTION_PENDING, so a re-run retries it; the
-        // report entry is what tells the operator this pass did not land it.
+        // The row stays as it was, so a re-run retries it; the report entry
+        // is what tells the operator this pass did not land it.
         result.failed += 1;
         result.failures.push(writeFailure(row.id, writeError));
         continue;
       }
     }
-    result.updated += 1;
+    if (outcome.kind === 'core-kind') {
+      result.coreKindsResolved += 1;
+    } else {
+      result.updated += 1;
+    }
   }
 
   return result;
 }
 
-async function* eachPendingCredentialRow(client: BackfillClient): AsyncGenerator<PendingCredentialRow> {
+async function* eachPendingCredentialRow(client: BackfillClient): AsyncGenerator<PendingRecordRow> {
   let cursor: string | undefined;
   for (;;) {
-    const rows = await client.credential.findMany({
+    const rows = await client.libraryRecord.findMany({
       where: {
-        detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING,
+        origin: LibraryRecordOrigin.NATIVE,
+        OR: [{ detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING }, { coreCredentialType: null }],
         ...(cursor !== undefined && { id: { gt: cursor } }),
       },
       select: {
         id: true,
-        storageUri: true,
-        decryptionKey: true,
+        detailsStatus: true,
         credentialType: true,
+        coreCredentialType: true,
         coreDataModelVersion: true,
+        credential: { select: { storageUri: true, decryptionKey: true } },
       },
       orderBy: { id: 'asc' },
       take: BATCH_SIZE,
@@ -212,13 +276,36 @@ async function* eachPendingCredentialRow(client: BackfillClient): AsyncGenerator
   }
 }
 
+type RowOutcome =
+  | {
+      kind: 'extracted';
+      details: ReturnType<typeof extractCredentialDetails>;
+      coreDataModelVersion: string;
+      coreCredentialType: CoreCredentialType | null;
+    }
+  | { kind: 'core-kind'; coreCredentialType: CoreCredentialType };
+
+/**
+ * Reads one record's artefact. A row selected only for its unknown core
+ * kind stops once the signed credential's type array has named it (ADR-053
+ * decision 8): the bridge and the extractor are not consulted, because a
+ * kind the artefact states plainly must not be withheld by a version the
+ * registry does not know or a subject the bridge cannot read.
+ */
 async function processRow(
-  row: PendingCredentialRow,
+  row: PendingRecordRow,
   fetchArtifact: (uri: string) => Promise<string>,
-): Promise<{ details: ReturnType<typeof extractCredentialDetails>; coreDataModelVersion: string }> {
+  kindOnly: boolean,
+): Promise<RowOutcome> {
+  if (!row.credential) {
+    throw new RowError(
+      CredentialDetailsError.UNREADABLE_ENVELOPE,
+      'The library record has no Credential row to read the artefact from',
+    );
+  }
   let bodyText: string;
   try {
-    bodyText = await fetchArtifact(row.storageUri);
+    bodyText = await fetchArtifact(row.credential.storageUri);
   } catch (error) {
     if (error instanceof RowError) throw error;
     throw new RowError(CredentialDetailsError.UNREADABLE_ENVELOPE, errorMessage(error, 'Failed to fetch credential'), {
@@ -233,7 +320,7 @@ async function processRow(
     throw new RowError(CredentialDetailsError.UNREADABLE_ENVELOPE, 'Response from storage URI is not valid JSON');
   }
 
-  const credentialObject = unwrapToCredentialObject(fetched, row.decryptionKey);
+  const credentialObject = unwrapToCredentialObject(fetched, row.credential.decryptionKey);
 
   let decoded: UNTPVerifiableCredential;
   try {
@@ -251,17 +338,44 @@ async function processRow(
     );
   }
 
-  const coreDataModelVersion = resolveVersion(row, decoded);
-  const bridge = getBridge(row.credentialType, coreDataModelVersion);
+  // The bridge is keyed by the core type. A row that already knows its core
+  // kind names the bridge directly; otherwise the asserted type is tried as
+  // written, which is right for a core credential and fails, as it always
+  // did, for an extension whose core kind was never recorded.
+  // A native record's kind came from the data model issuance resolved, the
+  // most authoritative source there is (ADR-053 decision 8), so it stands.
+  // Only a record that never learnt its kind reads the artefact's type set.
+  const coreCredentialType = row.coreCredentialType ?? coreKindFromArtefact(decoded.type, row.credentialType, kindOnly);
+  if (kindOnly && coreCredentialType !== null) {
+    return { kind: 'core-kind', coreCredentialType };
+  }
+  if (coreCredentialType === null) {
+    // Bridges are registered under the core names only, so without a core
+    // kind there is no bridge to read the credential with.
+    throw new RowError(
+      CredentialDetailsError.BRIDGE_ERROR,
+      row.credentialType
+        ? `Neither the credential's type nor its asserted type (${row.credentialType}) names a core credential type, so no bridge can be chosen`
+        : 'The record names no credential type to pick a bridge by',
+    );
+  }
+  const bridgeType = bridgeNameOf(coreCredentialType);
+  const coreDataModelVersion = resolveVersion(row, bridgeType, decoded);
+  const bridge = getBridge(bridgeType, coreDataModelVersion);
   if (!bridge) {
     throw new RowError(
       CredentialDetailsError.BRIDGE_ERROR,
-      `No bridge registered for ${row.credentialType} v${coreDataModelVersion}`,
+      `No bridge registered for ${bridgeType} v${coreDataModelVersion}`,
     );
   }
 
   try {
-    return { details: extractCredentialDetails(decoded, bridge), coreDataModelVersion };
+    return {
+      kind: 'extracted',
+      details: extractCredentialDetails(decoded, bridge),
+      coreDataModelVersion,
+      coreCredentialType,
+    };
   } catch (error) {
     throw new RowError(
       CredentialDetailsError.BRIDGE_ERROR,
@@ -340,22 +454,48 @@ function unwrapToCredentialObject(fetched: unknown, storedDecryptionKey: string 
   return credential as Record<string, unknown>;
 }
 
-function resolveVersion(row: PendingCredentialRow, decoded: UNTPVerifiableCredential): string {
+/**
+ * The core kind for a record that never learnt one: the one core type the
+ * artefact's type set names. A type set naming two core kinds is refused,
+ * because no bridge can then be chosen (ADR-053 decision 8). A pending
+ * extraction may still pick its bridge by the asserted type when that is a
+ * core name, the rule issuance validated it under; a record selected only
+ * for its unknown kind is filled from the signed type array alone, as the
+ * ADR's 2026-09-03 update decides, and stays reported otherwise.
+ */
+function coreKindFromArtefact(
+  types: unknown,
+  assertedType: string | null,
+  typeArrayOnly: boolean,
+): CoreCredentialType | null {
+  const fromTypes = coreCredentialTypeFromTypes(types);
+  if (fromTypes === 'ambiguous') {
+    throw new RowError(
+      CredentialDetailsError.BRIDGE_ERROR,
+      "The credential's type names more than one core credential type, so no bridge can be chosen",
+    );
+  }
+  if (fromTypes !== 'none') return fromTypes;
+  if (typeArrayOnly || !assertedType) return null;
+  return coreCredentialTypeOf(assertedType) ?? null;
+}
+
+function resolveVersion(row: PendingRecordRow, bridgeType: string, decoded: UNTPVerifiableCredential): string {
   if (row.coreDataModelVersion) {
     return row.coreDataModelVersion;
   }
 
-  const matches = versionsMatchingContext(row.credentialType, decoded['@context']);
+  const matches = versionsMatchingContext(bridgeType, decoded['@context']);
   if (matches.length === 0) {
     throw new RowError(
       CredentialDetailsError.BRIDGE_ERROR,
-      `No registered bridge version for ${row.credentialType} matched the credential @context`,
+      `No registered bridge version for ${bridgeType} matched the credential @context`,
     );
   }
   if (matches.length > 1) {
     throw new RowError(
       CredentialDetailsError.BRIDGE_ERROR,
-      `Ambiguous bridge version for ${row.credentialType} from @context: ${matches.join(', ')}`,
+      `Ambiguous bridge version for ${bridgeType} from @context: ${matches.join(', ')}`,
     );
   }
   return matches[0];
@@ -437,7 +577,10 @@ async function defaultFetchArtifact(uri: string): Promise<string> {
   return text;
 }
 
-function classifyRowError(id: string, error: unknown): BackfillFailure {
+/** A failure marked on the row: its class is always one of the row's own. */
+type ExtractionFailure = BackfillFailure & { errorClass: CredentialDetailsError };
+
+function classifyRowError(id: string, error: unknown): ExtractionFailure {
   if (error instanceof RowError) {
     return { id, errorClass: error.errorClass, message: error.message };
   }

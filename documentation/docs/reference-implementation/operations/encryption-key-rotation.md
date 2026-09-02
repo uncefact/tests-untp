@@ -5,14 +5,14 @@ title: Encryption Key Rotation
 
 # Encryption Key Rotation
 
-The Reference Implementation [encrypts service instance configurations, credential decryption keys and idempotent-retry response bodies at rest](../services/service-architecture#encryption-at-rest) under `DATA_ENCRYPTION_KEY`. Each stored envelope opens only under the key that wrote it, so changing the variable in place makes existing data unreadable. The `rotate:encryption-key` command moves the data instead: given the previous key, it re-encrypts every stored envelope under the new active key.
+The Reference Implementation [encrypts service instance configurations, credential decryption keys, the keys of credentials registered from third parties and idempotent-retry response bodies at rest](../services/service-architecture#encryption-at-rest) under `DATA_ENCRYPTION_KEY`. Each stored envelope opens only under the key that wrote it, so changing the variable in place makes existing data unreadable. The `rotate:encryption-key` command moves the data instead: given the previous key, it re-encrypts every stored envelope under the new active key.
 
 The command is idempotent. A re-run with the same key pair finds rows already on the new key and leaves them alone, so a run interrupted partway is completed by running it again.
 
 ## Before you start
 
 1. Back up the database, and keep both key values somewhere safe until the rotation is verified. A backup without its matching key is not a recovery artefact; see [Key Management and Recovery](./key-management#backups-pair-with-the-key) for the pairing and retention rules.
-2. Run [`audit:encryption`](./encryption-audit) under the current key and resolve any findings. The rotation refuses to write when a service instance configuration or a credential key fails to decrypt under both supplied keys, or a service configuration is corrupted. Findings against idempotent-retry response bodies are the exception: they are expected leftovers until a rotation clears them, and they do not stop the run.
+2. Run [`audit:encryption`](./encryption-audit) under the current key and resolve any findings. The rotation refuses to write when a service instance configuration, a credential key, or the key of a credential registered from a third party fails to decrypt under both supplied keys, or when a service configuration or one of those third-party credential keys is corrupted. Findings against idempotent-retry response bodies are the exception: they are expected leftovers until a rotation clears them, and they do not stop the run.
 3. Stop every application instance, including replicas and any maintenance jobs. The rotation must be the only thing touching the database. Run it as a one-off process (for Docker deployments, `docker compose run --rm`), never by `exec`-ing into a serving container.
 
 ## Running the rotation
@@ -41,7 +41,7 @@ The new key must not be the placeholder value published in `.env.example`: outsi
 
 ## Reading the report
 
-For each store the report shows how many envelopes were already under the active key, how many opened only under the outgoing key, how many were rotated, and the ids of anything else: envelopes neither key opened, corrupted service configurations (both abort the run before any write, except in the idempotent-retry response bodies, where such rows are cleared, the claim and its credential kept, and the run continues, because the application already answers a retry without that body), corrupted-looking credential rows the rotation leaves untouched, rows deleted or changed while the run was in flight, and legacy plaintext credential keys (which belong to [`backfill:decryption-keys`](./backfills/decryption-keys), run under the new key).
+For each store the report shows how many envelopes were already under the active key, how many opened only under the outgoing key, how many were rotated, and the ids of anything else: envelopes neither key opened, corrupted service configurations and corrupted keys of credentials registered from third parties (all of which abort the run before any write, except in the idempotent-retry response bodies, where such rows are cleared, the claim and its credential kept, and the run continues, because the application already answers a retry without that body), corrupted-looking credential rows the rotation leaves untouched, rows deleted or changed while the run was in flight, and legacy plaintext credential keys (which belong to [`backfill:decryption-keys`](./backfills/decryption-keys), run under the new key).
 
 When a valid envelope opens under neither key, the report shows both decrypt errors for the first such row. A wrong third key and tampered data produce the same error, so the report does not claim which it is.
 

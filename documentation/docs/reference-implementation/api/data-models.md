@@ -48,7 +48,7 @@ Extensions cannot currently be nested — an extension must reference a UNTP cor
 
 ### Credential Types
 
-The `credentialType` field identifies which UNTP core data model the data model represents. The supported types align with the [UNTP specification](https://untp.unece.org/):
+The `credentialType` field names the credential type a data model represents. The UNTP core data models carry the types below, which align with the [UNTP specification](https://untp.unece.org/):
 
 | Credential Type | Description |
 |-----------------|-------------|
@@ -58,6 +58,7 @@ The `credentialType` field identifies which UNTP core data model the data model 
 | `DigitalIdentityAnchor` | Identity verification and anchoring |
 | `DigitalTraceabilityEvent` | Supply chain events (object, aggregation, transformation, transaction, association) |
 
+An extension supplies its own `credentialType` when it is created, and it is not required to match its parent's.
 
 ### Data Model Bridges
 
