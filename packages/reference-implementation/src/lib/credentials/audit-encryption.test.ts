@@ -21,33 +21,15 @@ afterAll(() => {
 type Row = { id: string; decryptionKey: string | null };
 type ServiceInstanceRow = { id: string; config: string };
 
-function createFakeClient(rows: Row[], serviceInstances: ServiceInstanceRow[] = []) {
-  return {
-    credential: {
-      findMany: jest.fn(
-        async (args: { where: { decryptionKey: { not: null }; id?: { gt: string } }; take: number }): Promise<Row[]> =>
-          rows
-            .filter((row) => row.decryptionKey !== null)
-            .filter((row) => (args.where.id ? row.id > args.where.id.gt : true))
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .slice(0, args.take)
-            .map((row) => ({ id: row.id, decryptionKey: row.decryptionKey })),
-      ),
-      update: jest.fn(async () => {
-        throw new Error('the audit must never write');
-      }),
-    },
-    serviceInstance: {
-      findMany: jest.fn(
-        async (args: { where?: { id?: { gt: string } }; take: number }): Promise<ServiceInstanceRow[]> =>
-          serviceInstances
-            .filter((row) => (args.where?.id ? row.id > args.where.id.gt : true))
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .slice(0, args.take)
-            .map((row) => ({ id: row.id, config: row.config })),
-      ),
-    },
-  };
+import { fakeStores as sharedFakeStores } from './envelope-stores.fake';
+
+/** This suite's row order: credentials first, then service instances, then replay bodies. */
+function fakeStores(
+  rows: Row[],
+  serviceInstances: ServiceInstanceRow[] = [],
+  replayRows: { id: string; responseBody: string | null }[] = [],
+) {
+  return sharedFakeStores(serviceInstances, rows, replayRows);
 }
 
 async function activeService() {
@@ -74,16 +56,48 @@ describe('auditEncryption', () => {
       { id: 'cred-2', decryptionKey: null },
     ];
     const serviceInstances: ServiceInstanceRow[] = [{ id: 'svc-1', config: protectDecryptionKey('{"apiUrl":"x"}') }];
-    const client = createFakeClient(rows, serviceInstances);
+    const stores = fakeStores(rows, serviceInstances);
 
-    const result = await auditEncryption(client, await activeService());
+    const result = await auditEncryption(stores, await activeService());
 
+    const clean = { decryptFailedIds: [], corruptedIds: [], suspectRowIds: [], plaintextCount: 0 };
     expect(result).toEqual({
       keyVerified: true,
-      serviceInstances: { okCount: 1, decryptFailedIds: [], corruptedIds: [] },
-      credentials: { okCount: 1, decryptFailedIds: [], suspectRowIds: [], wrappablePlaintextCount: 0 },
+      stores: {
+        serviceInstances: { ...clean, okCount: 1 },
+        credentials: { ...clean, okCount: 1 },
+        idempotencyResponses: { ...clean, okCount: 0 },
+      },
     });
     expect(auditFoundProblems(result)).toBe(false);
+  });
+
+  it('audits idempotency replay bodies as a store that never holds plaintext and never proves the key', async () => {
+    const { auditEncryption, auditFoundProblems } = await import('./audit-encryption');
+    const { protectDecryptionKey } = await import('./decryption-key-protection');
+
+    const replayRows = [
+      { id: 'claim-1', responseBody: protectDecryptionKey('["warning"]') },
+      { id: 'claim-2', responseBody: await envelopeUnderOtherKey('[]') },
+      { id: 'claim-3', responseBody: '["not an envelope"]' },
+      { id: 'claim-4', responseBody: null },
+    ];
+    const stores = fakeStores([], [], replayRows);
+
+    const result = await auditEncryption(stores, await activeService());
+
+    expect(result.stores.idempotencyResponses).toEqual({
+      okCount: 1,
+      decryptFailedIds: ['claim-2'],
+      corruptedIds: ['claim-3'],
+      suspectRowIds: [],
+      plaintextCount: 0,
+    });
+    // A replay body that opens is not proof of the key: it may predate a rotation.
+    expect(result.keyVerified).toBe(false);
+    expect(auditFoundProblems(result)).toBe(true);
+    // A discardable failure is never the sample an abort is blamed on.
+    expect(result.firstDecryptFailure).toBeUndefined();
   });
 
   it('collects every decrypt failure across both stores without aborting mid-scan', async () => {
@@ -99,13 +113,13 @@ describe('auditEncryption', () => {
       { id: 'svc-1', config: await envelopeUnderOtherKey('{"a":1}') },
       { id: 'svc-2', config: protectDecryptionKey('{"b":2}') },
     ];
-    const client = createFakeClient(rows, serviceInstances);
+    const stores = fakeStores(rows, serviceInstances);
 
-    const result = await auditEncryption(client, await activeService());
+    const result = await auditEncryption(stores, await activeService());
 
-    expect(result.serviceInstances).toEqual({ okCount: 1, decryptFailedIds: ['svc-1'], corruptedIds: [] });
-    expect(result.credentials.decryptFailedIds).toEqual(['cred-1', 'cred-3']);
-    expect(result.credentials.okCount).toBe(1);
+    expect(result.stores.serviceInstances).toMatchObject({ okCount: 1, decryptFailedIds: ['svc-1'], corruptedIds: [] });
+    expect(result.stores.credentials.decryptFailedIds).toEqual(['cred-1', 'cred-3']);
+    expect(result.stores.credentials.okCount).toBe(1);
     expect(result.keyVerified).toBe(true);
     expect(auditFoundProblems(result)).toBe(true);
     // The first failure's original error rides along for cause-chaining.
@@ -127,12 +141,12 @@ describe('auditEncryption', () => {
       { id: 'svc-5', config: '{"cipherText":null,"iv":null,"tag":null,"type":null}' },
       { id: 'svc-6', config: protectDecryptionKey('{"ok":true}') },
     ];
-    const client = createFakeClient([], serviceInstances);
+    const stores = fakeStores([], serviceInstances);
 
-    const result = await auditEncryption(client, await activeService());
+    const result = await auditEncryption(stores, await activeService());
 
-    expect(result.serviceInstances.corruptedIds).toEqual(['svc-1', 'svc-2', 'svc-3', 'svc-4', 'svc-5']);
-    expect(result.serviceInstances.okCount).toBe(1);
+    expect(result.stores.serviceInstances.corruptedIds).toEqual(['svc-1', 'svc-2', 'svc-3', 'svc-4', 'svc-5']);
+    expect(result.stores.serviceInstances.okCount).toBe(1);
   });
 
   it('classifies credential values per the backfill taxonomy: suspect, plaintext, or decrypt failure', async () => {
@@ -145,29 +159,29 @@ describe('auditEncryption', () => {
       { id: 'cred-4', decryptionKey: await envelopeUnderOtherKey('c'.repeat(64)) },
       { id: 'cred-5', decryptionKey: null },
     ];
-    const client = createFakeClient(rows);
+    const stores = fakeStores(rows);
 
-    const result = await auditEncryption(client, await activeService());
+    const result = await auditEncryption(stores, await activeService());
 
-    expect(result.credentials.suspectRowIds).toEqual(['cred-1']);
-    expect(result.credentials.wrappablePlaintextCount).toBe(2);
-    expect(result.credentials.decryptFailedIds).toEqual(['cred-4']);
-    expect(result.credentials.okCount).toBe(0);
+    expect(result.stores.credentials.suspectRowIds).toEqual(['cred-1']);
+    expect(result.stores.credentials.plaintextCount).toBe(2);
+    expect(result.stores.credentials.decryptFailedIds).toEqual(['cred-4']);
+    expect(result.stores.credentials.okCount).toBe(0);
   });
 
   it('reports an unverified key on empty stores and on plaintext-only stores', async () => {
     const { auditEncryption, auditFoundProblems } = await import('./audit-encryption');
 
-    const empty = await auditEncryption(createFakeClient([]), await activeService());
+    const empty = await auditEncryption(fakeStores([]), await activeService());
     expect(empty.keyVerified).toBe(false);
     expect(auditFoundProblems(empty)).toBe(false);
 
     const plaintextOnly = await auditEncryption(
-      createFakeClient([{ id: 'cred-1', decryptionKey: 'b'.repeat(64) }]),
+      fakeStores([{ id: 'cred-1', decryptionKey: 'b'.repeat(64) }]),
       await activeService(),
     );
     expect(plaintextOnly.keyVerified).toBe(false);
-    expect(plaintextOnly.credentials.wrappablePlaintextCount).toBe(1);
+    expect(plaintextOnly.stores.credentials.plaintextCount).toBe(1);
     expect(auditFoundProblems(plaintextOnly)).toBe(false);
   });
 
@@ -183,10 +197,10 @@ describe('auditEncryption', () => {
     logger.child.mockReturnValue(logger);
     const outgoingKeyService = new AesGcmEncryptionAdapter(OTHER_KEY, logger as never);
 
-    const result = await auditEncryption(createFakeClient(rows), outgoingKeyService);
+    const result = await auditEncryption(fakeStores(rows), outgoingKeyService);
 
-    expect(result.credentials.okCount).toBe(1);
-    expect(result.credentials.decryptFailedIds).toEqual([]);
+    expect(result.stores.credentials.okCount).toBe(1);
+    expect(result.stores.credentials.decryptFailedIds).toEqual([]);
     expect(result.keyVerified).toBe(true);
   });
 
@@ -194,23 +208,46 @@ describe('auditEncryption', () => {
     const DOCS = 'https://docs.example/audit';
 
     function baseResult() {
+      const store = () => ({
+        okCount: 0,
+        decryptFailedIds: [] as string[],
+        corruptedIds: [] as string[],
+        suspectRowIds: [] as string[],
+        plaintextCount: 0,
+      });
       return {
         keyVerified: true,
-        serviceInstances: { okCount: 0, decryptFailedIds: [] as string[], corruptedIds: [] as string[] },
-        credentials: {
-          okCount: 0,
-          decryptFailedIds: [] as string[],
-          suspectRowIds: [] as string[],
-          wrappablePlaintextCount: 0,
+        stores: {
+          serviceInstances: store(),
+          credentials: store(),
+          idempotencyResponses: store(),
         },
       };
     }
 
+    it('reports a damaged replay body with its remedy, and still lets a backfill dry run proceed', async () => {
+      const { buildAuditReport } = await import('./audit-encryption');
+      const result = baseResult();
+      result.stores.idempotencyResponses.corruptedIds = ['claim-3'];
+      result.stores.idempotencyResponses.decryptFailedIds = ['claim-2'];
+      result.stores.credentials.plaintextCount = 2;
+
+      const report = buildAuditReport(result, DOCS);
+
+      expect(report.exitCode).toBe(1);
+      const text = report.lines.map((line) => line.text).join('\n');
+      expect(text).toContain('not a valid encrypted envelope (1): claim-3');
+      expect(text).toContain('failed to decrypt (1): claim-2');
+      expect(text).toContain('a rotation clears them, or clear the replay body of the affected claims');
+      expect(text).toContain('would wrap 2 plaintext key(s)');
+      expect(text).not.toContain('would abort');
+    });
+
     it('exits 0 on a clean verified result without the nothing-to-verify note', async () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
-      result.serviceInstances.okCount = 2;
-      result.credentials.okCount = 3;
+      result.stores.serviceInstances.okCount = 2;
+      result.stores.credentials.okCount = 3;
 
       const report = buildAuditReport(result, DOCS);
 
@@ -223,8 +260,8 @@ describe('auditEncryption', () => {
     it('exits 1 and lists ids on stderr when findings exist', async () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
-      result.serviceInstances.corruptedIds = ['si-corrupt'];
-      result.credentials.suspectRowIds = ['cred-suspect'];
+      result.stores.serviceInstances.corruptedIds = ['si-corrupt'];
+      result.stores.credentials.suspectRowIds = ['cred-suspect'];
 
       const report = buildAuditReport(result, DOCS);
 
@@ -242,8 +279,8 @@ describe('auditEncryption', () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
       result.keyVerified = false;
-      result.serviceInstances.decryptFailedIds = ['si-1'];
-      result.credentials.decryptFailedIds = ['cred-1', 'cred-2'];
+      result.stores.serviceInstances.decryptFailedIds = ['si-1'];
+      result.stores.credentials.decryptFailedIds = ['cred-1', 'cred-2'];
 
       const report = buildAuditReport(result, DOCS);
 
@@ -263,8 +300,8 @@ describe('auditEncryption', () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
       result.keyVerified = false;
-      result.serviceInstances.corruptedIds = ['si-corrupt'];
-      result.credentials.wrappablePlaintextCount = 2;
+      result.stores.serviceInstances.corruptedIds = ['si-corrupt'];
+      result.stores.credentials.plaintextCount = 2;
 
       const report = buildAuditReport(result, DOCS);
 
@@ -279,9 +316,9 @@ describe('auditEncryption', () => {
     it('reports the abort, not a wrap count, when a verified key coexists with a decrypt failure', async () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
-      result.serviceInstances.okCount = 1;
-      result.credentials.decryptFailedIds = ['cred-bad'];
-      result.credentials.wrappablePlaintextCount = 3;
+      result.stores.serviceInstances.okCount = 1;
+      result.stores.credentials.decryptFailedIds = ['cred-bad'];
+      result.stores.credentials.plaintextCount = 3;
 
       const report = buildAuditReport(result, DOCS);
 
@@ -296,7 +333,7 @@ describe('auditEncryption', () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
       result.keyVerified = false;
-      result.credentials.decryptFailedIds = ['cred-bad'];
+      result.stores.credentials.decryptFailedIds = ['cred-bad'];
 
       const report = buildAuditReport(result, DOCS);
 
@@ -310,7 +347,7 @@ describe('auditEncryption', () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
       result.keyVerified = false;
-      result.credentials.suspectRowIds = ['cred-suspect'];
+      result.stores.credentials.suspectRowIds = ['cred-suspect'];
 
       const report = buildAuditReport(result, DOCS);
 
@@ -337,7 +374,7 @@ describe('auditEncryption', () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
       result.keyVerified = false;
-      result.credentials.wrappablePlaintextCount = 2;
+      result.stores.credentials.plaintextCount = 2;
 
       const report = buildAuditReport(result, DOCS);
 
@@ -349,8 +386,8 @@ describe('auditEncryption', () => {
     it('states a plain dry-run wrap count when the key is verified', async () => {
       const { buildAuditReport } = await import('./audit-encryption');
       const result = baseResult();
-      result.serviceInstances.okCount = 1;
-      result.credentials.wrappablePlaintextCount = 3;
+      result.stores.serviceInstances.okCount = 1;
+      result.stores.credentials.plaintextCount = 3;
 
       const report = buildAuditReport(result, DOCS);
 
@@ -361,7 +398,7 @@ describe('auditEncryption', () => {
     });
   });
 
-  it('never writes, and paginates past a single batch', async () => {
+  it('never writes, whatever the size of the stores', async () => {
     const { auditEncryption } = await import('./audit-encryption');
     const { protectDecryptionKey } = await import('./decryption-key-protection');
 
@@ -373,14 +410,14 @@ describe('auditEncryption', () => {
       id: `svc-${String(index).padStart(3, '0')}`,
       config: protectDecryptionKey('{"x":1}'),
     }));
-    const client = createFakeClient(rows, serviceInstances);
+    const stores = fakeStores(rows, serviceInstances);
 
-    const result = await auditEncryption(client, await activeService());
+    const result = await auditEncryption(stores, await activeService());
 
-    expect(result.credentials.okCount).toBe(150);
-    expect(result.serviceInstances.okCount).toBe(120);
-    expect(client.credential.update).not.toHaveBeenCalled();
-    expect(client.credential.findMany.mock.calls.length).toBeGreaterThan(1);
-    expect(client.serviceInstance.findMany.mock.calls.length).toBeGreaterThan(1);
+    expect(result.stores.credentials.okCount).toBe(150);
+    expect(result.stores.serviceInstances.okCount).toBe(120);
+    for (const store of Object.values(stores)) {
+      expect(store.casWrite).not.toHaveBeenCalled();
+    }
   });
 });

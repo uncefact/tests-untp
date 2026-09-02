@@ -33,7 +33,7 @@
   },
   "scripts": {
     "dev": "prisma generate && next dev -p 3003",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && npx tsx scripts/check-encrypted-columns.ts && next build",
     "start": "next start",
     "lint": "prisma generate && eslint .",
     "storybook": "storybook dev -p 6006",

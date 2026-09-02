@@ -1,8 +1,9 @@
 /**
  * Read-only audit of data encrypted at rest under DATA_ENCRYPTION_KEY.
  *
- * Attempts to decrypt every stored envelope (service instance configurations
- * and credential decryption keys) under the active key and reports the
+ * Attempts to decrypt every stored envelope in every store the key protects
+ * (service instance configurations, credential decryption keys, idempotency
+ * replay bodies) under the active key and reports the
  * result per store, without writing anything. Run it before a key rotation,
  * after a database restore, and during incident triage; it also doubles as
  * the dry run for `backfill:decryption-keys`, reporting what that command
@@ -49,10 +50,11 @@ if (!process.env.RI_DATABASE_URL && constructedDatabaseUrl) {
 
 const { prisma } = await import('../src/lib/prisma/prisma.js');
 const { auditEncryption, buildAuditReport } = await import('../src/lib/credentials/audit-encryption.js');
+const { prismaEnvelopeStores } = await import('../src/lib/credentials/prisma-envelope-stores.js');
 const { getEncryptionService } = await import('../src/lib/encryption/encryption.js');
 
 try {
-  const result = await auditEncryption(prisma, getEncryptionService());
+  const result = await auditEncryption(prismaEnvelopeStores(prisma), getEncryptionService());
   const report = buildAuditReport(result, DOCS_URL);
   for (const line of report.lines) {
     (line.stream === 'err' ? console.error : console.log)(line.text);

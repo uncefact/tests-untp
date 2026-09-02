@@ -4,8 +4,20 @@ import type { LoggerService } from '@uncefact/untp-ri-services/logging';
 // Relative imports (not the @/ alias): this module runs inside the Docker
 // image via tsx, where no tsconfig.json exists to resolve path aliases.
 import { parseEnvelope } from './decryption-key-protection';
+import { decryptFailure, errorMessage } from './envelope-decrypt';
 import { assertNotPlaceholderEncryptionKey, PLACEHOLDER_ENCRYPTION_KEY } from './validate-encryption-key-startup';
-import { eachKeyedCredentialRow, eachServiceInstanceRow, type EnvelopeStoresClient } from './envelope-stores';
+import {
+  blockingStores,
+  classifyNonEnvelope,
+  ENVELOPE_STORE_IDS,
+  ENVELOPE_STORE_INFO,
+  perStore,
+  recordNonEnvelope,
+  type EnvelopeStore,
+  type EnvelopeStoreId,
+  type EnvelopeStores,
+} from './envelope-stores';
+import { reportLines, type Report, type ReportLine } from './operator-report';
 
 /**
  * The services the rotation runs under, both injected so the library never
@@ -19,34 +31,6 @@ import { eachKeyedCredentialRow, eachServiceInstanceRow, type EnvelopeStoresClie
 export type RotationServices = {
   activeService: IEncryptionService;
   outgoingService: Pick<IEncryptionService, 'decrypt'>;
-};
-
-/**
- * The client contract for the rotation. Extends the shared envelope-store
- * scans with conditional writes: every update matches the exact stored
- * value alongside the id (compare-and-swap), so a row changed between scan
- * and write is never overwritten with a re-encryption of stale plaintext
- * (which would be unrecoverable), and with single-row re-reads used to
- * classify a compare-and-swap miss.
- */
-export type RotateEncryptionKeyClient = EnvelopeStoresClient & {
-  credential: {
-    updateMany(args: {
-      where: { id: string; decryptionKey: string };
-      data: { decryptionKey: string };
-    }): Promise<{ count: number }>;
-    findUnique(args: {
-      where: { id: string };
-      select: { id: true; decryptionKey: true };
-    }): Promise<{ id: string; decryptionKey: string | null } | null>;
-  };
-  serviceInstance: {
-    updateMany(args: { where: { id: string; config: string }; data: { config: string } }): Promise<{ count: number }>;
-    findUnique(args: { where: { id: string }; select: { id: true; config: true } }): Promise<{
-      id: string;
-      config: string;
-    } | null>;
-  };
 };
 
 /** Per-store outcome. Id arrays are unbounded and never truncated. */
@@ -73,24 +57,33 @@ export type RotationStoreResult = {
    * something this run must not touch. Never overwritten.
    */
   conflictIds: string[];
+  /**
+   * Non-envelope values in a store where plaintext is never written, so
+   * they are corruption; blockers. Always empty where plaintext is allowed.
+   */
+  corruptedIds: string[];
+  /**
+   * Rows in a discardable store whose value was not an envelope or opened
+   * under neither key, cleared by this run: the value is gone, the row
+   * stays. Such rows also appear in `corruptedIds` or `neitherKeyIds`, which
+   * record what was found; this records what was done about it.
+   */
+  clearedIds: string[];
+  /** Brace-prefixed unparseable values in a store where plaintext is allowed; skipped untouched, reported. */
+  suspectRowIds: string[];
+  /** Legacy plaintext values; the backfill owns wrapping them, the rotation never touches them. */
+  plaintextCount: number;
 };
 
 export type RotateEncryptionKeyResult = {
   /**
-   * True when blockers (neither-key envelopes, corrupted service configs)
-   * stopped the run before any write.
+   * True when blockers (neither-key envelopes, corrupted values in a store
+   * that never holds plaintext) stopped the run before any write. A
+   * discardable store's rows never block: they are cleared instead.
    */
   blocked: boolean;
-  serviceInstances: RotationStoreResult & {
-    /** Non-envelope configs. Service configs have no plaintext form, so these are corruption; blockers. */
-    corruptedIds: string[];
-  };
-  credentials: RotationStoreResult & {
-    /** Brace-prefixed unparseable values; skipped untouched, reported. */
-    suspectRowIds: string[];
-    /** Legacy plaintext keys; the backfill owns wrapping them, the rotation never touches them. */
-    plaintextCount: number;
-  };
+  /** One outcome per registered store, in walk order. */
+  stores: Record<EnvelopeStoreId, RotationStoreResult>;
   /**
    * Both keys' errors from the first neither-key row. The id lists are the
    * record; this is one debugging sample. The errors are deliberately not
@@ -101,39 +94,31 @@ export type RotateEncryptionKeyResult = {
 };
 
 type Candidate = {
-  store: 'serviceInstance' | 'credential';
+  store: EnvelopeStoreId;
   id: string;
   stored: string;
   envelope: EncryptedEnvelope;
 };
 
+/** A discardable store's row this run will clear: what was stored, so the clear is compare-and-swap too. */
+type Discard = { store: EnvelopeStoreId; id: string; stored: string };
+
 /**
- * Re-encrypts every stored envelope that opens under the outgoing key so it
- * opens under the active key instead.
- *
- * Two phases. A full classification pass first walks both stores, parsing
- * each stored value once and trying the active service before the outgoing
- * one on that same value; any valid envelope neither key opens, or any
- * non-envelope service configuration, blocks the run before a single write
- * (`blocked: true`). Only a blocker-free classification proceeds to the
- * write pass, which re-encrypts each candidate preserving its envelope's
- * algorithm and writes via compare-and-swap; a miss is re-read and
- * classified (deleted, concurrently completed, changed-and-still-rotatable
- * which is retried once against the fresh value, or a conflict left
- * untouched).
- *
- * Idempotent: a re-run finds rows already under the active key and writes
- * nothing; a re-run after a mid-run crash rotates only the remainder.
- *
- * The scan is best-effort under concurrent writes; the documented procedure
- * requires every writer stopped for the rotation window. Compare-and-swap
- * is the backstop for the writer that was missed, not a licence to rotate a
- * live system.
+ * The classification counts per store, printed by the CLI before the first
+ * write.
  */
-export type RotationPreflightSummary = {
-  serviceInstances: { alreadyActive: number; outgoingOpened: number; corrupted: number };
-  credentials: { alreadyActive: number; outgoingOpened: number; suspects: number; plaintext: number };
-};
+export type RotationPreflightSummary = Record<
+  EnvelopeStoreId,
+  {
+    alreadyActive: number;
+    outgoingOpened: number;
+    corrupted: number;
+    suspects: number;
+    plaintext: number;
+    /** Discardable rows this run will clear: not an envelope, or opened under neither key. */
+    toClear: number;
+  }
+>;
 
 export type RotateEncryptionKeyOptions = {
   /**
@@ -146,97 +131,127 @@ export type RotateEncryptionKeyOptions = {
   onPreflight?: (summary: RotationPreflightSummary) => void;
 };
 
+/**
+ * Re-encrypts every stored envelope that opens under the outgoing key so it
+ * opens under the active key instead.
+ *
+ * Two phases. A full classification pass first walks every registered
+ * store, parsing each stored value once and trying the active service
+ * before the outgoing one on that same value; any valid envelope neither
+ * key opens, or any non-envelope value in a store that never holds
+ * plaintext, blocks the run before a single write (`blocked: true`), unless
+ * the store is discardable, in which case the row is cleared in the write
+ * pass (compare-and-swap, the row stays) rather than left holding material
+ * under a key that may be compromised. Only a
+ * blocker-free classification proceeds to the write pass, which re-encrypts
+ * each candidate preserving its envelope's algorithm and writes via
+ * compare-and-swap; a miss is re-read and classified (deleted, concurrently
+ * completed, changed-and-still-rotatable which is retried once against the
+ * fresh value, or a conflict left untouched).
+ *
+ * Idempotent: a re-run finds rows already under the active key and writes
+ * nothing; a re-run after a mid-run crash rotates only the remainder.
+ *
+ * The scan is best-effort under concurrent writes; the documented procedure
+ * requires every writer stopped for the rotation window. Compare-and-swap
+ * is the backstop for the writer that was missed, not a licence to rotate a
+ * live system.
+ */
 export async function rotateEncryptionKey(
-  client: RotateEncryptionKeyClient,
+  stores: EnvelopeStores,
   services: RotationServices,
   options: RotateEncryptionKeyOptions = {},
 ): Promise<RotateEncryptionKeyResult> {
   const result: RotateEncryptionKeyResult = {
     blocked: false,
-    serviceInstances: emptyStoreResult({ corruptedIds: [] as string[] }),
-    credentials: emptyStoreResult({ suspectRowIds: [] as string[], plaintextCount: 0 }),
+    stores: perStore(() => ({
+      alreadyActive: 0,
+      outgoingOpened: 0,
+      rotated: 0,
+      neitherKeyIds: [],
+      deletedIds: [],
+      concurrentlyCompletedIds: [],
+      conflictIds: [],
+      corruptedIds: [],
+      clearedIds: [],
+      suspectRowIds: [],
+      plaintextCount: 0,
+    })),
   };
   const candidates: Candidate[] = [];
+  const discards: Discard[] = [];
 
-  for await (const row of eachServiceInstanceRow(client)) {
-    const envelope = parseEnvelope(row.config);
-    if (envelope === null) {
-      result.serviceInstances.corruptedIds.push(row.id);
-      continue;
-    }
-    classify(result, candidates, services, {
-      store: 'serviceInstance',
-      id: row.id,
-      stored: row.config,
-      envelope,
-      bucket: result.serviceInstances,
-      rowDescription: `service instance ${row.id}`,
-    });
-  }
-
-  for await (const row of eachKeyedCredentialRow(client)) {
-    const envelope = parseEnvelope(row.decryptionKey);
-    if (envelope === null) {
-      // parseEnvelope already returned null; a brace prefix alone now
-      // distinguishes a corrupted-envelope-looking value from legacy
-      // plaintext (same rule as looksEnvelopeLikeButInvalid, without
-      // parsing the value a second time).
-      if (row.decryptionKey.startsWith('{')) {
-        result.credentials.suspectRowIds.push(row.id);
-      } else {
-        result.credentials.plaintextCount += 1;
+  for (const id of ENVELOPE_STORE_IDS) {
+    const bucket = result.stores[id];
+    const { discardable } = ENVELOPE_STORE_INFO[id];
+    for await (const row of stores[id].rows()) {
+      const envelope = parseEnvelope(row.value);
+      if (envelope === null) {
+        const kind = classifyNonEnvelope(id, row.value);
+        recordNonEnvelope(bucket, kind, row.id);
+        if (discardable && kind === 'corrupted') {
+          discards.push({ store: id, id: row.id, stored: row.value });
+        }
+        continue;
       }
-      continue;
+      const opened = classify(result, candidates, services, { store: id, id: row.id, stored: row.value, envelope });
+      if (discardable && !opened) {
+        discards.push({ store: id, id: row.id, stored: row.value });
+      }
     }
-    classify(result, candidates, services, {
-      store: 'credential',
-      id: row.id,
-      stored: row.decryptionKey,
-      envelope,
-      bucket: result.credentials,
-      rowDescription: `credential ${row.id}`,
-    });
   }
 
-  if (
-    result.serviceInstances.corruptedIds.length > 0 ||
-    result.serviceInstances.neitherKeyIds.length > 0 ||
-    result.credentials.neitherKeyIds.length > 0
-  ) {
+  const blocked =
+    blockingStores((id) => result.stores[id].corruptedIds.length > 0 || result.stores[id].neitherKeyIds.length > 0)
+      .length > 0;
+  if (blocked) {
     result.blocked = true;
     return result;
   }
 
-  options.onPreflight?.({
-    serviceInstances: {
-      alreadyActive: result.serviceInstances.alreadyActive,
-      outgoingOpened: result.serviceInstances.outgoingOpened,
-      corrupted: result.serviceInstances.corruptedIds.length,
-    },
-    credentials: {
-      alreadyActive: result.credentials.alreadyActive,
-      outgoingOpened: result.credentials.outgoingOpened,
-      suspects: result.credentials.suspectRowIds.length,
-      plaintext: result.credentials.plaintextCount,
-    },
-  });
+  options.onPreflight?.(
+    perStore((id) => {
+      const bucket = result.stores[id];
+      return {
+        alreadyActive: bucket.alreadyActive,
+        outgoingOpened: bucket.outgoingOpened,
+        corrupted: bucket.corruptedIds.length,
+        suspects: bucket.suspectRowIds.length,
+        plaintext: bucket.plaintextCount,
+        toClear: discards.filter((discard) => discard.store === id).length,
+      };
+    }),
+  );
 
   for (const candidate of candidates) {
-    const bucket = candidate.store === 'serviceInstance' ? result.serviceInstances : result.credentials;
     try {
-      await rotateCandidate(client, services, candidate, bucket);
+      await rotateCandidate(services, stores[candidate.store], candidate, result.stores[candidate.store]);
     } catch (error) {
       // Commit-safe wording: the failing write itself may or may not have
       // committed, so state only what was confirmed, never the exact key
       // mixture of the store.
-      const rotatedSoFar = result.serviceInstances.rotated + result.credentials.rotated;
+      const rotatedSoFar = Object.values(result.stores).reduce((sum, outcome) => sum + outcome.rotated, 0);
       const stateNote =
         rotatedSoFar > 0
           ? `${rotatedSoFar} write(s) confirmed before the failure`
           : 'no write had been confirmed before the failure';
       throw new Error(
-        `Failed to rotate ${describe(candidate)} (${stateNote}). The rotation may be incomplete: keep writers ` +
-          'stopped and re-run with the same key pair; the run converges.',
+        `Failed to rotate ${ENVELOPE_STORE_INFO[candidate.store].rowName} ${candidate.id} (${stateNote}). ` +
+          'The rotation may be incomplete: keep ' +
+          'writers stopped and re-run with the same key pair; the run converges.',
+        { cause: error },
+      );
+    }
+  }
+
+  for (const discard of discards) {
+    const bucket = result.stores[discard.store];
+    try {
+      await clearDiscard(stores[discard.store], discard, bucket);
+    } catch (error) {
+      throw new Error(
+        `Failed to clear ${ENVELOPE_STORE_INFO[discard.store].rowName} ${discard.id}. The rotation may be ` +
+          'incomplete: keep writers stopped and re-run with the same key pair; the run converges.',
         { cause: error },
       );
     }
@@ -245,51 +260,61 @@ export async function rotateEncryptionKey(
   return result;
 }
 
-function emptyStoreResult<Extra extends object>(extra: Extra): RotationStoreResult & Extra {
-  return {
-    alreadyActive: 0,
-    outgoingOpened: 0,
-    rotated: 0,
-    neitherKeyIds: [],
-    deletedIds: [],
-    concurrentlyCompletedIds: [],
-    conflictIds: [],
-    ...extra,
-  };
-}
-
+/** Records the row's outcome; true when the envelope opened under one of the two keys. */
 function classify(
   result: RotateEncryptionKeyResult,
   candidates: Candidate[],
   services: RotationServices,
-  row: Candidate & { bucket: RotationStoreResult; rowDescription: string },
-): void {
+  row: Candidate,
+): boolean {
+  const bucket = result.stores[row.store];
   const activeFailure = decryptFailure(services.activeService, row.envelope);
   if (activeFailure === null) {
-    row.bucket.alreadyActive += 1;
-    return;
+    bucket.alreadyActive += 1;
+    return true;
   }
   const outgoingFailure = decryptFailure(services.outgoingService, row.envelope);
   if (outgoingFailure === null) {
-    row.bucket.outgoingOpened += 1;
-    candidates.push({ store: row.store, id: row.id, stored: row.stored, envelope: row.envelope });
-    return;
+    bucket.outgoingOpened += 1;
+    candidates.push(row);
+    return true;
   }
-  row.bucket.neitherKeyIds.push(row.id);
+  bucket.neitherKeyIds.push(row.id);
   result.firstNeitherDecrypt ??= {
-    rowDescription: row.rowDescription,
+    rowDescription: `${ENVELOPE_STORE_INFO[row.store].rowName} ${row.id}`,
     activeError: activeFailure.error,
     outgoingError: outgoingFailure.error,
   };
+  return false;
+}
+
+/**
+ * Clears a discardable row's unreadable value by compare-and-swap. A miss
+ * is re-read: a row already gone is a deletion, one already cleared counts
+ * as cleared, and one holding a different value is a conflict left alone.
+ */
+async function clearDiscard(store: EnvelopeStore, discard: Discard, bucket: RotationStoreResult): Promise<void> {
+  if (await store.discard(discard.id, discard.stored)) {
+    bucket.clearedIds.push(discard.id);
+    return;
+  }
+  const current = await store.readCurrent(discard.id);
+  if (current.kind === 'missing') {
+    bucket.deletedIds.push(discard.id);
+  } else if (current.kind === 'cleared') {
+    bucket.clearedIds.push(discard.id);
+  } else {
+    bucket.conflictIds.push(discard.id);
+  }
 }
 
 async function rotateCandidate(
-  client: RotateEncryptionKeyClient,
   services: RotationServices,
+  store: EnvelopeStore,
   candidate: Candidate,
   bucket: RotationStoreResult,
 ): Promise<void> {
-  const written = await casWrite(client, services, candidate);
+  const written = await casWrite(services, store, candidate);
   if (written) {
     bucket.rotated += 1;
     return;
@@ -298,13 +323,13 @@ async function rotateCandidate(
   // The compare-and-swap missed: the row is gone or its value changed after
   // classification. Re-read and decide from the current value; never write
   // over a value this run has not examined.
-  const current = await readCurrent(client, candidate);
-  if (current.missing) {
+  const current = await store.readCurrent(candidate.id);
+  if (current.kind === 'missing') {
     bucket.deletedIds.push(candidate.id);
     return;
   }
-  if (current.value === null) {
-    // The row still exists but its key was cleared: a changed value this
+  if (current.kind === 'cleared') {
+    // The row still exists but its value was cleared: a changed value this
     // run must not touch, not a deletion.
     bucket.conflictIds.push(candidate.id);
     return;
@@ -317,7 +342,7 @@ async function rotateCandidate(
   if (envelope !== null && decryptFailure(services.outgoingService, envelope) === null) {
     // Still rotatable, just re-written meanwhile (an old replica). One
     // retry against the fresh value; a second miss is a conflict.
-    const retried = await casWrite(client, services, { ...candidate, stored: current.value, envelope });
+    const retried = await casWrite(services, store, { ...candidate, stored: current.value, envelope });
     if (retried) {
       bucket.rotated += 1;
       return;
@@ -327,66 +352,12 @@ async function rotateCandidate(
 }
 
 /** True when the conditional write landed on exactly the expected value. */
-async function casWrite(
-  client: RotateEncryptionKeyClient,
-  services: RotationServices,
-  candidate: Candidate,
-): Promise<boolean> {
+async function casWrite(services: RotationServices, store: EnvelopeStore, candidate: Candidate): Promise<boolean> {
   const plaintext = services.outgoingService.decrypt(candidate.envelope);
   // Preserve the envelope's algorithm: rotation is a key-only operation,
   // never an implicit algorithm migration.
   const rotated = JSON.stringify(services.activeService.encrypt(plaintext, candidate.envelope.type));
-  const { count } =
-    candidate.store === 'serviceInstance'
-      ? await client.serviceInstance.updateMany({
-          where: { id: candidate.id, config: candidate.stored },
-          data: { config: rotated },
-        })
-      : await client.credential.updateMany({
-          where: { id: candidate.id, decryptionKey: candidate.stored },
-          data: { decryptionKey: rotated },
-        });
-  return count === 1;
-}
-
-/**
- * Missing (row gone) and present-with-null-value are distinct outcomes: a
- * credential whose key was cleared still exists, and reporting it deleted
- * would misdescribe the store.
- */
-async function readCurrent(
-  client: RotateEncryptionKeyClient,
-  candidate: Candidate,
-): Promise<{ missing: true } | { missing: false; value: string | null }> {
-  if (candidate.store === 'serviceInstance') {
-    const row = await client.serviceInstance.findUnique({
-      where: { id: candidate.id },
-      select: { id: true, config: true },
-    });
-    return row === null ? { missing: true } : { missing: false, value: row.config };
-  }
-  const row = await client.credential.findUnique({
-    where: { id: candidate.id },
-    select: { id: true, decryptionKey: true },
-  });
-  return row === null ? { missing: true } : { missing: false, value: row.decryptionKey };
-}
-
-function describe(candidate: Candidate): string {
-  return `${candidate.store === 'serviceInstance' ? 'service instance' : 'credential'} ${candidate.id}`;
-}
-
-/** Null on success; the thrown error on failure. */
-function decryptFailure(
-  service: Pick<IEncryptionService, 'decrypt'>,
-  envelope: EncryptedEnvelope,
-): { error: unknown } | null {
-  try {
-    service.decrypt(envelope);
-    return null;
-  } catch (error) {
-    return { error };
-  }
+  return store.casWrite(candidate.id, candidate.stored, rotated);
 }
 
 export type RotationKeyValidation =
@@ -465,10 +436,9 @@ export function validateRotationKeys(
   return { ok: true, services: { activeService, outgoingService }, warnings };
 }
 
-/** One line of the operator-facing rotation report, tagged with its stream. */
-export type RotationReportLine = { text: string; stream: 'out' | 'err' };
+export type RotationReportLine = ReportLine;
 
-export type RotationReport = { lines: RotationReportLine[]; exitCode: 0 | 1 };
+export type RotationReport = Report;
 
 /**
  * Renders the rotation result as the operator-facing report and exit code,
@@ -479,39 +449,34 @@ export type RotationReport = { lines: RotationReportLine[]; exitCode: 0 | 1 };
  * job). Operational failures never reach this function.
  */
 export function buildRotationReport(result: RotateEncryptionKeyResult, docsUrl: string): RotationReport {
-  const lines: RotationReportLine[] = [];
-  const out = (text: string) => lines.push({ text, stream: 'out' });
-  const err = (text: string) => lines.push({ text, stream: 'err' });
-  const ids = (label: string, rowIds: string[]) => {
-    if (rowIds.length > 0) {
-      err(`  ${label} (${rowIds.length}): ${rowIds.join(', ')}`);
-    }
-  };
+  const { lines, out, err, ids } = reportLines();
 
-  for (const [heading, store] of [
-    ['Service instance configurations:', result.serviceInstances],
-    ['Credential decryption keys:', result.credentials],
-  ] as const) {
-    out(heading);
-    out(`  already under the active key: ${store.alreadyActive}`);
-    out(`  opened only under the outgoing key: ${store.outgoingOpened}`);
-    out(`  rotated from the outgoing key: ${store.rotated}`);
-    ids('decrypted under neither supplied key', store.neitherKeyIds);
-    if ('corruptedIds' in store) {
-      ids('not a valid encrypted envelope', store.corruptedIds);
+  for (const id of ENVELOPE_STORE_IDS) {
+    const info = ENVELOPE_STORE_INFO[id];
+    const outcome = result.stores[id];
+    out(info.heading);
+    out(`  already under the active key: ${outcome.alreadyActive}`);
+    out(`  opened only under the outgoing key: ${outcome.outgoingOpened}`);
+    out(`  rotated from the outgoing key: ${outcome.rotated}`);
+    ids('decrypted under neither supplied key', outcome.neitherKeyIds);
+    ids('not a valid encrypted envelope', outcome.corruptedIds);
+    ids('cleared, the rows kept', outcome.clearedIds);
+    if (
+      info.remedy !== undefined &&
+      outcome.neitherKeyIds.length + outcome.corruptedIds.length > outcome.clearedIds.length
+    ) {
+      err(`  some could not be cleared this run; ${info.remedy}`);
     }
-    if ('suspectRowIds' in store) {
-      ids('corrupted envelope-like, left untouched', store.suspectRowIds);
-      if (store.plaintextCount > 0) {
-        out(
-          `  legacy plaintext keys, left untouched: ${store.plaintextCount} ` +
-            '(wrap them with backfill:decryption-keys under the new key)',
-        );
-      }
+    ids('corrupted envelope-like, left untouched', outcome.suspectRowIds);
+    if (outcome.plaintextCount > 0) {
+      out(
+        `  legacy plaintext ${info.valueName}s, left untouched: ${outcome.plaintextCount} ` +
+          '(wrap them with backfill:decryption-keys under the new key)',
+      );
     }
-    ids('deleted between scan and write', store.deletedIds);
-    ids('already rotated by a concurrent run', store.concurrentlyCompletedIds);
-    ids('changed during the run, left untouched', store.conflictIds);
+    ids('deleted between scan and write', outcome.deletedIds);
+    ids('already rotated by a concurrent run', outcome.concurrentlyCompletedIds);
+    ids('changed during the run, left untouched', outcome.conflictIds);
   }
 
   if (result.firstNeitherDecrypt !== undefined) {
@@ -531,14 +496,22 @@ export function buildRotationReport(result: RotateEncryptionKeyResult, docsUrl: 
   // The reversed-keys and nothing-to-verify readouts derive from
   // classification counts, not write outcomes, so concurrent completions
   // and conflicts cannot masquerade as "the outgoing key opened nothing".
-  const totals = [result.serviceInstances, result.credentials];
+  const totals = Object.values(result.stores);
   const anyEnvelope = totals.some((store) => store.alreadyActive + store.outgoingOpened > 0);
   const outgoingOpenedTotal = totals.reduce((sum, store) => sum + store.outgoingOpened, 0);
 
-  const incomplete =
-    result.credentials.suspectRowIds.length > 0 ||
-    totals.some((store) => store.deletedIds.length + store.conflictIds.length > 0);
+  // A discardable store's unreadable rows did not block the run; those the
+  // run cleared are settled, and any it could not clear leave it incomplete.
+  const incomplete = totals.some(
+    (store) =>
+      store.suspectRowIds.length +
+        store.deletedIds.length +
+        store.conflictIds.length +
+        (store.neitherKeyIds.length + store.corruptedIds.length - store.clearedIds.length) >
+      0,
+  );
 
+  const clearedTotal = totals.reduce((sum, store) => sum + store.clearedIds.length, 0);
   if (!anyEnvelope) {
     out(
       'Note: no stored envelope opened under either supplied key (empty or plaintext-only stores); ' +
@@ -548,14 +521,19 @@ export function buildRotationReport(result: RotateEncryptionKeyResult, docsUrl: 
       err(`Run finished incomplete; inspect the rows above. See ${docsUrl}`);
       return { lines, exitCode: 1 };
     }
-    out('Nothing was modified.');
+    out(
+      clearedTotal > 0 ? `Nothing was rotated; ${clearedTotal} unreadable value(s) cleared.` : 'Nothing was modified.',
+    );
     return { lines, exitCode: 0 };
   }
 
   if (outgoingOpenedTotal === 0) {
     out(
       'The outgoing key opened nothing; every envelope already opens under the active key. ' +
-        'Nothing was rotated. If a rotation was expected, check the two variables are not reversed.',
+        (clearedTotal > 0
+          ? `Nothing was rotated; ${clearedTotal} unreadable value(s) cleared. `
+          : 'Nothing was rotated. ') +
+        'If a rotation was expected, check the two variables are not reversed.',
     );
     if (incomplete) {
       err(`Run finished incomplete; inspect the rows above. See ${docsUrl}`);
@@ -570,11 +548,4 @@ export function buildRotationReport(result: RotateEncryptionKeyResult, docsUrl: 
   }
   out('Rotation complete: every stored envelope opens under the active key.');
   return { lines, exitCode: 0 };
-}
-
-function errorMessage(error: unknown): string {
-  // Duck-typed rather than `instanceof Error`: the services package can
-  // throw from another realm (it does under jest).
-  const message = (error as { message?: unknown } | null)?.message;
-  return typeof message === 'string' ? message : String(error);
 }

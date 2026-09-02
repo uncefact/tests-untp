@@ -17,9 +17,10 @@
  * and a database target: a pre-set RI_DATABASE_URL is honoured as given, and
  * the RI_POSTGRES_* variables are used to construct one only when it is
  * absent. Before writing anything, the run decrypts every existing envelope
- * (credential keys and service instance configurations) and aborts on any
- * failure; when no envelope exists to check against, it refuses to write
- * unless --force is passed.
+ * in every store the key protects (service instance configurations,
+ * credential keys, idempotency replay bodies) and aborts on any failure in a
+ * store that is not discardable; when no such envelope exists to check
+ * against, it refuses to write unless --force is passed.
  *
  * Operator-run rather than automatic because a wrap cannot be turned back:
  * under the wrong DATA_ENCRYPTION_KEY nobody can unwrap the result, and even
@@ -64,7 +65,10 @@ if (force) {
 }
 
 try {
-  const result = await backfillDecryptionKeys(prisma, { force });
+  const result = await backfillDecryptionKeys(prisma, {
+    force,
+    onPreflightNote: (note) => console.warn(`Warning: ${note}.`),
+  });
   if (!result.keyVerified) {
     console.warn(
       'Warning: no existing encrypted value was available to validate DATA_ENCRYPTION_KEY against; ' +

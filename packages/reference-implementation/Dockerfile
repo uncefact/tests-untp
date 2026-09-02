@@ -170,6 +170,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 # scripts/audit-encryption.ts and (via the preflight) the backfill (#764)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/audit-encryption.ts ./src/lib/credentials/audit-encryption.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/envelope-stores.ts ./src/lib/credentials/envelope-stores.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/prisma-envelope-stores.ts ./src/lib/credentials/prisma-envelope-stores.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/encrypted-columns-check.ts ./src/lib/credentials/encrypted-columns-check.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/envelope-decrypt.ts ./src/lib/credentials/envelope-decrypt.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/operator-report.ts ./src/lib/credentials/operator-report.ts
 # Operator-run maintenance scripts (run via node_modules/.bin/tsx; see each
 # script's header for the in-image invocation)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/scripts ./scripts

@@ -31,76 +31,123 @@ async function services() {
   return { activeService: await adapterFor(ACTIVE_KEY), outgoingService: await adapterFor(OUTGOING_KEY) };
 }
 
-/**
- * In-memory fake whose updateMany implements genuine compare-and-swap
- * semantics against the backing arrays, so the CAS behaviour under test is
- * the same "write only if the value is still what was scanned" rule the
- * real query expresses.
- */
-function createFakeClient(rows: Row[], serviceInstances: ServiceInstanceRow[] = []) {
-  return {
-    rows,
-    serviceInstances,
-    credential: {
-      findMany: jest.fn(
-        async (args: { where: { decryptionKey: { not: null }; id?: { gt: string } }; take: number }): Promise<Row[]> =>
-          rows
-            .filter((row) => row.decryptionKey !== null)
-            .filter((row) => (args.where.id ? row.id > args.where.id.gt : true))
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .slice(0, args.take)
-            .map((row) => ({ id: row.id, decryptionKey: row.decryptionKey })),
-      ),
-      update: jest.fn(async () => {
-        throw new Error('the rotation must never use unconditional update');
-      }),
-      updateMany: jest.fn(
-        async (args: { where: { id: string; decryptionKey: string }; data: { decryptionKey: string } }) => {
-          const row = rows.find((r) => r.id === args.where.id && r.decryptionKey === args.where.decryptionKey);
-          if (!row) {
-            return { count: 0 };
-          }
-          row.decryptionKey = args.data.decryptionKey;
-          return { count: 1 };
-        },
-      ),
-      findUnique: jest.fn(async (args: { where: { id: string } }) => {
-        const row = rows.find((r) => r.id === args.where.id);
-        return row ? { id: row.id, decryptionKey: row.decryptionKey } : null;
-      }),
-    },
-    serviceInstance: {
-      findMany: jest.fn(
-        async (args: { where?: { id?: { gt: string } }; take: number }): Promise<ServiceInstanceRow[]> =>
-          serviceInstances
-            .filter((row) => (args.where?.id ? row.id > args.where.id.gt : true))
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .slice(0, args.take)
-            .map((row) => ({ id: row.id, config: row.config })),
-      ),
-      updateMany: jest.fn(async (args: { where: { id: string; config: string }; data: { config: string } }) => {
-        const row = serviceInstances.find((r) => r.id === args.where.id && r.config === args.where.config);
-        if (!row) {
-          return { count: 0 };
-        }
-        row.config = args.data.config;
-        return { count: 1 };
-      }),
-      findUnique: jest.fn(async (args: { where: { id: string } }) => {
-        const row = serviceInstances.find((r) => r.id === args.where.id);
-        return row ? { id: row.id, config: row.config } : null;
-      }),
-    },
-  };
+import { fakeStores as sharedFakeStores } from './envelope-stores.fake';
+
+/** This suite's row order: credentials first, then service instances, then replay bodies. */
+function fakeStores(
+  rows: Row[],
+  serviceInstances: ServiceInstanceRow[] = [],
+  replayRows: { id: string; responseBody: string | null }[] = [],
+) {
+  return sharedFakeStores(serviceInstances, rows, replayRows);
 }
 
-function expectNoWrites(client: ReturnType<typeof createFakeClient>) {
-  expect(client.credential.updateMany).not.toHaveBeenCalled();
-  expect(client.serviceInstance.updateMany).not.toHaveBeenCalled();
+function expectNoWrites(stores: ReturnType<typeof fakeStores>) {
+  for (const store of Object.values(stores)) {
+    expect(store.casWrite).not.toHaveBeenCalled();
+  }
 }
 
 describe('rotateEncryptionKey', () => {
-  it('rotates every outgoing envelope in both stores to values the active key opens, preserving plaintext and algorithm', async () => {
+  it('rotates idempotency replay bodies with the other stores', async () => {
+    const { rotateEncryptionKey } = await import('./rotate-encryption-key');
+    const svc = await services();
+    const replayRows = [{ id: 'claim-1', responseBody: await envelopeUnder(OUTGOING_KEY, '["w"]') }];
+    const stores = fakeStores([], [], replayRows);
+
+    const result = await rotateEncryptionKey(stores, svc);
+
+    expect(result.blocked).toBe(false);
+    expect(result.stores.idempotencyResponses).toMatchObject({ outgoingOpened: 1, rotated: 1 });
+    const { parseEnvelope } = await import('./decryption-key-protection');
+    expect(svc.activeService.decrypt(parseEnvelope(replayRows[0].responseBody as string)!)).toBe('["w"]');
+  });
+
+  it('clears a damaged or unopenable replay body, keeping the row, and rotates everything else', async () => {
+    const { rotateEncryptionKey, buildRotationReport } = await import('./rotate-encryption-key');
+    const svc = await services();
+    const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) }];
+    const replayRows = [
+      { id: 'claim-bad', responseBody: '["plain"]' },
+      { id: 'claim-third', responseBody: await envelopeUnder(THIRD_KEY, '[]') },
+      { id: 'claim-ok', responseBody: await envelopeUnder(OUTGOING_KEY, '["w"]') },
+    ];
+    const stores = fakeStores(rows, [], replayRows);
+    const onPreflight = jest.fn();
+
+    const result = await rotateEncryptionKey(stores, svc, { onPreflight });
+
+    expect(result.blocked).toBe(false);
+    expect(result.stores.credentials.rotated).toBe(1);
+    expect(result.stores.idempotencyResponses).toMatchObject({
+      corruptedIds: ['claim-bad'],
+      neitherKeyIds: ['claim-third'],
+      clearedIds: ['claim-bad', 'claim-third'],
+      rotated: 1,
+    });
+    expect(onPreflight.mock.calls[0][0].idempotencyResponses).toMatchObject({ toClear: 2, outgoingOpened: 1 });
+    // The value is gone, the rows are not: the claims still guard against a second issuance.
+    expect(replayRows.map((row) => [row.id, row.responseBody === null])).toEqual([
+      ['claim-bad', true],
+      ['claim-third', true],
+      ['claim-ok', false],
+    ]);
+    expect(stores.idempotencyResponses.discard).toHaveBeenCalledTimes(2);
+
+    const report = buildRotationReport(result, 'https://docs.example/rotation');
+    expect(report.exitCode).toBe(0);
+    const text = report.lines.map((line) => line.text).join('\n');
+    expect(text).toContain('cleared, the rows kept (2): claim-bad, claim-third');
+    expect(text).toContain('Rotation complete');
+  });
+
+  it('reports a replay body it could not clear as a conflict and the run as incomplete', async () => {
+    const { rotateEncryptionKey, buildRotationReport } = await import('./rotate-encryption-key');
+    const replayRows = [{ id: 'claim-third', responseBody: await envelopeUnder(THIRD_KEY, '[]') }];
+    const stores = fakeStores([], [], replayRows);
+    const realDiscard = stores.idempotencyResponses.discard.getMockImplementation()!;
+    stores.idempotencyResponses.discard.mockImplementationOnce(async (...args) => {
+      replayRows[0].responseBody = '{"rewritten":true}';
+      return realDiscard(...args);
+    });
+
+    const result = await rotateEncryptionKey(stores, await services());
+
+    expect(result.stores.idempotencyResponses).toMatchObject({
+      neitherKeyIds: ['claim-third'],
+      clearedIds: [],
+      conflictIds: ['claim-third'],
+    });
+    expect(buildRotationReport(result, 'https://docs.example/rotation').exitCode).toBe(1);
+  });
+
+  it('says what it cleared when the outgoing key opened nothing', async () => {
+    const { rotateEncryptionKey, buildRotationReport } = await import('./rotate-encryption-key');
+    const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(ACTIVE_KEY, 'b'.repeat(64)) }];
+    const stores = fakeStores(rows, [], [{ id: 'claim-bad', responseBody: '["plain"]' }]);
+
+    const result = await rotateEncryptionKey(stores, await services());
+    const text = buildRotationReport(result, 'https://docs.example/rotation')
+      .lines.map((line) => line.text)
+      .join('\n');
+
+    expect(text).toContain('Nothing was rotated; 1 unreadable value(s) cleared.');
+  });
+
+  it('says what it cleared when nothing opened under either key', async () => {
+    const { rotateEncryptionKey, buildRotationReport } = await import('./rotate-encryption-key');
+    const stores = fakeStores([], [], [{ id: 'claim-bad', responseBody: '["plain"]' }]);
+
+    const result = await rotateEncryptionKey(stores, await services());
+    const report = buildRotationReport(result, 'https://docs.example/rotation');
+
+    expect(report.exitCode).toBe(0);
+    const text = report.lines.map((line) => line.text).join('\n');
+    expect(text).toContain('Nothing was rotated; 1 unreadable value(s) cleared.');
+    expect(text).not.toContain('Nothing was modified.');
+  });
+
+  it('rotates every outgoing envelope in two stores to values the active key opens, preserving plaintext and algorithm', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const configPlaintext = '{"url":"https://vc.example","headers":{"Authorization":"Bearer x"}}';
     const keyPlaintext = 'b'.repeat(64);
@@ -108,15 +155,15 @@ describe('rotateEncryptionKey', () => {
     const serviceInstances: ServiceInstanceRow[] = [
       { id: 'svc-1', config: await envelopeUnder(OUTGOING_KEY, configPlaintext) },
     ];
-    const client = createFakeClient(rows, serviceInstances);
+    const stores = fakeStores(rows, serviceInstances);
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
     expect(result.blocked).toBe(false);
-    expect(result.serviceInstances.outgoingOpened).toBe(1);
-    expect(result.credentials.outgoingOpened).toBe(1);
-    expect(result.serviceInstances.rotated).toBe(1);
-    expect(result.credentials.rotated).toBe(1);
+    expect(result.stores.serviceInstances.outgoingOpened).toBe(1);
+    expect(result.stores.credentials.outgoingOpened).toBe(1);
+    expect(result.stores.serviceInstances.rotated).toBe(1);
+    expect(result.stores.credentials.rotated).toBe(1);
 
     // Round-trip with a FRESH active adapter: the stored value is a
     // stringified envelope, its algorithm is preserved, and the plaintext
@@ -136,28 +183,28 @@ describe('rotateEncryptionKey', () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(ACTIVE_KEY, 'b'.repeat(64)) }];
     const serviceInstances: ServiceInstanceRow[] = [{ id: 'svc-1', config: await envelopeUnder(ACTIVE_KEY, '{}') }];
-    const client = createFakeClient(rows, serviceInstances);
+    const stores = fakeStores(rows, serviceInstances);
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.serviceInstances.alreadyActive).toBe(1);
-    expect(result.credentials.alreadyActive).toBe(1);
-    expect(result.serviceInstances.rotated + result.credentials.rotated).toBe(0);
-    expectNoWrites(client);
+    expect(result.stores.serviceInstances.alreadyActive).toBe(1);
+    expect(result.stores.credentials.alreadyActive).toBe(1);
+    expect(result.stores.serviceInstances.rotated + result.stores.credentials.rotated).toBe(0);
+    expectNoWrites(stores);
   });
 
   it('writes nothing when the two supplied keys are the same bytes in different hex case', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(ACTIVE_KEY, 'b'.repeat(64)) }];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
 
-    const result = await rotateEncryptionKey(client, {
+    const result = await rotateEncryptionKey(stores, {
       activeService: await adapterFor(ACTIVE_KEY),
       outgoingService: await adapterFor(ACTIVE_KEY.toUpperCase()),
     });
 
-    expect(result.credentials.alreadyActive).toBe(1);
-    expectNoWrites(client);
+    expect(result.stores.credentials.alreadyActive).toBe(1);
+    expectNoWrites(stores);
   });
 
   it('rotates only the remainder on a re-run over a partially rotated store', async () => {
@@ -166,13 +213,13 @@ describe('rotateEncryptionKey', () => {
       { id: 'cred-1', decryptionKey: await envelopeUnder(ACTIVE_KEY, 'b'.repeat(64)) },
       { id: 'cred-2', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'c'.repeat(64)) },
     ];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.credentials.alreadyActive).toBe(1);
-    expect(result.credentials.rotated).toBe(1);
-    expect(client.credential.updateMany).toHaveBeenCalledTimes(1);
+    expect(result.stores.credentials.alreadyActive).toBe(1);
+    expect(result.stores.credentials.rotated).toBe(1);
+    expect(stores.credentials.casWrite).toHaveBeenCalledTimes(1);
   });
 
   it('aborts before any write when a valid envelope opens under neither key, naming every such row with both errors sampled', async () => {
@@ -182,30 +229,30 @@ describe('rotateEncryptionKey', () => {
       { id: 'cred-2', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'c'.repeat(64)) },
     ];
     const serviceInstances: ServiceInstanceRow[] = [{ id: 'svc-1', config: await envelopeUnder(THIRD_KEY, '{}') }];
-    const client = createFakeClient(rows, serviceInstances);
+    const stores = fakeStores(rows, serviceInstances);
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
     expect(result.blocked).toBe(true);
-    expect(result.serviceInstances.neitherKeyIds).toEqual(['svc-1']);
-    expect(result.credentials.neitherKeyIds).toEqual(['cred-1']);
+    expect(result.stores.serviceInstances.neitherKeyIds).toEqual(['svc-1']);
+    expect(result.stores.credentials.neitherKeyIds).toEqual(['cred-1']);
     expect(result.firstNeitherDecrypt?.rowDescription).toBe('service instance svc-1');
     expect((result.firstNeitherDecrypt?.activeError as { message?: unknown })?.message).toEqual(expect.any(String));
     expect((result.firstNeitherDecrypt?.outgoingError as { message?: unknown })?.message).toEqual(expect.any(String));
-    expectNoWrites(client);
+    expectNoWrites(stores);
   });
 
   it('aborts before any write when a service configuration is not a valid envelope', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) }];
     const serviceInstances: ServiceInstanceRow[] = [{ id: 'svc-bad', config: 'not an envelope' }];
-    const client = createFakeClient(rows, serviceInstances);
+    const stores = fakeStores(rows, serviceInstances);
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
     expect(result.blocked).toBe(true);
-    expect(result.serviceInstances.corruptedIds).toEqual(['svc-bad']);
-    expectNoWrites(client);
+    expect(result.stores.serviceInstances.corruptedIds).toEqual(['svc-bad']);
+    expectNoWrites(stores);
   });
 
   it('rotates valid rows while leaving suspect credential values untouched', async () => {
@@ -215,13 +262,13 @@ describe('rotateEncryptionKey', () => {
       { id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) },
       { id: 'cred-2', decryptionKey: suspect },
     ];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
     expect(result.blocked).toBe(false);
-    expect(result.credentials.rotated).toBe(1);
-    expect(result.credentials.suspectRowIds).toEqual(['cred-2']);
+    expect(result.stores.credentials.rotated).toBe(1);
+    expect(result.stores.credentials.suspectRowIds).toEqual(['cred-2']);
     expect(rows[1].decryptionKey).toBe(suspect);
   });
 
@@ -231,63 +278,63 @@ describe('rotateEncryptionKey', () => {
       { id: 'cred-1', decryptionKey: 'f'.repeat(64) },
       { id: 'cred-2', decryptionKey: null },
     ];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.credentials.plaintextCount).toBe(1);
+    expect(result.stores.credentials.plaintextCount).toBe(1);
     expect(rows[0].decryptionKey).toBe('f'.repeat(64));
-    expectNoWrites(client);
+    expectNoWrites(stores);
   });
 
   it('reports a row deleted between scan and write without failing the run', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) }];
-    const client = createFakeClient(rows, []);
-    const realUpdateMany = client.credential.updateMany.getMockImplementation()!;
-    client.credential.updateMany.mockImplementationOnce(async (args) => {
+    const stores = fakeStores(rows, []);
+    const realCasWrite = stores.credentials.casWrite.getMockImplementation()!;
+    stores.credentials.casWrite.mockImplementationOnce(async (...args) => {
       rows.length = 0;
-      return realUpdateMany(args);
+      return realCasWrite(...args);
     });
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.credentials.deletedIds).toEqual(['cred-1']);
-    expect(result.credentials.rotated).toBe(0);
+    expect(result.stores.credentials.deletedIds).toEqual(['cred-1']);
+    expect(result.stores.credentials.rotated).toBe(0);
   });
 
   it('leaves a row alone and reports concurrent completion when another run already rotated it', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) }];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
     const alreadyRotated = await envelopeUnder(ACTIVE_KEY, 'b'.repeat(64));
-    const realUpdateMany = client.credential.updateMany.getMockImplementation()!;
-    client.credential.updateMany.mockImplementationOnce(async (args) => {
+    const realCasWrite = stores.credentials.casWrite.getMockImplementation()!;
+    stores.credentials.casWrite.mockImplementationOnce(async (...args) => {
       rows[0].decryptionKey = alreadyRotated;
-      return realUpdateMany(args);
+      return realCasWrite(...args);
     });
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.credentials.concurrentlyCompletedIds).toEqual(['cred-1']);
+    expect(result.stores.credentials.concurrentlyCompletedIds).toEqual(['cred-1']);
     expect(rows[0].decryptionKey).toBe(alreadyRotated);
   });
 
   it('re-rotates once from the fresh value when a row changed but still opens under the outgoing key', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) }];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
     const rewritten = await envelopeUnder(OUTGOING_KEY, 'c'.repeat(64));
-    const realUpdateMany = client.credential.updateMany.getMockImplementation()!;
-    client.credential.updateMany.mockImplementationOnce(async (args) => {
+    const realCasWrite = stores.credentials.casWrite.getMockImplementation()!;
+    stores.credentials.casWrite.mockImplementationOnce(async (...args) => {
       rows[0].decryptionKey = rewritten;
-      return realUpdateMany(args);
+      return realCasWrite(...args);
     });
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.credentials.rotated).toBe(1);
-    expect(result.credentials.conflictIds).toEqual([]);
+    expect(result.stores.credentials.rotated).toBe(1);
+    expect(result.stores.credentials.conflictIds).toEqual([]);
     const fresh = await adapterFor(ACTIVE_KEY);
     expect(fresh.decrypt(JSON.parse(rows[0].decryptionKey as string))).toBe('c'.repeat(64));
   });
@@ -295,34 +342,34 @@ describe('rotateEncryptionKey', () => {
   it('never overwrites a row that changed into something it cannot rotate', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) }];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
     const foreign = await envelopeUnder(THIRD_KEY, 'x'.repeat(64));
-    const realUpdateMany = client.credential.updateMany.getMockImplementation()!;
-    client.credential.updateMany.mockImplementationOnce(async (args) => {
+    const realCasWrite = stores.credentials.casWrite.getMockImplementation()!;
+    stores.credentials.casWrite.mockImplementationOnce(async (...args) => {
       rows[0].decryptionKey = foreign;
-      return realUpdateMany(args);
+      return realCasWrite(...args);
     });
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.credentials.conflictIds).toEqual(['cred-1']);
+    expect(result.stores.credentials.conflictIds).toEqual(['cred-1']);
     expect(rows[0].decryptionKey).toBe(foreign);
   });
 
   it('classifies a credential whose key was cleared mid-run as a conflict, not a deletion', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) }];
-    const client = createFakeClient(rows, []);
-    const realUpdateMany = client.credential.updateMany.getMockImplementation()!;
-    client.credential.updateMany.mockImplementationOnce(async (args) => {
+    const stores = fakeStores(rows, []);
+    const realCasWrite = stores.credentials.casWrite.getMockImplementation()!;
+    stores.credentials.casWrite.mockImplementationOnce(async (...args) => {
       rows[0].decryptionKey = null;
-      return realUpdateMany(args);
+      return realCasWrite(...args);
     });
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.credentials.conflictIds).toEqual(['cred-1']);
-    expect(result.credentials.deletedIds).toEqual([]);
+    expect(result.stores.credentials.conflictIds).toEqual(['cred-1']);
+    expect(result.stores.credentials.deletedIds).toEqual([]);
     expect(rows[0].decryptionKey).toBeNull();
   });
 
@@ -331,17 +378,17 @@ describe('rotateEncryptionKey', () => {
     const serviceInstances: ServiceInstanceRow[] = [
       { id: 'svc-1', config: await envelopeUnder(OUTGOING_KEY, '{"a":1}') },
     ];
-    const client = createFakeClient([], serviceInstances);
+    const stores = fakeStores([], serviceInstances);
     const foreign = await envelopeUnder(THIRD_KEY, '{"b":2}');
-    const realUpdateMany = client.serviceInstance.updateMany.getMockImplementation()!;
-    client.serviceInstance.updateMany.mockImplementationOnce(async (args) => {
+    const realCasWrite = stores.serviceInstances.casWrite.getMockImplementation()!;
+    stores.serviceInstances.casWrite.mockImplementationOnce(async (...args) => {
       serviceInstances[0].config = foreign;
-      return realUpdateMany(args);
+      return realCasWrite(...args);
     });
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.serviceInstances.conflictIds).toEqual(['svc-1']);
+    expect(result.stores.serviceInstances.conflictIds).toEqual(['svc-1']);
     expect(serviceInstances[0].config).toBe(foreign);
   });
 
@@ -351,16 +398,16 @@ describe('rotateEncryptionKey', () => {
       { id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) },
       { id: 'cred-2', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'c'.repeat(64)) },
     ];
-    const client = createFakeClient(rows, []);
-    const realUpdateMany = client.credential.updateMany.getMockImplementation()!;
-    client.credential.updateMany
-      .mockImplementationOnce(realUpdateMany)
+    const stores = fakeStores(rows, []);
+    const realCasWrite = stores.credentials.casWrite.getMockImplementation()!;
+    stores.credentials.casWrite
+      .mockImplementationOnce(realCasWrite)
       .mockImplementationOnce(async () => {
         throw new Error('connection reset');
       })
-      .mockImplementation(realUpdateMany);
+      .mockImplementation(realCasWrite);
 
-    const error: Error = await rotateEncryptionKey(client, await services()).then(
+    const error: Error = await rotateEncryptionKey(stores, await services()).then(
       () => {
         throw new Error('expected the write failure to propagate');
       },
@@ -369,15 +416,15 @@ describe('rotateEncryptionKey', () => {
     expect(error.message).toContain('credential cred-2');
     expect(error.message).toContain('1 write(s) confirmed before the failure');
 
-    const rerun = await rotateEncryptionKey(client, await services());
-    expect(rerun.credentials.alreadyActive).toBe(1);
-    expect(rerun.credentials.rotated).toBe(1);
+    const rerun = await rotateEncryptionKey(stores, await services());
+    expect(rerun.stores.credentials.alreadyActive).toBe(1);
+    expect(rerun.stores.credentials.rotated).toBe(1);
   });
 
   it('propagates an active-service encrypt failure with the row named', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const rows: Row[] = [{ id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) }];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
     const real = await services();
     const failingActive = {
       decrypt: real.activeService.decrypt.bind(real.activeService),
@@ -386,7 +433,7 @@ describe('rotateEncryptionKey', () => {
       },
     };
 
-    const error: Error = await rotateEncryptionKey(client, {
+    const error: Error = await rotateEncryptionKey(stores, {
       activeService: failingActive,
       outgoingService: real.outgoingService,
     }).then(
@@ -406,22 +453,22 @@ describe('rotateEncryptionKey', () => {
       { id: 'cred-1', decryptionKey: await envelopeUnder(OUTGOING_KEY, 'b'.repeat(64)) },
       { id: 'cred-2', decryptionKey: await envelopeUnder(ACTIVE_KEY, 'c'.repeat(64)) },
     ];
-    const client = createFakeClient(rows, []);
+    const stores = fakeStores(rows, []);
     const events: string[] = [];
-    const realUpdateMany = client.credential.updateMany.getMockImplementation()!;
-    client.credential.updateMany.mockImplementation(async (args) => {
+    const realCasWrite = stores.credentials.casWrite.getMockImplementation()!;
+    stores.credentials.casWrite.mockImplementation(async (...args) => {
       events.push('write');
-      return realUpdateMany(args);
+      return realCasWrite(...args);
     });
 
-    await rotateEncryptionKey(client, await services(), {
+    await rotateEncryptionKey(stores, await services(), {
       onPreflight: (summary) => {
         events.push(`preflight:${summary.credentials.alreadyActive}:${summary.credentials.outgoingOpened}`);
       },
     });
     expect(events).toEqual(['preflight:1:1', 'write']);
 
-    const blockedClient = createFakeClient(
+    const blockedClient = fakeStores(
       [{ id: 'cred-bad', decryptionKey: await envelopeUnder(THIRD_KEY, 'd'.repeat(64)) }],
       [],
     );
@@ -433,7 +480,7 @@ describe('rotateEncryptionKey', () => {
     expect(blockedEvents).toEqual([]);
   });
 
-  it('paginates past a single batch in both stores', async () => {
+  it('classifies many rows in two stores', async () => {
     const { rotateEncryptionKey } = await import('./rotate-encryption-key');
     const active = await envelopeUnder(ACTIVE_KEY, 'b'.repeat(64));
     const rows: Row[] = Array.from({ length: 150 }, (_, index) => ({
@@ -445,14 +492,12 @@ describe('rotateEncryptionKey', () => {
       id: `svc-${String(index).padStart(3, '0')}`,
       config: activeConfig,
     }));
-    const client = createFakeClient(rows, serviceInstances);
+    const stores = fakeStores(rows, serviceInstances);
 
-    const result = await rotateEncryptionKey(client, await services());
+    const result = await rotateEncryptionKey(stores, await services());
 
-    expect(result.credentials.alreadyActive).toBe(150);
-    expect(result.serviceInstances.alreadyActive).toBe(120);
-    expect(client.credential.findMany.mock.calls.length).toBeGreaterThan(1);
-    expect(client.serviceInstance.findMany.mock.calls.length).toBeGreaterThan(1);
+    expect(result.stores.credentials.alreadyActive).toBe(150);
+    expect(result.stores.serviceInstances.alreadyActive).toBe(120);
   });
 });
 
@@ -547,38 +592,57 @@ describe('buildRotationReport', () => {
   const DOCS = 'https://docs.example/rotation';
 
   function baseResult() {
+    const store = () => ({
+      alreadyActive: 0,
+      outgoingOpened: 0,
+      rotated: 0,
+      neitherKeyIds: [] as string[],
+      deletedIds: [] as string[],
+      concurrentlyCompletedIds: [] as string[],
+      conflictIds: [] as string[],
+      corruptedIds: [] as string[],
+      clearedIds: [] as string[],
+      suspectRowIds: [] as string[],
+      plaintextCount: 0,
+    });
     return {
       blocked: false,
-      serviceInstances: {
-        alreadyActive: 0,
-        outgoingOpened: 0,
-        rotated: 0,
-        neitherKeyIds: [] as string[],
-        deletedIds: [] as string[],
-        concurrentlyCompletedIds: [] as string[],
-        conflictIds: [] as string[],
-        corruptedIds: [] as string[],
-      },
-      credentials: {
-        alreadyActive: 0,
-        outgoingOpened: 0,
-        rotated: 0,
-        neitherKeyIds: [] as string[],
-        deletedIds: [] as string[],
-        concurrentlyCompletedIds: [] as string[],
-        conflictIds: [] as string[],
-        suspectRowIds: [] as string[],
-        plaintextCount: 0,
+      stores: {
+        serviceInstances: store(),
+        credentials: store(),
+        idempotencyResponses: store(),
       },
     };
   }
 
+  it('reports the replay-body store with the other two, and unreadable rows a run could not clear with the remedy', async () => {
+    const { buildRotationReport } = await import('./rotate-encryption-key');
+    const result = baseResult();
+    result.stores.serviceInstances.alreadyActive = 1;
+    result.stores.idempotencyResponses.neitherKeyIds = ['claim-1'];
+    result.stores.idempotencyResponses.corruptedIds = ['claim-2'];
+
+    const report = buildRotationReport(result, DOCS);
+
+    expect(report.exitCode).toBe(1);
+    const text = report.lines.map((line) => line.text).join('\n');
+    expect(text).toContain('Idempotency replay bodies:');
+    const errText = report.lines
+      .filter((line) => line.stream === 'err')
+      .map((line) => line.text)
+      .join('\n');
+    expect(errText).toContain('decrypted under neither supplied key (1): claim-1');
+    expect(errText).toContain('not a valid encrypted envelope (1): claim-2');
+    expect(errText).toContain('some could not be cleared this run; clear the replay body of the affected claims');
+    expect(errText).toContain('Run finished incomplete');
+  });
+
   it('exits 0 and reports completion when everything ended under the active key', async () => {
     const { buildRotationReport } = await import('./rotate-encryption-key');
     const result = baseResult();
-    result.serviceInstances.outgoingOpened = 2;
-    result.serviceInstances.rotated = 2;
-    result.credentials.alreadyActive = 3;
+    result.stores.serviceInstances.outgoingOpened = 2;
+    result.stores.serviceInstances.rotated = 2;
+    result.stores.credentials.alreadyActive = 3;
 
     const report = buildRotationReport(result, DOCS);
 
@@ -591,8 +655,8 @@ describe('buildRotationReport', () => {
     const { buildRotationReport } = await import('./rotate-encryption-key');
     const result = baseResult();
     result.blocked = true;
-    result.serviceInstances.corruptedIds = ['svc-bad'];
-    result.credentials.neitherKeyIds = ['cred-1', 'cred-2'];
+    result.stores.serviceInstances.corruptedIds = ['svc-bad'];
+    result.stores.credentials.neitherKeyIds = ['cred-1', 'cred-2'];
     (result as Record<string, unknown>).firstNeitherDecrypt = {
       rowDescription: 'credential cred-1',
       activeError: new Error('active boom'),
@@ -617,9 +681,9 @@ describe('buildRotationReport', () => {
   it('exits 1 incomplete when suspects remain, while still reporting the rotated count', async () => {
     const { buildRotationReport } = await import('./rotate-encryption-key');
     const result = baseResult();
-    result.credentials.outgoingOpened = 4;
-    result.credentials.rotated = 4;
-    result.credentials.suspectRowIds = ['cred-odd'];
+    result.stores.credentials.outgoingOpened = 4;
+    result.stores.credentials.rotated = 4;
+    result.stores.credentials.suspectRowIds = ['cred-odd'];
 
     const report = buildRotationReport(result, DOCS);
 
@@ -632,10 +696,10 @@ describe('buildRotationReport', () => {
   it('exits 1 when conflicts or deletes occurred', async () => {
     const { buildRotationReport } = await import('./rotate-encryption-key');
     const result = baseResult();
-    result.serviceInstances.outgoingOpened = 1;
-    result.serviceInstances.rotated = 1;
-    result.credentials.outgoingOpened = 1;
-    result.credentials.conflictIds = ['cred-racy'];
+    result.stores.serviceInstances.outgoingOpened = 1;
+    result.stores.serviceInstances.rotated = 1;
+    result.stores.credentials.outgoingOpened = 1;
+    result.stores.credentials.conflictIds = ['cred-racy'];
 
     const report = buildRotationReport(result, DOCS);
 
@@ -646,7 +710,7 @@ describe('buildRotationReport', () => {
   it('states that nothing was rotated and hints at reversed variables when only the active key opened envelopes', async () => {
     const { buildRotationReport } = await import('./rotate-encryption-key');
     const result = baseResult();
-    result.credentials.alreadyActive = 5;
+    result.stores.credentials.alreadyActive = 5;
 
     const report = buildRotationReport(result, DOCS);
 
@@ -660,8 +724,8 @@ describe('buildRotationReport', () => {
   it('does not print the reversed-keys note or nothing-to-verify when candidates were concurrently completed', async () => {
     const { buildRotationReport } = await import('./rotate-encryption-key');
     const result = baseResult();
-    result.credentials.outgoingOpened = 2;
-    result.credentials.concurrentlyCompletedIds = ['cred-1', 'cred-2'];
+    result.stores.credentials.outgoingOpened = 2;
+    result.stores.credentials.concurrentlyCompletedIds = ['cred-1', 'cred-2'];
 
     const report = buildRotationReport(result, DOCS);
 
@@ -674,7 +738,7 @@ describe('buildRotationReport', () => {
   it('prints the nothing-to-verify note on empty or plaintext-only stores, exiting 0', async () => {
     const { buildRotationReport } = await import('./rotate-encryption-key');
     const result = baseResult();
-    result.credentials.plaintextCount = 3;
+    result.stores.credentials.plaintextCount = 3;
 
     const report = buildRotationReport(result, DOCS);
 

@@ -121,7 +121,7 @@ Before the application accepts its first request, it validates `RI_APP_URL` (the
 
 ### Encryption Key Validation
 
-Before the application accepts its first request, it validates the active `DATA_ENCRYPTION_KEY` by decrypting one existing encrypted value — a service instance configuration, or (when no service instance has a usable one, whether because none exists yet or because every existing configuration is corrupted) a protected credential decryption key. This runs once per process start, using the same check the [seed](#step-3-database-seed) already runs before it writes.
+Before the application accepts its first request, it validates the active `DATA_ENCRYPTION_KEY` by decrypting one existing encrypted value, a service instance configuration, or (when no service instance has a usable one, whether because none exists yet or because every existing configuration is corrupted) a protected credential decryption key. Stored response bodies for idempotent retries are never sampled: one may predate a key rotation, so it proves nothing. This runs once per process start, using the same check the [seed](#step-3-database-seed) already runs before it writes.
 
 | Situation                                                                             | Result                                                                                                                                                                  |
 | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
