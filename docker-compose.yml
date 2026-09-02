@@ -150,6 +150,9 @@ services:
       SYSTEM_DID_DESCRIPTION: ${SYSTEM_DID_DESCRIPTION:-System-wide default DID for the UNTP reference implementation}
       # OpenTelemetry - see docs/observability.md
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
+      # Always forwarded, possibly empty; buildResource treats an empty value
+      # as absent and applies its own default.
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-}
       DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
     # No healthcheck here. The image carries its own HEALTHCHECK, so the probe
     # ships with the container rather than being repeated by every consumer.

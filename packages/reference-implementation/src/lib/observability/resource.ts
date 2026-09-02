@@ -15,7 +15,7 @@ import type { Resource } from '@opentelemetry/resources';
 
 import pkg from '../../../package.json';
 
-const SERVICE_NAME = 'reference-implementation';
+const DEFAULT_SERVICE_NAME = 'reference-implementation';
 const DEFAULT_ENVIRONMENT = 'local';
 
 /**
@@ -23,14 +23,27 @@ const DEFAULT_ENVIRONMENT = 'local';
  * derived from the process environment or the package's own
  * `package.json`; tests use this to inject specific values. An empty
  * or whitespace-only string is treated as absent so misconfigured
- * deployments that ship `DEPLOYMENT_ENVIRONMENT=` fall back to the
- * default rather than tagging telemetry with an empty environment.
+ * deployments that ship `DEPLOYMENT_ENVIRONMENT=` or `OTEL_SERVICE_NAME=`
+ * (which the compose file forwards even when unset on the host) fall back
+ * to the default rather than tagging telemetry with an empty value.
  */
 export interface BuildResourceOptions {
   /** Overrides `process.env.DEPLOYMENT_ENVIRONMENT`. */
   deploymentEnvironment?: string;
+  /** Overrides `process.env.OTEL_SERVICE_NAME`. */
+  serviceName?: string;
   /** Overrides the version read from `package.json`. */
   serviceVersion?: string;
+}
+
+/**
+ * Resolve the service name: an explicit override, else `OTEL_SERVICE_NAME`,
+ * else the default. Empty and whitespace-only values are absent, and the
+ * result is trimmed, so the name emitted matches the name operators filter
+ * dashboards by.
+ */
+export function resolveServiceName(override?: string): string {
+  return firstNonEmpty(override) ?? firstNonEmpty(process.env.OTEL_SERVICE_NAME) ?? DEFAULT_SERVICE_NAME;
 }
 
 /**
@@ -42,11 +55,19 @@ export interface BuildResourceOptions {
  * for the deprecated `deployment.environment`; the shared stack
  * indexes on the new key.
  *
+ * `service.name` is resolved by {@link resolveServiceName} and must ALSO be
+ * passed to the NodeSDK as its `serviceName` option (see
+ * `instrumentation.node.ts`): the SDK merges its env detector's attributes
+ * over this resource, then merges `serviceName` last, so only that option
+ * makes the resolved name authoritative over a padded `OTEL_SERVICE_NAME`
+ * or a `service.name` set through `OTEL_RESOURCE_ATTRIBUTES`.
+ *
  * @param options Optional overrides, primarily for tests.
  * @returns A resource carrying `service.name`, `service.version`,
  *   and `deployment.environment.name`.
  */
 export function buildResource(options: BuildResourceOptions = {}): Resource {
+  const serviceName = resolveServiceName(options.serviceName);
   const serviceVersion = firstNonEmpty(options.serviceVersion) ?? pkg.version;
   const deploymentEnvironment =
     firstNonEmpty(options.deploymentEnvironment) ??
@@ -54,7 +75,7 @@ export function buildResource(options: BuildResourceOptions = {}): Resource {
     DEFAULT_ENVIRONMENT;
 
   return resourceFromAttributes({
-    'service.name': SERVICE_NAME,
+    'service.name': serviceName,
     'service.version': serviceVersion,
     'deployment.environment.name': deploymentEnvironment,
   });

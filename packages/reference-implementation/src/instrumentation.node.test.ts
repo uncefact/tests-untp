@@ -42,10 +42,18 @@ jest.mock('@/lib/api/logger', () => ({
   apiLogger: { child: () => ({ warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() }) },
 }));
 jest.mock('@/lib/observability/instrumentations', () => ({ buildInstrumentations: () => [] }));
-jest.mock('@/lib/observability/resource', () => ({ buildResource: () => ({}) }));
+jest.mock('@/lib/observability/resource', () => ({
+  buildResource: () => ({}),
+  resolveServiceName: () => 'resolved-service-name',
+}));
 jest.mock('@opentelemetry/exporter-trace-otlp-grpc', () => ({ OTLPTraceExporter: jest.fn() }));
+const mockNodeSDK = jest.fn().mockImplementation(() => ({ start: jest.fn(), shutdown: jest.fn() }));
 jest.mock('@opentelemetry/sdk-node', () => ({
-  NodeSDK: jest.fn().mockImplementation(() => ({ start: jest.fn(), shutdown: jest.fn() })),
+  // A plain function, not an arrow, so `new NodeSDK(...)` in the module under
+  // test is constructible; the returned object replaces `this`.
+  NodeSDK: function MockNodeSDK(...args: unknown[]) {
+    return mockNodeSDK(...args);
+  },
 }));
 
 import { registerNode } from './instrumentation.node';
@@ -56,6 +64,12 @@ beforeEach(() => {
 });
 
 describe('registerNode boot wiring', () => {
+  it('passes the resolved service name to the NodeSDK, where it is merged after resource detection', async () => {
+    await registerNode();
+
+    expect(mockNodeSDK).toHaveBeenCalledWith(expect.objectContaining({ serviceName: 'resolved-service-name' }));
+  });
+
   it('runs every boot validation: app URL, HTTP User-Agent, encryption key', async () => {
     await registerNode();
 
