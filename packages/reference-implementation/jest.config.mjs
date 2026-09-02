@@ -29,6 +29,12 @@ const jestConfig = {
     // Mapped to TypeScript source (not the ESM build) so tests can
     // `jest.requireActual` the canonical SSRF guard's error classes.
     '^@uncefact/untp-utils/node$': '<rootDir>/../untp-utils/src/node/index.ts',
+    // The resolvers' error classes on their own. A test that replaces
+    // `resolveDocument` spreads these into its mock so the classes it
+    // constructs are the ones the code under test checks with `instanceof`;
+    // the full resolvers module cannot load here because multiformats'
+    // subpath exports do not resolve under jest.
+    '^@uncefact/untp-utils/resolvers/errors$': '<rootDir>/../untp-utils/build/resolvers/errors.js',
     '^@uncefact/untp-utils/common$': '<rootDir>/../untp-utils/src/common/index.ts',
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
     '^@uncefact/untp-utils/loaders$': '<rootDir>/../untp-utils/build/loaders/index.js',
