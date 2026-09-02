@@ -3,6 +3,7 @@ import type { IEncryptionService } from '@uncefact/untp-ri-services/encryption';
 // Next.js app (instrumentation.node.ts) and via tsx (prisma/seed.ts), which
 // has no tsconfig.json to resolve path aliases.
 import { parseEnvelope } from './decryption-key-protection';
+import { ENVELOPE_STORE_IDS, ENVELOPE_STORE_INFO, type EnvelopeStoreId, type EnvelopeStores } from './envelope-stores';
 import { apiLogger } from '../api/logger';
 
 const logger = apiLogger.child({ module: 'validate-encryption-key-startup' });
@@ -32,7 +33,8 @@ export class PlaceholderEncryptionKeyError extends Error {
 }
 
 export class EncryptionKeyValidationError extends Error {
-  constructor(source: 'service instance configuration' | 'credential decryption key', id: string, cause: unknown) {
+  /** `source` names the row and the value, e.g. "credential decryption key". */
+  constructor(source: string, id: string, cause: unknown) {
     super(
       `DATA_ENCRYPTION_KEY cannot decrypt an existing ${source} ("${id}"). ` +
         `The configured key does not match the key the data was encrypted under. See ${DOCS_URL}`,
@@ -73,44 +75,8 @@ function firstNonEmpty(value: string | undefined): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-type ServiceInstanceRow = { id: string; config: string };
-type CredentialRow = { id: string; decryptionKey: string | null };
-
-const CANDIDATE_BATCH_SIZE = 100;
-
-/**
- * The subset of the Prisma client this check needs; structural so tests can
- * supply an in-memory fake (same approach as BackfillClient). Both resource
- * types are fetched via cursor-paginated `findMany`, in id order, never
- * `findFirst`: a single unordered sample is not safe to trust as "the"
- * validation candidate. A row can be envelope-*shaped* without being a
- * genuine envelope (a truncated/corrupted value can also start with "{",
- * and a service instance config can be corrupted the same way), so the
- * caller must be able to skip a bad candidate and keep scanning rather than
- * either crashing on it or reporting "nothing encrypted" on the strength of
- * one bad row.
- */
-export type EncryptionKeyValidationClient = {
-  serviceInstance: {
-    findMany(args: {
-      where?: { id: { gt: string } };
-      select: { id: true; config: true };
-      orderBy: { id: 'asc' };
-      take: number;
-    }): Promise<ServiceInstanceRow[]>;
-  };
-  credential: {
-    findMany(args: {
-      where: { decryptionKey: { startsWith: string }; id?: { gt: string } };
-      select: { id: true; decryptionKey: true };
-      orderBy: { id: 'asc' };
-      take: number;
-    }): Promise<CredentialRow[]>;
-  };
-};
-
 export type EncryptionKeyValidationResult =
-  | { validated: true; source: 'service-instance' | 'credential'; id: string }
+  | { validated: true; source: EnvelopeStoreId; id: string }
   | { validated: false };
 
 /**
@@ -123,120 +89,60 @@ export type EncryptionKeyValidationResult =
  * process boot, not as a one-off migration, so it favours a cheap, bounded
  * check over exhaustively verifying every row.
  *
- * Prefers service instance configurations, scanned in id order: every
- * writer encrypts one before persistence, so any row is a valid sample.
- * Falls back to scanning credential decryption keys only once every service
- * instance candidate is exhausted — credentials predating #697 can
- * legitimately hold plaintext, so those candidates are narrowed to
- * envelope-shaped values before scanning.
+ * Walks the stores that can prove the key in their listed order
+ * (ENVELOPE_STORE_IDS): service instance configurations first, since every
+ * writer encrypts one before persistence so any row is a valid sample, then
+ * each keyed store only once the one before it is exhausted. A discardable
+ * store is never sampled. Each store decides which rows are worth sampling
+ * (`candidates`): where legacy plaintext may exist, only envelope-shaped
+ * values.
  *
- * In both scans, a candidate that does not actually parse as an envelope
+ * In every scan, a candidate that does not actually parse as an envelope
  * (corrupted or otherwise malformed) is logged and skipped rather than
  * treated as proof the key is wrong or that nothing is encrypted: a single
  * damaged row must never crash startup, or mask a genuinely wrong key
  * sitting in a later row, when other valid envelopes exist. Only a
  * genuine envelope that fails to *decrypt* is a key mismatch, and that
  * throws {@link EncryptionKeyValidationError} immediately. Returns
- * `{ validated: false }` (not an error) once every candidate across both
+ * `{ validated: false }` (not an error) once every candidate across the
  * scans is exhausted with nothing to validate against, so a deployment
  * with nothing encrypted yet — or, in the pathological case, nothing but
  * corrupted rows — starts normally rather than crash-looping.
  */
 export async function validateEncryptionKeyAtStartup(
-  client: EncryptionKeyValidationClient,
+  stores: EnvelopeStores,
   encryptionService: Pick<IEncryptionService, 'decrypt'>,
 ): Promise<EncryptionKeyValidationResult> {
-  for await (const instance of eachCandidateServiceInstance(client)) {
-    const envelope = parseEnvelope(instance.config);
-    if (envelope === null) {
-      logger.warn(
-        { instanceId: instance.id },
-        'Service instance configuration is not a valid encrypted envelope; skipping it as a validation sample',
-      );
+  for (const id of ENVELOPE_STORE_IDS) {
+    const info = ENVELOPE_STORE_INFO[id];
+    if (info.discardable) {
+      // A discardable value proves nothing about the key (it may predate a
+      // rotation), and its store is unbounded; sampling it would make boot
+      // neither a proof nor cheap.
       continue;
     }
-    decryptOrThrow(() => encryptionService.decrypt(envelope), 'service instance configuration', instance.id);
-    return { validated: true, source: 'service-instance', id: instance.id };
-  }
-
-  for await (const row of eachCandidateCredential(client)) {
-    const envelope = parseEnvelope(row.decryptionKey);
-    if (envelope === null) {
-      logger.warn(
-        { credentialId: row.id },
-        'Credential decryption key is not a valid encrypted envelope; skipping it as a validation sample',
-      );
-      continue;
+    const source = `${info.rowName} ${info.valueName}`;
+    for await (const row of stores[id].candidates()) {
+      const envelope = parseEnvelope(row.value);
+      if (envelope === null) {
+        logger.warn(
+          { [info.logIdField]: row.id },
+          `Skipping ${source} "${row.id}" as a validation sample: it is not a valid encrypted envelope`,
+        );
+        continue;
+      }
+      try {
+        encryptionService.decrypt(envelope);
+      } catch (error) {
+        logger.error(
+          { err: error, source, id: row.id },
+          'DATA_ENCRYPTION_KEY failed to decrypt an existing envelope at startup',
+        );
+        throw new EncryptionKeyValidationError(source, row.id, error);
+      }
+      return { validated: true, source: id, id: row.id };
     }
-    decryptOrThrow(() => encryptionService.decrypt(envelope), 'credential decryption key', row.id);
-    return { validated: true, source: 'credential', id: row.id };
   }
 
   return { validated: false };
-}
-
-/**
- * Iterates every service instance row in id order via cursor pagination —
- * same approach as the backfill script's `eachServiceInstanceRow`, so a row
- * deleted mid-scan cannot skip a surviving one. No content filter: every
- * service instance config is written encrypted, so any row is a candidate.
- */
-async function* eachCandidateServiceInstance(
-  client: EncryptionKeyValidationClient,
-): AsyncGenerator<ServiceInstanceRow> {
-  let cursor: string | undefined;
-  for (;;) {
-    const rows = await client.serviceInstance.findMany({
-      ...(cursor !== undefined && { where: { id: { gt: cursor } } }),
-      select: { id: true, config: true },
-      orderBy: { id: 'asc' },
-      take: CANDIDATE_BATCH_SIZE,
-    });
-    if (rows.length === 0) {
-      return;
-    }
-    cursor = rows[rows.length - 1].id;
-    yield* rows;
-  }
-}
-
-/**
- * Iterates credential rows whose decryption key looks envelope-shaped, in
- * id order via cursor pagination — same approach as the backfill script's
- * `eachKeyedRow`, so a row deleted mid-scan cannot skip a surviving one.
- */
-async function* eachCandidateCredential(
-  client: EncryptionKeyValidationClient,
-): AsyncGenerator<{ id: string; decryptionKey: string }> {
-  let cursor: string | undefined;
-  for (;;) {
-    const rows = await client.credential.findMany({
-      where: { decryptionKey: { startsWith: '{' }, ...(cursor !== undefined && { id: { gt: cursor } }) },
-      select: { id: true, decryptionKey: true },
-      orderBy: { id: 'asc' },
-      take: CANDIDATE_BATCH_SIZE,
-    });
-    if (rows.length === 0) {
-      return;
-    }
-    cursor = rows[rows.length - 1].id;
-    for (const row of rows) {
-      if (row.decryptionKey !== null) {
-        yield { id: row.id, decryptionKey: row.decryptionKey };
-      }
-    }
-  }
-}
-
-function decryptOrThrow(
-  decrypt: () => string,
-  source: 'service instance configuration' | 'credential decryption key',
-  id: string,
-): void {
-  try {
-    decrypt();
-  } catch (error) {
-    logger.error({ err: error, source, id }, 'DATA_ENCRYPTION_KEY failed to decrypt an existing envelope at startup');
-    throw new EncryptionKeyValidationError(source, id, error);
-  }
 }

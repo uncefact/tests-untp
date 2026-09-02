@@ -27,6 +27,7 @@ import {
   assertNotPlaceholderEncryptionKey,
   validateEncryptionKeyAtStartup,
 } from './lib/credentials/validate-encryption-key-startup';
+import { prismaEnvelopeStores } from './lib/credentials/prisma-envelope-stores';
 import { resolveAppUrl } from './lib/config/app-url.config';
 import { startSeededSchemeRefreshInterval } from './lib/cvc/seeded-refresh-interval';
 import { validateHttpUserAgentOnBoot } from './lib/config/http-user-agent.config';
@@ -70,7 +71,7 @@ async function validateEncryptionKeyOnBoot(): Promise<void> {
   }
 
   assertNotPlaceholderEncryptionKey(resolved.key, { deploymentEnvironment: process.env.DEPLOYMENT_ENVIRONMENT });
-  await validateEncryptionKeyAtStartup(prisma, getEncryptionService());
+  await validateEncryptionKeyAtStartup(prismaEnvelopeStores(prisma), getEncryptionService());
 }
 
 /**

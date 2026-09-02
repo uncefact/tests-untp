@@ -47,6 +47,7 @@ import {
   assertNotPlaceholderEncryptionKey,
   validateEncryptionKeyAtStartup,
 } from '../src/lib/credentials/validate-encryption-key-startup.js';
+import { prismaEnvelopeStores } from '../src/lib/credentials/prisma-envelope-stores.js';
 import {
   SYSTEM_TENANT_ID,
   SYSTEM_IDR_SERVICE_ID,
@@ -259,7 +260,7 @@ export async function main() {
       // under it.
       assertNotPlaceholderEncryptionKey(ENCRYPTION_KEY, { deploymentEnvironment: process.env.DEPLOYMENT_ENVIRONMENT });
       encryptionService = new AesGcmEncryptionAdapter(ENCRYPTION_KEY, logger);
-      await validateEncryptionKeyAtStartup(prisma, encryptionService);
+      await validateEncryptionKeyAtStartup(prismaEnvelopeStores(prisma), encryptionService);
     } else {
       logger.warn(
         'DATA_ENCRYPTION_KEY not set; skipping service instance seeds (IDR, storage, VC). ' +

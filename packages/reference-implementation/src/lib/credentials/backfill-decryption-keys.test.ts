@@ -21,18 +21,56 @@ afterAll(() => {
 type Row = { id: string; decryptionKey: string | null };
 type ServiceInstanceRow = { id: string; config: string };
 
-function createFakeClient(rows: Row[], serviceInstances: ServiceInstanceRow[] = []) {
+type ReplayRow = { id: string; responseBody: string | null };
+
+/**
+ * An in-memory table for one encrypted column. `findMany` applies the
+ * filters the registry actually sends (`not: null`, `startsWith`, the id
+ * cursor and `take`), so a test proves the production query shape rather
+ * than receiving canned data, and `updateMany` implements genuine
+ * compare-and-swap against the backing array.
+ */
+function fakeTable<Column extends string, R extends { id: string } & Record<Column, string | null>>(
+  rows: R[],
+  column: Column,
+) {
+  type Filter = { not?: null; startsWith?: string } | undefined;
+  const matching = (args: { where?: Record<string, unknown>; take: number }) => {
+    const filter = args.where?.[column] as Filter;
+    const cursor = args.where?.id as { gt: string } | undefined;
+    return rows
+      .filter((row) => (filter !== undefined && 'not' in filter ? row[column] !== null : true))
+      .filter((row) => (filter?.startsWith !== undefined ? row[column]?.startsWith(filter.startsWith) ?? false : true))
+      .filter((row) => (cursor ? row.id > cursor.gt : true))
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .slice(0, args.take);
+  };
   return {
+    findMany: jest.fn(async (args: { where?: Record<string, unknown>; take: number }) =>
+      matching(args).map((row) => ({ id: row.id, [column]: row[column] }) as { id: string } & Pick<R, Column>),
+    ),
+    updateMany: jest.fn(
+      async (args: { where: { id: string } & Record<string, unknown>; data: Record<string, unknown> }) => {
+        const row = rows.find((r) => r.id === args.where.id && r[column] === args.where[column]);
+        if (!row) {
+          return { count: 0 };
+        }
+        row[column] = args.data[column] as R[Column];
+        return { count: 1 };
+      },
+    ),
+    findUnique: jest.fn(async (args: { where: { id: string } }) => {
+      const row = rows.find((r) => r.id === args.where.id);
+      return row ? ({ id: row.id, [column]: row[column] } as { id: string } & Pick<R, Column>) : null;
+    }),
+  };
+}
+
+function createFakeClient(rows: Row[], serviceInstances: ServiceInstanceRow[] = [], replayRows: ReplayRow[] = []) {
+  return {
+    serviceInstance: fakeTable(serviceInstances, 'config'),
     credential: {
-      findMany: jest.fn(
-        async (args: { where: { decryptionKey: { not: null }; id?: { gt: string } }; take: number }): Promise<Row[]> =>
-          rows
-            .filter((row) => row.decryptionKey !== null)
-            .filter((row) => (args.where.id ? row.id > args.where.id.gt : true))
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .slice(0, args.take)
-            .map((row) => ({ id: row.id, decryptionKey: row.decryptionKey })),
-      ),
+      ...fakeTable(rows, 'decryptionKey'),
       update: jest.fn(async (args: { where: { id: string }; data: { decryptionKey: string } }) => {
         const row = rows.find((candidate) => candidate.id === args.where.id);
         if (!row) {
@@ -43,16 +81,7 @@ function createFakeClient(rows: Row[], serviceInstances: ServiceInstanceRow[] = 
         return row;
       }),
     },
-    serviceInstance: {
-      findMany: jest.fn(
-        async (args: { where?: { id?: { gt: string } }; take: number }): Promise<ServiceInstanceRow[]> =>
-          serviceInstances
-            .filter((row) => (args.where?.id ? row.id > args.where.id.gt : true))
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .slice(0, args.take)
-            .map((row) => ({ id: row.id, config: row.config })),
-      ),
-    },
+    idempotencyKey: fakeTable(replayRows, 'responseBody'),
   };
 }
 
@@ -87,6 +116,7 @@ describe('backfillDecryptionKeys', () => {
       keyVerified: true,
       suspectRowIds: [],
       deletedRowIds: [],
+      preflightNotes: [],
     });
     expect(isProtectedDecryptionKey(rows[0].decryptionKey as string)).toBe(true);
     expect(revealDecryptionKey(rows[0].decryptionKey)).toBe('b'.repeat(64));
@@ -126,6 +156,7 @@ describe('backfillDecryptionKeys', () => {
       keyVerified: false,
       suspectRowIds: [],
       deletedRowIds: [],
+      preflightNotes: [],
     });
     expect(rows.every((row) => isProtectedDecryptionKey(row.decryptionKey as string))).toBe(true);
   });
@@ -143,6 +174,7 @@ describe('backfillDecryptionKeys', () => {
       keyVerified: false,
       suspectRowIds: [],
       deletedRowIds: [],
+      preflightNotes: [],
     });
     expect(client.credential.update).not.toHaveBeenCalled();
   });
@@ -217,7 +249,7 @@ describe('backfillDecryptionKeys', () => {
     const client = createFakeClient(rows, serviceInstances);
 
     await expect(backfillDecryptionKeys(client)).rejects.toThrow(
-      'Service instance(s) svc-1 hold configurations that are not valid encrypted envelopes',
+      'Preflight found service instance(s) svc-1 whose configuration is not a valid encrypted envelope',
     );
     expect(client.credential.update).not.toHaveBeenCalled();
   });
@@ -237,7 +269,7 @@ describe('backfillDecryptionKeys', () => {
     const client = createFakeClient(rows, serviceInstances);
 
     await expect(backfillDecryptionKeys(client)).rejects.toThrow(
-      'Service instance(s) svc-1 hold configurations that are not valid encrypted envelopes',
+      'Preflight found service instance(s) svc-1 whose configuration is not a valid encrypted envelope',
     );
     expect(client.credential.update).not.toHaveBeenCalled();
   });
@@ -332,7 +364,7 @@ describe('backfillDecryptionKeys', () => {
       (thrown: Error) => thrown,
     );
     expect(error.message).toContain(
-      'Service instance(s) svc-corrupt hold configurations that are not valid encrypted envelopes',
+      'Preflight found service instance(s) svc-corrupt whose configuration is not a valid encrypted envelope',
     );
     expect(error.message).toContain('Preflight decrypt failed for service instance svc-wrong, credential cred-1');
     expect(error.message).toContain('aborting before any write');
@@ -446,6 +478,7 @@ describe('backfillDecryptionKeys', () => {
       keyVerified: true,
       suspectRowIds: [],
       deletedRowIds: [],
+      preflightNotes: [],
     });
     expect(client.credential.update).toHaveBeenCalledTimes(2);
   });
@@ -479,5 +512,42 @@ describe('backfillDecryptionKeys', () => {
     expect(result.wrapped).toBe(150);
     expect(result.keyVerified).toBe(false);
     expect(rows.every((row) => isProtectedDecryptionKey(row.decryptionKey as string))).toBe(true);
+  });
+});
+
+describe('discardable stores in the preflight', () => {
+  it('notes a damaged or unopenable replay body and wraps anyway, since the wrap never touches that store', async () => {
+    const { backfillDecryptionKeys } = await import('./backfill-decryption-keys');
+    const { protectDecryptionKey } = await import('./decryption-key-protection');
+    const rows: Row[] = [{ id: 'cred-plain', decryptionKey: 'b'.repeat(64) }];
+    const serviceInstances: ServiceInstanceRow[] = [{ id: 'svc-1', config: protectDecryptionKey('{"ok":true}') }];
+    const replayRows: ReplayRow[] = [
+      { id: 'claim-bad', responseBody: '["plain"]' },
+      { id: 'claim-other', responseBody: await envelopeUnderOtherKey('[]') },
+    ];
+    const client = createFakeClient(rows, serviceInstances, replayRows);
+    const onPreflightNote = jest.fn();
+
+    const result = await backfillDecryptionKeys(client, { onPreflightNote });
+
+    expect(result.wrapped).toBe(1);
+    expect(result.preflightNotes).toEqual([
+      expect.stringContaining(
+        'idempotency claim(s) claim-bad, claim-other hold a replay body that is damaged or does not open',
+      ),
+    ]);
+    expect(result.preflightNotes[0]).toContain('clear the replay body of the affected claims');
+    expect(onPreflightNote).toHaveBeenCalledWith(result.preflightNotes[0]);
+  });
+
+  it('refuses to treat a replay body that opens as proof of the key', async () => {
+    const { backfillDecryptionKeys, KeyUnverifiedError } = await import('./backfill-decryption-keys');
+    const { protectDecryptionKey } = await import('./decryption-key-protection');
+    const rows: Row[] = [{ id: 'cred-plain', decryptionKey: 'b'.repeat(64) }];
+    const replayRows: ReplayRow[] = [{ id: 'claim-1', responseBody: protectDecryptionKey('[]') }];
+    const client = createFakeClient(rows, [], replayRows);
+
+    await expect(backfillDecryptionKeys(client)).rejects.toBeInstanceOf(KeyUnverifiedError);
+    expect(rows[0].decryptionKey).toBe('b'.repeat(64));
   });
 });

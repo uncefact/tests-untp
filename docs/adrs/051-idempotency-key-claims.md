@@ -1,6 +1,7 @@
 # ADR: An idempotency key is claimed before the work and owned by the request that claimed it
 
 - **Status:** accepted
+- **Update (2026-09-03):** The stored response body is one of the columns the key lifecycle covers: `rotate:encryption-key` re-encrypts it with the other stores and `audit:encryption` reports it. It is the one discardable store: a body that is damaged or opens under neither key never blocks a rotation or a backfill, never counts as proof that the configured key is right (it may predate a rotation), and is never sampled at startup; a rotation clears such a body and keeps the claim. While the unreadable body remains, a retry is answered with the recorded credential and a warning that the body was lost; once cleared, with the credential alone. Never with a second issuance. The claim row itself is never deleted by the lifecycle. The store list and the rule live in `src/lib/credentials/envelope-stores.ts`.
 
 ## Context
 

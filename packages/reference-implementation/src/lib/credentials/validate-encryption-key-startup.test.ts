@@ -27,51 +27,7 @@ afterAll(() => {
 
 type ServiceInstanceRow = { id: string; config: string };
 type CredentialRow = { id: string; decryptionKey: string | null };
-type ServiceInstanceFindManyArgs = {
-  where?: { id: { gt: string } };
-  select: { id: true; config: true };
-  orderBy: { id: 'asc' };
-  take: number;
-};
-type CredentialFindManyArgs = {
-  where: { decryptionKey: { startsWith: string }; id?: { gt: string } };
-  select: { id: true; decryptionKey: true };
-  orderBy: { id: 'asc' };
-  take: number;
-};
-
-/**
- * Mirrors backfill-decryption-keys.test.ts's fake client: it actually
- * applies the `where`/cursor/`take` arguments the code sends (rather than
- * ignoring them and returning canned data), so a test can prove the
- * production code queries with the right filter — see the two "queries ...
- * with the expected" tests below.
- */
-function createFakeClient(serviceInstances: ServiceInstanceRow[] = [], credentials: CredentialRow[] = []) {
-  return {
-    serviceInstance: {
-      findMany: jest.fn(
-        async (args: ServiceInstanceFindManyArgs): Promise<ServiceInstanceRow[]> =>
-          serviceInstances
-            .filter((row) => (args.where ? row.id > args.where.id.gt : true))
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .slice(0, args.take)
-            .map((row) => ({ id: row.id, config: row.config })),
-      ),
-    },
-    credential: {
-      findMany: jest.fn(
-        async (args: CredentialFindManyArgs): Promise<CredentialRow[]> =>
-          credentials
-            .filter((row) => row.decryptionKey?.startsWith(args.where.decryptionKey.startsWith) ?? false)
-            .filter((row) => (args.where.id ? row.id > args.where.id.gt : true))
-            .sort((a, b) => a.id.localeCompare(b.id))
-            .slice(0, args.take)
-            .map((row) => ({ id: row.id, decryptionKey: row.decryptionKey })),
-      ),
-    },
-  };
-}
+import { fakeStores } from './envelope-stores.fake';
 
 async function encryptUnder(key: string, plaintext: string): Promise<string> {
   const { AesGcmEncryptionAdapter, EncryptionAlgorithm } = await import('@uncefact/untp-ri-services/encryption');
@@ -89,16 +45,33 @@ async function buildEncryptionService(key: string) {
 }
 
 describe('validateEncryptionKeyAtStartup', () => {
+  it('never samples replay bodies: a database holding only those has nothing to validate against', async () => {
+    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
+    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
+    const stores = fakeStores(
+      [],
+      [],
+      [
+        { id: 'claim-0', responseBody: await encryptUnder(OTHER_KEY, '[]') },
+        { id: 'claim-1', responseBody: await encryptUnder(ACTIVE_KEY, '[]') },
+      ],
+    );
+
+    await expect(validateEncryptionKeyAtStartup(stores, encryptionService)).resolves.toEqual({ validated: false });
+    expect(stores.idempotencyResponses.candidates).not.toHaveBeenCalled();
+    expect(mockError).not.toHaveBeenCalled();
+  });
+
   it('validates against a service instance configuration and returns its id', async () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
     const config = await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}');
-    const client = createFakeClient([{ id: 'svc-1', config }]);
+    const stores = fakeStores([{ id: 'svc-1', config }]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'svc-1' });
+    expect(result).toEqual({ validated: true, source: 'serviceInstances', id: 'svc-1' });
   });
 
   it('throws a named EncryptionKeyValidationError naming the service instance when the key cannot decrypt it', async () => {
@@ -111,12 +84,12 @@ describe('validateEncryptionKeyAtStartup', () => {
     // now running with — exactly the "wrong key deployed" scenario #762
     // exists to catch before a real request hits it.
     const config = await encryptUnder(OTHER_KEY, '{"apiUrl":"x"}');
-    const client = createFakeClient([{ id: 'svc-1', config }]);
+    const stores = fakeStores([{ id: 'svc-1', config }]);
 
-    await expect(validateEncryptionKeyAtStartup(client, encryptionService)).rejects.toThrow(
+    await expect(validateEncryptionKeyAtStartup(stores, encryptionService)).rejects.toThrow(
       EncryptionKeyValidationError,
     );
-    await expect(validateEncryptionKeyAtStartup(client, encryptionService)).rejects.toThrow('svc-1');
+    await expect(validateEncryptionKeyAtStartup(stores, encryptionService)).rejects.toThrow('svc-1');
     expect(mockError).toHaveBeenCalled();
   });
 
@@ -128,14 +101,14 @@ describe('validateEncryptionKeyAtStartup', () => {
     // candidate the scan reaches. A damaged config on one row must not stop
     // startup from finding and validating against another, genuinely valid
     // one — a multi-tenant deployment can have many service instances.
-    const client = createFakeClient([
+    const stores = fakeStores([
       { id: 'a-corrupt', config: '{"cipherText":"truncated' },
       { id: 'z-valid', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') },
     ]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'z-valid' });
+    expect(result).toEqual({ validated: true, source: 'serviceInstances', id: 'z-valid' });
     expect(mockWarn).toHaveBeenCalled();
   });
 
@@ -147,15 +120,15 @@ describe('validateEncryptionKeyAtStartup', () => {
 
     // The corrupted row must not be mistaken for "nothing to validate" and
     // let a genuinely wrong key on "w-wrongkey" survive startup.
-    const client = createFakeClient([
+    const stores = fakeStores([
       { id: 'a-corrupt', config: '{"cipherText":"truncated' },
       { id: 'w-wrongkey', config: await encryptUnder(OTHER_KEY, '{"apiUrl":"x"}') },
     ]);
 
-    await expect(validateEncryptionKeyAtStartup(client, encryptionService)).rejects.toThrow(
+    await expect(validateEncryptionKeyAtStartup(stores, encryptionService)).rejects.toThrow(
       EncryptionKeyValidationError,
     );
-    await expect(validateEncryptionKeyAtStartup(client, encryptionService)).rejects.toThrow('w-wrongkey');
+    await expect(validateEncryptionKeyAtStartup(stores, encryptionService)).rejects.toThrow('w-wrongkey');
   });
 
   it('warn-skips a service instance candidate with an unsupported algorithm, instead of throwing it as a key mismatch', async () => {
@@ -169,17 +142,17 @@ describe('validateEncryptionKeyAtStartup', () => {
     // shape-invalid up front and skipped like any other corrupted
     // candidate, falling through to a later valid one instead.
     const unsupportedAlgorithm = '{"cipherText":"a","iv":"b","tag":"c","type":"des-ede3-cbc"}';
-    const client = createFakeClient([
+    const stores = fakeStores([
       { id: 'a-unsupported-algo', config: unsupportedAlgorithm },
       { id: 'z-valid', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') },
     ]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
     // Resolving to a valid result (rather than rejecting with
     // EncryptionKeyValidationError) is itself the proof that the
     // unsupported-algorithm candidate was skipped, not decrypted-and-failed.
-    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'z-valid' });
+    expect(result).toEqual({ validated: true, source: 'serviceInstances', id: 'z-valid' });
     expect(mockWarn).toHaveBeenCalled();
     expect(mockError).not.toHaveBeenCalled();
   });
@@ -195,14 +168,14 @@ describe('validateEncryptionKeyAtStartup', () => {
     // decryptOrThrow used to mislabel as EncryptionKeyValidationError and
     // crash-loop the whole process.
     const zeroByteFields = '{"cipherText":"a","iv":"b","tag":"c","type":"aes-256-gcm"}';
-    const client = createFakeClient([
+    const stores = fakeStores([
       { id: 'a-zero-byte-fields', config: zeroByteFields },
       { id: 'z-valid', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') },
     ]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'z-valid' });
+    expect(result).toEqual({ validated: true, source: 'serviceInstances', id: 'z-valid' });
     expect(mockWarn).toHaveBeenCalled();
     expect(mockError).not.toHaveBeenCalled();
   });
@@ -212,9 +185,9 @@ describe('validateEncryptionKeyAtStartup', () => {
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
     const zeroByteFields = '{"cipherText":"a","iv":"b","tag":"c","type":"aes-256-gcm"}';
-    const client = createFakeClient([{ id: 'a-zero-byte-fields', config: zeroByteFields }]);
+    const stores = fakeStores([{ id: 'a-zero-byte-fields', config: zeroByteFields }]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
     expect(result).toEqual({ validated: false });
   });
@@ -231,14 +204,14 @@ describe('validateEncryptionKeyAtStartup', () => {
     // before decrypting.
     const goodEnvelope = JSON.parse(await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}'));
     const wrongLengthIv = { ...goodEnvelope, iv: Buffer.from('12345678').toString('base64') };
-    const client = createFakeClient([
+    const stores = fakeStores([
       { id: 'a-wrong-iv-length', config: JSON.stringify(wrongLengthIv) },
       { id: 'z-valid', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') },
     ]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'z-valid' });
+    expect(result).toEqual({ validated: true, source: 'serviceInstances', id: 'z-valid' });
     expect(mockWarn).toHaveBeenCalled();
     expect(mockError).not.toHaveBeenCalled();
   });
@@ -251,52 +224,34 @@ describe('validateEncryptionKeyAtStartup', () => {
     // the process, and must not stop the check falling through to a
     // credential envelope that can still validate the key.
     const decryptionKey = await encryptUnder(ACTIVE_KEY, 'b'.repeat(64));
-    const client = createFakeClient(
+    const stores = fakeStores(
       [{ id: 'svc-corrupt', config: '{"cipherText":"truncated' }],
       [{ id: 'cred-1', decryptionKey }],
     );
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'credential', id: 'cred-1' });
+    expect(result).toEqual({ validated: true, source: 'credentials', id: 'cred-1' });
     expect(mockWarn).toHaveBeenCalled();
   });
 
-  it('queries service instance candidates with the expected selection and ordering', async () => {
+  it('finds a valid service instance candidate past a hundred corrupted ones', async () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
-    const client = createFakeClient([], []);
-
-    await validateEncryptionKeyAtStartup(client, encryptionService);
-
-    expect(client.serviceInstance.findMany).toHaveBeenCalledWith({
-      select: { id: true, config: true },
-      orderBy: { id: 'asc' },
-      take: 100,
-    });
-  });
-
-  it('finds a valid service instance candidate on the second page, proving cursor traversal past the first batch', async () => {
-    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
-    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
-
-    // The scan fetches 100 rows per batch; the first 100 (page 1) are all
-    // corrupted, and only the 101st (page 2) is a genuine, valid envelope.
-    // If cursor pagination stopped after the first batch, this candidate
-    // would never be reached and the check would wrongly conclude nothing
-    // encrypted exists.
+    // The first hundred candidates are damaged and only the last one is a
+    // genuine envelope. A scan that gave up after some number of damaged rows
+    // would wrongly conclude nothing encrypted exists.
     const serviceInstances: ServiceInstanceRow[] = Array.from({ length: 100 }, (_, index) => ({
       id: `svc-${String(index).padStart(3, '0')}`,
       config: '{"cipherText":"truncated',
     }));
     serviceInstances.push({ id: 'svc-100', config: await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}') });
-    const client = createFakeClient(serviceInstances);
+    const stores = fakeStores(serviceInstances);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'svc-100' });
-    expect(client.serviceInstance.findMany).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ validated: true, source: 'serviceInstances', id: 'svc-100' });
   });
 
   it('falls back to a protected credential decryption key when no service instance exists', async () => {
@@ -304,11 +259,11 @@ describe('validateEncryptionKeyAtStartup', () => {
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
     const decryptionKey = await encryptUnder(ACTIVE_KEY, 'b'.repeat(64));
-    const client = createFakeClient([], [{ id: 'cred-1', decryptionKey }]);
+    const stores = fakeStores([], [{ id: 'cred-1', decryptionKey }]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'credential', id: 'cred-1' });
+    expect(result).toEqual({ validated: true, source: 'credentials', id: 'cred-1' });
   });
 
   it('throws naming the credential when its envelope was encrypted under a different key', async () => {
@@ -316,18 +271,18 @@ describe('validateEncryptionKeyAtStartup', () => {
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
     const decryptionKey = await encryptUnder(OTHER_KEY, 'b'.repeat(64));
-    const client = createFakeClient([], [{ id: 'cred-1', decryptionKey }]);
+    const stores = fakeStores([], [{ id: 'cred-1', decryptionKey }]);
 
-    await expect(validateEncryptionKeyAtStartup(client, encryptionService)).rejects.toThrow('cred-1');
+    await expect(validateEncryptionKeyAtStartup(stores, encryptionService)).rejects.toThrow('cred-1');
   });
 
   it('returns validated: false when nothing encrypted exists anywhere, so startup proceeds normally', async () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
-    const client = createFakeClient([], []);
+    const stores = fakeStores([], []);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
     expect(result).toEqual({ validated: false });
   });
@@ -336,9 +291,9 @@ describe('validateEncryptionKeyAtStartup', () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
-    const client = createFakeClient([], [{ id: 'cred-1', decryptionKey: 'b'.repeat(64) }]);
+    const stores = fakeStores([], [{ id: 'cred-1', decryptionKey: 'b'.repeat(64) }]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
     expect(result).toEqual({ validated: false });
   });
@@ -351,9 +306,9 @@ describe('validateEncryptionKeyAtStartup', () => {
     // candidate) but does not parse as a valid encrypted envelope —
     // corruption, not a key mismatch, and there is nothing else to
     // validate against.
-    const client = createFakeClient([], [{ id: 'cred-1', decryptionKey: '{"cipherText":"truncated' }]);
+    const stores = fakeStores([], [{ id: 'cred-1', decryptionKey: '{"cipherText":"truncated' }]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
     expect(result).toEqual({ validated: false });
   });
@@ -369,7 +324,7 @@ describe('validateEncryptionKeyAtStartup', () => {
     // treated as proof nothing is encrypted, the wrong key on the second
     // row would never be caught and the app would boot unable to decrypt
     // its own data.
-    const client = createFakeClient(
+    const stores = fakeStores(
       [],
       [
         { id: 'a-corrupt', decryptionKey: '{"cipherText":"truncated' },
@@ -377,17 +332,17 @@ describe('validateEncryptionKeyAtStartup', () => {
       ],
     );
 
-    await expect(validateEncryptionKeyAtStartup(client, encryptionService)).rejects.toThrow(
+    await expect(validateEncryptionKeyAtStartup(stores, encryptionService)).rejects.toThrow(
       EncryptionKeyValidationError,
     );
-    await expect(validateEncryptionKeyAtStartup(client, encryptionService)).rejects.toThrow('w-wrongkey');
+    await expect(validateEncryptionKeyAtStartup(stores, encryptionService)).rejects.toThrow('w-wrongkey');
   });
 
   it('scans past a corrupted candidate to find a genuinely valid credential envelope under the active key', async () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
-    const client = createFakeClient(
+    const stores = fakeStores(
       [],
       [
         { id: 'a-corrupt', decryptionKey: '{"cipherText":"truncated' },
@@ -395,9 +350,9 @@ describe('validateEncryptionKeyAtStartup', () => {
       ],
     );
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'credential', id: 'z-valid' });
+    expect(result).toEqual({ validated: true, source: 'credentials', id: 'z-valid' });
   });
 
   it('warn-skips a credential candidate whose IV is valid Base64 but the wrong decoded length', async () => {
@@ -411,7 +366,7 @@ describe('validateEncryptionKeyAtStartup', () => {
     // structurally, before decrypt.
     const goodEnvelope = JSON.parse(await encryptUnder(ACTIVE_KEY, 'b'.repeat(64)));
     const wrongLengthIv = { ...goodEnvelope, iv: Buffer.from('12345678').toString('base64') };
-    const client = createFakeClient(
+    const stores = fakeStores(
       [],
       [
         { id: 'a-wrong-iv-length', decryptionKey: JSON.stringify(wrongLengthIv) },
@@ -419,48 +374,29 @@ describe('validateEncryptionKeyAtStartup', () => {
       ],
     );
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'credential', id: 'z-valid' });
+    expect(result).toEqual({ validated: true, source: 'credentials', id: 'z-valid' });
     expect(mockWarn).toHaveBeenCalled();
     expect(mockError).not.toHaveBeenCalled();
   });
 
-  it('queries credential candidates with the expected filter, selection, and ordering', async () => {
+  it('finds a valid credential candidate past a hundred corrupted ones', async () => {
     const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
     const encryptionService = await buildEncryptionService(ACTIVE_KEY);
 
-    const client = createFakeClient([], []);
-
-    await validateEncryptionKeyAtStartup(client, encryptionService);
-
-    expect(client.credential.findMany).toHaveBeenCalledWith({
-      where: { decryptionKey: { startsWith: '{' } },
-      select: { id: true, decryptionKey: true },
-      orderBy: { id: 'asc' },
-      take: 100,
-    });
-  });
-
-  it('finds a valid credential candidate on the second page, proving cursor traversal past the first batch', async () => {
-    const { validateEncryptionKeyAtStartup } = await import('./validate-encryption-key-startup');
-    const encryptionService = await buildEncryptionService(ACTIVE_KEY);
-
-    // Same shape as the service instance pagination test: the first 100
-    // candidates (page 1) are all corrupted, and only the 101st (page 2)
-    // genuinely validates. If cursor pagination stopped after the first
-    // batch, the check would wrongly conclude nothing encrypted exists.
+    // Same shape as the service instance case: only the last candidate
+    // genuinely validates.
     const credentials: CredentialRow[] = Array.from({ length: 100 }, (_, index) => ({
       id: `cred-${String(index).padStart(3, '0')}`,
       decryptionKey: '{"cipherText":"truncated',
     }));
     credentials.push({ id: 'cred-100', decryptionKey: await encryptUnder(ACTIVE_KEY, 'b'.repeat(64)) });
-    const client = createFakeClient([], credentials);
+    const stores = fakeStores([], credentials);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
-    expect(result).toEqual({ validated: true, source: 'credential', id: 'cred-100' });
-    expect(client.credential.findMany).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ validated: true, source: 'credentials', id: 'cred-100' });
   });
 
   it('prefers a valid service instance over a credential when both exist', async () => {
@@ -469,14 +405,14 @@ describe('validateEncryptionKeyAtStartup', () => {
 
     const config = await encryptUnder(ACTIVE_KEY, '{"apiUrl":"x"}');
     const decryptionKey = await encryptUnder(OTHER_KEY, 'b'.repeat(64));
-    const client = createFakeClient([{ id: 'svc-1', config }], [{ id: 'cred-1', decryptionKey }]);
+    const stores = fakeStores([{ id: 'svc-1', config }], [{ id: 'cred-1', decryptionKey }]);
 
-    const result = await validateEncryptionKeyAtStartup(client, encryptionService);
+    const result = await validateEncryptionKeyAtStartup(stores, encryptionService);
 
     // The credential envelope is under a different key, but it is never
     // consulted because a valid service instance was found first.
-    expect(result).toEqual({ validated: true, source: 'service-instance', id: 'svc-1' });
-    expect(client.credential.findMany).not.toHaveBeenCalled();
+    expect(result).toEqual({ validated: true, source: 'serviceInstances', id: 'svc-1' });
+    expect(stores.credentials.candidates).not.toHaveBeenCalled();
   });
 });
 

@@ -2,10 +2,12 @@
  * Rotates data encrypted at rest from a previous DATA_ENCRYPTION_KEY to the
  * current one.
  *
- * Re-encrypts every stored envelope (service instance configurations and
- * credential decryption keys) that opens under the outgoing key so it opens
- * under the active key. Aborts before any write when a stored envelope
- * opens under neither key or a service configuration is corrupted.
+ * Re-encrypts every stored envelope in every store the key protects
+ * (service instance configurations, credential decryption keys, idempotency
+ * replay bodies) that opens under the outgoing key so it opens under the
+ * active key. Aborts before any write when a stored envelope opens under
+ * neither key or a stored value is corrupted, except in a discardable store
+ * (replay bodies), whose unreadable rows are cleared instead.
  * Idempotent: re-running with the same key pair converges, including after
  * a mid-run failure.
  *
@@ -58,6 +60,8 @@ const { createLogger } = await import('@uncefact/untp-ri-services/logging');
 const { rotateEncryptionKey, buildRotationReport, validateRotationKeys } = await import(
   '../src/lib/credentials/rotate-encryption-key.js'
 );
+const { ENVELOPE_STORE_IDS, ENVELOPE_STORE_INFO } = await import('../src/lib/credentials/envelope-stores.js');
+const { prismaEnvelopeStores } = await import('../src/lib/credentials/prisma-envelope-stores.js');
 
 // The whole key gate (named missing-variable errors, format validation,
 // the placeholder policy on the active key, warnings for a placeholder
@@ -78,18 +82,22 @@ for (const warning of validation.warnings) {
 const { prisma } = await import('../src/lib/prisma/prisma.js');
 
 try {
-  const result = await rotateEncryptionKey(prisma, validation.services, {
+  const result = await rotateEncryptionKey(prismaEnvelopeStores(prisma), validation.services, {
     // Printed before the first write, so a mid-run failure still leaves
     // the operator the classification readout.
     onPreflight: (summary) => {
-      const candidates = summary.serviceInstances.outgoingOpened + summary.credentials.outgoingOpened;
-      console.log(
-        `Preflight: service instances ${summary.serviceInstances.alreadyActive} already active, ` +
-          `${summary.serviceInstances.outgoingOpened} to rotate; credentials ` +
-          `${summary.credentials.alreadyActive} already active, ${summary.credentials.outgoingOpened} to rotate, ` +
-          `${summary.credentials.suspects} suspect, ${summary.credentials.plaintext} legacy plaintext. ` +
-          (candidates > 0 ? 'Writing...' : 'Nothing to write.'),
-      );
+      const perStore = ENVELOPE_STORE_IDS.map((id) => {
+        const counts = summary[id];
+        return (
+          `${ENVELOPE_STORE_INFO[id].rowName}s ${counts.alreadyActive} already active, ${counts.outgoingOpened} to rotate` +
+          (counts.suspects > 0 ? `, ${counts.suspects} suspect` : '') +
+          (counts.plaintext > 0 ? `, ${counts.plaintext} legacy plaintext` : '') +
+          (counts.toClear > 0 ? `, ${counts.toClear} unreadable to clear` : '')
+        );
+      });
+      // A clear is a write too: the line must never call a run that is about to null rows a no-op.
+      const writes = Object.values(summary).reduce((sum, counts) => sum + counts.outgoingOpened + counts.toClear, 0);
+      console.log(`Preflight: ${perStore.join('; ')}. ` + (writes > 0 ? 'Writing...' : 'Nothing to write.'));
     },
   });
   const report = buildRotationReport(result, DOCS_URL);

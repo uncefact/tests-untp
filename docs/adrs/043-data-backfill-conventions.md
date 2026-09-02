@@ -2,6 +2,7 @@
 
 - **Date:** 2026-08-16
 - **Status:** accepted
+- **Update (2026-09-03):** Point 7 now has one exception. The preflight walks every column encrypted under `DATA_ENCRYPTION_KEY` from the shared store list in `src/lib/credentials/envelope-stores.ts`, and one of those stores is discardable, namely the response body an idempotency claim keeps for a retry (ADR-051). A body that is damaged or will not open is reported with its remedy, never aborts the run and never counts as proof of the key, because the application already answers a retry without it. Every other store still aborts the run, and `--force` still bypasses neither. Point 5's file-by-file `COPY` list is no longer held by review alone, because `packages/reference-implementation/prisma/__tests__/dockerfile-copies-runtime-imports.test.ts` follows what the in-image scripts import and fails when a module the Dockerfile does not copy is reached.
 
 ## Context
 

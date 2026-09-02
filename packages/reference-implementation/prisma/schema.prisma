@@ -152,6 +152,9 @@ model Credential {
   tenantId        String
   storageUri      String
   digestMultibase String
+  /// @encryptedAtRest The storage service's key for the private copy, protected
+  /// by protectDecryptionKey (#697). Rows written before that may hold it in
+  /// plaintext until backfill:decryption-keys wraps them.
   decryptionKey   String?
   credentialType  String
   coreDataModelVersion String?
@@ -196,9 +199,9 @@ model IdempotencyKey {
   credentialId     String?              @unique
   /// Set with credentialId. Ages a recorded-but-unfinalised row. An empty claim ages from createdAt (#954).
   resultRecordedAt DateTime?
-  /// AES-256-GCM envelope of the response a later retry replays. The same
-  /// protection Credential.decryptionKey uses, so a database reader cannot
-  /// recover a replayed response (#954, ADR-051).
+  /// @encryptedAtRest AES-256-GCM envelope of the response a later retry
+  /// replays. The same protection Credential.decryptionKey uses, so a database
+  /// reader cannot recover a replayed response (#954, ADR-051).
   responseBody     String?
   createdAt        DateTime             @default(now())
   finalisedAt      DateTime?
@@ -246,7 +249,8 @@ model ServiceInstance {
   adapterType AdapterType
   name        String
   description String?
-  config      String // AES-256-GCM encrypted JSON blob
+  /// @encryptedAtRest AES-256-GCM envelope of the adapter configuration JSON.
+  config      String
   isPrimary   Boolean     @default(false)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

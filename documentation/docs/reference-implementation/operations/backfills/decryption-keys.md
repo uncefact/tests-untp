@@ -36,7 +36,7 @@ It needs `DATA_ENCRYPTION_KEY` and a database target. A pre-set `RI_DATABASE_URL
 
 ## How it protects itself
 
-Before writing anything, the run decrypts every encrypted value it can find, both credential keys and service instance configurations, and aborts on any failure, naming every row that could not be read. A wrong key therefore ends as a refusal rather than as damage.
+Before writing anything, the run decrypts every encrypted value it can find in every store the key protects: credential keys, service instance configurations and idempotent-retry response bodies. A response body that is damaged or does not open is reported, never blocks the run and never counts as proof that the key is right; the next key rotation clears it, and the claim and its credential stay. Any other failed decryption aborts the run, naming every row that could not be read. A wrong key therefore ends as a refusal rather than as damage.
 
 Where nothing stored can prove the key and there are plaintext keys waiting to be wrapped, the run refuses rather than guessing. Both halves matter: a database with nothing to wrap completes without `--force`, because there is no risky write to gate. `--force` accepts the risk explicitly, and is only appropriate once you have verified the key out of band and hold a backup:
 
@@ -48,7 +48,7 @@ pnpm backfill:decryption-keys -- --force
 docker compose exec -w /app ri node_modules/.bin/tsx scripts/backfill-decryption-keys.ts --force
 ```
 
-`--force` covers only that one case. It does not bypass a failed decryption: a run whose preflight cannot read an existing envelope aborts whether or not the flag is passed.
+`--force` covers only that one case. It does not bypass a failed decryption: a run whose preflight cannot read an existing service instance configuration or credential key aborts whether or not the flag is passed. A response body that will not open is the one exception, reported rather than blocking.
 
 ## What it reports
 
@@ -60,7 +60,7 @@ A completed run reports how many keys it wrapped and how many were already prote
 
 After a run, confirm a wrapped key still round-trips by retrieving a credential through the API (`GET /api/v1/credentials/{id}`) and checking its decryption key behaves as before.
 
-A run that finishes its work exits 0, including one that reported deleted rows or proceeded under `--force`. It exits 1 when it skipped suspect rows, when it refused an unproven key, when the preflight could not decrypt something, and when a write failed.
+A run that finishes its work exits 0, including one that reported deleted rows or proceeded under `--force`. It exits 1 when it skipped suspect rows, when it refused an unproven key, when the preflight could not decrypt a service instance configuration or a credential key, and when a write failed.
 
 ## Re-running
 
