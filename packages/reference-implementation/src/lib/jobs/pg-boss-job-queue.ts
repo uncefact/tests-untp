@@ -160,6 +160,10 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
     await this.assertInserted(jobId, name, options);
   }
 
+  async declareQueue(name: string, options?: Pick<RegisterOptions, 'dedupeWaiting'>): Promise<void> {
+    await this.ensureQueue(name, options?.dedupeWaiting ? 'short' : 'standard');
+  }
+
   async schedule(name: string, cron: string, payload?: object): Promise<void> {
     await this.ensureQueue(name, 'standard');
     // Cron ticks are dispatched by pg-boss without a singleton key. On a

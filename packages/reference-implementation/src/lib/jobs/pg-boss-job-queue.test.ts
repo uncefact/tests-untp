@@ -274,6 +274,34 @@ describe('transactional enqueue', () => {
   });
 });
 
+describe('declareQueue', () => {
+  it('creates the queue up front with the policy the declaration names', async () => {
+    const queue = makeQueue();
+    await queue.declareQueue('verify');
+    await queue.declareQueue('dedup', { dedupeWaiting: true });
+    expect(bossMock.createQueue).toHaveBeenCalledWith('verify', { policy: 'standard', notify: true });
+    expect(bossMock.createQueue).toHaveBeenCalledWith('dedup', { policy: 'short', notify: true });
+  });
+
+  it('is idempotent and leaves a later send as one insert', async () => {
+    const queue = makeQueue();
+    await queue.declareQueue('verify');
+    await queue.declareQueue('verify');
+    const tx = { executeSql: jest.fn(async () => ({ rows: [] })) };
+    await queue.enqueueWithin(tx, 'verify', { recordId: 'r1' });
+    expect(bossMock.createQueue).toHaveBeenCalledTimes(1);
+    expect(bossMock.send).toHaveBeenCalledWith('verify', { recordId: 'r1' }, { db: tx });
+  });
+
+  it('rejects a send whose policy contradicts the declared queue', async () => {
+    const queue = makeQueue();
+    await queue.declareQueue('verify');
+    await expect(queue.enqueue('verify', { recordId: 'r1' }, { dedupeKey: 'r1' })).rejects.toMatchObject({
+      code: 'jobs.queue-policy-mismatch',
+    });
+  });
+});
+
 describe('a send that inserts no job', () => {
   // pg-boss reports an insert that did not happen by returning null, never by
   // throwing, so resolving on a null would hand the caller a job it does not

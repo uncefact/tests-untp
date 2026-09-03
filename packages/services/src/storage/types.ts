@@ -39,13 +39,18 @@ export interface IStorageService {
 
   /**
    * Stores binary or text content via multipart upload.
-   * @param content - The content to store (as a string)
+   * @param content - The content to store: bytes are uploaded exactly as given; a string is UTF-8 encoded
    * @param filename - The filename to use in the multipart upload
    * @param contentType - The MIME type of the content (e.g. 'text/html')
    * @param encrypt - If true, the content will be encrypted by the storage service
    *                  and a decryption key will be returned. Defaults to false.
    */
-  storeBinary(content: string, filename: string, contentType: string, encrypt?: boolean): Promise<StorageRecord>;
+  storeBinary(
+    content: string | Uint8Array,
+    filename: string,
+    contentType: string,
+    encrypt?: boolean,
+  ): Promise<StorageRecord>;
 
   /**
    * Deletes content by its storage resource identifier.

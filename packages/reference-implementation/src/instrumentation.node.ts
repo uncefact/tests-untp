@@ -34,6 +34,7 @@ import { validateHttpUserAgentOnBoot } from './lib/config/http-user-agent.config
 import { validateCacheMaxEntriesOnBoot } from './lib/config/cache-max-entries.config';
 import { validateStaleClaimOnBoot } from './lib/config/idempotency-claim.config';
 import { validateMaxRequestBodyBytesOnBoot } from './lib/config/request-body-limit.config';
+import { startJobQueue, stopJobQueue } from './lib/jobs/app-job-queue';
 
 export async function registerNode(): Promise<void> {
   // Fail the boot on a missing or unusable RI_APP_URL: it backs the OIDC
@@ -48,6 +49,7 @@ export async function registerNode(): Promise<void> {
   validateStaleClaimOnBoot();
   validateMaxRequestBodyBytesOnBoot();
   await validateEncryptionKeyOnBoot();
+  await startJobQueueOnBoot();
   startOpenTelemetry();
   // Periodic refresh of seeded conformity schemes (#728). Validates
   // CVC_REFRESH_INTERVAL_HOURS as part of the fail-fast boot checks above.
@@ -72,6 +74,27 @@ async function validateEncryptionKeyOnBoot(): Promise<void> {
 
   assertNotPlaceholderEncryptionKey(resolved.key, { deploymentEnvironment: process.env.DEPLOYMENT_ENVIRONMENT });
   await validateEncryptionKeyAtStartup(prismaEnvelopeStores(prisma), getEncryptionService());
+}
+
+/**
+ * The web process's job queue, started at boot with every queue it sends to
+ * created, so the first register call's transactional send is one insert and
+ * never holds the caller's transaction open across a queue creation
+ * (ADR-054 decision 4). A queue that cannot start fails the boot: it lives in
+ * the same database as everything else, so a process that cannot reach it
+ * cannot serve much anyway. Handlers are not registered here: the worker
+ * process (#985) works the queue; this process only sends.
+ */
+async function startJobQueueOnBoot(): Promise<void> {
+  await startJobQueue();
+  const shutdown = () => {
+    stopJobQueue().catch((err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.error('Job queue shutdown failed', err);
+    });
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 /**

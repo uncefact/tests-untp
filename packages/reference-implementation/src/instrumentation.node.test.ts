@@ -37,6 +37,11 @@ jest.mock('@/lib/credentials/validate-encryption-key-startup', () => ({
   validateEncryptionKeyAtStartup: jest.fn(),
 }));
 jest.mock('@/lib/api/pagination', () => ({ warnOnRejectedMaxPageLimitOverride: jest.fn() }));
+const mockStartJobQueue = jest.fn(async () => ({}));
+jest.mock('@/lib/jobs/app-job-queue', () => ({
+  startJobQueue: () => mockStartJobQueue(),
+  stopJobQueue: jest.fn(async () => undefined),
+}));
 jest.mock('@/lib/cvc/seeded-refresh-interval', () => ({ startSeededSchemeRefreshInterval: jest.fn() }));
 jest.mock('@/lib/api/logger', () => ({
   apiLogger: { child: () => ({ warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() }) },
@@ -82,6 +87,19 @@ describe('registerNode boot wiring', () => {
     expect(mockValidateCacheMaxEntriesOnBoot).toHaveBeenCalledTimes(1);
     expect(mockValidateStaleClaimOnBoot).toHaveBeenCalledTimes(1);
     expect(mockValidateMaxRequestBodyBytesOnBoot).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the job queue before serving', async () => {
+    await registerNode();
+
+    expect(mockStartJobQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails the boot when the job queue cannot start', async () => {
+    mockStartJobQueue.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+
+    await expect(registerNode()).rejects.toThrow('ECONNREFUSED');
+    expect(mockNodeSDK).not.toHaveBeenCalled();
   });
 
   it('fails the boot when a request-body cap override is invalid', async () => {

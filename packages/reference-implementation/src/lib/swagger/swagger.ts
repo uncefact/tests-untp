@@ -79,6 +79,7 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
       tags: [
         { name: 'DIDs', description: 'Decentralised Identifier management' },
         { name: 'Credentials', description: 'Verifiable Credential issuance' },
+        { name: 'Library', description: 'Credential library: records of issued and registered credentials' },
         { name: 'Registrars', description: 'Identifier registrar management' },
         { name: 'Schemes', description: 'Identifier scheme management' },
         { name: 'Identifiers', description: 'Identifier instance management' },

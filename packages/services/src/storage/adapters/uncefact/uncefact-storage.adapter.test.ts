@@ -152,6 +152,23 @@ describe('UncefactStorageAdapter', () => {
       expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/api/v4/public', expect.any(Object));
     });
 
+    it('uploads bytes exactly as given, including a byte-order mark and bytes that are not UTF-8', async () => {
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      const bytes = new Uint8Array([0xef, 0xbb, 0xbf, 0x7b, 0xff, 0xfe, 0x7d]);
+      await adapter.storeBinary(bytes, 'copy.bin', 'application/octet-stream');
+
+      const body = mockFetch.mock.calls.at(-1)?.[1].body as FormData;
+      const file = body.get('file') as Blob;
+      // jsdom's Blob has no arrayBuffer(); FileReader is how its bytes are read.
+      const uploaded = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(file);
+      });
+      expect(Buffer.from(uploaded)).toEqual(Buffer.from(bytes));
+    });
+
     it('should construct the legacy /api/3.1.0/... URL when configured for storage 3.x', async () => {
       const legacyConfig: UncefactStorageConfig = { ...mockConfig, apiVersion: '3.1.0' };
       const adapter = new UncefactStorageAdapter(legacyConfig, mockLogger);

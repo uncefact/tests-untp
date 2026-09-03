@@ -61,7 +61,7 @@ services:
       - DEFAULT_BUCKET=${UNCEFACT_STORAGE_PUBLIC_BUCKET:-public-data}
       - STORAGE_TYPE=local
       - API_KEY=${UNCEFACT_STORAGE_API_KEY:-test123}
-      - ALLOWED_UPLOAD_TYPES=image/png,image/jpeg,image/webp,application/pdf,text/html
+      - ALLOWED_UPLOAD_TYPES=image/png,image/jpeg,image/webp,application/pdf,text/html,application/json,application/octet-stream,text/plain
 
   identity-resolver-service:
     image: ghcr.io/pyx-industries/pyx-identity-resolver:4.0.0
