@@ -13,27 +13,51 @@ import {
   VcVerifyError,
 } from '@uncefact/untp-ri-services';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import {
-  resolveDocument,
-  ResolverError,
-  ResolverHttpError,
-  ResolverTimedOutError,
-  ResolverTooLargeError,
-} from '@uncefact/untp-utils/resolvers';
-import { UrlValidationError } from '@uncefact/untp-utils/node';
 import type { EnvelopedVerifiableCredential, VerifyResult } from '@uncefact/untp-ri-services';
 import { decodeJwt } from 'jose';
+import { UrlValidationError } from '@uncefact/untp-utils/node';
+import {
+  CredentialDocumentFetchError,
+  fetchCredentialDocument,
+  getMaxCredentialSize,
+  type DocumentFetchFailure,
+} from '@/lib/credentials/fetch-credential-document';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials/verify' });
 
 const JWT_PREFIX = 'data:application/vc+jwt,';
-const DEFAULT_MAX_CREDENTIAL_SIZE = 10_485_760; // 10 MB
 
-function getMaxCredentialSize(): number {
-  const envVal = process.env.VERIFY_MAX_CREDENTIAL_SIZE;
-  if (!envVal) return DEFAULT_MAX_CREDENTIAL_SIZE;
-  const parsed = parseInt(envVal, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_CREDENTIAL_SIZE;
+/**
+ * The 502 this route returns for a failure while retrieving, worded as the
+ * route always has (a resolver 304 is the one newcomer, answered like any
+ * other status). The caller decides which failures are the caller's 400 and
+ * does not pass those here.
+ */
+function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, maxSize: number) {
+  const respond = (error: string) => NextResponse.json({ error, code: 'UPSTREAM_ERROR' }, { status: 502 });
+  switch (failure.reason) {
+    case 'timeout':
+      logger.warn({ uri }, 'Credential fetch timed out');
+      return respond('Failed to fetch credential: request timed out');
+    case 'http':
+      logger.warn({ uri, status: failure.status }, 'Credential fetch failed');
+      return respond(`Failed to fetch credential: storage returned ${failure.status}`);
+    case 'too-large':
+      logger.warn(
+        { uri, maxSize, ...(failure.observedBytes !== undefined ? { size: failure.observedBytes } : {}) },
+        'Credential response exceeds maximum size',
+      );
+      return respond(`Credential response exceeds maximum size of ${maxSize} bytes`);
+    case 'body-unreadable':
+      logger.warn({ uri, err: failure.error }, 'Failed to read credential response body');
+      return respond('Failed to read credential response');
+    case 'redirects':
+      logger.warn({ uri, err: failure.error }, 'Credential fetch redirect not followed');
+      return respond('Failed to fetch credential: network error');
+    default:
+      logger.warn({ uri, err: failure.error }, 'Credential fetch failed');
+      return respond('Failed to fetch credential: network error');
+  }
 }
 
 /**
@@ -122,7 +146,7 @@ function getMaxCredentialSize(): number {
  *                     message:
  *                       type: string
  *       400:
- *         description: Validation error naming the offending field (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format)
+ *         description: Validation error. A malformed field is named (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format). A uri whose host is private or reserved, or whose host does not resolve, is refused with the guard's own message; with VERIFY_ALLOW_PRIVATE_URLS=true those hosts are fetched instead.
  *         content:
  *           application/json:
  *             schema:
@@ -204,92 +228,30 @@ export const POST = withPublicRoute(async (req) => {
   const credentialUri = new URL(body.uri).href;
 
   // ── Step 2: Fetch credential from storage URI ──────────────────────
-  // The guarded resolver validates the hostname against private/reserved
-  // ranges on every redirect hop and pins the connection to the validated
-  // address, closing the redirect-following and DNS-rebinding gaps a
-  // validate-then-fetch sequence leaves open. VERIFY_ALLOW_PRIVATE_URLS=true
-  // (development only) falls back to a plain fetch so private storage hosts
-  // in local compose setups keep working.
+  // The shared helper runs the guarded resolver, which validates the
+  // hostname against private/reserved ranges on every redirect hop and pins
+  // the connection to the validated address, closing the redirect-following
+  // and DNS-rebinding gaps a validate-then-fetch sequence leaves open.
+  // VERIFY_ALLOW_PRIVATE_URLS=true (development only) falls back to a plain
+  // fetch so private storage hosts in local compose setups keep working.
   logger.info({ uri: credentialUri }, 'Fetching credential from storage');
 
   const maxSize = getMaxCredentialSize();
   let responseText: string;
-
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS === 'true') {
-    let fetchResponse: Response;
-    try {
-      fetchResponse = await fetch(credentialUri, { signal: AbortSignal.timeout(10_000) });
-    } catch (e: unknown) {
-      const message =
-        e instanceof Error && e.name === 'TimeoutError'
-          ? 'Failed to fetch credential: request timed out'
-          : 'Failed to fetch credential: network error';
-      logger.warn({ uri: credentialUri, error: message }, 'Credential fetch failed');
-      return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
+  try {
+    const document = await fetchCredentialDocument(credentialUri, { maxBytes: maxSize, timeoutMs: 10_000 });
+    responseText = new TextDecoder().decode(document.bytes);
+  } catch (e: unknown) {
+    if (!(e instanceof CredentialDocumentFetchError)) throw e;
+    // Whatever the guard refused, a name it could not resolve included, has
+    // always been this route's 400 with the guard's own message. The guard
+    // reports all of those as its validation error, so that class, not the
+    // failure's reason, is the test: a DNS fault on the development bypass
+    // never met the guard and stays the upstream's 502 it always was.
+    if (e.failure.error instanceof UrlValidationError) {
+      throw new ValidationError(e.failure.error.message);
     }
-
-    if (!fetchResponse.ok) {
-      const message = `Failed to fetch credential: storage returned ${fetchResponse.status}`;
-      logger.warn({ uri: credentialUri, status: fetchResponse.status }, 'Credential fetch failed');
-      return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
-    }
-
-    try {
-      responseText = await fetchResponse.text();
-    } catch (e: unknown) {
-      logger.warn({ uri: credentialUri, err: e }, 'Failed to read credential response body');
-      return NextResponse.json(
-        { error: 'Failed to read credential response', code: 'UPSTREAM_ERROR' },
-        { status: 502 },
-      );
-    }
-
-    if (responseText.length > maxSize) {
-      logger.warn(
-        { uri: credentialUri, size: responseText.length, maxSize },
-        'Credential response exceeds maximum size',
-      );
-      return NextResponse.json(
-        { error: `Credential response exceeds maximum size of ${maxSize} bytes`, code: 'UPSTREAM_ERROR' },
-        { status: 502 },
-      );
-    }
-  } else {
-    try {
-      const resolved = await resolveDocument(credentialUri, { maxResponseBytes: maxSize, totalTimeoutMs: 10_000 });
-      responseText = new TextDecoder().decode(resolved.body);
-    } catch (e: unknown) {
-      if (e instanceof UrlValidationError) {
-        throw new ValidationError(e.message);
-      }
-      if (e instanceof ResolverTooLargeError) {
-        logger.warn({ uri: credentialUri, maxSize }, 'Credential response exceeds maximum size');
-        return NextResponse.json(
-          { error: `Credential response exceeds maximum size of ${maxSize} bytes`, code: 'UPSTREAM_ERROR' },
-          { status: 502 },
-        );
-      }
-      if (e instanceof ResolverHttpError) {
-        const message = `Failed to fetch credential: storage returned ${e.status}`;
-        logger.warn({ uri: credentialUri, status: e.status }, 'Credential fetch failed');
-        return NextResponse.json({ error: message, code: 'UPSTREAM_ERROR' }, { status: 502 });
-      }
-      if (e instanceof ResolverTimedOutError) {
-        logger.warn({ uri: credentialUri }, 'Credential fetch timed out');
-        return NextResponse.json(
-          { error: 'Failed to fetch credential: request timed out', code: 'UPSTREAM_ERROR' },
-          { status: 502 },
-        );
-      }
-      if (e instanceof ResolverError) {
-        logger.warn({ uri: credentialUri, err: e }, 'Credential fetch failed');
-        return NextResponse.json(
-          { error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' },
-          { status: 502 },
-        );
-      }
-      throw e;
-    }
+    return upstreamFailureResponse(e.failure, credentialUri, maxSize);
   }
 
   let fetchedData: unknown;

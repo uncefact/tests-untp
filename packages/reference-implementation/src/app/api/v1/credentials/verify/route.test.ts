@@ -69,43 +69,13 @@ jest.mock('@uncefact/untp-utils/multibase-digest', () => ({
   },
 }));
 
-// The route does `instanceof` checks against these classes, so the classes
-// created here (which the route receives via the module mock) are the same
-// identities the tests construct below.
-jest.mock('@uncefact/untp-utils/resolvers', () => {
-  class ResolverError extends Error {}
-  class ResolverHttpError extends ResolverError {
-    status: number;
-    constructor(url: string, status: number) {
-      super(`${url} returned status ${status}.`);
-      this.status = status;
-    }
-  }
-  class ResolverTooLargeError extends ResolverError {
-    limit: number;
-    constructor(url: string, limit: number) {
-      super(`Response body for ${url} exceeds ${limit}-byte limit.`);
-      this.limit = limit;
-    }
-  }
-  class ResolverTimedOutError extends ResolverError {
-    constructor(url: string, timeoutMs: number) {
-      super(`Timed out fetching ${url} after ${timeoutMs}ms.`);
-    }
-  }
-  return {
-    resolveDocument: (...args: unknown[]) => mockResolveDocument(...args),
-    ResolverError,
-    ResolverHttpError,
-    ResolverTooLargeError,
-    ResolverTimedOutError,
-  };
-});
-
-jest.mock('@uncefact/untp-utils/node', () => {
-  class UrlValidationError extends Error {}
-  return { UrlValidationError };
-});
+// The fetch helper the route uses does `instanceof` checks against the real
+// resolver and guard error classes, so only `resolveDocument` is replaced and
+// the classes the tests construct below are the actual ones.
+jest.mock('@uncefact/untp-utils/resolvers', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/resolvers/errors'),
+  resolveDocument: (...args: unknown[]) => mockResolveDocument(...args),
+}));
 
 jest.mock('jose', () => ({
   decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
@@ -122,10 +92,14 @@ import { ServiceResolutionError } from '@/lib/api/errors';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { POST } from './route';
 
-const { ResolverError, ResolverHttpError, ResolverTooLargeError, ResolverTimedOutError } = jest.requireMock(
-  '@uncefact/untp-utils/resolvers',
-);
-const { UrlValidationError } = jest.requireMock('@uncefact/untp-utils/node');
+const {
+  ResolverHttpError,
+  ResolverNetworkError,
+  ResolverTimedOutError,
+  ResolverTooLargeError,
+  ResolverTooManyRedirectsError,
+} = jest.requireMock('@uncefact/untp-utils/resolvers');
+const { PrivateHostnameError, ResolutionFailedError } = jest.requireActual('@uncefact/untp-utils/node');
 
 // ── Fixtures ──────────────────────────────────────────────────────────
 
@@ -174,16 +148,19 @@ function createBadJsonRequest(): Request {
 /** Makes the guarded resolver return the given document (JSON-encoded unless a string). */
 function mockStorageDocument(body: unknown) {
   const text = typeof body === 'string' ? body : JSON.stringify(body);
-  mockResolveDocument.mockResolvedValue({ body: new TextEncoder().encode(text) });
+  mockResolveDocument.mockResolvedValue({ body: new TextEncoder().encode(text), status: 200 });
 }
 
 function createFetchResponse(body: unknown, opts?: { ok?: boolean; status?: number }) {
   const ok = opts?.ok ?? true;
   const status = opts?.status ?? (ok ? 200 : 500);
+  const text = typeof body === 'string' ? body : JSON.stringify(body);
   return {
     ok,
     status,
-    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    url: '',
+    headers: { get: () => null },
+    arrayBuffer: async () => new TextEncoder().encode(text).buffer,
   };
 }
 
@@ -340,14 +317,50 @@ describe('POST /api/v1/credentials/verify', () => {
   // ── SSRF Protection (guarded fetch) ───────────────────────────────
 
   it('returns 400 when the guarded resolver rejects the URI as private', async () => {
-    mockResolveDocument.mockRejectedValue(
-      new UrlValidationError('uri must not point to a private or reserved network address'),
-    );
+    mockResolveDocument.mockRejectedValue(new PrivateHostnameError('localhost'));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('uri must not point to a private or reserved network address');
+    expect(json.error).toBe('Hostname localhost names a private or local resource.');
+  });
+
+  it('returns 400 with the guard message when the host does not resolve', async () => {
+    const unresolved = new ResolutionFailedError('storage.example', new Error('ENOTFOUND'));
+    mockResolveDocument.mockRejectedValue(unresolved);
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe(unresolved.message);
+  });
+
+  it('returns 502 as a network error when the bypass fetch cannot resolve the host (the guard never ran)', async () => {
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    mockFetch.mockRejectedValue(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } }));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' });
+  });
+
+  it('returns 502 naming the status when the resolver hands back a 304 instead of a document', async () => {
+    mockResolveDocument.mockResolvedValue({ body: new Uint8Array(), status: 304, finalUrl: VALID_URI });
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({
+      error: 'Failed to fetch credential: storage returned 304',
+      code: 'UPSTREAM_ERROR',
+    });
+  });
+
+  it('returns 502 as a network error when the resolver stops following redirects', async () => {
+    mockResolveDocument.mockRejectedValue(new ResolverTooManyRedirectsError(VALID_URI, 5));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' });
   });
 
   it('fetches via the guarded resolver with the size cap, not plain fetch', async () => {
@@ -387,7 +400,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('returns 502 when the guarded fetch fails with a network error', async () => {
-    mockResolveDocument.mockRejectedValue(new ResolverError('socket hang up'));
+    mockResolveDocument.mockRejectedValue(new ResolverNetworkError(VALID_URI, new Error('socket hang up')));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(502);
@@ -460,12 +473,7 @@ describe('POST /api/v1/credentials/verify', () => {
     });
 
     it('returns 502 when response exceeds size limit', async () => {
-      const hugeText = 'x'.repeat(MAX_SIZE + 1);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: async () => hugeText,
-      });
+      mockFetch.mockResolvedValue(createFetchResponse('x'.repeat(MAX_SIZE + 1)));
 
       const res = await POST(createFakeRequest({ uri: VALID_URI }));
       expect(res.status).toBe(502);
@@ -474,11 +482,13 @@ describe('POST /api/v1/credentials/verify', () => {
       expect(json.code).toBe('UPSTREAM_ERROR');
     });
 
-    it('returns 502 when response.text() throws', async () => {
+    it('returns 502 when reading the response body throws', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
-        text: async () => {
+        url: '',
+        headers: { get: () => null },
+        arrayBuffer: async () => {
           throw new Error('stream error');
         },
       });
