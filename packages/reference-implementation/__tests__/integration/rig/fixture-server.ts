@@ -2,7 +2,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 export interface Fixture {
-  body: string;
+  /** Bytes are served exactly as given, so a fixture can carry a byte-order mark or invalid UTF-8. */
+  body: string | Buffer;
   contentType?: string;
   status?: number;
 }

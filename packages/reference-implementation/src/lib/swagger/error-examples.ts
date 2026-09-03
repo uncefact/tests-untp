@@ -149,6 +149,7 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'An identifier with this value already exists for the scheme',
   'A request with this Idempotency-Key is still being processed. Retry shortly.',
   "Another request now holds this Idempotency-Key. Retry to receive that request's result.",
+  'The record this Idempotency-Key produced was deleted while this request was being answered; retry the request.',
   'Credential not found',
   'DID not found',
   'Data model not found',

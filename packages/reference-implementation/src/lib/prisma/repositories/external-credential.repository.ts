@@ -107,8 +107,8 @@ export type InitialCheckRunInput =
        * commit together or not at all (ADR-054 decision 4). Required on a
        * PENDING run so no pending record is created without a caller that
        * owns its job; the row's `lastEnqueuedAt` records that this ran. Do
-       * nothing else here: the transaction is open for its duration, under
-       * Prisma's default budget. The caller's precondition, not enforced
+       * nothing else here: the transaction is open for its duration, within
+       * the explicit budget the create sets. The caller's precondition, not enforced
        * here: the verify queue is created at boot, so the send inside the
        * transaction is one insert rather than queue creation on first use.
        */
@@ -204,71 +204,79 @@ export async function createExternalCredential(
   // One instant for every timestamp the rows carry, so the record can never
   // read as updated, or enqueued, before it was created.
   const now = new Date(Date.now());
-  return prisma.$transaction(async (tx) => {
-    const record = await tx.libraryRecord.create({
-      data: {
-        tenantId: input.tenantId,
-        origin: LibraryRecordOrigin.EXTERNAL,
-        createdAt: now,
-        updatedAt: now,
-        ...detailsColumns(input.details),
-      },
-    });
-    const external = await tx.externalCredential.create({
-      data: {
-        id: record.id,
-        tenantId: input.tenantId,
-        createdAt: now,
-        updatedAt: now,
-        sourceUrl: input.sourceUrl,
-        sourceDigest: input.sourceDigest ?? null,
-        encrypted: input.encrypted ?? null,
-        contentKind: input.contentKind ?? null,
-        storageUri: input.storage?.uri ?? null,
-        storageDigestMultibase: input.storage?.digestMultibase ?? null,
-        storageServiceInstanceId: input.storage?.serviceInstanceId ?? null,
-        storageExternalId: input.storage?.externalId ?? null,
-        storageBucket: input.storage?.bucket ?? null,
-        decryptionKey: input.storage?.decryptionKey ?? null,
-        displayName: input.annotations.displayName,
-        declaredCredentialType: input.annotations.declaredCredentialType,
-        dateReceived: input.annotations.dateReceived ?? null,
-        notes: input.annotations.notes ?? null,
-        decryptionKeyUnused: input.decryptionKeyUnused ?? false,
-      },
-    });
-    const checkRun = await tx.checkRun.create({
-      data: {
-        recordId: record.id,
-        tenantId: input.tenantId,
-        generation: 1,
-        state: input.checkRun.state,
-        ...noChecksRun(),
-        ...input.checkRun.checks,
-        ...(input.checkRun.state === CheckRunState.FAILED
-          ? {
-              failureCode: input.checkRun.failure.code,
-              failureMessage: input.checkRun.failure.message,
-              failureRetryable: input.checkRun.failure.retryable,
-              completedAt: now,
-            }
-          : { lastEnqueuedAt: now }),
-        requestedAt: now,
-      },
-    });
-    if (input.idempotencyClaimId) {
-      await linkClaimToRecord(tx, input.idempotencyClaimId, record.id, IdempotencyOperation.LIBRARY_REGISTER);
-    }
-    if (input.checkRun.state === CheckRunState.PENDING) {
-      await input.checkRun.enqueue(prismaSqlExecutor(tx), {
-        tenantId: input.tenantId,
-        recordId: record.id,
-        generation: checkRun.generation,
-        checkRunId: checkRun.id,
+  // An explicit budget rather than Prisma's 5 s default: the transaction
+  // holds the enqueue, which is a round trip to the same database, and a
+  // budget that expires here rolls the rows back after the durable copy was
+  // already stored (the caller logs the orphan's coordinates). Generous
+  // enough that only a genuinely stuck database trips it.
+  return prisma.$transaction(
+    async (tx) => {
+      const record = await tx.libraryRecord.create({
+        data: {
+          tenantId: input.tenantId,
+          origin: LibraryRecordOrigin.EXTERNAL,
+          createdAt: now,
+          updatedAt: now,
+          ...detailsColumns(input.details),
+        },
       });
-    }
-    return { origin: LibraryRecordOrigin.EXTERNAL, record, external, checkRun };
-  });
+      const external = await tx.externalCredential.create({
+        data: {
+          id: record.id,
+          tenantId: input.tenantId,
+          createdAt: now,
+          updatedAt: now,
+          sourceUrl: input.sourceUrl,
+          sourceDigest: input.sourceDigest ?? null,
+          encrypted: input.encrypted ?? null,
+          contentKind: input.contentKind ?? null,
+          storageUri: input.storage?.uri ?? null,
+          storageDigestMultibase: input.storage?.digestMultibase ?? null,
+          storageServiceInstanceId: input.storage?.serviceInstanceId ?? null,
+          storageExternalId: input.storage?.externalId ?? null,
+          storageBucket: input.storage?.bucket ?? null,
+          decryptionKey: input.storage?.decryptionKey ?? null,
+          displayName: input.annotations.displayName,
+          declaredCredentialType: input.annotations.declaredCredentialType,
+          dateReceived: input.annotations.dateReceived ?? null,
+          notes: input.annotations.notes ?? null,
+          decryptionKeyUnused: input.decryptionKeyUnused ?? false,
+        },
+      });
+      const checkRun = await tx.checkRun.create({
+        data: {
+          recordId: record.id,
+          tenantId: input.tenantId,
+          generation: 1,
+          state: input.checkRun.state,
+          ...noChecksRun(),
+          ...input.checkRun.checks,
+          ...(input.checkRun.state === CheckRunState.FAILED
+            ? {
+                failureCode: input.checkRun.failure.code,
+                failureMessage: input.checkRun.failure.message,
+                failureRetryable: input.checkRun.failure.retryable,
+                completedAt: now,
+              }
+            : { lastEnqueuedAt: now }),
+          requestedAt: now,
+        },
+      });
+      if (input.idempotencyClaimId) {
+        await linkClaimToRecord(tx, input.idempotencyClaimId, record.id, IdempotencyOperation.LIBRARY_REGISTER);
+      }
+      if (input.checkRun.state === CheckRunState.PENDING) {
+        await input.checkRun.enqueue(prismaSqlExecutor(tx), {
+          tenantId: input.tenantId,
+          recordId: record.id,
+          generation: checkRun.generation,
+          checkRunId: checkRun.id,
+        });
+      }
+      return { origin: LibraryRecordOrigin.EXTERNAL, record, external, checkRun };
+    },
+    { maxWait: 5_000, timeout: 15_000 },
+  );
 }
 
 /**

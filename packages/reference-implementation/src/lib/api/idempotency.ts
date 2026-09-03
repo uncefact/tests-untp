@@ -16,6 +16,8 @@ export const IDEMPOTENCY_KEY_IN_FLIGHT_MESSAGE =
   'A request with this Idempotency-Key is still being processed. Retry shortly.';
 export const IDEMPOTENCY_KEY_HELD_ELSEWHERE_MESSAGE =
   "Another request now holds this Idempotency-Key. Retry to receive that request's result.";
+export const IDEMPOTENCY_KEY_RECORD_DELETED_MESSAGE =
+  'The record this Idempotency-Key produced was deleted while this request was being answered; retry the request.';
 
 const IDEMPOTENCY_KEY_CHARSET_MESSAGE = 'Idempotency-Key must contain only printable ASCII characters';
 

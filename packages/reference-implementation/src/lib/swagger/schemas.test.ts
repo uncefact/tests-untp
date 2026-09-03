@@ -10,11 +10,14 @@ import { CredentialDetailsStatus } from '@/lib/prisma/generated';
  */
 type JsonSchemaObject = {
   properties?: Record<string, JsonSchemaObject>;
+  format?: string;
   required?: string[];
   items?: JsonSchemaObject;
   nullable?: boolean;
   enum?: string[];
   description?: string;
+  pattern?: string;
+  type?: string;
 };
 
 /**
@@ -485,5 +488,35 @@ describe('generateOpenAPISchemas — Credential descriptive fields (#952)', () =
       expect(description).toContain("read where the credential's data model places it");
       expect(description).toContain('the first subject when the credential carries several');
     }
+  });
+});
+
+describe('generateOpenAPISchemas — RegisterExternalCredentialRequest (#955)', () => {
+  const request = (generateOpenAPISchemas() as Record<string, JsonSchemaObject>).RegisterExternalCredentialRequest;
+
+  it('publishes dateReceived as a date-formatted string, so an integrator reads the shape before meeting it', () => {
+    // The runtime rejects anything that is not a real YYYY-MM-DD day. Fails
+    // if the schema goes back to a hand-rolled regex refinement, which the
+    // published component cannot carry and which would leave the contract
+    // describing a bare string.
+    const dateReceived = request.properties?.annotations?.properties?.dateReceived;
+    expect(dateReceived?.type ?? 'string').toBe('string');
+    expect(dateReceived?.format).toBe('date');
+  });
+
+  it('states the not-only-whitespace rule on the field whose refinement the component cannot carry', () => {
+    // The bound publishes as maxLength but the blank check does not, so the
+    // description is the only place a caller can read it. Fails if the
+    // description drops the rule.
+    expect(request.properties?.annotations?.properties?.displayName?.description).toContain('not only whitespace');
+  });
+
+  it('publishes the decryption key as a 64-character hexadecimal pattern', () => {
+    // The key rule is a regex, which the component can carry, so an
+    // integrator reads it rather than meeting a 400. Fails if the schema
+    // goes back to a length-bounded free string.
+    const decryptionKey = request.properties?.sourceEncryption?.properties?.decryptionKey;
+    expect(decryptionKey?.pattern).toBe('^[a-f0-9]{64}$');
+    expect(decryptionKey?.description).toContain('64 hexadecimal characters');
   });
 });

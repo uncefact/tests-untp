@@ -84,6 +84,15 @@ function apiVersionToPathSegment(version: UncefactStorageConfig['apiVersion']): 
   return `v${major}`;
 }
 
+/**
+ * A store that answered 2xx and then failed validation may have created the
+ * object; the detail names it so a caller logging the failure can find and
+ * remove the orphan.
+ */
+function mayExist(externalId: string, bucket: string): string {
+  return ` (object ${externalId} in bucket ${bucket} may have been created)`;
+}
+
 export class UncefactStorageAdapter extends BaseServiceAdapter implements IStorageService {
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
@@ -144,12 +153,18 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       parsed = await response.json();
     } catch {
       this.logger.error({ httpStatus: response.status }, 'Storage API returned non-JSON response');
-      throw new StorageStoreError(response.status, 'Storage API returned invalid JSON response');
+      throw new StorageStoreError(
+        response.status,
+        'Storage API returned invalid JSON response' + mayExist(externalId, bucket),
+      );
     }
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       this.logger.error({ httpStatus: response.status }, 'Storage API returned non-object response body');
-      throw new StorageStoreError(response.status, 'Storage API returned invalid response: body is not an object');
+      throw new StorageStoreError(
+        response.status,
+        'Storage API returned invalid response: body is not an object' + mayExist(externalId, bucket),
+      );
     }
 
     const body = parsed as Record<string, unknown>;
@@ -158,7 +173,10 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
     if (!uri || typeof uri !== 'string') {
       this.logger.error({ uri }, 'Storage API response missing required "uri" field');
-      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "uri"');
+      throw new StorageStoreError(
+        response.status,
+        'Storage API returned invalid response: missing "uri"' + mayExist(externalId, bucket),
+      );
     }
 
     if (encrypt && (!decryptionKey || typeof decryptionKey !== 'string')) {
@@ -166,7 +184,10 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
         { decryptionKey },
         'Storage API response missing required "decryptionKey" field for encrypted storage',
       );
-      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "decryptionKey"');
+      throw new StorageStoreError(
+        response.status,
+        'Storage API returned invalid response: missing "decryptionKey"' + mayExist(externalId, bucket),
+      );
     }
 
     const digestMultibase = resolveDigestMultibase(body, response.status);
@@ -183,7 +204,12 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     };
   }
 
-  async storeBinary(content: string, filename: string, contentType: string, encrypt = false): Promise<StorageRecord> {
+  async storeBinary(
+    content: string | Uint8Array,
+    filename: string,
+    contentType: string,
+    encrypt = false,
+  ): Promise<StorageRecord> {
     const endpoint = encrypt ? 'private' : 'public';
     const url = `${this.baseUrl}/api/${this.apiPathSegment}/${endpoint}`;
 
@@ -193,7 +219,10 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     this.logger.info({ url, filename, contentType, encrypt, externalId }, 'Uploading binary content to storage');
 
     const formData = new FormData();
-    const blob = new Blob([content], { type: contentType });
+    // A copy of the bytes: Blob wants a view over a plain ArrayBuffer, and a
+    // caller's view may sit over a shared or offset buffer.
+    const part: BlobPart = typeof content === 'string' ? content : content.slice();
+    const blob = new Blob([part], { type: contentType });
     formData.append('file', blob, filename);
     formData.append('id', externalId);
     formData.append('bucket', bucket);
@@ -236,12 +265,18 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       parsed = await response.json();
     } catch {
       this.logger.error({ httpStatus: response.status }, 'Storage API returned non-JSON response');
-      throw new StorageStoreError(response.status, 'Storage API returned invalid JSON response');
+      throw new StorageStoreError(
+        response.status,
+        'Storage API returned invalid JSON response' + mayExist(externalId, bucket),
+      );
     }
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       this.logger.error({ httpStatus: response.status }, 'Storage API returned non-object response body');
-      throw new StorageStoreError(response.status, 'Storage API returned invalid response: body is not an object');
+      throw new StorageStoreError(
+        response.status,
+        'Storage API returned invalid response: body is not an object' + mayExist(externalId, bucket),
+      );
     }
 
     const body = parsed as Record<string, unknown>;
@@ -250,7 +285,10 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
 
     if (!uri || typeof uri !== 'string') {
       this.logger.error({ uri }, 'Storage API response missing required "uri" field');
-      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "uri"');
+      throw new StorageStoreError(
+        response.status,
+        'Storage API returned invalid response: missing "uri"' + mayExist(externalId, bucket),
+      );
     }
 
     if (encrypt && (!decryptionKey || typeof decryptionKey !== 'string')) {
@@ -258,7 +296,10 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
         { decryptionKey },
         'Storage API response missing required "decryptionKey" field for encrypted storage',
       );
-      throw new StorageStoreError(response.status, 'Storage API returned invalid response: missing "decryptionKey"');
+      throw new StorageStoreError(
+        response.status,
+        'Storage API returned invalid response: missing "decryptionKey"' + mayExist(externalId, bucket),
+      );
     }
 
     const digestMultibase = resolveDigestMultibase(body, response.status);

@@ -40,6 +40,12 @@ All data in the database is scoped to a tenant; see [Multi-Tenancy](#multi-tenan
 
 On startup, the Reference Implementation automatically applies database migrations, converts existing rows to the formats the current version writes, and seeds system default records (tenants, service instances, data models, render templates, and more). All three steps are idempotent and can be disabled. The seed also applies any manifest mounted at `/app/seed/custom`, which is where registrars and identifier schemes come from. See [Startup](./operations/startup) for the full sequence and what gets seeded.
 
+### Background Work
+
+Some of what a request sets in motion finishes after the response. Registering a credential received from a third party ([Library API](./api/library)) does its fetching, opening and copying inside the request, then leaves the signature and status check to run later, so the record is returned in a `pending` state that settles afterwards.
+
+That later work is carried by a job queue that lives in the same PostgreSQL database as everything else, so a job and the record whose state it will settle are committed together and neither can exist without the other. The application process that serves requests only places jobs on the queue. Taking them off and running them is a separate process's job, so a deployment where none is running leaves records waiting rather than losing them, and they settle whenever one starts. The reasoning behind this shape is recorded in [ADR-054](https://github.com/uncefact/tests-untp/blob/next/docs/adrs/054-background-work-runs-on-a-worker.md). See [Startup](./operations/startup#job-queue-start) for what happens to the queue when a process boots.
+
 ### Federated IDP (Identity Provider)
 
 The Reference Implementation delegates authentication to a federated identity provider rather than managing credentials directly. The IDP handles user sign-in and issues tokens that the Reference Implementation validates on each request. See [Authentication](./authentication) for how authentication works, and [IDP Requirements](./authentication/idp-requirements) for supported providers and their configuration.

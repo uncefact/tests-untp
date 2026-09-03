@@ -154,6 +154,17 @@ export interface JobQueue<Tx = SqlExecutor> {
   unschedule(name: string): Promise<void>;
 
   /**
+   * Create the queue for `name` now, if it does not exist, with the policy
+   * a deduplicating or plain queue needs. A process that only sends (the
+   * web process) calls this at boot so its first transactional send is one
+   * insert inside the caller's transaction rather than queue creation on
+   * first use, which would hold that transaction open for the creation.
+   * Idempotent, and consistent with a later registration of the same name:
+   * a policy that contradicts the queue's real one fails loudly.
+   */
+  declareQueue(name: string, options?: Pick<RegisterOptions, 'dedupeWaiting'>): Promise<void>;
+
+  /**
    * Declare the handler for a job name. Registration is local mutation;
    * handlers start running when {@link start} is called. Each name is
    * registered at most once.

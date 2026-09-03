@@ -26,6 +26,12 @@ import {
 } from '@uncefact/untp-ri-services';
 import { paginationMetaSchema } from '@/lib/api/pagination';
 import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
+import { registerExternalCredentialRequestSchema } from '@/lib/api/request-schemas/library';
+import {
+  credentialRecordSchema,
+  credentialRecordWarningSchema,
+  verificationEnvelopeSchema,
+} from '@/lib/library/credential-record-projection';
 import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
 import { CredentialDetailsError, CredentialDetailsStatus, CoreCredentialType } from '@/lib/prisma/generated';
 import {
@@ -558,6 +564,14 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     ConformityScheme: conformitySchemeSummarySchema,
     ConformityProfile: conformityProfileSummarySchema,
     ConformityCriterion: conformityCriterionSummarySchema,
+    // The library surface (#955): the record and its verification envelope
+    // are the same schemas the routes check every outbound envelope against
+    // (ADR-053 decision 7), so the published shapes cannot drift from the
+    // enforced ones.
+    RegisterExternalCredentialRequest: registerExternalCredentialRequestSchema,
+    CredentialRecord: credentialRecordSchema,
+    VerificationEnvelope: verificationEnvelopeSchema,
+    CredentialRecordWarning: credentialRecordWarningSchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};
@@ -577,7 +591,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     // would document those same requests as rejected, so the request
     // component drops that assertion at every nesting level. Response
     // components keep it: their shapes are server-produced and closed.
-    if (name === 'CredentialIssueRequest') {
+    if (name === 'CredentialIssueRequest' || name === 'RegisterExternalCredentialRequest') {
       stripAdditionalPropertiesFalse(schemaObj);
     }
     openAPISchemas[name] = schemaObj as OpenAPISchema;

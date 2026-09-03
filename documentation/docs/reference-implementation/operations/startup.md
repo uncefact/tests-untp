@@ -155,3 +155,7 @@ The first logger constructed during startup validates any paths supplied via `LO
 ### Seeded Conformity Scheme Refresh Interval
 
 Startup registers an in-process interval that periodically re-fetches seeded (`SYSTEM_SEED`) conformity schemes from their source URLs, so a seed-only deployment picks up publisher updates without a reboot. `CVC_REFRESH_INTERVAL_HOURS` sets the cadence in hours (default 24). When it is set, startup validates it is a positive number no greater than 500 and fails with a message naming the variable otherwise. See [Custom Seed: Periodic Refresh](./custom-seed#periodic-refresh) for what the interval does and how it interacts with the boot-time seed.
+
+### Job Queue Start
+
+Startup connects the job queue (a set of tables in the application database, managed by pg-boss) and creates the queue that credential registration sends its verification job to. Creating it here rather than on the first registration keeps that registration's job insert to a single row written in the same database transaction as the credential record, so a record is never acknowledged without the job that will settle it, and a job never runs for a record that rolled back. The web process only sends; the worker process runs the handlers. Startup fails if the database the queue needs cannot be reached.

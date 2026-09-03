@@ -1,7 +1,7 @@
 // Subpath imports rather than the package barrel: the barrel reaches modules
 // whose deep dependencies do not resolve under the CJS loader this script is
 // run with, so the operator CLI would fail at import time.
-import { getBridge, listRegisteredVersions } from '@uncefact/untp-ri-services/data-model-bridges';
+import { getBridge } from '@uncefact/untp-ri-services/data-model-bridges';
 import {
   decodeCredential,
   type EnvelopedVerifiableCredential,
@@ -21,6 +21,7 @@ import {
 import { extractCredentialDetails } from './extract-credential-details';
 import { bridgeNameOf, coreCredentialTypeFromTypes, coreCredentialTypeOf } from '../library/core-credential-type';
 import { revealDecryptionKey } from './decryption-key-protection';
+import { versionsMatchingContext } from './bridge-version';
 
 const BATCH_SIZE = 100;
 
@@ -499,35 +500,6 @@ function resolveVersion(row: PendingRecordRow, bridgeType: string, decoded: UNTP
     );
   }
   return matches[0];
-}
-
-function versionsMatchingContext(credentialType: string, context: unknown): string[] {
-  const urls = contextUrls(context);
-  return listRegisteredVersions(credentialType).filter((version) =>
-    urls.some((url) => urlPathHasVersion(url, version)),
-  );
-}
-
-function contextUrls(context: unknown): string[] {
-  if (typeof context === 'string') {
-    return [context];
-  }
-  if (Array.isArray(context)) {
-    return context.filter((item): item is string => typeof item === 'string');
-  }
-  return [];
-}
-
-/**
- * A version matches when it appears as a complete URL path segment, so
- * `0.6.0` does not match a `0.6.1` context URL.
- */
-function urlPathHasVersion(url: string, version: string): boolean {
-  try {
-    return new URL(url).pathname.split('/').includes(version);
-  } catch {
-    return false;
-  }
 }
 
 /** Stops a misbehaving storage response from exhausting the operator's process. */
