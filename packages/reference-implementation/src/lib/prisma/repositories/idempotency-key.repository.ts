@@ -181,19 +181,40 @@ export async function releaseIdempotencyKey(input: ReleaseIdempotencyKeyInput): 
  * (ADR-051 decision 3). Compare-and-set on `recordId` still being null: a
  * claim another request reclaimed in the meantime matches no row, and the
  * caller's record is rolled back with the `IdempotencyClaimLostError` this
- * throws.
+ * throws. The claim must belong to `operation`: a claim is scoped by tenant,
+ * operation and key (ADR-051 decision 1), and a record of one operation
+ * linked to a claim of another would replay the wrong resource. That is a
+ * caller defect rather than a race, so it fails with an error naming it.
  */
 export async function linkClaimToRecord(
   client: Prisma.TransactionClient,
   claimId: string,
   recordId: string,
+  operation: IdempotencyOperation,
 ): Promise<void> {
   const updated = await client.idempotencyKey.updateMany({
-    where: { id: claimId, recordId: null },
+    where: { id: claimId, recordId: null, operation },
     data: { recordId, resultRecordedAt: new Date(Date.now()) },
   });
-  if (updated.count === 0) {
-    throw new IdempotencyClaimLostError();
+  if (updated.count > 0) {
+    return;
+  }
+  const claim = await client.idempotencyKey.findUnique({ where: { id: claimId }, select: { operation: true } });
+  if (claim && claim.operation !== operation) {
+    throw new IdempotencyClaimOperationMismatchError(claimId, claim.operation, operation);
+  }
+  throw new IdempotencyClaimLostError();
+}
+
+/**
+ * A claim held for one operation was offered to a record of another. A
+ * caller defect, never a race, so it is not the lost-claim conflict a route
+ * answers with a 409; it fails the request as the broken invariant it is.
+ */
+export class IdempotencyClaimOperationMismatchError extends Error {
+  constructor(claimId: string, held: IdempotencyOperation, offered: IdempotencyOperation) {
+    super(`Idempotency claim ${claimId} is for ${held}, not ${offered}, and cannot link this record`);
+    this.name = 'IdempotencyClaimOperationMismatchError';
   }
 }
 

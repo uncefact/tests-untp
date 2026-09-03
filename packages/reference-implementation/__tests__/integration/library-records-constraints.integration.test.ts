@@ -399,4 +399,42 @@ describe('library record constraints', () => {
       expect(await prisma.checkRun.count()).toBe(2);
     });
   });
+
+  describe('the objects the Prisma schema cannot declare', () => {
+    it('pins the triggers, checks and hand-written indexes the schema cannot declare, by name', async () => {
+      const names = async (sql: string) => (await prisma.$queryRawUnsafe<{ name: string }[]>(sql)).map((r) => r.name);
+
+      await expect(names(`SELECT tgname AS name FROM pg_trigger WHERE NOT tgisinternal`)).resolves.toEqual(
+        expect.arrayContaining([
+          'LibraryRecord_has_one_child',
+          'Credential_delete_via_parent',
+          'ExternalCredential_delete_via_parent',
+          'Credential_identity_immutable',
+          'ExternalCredential_identity_immutable',
+          'Credential_link_change_touches_record',
+        ]),
+      );
+      await expect(names(`SELECT conname AS name FROM pg_constraint WHERE contype = 'c'`)).resolves.toEqual(
+        expect.arrayContaining([
+          'Credential_origin_check',
+          'ExternalCredential_origin_check',
+          'CheckRun_generation_check',
+        ]),
+      );
+      await expect(names(`SELECT indexname AS name FROM pg_indexes WHERE schemaname = 'public'`)).resolves.toEqual(
+        expect.arrayContaining(['CheckRun_one_pending_per_record', 'LibraryRecord_tenantId_lower_issuerName_idx']),
+      );
+    });
+
+    it('keeps the issuer-name index on the lower-cased expression the case-insensitive filter needs', async () => {
+      // The only object here with no behavioural test of its own: a migration
+      // that recreated it on `upper("issuerName")`, or on the bare column,
+      // would keep the name and silently send the filter to a sequential scan.
+      const [index] = await prisma.$queryRawUnsafe<{ indexdef: string }[]>(
+        `SELECT indexdef FROM pg_indexes WHERE indexname = 'LibraryRecord_tenantId_lower_issuerName_idx'`,
+      );
+
+      expect(index?.indexdef).toContain('lower("issuerName")');
+    });
+  });
 });

@@ -227,6 +227,7 @@ Each package has its own `tsconfig.json` (no centralized config)
 ### Test Configuration
 - Base config: `jest.config.base.js`
 - Package-specific: `packages/*/jest.config.{mjs,ts}`
+- The reference implementation's unit config does not transform pg-boss's ESM-only build (only the integration rig does), so production code reachable from a unit test must not import the `@/lib/jobs` barrel, which loads pg-boss; import the piece it needs by its module path instead
 
 ### Environment Variables
 - Root `.env` file (use `.env.example` as template)

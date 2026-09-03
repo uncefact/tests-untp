@@ -7,12 +7,14 @@ import {
   type Credential,
   type LibraryRecord,
   type Prisma,
+  IdempotencyOperation,
 } from '../generated';
 import { prisma } from '../prisma';
 import { linkClaimToRecord } from './idempotency-key.repository';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
+import type { ProtectedDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 
 /**
  * A native credential as its callers see it: the `Credential` child row
@@ -44,7 +46,8 @@ export type CreateCredentialInput = {
   tenantId: string;
   storageUri: string;
   digestMultibase: string;
-  decryptionKey?: string;
+  /** Already wrapped by protectDecryptionKey; a raw storage-service key is a type error. */
+  decryptionKey?: ProtectedDecryptionKey;
   /** The type issuance was asked for: an extension's own name when it is one. */
   credentialType: string;
   /** The core kind the type resolves to (ADR-053 decision 8); null when unknown. */
@@ -180,7 +183,7 @@ export async function createCredential(
       data: { id: record.id, ...(withLinks ? linkedChildData : childData) },
     });
     if (input.idempotencyClaimId) {
-      await linkClaimToRecord(tx, input.idempotencyClaimId, record.id);
+      await linkClaimToRecord(tx, input.idempotencyClaimId, record.id, IdempotencyOperation.CREDENTIAL_ISSUE);
     }
     return flattenCredential({ ...credential, record });
   };
