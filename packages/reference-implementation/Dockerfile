@@ -165,6 +165,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/backfill-decryption-keys.ts ./src/lib/credentials/backfill-decryption-keys.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/backfill-credential-details.ts ./src/lib/credentials/backfill-credential-details.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/extract-credential-details.ts ./src/lib/credentials/extract-credential-details.ts
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/library/core-credential-type.ts ./src/lib/library/core-credential-type.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib/credentials/rotate-encryption-key.ts ./src/lib/credentials/rotate-encryption-key.ts
 # Read-only encryption audit and shared envelope-store iteration, required by
 # scripts/audit-encryption.ts and (via the preflight) the backfill (#764)

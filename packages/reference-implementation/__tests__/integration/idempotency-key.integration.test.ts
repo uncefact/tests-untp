@@ -1,6 +1,6 @@
 import { IdempotencyOperation } from '../../src/lib/prisma/generated';
 import { createRigClient, truncateApplicationTables } from './rig/db';
-import { seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
+import { insertNativeCredential, seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
 import {
   claimIdempotencyKey,
   completeIdempotencyKey,
@@ -49,14 +49,10 @@ describe('idempotency key', () => {
   }
 
   async function insertCredential() {
-    return prisma.credential.create({
-      data: {
-        tenantId: SYSTEM_TENANT_ID,
-        storageUri: 'https://storage.test/idempotent',
-        digestMultibase: 'zIdempotent',
-        credentialType: 'DigitalProductPassport',
-        coreDataModelVersion: '0.6.1',
-      },
+    return insertNativeCredential(prisma, {
+      storageUri: 'https://storage.test/idempotent',
+      digestMultibase: 'zIdempotent',
+      coreDataModelVersion: '0.6.1',
     });
   }
 
@@ -73,12 +69,12 @@ describe('idempotency key', () => {
     const credential = await insertCredential();
     await prisma.idempotencyKey.update({
       where: { id: claimed.claimId },
-      data: { credentialId: credential.id },
+      data: { recordId: credential.id },
     });
 
     const completed = await completeIdempotencyKey({
       claimId: claimed.claimId,
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: null,
     });
     expect(completed).toEqual({ applied: true });
@@ -86,11 +82,13 @@ describe('idempotency key', () => {
     const replay = await claimIdempotencyKey(claimInput());
     expect(replay).toEqual({
       outcome: 'replay',
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: null,
     });
 
-    await prisma.credential.delete({ where: { id: credential.id } });
+    // The library record is the delete target (ADR-053 decision 1): removing
+    // it cascades to the credential child and frees the claim.
+    await prisma.libraryRecord.delete({ where: { id: credential.id } });
 
     const afterDelete = await claimIdempotencyKey(claimInput());
     expect(afterDelete).toEqual({ outcome: 'claimed', claimId: expect.any(String) });
@@ -114,12 +112,12 @@ describe('idempotency key', () => {
     const credential = await insertCredential();
     await prisma.idempotencyKey.update({
       where: { id: reclaimed.claimId },
-      data: { credentialId: credential.id },
+      data: { recordId: credential.id },
     });
 
     const lateComplete = await completeIdempotencyKey({
       claimId: original.claimId,
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: [{ code: 'SHOULD_NOT_LAND', message: 'late original' }],
     });
     expect(lateComplete).toEqual({ applied: false });
@@ -127,7 +125,7 @@ describe('idempotency key', () => {
     const newRow = await prisma.idempotencyKey.findUnique({
       where: { id: reclaimed.claimId },
     });
-    expect(newRow?.credentialId).toBe(credential.id);
+    expect(newRow?.recordId).toBe(credential.id);
     expect(newRow?.responseBody).toBeNull();
     expect(newRow?.finalisedAt).toBeNull();
   });
@@ -140,7 +138,7 @@ describe('idempotency key', () => {
         operation: IdempotencyOperation.CREDENTIAL_ISSUE,
         key: KEY,
         bodyDigest: DIGEST,
-        credentialId: credential.id,
+        recordId: credential.id,
         resultRecordedAt: new Date(Date.now() - STALE_IN_FLIGHT_CLAIM_MS - 1),
       },
     });
@@ -148,7 +146,7 @@ describe('idempotency key', () => {
     const result = await claimIdempotencyKey(claimInput());
     expect(result).toEqual({
       outcome: 'replay',
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: null,
     });
 
@@ -183,7 +181,7 @@ describe('idempotency key', () => {
 
     expect(entityLinkFailed).toBe(true);
     const claimAfterRetry = await prisma.idempotencyKey.findUnique({ where: { id: kept.claimId } });
-    expect(claimAfterRetry?.credentialId).toBe(credential.id);
+    expect(claimAfterRetry?.recordId).toBe(credential.id);
     expect(claimAfterRetry?.resultRecordedAt).not.toBeNull();
 
     // Same path, but the claim is gone by the time the retry associates.
@@ -256,7 +254,7 @@ describe('idempotency key', () => {
       },
     });
     expect(keyRow?.id).toBe(reclaimed.claimId);
-    expect(keyRow?.credentialId).toBe(winner.credential.id);
+    expect(keyRow?.recordId).toBe(winner.credential.id);
     expect(keyRow?.resultRecordedAt).not.toBeNull();
   });
 
@@ -276,14 +274,14 @@ describe('idempotency key', () => {
 
     const first = await completeIdempotencyKey({
       claimId: claimed.claimId,
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: [{ code: 'ENTITY_LINK_FAILED', message: 'from original' }],
     });
     expect(first).toEqual({ applied: true });
 
     const second = await completeIdempotencyKey({
       claimId: claimed.claimId,
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: [{ code: 'SHOULD_NOT_LAND', message: 'from stale replayer' }],
     });
     expect(second).toEqual({ applied: false });
@@ -313,7 +311,7 @@ describe('idempotency key', () => {
     const body = [{ code: 'ENTITY_LINK_FAILED', message: 'gone-from-the-clear-column' }];
     const completed = await completeIdempotencyKey({
       claimId: claimed.claimId,
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: body,
     });
     expect(completed).toEqual({ applied: true });
@@ -329,7 +327,7 @@ describe('idempotency key', () => {
     const replay = await claimIdempotencyKey(claimInput());
     expect(replay).toEqual({
       outcome: 'replay',
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: body,
     });
   });
@@ -356,11 +354,11 @@ describe('idempotency key', () => {
     const credential = await insertCredential();
     await prisma.idempotencyKey.update({
       where: { id: issue.claimId },
-      data: { credentialId: credential.id },
+      data: { recordId: credential.id },
     });
     await completeIdempotencyKey({
       claimId: issue.claimId,
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: [{ code: 'ENTITY_LINK_FAILED', message: 'from issue' }],
     });
 
@@ -372,7 +370,7 @@ describe('idempotency key', () => {
     const replayIssue = await claimIdempotencyKey(claimInput());
     expect(replayIssue).toEqual({
       outcome: 'replay',
-      credentialId: credential.id,
+      recordId: credential.id,
       responseBody: [{ code: 'ENTITY_LINK_FAILED', message: 'from issue' }],
     });
   });

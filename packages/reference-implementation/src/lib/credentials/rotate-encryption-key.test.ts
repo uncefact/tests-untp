@@ -610,6 +610,7 @@ describe('buildRotationReport', () => {
       stores: {
         serviceInstances: store(),
         credentials: store(),
+        externalCredentials: store(),
         idempotencyResponses: store(),
       },
     };

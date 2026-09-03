@@ -14,6 +14,12 @@ export type ResolvedDataModel = {
    * that is the key the registry uses.
    */
   coreDataModelVersion: string;
+  /**
+   * The core data model's type name (`DigitalProductPassport` and so on),
+   * the parent's for an extension, which is also the key the bridge is
+   * registered under.
+   */
+  coreDataModelType: string;
 };
 
 export function isDccDataModel(dataModel: DataModelListItem): boolean {
@@ -54,5 +60,5 @@ export async function resolveDataModel(
   }
   schemaUrls.push(dataModel.schemaUrl);
 
-  return { dataModel, bridge, schemaUrls, coreDataModelVersion };
+  return { dataModel, bridge, schemaUrls, coreDataModelVersion, coreDataModelType: dataModelType };
 }

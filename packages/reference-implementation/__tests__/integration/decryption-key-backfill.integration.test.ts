@@ -1,5 +1,5 @@
 import { createRigClient, truncateApplicationTables } from './rig/db';
-import { seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
+import { seedSystemTenant, SYSTEM_TENANT_ID, insertNativeCredential } from './fixtures';
 import { AdapterType, ServiceType, type PrismaClient } from '../../src/lib/prisma/generated/index.js';
 
 /**
@@ -75,15 +75,11 @@ async function envelopeUnder(key: string, plaintext: string): Promise<string> {
 }
 
 async function createCredential(id: string, decryptionKey: string | null): Promise<void> {
-  await client.credential.create({
-    data: {
-      id,
-      tenantId: SYSTEM_TENANT_ID,
-      storageUri: `https://storage.test/${id}`,
-      digestMultibase: `zQm${id}`,
-      credentialType: 'DigitalProductPassport',
-      decryptionKey,
-    },
+  await insertNativeCredential(client, {
+    id,
+    storageUri: `https://storage.test/${id}`,
+    digestMultibase: `zQm${id}`,
+    decryptionKey,
   });
 }
 
@@ -145,16 +141,27 @@ describe('decryption-key backfill against Postgres', () => {
     // a hang rather than as this assertion.
     const total = 250;
     const ids = Array.from({ length: total }, (_, i) => `c-page-${String(i).padStart(4, '0')}`);
-    await client.credential.createMany({
-      data: [...ids].reverse().map((id) => ({
-        id,
-        tenantId: SYSTEM_TENANT_ID,
-        storageUri: `https://storage.test/${id}`,
-        digestMultibase: `zQm${id}`,
-        credentialType: 'DigitalProductPassport',
-        decryptionKey: `plaintext-${id}`,
-      })),
-    });
+    // Parent and child rows in one transaction: the deferred constraint
+    // trigger refuses a parent that reaches commit without its child.
+    await client.$transaction([
+      client.libraryRecord.createMany({
+        data: [...ids].reverse().map((id) => ({
+          id,
+          tenantId: SYSTEM_TENANT_ID,
+          origin: 'NATIVE' as const,
+          credentialType: 'DigitalProductPassport',
+        })),
+      }),
+      client.credential.createMany({
+        data: [...ids].reverse().map((id) => ({
+          id,
+          tenantId: SYSTEM_TENANT_ID,
+          storageUri: `https://storage.test/${id}`,
+          digestMultibase: `zQm${id}`,
+          decryptionKey: `plaintext-${id}`,
+        })),
+      }),
+    ]);
 
     const { backfillDecryptionKeys } = await loadBackfill();
     const { revealDecryptionKey, isProtectedDecryptionKey } = await loadProtection();
@@ -230,7 +237,10 @@ describe('decryption-key backfill against Postgres', () => {
     // hand-built object carrying that code, which proves nothing about what
     // Prisma actually raises. The hook deletes whichever row is about to be
     // updated, so the scenario does not depend on the production batch size
-    // holding both rows in one page.
+    // holding both rows in one page. A record is deleted through its
+    // LibraryRecord parent, which cascades to the Credential row the backfill
+    // is about to update; deleting the child directly is refused (ADR-053
+    // decision 1).
     let deletedId: string | null = null;
     const racing = new Proxy(client, {
       get(target, property, receiver) {
@@ -244,7 +254,7 @@ describe('decryption-key backfill against Postgres', () => {
             return async (args: { where: { id: string } }) => {
               if (deletedId === null) {
                 deletedId = args.where.id;
-                await concurrent.credential.delete({ where: { id: deletedId } });
+                await concurrent.libraryRecord.delete({ where: { id: deletedId } });
               }
               return (credentialTarget.update as (a: unknown) => Promise<unknown>)(args);
             };

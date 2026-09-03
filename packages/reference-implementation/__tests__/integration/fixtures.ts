@@ -3,7 +3,12 @@ import os from 'node:os';
 import path from 'node:path';
 import type { LoggerService as Logger } from '@uncefact/untp-ri-services';
 import type { PrismaClient } from '../../src/lib/prisma/generated/index.js';
-import { RecordSource } from '../../src/lib/prisma/generated/index.js';
+import { LibraryRecordOrigin, RecordSource } from '../../src/lib/prisma/generated/index.js';
+import type {
+  CoreCredentialType,
+  CredentialDetailsError,
+  CredentialDetailsStatus,
+} from '../../src/lib/prisma/generated/index.js';
 import { SYSTEM_TENANT_ID } from '../../src/lib/prisma/constants';
 import { runCustomSeed, type CustomSeedDependencies } from '../../prisma/custom-seed';
 import type { FixtureServer } from './rig/fixture-server';
@@ -174,4 +179,64 @@ export function schemeDoc(
       })),
     })),
   };
+}
+
+export type NativeCredentialFixture = {
+  id?: string;
+  tenantId?: string;
+  storageUri?: string;
+  digestMultibase?: string;
+  decryptionKey?: string | null;
+  credentialType?: string;
+  coreCredentialType?: CoreCredentialType | null;
+  coreDataModelVersion?: string | null;
+  detailsStatus?: CredentialDetailsStatus;
+  detailsError?: CredentialDetailsError | null;
+  details?: {
+    name?: string | null;
+    issuerName?: string | null;
+    issuerDid?: string | null;
+    subjectName?: string | null;
+    subjectId?: string | null;
+    validFrom?: Date | null;
+    validUntil?: Date | null;
+  };
+};
+
+/**
+ * Inserts a native credential the way the write paths do (ADR-053 decision
+ * 1): its LibraryRecord parent and its Credential child, sharing one id, in
+ * one transaction. Suites that need a credential row use this rather than
+ * creating a bare child, which the schema refuses.
+ */
+export async function insertNativeCredential(
+  prisma: PrismaClient,
+  fixture: NativeCredentialFixture = {},
+): Promise<{ id: string }> {
+  const tenantId = fixture.tenantId ?? SYSTEM_TENANT_ID;
+  return prisma.$transaction(async (tx) => {
+    const record = await tx.libraryRecord.create({
+      data: {
+        ...(fixture.id !== undefined ? { id: fixture.id } : {}),
+        tenantId,
+        origin: LibraryRecordOrigin.NATIVE,
+        credentialType: fixture.credentialType ?? 'DigitalProductPassport',
+        coreCredentialType: fixture.coreCredentialType ?? null,
+        coreDataModelVersion: fixture.coreDataModelVersion ?? null,
+        ...(fixture.detailsStatus !== undefined ? { detailsStatus: fixture.detailsStatus } : {}),
+        detailsError: fixture.detailsError ?? null,
+        ...(fixture.details ?? {}),
+      },
+    });
+    await tx.credential.create({
+      data: {
+        id: record.id,
+        tenantId,
+        storageUri: fixture.storageUri ?? `https://storage.test/${record.id}`,
+        digestMultibase: fixture.digestMultibase ?? `z${record.id}`,
+        decryptionKey: fixture.decryptionKey ?? null,
+      },
+    });
+    return { id: record.id };
+  });
 }

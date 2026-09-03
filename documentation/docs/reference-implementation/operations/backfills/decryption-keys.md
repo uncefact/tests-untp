@@ -36,7 +36,7 @@ It needs `DATA_ENCRYPTION_KEY` and a database target. A pre-set `RI_DATABASE_URL
 
 ## How it protects itself
 
-Before writing anything, the run decrypts every encrypted value it can find in every store the key protects: credential keys, service instance configurations and idempotent-retry response bodies. A response body that is damaged or does not open is reported, never blocks the run and never counts as proof that the key is right; the next key rotation clears it, and the claim and its credential stay. Any other failed decryption aborts the run, naming every row that could not be read. A wrong key therefore ends as a refusal rather than as damage.
+Before writing anything, the run decrypts every encrypted value it can find in every store the key protects: credential keys, service instance configurations, the keys of credentials registered from third parties, and idempotent-retry response bodies. A response body that is damaged or does not open is reported, never blocks the run and never counts as proof that the key is right; the next key rotation clears it, and the claim and its credential stay. Any other failed decryption aborts the run, naming every row that could not be read. A wrong key therefore ends as a refusal rather than as damage.
 
 Where nothing stored can prove the key and there are plaintext keys waiting to be wrapped, the run refuses rather than guessing. Both halves matter: a database with nothing to wrap completes without `--force`, because there is no risky write to gate. `--force` accepts the risk explicitly, and is only appropriate once you have verified the key out of band and hold a backup:
 

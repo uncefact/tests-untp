@@ -11,8 +11,8 @@ jest.mock('jose', () => ({
 }));
 
 import { createRigClient, truncateApplicationTables } from './rig/db';
-import { seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
-import { CredentialDetailsStatus } from '../../src/lib/prisma/generated/index.js';
+import { insertNativeCredential, seedSystemTenant } from './fixtures';
+import { CoreCredentialType, CredentialDetailsStatus } from '../../src/lib/prisma/generated/index.js';
 
 /**
  * Integration coverage for the credential-details backfill (#953), against
@@ -44,6 +44,7 @@ function compactJwt(payload: Record<string, unknown>): string {
 function envelopedCredential() {
   const payload = {
     '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
+    type: ['VerifiableCredential', 'DigitalProductPassport'],
     name: 'Wool Passport',
     issuer: { id: 'did:web:issuer.example', name: 'Example Issuer' },
     credentialSubject: {
@@ -60,15 +61,37 @@ function envelopedCredential() {
 }
 
 describe('credential-details backfill against Postgres', () => {
+  it('fills in only the core kind of an extracted record that has none, and leaves a record with a known kind alone', async () => {
+    await insertNativeCredential(client, {
+      id: 'cred-nokind',
+      credentialType: 'DigitalLivestockPassport',
+      coreCredentialType: null,
+      detailsStatus: CredentialDetailsStatus.EXTRACTED,
+      details: { name: 'Kept' },
+    });
+    await insertNativeCredential(client, {
+      id: 'cred-known',
+      coreCredentialType: CoreCredentialType.DPP,
+      detailsStatus: CredentialDetailsStatus.EXTRACTED,
+    });
+    const { backfillCredentialDetails } = await import('../../src/lib/credentials/backfill-credential-details');
+    const fetchArtifact = async () => JSON.stringify(envelopedCredential());
+
+    const result = await backfillCredentialDetails(client, { fetchArtifact });
+
+    expect(result.failures).toEqual([]);
+    expect(result).toMatchObject({ scanned: 1, updated: 0, coreKindsResolved: 1, failed: 0 });
+    const filled = await client.libraryRecord.findUniqueOrThrow({ where: { id: 'cred-nokind' } });
+    expect(filled.coreCredentialType).toBe(CoreCredentialType.DPP);
+    expect(filled.detailsStatus).toBe(CredentialDetailsStatus.EXTRACTED);
+    expect(filled.name).toBe('Kept');
+  });
+
   it('fills a pre-capture row, then reports zero changes on a second run', async () => {
-    await client.credential.create({
-      data: {
-        id: 'c-pending',
-        tenantId: SYSTEM_TENANT_ID,
-        storageUri: 'https://storage.test/c-pending',
-        digestMultibase: 'zQmPending',
-        credentialType: 'DigitalProductPassport',
-      },
+    await insertNativeCredential(client, {
+      id: 'c-pending',
+      storageUri: 'https://storage.test/c-pending',
+      digestMultibase: 'zQmPending',
     });
 
     const { backfillCredentialDetails } = await import('../../src/lib/credentials/backfill-credential-details');
@@ -80,7 +103,7 @@ describe('credential-details backfill against Postgres', () => {
     expect(first.updated).toBe(1);
     expect(first.failed).toBe(0);
 
-    const afterFirst = await client.credential.findUniqueOrThrow({ where: { id: 'c-pending' } });
+    const afterFirst = await client.libraryRecord.findUniqueOrThrow({ where: { id: 'c-pending' } });
     expect(afterFirst.detailsStatus).toBe(CredentialDetailsStatus.EXTRACTED);
     expect(afterFirst.coreDataModelVersion).toBe('0.6.1');
     expect(afterFirst.name).toBe('Wool Passport');
@@ -97,7 +120,7 @@ describe('credential-details backfill against Postgres', () => {
     expect(second.updated).toBe(0);
     expect(second.failed).toBe(0);
 
-    const afterSecond = await client.credential.findUniqueOrThrow({ where: { id: 'c-pending' } });
+    const afterSecond = await client.libraryRecord.findUniqueOrThrow({ where: { id: 'c-pending' } });
     expect(afterSecond.updatedAt).toEqual(afterFirst.updatedAt);
     expect(afterSecond.name).toBe(afterFirst.name);
     expect(afterSecond.coreDataModelVersion).toBe(afterFirst.coreDataModelVersion);

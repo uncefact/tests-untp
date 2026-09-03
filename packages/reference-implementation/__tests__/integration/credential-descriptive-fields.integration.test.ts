@@ -1,5 +1,5 @@
 import { createRigClient, truncateApplicationTables } from './rig/db';
-import { seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
+import { insertNativeCredential, seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
 import { CredentialDetailsStatus } from '../../src/lib/prisma/generated/index.js';
 import { createCredential } from '../../src/lib/prisma/repositories/credential.repository';
 
@@ -23,17 +23,13 @@ describe('credential descriptive fields', () => {
   });
 
   it('reads EXTRACTION_PENDING for a row inserted without captured fields', async () => {
-    const created = await prisma.credential.create({
-      data: {
-        tenantId: SYSTEM_TENANT_ID,
-        storageUri: 'https://storage.test/legacy',
-        digestMultibase: 'zLegacy',
-        credentialType: 'DigitalProductPassport',
-        coreDataModelVersion: '0.6.1',
-      },
+    const created = await insertNativeCredential(prisma, {
+      storageUri: 'https://storage.test/legacy',
+      digestMultibase: 'zLegacy',
+      coreDataModelVersion: '0.6.1',
     });
 
-    const row = await prisma.credential.findUnique({ where: { id: created.id } });
+    const row = await prisma.libraryRecord.findUnique({ where: { id: created.id } });
 
     expect(row).not.toBeNull();
     expect(row?.detailsStatus).toBe(CredentialDetailsStatus.EXTRACTION_PENDING);
@@ -67,7 +63,7 @@ describe('credential descriptive fields', () => {
       detailsStatus: CredentialDetailsStatus.EXTRACTED,
     });
 
-    const row = await prisma.credential.findUnique({ where: { id: credential.id } });
+    const row = await prisma.libraryRecord.findUnique({ where: { id: credential.id } });
 
     expect(row).not.toBeNull();
     expect(row?.name).toBe(captured.name);

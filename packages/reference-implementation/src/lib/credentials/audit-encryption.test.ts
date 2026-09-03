@@ -66,6 +66,7 @@ describe('auditEncryption', () => {
       stores: {
         serviceInstances: { ...clean, okCount: 1 },
         credentials: { ...clean, okCount: 1 },
+        externalCredentials: { ...clean, okCount: 0 },
         idempotencyResponses: { ...clean, okCount: 0 },
       },
     });
@@ -220,6 +221,7 @@ describe('auditEncryption', () => {
         stores: {
           serviceInstances: store(),
           credentials: store(),
+          externalCredentials: store(),
           idempotencyResponses: store(),
         },
       };

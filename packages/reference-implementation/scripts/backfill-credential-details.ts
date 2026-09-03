@@ -2,11 +2,15 @@
  * Captures descriptive fields onto credential rows issued before those
  * columns existed (#953).
  *
- * Rows still at EXTRACTION_PENDING are fetched from storage, decrypted when
- * the row holds a key, decoded, and written with the library-facing details
- * plus the spec version the matching data-model bridge was resolved with.
- * Rows already EXTRACTED or EXTRACTION_FAILED are left untouched, so
- * re-running converges to no changes.
+ * Records still at EXTRACTION_PENDING are fetched from storage, decrypted
+ * when the row holds a key, decoded, and written with the library-facing
+ * details plus the spec version the matching data-model bridge was resolved
+ * with. A record whose core credential type is null is also selected,
+ * whatever its extraction status, and has only that type written, read from
+ * the signed credential's type array (ADR-053 decision 8). Such a record is
+ * selected on every run until the type is set, so a record whose type the
+ * artefact does not name is reported and holds the exit code at 1 until an
+ * operator sets it by hand or removes the record.
  *
  * Usage (from packages/reference-implementation, source checkout):
  *   pnpm backfill:credential-details [-- --dry-run]
@@ -57,10 +61,11 @@ try {
   const result = await backfillCredentialDetails(prisma, { dryRun });
   const verb = dryRun ? 'would update' : 'updated';
   const failVerb = dryRun ? 'would fail' : 'failed';
+  const kindVerb = dryRun ? 'would have their core kind filled in' : 'had their core kind filled in';
   console.log(
     `${dryRun ? 'Dry run' : 'Backfill complete'}: ${result.scanned} scanned, ${result.updated} ${verb}, ${
-      result.failed
-    } ${failVerb}.`,
+      result.coreKindsResolved
+    } ${kindVerb}, ${result.failed} ${failVerb}.`,
   );
   if (result.failures.length > 0) {
     for (const failure of result.failures) {

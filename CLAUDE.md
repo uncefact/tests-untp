@@ -158,7 +158,7 @@ External integrations use interfaces + implementations:
 - Identity scheme handling (GS1)
 
 ### Reference Implementation Architecture
-- **Database**: Prisma ORM. See `packages/reference-implementation/prisma/schema.prisma` for the full model list (users, tenants, DIDs, credentials, service instances, identifiers and schemes, organisations, facilities, products, data models, render templates, and conformity records)
+- **Database**: Prisma ORM. See `packages/reference-implementation/prisma/schema.prisma` for the full model list (users, tenants, DIDs, credentials, service instances, identifiers and schemes, organisations, facilities, products, data models, render templates, and conformity records). A credential is two rows, a `LibraryRecord` parent and an origin-specific child. The child is `Credential` for one this system issued, or `ExternalCredential` for one registered from a third party (ADR-053)
 - **API Routes**: `/src/app/api/v1/` - credentials, cvc, data-models, dids, facilities, identifiers, organisations, products, registrars, render-templates, schemes, services. Auth is unversioned, at `/api/auth/[...nextauth]`
 - **Auth**: Keycloak via NextAuth.js with organization-level branding
 - **Config**: Tenant configuration via database (replacing legacy app-config.json)

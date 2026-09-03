@@ -5,7 +5,7 @@ title: Credential Details
 
 # Credential Details Backfill
 
-Reads stored credentials that predate descriptive-field capture and writes the library-facing name, issuer, subject, and validity columns, plus the spec version the matching data-model bridge was resolved with.
+Reads stored credentials that predate descriptive-field capture and writes the library-facing name, issuer, subject, and validity columns, plus the spec version the matching data-model bridge was resolved with. It also fills in the core credential type of any record whose type the parent-row migration could not resolve.
 
 This is an **operator-run** backfill. It ships in the image but never runs on its own, because it fetches every tenant's stored artefact. A wrong details write is not itself destructive to the stored credential, but the fetch is an external side effect, and the window during which existing rows sit at `EXTRACTION_PENDING` should stay short.
 
@@ -13,7 +13,7 @@ Credentials issued after descriptive-field capture already carry these columns. 
 
 ## Before running it
 
-The descriptive-column migration must already have been applied. Run this job immediately after that migration deploys, so existing rows do not sit at `EXTRACTION_PENDING` indefinitely.
+The migrations that add the descriptive columns and move them onto the library record must already have been applied. Run this job immediately after they deploy, so existing rows do not sit at `EXTRACTION_PENDING` indefinitely.
 
 Take a database backup first. The job does not rewrite the stored credential, but it does update every matching row's details columns.
 
@@ -49,20 +49,28 @@ If a row holds an encrypted artefact, `DATA_ENCRYPTION_KEY` must match the key t
 
 ## What it reports
 
-A completed run reports how many rows it scanned, how many it updated (or would update, in a dry run), and how many failed (or would fail). Every failed row is listed by record id, error class, and message.
+The job selects every native record whose descriptive fields are still `EXTRACTION_PENDING`, and also every native record whose core credential type is unknown, whatever its status. A record selected only for its unknown core type has that one value filled in from the signed credential's type array and nothing else changed, and it is reported as a failure, run after run, if the credential names no core type. The job exits 1 for as long as such a record exists, so anything that runs it on a schedule keeps failing until the record's core type is set by hand or the record is removed. A completed run reports how many rows it scanned, how many it updated (or would update, in a dry run), how many had only their core type filled in, and how many failed (or would fail). Every failed row is listed by record id, error class, and message.
 
-Three error classes:
+Three error classes name a problem reading the credential:
 
-- **UNREADABLE_ENVELOPE.** The storage URI could not be fetched, or the body was not valid JSON, or the artefact was not a decodable enveloped credential. Check that the storage service is reachable and that the object at that URI is intact. After the artefact can be read, set that row's `detailsStatus` back to `EXTRACTION_PENDING` and re-run.
-- **DECRYPT_FAILED.** The stored decryption key could not unwrap the artefact, or the at-rest key envelope could not be opened. Confirm `DATA_ENCRYPTION_KEY` matches the running application, and that the row's key is the one that stored the artefact. After the key is restored, set `detailsStatus` back to `EXTRACTION_PENDING` and re-run.
-- **BRIDGE_ERROR.** No unique registered bridge version matched the credential's `@context`, or a stored `coreDataModelVersion` has no bridge, or the extractor threw. Do not guess a version. After a code fix (for example a newly registered bridge), set `detailsStatus` back to `EXTRACTION_PENDING` and re-run.
+- **UNREADABLE_ENVELOPE.** The storage URI could not be fetched, or the body was not valid JSON, or the artefact was not a decodable enveloped credential. Check that the storage service is reachable and that the object at that URI is intact.
+- **DECRYPT_FAILED.** The stored decryption key could not unwrap the artefact, or the at-rest key envelope could not be opened. Confirm `DATA_ENCRYPTION_KEY` matches the running application, and that the row's key is the one that stored the artefact.
+- **BRIDGE_ERROR.** No unique registered bridge version matched the credential's `@context`, or a stored `coreDataModelVersion` has no bridge, or the extractor threw, or the credential's type array names no core credential type, or names two of them. Do not guess a version.
+
+Once the cause is fixed, a record whose descriptive fields failed to extract is retried by setting its `detailsStatus` back to `EXTRACTION_PENDING` and re-running. A record that failed only on its core credential type needs no such reset, because it is selected on every run for as long as that type is unknown. See [Re-running](#re-running).
+
+Two failure messages, reported under the class `WRITE_FAILED`, name no problem with the credential at all. One says the row's outcome could not be written, and the other says the record changed after it was read. Both mean this pass did not land that row, and a re-run picks it up.
 
 A run that finishes its work with no failures exits 0. It exits 1 when any row failed, so an automated caller notices.
 
-One failed row does not abort the batch. Every other row is still attempted, and the failed row is marked `EXTRACTION_FAILED` rather than left pending.
+One failed row does not abort the batch. Every other row is still attempted. A record selected because its descriptive fields were pending is marked `EXTRACTION_FAILED`, so a later run leaves it alone until an operator resets it. A record selected only for its unknown core credential type keeps whatever status it had, because the run was never reading its details.
 
 ## Re-running
 
-Re-running is safe and converges. Rows already `EXTRACTED` or `EXTRACTION_FAILED` are not selected. A second run over a fully backfilled table reports zero rows changed.
+Re-running is safe. A record whose descriptive fields were extracted is not selected again, and neither is one whose core credential type has been filled in, so a second run over a table with nothing left to resolve reports zero rows changed.
 
-Failed rows stay failed until you reset them to `EXTRACTION_PENDING`. That is deliberate: a retry must be an operator decision after the cause is understood, not an automatic re-derivation.
+A record whose core credential type is still unknown after a run is the exception, and that is by design. It is selected again on every run, reported again, and the job exits 1 for as long as one exists, so a scheduled run keeps failing rather than leaving the record unresolved and unmentioned. Where the cause was an artefact that could not be fetched or opened, fixing that and re-running resolves it. Where the credential's type array names no core credential type, or names two of them, nothing in the artefact says which core type the record belongs to, so no re-run will resolve it and an operator has to.
+
+Resetting such a record's `detailsStatus` to `EXTRACTION_PENDING` does not resolve its core credential type, and on a record whose details were extracted it costs you what you have. The next run treats the record as a full extraction, fails on the same missing type, and marks the record `EXTRACTION_FAILED`, so a field the credential genuinely does not carry stops reading as absent and starts reading as unknown. Set the record's `coreCredentialType` by hand instead, to the core type the credential belongs to, or remove the record. Where the record's descriptive fields never extracted either, set the core type first and reset `detailsStatus` afterwards, so the next run has a bridge to read the credential with.
+
+A record whose descriptive-field extraction failed stays failed until you reset it to `EXTRACTION_PENDING`. That is deliberate: a retry must be an operator decision after the cause is understood, not an automatic re-derivation.

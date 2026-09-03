@@ -71,7 +71,10 @@ async function deleteTenantData(client: any, tenantId: string, options?: { prese
   await client.query(`DELETE FROM "DataModel" WHERE "tenantId" = $1 AND "parentConfigId" IS NOT NULL`, [tenantId]);
   await client.query(`DELETE FROM "DataModel" WHERE "tenantId" = $1`, [tenantId]);
 
-  await client.query(`DELETE FROM "Credential" WHERE "tenantId" = $1`, [tenantId]);
+  // A credential is a child of its library record and the database refuses a
+  // direct child delete; deleting the parent cascades to the child, its
+  // check runs and its idempotency claim.
+  await client.query(`DELETE FROM "LibraryRecord" WHERE "tenantId" = $1`, [tenantId]);
   await client.query(`DELETE FROM "LinkRegistration" WHERE "tenantId" = $1`, [tenantId]);
   await client.query(`DELETE FROM "Identifier" WHERE "tenantId" = $1`, [tenantId]);
   await client.query(

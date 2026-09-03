@@ -81,6 +81,7 @@ function createFakeClient(rows: Row[], serviceInstances: ServiceInstanceRow[] = 
         return row;
       }),
     },
+    externalCredential: fakeTable([] as Row[], 'decryptionKey'),
     idempotencyKey: fakeTable(replayRows, 'responseBody'),
   };
 }

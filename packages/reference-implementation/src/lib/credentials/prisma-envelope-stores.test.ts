@@ -42,10 +42,12 @@ function client(
   serviceInstances: { id: string; config: string }[] = [],
   credentials: KeyRow[] = [],
   replays: { id: string; responseBody: string | null }[] = [],
+  externals: KeyRow[] = [],
 ) {
   return {
     serviceInstance: fakeDelegate(serviceInstances, 'config'),
     credential: fakeDelegate(credentials, 'decryptionKey'),
+    externalCredential: fakeDelegate(externals, 'decryptionKey'),
     idempotencyKey: fakeDelegate(replays, 'responseBody'),
   } satisfies PrismaEnvelopeStoresClient;
 }
@@ -110,6 +112,37 @@ describe('Prisma envelope stores (the adapter)', () => {
       take: 100,
     });
     expect(c.credential.findMany.mock.calls[2][0].where).toEqual({ decryptionKey: { startsWith: '{' } });
+  });
+
+  it('walks and samples every keyed external credential row, since that store never holds plaintext', async () => {
+    const c = client(
+      [],
+      [],
+      [],
+      [
+        { id: 'ext-plain', decryptionKey: 'not-an-envelope' },
+        { id: 'ext-1', decryptionKey: '{"envelope":true}' },
+        { id: 'ext-null', decryptionKey: null },
+      ],
+    );
+    const stores = prismaEnvelopeStores(c);
+
+    await expect(ids(stores.externalCredentials.rows())).resolves.toEqual(['ext-1', 'ext-plain']);
+    await expect(ids(stores.externalCredentials.candidates())).resolves.toEqual(['ext-1', 'ext-plain']);
+    expect(c.externalCredential.findMany).toHaveBeenNthCalledWith(1, {
+      where: { decryptionKey: { not: null } },
+      select: { id: true, decryptionKey: true },
+      orderBy: { id: 'asc' },
+      take: 100,
+    });
+    await expect(stores.externalCredentials.casWrite('ext-1', '{"envelope":true}', 'next')).resolves.toBe(true);
+    expect(c.externalCredential.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'ext-1', decryptionKey: '{"envelope":true}' },
+      data: { decryptionKey: 'next' },
+    });
+    await expect(stores.externalCredentials.readCurrent('ext-1')).resolves.toEqual({ kind: 'present', value: 'next' });
+    await expect(stores.externalCredentials.readCurrent('ext-null')).resolves.toEqual({ kind: 'cleared' });
+    await expect(stores.externalCredentials.readCurrent('nope')).resolves.toEqual({ kind: 'missing' });
   });
 
   it('samples every stored replay body, since that store never holds plaintext', async () => {
@@ -182,5 +215,6 @@ describe('Prisma envelope stores (the adapter)', () => {
     });
     await expect(stores.serviceInstances.discard('svc-1', 'c')).rejects.toThrow('never discarded');
     await expect(stores.credentials.discard('cred-1', 'k')).rejects.toThrow('never discarded');
+    await expect(stores.externalCredentials.discard('ext-1', 'k')).rejects.toThrow('never discarded');
   });
 });

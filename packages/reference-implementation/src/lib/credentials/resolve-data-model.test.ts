@@ -70,6 +70,7 @@ describe('resolveDataModel', () => {
       bridge: MOCK_BRIDGE,
       schemaUrls: ['https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json'],
       coreDataModelVersion: '0.6.1',
+      coreDataModelType: 'DigitalProductPassport',
     });
   });
 

@@ -286,6 +286,7 @@ function setupHappyPath() {
     bridge: stubBridge,
     schemaUrls: [DATA_MODEL.schemaUrl],
     coreDataModelVersion: '0.6.1',
+    coreDataModelType: 'DigitalProductPassport',
   });
   mockValidateCredentialPayload.mockResolvedValue(undefined);
   mockGetDidByDid.mockResolvedValue({
@@ -871,6 +872,7 @@ describe('POST /api/v1/credentials', () => {
         credentialPayload: VALID_PAYLOAD,
         credentialType: 'DigitalProductPassport',
         coreDataModelVersion: '0.6.1',
+        coreCredentialType: 'DPP',
         refs: { organisations: [], facilities: [], products: [] },
         vcService,
         storageService,
@@ -2031,7 +2033,7 @@ describe('POST /api/v1/credentials', () => {
     it('replays a stored 201 without warnings and never validates or issues', async () => {
       mockFindIdempotencyKey.mockResolvedValue({
         outcome: 'replay',
-        credentialId: 'cred-original',
+        recordId: 'cred-original',
         responseBody: null,
       });
 
@@ -2050,7 +2052,7 @@ describe('POST /api/v1/credentials', () => {
       const warnings = [{ code: 'ENTITY_LINK_FAILED', message: 'gone' }];
       mockFindIdempotencyKey.mockResolvedValue({
         outcome: 'replay',
-        credentialId: 'cred-original',
+        recordId: 'cred-original',
         responseBody: warnings,
       });
 
@@ -2067,7 +2069,7 @@ describe('POST /api/v1/credentials', () => {
     it('omits warnings on replay when the stored list is empty', async () => {
       mockFindIdempotencyKey.mockResolvedValue({
         outcome: 'replay',
-        credentialId: 'cred-original',
+        recordId: 'cred-original',
         responseBody: [],
       });
 
@@ -2149,7 +2151,7 @@ describe('POST /api/v1/credentials', () => {
       mockFindIdempotencyKey.mockResolvedValue({ outcome: 'absent' });
       mockClaimIdempotencyKey.mockResolvedValue({
         outcome: 'replay',
-        credentialId: 'cred-original',
+        recordId: 'cred-original',
         responseBody: warnings,
       });
 
@@ -2166,7 +2168,7 @@ describe('POST /api/v1/credentials', () => {
     it('appends IDEMPOTENCY_RESPONSE_UNREADABLE when a replayed response body could not be read', async () => {
       mockFindIdempotencyKey.mockResolvedValue({
         outcome: 'replay',
-        credentialId: 'cred-original',
+        recordId: 'cred-original',
         responseBody: null,
         responseBodyUnreadable: true,
       });
@@ -2211,7 +2213,7 @@ describe('POST /api/v1/credentials', () => {
       expect(mockCompleteIdempotencyKey).toHaveBeenCalledTimes(1);
       expect(mockCompleteIdempotencyKey).toHaveBeenCalledWith({
         claimId: 'claim-1',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: json.warnings,
       });
       expect(json.warnings).toEqual([expect.objectContaining({ code: 'ENTITY_LINK_FAILED' })]);
@@ -2244,7 +2246,7 @@ describe('POST /api/v1/credentials', () => {
       mockCompleteIdempotencyKey.mockResolvedValue({ applied: false });
       mockFindIdempotencyKey.mockResolvedValueOnce({ outcome: 'absent' }).mockResolvedValueOnce({
         outcome: 'replay',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: winnerWarnings,
       });
 
@@ -2288,7 +2290,7 @@ describe('POST /api/v1/credentials', () => {
       expect(mockCompleteIdempotencyKey).toHaveBeenCalledTimes(1);
       expect(mockCompleteIdempotencyKey).toHaveBeenCalledWith({
         claimId: 'claim-1',
-        credentialId: 'cred-1',
+        recordId: 'cred-1',
         responseBody: json.warnings,
       });
       expect(json.warnings).toEqual([expect.objectContaining({ code: 'PUBLISH_IDENTIFIER_UNKNOWN' })]);
@@ -2344,7 +2346,7 @@ describe('POST /api/v1/credentials', () => {
     it('omits warnings on replay when the stored body is not an array', async () => {
       mockFindIdempotencyKey.mockResolvedValue({
         outcome: 'replay',
-        credentialId: 'cred-original',
+        recordId: 'cred-original',
         responseBody: { code: 'not-a-list' },
       });
 

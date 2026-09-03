@@ -15,7 +15,7 @@ import {
   throwIdempotencyClassification,
 } from '@/lib/api/idempotency';
 import { readRequestBytes } from '@/lib/api/request-body';
-import { IdempotencyOperation } from '@/lib/prisma/generated';
+import { CoreCredentialType, IdempotencyOperation } from '@/lib/prisma/generated';
 import { credentialIssueRequestSchema, listCredentialsQuerySchema } from '@/lib/api/request-schemas/credential';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { resolveAppUrl, buildVerifyUrl } from '@/lib/config/app-url.config';
@@ -25,6 +25,7 @@ import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
 import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
+import { coreCredentialTypeOf } from '@/lib/library/core-credential-type';
 import { schemaLoader } from '@/lib/credentials/schema-loader';
 import {
   updateCredentialPublished,
@@ -59,6 +60,24 @@ type CredentialWarning = {
 const logger = apiLogger.child({ route: '/api/v1/credentials' });
 
 /**
+ * The core credential type a resolved data model stands for. That name is
+ * always one the bridge registry knows today, so a miss means the registry
+ * and the core-type vocabulary have drifted apart. The record is still
+ * written, with its core kind unknown, and the operator is told why.
+ */
+function resolveCoreCredentialType(coreDataModelType: string): CoreCredentialType | null {
+  const coreCredentialType = coreCredentialTypeOf(coreDataModelType);
+  if (coreCredentialType === undefined) {
+    logger.warn(
+      { coreDataModelType },
+      'Core data model type is not a known core credential type; recording no core kind',
+    );
+    return null;
+  }
+  return coreCredentialType;
+}
+
+/**
  * Default human verification link: this RI's own verify page, built from the
  * boot-validated RI_APP_URL (see instrumentation.node.ts). Used when a caller
  * requests publishing without an explicit publishingOptions.humanVerificationUrl.
@@ -85,12 +104,8 @@ function idempotencyResponseUnreadableWarning(): CredentialWarning {
   };
 }
 
-function issuanceReplayResponse(replay: {
-  credentialId: string;
-  responseBody: unknown;
-  responseBodyUnreadable?: true;
-}) {
-  const response: Record<string, unknown> = { credentialId: replay.credentialId };
+function issuanceReplayResponse(replay: { recordId: string; responseBody: unknown; responseBodyUnreadable?: true }) {
+  const response: Record<string, unknown> = { credentialId: replay.recordId };
   const warnings = Array.isArray(replay.responseBody) ? [...replay.responseBody] : [];
   if (replay.responseBodyUnreadable) {
     warnings.push(idempotencyResponseUnreadableWarning());
@@ -123,7 +138,7 @@ async function completeIssuanceIdempotencyKeyOrReplay(input: {
   try {
     const { applied } = await completeIdempotencyKey({
       claimId: input.claimId,
-      credentialId: input.credentialId,
+      recordId: input.credentialId,
       responseBody: input.warnings,
     });
     if (!applied) {
@@ -556,7 +571,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // ── Step 2: Resolve data model ──────────────────────────────────────────
 
   logger.info({ credentialType, version }, 'Resolving data model');
-  const { dataModel, bridge, schemaUrls, coreDataModelVersion } = await resolveDataModel(
+  const { dataModel, bridge, schemaUrls, coreDataModelVersion, coreDataModelType } = await resolveDataModel(
     tenantId,
     credentialType,
     version,
@@ -690,6 +705,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       storageOptions,
       bridge,
       coreDataModelVersion,
+      coreCredentialType: resolveCoreCredentialType(coreDataModelType),
       ...(claimId !== undefined ? { idempotencyClaimId: claimId } : {}),
     });
   } catch (error) {
