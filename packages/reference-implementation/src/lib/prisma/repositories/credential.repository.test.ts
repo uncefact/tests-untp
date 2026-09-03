@@ -8,7 +8,7 @@ import { IdempotencyClaimLostError } from './idempotency-key.repository';
 import { NotFoundError } from '@/lib/api/errors';
 import { prismaError } from '../db-errors.fixtures';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
-import { CoreCredentialType, CredentialDetailsError, LibraryRecordOrigin } from '../generated';
+import { CoreCredentialType, CredentialDetailsError, LibraryRecordOrigin, IdempotencyOperation } from '../generated';
 
 // Mock Prisma client. Use jest.fn() inside the factory to avoid hoisting issues.
 jest.mock('../prisma', () => {
@@ -21,7 +21,7 @@ jest.mock('../prisma', () => {
       count: jest.Mock;
       update: jest.Mock;
     };
-    idempotencyKey: { updateMany: jest.Mock };
+    idempotencyKey: { updateMany: jest.Mock; findUnique: jest.Mock };
     $transaction: jest.Mock;
   } = {
     libraryRecord: { create: jest.fn(), update: jest.fn() },
@@ -34,6 +34,7 @@ jest.mock('../prisma', () => {
     },
     idempotencyKey: {
       updateMany: jest.fn(),
+      findUnique: jest.fn(async () => null),
     },
     $transaction: jest.fn(),
   };
@@ -52,7 +53,7 @@ const mockCredential = prisma.credential as unknown as {
   count: jest.Mock;
   update: jest.Mock;
 };
-const mockIdempotencyKey = prisma.idempotencyKey as unknown as { updateMany: jest.Mock };
+const mockIdempotencyKey = prisma.idempotencyKey as unknown as { updateMany: jest.Mock; findUnique: jest.Mock };
 const mockTransaction = prisma.$transaction as unknown as jest.Mock;
 
 describe('credential.repository', () => {
@@ -350,7 +351,7 @@ describe('credential.repository', () => {
       expect(result.credential.id).toBe('cred-new');
       expect(mockTransaction).toHaveBeenCalledTimes(1);
       expect(mockIdempotencyKey.updateMany).toHaveBeenCalledWith({
-        where: { id: 'claim-1', recordId: null },
+        where: { id: 'claim-1', recordId: null, operation: IdempotencyOperation.CREDENTIAL_ISSUE },
         data: { recordId: 'cred-new', resultRecordedAt: expect.any(Date) },
       });
     });
@@ -376,7 +377,7 @@ describe('credential.repository', () => {
       expect(mockTransaction).toHaveBeenCalledTimes(2);
       expect(mockIdempotencyKey.updateMany).toHaveBeenCalledTimes(1);
       expect(mockIdempotencyKey.updateMany).toHaveBeenCalledWith({
-        where: { id: 'claim-1', recordId: null },
+        where: { id: 'claim-1', recordId: null, operation: IdempotencyOperation.CREDENTIAL_ISSUE },
         data: { recordId: 'cred-new', resultRecordedAt: expect.any(Date) },
       });
     });

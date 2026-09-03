@@ -11,6 +11,7 @@ import {
   completeIdempotencyKey,
   findIdempotencyKey,
   IdempotencyClaimLostError,
+  IdempotencyClaimOperationMismatchError,
   linkClaimToRecord,
   releaseIdempotencyKey,
 } from './idempotency-key.repository';
@@ -729,23 +730,37 @@ describe('idempotency-key.repository', () => {
   });
 
   describe('linkClaimToRecord', () => {
-    it('sets the record only while the claim has recorded none', async () => {
+    it('sets the record only while the claim has recorded none and belongs to the operation', async () => {
       mockKey.updateMany.mockResolvedValue({ count: 1 });
 
-      await linkClaimToRecord(prisma as never, CLAIM_ID, 'ext-1');
+      await linkClaimToRecord(prisma as never, CLAIM_ID, 'ext-1', IdempotencyOperation.LIBRARY_REGISTER);
 
       expect(mockKey.updateMany).toHaveBeenCalledWith({
-        where: { id: CLAIM_ID, recordId: null },
+        where: { id: CLAIM_ID, recordId: null, operation: IdempotencyOperation.LIBRARY_REGISTER },
         data: { recordId: 'ext-1', resultRecordedAt: new Date(NOW) },
       });
+      expect(mockKey.findUnique).not.toHaveBeenCalled();
     });
 
     it('throws IdempotencyClaimLostError when the claim no longer belongs to this request', async () => {
       mockKey.updateMany.mockResolvedValue({ count: 0 });
+      mockKey.findUnique.mockResolvedValue(null);
 
-      await expect(linkClaimToRecord(prisma as never, CLAIM_ID, 'cred-1')).rejects.toBeInstanceOf(
-        IdempotencyClaimLostError,
-      );
+      await expect(
+        linkClaimToRecord(prisma as never, CLAIM_ID, 'cred-1', IdempotencyOperation.CREDENTIAL_ISSUE),
+      ).rejects.toBeInstanceOf(IdempotencyClaimLostError);
+    });
+
+    it('names the mismatch when the claim belongs to another operation, which is a caller defect rather than a race', async () => {
+      mockKey.updateMany.mockResolvedValue({ count: 0 });
+      mockKey.findUnique.mockResolvedValue({ operation: IdempotencyOperation.CREDENTIAL_ISSUE });
+
+      await expect(
+        linkClaimToRecord(prisma as never, CLAIM_ID, 'ext-1', IdempotencyOperation.LIBRARY_REGISTER),
+      ).rejects.toBeInstanceOf(IdempotencyClaimOperationMismatchError);
+      await expect(
+        linkClaimToRecord(prisma as never, CLAIM_ID, 'ext-1', IdempotencyOperation.LIBRARY_REGISTER),
+      ).rejects.toThrow(`is for CREDENTIAL_ISSUE, not LIBRARY_REGISTER`);
     });
   });
 

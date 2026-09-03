@@ -123,13 +123,41 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
   ): Promise<void> {
     validateEnqueueOptions(options);
     await this.ensureQueue(name, this.queuePolicy(options));
-    await this.boss.send(name, payload, { ...this.sendOptions(options), db: tx });
+    const jobId = await this.boss.send(name, payload, { ...this.sendOptions(options), db: tx });
+    await this.assertInserted(jobId, name, options);
+  }
+
+  /**
+   * pg-boss reports a send that inserted no row by returning null, never by
+   * throwing, and the same null covers two cases: a duplicate suppressed by
+   * the dedupeKey, and a queue this process still has cached that has since
+   * been removed (the insert joins the queue table and finds nothing).
+   * Without a dedupeKey only the second is possible, so the null is a failed
+   * send. With one, the queue is read back, on the null path only, and a
+   * queue that is still there means a suppressed duplicate; a queue removed
+   * and recreated between the send and the read-back would pass as one, a
+   * window one round-trip wide that no keyed caller exists to meet.
+   * Resolving on a failed send would let a record commit with no job to
+   * progress it, the state ADR-054 decision 4 rules out.
+   */
+  private async assertInserted(jobId: string | null, name: string, options?: EnqueueOptions): Promise<void> {
+    if (jobId !== null) {
+      return;
+    }
+    if (options?.dedupeKey !== undefined && (await this.boss.getQueue(name)) !== null) {
+      return;
+    }
+    throw new JobQueueError({
+      code: 'jobs.enqueue-not-inserted',
+      message: `queue '${name}' accepted no job; the queue may have been removed since this process created it`,
+    });
   }
 
   async enqueue<P extends object>(name: string, payload: P, options?: EnqueueOptions): Promise<void> {
     validateEnqueueOptions(options);
     await this.ensureQueue(name, this.queuePolicy(options));
-    await this.boss.send(name, payload, this.sendOptions(options));
+    const jobId = await this.boss.send(name, payload, this.sendOptions(options));
+    await this.assertInserted(jobId, name, options);
   }
 
   async schedule(name: string, cron: string, payload?: object): Promise<void> {

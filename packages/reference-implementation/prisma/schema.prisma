@@ -403,7 +403,9 @@ model ExternalCredential {
   notes                  String?
   annotationVersion      Int                @default(1)
   /// A key was supplied but the source turned out to be plaintext, so it was
-  /// never applied; recorded rather than silently discarded.
+  /// never applied; recorded rather than silently discarded. Set by a
+  /// registration or a re-verification and never cleared, so it reads as
+  /// "at least one call supplied a key that was not needed".
   decryptionKeyUnused    Boolean            @default(false)
 
   createdAt DateTime @default(now())
@@ -418,8 +420,10 @@ model ExternalCredential {
 }
 
 /**
- * One run of the seven checks over a library record's artefact (#955,
- * ADR-053 decision 3): acquisition (retrieval, decryption), custody integrity
+ * One run of the seven checks over a library record's artefact (#955; the
+ * checks are the coverage listed under ADR-055 decision 7, the generation
+ * row ADR-053 decision 3):
+ * acquisition (retrieval, decryption), custody integrity
  * (digest), verification proper (proof, status, temporal) and validation
  * (schemaConformance). The wire calls a run a "verification generation"; the
  * table is named for what it holds, since only three of the seven checks are
@@ -464,7 +468,9 @@ model CheckRun {
   completedAt    DateTime?
   /// When the verify job for this run was last enqueued. The column and its
   /// index exist for a reconciliation sweep that will re-enqueue PENDING rows
-  /// whose marker is stale; no sweep runs yet.
+  /// whose marker is stale; no sweep runs yet. Written from the application
+  /// clock, like requestedAt on the same row, so the sweep computes its
+  /// cutoff in the application too rather than in SQL.
   lastEnqueuedAt DateTime?
 
   record LibraryRecord @relation(fields: [recordId, tenantId], references: [id, tenantId], onDelete: Cascade)

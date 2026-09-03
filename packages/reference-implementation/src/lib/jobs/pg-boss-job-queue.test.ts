@@ -274,6 +274,76 @@ describe('transactional enqueue', () => {
   });
 });
 
+describe('a send that inserts no job', () => {
+  // pg-boss reports an insert that did not happen by returning null, never by
+  // throwing, so resolving on a null would hand the caller a job it does not
+  // have.
+  const tx = () => ({ executeSql: jest.fn(async () => ({ rows: [] })) });
+
+  it('throws from enqueue when the caller named no dedupeKey', async () => {
+    bossMock.send.mockResolvedValueOnce(null);
+    const queue = makeQueue();
+
+    await expect(queue.enqueue('issue', { recordId: 'r1' })).rejects.toMatchObject({
+      code: 'jobs.enqueue-not-inserted',
+      message: expect.stringContaining("queue 'issue' accepted no job"),
+    });
+  });
+
+  it('throws from enqueueWithin when the caller named no dedupeKey', async () => {
+    bossMock.send.mockResolvedValueOnce(null);
+    const queue = makeQueue();
+
+    await expect(queue.enqueueWithin(tx(), 'issue', { recordId: 'r1' })).rejects.toMatchObject({
+      code: 'jobs.enqueue-not-inserted',
+    });
+  });
+
+  it('accepts the null from enqueue as the documented suppression of a duplicate while the queue still exists', async () => {
+    bossMock.send.mockResolvedValueOnce(null);
+    const queue = makeQueue();
+
+    await expect(queue.enqueue('dedup', { recordId: 'r1' }, { dedupeKey: 'issue:r1' })).resolves.toBeUndefined();
+    expect(bossMock.getQueue).toHaveBeenLastCalledWith('dedup');
+  });
+
+  it('accepts the null from enqueueWithin as the documented suppression of a duplicate while the queue still exists', async () => {
+    bossMock.send.mockResolvedValueOnce(null);
+    const queue = makeQueue();
+
+    await expect(
+      queue.enqueueWithin(tx(), 'dedup', { recordId: 'r1' }, { dedupeKey: 'issue:r1' }),
+    ).resolves.toBeUndefined();
+    expect(bossMock.getQueue).toHaveBeenLastCalledWith('dedup');
+  });
+
+  it('throws from a keyed enqueue whose null came from a queue that no longer exists', async () => {
+    // The same null covers a suppressed duplicate and a removed queue; the
+    // read-back is what tells them apart.
+    const queue = makeQueue();
+    // The queue is known to this process from an earlier send; pg-boss then
+    // reports the next send as no row, and the read-back finds no queue.
+    await queue.enqueue('dedup', { recordId: 'r0' }, { dedupeKey: 'issue:r0' });
+    bossMock.send.mockResolvedValueOnce(null);
+    bossMock.getQueue.mockResolvedValueOnce(null);
+
+    await expect(queue.enqueue('dedup', { recordId: 'r1' }, { dedupeKey: 'issue:r1' })).rejects.toMatchObject({
+      code: 'jobs.enqueue-not-inserted',
+    });
+  });
+
+  it('throws from a keyed enqueueWithin whose null came from a queue that no longer exists', async () => {
+    const queue = makeQueue();
+    await queue.enqueueWithin(tx(), 'dedup', { recordId: 'r0' }, { dedupeKey: 'issue:r0' });
+    bossMock.send.mockResolvedValueOnce(null);
+    bossMock.getQueue.mockResolvedValueOnce(null);
+
+    await expect(
+      queue.enqueueWithin(tx(), 'dedup', { recordId: 'r1' }, { dedupeKey: 'issue:r1' }),
+    ).rejects.toMatchObject({ code: 'jobs.enqueue-not-inserted' });
+  });
+});
+
 describe('queue policy', () => {
   it('creates a short-policy queue for a keyed send and standard for an unkeyed one', async () => {
     const queue = makeQueue();

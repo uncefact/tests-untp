@@ -11,17 +11,31 @@ import { apiLogger } from '../api/logger';
 
 const logger = apiLogger.child({ module: 'decryption-key-protection' });
 
+declare const protectedDecryptionKey: unique symbol;
+
+/**
+ * A decryption key already wrapped for persistence by
+ * {@link protectDecryptionKey}. The brand is the only thing that separates
+ * a wrapped key from a raw one, because both are strings and
+ * {@link revealDecryptionKey} returns a raw value unchanged, so a raw key
+ * written to a key column would read back correctly everywhere except in the
+ * database itself (#697). The two repository create inputs that write a key
+ * column take this type and nothing else; writes through the Prisma client
+ * or the key-lifecycle stores are still plain strings.
+ */
+export type ProtectedDecryptionKey = string & { readonly [protectedDecryptionKey]: true };
+
 /**
  * Wraps a storage-service decryption key in an AES-256-GCM envelope for
  * persistence, so the raw database row does not expose a usable key.
  */
-export function protectDecryptionKey(key: string): string;
-export function protectDecryptionKey(key: string | undefined): string | undefined;
-export function protectDecryptionKey(key: string | undefined): string | undefined {
+export function protectDecryptionKey(key: string): ProtectedDecryptionKey;
+export function protectDecryptionKey(key: string | undefined): ProtectedDecryptionKey | undefined;
+export function protectDecryptionKey(key: string | undefined): ProtectedDecryptionKey | undefined {
   if (key === undefined) {
     return undefined;
   }
-  return JSON.stringify(getEncryptionService().encrypt(key, EncryptionAlgorithm.AES_256_GCM));
+  return JSON.stringify(getEncryptionService().encrypt(key, EncryptionAlgorithm.AES_256_GCM)) as ProtectedDecryptionKey;
 }
 
 /**

@@ -207,3 +207,23 @@ describe('revealDecryptionKey', () => {
     expect(mockError).toHaveBeenCalled();
   });
 });
+
+/** The key column's write input, as the external credential repository declares it. */
+type StoredDecryptionKey =
+  import('@/lib/prisma/repositories/external-credential.repository').ExternalStorageInput['decryptionKey'];
+
+describe('the ProtectedDecryptionKey brand at a key column', () => {
+  it('accepts a wrapped key where a raw one is a compile-time error', async () => {
+    const { protectDecryptionKey } = await import('./decryption-key-protection');
+
+    // Both are strings at runtime, so the brand is the only thing standing
+    // between a raw storage-service key and a key column (#697). tsc enforces
+    // this line; jest transpiles with isolatedModules and would not.
+    // @ts-expect-error a raw string is not a ProtectedDecryptionKey
+    const raw: StoredDecryptionKey = PLAINTEXT_KEY;
+    const wrapped: StoredDecryptionKey = protectDecryptionKey(PLAINTEXT_KEY);
+
+    expect(raw).toBe(PLAINTEXT_KEY);
+    expect(wrapped).not.toBe(PLAINTEXT_KEY);
+  });
+});

@@ -21,7 +21,11 @@ const jestConfig = {
   // Suites share one database; truncation between tests requires serial runs.
   maxWorkers: 1,
   testTimeout: 30_000,
-  transformIgnorePatterns: ['node_modules/(?!@reference-implementation|uuid)'],
+  // pg-boss and two of its dependencies ship ESM only, so their files are
+  // rewritten to CommonJS by the transformer below instead of being skipped.
+  // The lookahead spans the whole pnpm path because every `node_modules/`
+  // segment in it is tested.
+  transformIgnorePatterns: ['node_modules/(?!.*(pg-boss|serialize-error|non-error))(?!@reference-implementation|uuid)'],
   moduleNameMapper: {
     // The untp-utils build reaches its multibase-digest module via relative
     // imports (bypassing the bare-specifier mapping below), and that module
@@ -52,6 +56,10 @@ const jestConfig = {
     '^@uncefact/untp-utils$': '<rootDir>/../untp-utils/build/index.js',
   },
   transform: {
+    // Listed first: jest uses the first matching pattern. The `.pnpm` segment
+    // is optional so a hoisted install matches the same three packages.
+    'node_modules/(?:\\.pnpm/)?(pg-boss|serialize-error|non-error)@?.*\\.js$':
+      '<rootDir>/__tests__/integration/rig/esm-to-cjs-transformer.mjs',
     '^.+\\.m?[tj]sx?$': [
       'ts-jest',
       {
