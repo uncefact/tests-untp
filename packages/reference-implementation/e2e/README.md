@@ -51,6 +51,37 @@ pnpm test:e2e:ri:closed
 docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri down -v
 ```
 
+## HTML Report
+
+Every `cypress run` (i.e. every `pnpm test:e2e:ri*` script, and the Playground's `pnpm test:e2e:playground`) generates a self-contained HTML report via `cypress-mochawesome-reporter`, with failure screenshots embedded inline. Open the most recent one directly in a browser (double-click, no server needed):
+
+```bash
+pnpm --filter reference-implementation-e2e test:e2e:report:open   # macOS `open`; browse to the file manually elsewhere
+```
+
+### Versioning and history
+
+Each run gets its own report directory, so nothing is overwritten:
+
+```
+cypress/reports/
+├── latest.html                                    # copy of the most recent run's report
+├── latest-run-info.json                           # copy of the most recent run's manifest
+└── <appVersion>_<gitSha>[-unofficial]_<timestamp>/ # one directory per run
+    ├── index.html                                  # self-contained report (title includes the same version info)
+    ├── index.json                                   # full mochawesome data: every suite/test, durations, error stacks
+    ├── run-info.json                                # versions + result totals — a lightweight summary of the above
+    └── screenshots/
+```
+
+- `appVersion` is read from the app's `package.json` (override for a deployed target by setting `E2E_TESTED_APP_VERSION`, since the checked-out commit and the deployed build can differ).
+- `gitSha` identifies the exact commit the test suite — and, for local Docker Compose runs, the app itself — was built from. `run-info.json`'s `officialRun` is `true` only when the working tree was clean at run time (reflected as a `-unofficial` directory suffix otherwise) — a report from an uncommitted working tree isn't fully reproducible from `gitSha` alone, so don't cite it as an official result.
+- `run-info.json` also records the tenant mode, base URL tested, Cypress/browser/OS versions, and the pass/fail totals — useful as a machine-readable manifest to accompany the HTML report in an official write-up, or to index runs without opening each one. `index.json` is the full mochawesome dataset the HTML is rendered from (every suite, test, duration, error stack) — reach for it when a script needs per-test detail rather than the run-level summary.
+
+Report directories are pruned automatically, keeping the 20 most recent runs (see `keepRuns` in `reportMeta.ts`). Nothing under `cypress/reports/` is checked into git — archive specific run directories separately (e.g. as a CI artifact) if they need to be attached to an official report.
+
+Set `E2E_REPORTS_DIR` to write reports somewhere else — absolute, or relative to the e2e workspace root (e.g. a shared/uploaded CI artifact path). Defaults to `cypress/reports`.
+
 ## Testing a Deployed Instance
 
 To run E2E tests against deployed instances of the RI and Playground (e.g. staging, production):
@@ -122,18 +153,20 @@ In closed mode, the tenant is determined by the IDP group claim. Test users must
 
 All variables and their defaults are set in [`cypress.config.ts`](./cypress.config.ts). Key variables:
 
-| Variable                         | Purpose                                             | Default                 |
-| -------------------------------- | --------------------------------------------------- | ----------------------- |
-| `CYPRESS_BASE_URL`               | RI application URL                                  | `http://localhost:3003` |
-| `E2E_IDP_PROVIDER`               | `keycloak` or `zitadel`                             | `keycloak`              |
-| `E2E_IDP_BASE_URL`               | Identity provider URL                               | `http://localhost:8081` |
-| `E2E_IDP_AUDIENCE`               | Zitadel project ID (Zitadel only)                   | —                       |
-| `E2E_TENANT_MODE`                | `open` or `closed`                                  | `open`                  |
-| `E2E_DB_HOST`                    | PostgreSQL host                                     | `localhost`             |
-| `E2E_DB_PORT`                    | PostgreSQL port                                     | `5433`                  |
-| `E2E_USER2_PASSWORD`             | Second test user password (if different from first) | (empty)                 |
-| `E2E_DB_SSL_REJECT_UNAUTHORIZED` | Reject self-signed DB certs                         | `true`                  |
-| `VERIFY_ALLOW_PRIVATE_URLS`      | SSRF validation (`false` for deployed)              | `true`                  |
+| Variable                         | Purpose                                               | Default                            |
+| -------------------------------- | ----------------------------------------------------- | ---------------------------------- |
+| `CYPRESS_BASE_URL`               | RI application URL                                    | `http://localhost:3003`            |
+| `E2E_IDP_PROVIDER`               | `keycloak` or `zitadel`                               | `keycloak`                         |
+| `E2E_IDP_BASE_URL`               | Identity provider URL                                 | `http://localhost:8081`            |
+| `E2E_IDP_AUDIENCE`               | Zitadel project ID (Zitadel only)                     | —                                  |
+| `E2E_TENANT_MODE`                | `open` or `closed`                                    | `open`                             |
+| `E2E_DB_HOST`                    | PostgreSQL host                                       | `localhost`                        |
+| `E2E_DB_PORT`                    | PostgreSQL port                                       | `5433`                             |
+| `E2E_USER2_PASSWORD`             | Second test user password (if different from first)   | (empty)                            |
+| `E2E_DB_SSL_REJECT_UNAUTHORIZED` | Reject self-signed DB certs                           | `true`                             |
+| `VERIFY_ALLOW_PRIVATE_URLS`      | SSRF validation (`false` for deployed)                | `true`                             |
+| `E2E_TESTED_APP_VERSION`         | App version recorded in the report (deployed target)  | checked-out `package.json` version |
+| `E2E_REPORTS_DIR`                | Where HTML reports are written (absolute or relative) | `cypress/reports`                  |
 
 ### did:web and HTTPS
 
