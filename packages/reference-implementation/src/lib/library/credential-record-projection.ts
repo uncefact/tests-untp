@@ -6,10 +6,14 @@ import {
   CoreCredentialType,
   CredentialDetailsError,
   CredentialDetailsStatus,
+  LibraryRecordOrigin,
   type CheckRun,
+  type LibraryRecord,
 } from '@/lib/prisma/generated';
+import { looksEnvelopeLikeButInvalid } from '@/lib/credentials/decryption-key-protection';
 import { CHECK_NAMES, type CheckName } from '@/lib/prisma/repositories/check-run.repository';
 import type { ExternalCredentialRecord } from '@/lib/prisma/repositories/external-credential.repository';
+import { type LibraryRecordDetailView, type NativeLibraryRecordView } from './library-record-view';
 
 /**
  * The library surface's outbound shape for a credential record, as the
@@ -101,6 +105,18 @@ const failedEnvelopeSchema = z
   })
   .strict();
 
+const verificationEnvelopeDescription =
+  'Discriminated by `state`. A `pending` envelope has neither `completedAt` nor `failure`; `complete` has `completedAt` and no `failure`; `failed` has both. A `complete` summary is derived from the blocking checks (retrieval, decryption, digest, proof, status): any `fail` is `not_conformant`, otherwise `verified` when at least one of them ran. `temporal` and `schemaConformance` never change it.';
+
+/**
+ * What the record schemas add to the envelope's own description, and why it
+ * is not on {@link verificationEnvelopeSchema} itself: the register route
+ * returns that same envelope for a generation 1 that really did run, so the
+ * qualification only holds once the origin is known.
+ */
+const nativeIssuanceAssertionNote =
+  'For a native record, generation 1 is an issuance assertion rather than an executed run. `proof` reads `pass` because this service signed the artefact moments earlier, and no check was run. Generation 2 onward is executed. Every generation of an external record is executed.';
+
 /**
  * The three settlement variants, discriminated by `state`; each fixes which
  * `summary` values it permits and whether `completedAt` and `failure` are
@@ -118,9 +134,7 @@ export const verificationEnvelopeSchema = z
       });
     }
   })
-  .describe(
-    'Discriminated by `state`. A `pending` envelope has neither `completedAt` nor `failure`; `complete` has `completedAt` and no `failure`; `failed` has both. A `complete` summary is derived from the blocking checks (retrieval, decryption, digest, proof, status): any `fail` is `not_conformant`, otherwise `verified` when at least one of them ran. `temporal` and `schemaConformance` never change it.',
-  );
+  .describe(verificationEnvelopeDescription);
 
 export type VerificationEnvelope = z.infer<typeof verificationEnvelopeSchema>;
 
@@ -190,7 +204,9 @@ export const credentialRecordSchema = z
       .nullable()
       .describe('Whether the fetched body was an encrypted envelope; null until a body has been observed.'),
     hasKey: z.boolean().describe('Whether this service holds a key that opens its own durable copy.'),
-    verification: verificationEnvelopeSchema,
+    verification: verificationEnvelopeSchema.describe(
+      `${verificationEnvelopeDescription} ${nativeIssuanceAssertionNote}`,
+    ),
     currencyStatus: z.enum(['current', 'not_yet_valid', 'expired', 'unknown']),
     detailsStatus: z.nativeEnum(CredentialDetailsStatus),
     detailsError: z.nativeEnum(CredentialDetailsError).nullable(),
@@ -203,12 +219,77 @@ export const credentialRecordSchema = z
 
 export type CredentialRecordResponse = z.infer<typeof credentialRecordSchema>;
 
+export const credentialRecordDetailSchema = credentialRecordSchema
+  .extend({
+    storageUri: z
+      .string()
+      .nullable()
+      .describe(
+        "The Reference Implementation's own durable-copy location. Always present for a native record; null only for an external record with no durable copy yet.",
+      ),
+    digestMultibase: z
+      .string()
+      .nullable()
+      .describe(
+        "The storage service's content digest for the durable copy, null whenever storageUri is null. For a copy the storage service encrypted, it covers the content before encryption. For an unencrypted copy, and for unopened ciphertext stored exactly as fetched, it covers the stored bytes. A caller fetching an encrypted copy must decrypt it before comparing.",
+      ),
+    decryptionKey: z
+      .string()
+      .nullable()
+      .describe(
+        "The key that opens the Reference Implementation's durable copy. Non-null exactly when hasKey is true, and null whenever hasKey is false. A non-null key always comes with a non-null storageUri.",
+      ),
+  })
+  .superRefine((record, ctx) => {
+    if ((record.decryptionKey !== null) !== record.hasKey) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['decryptionKey'],
+        message: 'decryptionKey must be non-null exactly when hasKey is true',
+      });
+    }
+    if (record.decryptionKey !== null && record.storageUri === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['storageUri'],
+        message: 'decryptionKey requires storageUri',
+      });
+    }
+    if (record.storageUri === null && record.digestMultibase !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['digestMultibase'],
+        message: 'digestMultibase requires storageUri',
+      });
+    }
+    if (record.origin === 'native' && record.storageUri === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['storageUri'],
+        message: 'native records require storageUri',
+      });
+    }
+  })
+  .describe(
+    'CredentialRecord plus required-nullable durable-copy coordinates and the receiver-side decryption key. The URI and digest are present together whenever a durable copy exists.',
+  );
+
+export type CredentialRecordDetailResponse = z.infer<typeof credentialRecordDetailSchema>;
+
 /** A record read from the database whose rows cannot be projected: a broken invariant, never caller input. */
 export class CredentialRecordProjectionError extends Error {
   constructor(recordId: string, detail: string) {
     super(`Library record ${recordId} cannot be projected: ${detail}`);
     this.name = 'CredentialRecordProjectionError';
   }
+}
+
+function parseProjection<S extends z.ZodTypeAny>(schema: S, recordId: string, projected: unknown): z.infer<S> {
+  const checked = schema.safeParse(projected);
+  if (!checked.success) {
+    throw new CredentialRecordProjectionError(recordId, checked.error.issues.map((issue) => issue.message).join('; '));
+  }
+  return checked.data;
 }
 
 const WIRE_RESULT: Record<CheckResult, VerificationChecks[CheckName]> = {
@@ -284,6 +365,72 @@ function isoDateTime(value: Date | null): string | null {
   return value === null ? null : value.toISOString();
 }
 
+function issuanceAssertionEnvelope(record: LibraryRecord): VerificationEnvelope {
+  const checks: VerificationChecks = {
+    retrieval: 'not_run',
+    decryption: 'not_run',
+    digest: 'not_run',
+    proof: 'pass',
+    status: 'not_run',
+    temporal: 'not_run',
+    schemaConformance: 'not_run',
+  };
+  return {
+    generation: 1,
+    state: 'complete',
+    requestedAt: record.createdAt.toISOString(),
+    completedAt: record.createdAt.toISOString(),
+    checks,
+    summary: deriveCompleteSummary(checks),
+  };
+}
+
+/**
+ * Projects a native library record onto the keyless CredentialRecord shape.
+ * A stored generation 1 is refused where the record is read, so the envelope
+ * here is the stored run when there is one and the synthesised issuance
+ * assertion otherwise (ADR-053 decision 4).
+ */
+export function toNativeCredentialRecord(
+  view: NativeLibraryRecordView,
+  options: { now?: Date } = {},
+): CredentialRecordResponse {
+  const { record: parent, credential, checkRun } = view;
+  const projected: CredentialRecordResponse = {
+    id: parent.id,
+    origin: 'native',
+    credential: {
+      name: parent.name,
+      credentialType: parent.coreCredentialType,
+      issuerName: parent.issuerName,
+      issuerDid: parent.issuerDid,
+      subjectName: parent.subjectName,
+      subjectId: parent.subjectId,
+      validFrom: isoDateTime(parent.validFrom),
+      validUntil: isoDateTime(parent.validUntil),
+    },
+    annotations: null,
+    organisationId: credential.organisationId,
+    facilityId: credential.facilityId,
+    productId: credential.productId,
+    sourceUrl: null,
+    sourceDigest: null,
+    resolverUri: null,
+    issuedAt: isoDateTime(parent.validFrom),
+    encrypted: credential.decryptionKey !== null,
+    hasKey: credential.decryptionKey !== null,
+    verification: checkRun ? envelopeOf(checkRun) : issuanceAssertionEnvelope(parent),
+    currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, options.now ?? new Date(Date.now())),
+    detailsStatus: parent.detailsStatus,
+    detailsError: parent.detailsError,
+    capabilities: { deletable: false, annotatable: false, verifiable: true },
+    warnings: [],
+    createdAt: parent.createdAt.toISOString(),
+    updatedAt: parent.updatedAt.toISOString(),
+  };
+  return parseProjection(credentialRecordSchema, parent.id, projected);
+}
+
 /**
  * Projects an external record onto the contract. Every value the contract
  * lists is set here explicitly: the repository row is never serialised
@@ -350,9 +497,49 @@ export function toCredentialRecord(
     createdAt: parent.createdAt.toISOString(),
     updatedAt: parent.updatedAt.toISOString(),
   };
-  const checked = credentialRecordSchema.safeParse(projected);
-  if (!checked.success) {
-    throw new CredentialRecordProjectionError(parent.id, checked.error.issues.map((issue) => issue.message).join('; '));
+  return parseProjection(credentialRecordSchema, parent.id, projected);
+}
+
+/**
+ * The stored value is never null here: a record with no key skips the
+ * revealer entirely, so a null answer would have no meaning the projection
+ * could express.
+ */
+type DetailRevealer = (stored: string) => string;
+
+/**
+ * Adds the durable-copy coordinates to either origin's keyless projection.
+ * A malformed envelope-shaped stored key is a record failure, not legacy
+ * plaintext, and is rejected before the supplied revealer is called.
+ */
+export function toCredentialRecordDetail(
+  view: LibraryRecordDetailView,
+  options: { now?: Date; reveal: DetailRevealer },
+): CredentialRecordDetailResponse {
+  const { base, storageUri, digestMultibase, storedKey } =
+    view.origin === LibraryRecordOrigin.NATIVE
+      ? {
+          base: toNativeCredentialRecord(view, options),
+          storageUri: view.credential.storageUri,
+          digestMultibase: view.credential.digestMultibase,
+          storedKey: view.credential.decryptionKey,
+        }
+      : {
+          base: toCredentialRecord(view, options),
+          storageUri: view.external.storageUri,
+          digestMultibase: view.external.storageDigestMultibase,
+          storedKey: view.external.decryptionKey,
+        };
+
+  if (storedKey !== null && looksEnvelopeLikeButInvalid(storedKey)) {
+    throw new CredentialRecordProjectionError(view.record.id, 'has an invalid stored decryption-key envelope');
   }
-  return checked.data;
+
+  const decryptionKey = storedKey === null ? null : options.reveal(storedKey);
+  return parseProjection(credentialRecordDetailSchema, view.record.id, {
+    ...base,
+    storageUri,
+    digestMultibase,
+    decryptionKey,
+  });
 }

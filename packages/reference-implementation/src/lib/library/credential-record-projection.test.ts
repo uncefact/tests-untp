@@ -8,16 +8,21 @@ import {
   ExternalContentKind,
   LibraryRecordOrigin,
   type CheckRun,
+  type Credential,
   type ExternalCredential,
   type LibraryRecord,
 } from '@/lib/prisma/generated';
 import type { ExternalCredentialRecord } from '@/lib/prisma/repositories/external-credential.repository';
+import type { NativeLibraryRecordView } from './library-record-view';
 import {
   BLOCKING_CHECKS,
   CredentialRecordProjectionError,
+  credentialRecordDetailSchema,
   credentialRecordSchema,
   deriveCompleteSummary,
   deriveCurrencyStatus,
+  toCredentialRecordDetail,
+  toNativeCredentialRecord,
   toCredentialRecord,
   verificationEnvelopeSchema,
   type VerificationChecks,
@@ -124,6 +129,40 @@ function record(
     record: parent(overrides.parent),
     external: external(overrides.external),
     checkRun: run(overrides.run),
+  };
+}
+
+function nativeCredential(overrides: Partial<Credential> = {}): Credential {
+  return {
+    id: 'crec0000000000000000000001',
+    tenantId: 'tenant-1',
+    origin: LibraryRecordOrigin.NATIVE,
+    storageUri: 'https://storage.example/native/credential-a',
+    digestMultibase: 'zQmNativeDigest',
+    decryptionKey: null,
+    isPublished: false,
+    organisationId: 'organisation-1',
+    facilityId: 'facility-1',
+    productId: 'product-1',
+    createdAt: new Date('2026-09-03T11:00:00.000Z'),
+    updatedAt: new Date('2026-09-03T11:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function nativeRecord(
+  overrides: { parent?: Partial<LibraryRecord>; credential?: Partial<Credential>; run?: CheckRun | null } = {},
+): NativeLibraryRecordView {
+  return {
+    origin: LibraryRecordOrigin.NATIVE,
+    record: parent({
+      origin: LibraryRecordOrigin.NATIVE,
+      coreCredentialType: CoreCredentialType.DPP,
+      credentialType: 'DigitalProductPassport',
+      ...overrides.parent,
+    }),
+    credential: nativeCredential(overrides.credential),
+    checkRun: overrides.run === undefined ? null : overrides.run,
   };
 }
 
@@ -446,5 +485,270 @@ describe('toCredentialRecord', () => {
     const projected = toCredentialRecord(record(), { now: NOW });
     expect(credentialRecordSchema.safeParse(projected).success).toBe(true);
     expect(credentialRecordSchema.safeParse({ ...projected, decryptionKey: 'x' }).success).toBe(false);
+  });
+});
+
+describe('toNativeCredentialRecord', () => {
+  /**
+   * Every descriptive value is a distinct non-null fixture, and the parent's
+   * two timestamps differ from each other and from the credential child's, so
+   * reading the wrong row or the wrong column returns the wrong value rather
+   * than an indistinguishable one.
+   */
+  it('synthesises generation 1 from the parent and keeps native coordinates', () => {
+    const projected = toNativeCredentialRecord(
+      nativeRecord({
+        parent: {
+          name: 'Battery pack passport',
+          issuerName: 'Acme Battery Co',
+          issuerDid: 'did:web:acme.example',
+          subjectName: 'Battery pack BP-77',
+          subjectId: 'https://acme.example/products/BP-77',
+          validFrom: new Date('2026-07-15T09:00:00.000Z'),
+          validUntil: new Date('2029-07-15T09:00:00.000Z'),
+          detailsStatus: CredentialDetailsStatus.EXTRACTED,
+          createdAt: new Date('2026-07-15T09:00:00.000Z'),
+          updatedAt: new Date('2026-07-16T14:30:00.000Z'),
+        },
+        credential: {
+          decryptionKey: null,
+          createdAt: new Date('2026-07-17T08:00:00.000Z'),
+          updatedAt: new Date('2026-07-18T08:00:00.000Z'),
+        },
+      }),
+      { now: NOW },
+    );
+
+    expect(projected).toMatchObject({
+      origin: 'native',
+      credential: {
+        name: 'Battery pack passport',
+        credentialType: 'DPP',
+        issuerName: 'Acme Battery Co',
+        issuerDid: 'did:web:acme.example',
+        subjectName: 'Battery pack BP-77',
+        subjectId: 'https://acme.example/products/BP-77',
+        validFrom: '2026-07-15T09:00:00.000Z',
+        validUntil: '2029-07-15T09:00:00.000Z',
+      },
+      annotations: null,
+      organisationId: 'organisation-1',
+      facilityId: 'facility-1',
+      productId: 'product-1',
+      sourceUrl: null,
+      sourceDigest: null,
+      resolverUri: null,
+      issuedAt: '2026-07-15T09:00:00.000Z',
+      encrypted: false,
+      hasKey: false,
+      capabilities: { deletable: false, annotatable: false, verifiable: true },
+      verification: {
+        generation: 1,
+        state: 'complete',
+        requestedAt: '2026-07-15T09:00:00.000Z',
+        completedAt: '2026-07-15T09:00:00.000Z',
+        summary: 'verified',
+        checks: checks({ proof: 'pass' }),
+      },
+    });
+    expect(projected.createdAt).toBe('2026-07-15T09:00:00.000Z');
+    expect(projected.updatedAt).toBe('2026-07-16T14:30:00.000Z');
+  });
+
+  it('keeps a native extraction status and its error class', () => {
+    expect(toNativeCredentialRecord(nativeRecord(), { now: NOW })).toMatchObject({
+      credential: {
+        name: null,
+        issuerName: null,
+        issuerDid: null,
+        subjectName: null,
+        subjectId: null,
+        validFrom: null,
+        validUntil: null,
+      },
+      detailsStatus: 'EXTRACTION_PENDING',
+      detailsError: null,
+    });
+
+    expect(
+      toNativeCredentialRecord(
+        nativeRecord({
+          parent: {
+            detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED,
+            detailsError: CredentialDetailsError.UNREADABLE_ENVELOPE,
+          },
+        }),
+        { now: NOW },
+      ),
+    ).toMatchObject({ detailsStatus: 'EXTRACTION_FAILED', detailsError: 'UNREADABLE_ENVELOPE' });
+  });
+
+  it('uses the newest stored run, including pending and failed states, instead of synthesis', () => {
+    const stored = run({ generation: 2, state: CheckRunState.PENDING });
+    expect(toNativeCredentialRecord(nativeRecord({ run: stored }), { now: NOW }).verification).toMatchObject({
+      generation: 2,
+      state: 'pending',
+    });
+
+    const failed = run({
+      generation: 3,
+      state: CheckRunState.FAILED,
+      completedAt: new Date('2026-09-03T11:00:06.000Z'),
+      failureCode: CheckRunFailureCode.RETRIEVAL_FAILED,
+      failureMessage: 'retrieval failed',
+      failureRetryable: true,
+    });
+    expect(toNativeCredentialRecord(nativeRecord({ run: failed }), { now: NOW }).verification).toMatchObject({
+      generation: 3,
+      state: 'failed',
+      failure: { code: 'RETRIEVAL_FAILED' },
+    });
+  });
+
+  it('reports an encrypted native copy only when its key column is non-null', () => {
+    const projected = toNativeCredentialRecord(nativeRecord({ credential: { decryptionKey: 'stored-envelope' } }), {
+      now: NOW,
+    });
+    expect(projected).toMatchObject({ encrypted: true, hasKey: true });
+  });
+});
+
+describe('credentialRecordDetailSchema and toCredentialRecordDetail', () => {
+  /**
+   * Each case seeds source coordinates that differ from the storage ones, so a
+   * projection that read `sourceUrl` or `sourceDigest` into the custody fields
+   * would return the wrong value rather than merely the wrong column name.
+   */
+  it.each([
+    {
+      name: 'native encrypted',
+      view: nativeRecord({ credential: { decryptionKey: 'stored-envelope' } }),
+      stored: 'stored-envelope',
+      revealed: 'revealed-key',
+      custody: {
+        storageUri: 'https://storage.example/native/credential-a',
+        digestMultibase: 'zQmNativeDigest',
+        sourceUrl: null,
+        sourceDigest: null,
+      },
+    },
+    {
+      name: 'native unencrypted',
+      view: nativeRecord(),
+      stored: null,
+      revealed: null,
+      custody: {
+        storageUri: 'https://storage.example/native/credential-a',
+        digestMultibase: 'zQmNativeDigest',
+        sourceUrl: null,
+        sourceDigest: null,
+      },
+    },
+    {
+      name: 'external protected',
+      view: record({
+        external: {
+          sourceUrl: 'https://supplier.example/source-protected',
+          sourceDigest: 'zSourceProtected',
+          storageUri: 'https://storage.example/external/a',
+          storageDigestMultibase: 'zStorage',
+          decryptionKey: 'stored-envelope',
+        },
+      }),
+      stored: 'stored-envelope',
+      revealed: 'receiver-key',
+      custody: {
+        storageUri: 'https://storage.example/external/a',
+        digestMultibase: 'zStorage',
+        sourceUrl: 'https://supplier.example/source-protected',
+        sourceDigest: 'zSourceProtected',
+      },
+    },
+    {
+      name: 'external unopened',
+      view: record({
+        external: {
+          encrypted: true,
+          sourceUrl: 'https://supplier.example/source-unopened',
+          sourceDigest: 'zSourceUnopened',
+          storageUri: 'https://storage.example/external/ciphertext',
+          storageDigestMultibase: 'zCiphertext',
+        },
+      }),
+      stored: null,
+      revealed: null,
+      custody: {
+        storageUri: 'https://storage.example/external/ciphertext',
+        digestMultibase: 'zCiphertext',
+        sourceUrl: 'https://supplier.example/source-unopened',
+        sourceDigest: 'zSourceUnopened',
+      },
+    },
+    {
+      name: 'external without a copy',
+      view: record({
+        external: { sourceUrl: 'https://supplier.example/source-no-copy', sourceDigest: 'zSourceNoCopy' },
+      }),
+      stored: null,
+      revealed: null,
+      custody: {
+        storageUri: null,
+        digestMultibase: null,
+        sourceUrl: 'https://supplier.example/source-no-copy',
+        sourceDigest: 'zSourceNoCopy',
+      },
+    },
+  ])('projects the $name custody state from the storage columns', ({ view, stored, revealed, custody }) => {
+    const reveal = jest.fn((): string => {
+      if (revealed === null) throw new Error('the revealer was called without a stored key');
+      return revealed;
+    });
+    const projected = toCredentialRecordDetail(view, { now: NOW, reveal });
+
+    expect(projected).toMatchObject(custody);
+    expect(projected.decryptionKey).toBe(revealed);
+    expect(projected.hasKey).toBe(revealed !== null);
+    expect(reveal.mock.calls).toEqual(stored === null ? [] : [[stored]]);
+  });
+
+  it.each([
+    ['at the start of the value', '{"cipherText":"broken"}'],
+    // JSON parsing accepts whitespace before the brace, so a padded corrupt
+    // envelope is corrupt too and must not reach the revealer as plaintext.
+    ['after leading whitespace', '\n  {"cipherText":"broken"}'],
+  ])('checks an envelope-shaped stored key %s before calling the revealer', (_name, storedKey) => {
+    const reveal = jest.fn((): string => 'should-not-return');
+    expect(() =>
+      toCredentialRecordDetail(nativeRecord({ credential: { decryptionKey: storedKey } }), {
+        now: NOW,
+        reveal,
+      }),
+    ).toThrow(CredentialRecordProjectionError);
+    expect(reveal).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['key without URI', { decryptionKey: 'key', hasKey: true, storageUri: null, digestMultibase: null }],
+    ['hasKey without key', { decryptionKey: null, hasKey: true, storageUri: 'https://storage', digestMultibase: 'z' }],
+    [
+      'key while hasKey is false',
+      { decryptionKey: 'key', hasKey: false, storageUri: 'https://storage', digestMultibase: 'z' },
+    ],
+    ['digest without URI', { decryptionKey: null, hasKey: false, storageUri: null, digestMultibase: 'z' }],
+  ])('rejects the illegal detail combination %s', (_name, custody) => {
+    const base = toCredentialRecord(record(), { now: NOW });
+    expect(credentialRecordDetailSchema.safeParse({ ...base, ...custody }).success).toBe(false);
+  });
+
+  it('rejects a native detail without storageUri', () => {
+    const native = toNativeCredentialRecord(nativeRecord(), { now: NOW });
+    expect(
+      credentialRecordDetailSchema.safeParse({
+        ...native,
+        storageUri: null,
+        digestMultibase: null,
+        decryptionKey: null,
+      }).success,
+    ).toBe(false);
   });
 });

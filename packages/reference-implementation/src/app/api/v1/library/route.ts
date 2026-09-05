@@ -130,8 +130,8 @@ function sanitisedServerError(error: Error, detail: string): Response {
  *       background, on the worker process, and settles the record from
  *       `pending`. `pending` has no upper bound: it settles when a worker
  *       runs the check, and a deployment with no worker running leaves it
- *       `pending`. The read operation that reports the settled state arrives
- *       with a later part of the library.
+ *       `pending`. Re-poll `GET /api/v1/library/{id}` to read the settled
+ *       state.
  *
  *       Every branch's outcome is on the returned record's `verification`
  *       envelope. A source that could not be fetched is `RETRIEVAL_FAILED`

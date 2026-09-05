@@ -7,10 +7,10 @@ title: Library
 
 The library holds every credential a tenant has, whether the tenant issued it through this Reference Implementation or received it from someone else. A record for a credential the tenant issued is a **native** record. A record for a credential received from a third party is an **external** record: the tenant gives the credential's location, the Reference Implementation fetches it, checks it, and keeps its own copy, so the credential is still available if the supplier later takes it offline.
 
-This page covers the first library operation, registering an external credential. Listing, reading, annotating, deleting and re-verifying records are separate operations that arrive with the rest of the library epic.
+This page covers registering an external credential and retrieving one record. Listing, annotating, deleting and re-verifying records are separate operations that arrive with the rest of the library epic.
 
 :::tip[Interactive API documentation]
-The Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) carries the exact request and response schemas for this operation. This page explains the behaviour; refer to Swagger for payload shapes. Every library endpoint requires authentication. See [Authentication](../authentication#obtaining-a-token) for how to obtain a Bearer token.
+The Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) carries the exact request and response schemas for both operations on this page. This page explains the behaviour, and Swagger carries the payload shapes. Every library endpoint requires authentication. See [Authentication](../authentication#obtaining-a-token) for how to obtain a Bearer token.
 :::
 
 ## Concepts
@@ -19,7 +19,7 @@ The Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) carries the exac
 
 A register call takes a URL and does most of its work before it answers. It fetches the credential through the same guarded fetch the [verify endpoint](./credentials#verify-a-credential) uses, so a private or reserved network address is refused. If the body is an encrypted envelope and the caller supplied a key, it opens the envelope with that key. It reads the credential's descriptive fields (name, issuer, subject, validity window) from the signed artefact. It stores a durable copy with the tenant's [storage service](./services), encrypted by that service, and keeps the key the service returns. Then it writes the record and answers `201`.
 
-Only one step is left for later: asking the [verifiable credential service](../services/verifiable-credential-service) to check the signature and status. That check runs in the background, on the worker process, and the record's `verification` envelope moves from `pending` to `complete` or `failed` when it finishes. `pending` has no upper bound. It settles when a worker runs the check, and a deployment with no worker process running leaves records `pending` until one does. The Compose stack runs one as `ri-worker` (see [Worker Boot](../operations/startup#worker-boot)). The read operation that shows the settled state arrives with a later part of the library.
+Only one step is left for later: asking the [verifiable credential service](../services/verifiable-credential-service) to check the signature and status. That check runs in the background, on the worker process, and the record's `verification` envelope moves from `pending` to `complete` or `failed` when it finishes. `pending` has no upper bound. It settles when a worker runs the check, and a deployment with no worker process running leaves records `pending` until one does. The Compose stack runs one as `ri-worker` (see [Worker Boot](../operations/startup#worker-boot)). Re-poll `GET /api/v1/library/{id}` to read the settled state.
 
 The fetch follows redirects. The record keeps the URL the caller supplied, in its canonical form, as `sourceUrl`; the bytes are whatever the final location returned.
 
@@ -34,6 +34,8 @@ Every record carries a `verification` object describing its newest verification 
 | `failed`   | Something stopped the checks from reaching a conclusion; `failure` says what and whether to retry. | `failed`                       |
 
 The `checks` object always lists seven checks (`retrieval`, `decryption`, `digest`, `proof`, `status`, `temporal`, `schemaConformance`), each `pass`, `fail` or `not_run`. A `complete` generation is `verified` when no blocking check failed and at least one ran. The blocking checks are `retrieval`, `decryption`, `digest`, `proof` and `status`. `temporal` is recorded as evidence and does not block, so a genuine credential that has expired is still `verified`; its currency is reported separately in `currencyStatus`. `schemaConformance` is advisory.
+
+Every generation of an external record is an executed check. A native record's generation 1 is an issuance assertion instead, described under [Retrieve one library record](#retrieve-one-library-record).
 
 ### What each outcome looks like
 
@@ -97,4 +99,52 @@ Responses:
 - `409 IDEMPOTENCY_KEY_IN_FLIGHT` and `422 IDEMPOTENCY_KEY_MISMATCH` as above. `409 IDEMPOTENCY_KEY_RECORD_DELETED` when the record a replayed key produced was deleted while the request was being answered; retrying the request registers afresh.
 - `500` with no code for any other server failure; the message carries a correlation id for the operator. `500 CREDENTIALS_ENCRYPTION_UNAVAILABLE` when this deployment cannot protect the storage key a copy of an opened credential needs. The fetch and any decrypt already ran; no copy is stored and no record is created. This is a deployment problem (the encryption key configuration), not a caller problem; see [Startup](../operations/startup).
 
-The response is the full record. Key material is never in it; the record's own decryption key is only returned by the single-record detail route, as for native credentials.
+The response is the full record. Key material is never in it; the record's own decryption key is only returned by [the detail route](#retrieve-one-library-record), for a record of either origin.
+
+## Retrieve one library record
+
+```
+GET /api/v1/library/{id}
+```
+
+This returns one record of either origin. It carries the same fields the register call answers with, plus `storageUri`, `digestMultibase` and `decryptionKey`. The three added fields are always present in the JSON object, but each value can be `null`.
+
+The route is also the verification polling target. A record with `verification.state: pending` is read again later until the newest generation is `complete` or `failed`. Each read reports the stored record and custody state. The route does not fetch the durable copy, verify it, change custody columns or create a verification run.
+
+The custody fields describe the copy held by this Reference Implementation. For an external record, `sourceUrl` is the supplier's fetch location and `sourceDigest` is the digest of the raw bytes as fetched. `storageUri` is the location of the Reference Implementation's durable copy and `digestMultibase` is the storage service's content digest for that copy. Do not substitute `sourceUrl` for `storageUri`.
+
+| Record state                               | `storageUri` | `digestMultibase` | `decryptionKey`               |
+| ------------------------------------------ | ------------ | ----------------- | ----------------------------- |
+| Native credential, encrypted copy          | set          | set               | the native storage key        |
+| Native credential, unencrypted copy        | set          | set               | `null`                        |
+| External credential, protected copy        | set          | set               | the receiver-side storage key |
+| External credential, unopened ciphertext   | set          | set               | `null`                        |
+| External credential without a durable copy | `null`       | `null`            | `null`                        |
+
+What `digestMultibase` covers depends on the copy. For a copy the storage service encrypted, meaning a native encrypted credential or an external protected copy, it covers the content before encryption. For an unencrypted copy, and for unopened ciphertext stored exactly as fetched, it covers the stored bytes. A caller fetching an encrypted copy must decrypt it before comparing the digest.
+
+`storageUri` and `digestMultibase` travel together: both are set whenever a durable copy exists, and the digest is `null` whenever the URI is `null`. `decryptionKey` is non-null exactly when `hasKey` is `true`, and a key is only ever returned alongside a `storageUri`. A native record always has a durable copy, so its URI and digest are never `null`.
+
+`hasKey` and `decryptionKey` report the stored custody columns as they are now. A later re-verification that proves the durable copy lost does not yet clear them, so a key can still be returned for a copy that no longer answers. That transition is tracked by [uncefact/tests-untp#957](https://github.com/uncefact/tests-untp/issues/957).
+
+An external record with unopened ciphertext has `encrypted: true`, `hasKey: false` and normally `detailsStatus: EXTRACTION_PENDING`. The key is `null` because the service has no key that opens that copy. The supplier's original key lives only for the length of the registration or re-verification request that carried it, and is never returned by this route.
+
+For a native record with no stored verification run, `verification.generation: 1` is the issuance assertion. It is synthesised from the native record and has `state: complete`, `proof: pass`, six `not_run` checks, and matching `requestedAt` and `completedAt` values from the record's creation time. Once a stored run exists, the newest stored generation is returned, including when it is `pending` or `failed`.
+
+The response carries `Cache-Control: no-store` for every custody state. Serve this endpoint over HTTPS so the returned key is protected in transit.
+
+The example below shows the custody fields alongside the record id and origin. Every other record field is omitted.
+
+```json
+{
+  "id": "clw0ext3rn4lprotect000003",
+  "origin": "external",
+  "storageUri": "https://storage.internal.example/credentials/clw0ext3rn4lprotect000003",
+  "digestMultibase": "zQm-storage-digest",
+  "decryptionKey": "<receiver-side key>"
+}
+```
+
+An unknown id and an id belonging to another tenant both return `404 NOT_FOUND` with the same body. The detail route does not distinguish those cases.
+
+If a stored key cannot be revealed, or a stored value resembles an encryption envelope but is invalid, the route returns a sanitised `500` with the request correlation id. The settled response for that case is tracked by [uncefact/tests-untp#769](https://github.com/uncefact/tests-untp/issues/769).

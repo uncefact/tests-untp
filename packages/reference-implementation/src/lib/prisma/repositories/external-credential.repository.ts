@@ -3,7 +3,6 @@ import {
   CredentialDetailsStatus,
   IdempotencyOperation,
   LibraryRecordOrigin,
-  type CheckRun,
   type CoreCredentialType,
   type CredentialDetailsError,
   type ExternalContentKind,
@@ -21,7 +20,7 @@ import type { SqlExecutor } from '@/lib/jobs/types';
 import {
   LibraryRecordShapeError,
   narrowExternalRecord,
-  type ExternalRecordView,
+  type ExternalLibraryRecordView,
 } from '@/lib/library/library-record-view';
 
 /**
@@ -161,11 +160,13 @@ export type CreateExternalCredentialInput = {
 };
 
 /**
- * An external credential as its callers see it: the library record (identity
- * and the extracted fields) narrowed to its external child (source, custody,
- * annotations), and its newest check run.
+ * An external credential as this repository's callers see it: the library
+ * record (identity and the extracted fields) narrowed to its external child
+ * (source, custody, annotations), and its newest check run. One declaration
+ * under two names, so the detail view and this repository's return type
+ * cannot drift apart.
  */
-export type ExternalCredentialRecord = ExternalRecordView & { checkRun: CheckRun };
+export type { ExternalLibraryRecordView as ExternalCredentialRecord };
 
 function detailsColumns(capture: ExternalDetailsCapture) {
   switch (capture.status) {
@@ -200,7 +201,7 @@ function detailsColumns(capture: ExternalDetailsCapture) {
  */
 export async function createExternalCredential(
   input: CreateExternalCredentialInput,
-): Promise<ExternalCredentialRecord> {
+): Promise<ExternalLibraryRecordView> {
   // One instant for every timestamp the rows carry, so the record can never
   // read as updated, or enqueued, before it was created.
   const now = new Date(Date.now());
@@ -286,7 +287,7 @@ export async function createExternalCredential(
 export async function getExternalCredentialById(
   id: string,
   tenantId: string,
-): Promise<ExternalCredentialRecord | null> {
+): Promise<ExternalLibraryRecordView | null> {
   const row = await prisma.libraryRecord.findFirst({
     where: { id, tenantId, origin: LibraryRecordOrigin.EXTERNAL },
     include: { externalCredential: true, checkRuns: { orderBy: { generation: 'desc' }, take: 1 } },

@@ -1,6 +1,7 @@
 export * from './credential.repository';
 export * from './idempotency-key.repository';
 export * from './external-credential.repository';
+export * from './library-record.repository';
 export * from './check-run.repository';
 export * from './did.repository';
 export * from './service-instance.repository';
