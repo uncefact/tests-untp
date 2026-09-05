@@ -242,3 +242,24 @@ describe('stopJobQueue', () => {
     expect(constructed[0].stop).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("createJobQueue (the worker's construction path)", () => {
+  it('builds an unstarted queue against the resolved target so handlers can be registered before start', () => {
+    process.env.RI_DATABASE_URL = 'postgresql://u:p@h:5432/db';
+    const loaded = loadModule();
+    const queue = loaded.createJobQueue();
+    expect(queue).toBeDefined();
+    expect(constructed).toHaveLength(1);
+    expect(constructed[0].options.connectionString).toBe('postgresql://u:p@h:5432/db');
+    expect(constructed[0].start).not.toHaveBeenCalled();
+  });
+
+  it('fails with the same missing-target error the web process gets', () => {
+    const loaded = loadModule();
+    expect(() => loaded.resolveQueueConnectionString()).toThrow(
+      expect.objectContaining({ code: 'jobs.database-url-missing' }),
+    );
+    expect(() => loaded.createJobQueue()).toThrow(expect.objectContaining({ code: 'jobs.database-url-missing' }));
+    expect(constructed).toHaveLength(0);
+  });
+});

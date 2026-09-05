@@ -1,8 +1,11 @@
 /**
  * OpenTelemetry auto-instrumentation configuration.
  *
- * `@opentelemetry/auto-instrumentations-node` covers HTTP, fetch,
- * Next.js, Prisma, and other common libraries out of the box. Its `fs`
+ * `@opentelemetry/auto-instrumentations-node` covers HTTP, `fetch`
+ * (undici), `pg`, `pino` and other common libraries out of the box. It does
+ * not cover Prisma (that is the separate `@prisma/instrumentation`, not
+ * installed), so there are no Prisma spans. Next.js spans (`next.js` scope)
+ * come from Next's own tracer in the web process, not from this list. Its `fs`
  * instrumentation is disabled here by default: every filesystem call
  * Next.js and Node make internally becomes a span, which produces a
  * high-cardinality, low-value flood that drowns the request-level

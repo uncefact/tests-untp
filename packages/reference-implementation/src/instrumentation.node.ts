@@ -13,21 +13,12 @@
  * @see ../../../docs/observability.md
  * @see ../../../documentation/docs/reference-implementation/operations/startup.md
  */
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
-import { NodeSDK } from '@opentelemetry/sdk-node';
-
-import { buildInstrumentations } from './lib/observability/instrumentations';
-import { buildResource, resolveServiceName } from './lib/observability/resource';
+import { resolveServiceName } from './lib/observability/resource';
+import { startNodeSdk } from './lib/observability/start-sdk';
 import { apiLogger } from './lib/api/logger';
 import { warnOnRejectedMaxPageLimitOverride } from './lib/api/pagination';
 import { resolveDataEncryptionKey } from './lib/encryption/resolve-data-encryption-key';
-import { getEncryptionService } from './lib/encryption/encryption';
-import { prisma } from './lib/prisma/prisma';
-import {
-  assertNotPlaceholderEncryptionKey,
-  validateEncryptionKeyAtStartup,
-} from './lib/credentials/validate-encryption-key-startup';
-import { prismaEnvelopeStores } from './lib/credentials/prisma-envelope-stores';
+import { validateConfiguredEncryptionKey } from './lib/encryption/encryption-key-boot';
 import { resolveAppUrl } from './lib/config/app-url.config';
 import { startSeededSchemeRefreshInterval } from './lib/cvc/seeded-refresh-interval';
 import { validateHttpUserAgentOnBoot } from './lib/config/http-user-agent.config';
@@ -71,9 +62,7 @@ async function validateEncryptionKeyOnBoot(): Promise<void> {
   if (!resolved.key) {
     return;
   }
-
-  assertNotPlaceholderEncryptionKey(resolved.key, { deploymentEnvironment: process.env.DEPLOYMENT_ENVIRONMENT });
-  await validateEncryptionKeyAtStartup(prismaEnvelopeStores(prisma), getEncryptionService());
+  await validateConfiguredEncryptionKey(resolved.key);
 }
 
 /**
@@ -103,19 +92,7 @@ async function startJobQueueOnBoot(): Promise<void> {
  * an observability profile is safe.
  */
 function startOpenTelemetry(): void {
-  const sdk = new NodeSDK({
-    resource: buildResource(),
-    // Merged by the SDK after its env detector, so the resolved name (not a
-    // padded OTEL_SERVICE_NAME or a service.name from OTEL_RESOURCE_ATTRIBUTES)
-    // is what every span carries. See resolveServiceName.
-    serviceName: resolveServiceName(),
-    traceExporter: new OTLPTraceExporter({
-      url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://localhost:4317',
-    }),
-    instrumentations: buildInstrumentations(),
-  });
-
-  sdk.start();
+  const sdk = startNodeSdk({ serviceName: resolveServiceName() });
 
   // Surface an unusable API_MAX_PAGE_LIMIT to the operator once at startup (issue #834).
   warnOnRejectedMaxPageLimitOverride(apiLogger);

@@ -74,7 +74,9 @@ The emitted `service.name` is read from `OTEL_SERVICE_NAME` and defaults to `ref
 
 Set `OTEL_SERVICE_NAME` when more than one thing reports into the same stack and they need to be told apart, such as a variation of the reference implementation running alongside the original. The environment is carried separately, in `deployment.environment.name`.
 
-Auto-instrumentation is provided by `@opentelemetry/auto-instrumentations-node`, which covers HTTP, fetch, Next.js, Prisma, and other common libraries. The `fs` instrumentation is disabled by default (`packages/reference-implementation/src/lib/observability/instrumentations.ts`): it turns every filesystem call Next.js and Node make internally into a span, which floods traces with high-cardinality, low-value noise.
+Auto-instrumentation is provided by `@opentelemetry/auto-instrumentations-node`, which covers HTTP, `fetch` (undici), `pg`, `pino` and other common libraries. It does not cover Prisma (that is the separate `@prisma/instrumentation`, not installed), so there are no Prisma spans; database activity shows up as `pg` spans where a query goes through the `pg` driver (the job queue), and not for Prisma's own queries. Next.js spans (scope `next.js`) come from Next's own tracer in the web process rather than from this list; the worker runs no Next and emits none.
+
+The background worker is a second process from the same image and reports under its own `service.name`, `reference-implementation-worker` by default (the compose file passes `OTEL_WORKER_SERVICE_NAME` through as the worker's `OTEL_SERVICE_NAME`). A dashboard filtered on the web process's name will not show the worker's spans; filter on both, or on `service.version`, which the two share. The `fs` instrumentation is disabled by default (`packages/reference-implementation/src/lib/observability/instrumentations.ts`): it turns every filesystem call Next.js and Node make internally into a span, which floods traces with high-cardinality, low-value noise.
 
 ## Relevant ADRs
 

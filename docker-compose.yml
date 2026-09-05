@@ -77,6 +77,9 @@ services:
       start_period: 30s
 
   ri:
+    # Named so the worker below runs the same built image rather than a second
+    # build of it; this service is the build owner, the worker only references.
+    image: untp-reference-implementation:local
     build:
       context: .
       dockerfile: packages/reference-implementation/Dockerfile
@@ -166,6 +169,52 @@ services:
         condition: service_started
       ri-db:
         condition: service_healthy
+
+  # The background worker (#985; ADR-054): the same image as ri, a different
+  # entrypoint, no port. It runs the job handlers the web process only
+  # enqueues for. The worker never migrates or seeds (the wrapper sets the
+  # SKIP_* flags before the shared entrypoint reads them); it checks at boot
+  # that every migration this build ships is applied, so it does not wait on
+  # the web container at all: the dependencies below only order start after
+  # the services a job talks to. It refuses to start without
+  # DATA_ENCRYPTION_KEY. The image's HTTP healthcheck is replaced by the
+  # worker's own: it publishes a heartbeat file each time its queue pool
+  # answers and a consumer has fetched recently, and the check reads the
+  # file's age. Unhealthy is the signal, not a restart trigger: the worker
+  # does not exit on a failed probe (both pools recover a lost connection),
+  # so under Compose an unhealthy worker is what `docker compose ps` shows.
+  # The grace period sits above the worker's own shutdown deadline (see the
+  # operations page for the budget).
+  ri-worker:
+    image: untp-reference-implementation:local
+    entrypoint: ['/app/docker-worker-entrypoint.sh']
+    healthcheck:
+      test: ['CMD', '/app/docker-worker-healthcheck.sh']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    restart: always
+    stop_grace_period: 60s
+    environment:
+      RI_POSTGRES_USER: ${RI_POSTGRES_USER:-ri-postgres}
+      RI_POSTGRES_PASSWORD: ${RI_POSTGRES_PASSWORD:-changeme}
+      RI_POSTGRES_DB: ${RI_POSTGRES_DB:-ri}
+      RI_POSTGRES_HOST: ri-db
+      RI_POSTGRES_PORT: 5432
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-}
+      SERVICE_ENCRYPTION_KEY: ${SERVICE_ENCRYPTION_KEY:-}
+      DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
+      LOG_REDACT_PATHS: ${LOG_REDACT_PATHS:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
+      OTEL_SERVICE_NAME: ${OTEL_WORKER_SERVICE_NAME:-reference-implementation-worker}
+    depends_on:
+      ri-db:
+        condition: service_healthy
+      vckit-api:
+        condition: service_healthy
+      storage-service:
+        condition: service_started
 
   db:
     image: postgres:16-alpine

@@ -181,6 +181,33 @@ services:
       e2e-ri-db:
         condition: service_healthy
 
+  # The worker beside app (#985): same image, the worker entrypoint, no port.
+  # Without it any end-to-end journey that registers a library credential
+  # sits pending for ever. See docker-compose.yml's ri-worker for the shape.
+  app-worker:
+    image: app:e2e
+    profiles: ['ri']
+    entrypoint: ['/app/docker-worker-entrypoint.sh']
+    healthcheck:
+      test: ['CMD', '/app/docker-worker-healthcheck.sh']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    restart: always
+    stop_grace_period: 60s
+    environment:
+      - RI_DATABASE_URL=postgresql://ri-postgres:ri-postgres@e2e-ri-db:5432/ri?schema=public
+      - DATA_ENCRYPTION_KEY=dd1b7430915155b51c503806031f31f901e85563035f65421d707f042c75f44b
+      - OTEL_SERVICE_NAME=reference-implementation-worker
+    extra_hosts:
+      - 'localhost:host-gateway'
+    depends_on:
+      vckit-api:
+        condition: service_healthy
+      e2e-ri-db:
+        condition: service_healthy
+
   e2e-ri-db:
     image: postgres:17-alpine
     profiles: ['ri']

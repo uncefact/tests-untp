@@ -17,6 +17,7 @@ The diagram below shows all of the components and their relationships. See [Quic
 graph TB
     Browser["Browser"]
     RI["Reference Implementation\n(Web UI + REST API)"]
+    Worker["Reference Implementation Worker\n(background jobs, same image)"]
     DB["Database"]
     KC["Federated IDP"]
 
@@ -25,7 +26,10 @@ graph TB
     IDR["Identity Resolver Service"]
 
     Browser --> RI
-    RI -->|"queries"| DB
+    RI -->|"queries, enqueues jobs"| DB
+    Worker -->|"claims and settles jobs"| DB
+    Worker --> VC
+    Worker --> Storage
     RI -->|"authentication"| KC
     RI --> VC
     RI --> Storage
@@ -44,7 +48,7 @@ On startup, the Reference Implementation automatically applies database migratio
 
 Some of what a request sets in motion finishes after the response. Registering a credential received from a third party ([Library API](./api/library)) does its fetching, opening and copying inside the request, then leaves the signature and status check to run later, so the record is returned in a `pending` state that settles afterwards.
 
-That later work is carried by a job queue that lives in the same PostgreSQL database as everything else, so a job and the record whose state it will settle are committed together and neither can exist without the other. The application process that serves requests only places jobs on the queue. Taking them off and running them is a separate process's job, so a deployment where none is running leaves records waiting rather than losing them, and they settle whenever one starts. The reasoning behind this shape is recorded in [ADR-054](https://github.com/uncefact/tests-untp/blob/next/docs/adrs/054-background-work-runs-on-a-worker.md). See [Startup](./operations/startup#job-queue-start) for what happens to the queue when a process boots.
+That later work is carried by a job queue that lives in the same PostgreSQL database as everything else, so a job and the record whose state it will settle are committed together and neither can exist without the other. The application process that serves requests only places jobs on the queue. Taking them off and running them is the worker's job: a second container from the same image (`ri-worker` in the Compose stack) with a different entrypoint, no port and no HTTP, sharing the database. A deployment with no worker running leaves records waiting rather than losing them, and they settle when one starts; a job interrupted by a worker dying is retried by the queue once its attempt expires, and only a job that exhausts its retries, or that the queue's retention drops first, is left for re-verification (#957) to recover. The worker never migrates or seeds the database; it checks at boot that the schema it expects is there, and refuses to start without the data encryption key, because every job it runs needs it. The reasoning behind this shape is recorded in [ADR-054](https://github.com/uncefact/tests-untp/blob/next/docs/adrs/054-background-work-runs-on-a-worker.md). See [Startup](./operations/startup#job-queue-start) for what happens to the queue when a process boots.
 
 ### Federated IDP (Identity Provider)
 
