@@ -179,21 +179,44 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 # Operator-run maintenance scripts (run via node_modules/.bin/tsx; see each
 # script's header for the in-image invocation)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/scripts ./scripts
+# The background worker (#985) runs the library's job handler under tsx, and
+# that handler graph reaches most of src/lib through @/ imports. The whole
+# directory is copied so a new import in the graph is never a missing COPY
+# line that fails only in a built image, and the worker's own directory
+# beside it. Tests never reached the builder stage (.dockerignore excluded
+# them from the build context), so none come along. The lines above stay:
+# they document which files the seed and the operator scripts need, and
+# copying a superset is harmless.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib ./src/lib
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/worker ./src/worker
+# tsx resolves the @/ alias only through a tsconfig, and looks for one from the
+# process working directory, so the worker gets an image-local tsconfig whose
+# paths match this flattened layout and an explicit pointer to it that does
+# not depend on where the process starts. The pointer is image-wide, so the
+# seed, the backfills and the operator scripts run under it too; they use
+# relative imports and are unaffected by the alias, and the seed runs under it
+# on every container start.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/tsconfig.worker.json ./tsconfig.json
+ENV TSX_TSCONFIG_PATH=/app/tsconfig.json
 # Render templates used by prisma/seed.ts
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/templates ./src/templates
 
-# Declare ./src as ESM so tsx interprets imported .ts files (constants.ts,
-# did.config.ts, etc.) as ESM and their named exports bind cleanly when
-# the ESM-scoped prisma/seed.ts imports them. Without this, tsx walks up
-# from ./src/lib/prisma/constants.ts to the next ancestor without a
-# "type" field and treats the file as CJS — ESM-side named imports then
-# fail with "module does not provide an export named …". The Prisma
-# generated client under src/lib/prisma/generated/ keeps its own
-# package.json (no "type" field), so it remains CJS as Prisma expects.
-RUN echo '{"type":"module"}' > ./src/package.json
+# ./src is declared ESM by src/package.json, committed in the checkout and
+# copied here (it sits at src/, beside src/lib), so tsx interprets the .ts
+# files there as ESM
+# and their named exports bind cleanly when the ESM-scoped prisma/seed.ts
+# and the worker import them. The Prisma generated client under
+# src/lib/prisma/generated/ keeps its own package.json (no "type" field),
+# so it remains CJS as Prisma expects.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/package.json ./src/package.json
 
 COPY --chown=nextjs:nodejs packages/reference-implementation/docker-entrypoint.sh ./docker-entrypoint.sh
-RUN chmod +x ./docker-entrypoint.sh
+# The worker container replaces the entrypoint with this wrapper and the
+# image's HTTP healthcheck with this check (see the scripts and the compose
+# files); neither is the default.
+COPY --chown=nextjs:nodejs packages/reference-implementation/docker-worker-entrypoint.sh ./docker-worker-entrypoint.sh
+COPY --chown=nextjs:nodejs packages/reference-implementation/docker-worker-healthcheck.sh ./docker-worker-healthcheck.sh
+RUN chmod +x ./docker-entrypoint.sh ./docker-worker-entrypoint.sh ./docker-worker-healthcheck.sh
 
 USER nextjs
 

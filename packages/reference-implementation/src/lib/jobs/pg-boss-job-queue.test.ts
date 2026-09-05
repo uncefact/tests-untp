@@ -15,6 +15,8 @@ jest.mock('pg-boss', () => {
     updateQueue: jest.fn(async () => undefined),
     complete: jest.fn(async () => undefined),
     fail: jest.fn(async () => undefined),
+    getDb: jest.fn(() => ({ executeSql: jest.fn(async () => ({ rows: [] })) })),
+    getWipData: jest.fn(() => [] as { lastFetchedOn: number | null; lastJobStartedOn: number | null; count: number }[]),
   };
   const mockState = { constructorArgs: [] as unknown[] };
   class PgBoss {
@@ -496,6 +498,45 @@ describe('registration and lifecycle', () => {
     await queue.stop();
     await queue.stop();
     expect(bossMock.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("probe queries through pg-boss's own pool and reports each consumer separately", async () => {
+    const queue = makeQueue();
+    bossMock.getWipData.mockReturnValue([
+      { lastFetchedOn: 1_000, lastJobStartedOn: 900, count: 0 },
+      { lastFetchedOn: 3_000, lastJobStartedOn: null, count: 2 },
+    ]);
+    await expect(queue.probe()).resolves.toEqual({
+      consumers: [
+        { lastFetchedOn: 1_000, lastJobStartedOn: 900, activeJobs: 0 },
+        { lastFetchedOn: 3_000, lastJobStartedOn: null, activeJobs: 2 },
+      ],
+    });
+    expect(bossMock.getDb).toHaveBeenCalled();
+  });
+
+  it('probe rejects when the pool cannot answer', async () => {
+    const queue = makeQueue();
+    bossMock.getDb.mockReturnValueOnce({
+      executeSql: jest.fn(async () => {
+        throw new Error('pool exhausted');
+      }),
+    });
+    await expect(queue.probe()).rejects.toThrow('pool exhausted');
+  });
+
+  it('passes a drain timeout through to pg-boss and otherwise leaves its default alone', async () => {
+    // The worker bounds its drain; the web does not. Fails if the option is
+    // dropped on the floor or a default is invented here.
+    const queue = makeQueue();
+    await queue.start();
+    await queue.stop({ drainTimeoutMs: 30_000 });
+    expect(bossMock.stop).toHaveBeenLastCalledWith({ graceful: true, timeout: 30_000 });
+
+    const plain = makeQueue();
+    await plain.start();
+    await plain.stop();
+    expect(bossMock.stop).toHaveBeenLastCalledWith({ graceful: true });
   });
 
   it('coalesces concurrent starts into one boot', async () => {

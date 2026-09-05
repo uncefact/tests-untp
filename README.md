@@ -61,9 +61,15 @@ For development with hot reloading, stop the Reference Implementation container 
 > **Warning**: Running the Reference Implementation on the host needs a one-line Keycloak change first. The Compose config sets `KC_HOSTNAME` to `http://keycloak:8080` for the containerised RI, but the host process cannot resolve `keycloak:8080` and the issuer in Keycloak's tokens would not match, so API authentication fails. Before the steps below, change `KC_HOSTNAME` to `http://localhost:8080` in `docker-compose.yml` and recreate Keycloak with `docker compose up -d keycloak`. Revert it to `http://keycloak:8080` before running the Reference Implementation in Docker again.
 
 ```bash
-docker compose stop ri
+docker compose stop ri ri-worker
 pnpm build
 pnpm start
+```
+
+The web process only places background jobs (a registered credential's verification, for one) on the queue; a second process runs them. Without it those records stay `pending`. In another terminal:
+
+```bash
+pnpm start:worker
 ```
 
 > **Note**: Ensure you have completed the [Prerequisites](#prerequisites) before running locally.
@@ -109,6 +115,7 @@ pnpm start
 ```bash
 pnpm build                    # Full build (services + components + test-suite)
 pnpm start                    # Start Reference Implementation dev server
+pnpm start:worker             # Start the background worker beside it (settles pending verifications)
 pnpm test                     # Run all tests
 pnpm lint:check               # ESLint across packages
 ```

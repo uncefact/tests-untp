@@ -179,6 +179,46 @@ export interface JobQueue<Tx = SqlExecutor> {
    */
   start(): Promise<void>;
 
-  /** Stop working and release resources. Safe to call more than once. */
-  stop(): Promise<void>;
+  /**
+   * Prove the queue can still work: a trivial query through the queue's own
+   * connection pool (not the application's, which can be healthy while this
+   * one is not), plus what its consumers have done lately. Rejects when the
+   * pool cannot answer. The worker's heartbeat calls this.
+   */
+  probe(): Promise<QueueProbe>;
+
+  /**
+   * Stop working and release resources. Safe to call more than once.
+   * `drainTimeoutMs` bounds how long active jobs are given to finish before
+   * they are failed and left for retry; it does not bound the release that
+   * follows, so a caller with a hard deadline wraps the whole call.
+   */
+  stop(options?: StopOptions): Promise<void>;
+}
+
+/**
+ * One consumer's recent history, kept per consumer rather than aggregated:
+ * a stale consumer's retained job count beside an idle consumer's fresh
+ * timestamp must not add up to "working".
+ */
+export interface ConsumerProbe {
+  /** When this consumer last completed a fetch (empty or not), as epoch ms; null before the first. */
+  lastFetchedOn: number | null;
+  /**
+   * Jobs this consumer reports as in hand. pg-boss keeps the count after a
+   * job whose settlement threw, so a positive count is only evidence of work
+   * when `lastJobStartedOn` is recent.
+   */
+  activeJobs: number;
+  /** When this consumer last started handling a fetch (an empty fetch counts), as epoch ms; null before the first. */
+  lastJobStartedOn: number | null;
+}
+
+export interface QueueProbe {
+  consumers: ConsumerProbe[];
+}
+
+export interface StopOptions {
+  /** How long to wait for active jobs before failing them. The implementation's default applies when omitted. */
+  drainTimeoutMs?: number;
 }

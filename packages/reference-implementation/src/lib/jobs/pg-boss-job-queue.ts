@@ -1,6 +1,15 @@
 import { PgBoss, type JobWithMetadata, type SendOptions } from 'pg-boss';
 import { JobQueueError } from './errors';
-import type { EnqueueOptions, JobContext, JobHandler, JobQueue, RegisterOptions, SqlExecutor } from './types';
+import type {
+  EnqueueOptions,
+  JobContext,
+  JobHandler,
+  JobQueue,
+  RegisterOptions,
+  SqlExecutor,
+  StopOptions,
+  QueueProbe,
+} from './types';
 
 /**
  * Options for {@link PgBossJobQueue}. The database arrives by injection;
@@ -353,7 +362,21 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
     this.started = true;
   }
 
-  async stop(): Promise<void> {
+  async probe(): Promise<QueueProbe> {
+    // pg-boss's own pool, which is the one its consumers fetch with, so a
+    // pool that is exhausted or blocked shows here even when the
+    // application's Prisma pool is fine.
+    await this.boss.getDb().executeSql('SELECT 1');
+    return {
+      consumers: this.boss.getWipData().map((worker) => ({
+        lastFetchedOn: worker.lastFetchedOn,
+        lastJobStartedOn: worker.lastJobStartedOn,
+        activeJobs: worker.count,
+      })),
+    };
+  }
+
+  async stop(options?: StopOptions): Promise<void> {
     if (this.startPromise === undefined && !this.started && !this.stopFailed) return;
     // Wait out an in-flight start (whatever its outcome) so stop never
     // returns while a boot is still bringing workers up behind it.
@@ -361,7 +384,13 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
     if (!this.started && !this.stopFailed) return;
     // Concurrent stops share one shutdown; started flips only on success so
     // a failed stop can be retried.
-    this.stopPromise ??= this.boss.stop({ graceful: true }).then(
+    // pg-boss's timeout bounds only its wait for active work; failWip and the
+    // pool close after it are unbounded, which is what JobQueue.stop's contract
+    // warns callers about. Omitted rather than passed as undefined so pg-boss
+    // applies its own default.
+    const bossOptions: { graceful: true; timeout?: number } = { graceful: true };
+    if (options?.drainTimeoutMs !== undefined) bossOptions.timeout = options.drainTimeoutMs;
+    this.stopPromise ??= this.boss.stop(bossOptions).then(
       () => {
         this.started = false;
         this.startPromise = undefined;

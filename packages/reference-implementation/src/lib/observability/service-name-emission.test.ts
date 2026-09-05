@@ -11,9 +11,10 @@
  */
 import { trace } from '@opentelemetry/api';
 import { envDetector } from '@opentelemetry/resources';
-import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
+import { tracing } from '@opentelemetry/sdk-node';
 
-import { buildResource, resolveServiceName } from './resource';
+import { resolveServiceName } from './resource';
+import { startNodeSdk } from './start-sdk';
 
 const SAVED = {
   OTEL_SERVICE_NAME: process.env.OTEL_SERVICE_NAME,
@@ -27,17 +28,20 @@ function restore(name: keyof typeof SAVED) {
 
 async function emittedServiceName(): Promise<unknown> {
   const exporter = new tracing.InMemorySpanExporter();
-  const sdk = new NodeSDK({
-    resource: buildResource({ serviceVersion: '0.0.0-test' }),
-    serviceName: resolveServiceName(),
-    // The env detector is the one that competes for service.name, and it is
-    // synchronous; the default host/process detectors add async attributes
-    // that would defer the export past the read below.
-    resourceDetectors: [envDetector],
-    spanProcessors: [new tracing.SimpleSpanProcessor(exporter)],
-    instrumentations: [],
-  });
-  sdk.start();
+  // The real starter, so dropping its `serviceName` option would fail this
+  // suite; only the exporter and detectors are swapped to read in memory.
+  const sdk = startNodeSdk(
+    { serviceName: resolveServiceName(), serviceVersion: '0.0.0-test' },
+    {
+      traceExporter: undefined,
+      // The env detector is the one that competes for service.name, and it is
+      // synchronous; the default host/process detectors add async attributes
+      // that would defer the export past the read below.
+      resourceDetectors: [envDetector],
+      spanProcessors: [new tracing.SimpleSpanProcessor(exporter)],
+      instrumentations: [],
+    },
+  );
   try {
     trace.getTracer('service-name-emission-test').startSpan('probe').end();
     const [span] = exporter.getFinishedSpans();

@@ -294,6 +294,30 @@ jobs:
           cache-from: type=gha,scope=reference-implementation-e2e
           cache-to: type=gha,scope=reference-implementation-e2e,mode=max
 
+      # The worker (#985) runs TypeScript from the image under tsx, so a
+      # module its handler graph imports that the Dockerfile does not copy, an
+      # alias that stops resolving, or an export-condition change in a
+      # dependency fails only when the container starts. Importing the
+      # worker's bootstrap module (which constructs nothing that connects)
+      # inside the built image catches all three before merge (the unit test
+      # over the Dockerfile's COPY lines catches the missing-copy case too, for
+      # relative imports). The real entrypoint is then booted with no
+      # environment: it must get as far as the database-target check, which
+      # proves the version and the migrations directory resolve in the
+      # flattened layout, and fail there by name. The wrapper is checked for
+      # the same reason: a worker service points its entrypoint at it.
+      - name: Smoke-test the worker in the built image
+        if: steps.affected.outputs.result == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint node app:e2e --import tsx \
+            --input-type=module -e "await import('/app/src/worker/bootstrap.ts'); console.log('worker bootstrap imports cleanly')"
+          out=$(docker run --rm --entrypoint node app:e2e --import tsx src/worker/main.ts 2>&1 || true)
+          echo "$out" | grep -q 'jobs.database-url-missing' || { echo "::error::worker entrypoint did not reach the database-target check"; echo "$out"; exit 1; }
+          echo "$out" | grep -q 'version unresolved' && { echo "::error::worker could not resolve its package version in the image"; echo "$out"; exit 1; }
+          docker run --rm --entrypoint sh app:e2e -c 'test -x /app/docker-worker-entrypoint.sh && test -x /app/docker-worker-healthcheck.sh && test -f /app/tsconfig.json && test "$TSX_TSCONFIG_PATH" = /app/tsconfig.json'
+
   build-e2e-image-playground:
     name: Build E2E image (playground)
     if: github.event_name == 'pull_request'

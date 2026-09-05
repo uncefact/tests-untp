@@ -45,6 +45,7 @@ The Docker Compose stack starts the following services. Each is an independent c
 | Service | Container | URL | Description |
 |---------|-----------|-----|-------------|
 | Reference Implementation | `ri` | `http://localhost:3003` | REST API (and web UI, when available) |
+| Reference Implementation Worker | `ri-worker` | none (serves nothing) | Runs the background jobs the web process enqueues, such as verifying a registered credential; the same image as `ri` with a different entrypoint |
 | Keycloak | `keycloak` | `http://localhost:8080` | Federated identity provider — handles authentication and issues tokens |
 | VCKit | `vckit-api` | `http://localhost:3332` | Verifiable credential service — signs and verifies credentials, manages DIDs |
 | VCKit Database | `db` | `localhost:5432` | PostgreSQL database for VCKit (key material, DIDs, credential metadata) |

@@ -53,6 +53,7 @@ Access the reference implementation at http://localhost:3003 (admin@example.com 
 ### Daily Development
 ```bash
 pnpm start                          # Start RI dev server (hot reload)
+pnpm start:worker                   # Start the background worker beside it (the web process only enqueues jobs)
 pnpm start:untp-playground          # Start playground on port 4001
 pnpm build:services                 # Rebuild services after changes
 pnpm build:components               # Rebuild components after changes
@@ -162,6 +163,7 @@ External integrations use interfaces + implementations:
 - **API Routes**: `/src/app/api/v1/` - credentials, cvc, data-models, dids, facilities, identifiers, library, organisations, products, registrars, render-templates, schemes, services. Auth is unversioned, at `/api/auth/[...nextauth]`
 - **Auth**: Keycloak via NextAuth.js with organization-level branding
 - **Config**: Tenant configuration via database (replacing legacy app-config.json)
+- **Processes**: two containers from one image. The web container serves the API and only enqueues background jobs. The worker container (`ri-worker`, entrypoint `src/worker/main.ts`, no HTTP) runs the handlers, and the queue is Postgres via pg-boss (ADR-054). The worker never migrates or seeds, and refuses to boot without `DATA_ENCRYPTION_KEY`
 
 ## Development Workflow
 

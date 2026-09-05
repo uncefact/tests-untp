@@ -5,6 +5,8 @@ const loggerCalls = {
   info: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
+  /** The bindings each `child` call was given, so a test can see what the handler puts on its log lines. */
+  child: jest.fn(),
 };
 jest.mock('@/lib/api/logger', () => {
   const logger: Record<string, unknown> = {
@@ -12,7 +14,10 @@ jest.mock('@/lib/api/logger', () => {
     warn: (...args: unknown[]) => loggerCalls.warn(...args),
     error: (...args: unknown[]) => loggerCalls.error(...args),
   };
-  logger.child = () => logger;
+  logger.child = (bindings: unknown) => {
+    loggerCalls.child(bindings);
+    return logger;
+  };
   return { apiLogger: logger };
 });
 
@@ -272,6 +277,39 @@ describe('verifyGenerationHandler preconditions', () => {
       },
     });
     expect(deps.findRun).not.toHaveBeenCalled();
+  });
+
+  it('processes a payload carrying a field this build does not know, exactly as one without it', async () => {
+    // A job is durable and a rolling deploy has an older worker claim jobs a
+    // newer web process wrote, so an observability-only addition must not be
+    // a parse failure. Fails if the schema goes back to rejecting unknown
+    // keys: the handler would then take the settleFailed path above.
+    verifier.verify.mockResolvedValue(verified());
+    const deps = dependencies();
+    await verifyGenerationHandler(deps)(
+      { ...JOB, traceParent: '00-abc-def-01' } as unknown as VerifyJobReference,
+      context(),
+    );
+
+    expect(loggerCalls.error).not.toHaveBeenCalledWith(expect.anything(), 'Verify job payload is not a run reference');
+    expect(deps.findRun).toHaveBeenCalledWith(RECORD_ID, 1, TENANT_ID);
+    expect(deps.settleComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not carry an unknown field through to the run it settles or the log it writes', async () => {
+    // strip, not passthrough: the handler spreads the parsed payload into
+    // its log child, so a passthrough would put every unknown key on every
+    // line. Fails if the schema becomes passthrough.
+    verifier.verify.mockResolvedValue(verified());
+    const deps = dependencies();
+    await verifyGenerationHandler(deps)(
+      { ...JOB, traceParent: '00-abc-def-01' } as unknown as VerifyJobReference,
+      context(),
+    );
+
+    const bindings = (loggerCalls.child.mock.calls as unknown[][]).map((call) => call[0] as Record<string, unknown>);
+    expect(bindings.some((b) => 'tenantId' in b)).toBe(true);
+    expect(bindings.every((b) => !('traceParent' in b))).toBe(true);
   });
 
   it('settles nothing when an unreadable payload does not even name a run', async () => {

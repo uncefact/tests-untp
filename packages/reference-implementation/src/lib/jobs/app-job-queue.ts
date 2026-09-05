@@ -20,7 +20,13 @@ const logger = apiLogger.child({ module: 'job-queue' });
 let instance: PgBossJobQueue | undefined;
 let started: Promise<JobQueue> | undefined;
 
-function connectionString(): string {
+/**
+ * The database the queue lives in: an explicit `RI_DATABASE_URL`, else one
+ * built from the `RI_POSTGRES_*` parts. Exported so the worker process,
+ * which builds its own queue rather than this module's singleton, fails on
+ * a missing target with the same code and message as the web process.
+ */
+export function resolveQueueConnectionString(): string {
   const url = process.env.RI_DATABASE_URL ?? databaseUrlFromEnvParts();
   if (!url) {
     throw new JobQueueError({
@@ -31,11 +37,20 @@ function connectionString(): string {
   return url;
 }
 
-function getJobQueue(): PgBossJobQueue {
-  instance ??= new PgBossJobQueue({
-    connectionString: connectionString(),
+/**
+ * A queue built and not started, for a process that registers handlers
+ * before starting. The web singleton below starts on construction and
+ * `register` throws after start, so a worker cannot use it (#985).
+ */
+export function createJobQueue(): PgBossJobQueue {
+  return new PgBossJobQueue({
+    connectionString: resolveQueueConnectionString(),
     onError: (error) => logger.error({ err: error }, 'Job queue reported an error'),
   });
+}
+
+function getJobQueue(): PgBossJobQueue {
+  instance ??= createJobQueue();
   return instance;
 }
 

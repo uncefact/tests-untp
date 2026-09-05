@@ -35,6 +35,7 @@
     "dev": "prisma generate && next dev -p 3003",
     "build": "prisma generate && npx tsx scripts/check-encrypted-columns.ts && next build",
     "start": "next start",
+    "worker": "prisma generate && node --import tsx src/worker/main.ts",
     "lint": "prisma generate && eslint .",
     "storybook": "storybook dev -p 6006",
     "test": "jest",

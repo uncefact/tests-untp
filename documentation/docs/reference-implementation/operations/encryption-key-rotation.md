@@ -13,7 +13,7 @@ The command is idempotent. A re-run with the same key pair finds rows already on
 
 1. Back up the database, and keep both key values somewhere safe until the rotation is verified. A backup without its matching key is not a recovery artefact; see [Key Management and Recovery](./key-management#backups-pair-with-the-key) for the pairing and retention rules.
 2. Run [`audit:encryption`](./encryption-audit) under the current key and resolve any findings. The rotation refuses to write when a service instance configuration, a credential key, or the key of a credential registered from a third party fails to decrypt under both supplied keys, or when a service configuration or one of those third-party credential keys is corrupted. Findings against idempotent-retry response bodies are the exception: they are expected leftovers until a rotation clears them, and they do not stop the run.
-3. Stop every application instance, including replicas and any maintenance jobs. The rotation must be the only thing touching the database. Run it as a one-off process (for Docker deployments, `docker compose run --rm`), never by `exec`-ing into a serving container.
+3. Stop every application instance, including replicas, the background worker (`ri-worker` in the Compose stack) and any maintenance jobs. The worker holds the key and settles jobs against encrypted data, so a rotation with one still running is not the only thing touching the database. The rotation must be run as a one-off process (for Docker deployments, `docker compose run --rm`), never by `exec`-ing into a serving container.
 
 ## Running the rotation
 

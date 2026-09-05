@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "pnpm --filter untp-reference-implementation dev",
+    "start:worker": "pnpm --filter untp-reference-implementation worker",
     "start:e2e-test": "pnpm --filter untp-reference-implementation start",
     "start:untp-playground": "PORT=4001 pnpm --filter untp-playground dev",
     "start:e2e-dependencies": "docker compose -f docker-compose.e2e.yml up -d --build",

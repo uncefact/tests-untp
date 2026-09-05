@@ -67,6 +67,16 @@ const logger = apiLogger.child({ module: 'verify-generation-job' });
  * Typed against the reference the register side enqueues, so a field added
  * to one and not the other is a build error rather than a payload every
  * worker rejects.
+ *
+ * Unknown keys are stripped, not rejected, because a job is durable and a
+ * rolling deploy (ADR-054) has an older worker claim jobs a newer web
+ * process wrote. The rule that makes stripping safe: a field may be added
+ * to this payload only if a worker that ignores it produces the same
+ * business outcome (the same verifier instance, the same checks, the same
+ * settlement). Observability-only fields qualify. Anything with business
+ * effect, whatever its default, is a new queue name, worked only by workers
+ * that know it. `VerifyJobReference` is the whole payload; the type-level
+ * guard is `src/worker/payload-contract.test.ts`.
  */
 const verifyJobReferenceSchema: z.ZodType<VerifyJobReference, z.ZodTypeDef, unknown> = z
   .object({
@@ -75,7 +85,7 @@ const verifyJobReferenceSchema: z.ZodType<VerifyJobReference, z.ZodTypeDef, unkn
     generation: z.number().int().min(1),
     checkRunId: z.string().min(1),
   } satisfies Record<keyof VerifyJobReference, z.ZodTypeAny>)
-  .strict();
+  .strip();
 
 /** The ids a payload must still carry for the run it names to be settled at all. */
 const settleableReferenceSchema = z.object({ tenantId: z.string().min(1), checkRunId: z.string().min(1) });

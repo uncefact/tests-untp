@@ -61,6 +61,9 @@ function entryPoints(): string[] {
     ...list(path.join(packageRoot, 'scripts')),
     ...list(path.join(packageRoot, 'prisma')),
     ...list(path.join(packageRoot, 'prisma/backfills')),
+    // The worker entrypoint (#985) and the modules beside it; their @/ imports
+    // are covered by the src/lib directory copy and are not walked here.
+    ...list(path.join(packageRoot, 'src/worker')),
   ];
 }
 
