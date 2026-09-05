@@ -8,13 +8,15 @@
     "cypress:open": "cypress open",
     "test:e2e": "cypress run",
     "test:e2e:open": "E2E_TENANT_MODE=open cypress run",
-    "test:e2e:closed": "E2E_TENANT_MODE=closed cypress run"
+    "test:e2e:closed": "E2E_TENANT_MODE=closed cypress run",
+    "test:e2e:report:open": "open cypress/reports/latest.html"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.13.1",
     "@types/pg": "^8.11.0",
     "cypress": "^13.17.0",
+    "cypress-mochawesome-reporter": "^5.0.0",
     "dotenv": "^16.4.5",
     "minio": "^8.0.4",
     "pg": "^8.13.0",
