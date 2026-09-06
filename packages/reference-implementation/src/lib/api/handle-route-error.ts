@@ -71,7 +71,8 @@ export function handleRouteError(e: unknown, options: HandleRouteErrorOptions = 
   }
   if (e instanceof NotFoundError) {
     logger.warn({ err: e }, 'Not found');
-    return NextResponse.json({ error: e.message }, { status: 404 });
+    const body = e.code !== undefined ? { error: e.message, code: e.code } : { error: e.message };
+    return NextResponse.json(body, { status: 404 });
   }
   if (e instanceof ConflictError) {
     logger.warn({ err: e }, 'Conflict');

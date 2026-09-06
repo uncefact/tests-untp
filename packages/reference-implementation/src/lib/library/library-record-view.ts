@@ -1,4 +1,10 @@
-import { LibraryRecordOrigin, type Credential, type ExternalCredential, type LibraryRecord } from '../prisma/generated';
+import {
+  LibraryRecordOrigin,
+  type CheckRun,
+  type Credential,
+  type ExternalCredential,
+  type LibraryRecord,
+} from '../prisma/generated';
 
 /**
  * A library record read with both of its possible children, as Prisma types
@@ -31,6 +37,18 @@ export type ExternalRecordView<TRecord = LibraryRecord> = {
   external: ExternalCredential;
 };
 export type LibraryRecordView<TRecord = LibraryRecord> = NativeRecordView<TRecord> | ExternalRecordView<TRecord>;
+
+export type NativeLibraryRecordView<TRecord = LibraryRecord> = NativeRecordView<TRecord> & {
+  checkRun: CheckRun | null;
+};
+
+export type ExternalLibraryRecordView<TRecord = LibraryRecord> = ExternalRecordView<TRecord> & {
+  checkRun: CheckRun;
+};
+
+export type LibraryRecordDetailView<TRecord = LibraryRecord> =
+  | NativeLibraryRecordView<TRecord>
+  | ExternalLibraryRecordView<TRecord>;
 
 /**
  * A committed read returned a shape the write paths never produce: a parent

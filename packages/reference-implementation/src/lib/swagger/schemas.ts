@@ -29,6 +29,7 @@ import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credenti
 import { registerExternalCredentialRequestSchema } from '@/lib/api/request-schemas/library';
 import {
   credentialRecordSchema,
+  credentialRecordDetailSchema,
   credentialRecordWarningSchema,
   verificationEnvelopeSchema,
 } from '@/lib/library/credential-record-projection';
@@ -55,7 +56,7 @@ function stripAdditionalPropertiesFalse(node: unknown): void {
 }
 
 // ============================================================================
-// Credential Schemas (remain local — no credential service directory yet)
+// Credential Schemas (remain local, no credential service directory yet)
 // ============================================================================
 
 /** Advisory warning that may accompany a credential-issue response. */
@@ -570,6 +571,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     // enforced ones.
     RegisterExternalCredentialRequest: registerExternalCredentialRequestSchema,
     CredentialRecord: credentialRecordSchema,
+    CredentialRecordDetail: credentialRecordDetailSchema,
     VerificationEnvelope: verificationEnvelopeSchema,
     CredentialRecordWarning: credentialRecordWarningSchema,
   };

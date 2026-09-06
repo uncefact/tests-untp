@@ -35,7 +35,7 @@ type JsonSchemaObject = {
  * an accidental one, and the resulting habit of regenerating the stored copy
  * lets the accidental case through under cover of the intended one.
  */
-describe('generateOpenAPISchemas — registrar/scheme projection congruence', () => {
+describe('generateOpenAPISchemas: registrar/scheme projection congruence', () => {
   it('does not log a recursive-reference warning while generating', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -101,7 +101,7 @@ describe('generateOpenAPISchemas — registrar/scheme projection congruence', ()
   });
 });
 
-describe('generateOpenAPISchemas — Organisation component', () => {
+describe('generateOpenAPISchemas: Organisation component', () => {
   // buildOrganisationSchema (in schemas.ts) is function-local and only
   // invoked from inside generateOpenAPISchemas, so the nested
   // primaryIdentifier/secondaryIdentifiers/secondaryIdentifierIds asymmetry
@@ -178,7 +178,7 @@ describe('generateOpenAPISchemas — Organisation component', () => {
  * Scoped to the Facility component only; other domains' components are not this
  * suite's concern.
  */
-describe('generateOpenAPISchemas — Facility component', () => {
+describe('generateOpenAPISchemas: Facility component', () => {
   type JsonSchema = {
     type?: string;
     properties?: Record<string, JsonSchema>;
@@ -313,7 +313,7 @@ describe('generateOpenAPISchemas: CredentialIssueRequest component', () => {
   });
 });
 
-describe('generateOpenAPISchemas — Conformity Vocabulary Catalogue components', () => {
+describe('generateOpenAPISchemas: Conformity Vocabulary Catalogue components', () => {
   // The three components derive from the same Zod schemas the browse
   // repository types are inferred from (conformity-scheme.schemas.ts), so
   // these assertions guard the projection each browse route's `data` array
@@ -365,7 +365,7 @@ describe('generateOpenAPISchemas — Conformity Vocabulary Catalogue components'
   });
 });
 
-describe('generateOpenAPISchemas — Product component', () => {
+describe('generateOpenAPISchemas: Product component', () => {
   type JsonSchema = {
     type?: string;
     properties?: Record<string, JsonSchema>;
@@ -466,7 +466,7 @@ describe('generateOpenAPISchemas — Product component', () => {
   });
 });
 
-describe('generateOpenAPISchemas — Credential descriptive fields (#952)', () => {
+describe('generateOpenAPISchemas: Credential descriptive fields (#952)', () => {
   const credential = (generateOpenAPISchemas() as Record<string, JsonSchemaObject>).Credential;
 
   it('documents detailsStatus with exactly the Prisma enum members', () => {
@@ -491,7 +491,7 @@ describe('generateOpenAPISchemas — Credential descriptive fields (#952)', () =
   });
 });
 
-describe('generateOpenAPISchemas — RegisterExternalCredentialRequest (#955)', () => {
+describe('generateOpenAPISchemas: RegisterExternalCredentialRequest (#955)', () => {
   const request = (generateOpenAPISchemas() as Record<string, JsonSchemaObject>).RegisterExternalCredentialRequest;
 
   it('publishes dateReceived as a date-formatted string, so an integrator reads the shape before meeting it', () => {
@@ -518,5 +518,17 @@ describe('generateOpenAPISchemas — RegisterExternalCredentialRequest (#955)', 
     const decryptionKey = request.properties?.sourceEncryption?.properties?.decryptionKey;
     expect(decryptionKey?.pattern).toBe('^[a-f0-9]{64}$');
     expect(decryptionKey?.description).toContain('64 hexadecimal characters');
+  });
+});
+
+describe('generateOpenAPISchemas: CredentialRecordDetail (#964)', () => {
+  const detail = (generateOpenAPISchemas() as Record<string, JsonSchemaObject>).CredentialRecordDetail;
+
+  it('publishes the three custody fields as required nullable strings', () => {
+    expect(detail.required).toEqual(expect.arrayContaining(['storageUri', 'digestMultibase', 'decryptionKey']));
+    for (const field of ['storageUri', 'digestMultibase', 'decryptionKey']) {
+      expect(detail.properties?.[field]?.type).toBe('string');
+      expect(detail.properties?.[field]?.nullable).toBe(true);
+    }
   });
 });

@@ -112,6 +112,21 @@ describe('looksEnvelopeLikeButInvalid', () => {
     expect(looksEnvelopeLikeButInvalid(JSON.stringify(tampered))).toBe(true);
   });
 
+  /**
+   * `JSON.parse` accepts whitespace before the opening brace, so a corrupt
+   * envelope that carries any is still a corrupt envelope: classifying it as
+   * legacy plaintext would have a writer re-encrypt it.
+   */
+  it.each([
+    ['a space', ' '],
+    ['a tab', '\t'],
+    ['a newline', '\n'],
+  ])('flags a corrupted envelope prefixed by %s', async (_name, prefix) => {
+    const { looksEnvelopeLikeButInvalid } = await import('./decryption-key-protection');
+    expect(looksEnvelopeLikeButInvalid(`${prefix}{"cipherText":"q1w2`)).toBe(true);
+    expect(looksEnvelopeLikeButInvalid(`${prefix}{"cipherText":null,"iv":null,"tag":null,"type":null}`)).toBe(true);
+  });
+
   it('accepts genuine envelopes and plausible legacy plaintext', async () => {
     const { looksEnvelopeLikeButInvalid, protectDecryptionKey } = await import('./decryption-key-protection');
     expect(looksEnvelopeLikeButInvalid(protectDecryptionKey(PLAINTEXT_KEY))).toBe(false);
@@ -175,6 +190,34 @@ describe('revealDecryptionKey', () => {
     expect(revealDecryptionKey(corrupted)).toBe(corrupted);
     expect(mockWarn).toHaveBeenCalled();
     expect(mockError).not.toHaveBeenCalled();
+  });
+
+  it('parses and reveals a genuine envelope written with leading whitespace', async () => {
+    const { protectDecryptionKey, parseEnvelope, revealDecryptionKey } = await import('./decryption-key-protection');
+
+    const padded = `\n  ${protectDecryptionKey(PLAINTEXT_KEY) as string}`;
+
+    expect(parseEnvelope(padded)).not.toBeNull();
+    expect(revealDecryptionKey(padded)).toBe(PLAINTEXT_KEY);
+    expect(mockWarn).not.toHaveBeenCalled();
+  });
+
+  it('returns a whitespace-padded legacy plaintext key unchanged and without warning', async () => {
+    const { revealDecryptionKey } = await import('./decryption-key-protection');
+
+    const padded = ` ${PLAINTEXT_KEY}`;
+
+    expect(revealDecryptionKey(padded)).toBe(padded);
+    expect(mockWarn).not.toHaveBeenCalled();
+  });
+
+  it('warns for an envelope-like value prefixed by whitespace rather than treating it as plaintext', async () => {
+    const { revealDecryptionKey } = await import('./decryption-key-protection');
+
+    const padded = ' \t{"cipherText":"q1w2';
+
+    expect(revealDecryptionKey(padded)).toBe(padded);
+    expect(mockWarn).toHaveBeenCalled();
   });
 
   it('returns a legacy all-digit key unchanged', async () => {

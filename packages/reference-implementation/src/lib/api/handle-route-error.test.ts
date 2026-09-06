@@ -80,6 +80,14 @@ describe('handleRouteError', () => {
     expect(body).toEqual({ error: 'missing' });
   });
 
+  it('includes the NotFoundError code in the 404 body when present', async () => {
+    const res = handleRouteError(new NotFoundError('No such credential record.', 'NOT_FOUND'));
+
+    expect(res.status).toBe(404);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'No such credential record.', code: 'NOT_FOUND' });
+  });
+
   it('maps ConflictError to 409', async () => {
     const res = handleRouteError(new ConflictError('already exists'));
 

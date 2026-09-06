@@ -151,6 +151,7 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   "Another request now holds this Idempotency-Key. Retry to receive that request's result.",
   'The record this Idempotency-Key produced was deleted while this request was being answered; retry the request.',
   'Credential not found',
+  'No such credential record.',
   'DID not found',
   'Data model not found',
   'Facility not found',

@@ -25,9 +25,12 @@ export function errorMessage(e: unknown, fallback: string = UNEXPECTED_ERROR_MES
 }
 
 export class NotFoundError extends Error {
-  constructor(message: string) {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
     super(message);
     this.name = 'NotFoundError';
+    if (code !== undefined) this.code = code;
   }
 }
 

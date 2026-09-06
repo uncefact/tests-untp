@@ -54,7 +54,13 @@ export function isProtectedDecryptionKey(stored: string): boolean {
  *
  * Throws when a stored envelope cannot be decrypted, for example when
  * `DATA_ENCRYPTION_KEY` has changed since the credential was stored.
+ *
+ * The overloads carry the fact the body already guarantees: null in is the
+ * only way out is null, so a caller that has already established it holds a
+ * stored value gets a key or an exception, never a null it must re-handle.
  */
+export function revealDecryptionKey(stored: string): string;
+export function revealDecryptionKey(stored: string | null): string | null;
 export function revealDecryptionKey(stored: string | null): string | null {
   if (stored === null) {
     return null;
@@ -88,9 +94,15 @@ export function revealDecryptionKey(stored: string | null): string | null {
  * (for example a truncated or corrupted envelope). Such values are neither
  * decryptable nor plausible legacy plaintext, so writers must not re-encrypt
  * them as if they were legitimate keys.
+ *
+ * The leading brace is looked for after leading whitespace, because
+ * `JSON.parse` accepts whitespace before the opening brace. A classifier that
+ * required the brace at index 0 would call a whitespace-prefixed corrupt
+ * envelope legacy plaintext, and writers would re-encrypt it. The stored
+ * value itself is never modified.
  */
 export function looksEnvelopeLikeButInvalid(stored: string): boolean {
-  return stored.startsWith('{') && parseEnvelope(stored) === null;
+  return stored.trimStart().startsWith('{') && parseEnvelope(stored) === null;
 }
 
 /**
@@ -119,7 +131,7 @@ export function parseEnvelope(stored: string): EncryptedEnvelope | null {
 }
 
 function warnIfEnvelopeLike(stored: string): void {
-  if (stored.startsWith('{')) {
+  if (stored.trimStart().startsWith('{')) {
     logger.warn(
       'Stored decryption key resembles an encrypted envelope but could not be parsed as one; treating it as a legacy plaintext key',
     );

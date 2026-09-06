@@ -28,6 +28,15 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
         },
       ],
       components: {
+        parameters: {
+          LibraryRecordId: {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'Opaque library record identifier',
+            schema: { type: 'string' },
+          },
+        },
         // Shared responses. Auth 401/403 are referenced from each JSDoc
         // block. 413 is declared here and attached to every operation that
         // accepts a request body (see attachPayloadTooLargeResponses).
