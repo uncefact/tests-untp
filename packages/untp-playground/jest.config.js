@@ -22,8 +22,9 @@ const config = {
     // `../multibase-digest/index.js` specifier, which in turn imports
     // `multiformats` through subpath exports that declare only an `import`
     // condition. Neither is resolvable by this package's Jest CJS resolver
-    // without a bigger toolchain change, so both the public subpath and the
-    // internal relative specifier are redirected to a deterministic stub.
+    // without a bigger toolchain change, so the `multibase-digest` public
+    // subpath and the internal `../multibase-digest/index.js` specifier are
+    // both redirected to a deterministic stub.
     // Production code consumes the real package; only tests see this stub.
     '^@uncefact/untp-utils/multibase-digest$': '<rootDir>/__tests__/mocks/multibase-digest.ts',
     '(^|/)multibase-digest/index\\.js$': '<rootDir>/__tests__/mocks/multibase-digest.ts',

@@ -12,7 +12,11 @@ jest.mock('@uncefact/untp-utils/loaders', () => {
     createSchemaLoader: jest.fn((): SchemaLoader => ({ load: (url) => mockLoad(url) })),
   };
 });
-const load = mockLoad;
+
+jest.mock('@uncefact/untp-utils/cache', () => {
+  const actual = jest.requireActual('@uncefact/untp-utils/cache');
+  return { ...actual, createInMemoryTtlCache: jest.fn(actual.createInMemoryTtlCache) };
+});
 
 import {
   SchemaLoaderHttpError,
@@ -30,16 +34,37 @@ function makeRequest(url?: string): Request {
 }
 
 describe('GET /api/schema', () => {
+  let consoleError: jest.SpyInstance;
+
   beforeEach(() => {
-    load.mockReset();
+    mockLoad.mockReset();
+    consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleError.mockRestore();
+  });
+
+  it('builds one loader over a bounded TTL cache when the module loads', () => {
+    jest.isolateModules(() => {
+      const { createInMemoryTtlCache: createCache } = jest.requireMock('@uncefact/untp-utils/cache');
+      const { createSchemaLoader: createLoader } = jest.requireMock('@uncefact/untp-utils/loaders');
+      createCache.mockClear();
+      createLoader.mockClear();
+      jest.requireActual('@/app/api/schema/route');
+      expect(createCache).toHaveBeenCalledTimes(1);
+      expect(createCache).toHaveBeenCalledWith({ ttlMs: 60 * 60 * 1000, maxEntries: 200 });
+      expect(createLoader).toHaveBeenCalledTimes(1);
+      expect(createLoader).toHaveBeenCalledWith(expect.objectContaining({ get: expect.any(Function) }));
+    });
   });
 
   it('returns the schema the loader fetched', async () => {
-    load.mockResolvedValueOnce({ $id: SCHEMA_URL, type: 'object' });
+    mockLoad.mockResolvedValueOnce({ $id: SCHEMA_URL, type: 'object' });
     const response = await GET(makeRequest(SCHEMA_URL));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ $id: SCHEMA_URL, type: 'object' });
-    expect(load).toHaveBeenCalledWith(SCHEMA_URL);
+    expect(mockLoad).toHaveBeenCalledWith(SCHEMA_URL);
   });
 
   it.each([
@@ -47,46 +72,64 @@ describe('GET /api/schema', () => {
     ['an unparseable url', 'not a url', 'Invalid schema URL'],
     ['a plain http url', 'http://untp.unece.org/schema.json', 'Schema URL must use https'],
     ['a host off the allowlist', 'https://evil.example/schema.json', 'Schema URL host is not on the allowlist'],
+    [
+      'an allowlisted host used as a subdomain prefix',
+      'https://untp.unece.org.evil.example/schema.json',
+      'Schema URL host is not on the allowlist',
+    ],
+    [
+      'an allowlisted host used as a subdomain suffix',
+      'https://evil.untp.unece.org/schema.json',
+      'Schema URL host is not on the allowlist',
+    ],
   ])('rejects %s before touching the loader', async (_label, url, message) => {
     const response = await GET(makeRequest(url));
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: message });
-    expect(load).not.toHaveBeenCalled();
+    expect(mockLoad).not.toHaveBeenCalled();
   });
 
   it('allows the DLP extension schema host', async () => {
-    load.mockResolvedValueOnce({ type: 'object' });
+    mockLoad.mockResolvedValueOnce({ type: 'object' });
     const url = 'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.1-beta1.json';
     const response = await GET(makeRequest(url));
     expect(response.status).toBe(200);
-    expect(load).toHaveBeenCalledWith(url);
+    expect(mockLoad).toHaveBeenCalledWith(url);
   });
 
   it('reports an upstream HTTP failure as 502 naming the status', async () => {
-    load.mockRejectedValueOnce(new SchemaLoaderHttpError(SCHEMA_URL, 404));
+    mockLoad.mockRejectedValueOnce(new SchemaLoaderHttpError(SCHEMA_URL, 404));
     const response = await GET(makeRequest(SCHEMA_URL));
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: 'Schema host returned status 404', upstreamStatus: 404 });
   });
 
   it('reports an unparseable upstream body as 502', async () => {
-    load.mockRejectedValueOnce(new SchemaLoaderInvalidJsonError(SCHEMA_URL, new SyntaxError('bad json')));
+    mockLoad.mockRejectedValueOnce(new SchemaLoaderInvalidJsonError(SCHEMA_URL, new SyntaxError('bad json')));
     const response = await GET(makeRequest(SCHEMA_URL));
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: 'Schema host returned a body that is not valid JSON' });
   });
 
   it('reports an unreachable schema host as 502 without the transport detail', async () => {
-    load.mockRejectedValueOnce(new SchemaLoaderNetworkError(SCHEMA_URL, new Error('getaddrinfo ENOTFOUND')));
+    const cause = new Error('getaddrinfo ENOTFOUND');
+    mockLoad.mockRejectedValueOnce(new SchemaLoaderNetworkError(SCHEMA_URL, cause));
     const response = await GET(makeRequest(SCHEMA_URL));
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: 'Schema host could not be reached' });
+    expect(consoleError).toHaveBeenCalledWith('Schema fetch failed', {
+      url: SCHEMA_URL,
+      code: 'schema-loader.network-error',
+      cause,
+    });
   });
 
   it('reports any other failure as 500', async () => {
-    load.mockRejectedValueOnce(new Error('boom'));
+    const error = new Error('boom');
+    mockLoad.mockRejectedValueOnce(error);
     const response = await GET(makeRequest(SCHEMA_URL));
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'Failed to fetch schema' });
+    expect(consoleError).toHaveBeenCalledWith('Unexpected schema loader failure', { url: SCHEMA_URL, error });
   });
 });

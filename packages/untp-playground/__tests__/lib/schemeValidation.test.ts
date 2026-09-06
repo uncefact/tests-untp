@@ -1,4 +1,4 @@
-import { detectSchemeVersion, schemeSchemaUrl } from '@/lib/schemeValidation';
+import { detectSchemeVersion, schemeSchemaUrl, validateSchemeSchema } from '@/lib/schemeValidation';
 
 describe('schemeValidation', () => {
   describe('schemeSchemaUrl', () => {
@@ -42,6 +42,40 @@ describe('schemeValidation', () => {
         type: ['ConformityScheme'],
       };
       expect(detectSchemeVersion(scheme)).toBe('0.7.1');
+    });
+  });
+
+  describe('validateSchemeSchema fetch failures', () => {
+    const originalFetch = global.fetch;
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('reports a missing schema when the proxy names an upstream 404', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => ({ error: 'Schema host returned status 404', upstreamStatus: 404 }),
+      }) as unknown as typeof fetch;
+
+      await expect(validateSchemeSchema({}, '9.9.9')).rejects.toMatchObject({
+        name: 'SchemaFetchError',
+        reason: 'not-found',
+        message: expect.stringContaining('No schema published at'),
+      });
+    });
+
+    it('carries the proxy error category for any other upstream failure', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => ({ error: 'Schema host could not be reached' }),
+      }) as unknown as typeof fetch;
+
+      await expect(validateSchemeSchema({}, '9.9.8')).rejects.toMatchObject({
+        reason: 'network',
+        message: expect.stringContaining('Schema host could not be reached'),
+      });
     });
   });
 });

@@ -45,15 +45,16 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
       const response = await fetch(`${API_BASE_PATH}/api/schema?url=${encodeURIComponent(schemaUrl)}`, {
         signal: controller.signal,
       });
-      if (response.status === 404) {
-        throw new SchemaFetchError(schemaUrl, 'not-found', `No schema published at ${schemaUrl}.`);
-      }
       if (!response.ok) {
-        throw new SchemaFetchError(
-          schemaUrl,
-          'network',
-          `Schema service returned ${response.status} for ${schemaUrl}.`,
-        );
+        // The proxy answers 502 for any upstream failure and names the upstream
+        // status in its body, so a missing schema is read from there.
+        const body = await response.json().catch(() => null);
+        const upstreamStatus = typeof body?.upstreamStatus === 'number' ? body.upstreamStatus : undefined;
+        if (upstreamStatus === 404) {
+          throw new SchemaFetchError(schemaUrl, 'not-found', `No schema published at ${schemaUrl}.`);
+        }
+        const reason = typeof body?.error === 'string' ? body.error : `Schema service returned ${response.status}`;
+        throw new SchemaFetchError(schemaUrl, 'network', `${reason} (${schemaUrl}).`);
       }
       let schema: unknown;
       try {

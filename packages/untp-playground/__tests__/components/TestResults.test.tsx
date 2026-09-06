@@ -12,7 +12,7 @@ import {
 import { credentialContentHash } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { validateContext } from '@/lib/contextValidation';
-import { detectExtension, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
+import { detectExtension, SchemaFetchError, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
@@ -31,7 +31,12 @@ import confetti from 'canvas-confetti';
 import { VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
 jest.mock('@/lib/verificationService');
-jest.mock('@/lib/schemaValidation');
+jest.mock('@/lib/schemaValidation', () => ({
+  ...jest.requireActual('@/lib/schemaValidation'),
+  detectExtension: jest.fn(),
+  validateCredentialSchema: jest.fn(),
+  validateExtension: jest.fn(),
+}));
 jest.mock('@/lib/vcdm-validation');
 jest.mock('@/lib/decryptCredential', () => ({
   ...jest.requireActual('@/lib/decryptCredential'),
@@ -448,6 +453,27 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     expect(
       await screen.findByText("Ensure the credential includes the required UNTP context IRIs in the '@context' field."),
     ).toBeInTheDocument();
+  });
+
+  it('blames the schema host, not the credential, when the schema could not be fetched', async () => {
+    (validateCredentialSchema as jest.Mock).mockRejectedValue(
+      new SchemaFetchError('Failed to fetch schema: Schema host could not be reached', 502),
+    );
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'untp-host-down' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to fetch schema: Schema host could not be reached');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
+    await userEvent.click(await screen.findByText('Fix validation error'));
+    expect(await screen.findByText(/Nothing in the credential needs changing/)).toBeInTheDocument();
+    expect(screen.queryByText(/required UNTP context IRIs/)).not.toBeInTheDocument();
   });
 
   it('validates against context and reports failure with the preserved toast copy', async () => {

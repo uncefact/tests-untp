@@ -35,7 +35,8 @@ WORKDIR /app
 # Build the untp-utils workspace dependency before the playground. It compiles
 # to `build/` (which .dockerignore keeps out of the build context) and its
 # package `exports` point at those compiled files, so `next build` needs them
-# present to resolve the `@uncefact/untp-utils/{node,resolvers}` imports.
+# present to resolve the `@uncefact/untp-utils/{cache,loaders}` imports (and
+# the resolver and guard graph they pull in transitively).
 # `next build` then bundles that import graph into the route chunk, so the
 # standalone runner self-contains it with no separate utils/undici tree.
 COPY packages/untp-utils/. ./packages/untp-utils/

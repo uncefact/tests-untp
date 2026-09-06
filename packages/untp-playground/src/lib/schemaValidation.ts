@@ -18,6 +18,33 @@ const ajv = new Ajv2020({
 });
 addFormats(ajv);
 
+/**
+ * A schema the proxy route could not deliver. `message` carries the route's
+ * own category (host unreachable, upstream status, not JSON, host not on the
+ * allowlist) so the verifier sees why, not just that it failed.
+ */
+export class SchemaFetchError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'SchemaFetchError';
+  }
+}
+
+// The proxy names the failure category in its body; fall back to the transport
+// status when the body is missing or not the shape this route publishes.
+async function readErrorReason(response: Response): Promise<string> {
+  try {
+    const body = await response.json();
+    if (typeof body?.error === 'string') return body.error;
+  } catch {
+    // Fall through to the transport status below.
+  }
+  return `${response.status} ${response.statusText}`;
+}
+
 export const schemaCache = new Map<string, any>();
 // Stores the in-flight Promise for each URL so concurrent callers requesting the same URL
 // await one shared fetch. Without this, the existing `has`/`set` cache check leaves a
@@ -38,7 +65,7 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
     try {
       const response = await fetch(proxyUrl);
       if (!response.ok) {
-        throw new Error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
+        throw new SchemaFetchError(`Failed to fetch schema: ${await readErrorReason(response)}`, response.status);
       }
       const schema = await response.json();
       schemaCache.set(schemaUrl, schema);

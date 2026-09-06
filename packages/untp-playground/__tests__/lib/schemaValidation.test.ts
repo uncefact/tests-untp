@@ -442,6 +442,26 @@ describe('schemaValidation', () => {
       );
     });
 
+    it('surfaces the proxy route error body when the schema host fails', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        json: async () => ({ error: 'Schema host returned status 404', upstreamStatus: 404 }),
+      });
+
+      const credential = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: ['VerifiableCredential'],
+      };
+
+      await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toMatchObject({
+        name: 'SchemaFetchError',
+        status: 502,
+        message: 'Failed to fetch schema: Schema host returned status 404',
+      });
+    });
+
     it('should handle network errors during schema fetch', async () => {
       const mockToast = { error: jest.fn() };
       jest.mock('sonner', () => ({ toast: mockToast }));
