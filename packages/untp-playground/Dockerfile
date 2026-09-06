@@ -6,13 +6,15 @@ RUN corepack enable
 
 # ---- Fetch + install (deps stage) ----
 # Workspace-aware install scoped to the playground via pnpm filter. The
-# playground has no workspace cross-deps, so the filter effectively
-# resolves only its own dependency tree.
+# playground depends on the @uncefact/untp-utils workspace package (guarded
+# fetch + SSRF guard), so its manifest is copied too and the `...` filter
+# pulls it and its dependencies into the install.
 FROM base AS deps
 WORKDIR /app
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json ./
 COPY packages/untp-playground/package.json ./packages/untp-playground/
+COPY packages/untp-utils/package.json ./packages/untp-utils/
 
 # Install the playground's tree only. The filter keeps the rest of the
 # workspace (RI, services, components, cypress, turbo, storybook, etc.)
@@ -29,6 +31,15 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm-store,sharing=locked \
 # ---- Builder ----
 FROM deps AS builder
 WORKDIR /app
+
+# Build the untp-utils workspace dependency before the playground. It compiles
+# to `build/` (which .dockerignore keeps out of the build context) and its
+# package `exports` point at those compiled files, so `next build` needs them
+# present to resolve the `@uncefact/untp-utils/{node,resolvers}` imports.
+# `next build` then bundles that import graph into the route chunk, so the
+# standalone runner self-contains it with no separate utils/undici tree.
+COPY packages/untp-utils/. ./packages/untp-utils/
+RUN pnpm --filter @uncefact/untp-utils run build
 
 COPY packages/untp-playground/. ./packages/untp-playground/
 
