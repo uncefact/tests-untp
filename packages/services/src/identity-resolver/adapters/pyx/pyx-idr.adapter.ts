@@ -108,6 +108,10 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
         ...(link.additionalRels && link.additionalRels.length > 0 ? { rel: link.additionalRels } : {}),
         ...(link.public !== undefined ? { public: link.public } : {}),
         ...(link.accessRole && link.accessRole.length > 0 ? { accessRole: link.accessRole } : {}),
+        // The resolver validates this against its own allow-list (none,
+        // AES-128, AES-256 as of Pyx IDR 4.x) and rejects the registration
+        // on any other value; that rejection surfaces as IdrPublishError.
+        ...(link.encryptionMethod !== undefined ? { encryptionMethod: link.encryptionMethod } : {}),
       })),
     };
 
@@ -172,6 +176,9 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       ...(Array.isArray(result.rel) && result.rel.length > 0 ? { additionalRels: result.rel } : {}),
       ...(typeof result.public === 'boolean' ? { public: result.public } : {}),
       ...(Array.isArray(result.accessRole) && result.accessRole.length > 0 ? { accessRole: result.accessRole } : {}),
+      ...(typeof result.encryptionMethod === 'string' && result.encryptionMethod.length > 0
+        ? { encryptionMethod: result.encryptionMethod }
+        : {}),
     };
   }
 
@@ -186,6 +193,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     if (link.additionalRels !== undefined) payload.rel = link.additionalRels;
     if (link.public !== undefined) payload.public = link.public;
     if (link.accessRole !== undefined) payload.accessRole = link.accessRole;
+    if (link.encryptionMethod !== undefined) payload.encryptionMethod = link.encryptionMethod;
 
     const response = await httpFetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       method: 'PUT',

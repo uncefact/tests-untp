@@ -334,7 +334,7 @@ Each `href` must be an absolute `http` or `https` URL without embedded credentia
 |----------------|-------------|
 | `links` | Non-empty array of link objects. Each requires `href` (a valid URL), `rel` and `type`. Optional per link: `title`, `hreflang`, `context`, `default`, `method`, `encryptionMethod`, `accessRole`, `additionalRels`, `public` |
 
-`context`, `default`, `method` and `encryptionMethod` are accepted by both the publish and the update routes, and the current Identity Resolver adapter does not send them upstream, so setting them has no effect on the published link.
+`context`, `default` and `method` are accepted by both the publish and the update routes, and the current Identity Resolver adapter does not send the caller's values upstream (it publishes its own configured `context`), so setting them has no effect on the published link. `encryptionMethod` is sent upstream and must be `none`, `AES-128` or `AES-256`, the vocabulary the UNTP Identity Resolver API definition declares for the field and the resolver validates against. Those are vocabulary values rather than cipher names, so a value such as `AES-256-GCM` is rejected with a 400 naming the field, as is anything else outside the set. Omitting the field leaves it absent from the resolver's link set, while sending `none` makes the resolver emit `encryptionMethod: none` on the link target. The Playground treats both as unencrypted, but they are distinct on the wire, and a consumer that checks for the field's presence will see them differently.
 
 `rel`, `type` and each `additionalRels` entry must carry non-whitespace content, and each `hreflang` entry must be a well-formed BCP 47 (RFC 5646) language tag, such as `en`, `en-AU` or `x-default`. A value that fails either rule is rejected with a 400 naming the field, and nothing is published upstream. The same rules apply on `PATCH`.
 
@@ -418,7 +418,7 @@ Updates a link on the upstream IDR and syncs the local audit record. The request
 | `context` | New link context. Accepted, and not applied by the current Identity Resolver adapter |
 | `default` | Whether this is the default variant for its relation type. Accepted, and not applied by the current Identity Resolver adapter |
 | `method` | New HTTP method for retrieving the link target (`GET` or `POST`). Accepted, and not applied by the current Identity Resolver adapter |
-| `encryptionMethod` | New encryption method identifier. Accepted, and not applied by the current Identity Resolver adapter |
+| `encryptionMethod` | New encryption method, sent upstream. Must be `none`, `AES-128` or `AES-256`. Any other value is rejected with a 400 naming the field |
 | `accessRole` | New UNTP access roles allowed to retrieve this link, from the [UNTP access role vocabulary](https://untp.unece.org/docs/specification/DecentralisedAccessControl) |
 | `additionalRels` | New additional link relation types to attach beyond `rel` |
 | `public` | Whether the published link is publicly resolvable |

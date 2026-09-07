@@ -1,4 +1,5 @@
 import type { EnvelopedVerifiableCredential } from '../verifiable-credential/types.js';
+import type { EncryptionAlgorithm } from '../encryption/encryption.interface.js';
 
 export const STORAGE_SERVICE_TYPE = 'STORAGE' as const;
 
@@ -17,6 +18,16 @@ export type StorageRecord = {
   digestMultibase: string;
   /** Decryption key if the credential was stored encrypted */
   decryptionKey?: string;
+  /**
+   * Algorithm the storage service applied during this store operation, as
+   * the resulting envelope's `type` field names it. Absent when this
+   * operation asked for no encryption, which says nothing about the bytes
+   * handed in: content that was already ciphertext (a supplier's encrypted
+   * credential stored as received) is stored without this field. Distinct
+   * from a published link's `encryptionMethod`, which carries the linkset
+   * vocabulary (`AES-256`), not the cipher name.
+   */
+  encryptionAlgorithm?: EncryptionAlgorithm;
   /** Storage resource identifier */
   externalId: string;
   /** The bucket where content was stored */

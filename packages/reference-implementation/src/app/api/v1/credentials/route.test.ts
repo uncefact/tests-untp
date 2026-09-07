@@ -1168,6 +1168,28 @@ describe('POST /api/v1/credentials', () => {
       expect((json.warnings as Array<{ code: string }>).map((w) => w.code)).toContain('PUBLISH_TARGET_UNRESOLVED');
     });
 
+    it('issues the credential with a PUBLISH_LINKS_UNBUILDABLE warning when the links cannot be built, and never publishes', async () => {
+      setupPublishingHappyPath();
+      mockBuildPublishLinks.mockImplementationOnce(() => {
+        throw new Error('boom from the link builder');
+      });
+
+      const res = await POST(
+        createFakeRequest(validBody({ publishingOptions: { publish: true } })),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.credentialId).toBe('cred-1');
+      const warning = (json.warnings as Array<{ code: string; message: string }>).find(
+        (w) => w.code === 'PUBLISH_LINKS_UNBUILDABLE',
+      );
+      expect(warning).toBeDefined();
+      expect(warning?.message).not.toContain('boom from the link builder');
+      expect(mockPublishLinks).not.toHaveBeenCalled();
+    });
+
     it('distinguishes a resolver rejection from an unconfirmed publish, and never leaks the upstream body', async () => {
       setupPublishingHappyPath();
       const rejection = new RealIdrPublishError(

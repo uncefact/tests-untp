@@ -261,6 +261,45 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
     expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
   });
 
+  it('forwards encryptionMethod on a link to publishLinks', async () => {
+    const req = createFakeRequest({
+      links: [
+        {
+          href: 'https://example.com/cred.json',
+          rel: 'untp:dpp',
+          type: 'application/json',
+          encryptionMethod: 'AES-256',
+        },
+      ],
+    });
+
+    const res = await POST(req, createContext());
+    expect(res.status).toBe(201);
+
+    const linksArg = MOCK_IDR_SERVICE.publishLinks.mock.calls[0][2];
+    expect(linksArg[0]).toMatchObject({ encryptionMethod: 'AES-256' });
+  });
+
+  it('returns 400 when encryptionMethod is outside the resolver vocabulary', async () => {
+    const req = createFakeRequest({
+      links: [
+        {
+          href: 'https://example.com/cred.json',
+          rel: 'untp:dpp',
+          type: 'application/json',
+          encryptionMethod: 'AES-256-GCM',
+        },
+      ],
+    });
+
+    const res = await POST(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/encryptionMethod/);
+    expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when hreflang is a string rather than an array', async () => {
     const req = createFakeRequest({
       links: [{ href: 'https://example.com/cred.json', rel: 'untp:dpp', type: 'application/json', hreflang: 'en' }],

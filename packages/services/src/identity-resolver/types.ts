@@ -40,7 +40,7 @@
  *     title: 'Conformity Certificate',
  *     hreflang: ['en'],
  *     method: 'POST',
- *     encryptionMethod: 'AES-256-GCM',
+ *     encryptionMethod: 'AES-256',
  *     accessRole: [AccessRole.Auditor]
  *   }
  * ];
@@ -104,7 +104,7 @@ export type RFC9264Link = {
 export type UNTPLinkExtensions = {
   /** HTTP method required to access the resource (default: GET) */
   method?: 'GET' | 'POST';
-  /** Encryption method if the resource is encrypted (e.g., "AES-256-GCM") */
+  /** Encryption method if the resource is encrypted (e.g., "AES-256") */
   encryptionMethod?: string;
   /** Access roles required to access the resource */
   accessRole?: AccessRole[];

@@ -6,6 +6,7 @@ import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import type { IStorageService, StorageRecord } from '../../types.js';
 import type { EnvelopedVerifiableCredential } from '../../../verifiable-credential/types.js';
 import { StorageDeleteError, StoragePayloadError, StorageStoreError } from '../../errors.js';
+import { EncryptionAlgorithm } from '../../../encryption/encryption.interface.js';
 import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
 import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './uncefact-storage.schema.js';
 
@@ -198,6 +199,12 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       uri,
       digestMultibase,
       decryptionKey: typeof decryptionKey === 'string' ? decryptionKey : undefined,
+      // The remote storage service performs the encryption; its response
+      // does not name the algorithm, so this is asserted from its source:
+      // uncefact/project-storage-service src/services/cryptography/index.ts
+      // declares AES_256_GCM = 'aes-256-gcm' as its only algorithm, and the
+      // envelope it stores carries that value in its `type` field.
+      ...(encrypt ? { encryptionAlgorithm: EncryptionAlgorithm.AES_256_GCM } : {}),
       externalId,
       bucket,
       mimeType: 'application/json',
@@ -310,6 +317,8 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       uri,
       digestMultibase,
       decryptionKey: typeof decryptionKey === 'string' ? decryptionKey : undefined,
+      // Asserted from the storage service's source; see store() above.
+      ...(encrypt ? { encryptionAlgorithm: EncryptionAlgorithm.AES_256_GCM } : {}),
       externalId,
       bucket,
       mimeType: contentType,

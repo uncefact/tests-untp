@@ -94,7 +94,7 @@ Service configurations often contain sensitive information such as API keys. Whe
 
 ## Encryption adapter
 
-The Reference Implementation also uses the adapter pattern for encrypting and decrypting credentials. The current implementation uses AES-256-GCM, but the adapter interface is designed so that alternative implementations — such as AWS KMS, Azure Key Vault, or other key management services — can be introduced without changing the rest of the application.
+The Reference Implementation also uses the adapter pattern for the encryption it performs itself, which is the [at-rest wrapping](#encryption-at-rest) described above. A credential stored privately is encrypted by the storage service instead, which hands back the decryption key for the Reference Implementation to record. The current implementation uses AES-256-GCM, but the adapter interface is designed so that alternative implementations (AWS KMS, Azure Key Vault, or another key management service) can be introduced without changing the rest of the application.
 
 Unlike the three external service types above, encryption is not yet exposed as a configurable service type. It is managed internally at the system level. Allowing operators to select an alternative encryption adapter (such as AWS KMS or Azure Key Vault) is planned but not yet implemented.
 
