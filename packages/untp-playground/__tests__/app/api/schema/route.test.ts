@@ -71,17 +71,6 @@ describe('GET /api/schema', () => {
     ['no url', undefined, 'No schema URL provided'],
     ['an unparseable url', 'not a url', 'Invalid schema URL'],
     ['a plain http url', 'http://untp.unece.org/schema.json', 'Schema URL must use https'],
-    ['a host off the allowlist', 'https://evil.example/schema.json', 'Schema URL host is not on the allowlist'],
-    [
-      'an allowlisted host used as a subdomain prefix',
-      'https://untp.unece.org.evil.example/schema.json',
-      'Schema URL host is not on the allowlist',
-    ],
-    [
-      'an allowlisted host used as a subdomain suffix',
-      'https://evil.untp.unece.org/schema.json',
-      'Schema URL host is not on the allowlist',
-    ],
   ])('rejects %s before touching the loader', async (_label, url, message) => {
     const response = await GET(makeRequest(url));
     expect(response.status).toBe(400);
@@ -89,12 +78,16 @@ describe('GET /api/schema', () => {
     expect(mockLoad).not.toHaveBeenCalled();
   });
 
-  it('allows the DLP extension schema host', async () => {
-    mockLoad.mockResolvedValueOnce({ type: 'object' });
-    const url = 'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.1-beta1.json';
-    const response = await GET(makeRequest(url));
-    expect(response.status).toBe(200);
-    expect(mockLoad).toHaveBeenCalledWith(url);
+  it('hands any public https host to the loader rather than keeping an allowlist', async () => {
+    mockLoad.mockResolvedValue({ type: 'object' });
+    for (const url of [
+      'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.1-beta1.json',
+      'https://schemas.example.org/some-future-extension.json',
+    ]) {
+      const response = await GET(makeRequest(url));
+      expect(response.status).toBe(200);
+      expect(mockLoad).toHaveBeenCalledWith(url);
+    }
   });
 
   it('reports an upstream HTTP failure as 502 naming the status', async () => {

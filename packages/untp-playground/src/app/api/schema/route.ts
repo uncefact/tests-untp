@@ -8,21 +8,14 @@ import {
 } from '@uncefact/untp-utils/loaders';
 import { NextResponse } from 'next/server';
 
-// The schema route's callers (`schemaURLConstructor` and `VCDM_SCHEMA_URLS` in
-// `src/lib/schemaValidation.ts`, `schemeSchemaUrl` in `src/lib/schemeValidation.ts`)
-// build URLs pointing at this fixed set of hosts. Allowlisting the initial
-// hostname at the route layer closes the `url` query parameter to attacker
-// substitution. Redirects are not re-checked against this list; the loader
-// below applies the shared `validatePublicUrl` guard to every hop instead
-// (public scheme, non-private address, IP-pinned, size, redirect and timeout
-// bounds). That guard has no opt-out, so a private or loopback schema host
+// Any public https host may serve a schema: credentials declare their own
+// schema locations (UNTP core versions, extensions such as the DLP schemas),
+// so a hostname allowlist only breaks the next host nobody anticipated. The
+// loader applies the shared `validatePublicUrl` guard to the URL and to every
+// redirect hop (public scheme, non-private and non-metadata address, IP-pinned
+// connection, size, redirect and timeout bounds), which is the whole SSRF
+// posture. That guard has no opt-out, so a private or loopback schema host
 // cannot be reached through this route even in local development.
-const ALLOWED_SCHEMA_HOSTS: ReadonlySet<string> = new Set([
-  'untp.unece.org',
-  'test.uncefact.org',
-  'w3c.github.io',
-  'aatp.foodagility.com',
-]);
 
 const SCHEMA_CACHE_TTL_MS = 60 * 60 * 1000;
 // The allowlist bounds the hosts but not the path space, so the cache is bounded too.
@@ -52,10 +45,6 @@ export async function GET(request: Request) {
 
   if (parsed.protocol !== 'https:') {
     return NextResponse.json({ error: 'Schema URL must use https' }, { status: 400 });
-  }
-
-  if (!ALLOWED_SCHEMA_HOSTS.has(parsed.hostname)) {
-    return NextResponse.json({ error: 'Schema URL host is not on the allowlist' }, { status: 400 });
   }
 
   const schemaUrl = parsed.toString();
