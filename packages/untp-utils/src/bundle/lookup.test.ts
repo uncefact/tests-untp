@@ -26,7 +26,7 @@ describe('findBundledArtefact', () => {
     const withSlash = await findBundledArtefact('https://vocabulary.uncefact.org/untp/0.7.0/context/');
     const without = await findBundledArtefact('https://vocabulary.uncefact.org/untp/0.7.0/context');
     expect(withSlash).toBeDefined();
-    expect(without).toBe(withSlash);
+    expect(without).toEqual(withSlash);
     expect(Object.keys(withSlash as object)).toContain('@context');
   });
 
@@ -75,10 +75,24 @@ describe('bundle integrity', () => {
     const manifest = JSON.parse(await readFile(new URL('../../artefacts/manifest.json', import.meta.url), 'utf8')) as {
       artefacts: { url: string; sha256: string }[];
     };
+    const sortKeys = (value: unknown): unknown =>
+      Array.isArray(value)
+        ? value.map(sortKeys)
+        : value !== null && typeof value === 'object'
+          ? Object.fromEntries(
+              Object.keys(value as object)
+                .sort()
+                .map((key) => [key, sortKeys((value as Record<string, unknown>)[key])]),
+            )
+          : value;
     for (const { url, sha256 } of manifest.artefacts) {
       const served = await findBundledArtefact(url);
       expect(served).toBeDefined();
-      expect(createHash('sha256').update(JSON.stringify(served)).digest('hex')).toBe(sha256);
+      expect(
+        createHash('sha256')
+          .update(JSON.stringify(sortKeys(served)))
+          .digest('hex'),
+      ).toBe(sha256);
     }
   });
 });

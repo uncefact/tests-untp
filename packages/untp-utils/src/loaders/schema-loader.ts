@@ -51,14 +51,19 @@ function toSchemaLoaderError(url: string, cause: unknown): Error {
  * @throws {SchemaLoaderHttpError} on a non-2xx HTTP status.
  * @throws {SchemaLoaderInvalidJsonError} if the body is not parseable as JSON.
  */
-async function fetchSchema<T extends object>(url: string): Promise<T> {
+async function fetchSchema<T extends object>(url: string, options: BundledFallbackOptions | undefined): Promise<T> {
   // Lazy import: the resolver stack pulls in undici, which jsdom test
   // environments cannot evaluate, so it loads at fetch time to keep this
   // module importable there.
   const { resolveJsonDocument } = await import('../resolvers/index.js');
   try {
-    const { json } = await resolveJsonDocument(url, { accept: SCHEMA_ACCEPT, totalTimeoutMs: FETCH_TIMEOUT_MS });
-    return json as T;
+    // The fallback classifies the resolver's own error, before it is mapped
+    // to this package's public error classes, so an untyped failure inside
+    // the fetch never reads as a host outage.
+    return await withBundledFallback<T>(url, options, async () => {
+      const { json } = await resolveJsonDocument(url, { accept: SCHEMA_ACCEPT, totalTimeoutMs: FETCH_TIMEOUT_MS });
+      return json as T;
+    });
   } catch (cause) {
     throw toSchemaLoaderError(url, cause);
   }
@@ -87,7 +92,7 @@ export function createSchemaLoader<T extends object = object>(
   cache?: TtlCache<T>,
   options?: BundledFallbackOptions,
 ): SchemaLoader<T> {
-  const load = (url: string) => withBundledFallback(url, options, () => fetchSchema<T>(url));
+  const load = (url: string) => fetchSchema<T>(url, options);
   if (!cache) {
     return { load };
   }

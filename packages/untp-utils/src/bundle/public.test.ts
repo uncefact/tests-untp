@@ -34,7 +34,7 @@ describe('bundled-artefacts public entry', () => {
     const legacyContext = (await bundledContext('DigitalProductPassport', '0.6.0')) as Record<string, unknown>;
     expect(Object.keys(legacyContext)).toContain('@context');
     const unified = await bundledContext('DigitalConformityCredential', '0.7.0');
-    expect(unified).toBe(await bundledContext('DigitalProductPassport', '0.7.0'));
+    expect(unified).toEqual(await bundledContext('DigitalProductPassport', '0.7.0'));
     expect(await bundledSchema('DigitalProductPassport', '9.9.9')).toBeUndefined();
   });
 

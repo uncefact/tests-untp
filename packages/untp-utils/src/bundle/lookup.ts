@@ -29,7 +29,13 @@ async function bundledByNormalisedUrl(): Promise<ReadonlyMap<string, Record<stri
   return index;
 }
 
-/** The bundled copy of the artefact published at `url`, or `undefined` when the bundle does not carry it. */
+/**
+ * The bundled copy of the artefact published at `url`, or `undefined` when the
+ * bundle does not carry it. Each call returns a fresh clone: validators such
+ * as Ajv mutate the documents they are given, and a mutation must not leak
+ * into every later fallback in the process.
+ */
 export async function findBundledArtefact(url: string): Promise<Record<string, unknown> | undefined> {
-  return (await bundledByNormalisedUrl()).get(normaliseArtefactUrl(url));
+  const artefact = (await bundledByNormalisedUrl()).get(normaliseArtefactUrl(url));
+  return artefact === undefined ? undefined : structuredClone(artefact);
 }

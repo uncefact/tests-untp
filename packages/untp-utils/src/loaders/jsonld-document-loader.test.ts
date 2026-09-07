@@ -1,4 +1,5 @@
 import { ResolverNetworkError } from '../resolvers/errors.js';
+import { ResolutionFailedError } from '../node/errors.js';
 import { createInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
 import { jest } from '@jest/globals';
 import type { LoadedRemoteDocument } from './jsonld-document-loader.js';
@@ -128,6 +129,14 @@ describe('createJsonLdDocumentLoader bundled fallback', () => {
     resolveJsonDocument.mockRejectedValue(cause as never);
     const load = createJsonLdDocumentLoader();
     await expect(load('https://example.com/context.jsonld')).rejects.toBe(cause);
+  });
+
+  it('serves the copy when the context host name stops resolving', async () => {
+    resolveJsonDocument.mockRejectedValue(
+      new ResolutionFailedError('vocabulary.uncefact.org', new Error('ENOTFOUND')) as never,
+    );
+    const result = await createJsonLdDocumentLoader()(CONTEXT_URL);
+    expect(result.documentUrl).toBe(CONTEXT_URL);
   });
 
   it('rethrows when the fallback is switched off', async () => {

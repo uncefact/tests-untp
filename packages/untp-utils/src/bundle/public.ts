@@ -14,10 +14,10 @@ export { findBundledArtefact, normaliseArtefactUrl } from './lookup.js';
 export { isHostDeliveryFailure } from './fallback.js';
 export type { BundledFallbackEvent, BundledFallbackOptions } from './fallback.js';
 
-/** Every bundled artefact keyed by its published URL. */
+/** Every bundled artefact keyed by its published URL (and each alias it is also published under), as fresh clones. */
 export async function loadBundledArtefacts(): Promise<ReadonlyMap<string, Record<string, unknown>>> {
   const { BUNDLED_ARTEFACTS } = await import('./index.js');
-  return BUNDLED_ARTEFACTS;
+  return new Map([...BUNDLED_ARTEFACTS].map(([url, artefact]) => [url, structuredClone(artefact)]));
 }
 
 /** UNTP versions the bundle carries, ascending (for example `['0.6.0', '0.6.1', '0.7.0']`). */

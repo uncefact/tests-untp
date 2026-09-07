@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { isHostDeliveryFailure, withBundledFallback } from './fallback.js';
 import { ResolverHttpError, ResolverNetworkError } from '../resolvers/errors.js';
-import { PrivateAddressError } from '../node/errors.js';
+import { PrivateAddressError, ResolutionEmptyError, ResolutionFailedError } from '../node/errors.js';
 import { SchemaLoaderNetworkError } from '../loaders/errors.js';
 
 const BUNDLED = 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json';
@@ -43,6 +43,27 @@ describe('withBundledFallback', () => {
       }),
     ).rejects.toBe(cause);
     expect(onBundledFallback).not.toHaveBeenCalled();
+  });
+
+  it('serves the copy when the host name stops resolving, bare (the JSON-LD path)', async () => {
+    const onBundledFallback = jest.fn();
+    const dns = new ResolutionFailedError('untp.unece.org', new Error('getaddrinfo ENOTFOUND untp.unece.org'));
+    const result = await withBundledFallback(BUNDLED, { onBundledFallback }, async () => {
+      throw dns;
+    });
+    expect(JSON.stringify(result)).toContain('DigitalProductPassport');
+    expect(onBundledFallback).toHaveBeenCalledWith({ url: BUNDLED, cause: dns });
+  });
+
+  it('hands back a fresh copy each time, so a caller mutating one cannot poison the next', async () => {
+    const first = (await withBundledFallback(BUNDLED, {}, async () => {
+      throw new ResolverHttpError(BUNDLED, 503);
+    })) as { required?: string[] };
+    first.required = ['mutated'];
+    const second = (await withBundledFallback(BUNDLED, {}, async () => {
+      throw new ResolverHttpError(BUNDLED, 503);
+    })) as { required?: string[] };
+    expect(second.required).not.toEqual(['mutated']);
   });
 
   it('never covers a URL the SSRF guard refused, even when wrapped by the schema loader', async () => {
@@ -91,7 +112,27 @@ describe('isHostDeliveryFailure', () => {
   it.each([
     ['resolver network', new ResolverNetworkError(BUNDLED, new Error('ENOTFOUND')), true],
     ['resolver http 403', new ResolverHttpError(BUNDLED, 403), true],
-    ['schema loader network', new SchemaLoaderNetworkError(BUNDLED, new Error('ENOTFOUND')), true],
+    [
+      'DNS resolution failed (the founding outage)',
+      new ResolutionFailedError('untp.unece.org', new Error('ENOTFOUND')),
+      true,
+    ],
+    ['DNS resolution empty', new ResolutionEmptyError('untp.unece.org'), true],
+    [
+      'contradictory resolver metadata',
+      new ResolutionFailedError('untp.unece.org', new Error('address does not match family')),
+      true,
+    ],
+    [
+      'DNS failure wrapped by the schema loader',
+      new SchemaLoaderNetworkError(BUNDLED, new ResolutionFailedError('untp.unece.org', new Error('ENOTFOUND'))),
+      false,
+    ],
+    [
+      'schema loader network (never classified any more)',
+      new SchemaLoaderNetworkError(BUNDLED, new Error('ENOTFOUND')),
+      false,
+    ],
     ['guard rejection', new PrivateAddressError(BUNDLED, ['127.0.0.1']), false],
     [
       'guard rejection wrapped',

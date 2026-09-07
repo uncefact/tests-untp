@@ -4,181 +4,211 @@
       "url": "https://www.w3.org/ns/credentials/v2",
       "file": "context/vcdm/2/credentials.json",
       "source": "https://www.w3.org/ns/credentials/v2",
-      "sha256": "bf6fd611e6773d58f649459a45dbbb81f94e8cfd058a756644cd5a4a882c4050"
+      "sha256": "b463c8d6a066214123ddd9827b135e1b50e1fc73322cc52a9b12a4f1fc7d86cf"
     },
     {
       "url": "https://w3c.github.io/vc-data-model/schema/verifiable-credential/verifiable-credential-schema.json",
       "file": "schema/vcdm/2/verifiable-credential.json",
       "source": "https://w3c.github.io/vc-data-model/schema/verifiable-credential/verifiable-credential-schema.json",
-      "sha256": "5bdb64de006e12b78e8eea4afd2abb083c1ebbd17fe27f15a280d72fcdb680fd"
+      "sha256": "b16995c25920e34b88322a5c091ed8edd9962820d1481de6706d58a526f7ff4d"
     },
     {
       "url": "https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json",
       "file": "schema/untp/0.7.0/dpp.json",
       "source": "https://opensource.unicc.org/api/v4/projects/un%2Funece%2Funcefact%2Fspec-untp/repository/files/artefacts%2Fschema%2Fv0.7.0%2Fdpp%2FDigitalProductPassport.json/raw?ref=v0.7.0",
-      "sha256": "a295cc4204e391a8f8428e90730a2abfaa779e4c9a1f12e76860346cfeb39d6a"
+      "sha256": "589dd15656e52e93981ea4e2d840c0f5116c8fb607b67403b84afe92f175e2e0"
     },
     {
       "url": "https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json",
       "file": "schema/untp/0.7.0/dcc.json",
       "source": "https://opensource.unicc.org/api/v4/projects/un%2Funece%2Funcefact%2Fspec-untp/repository/files/artefacts%2Fschema%2Fv0.7.0%2Fdcc%2FConformityCredential.json/raw?ref=v0.7.0",
-      "sha256": "e7c7f05c20579c486c2e0ade9815a962b0b77b426aec4be29be67a992e607a6c"
+      "sha256": "10869cc870bdf9e1d499c46a319c78fcdae7b1a4f37d837a84d34a4aaffb0883"
     },
     {
       "url": "https://untp.unece.org/artefacts/schema/v0.7.0/dfr/DigitalFacilityRecord.json",
       "file": "schema/untp/0.7.0/dfr.json",
       "source": "https://opensource.unicc.org/api/v4/projects/un%2Funece%2Funcefact%2Fspec-untp/repository/files/artefacts%2Fschema%2Fv0.7.0%2Fdfr%2FDigitalFacilityRecord.json/raw?ref=v0.7.0",
-      "sha256": "50757febd63ef00acf5f0ea85b9e8b861da9be1b4ca2ecded9093185adc5028d"
+      "sha256": "c6c8564d0fa6eb8e9eaa2057c7b310534ccaa7de90a8d7505ab9700a499e3c97"
     },
     {
       "url": "https://untp.unece.org/artefacts/schema/v0.7.0/dia/DigitalIdentityAnchor.json",
       "file": "schema/untp/0.7.0/dia.json",
       "source": "https://opensource.unicc.org/api/v4/projects/un%2Funece%2Funcefact%2Fspec-untp/repository/files/artefacts%2Fschema%2Fv0.7.0%2Fdia%2FDigitalIdentityAnchor.json/raw?ref=v0.7.0",
-      "sha256": "9cd0e4dedea3394b0b8ff9522870f330b17670dde99c52a29b473230c7bf517c"
+      "sha256": "0f125c2e8c6f0b01c79c7bf05ece2e33a88982edf023ee90479454b60b6b5eea"
     },
     {
       "url": "https://untp.unece.org/artefacts/schema/v0.7.0/dte/DigitalTraceabilityEvent.json",
       "file": "schema/untp/0.7.0/dte.json",
       "source": "https://opensource.unicc.org/api/v4/projects/un%2Funece%2Funcefact%2Fspec-untp/repository/files/artefacts%2Fschema%2Fv0.7.0%2Fdte%2FDigitalTraceabilityEvent.json/raw?ref=v0.7.0",
-      "sha256": "201776cffc9dfd841dc03f9ddb419e7761c28771cc5239f756219b1d520e679c"
+      "sha256": "e808457b958066038d5a7eeb2df62f648a2f6c9c993d52ce0c5c9a9be8e9dfde"
     },
     {
       "url": "https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json",
       "file": "schema/untp/0.7.0/cvc.json",
       "source": "https://opensource.unicc.org/api/v4/projects/un%2Funece%2Funcefact%2Fspec-untp/repository/files/artefacts%2Fschema%2Fv0.7.0%2Fcvc%2FConformityScheme.json/raw?ref=v0.7.0",
-      "sha256": "ff5f7705d3a882adc3581dc0cff93c50b7f7d5a328540403eac3835135489cc1"
+      "sha256": "7c367077199b9b4447eb4988cc2b4fc952ccc9b3dafd6b23c9c71721af6903a5"
     },
     {
       "url": "https://untp.unece.org/artefacts/schema/v0.7.0/idr/LinksetSchema.json",
       "file": "schema/untp/0.7.0/linkset.json",
       "source": "https://opensource.unicc.org/api/v4/projects/un%2Funece%2Funcefact%2Fspec-untp/repository/files/artefacts%2Fschema%2Fv0.7.0%2Fidr%2FLinksetSchema.json/raw?ref=v0.7.0",
-      "sha256": "735e4e9f1432613a7f4fbf6f915776628ad4b6ccc53e4977a50db3cc224fcec2"
+      "sha256": "b9751a4fa7577598c2e271a54b0f9d8b2950fb75459dc577428b03b03f99b6bd"
     },
     {
       "url": "https://vocabulary.uncefact.org/untp/0.7.0/context/",
       "file": "context/untp/0.7.0/untp.json",
       "source": "https://opensource.unicc.org/api/v4/projects/un%2Funece%2Funcefact%2Fspec-untp/repository/files/artefacts%2Fcontexts%2Fv0.7.0%2Funtp-context.jsonld/raw?ref=v0.7.0",
-      "sha256": "922764eee09c13717a8002095568c7e064fde4e8d93a98dcf00759ee039b829d"
+      "sha256": "3c0f6d7e6fdd4e54fc167c98a8ae232739c582fab845522bf81e7c67c881714f"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json",
       "file": "schema/untp/0.6.0/dpp.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json",
-      "sha256": "d6ecac8dbc47c210b7abedbe69d7183d18ee7f572e70a70c912509552aaa2ee5"
+      "sha256": "d9848208a5ac3e75a7138e129c452762367f0cb14ac0b6961fcc786ad25d2fd1"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/context/"
+      ],
       "file": "context/untp/0.6.0/dpp.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/context/",
-      "sha256": "dbd922faffdce60ebcba86a3f823c50e17e53da13e7729ef9fa3a40c516c1542"
+      "source": "https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/",
+      "sha256": "682164b576538ecddb246b1e6b9958ac011d5f007e3c08c57e87eb4e56abd29e"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.0.json",
       "file": "schema/untp/0.6.0/dcc.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.0.json",
-      "sha256": "a22e82033d0889f4a926ce466d72441cdc9a10785b276f39ff6f2076a47fb4c4"
+      "sha256": "cf24223eab1714819d32a609ec9a949b4d904475be5202d1fdca43d9c3dd3f95"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/context/"
+      ],
       "file": "context/untp/0.6.0/dcc.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/context/",
-      "sha256": "63ef3c6f3f2c9f6acdff27e247ad422c2711493964bb2a6fdf51192801a74954"
+      "source": "https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/",
+      "sha256": "7dc1324083f3cbd62f16ae6d0dd78ca0aa3312dc6a4c7276bac4e5376950486b"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.0.json",
       "file": "schema/untp/0.6.0/dfr.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.0.json",
-      "sha256": "12a9a621bc86fc8002a8abae5b276725be57a76dacceeab9b9fa7baef625822b"
+      "sha256": "40db7d00f4eb9f4944626bdaa8a50d9b331b5a7464a337bdedd34b143822223e"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/context/"
+      ],
       "file": "context/untp/0.6.0/dfr.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/context/",
-      "sha256": "0d8c74aa8897a61ca7d96d8183a94a26c10a2cf2a05a4b3ae656f1e597e6fdba"
+      "source": "https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/",
+      "sha256": "10c88686b1955511e89182e4e0f9acd7b4772a7a018df2fa39b24f1c12b39f08"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.0.json",
       "file": "schema/untp/0.6.0/dia.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.0.json",
-      "sha256": "e44faf3861cc2325ea194ddd22217222bf2f126881633ca5b19a0e7d0c76e79a"
+      "sha256": "447bf94e3c57cd7c11761add80884f474d7051fbe150c6b1d9a952fcdb76abe7"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dia/0.6.0/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dia/0.6.0/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dia/0.6.0/context/"
+      ],
       "file": "context/untp/0.6.0/dia.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dia/0.6.0/context/",
-      "sha256": "f87854ce186de626edf06b35b0365710fe415c09ebe9d0f7e9efd9cffc87960d"
+      "source": "https://test.uncefact.org/vocabulary/untp/dia/0.6.0/",
+      "sha256": "373c524541eebb25a0df78d9f61f7637c348cf2b85e88a688fc4b07e12a9ef50"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.0.json",
       "file": "schema/untp/0.6.0/dte.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.0.json",
-      "sha256": "b3b9dcad14a56601d29c6ef94eed3edf4fd8285dc146ae2ec791e76dee42bca4"
+      "sha256": "49338bc3bf2a3fd4185d453fdaaf3c14b3374c6891b81f6b257fd954db7cfce8"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/context/"
+      ],
       "file": "context/untp/0.6.0/dte.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/context/",
-      "sha256": "2df42156294050599173da22855b136fb02fe73caccbc805ec082725bb16aceb"
+      "source": "https://test.uncefact.org/vocabulary/untp/dte/0.6.0/",
+      "sha256": "a487797f808ff277910299c5faff65f72679b84763f27b46b20a0f75b3b6abb4"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json",
       "file": "schema/untp/0.6.1/dpp.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json",
-      "sha256": "944068816e8b823b3b743446c4acbeb94acab9b34296a3436f12cc31f94bd36b"
+      "sha256": "e8cd323c06ebd38f4b3c49b543d9906dba8e545dfa4c14734e90b54a45ea6cd0"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/context/"
+      ],
       "file": "context/untp/0.6.1/dpp.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/context/",
-      "sha256": "a98df1ab209228added64459a72709c832124b1258c08fc315ed6347f2216517"
+      "source": "https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/",
+      "sha256": "22cb827f369374d13c1e8fbe0e7d015d5d8bcafab480f6105b44da66586e232c"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.1.json",
       "file": "schema/untp/0.6.1/dcc.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.1.json",
-      "sha256": "8e40ac71cf3884ce1733ba19a0f40dd41f7b82b72cbe263d5fc333629e0ff220"
+      "sha256": "7c5a10f9368867ff8aea7d0b3ccae5b16d3dfcddddc4ceef11e2d09454af1f59"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/context/"
+      ],
       "file": "context/untp/0.6.1/dcc.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/context/",
-      "sha256": "b007927db0e7787e70bb081804783ebf1a3a8053c6463cb32a6ffc2795bb28c3"
+      "source": "https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/",
+      "sha256": "6b909403adb59001e77aa337ba22a1277c3d930718fb87e8c7f9c492b7d06b27"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.1.json",
       "file": "schema/untp/0.6.1/dfr.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.1.json",
-      "sha256": "c3e31d88830a53b2e5157ebcc484a68369f192e6608cf47692b13bee786efd69"
+      "sha256": "2899b3a9c3e72d7e40f2373a90b9196c7b7169868523eb25ba50bfab4a24ac5c"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/context/"
+      ],
       "file": "context/untp/0.6.1/dfr.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/context/",
-      "sha256": "81076123bfb6068e4d61d149efe6dc039e37825145a2f764d7bc9af1cd3a851a"
+      "source": "https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/",
+      "sha256": "11578ff8bb46ed93df2afcae560bba5830b2e785f5f111e64b17be9be21d777b"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.1.json",
       "file": "schema/untp/0.6.1/dia.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.1.json",
-      "sha256": "f70bdf3447c494868e7a9c9116a88182752fe143a81ee8bc9bafca9e3ed70204"
+      "sha256": "a76296ebc085955c0972f189958fbfa2a504d0073ad57e253b6fa97c9ddb8774"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dia/0.6.1/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dia/0.6.1/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dia/0.6.1/context/"
+      ],
       "file": "context/untp/0.6.1/dia.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dia/0.6.1/context/",
-      "sha256": "75d239379be9c6ead36c14bd9f490cf6c0772e1dcfabbc3a04811ed09f0648a2"
+      "source": "https://test.uncefact.org/vocabulary/untp/dia/0.6.1/",
+      "sha256": "2f20884c4cd6bc036ca2de8587b4973fcba25adad5979616a167ab62d0b7aefc"
     },
     {
       "url": "https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.1.json",
       "file": "schema/untp/0.6.1/dte.json",
       "source": "https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.1.json",
-      "sha256": "b218806e3c145eb9b7728accf49ddbbf3bdccc862bf85d75fcce1e00adab4d9c"
+      "sha256": "8e46e40e9d9c66f10b577ac48caaf55227eb44b9b8a25e4b9e2917491d1ff370"
     },
     {
-      "url": "https://test.uncefact.org/vocabulary/untp/dte/0.6.1/context/",
+      "url": "https://test.uncefact.org/vocabulary/untp/dte/0.6.1/",
+      "aliases": [
+        "https://test.uncefact.org/vocabulary/untp/dte/0.6.1/context/"
+      ],
       "file": "context/untp/0.6.1/dte.json",
-      "source": "https://test.uncefact.org/vocabulary/untp/dte/0.6.1/context/",
-      "sha256": "70fbf57990f37416a5c1c6721f3a07c5a37805d8de2ca93a31546486f44fc372"
+      "source": "https://test.uncefact.org/vocabulary/untp/dte/0.6.1/",
+      "sha256": "a90fd6ae1b46debb705c6241ab53525dfcb721eee41b03ca352670e96a6e2be3"
     }
   ]
 }

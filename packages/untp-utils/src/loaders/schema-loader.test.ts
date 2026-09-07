@@ -6,7 +6,7 @@ import {
   ResolverNetworkError,
   ResolverTimedOutError,
 } from '../resolvers/errors.js';
-import { PrivateHostnameError } from '../node/errors.js';
+import { PrivateHostnameError, ResolutionFailedError } from '../node/errors.js';
 import {
   SchemaLoaderError,
   SchemaLoaderHttpError,
@@ -214,7 +214,7 @@ describe('createSchemaLoader bundled fallback', () => {
     expect(onBundledFallback).toHaveBeenCalledTimes(1);
     expect(onBundledFallback.mock.calls[0][0]).toMatchObject({
       url: BUNDLED_URL,
-      cause: expect.any(SchemaLoaderNetworkError),
+      cause: expect.any(ResolverNetworkError),
     });
   });
 
@@ -237,6 +237,21 @@ describe('createSchemaLoader bundled fallback', () => {
     const onBundledFallback = jest.fn();
     const loader = createSchemaLoader(undefined, { onBundledFallback });
     await expect(loader.load(SCHEMA_URL)).rejects.toBeInstanceOf(SchemaLoaderNetworkError);
+    expect(onBundledFallback).not.toHaveBeenCalled();
+  });
+
+  it('serves the copy when DNS resolution fails, the outage behind uncefact/tests-untp#1006', async () => {
+    resolveJsonDocument.mockRejectedValue(new ResolutionFailedError('untp.unece.org', new Error('ENOTFOUND')) as never);
+    const loader = createSchemaLoader();
+    await expect(loader.load(BUNDLED_URL)).resolves.toBeDefined();
+  });
+
+  it('rethrows an untyped failure inside the fetch as a loader error instead of serving the copy', async () => {
+    const bug = new TypeError('resolver programming error');
+    resolveJsonDocument.mockRejectedValue(bug as never);
+    const onBundledFallback = jest.fn();
+    const loader = createSchemaLoader(undefined, { onBundledFallback });
+    await expect(loader.load(BUNDLED_URL)).rejects.toBeInstanceOf(SchemaLoaderNetworkError);
     expect(onBundledFallback).not.toHaveBeenCalled();
   });
 

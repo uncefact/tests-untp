@@ -24,25 +24,37 @@ const codeOf = (error: unknown): string | undefined =>
     ? (error as { code: string }).code
     : undefined;
 
+/** The guard's refusals: a URL that must not be fetched at all, whatever the host is doing. */
+const GUARD_REFUSAL_CODES: ReadonlySet<string> = new Set([
+  'url.invalid',
+  'url.unsupported-scheme',
+  'url.private-hostname',
+  'url.private-address',
+]);
+
 /**
- * Whether a fetch failure is one the publishing host is responsible for: it
- * could not be reached, answered a non-2xx status, sent a body that is not
- * JSON, or exceeded the resolver's size, redirect or time bounds. Those are
- * the failures the bundle exists to cover. Two kinds are deliberately
- * excluded: a URL the SSRF guard refused (a `url.*` code anywhere on the
- * cause chain), because a bundled host resolving to a private address is a
- * signal the operator must see, and any error that is not a typed
- * resolver or loader failure, because a bug in the fetch path must not read
- * as an outage.
+ * Whether a fetch failure is one the publishing host is responsible for: its
+ * name could not be resolved, it could not be reached, it answered a non-2xx
+ * status, it sent a body that is not JSON, or it exceeded the resolver's size,
+ * redirect or time bounds. Those are the failures the bundle exists to cover.
+ * Two kinds are deliberately excluded: a URL the SSRF guard refused (a
+ * private address or hostname, an unsupported scheme, an unparseable URL,
+ * anywhere on the cause chain), because a bundled host resolving to a private
+ * address is a signal the operator must see, and any error that is not a
+ * typed resolver or resolution failure, because a bug in the fetch path must
+ * not read as an outage. DNS failures (`url.resolution-failed`,
+ * `url.resolution-empty`) are host failures: the 2026-09-06 outage behind
+ * uncefact/tests-untp#1006 was exactly a name that stopped resolving.
  */
 export function isHostDeliveryFailure(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; depth < 8 && typeof current === 'object' && current !== null; depth += 1) {
-    if (codeOf(current)?.startsWith('url.')) return false;
+    const code = codeOf(current);
+    if (code !== undefined && GUARD_REFUSAL_CODES.has(code)) return false;
     current = (current as { cause?: unknown }).cause;
   }
   const code = codeOf(error);
-  return code !== undefined && (code.startsWith('resolver.') || code.startsWith('schema-loader.'));
+  return code !== undefined && (code.startsWith('resolver.') || code.startsWith('url.resolution-'));
 }
 
 /**
