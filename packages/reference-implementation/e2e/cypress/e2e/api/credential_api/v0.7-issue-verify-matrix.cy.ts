@@ -141,15 +141,23 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
                     { force: true },
                   );
 
-                  // The credential-type group renders an overall status icon
-                  // (`StatusIcon` in `TestResults.tsx`, testId = credential
-                  // type) that is `success` only when every validation step
-                  // passes (proof type, VCDM version + schema, credential
-                  // verification, UNTP schema, JSON-LD context). The
+                  // The credential-type group opens expanded and shows its
+                  // single instance row; the row's header carries that
+                  // instance's roll-up icon (`StatusIcon` in `TestResults.tsx`,
+                  // testId = instance id), which is `success` only when every
+                  // validation step passes (proof type, VCDM version + schema,
+                  // credential verification, UNTP schema, JSON-LD context).
+                  // The group-level icon only renders while the group is
+                  // collapsed, so it is not what a fresh upload shows. The
                   // verification step calls the configured VC service, so the
                   // timeout allows for that network round-trip. `should('exist')`
                   // retries until then.
-                  cy.get(`[data-testid="${credentialType}-status-icon-success"]`, { timeout: 60000 }).should('exist');
+                  cy.get(`[data-testid="${credentialType}-group-header"]`, { timeout: 60000 })
+                    .parent()
+                    .find('[data-testid="credential-instance-header"] [data-testid$="-status-icon-success"]', {
+                      timeout: 60000,
+                    })
+                    .should('exist');
                 },
               );
             });
