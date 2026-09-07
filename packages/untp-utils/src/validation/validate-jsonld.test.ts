@@ -221,7 +221,21 @@ describe('validateJsonLd', () => {
 
     await validateJsonLd({ '@context': 'https://example.com' }, { contextCache });
 
-    expect(createJsonLdDocumentLoader).toHaveBeenCalledWith({ cache: contextCache });
+    expect(createJsonLdDocumentLoader).toHaveBeenCalledWith({
+      cache: contextCache,
+      bundledFallback: undefined,
+      onBundledFallback: undefined,
+    });
+  });
+
+  it('forwards the bundled-fallback switch and listener to the document loader', async () => {
+    const onBundledFallback = jest.fn();
+    await validateJsonLd({ '@context': 'https://example.com' }, { bundledFallback: false, onBundledFallback });
+    expect(createJsonLdDocumentLoader).toHaveBeenCalledWith({
+      cache: undefined,
+      bundledFallback: false,
+      onBundledFallback,
+    });
   });
 
   it('passes toRDF a loader that delegates to the one createJsonLdDocumentLoader created', async () => {
@@ -231,7 +245,11 @@ describe('validateJsonLd', () => {
 
     await validateJsonLd({ '@context': 'https://example.com' });
 
-    expect(createJsonLdDocumentLoader).toHaveBeenCalledWith({ cache: undefined });
+    expect(createJsonLdDocumentLoader).toHaveBeenCalledWith({
+      cache: undefined,
+      bundledFallback: undefined,
+      onBundledFallback: undefined,
+    });
     // validateJsonLd wraps the created loader (to record failures for
     // rehydrateJsonLdCause's fallback, see validate-jsonld.ts), so toRDF
     // receives a different function reference; assert delegation instead.

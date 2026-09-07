@@ -67,3 +67,18 @@ describe('findBundledArtefact', () => {
     }
   });
 });
+
+describe('bundle integrity', () => {
+  it('serves every artefact with the content hash the manifest records', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { createHash } = await import('node:crypto');
+    const manifest = JSON.parse(await readFile(new URL('../../artefacts/manifest.json', import.meta.url), 'utf8')) as {
+      artefacts: { url: string; sha256: string }[];
+    };
+    for (const { url, sha256 } of manifest.artefacts) {
+      const served = await findBundledArtefact(url);
+      expect(served).toBeDefined();
+      expect(createHash('sha256').update(JSON.stringify(served)).digest('hex')).toBe(sha256);
+    }
+  });
+});

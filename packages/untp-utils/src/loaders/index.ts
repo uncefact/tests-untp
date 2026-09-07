@@ -10,4 +10,5 @@ export {
   type JsonLdDocumentLoaderOptions,
   type LoadedRemoteDocument,
 } from './jsonld-document-loader.js';
+export { isHostDeliveryFailure } from '../bundle/fallback.js';
 export type { BundledFallbackEvent, BundledFallbackOptions } from '../bundle/fallback.js';

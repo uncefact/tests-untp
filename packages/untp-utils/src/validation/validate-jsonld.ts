@@ -1,26 +1,22 @@
+import type { BundledFallbackOptions } from '../bundle/fallback.js';
 import type { JsonLdDocument } from 'jsonld';
 import type { TtlCache } from '../cache/ttl-cache.js';
 import type { LoadedRemoteDocument } from '../loaders/jsonld-document-loader.js';
 import { JsonLdExpansionFailedError, JsonLdInvalidShapeError } from './errors.js';
 
-export interface ValidateJsonLdOptions {
+export interface ValidateJsonLdOptions extends BundledFallbackOptions {
   /** Whether to use safe mode for JSON-LD expansion. Defaults to true. */
   safe?: boolean;
   /**
    * Optional cache, keyed by URL, for resolved remote `@context` documents.
    * Supplying a shared cache avoids re-fetching the same contexts on every
    * validation (e.g. the credential context on the issuance/verification
-   * hot path). Only successful fetches are cached, so a URL the SSRF guard
-   * rejects is re-checked every time. A successfully fetched and parsed
+   * hot path). Only successful loads are cached, so a URL the SSRF guard
+   * rejects is re-checked every time, while a bundled copy served after a
+   * host failure is cached like a fetched one. A successfully loaded
    * document is cached even if expansion later rejects it.
    */
   contextCache?: TtlCache<LoadedRemoteDocument>;
-  /**
-   * Whether a bundled UNTP context stands in when its fetch fails (default
-   * on), and who is told when it does. See `BundledFallbackOptions`.
-   */
-  bundledFallback?: boolean;
-  onBundledFallback?: (event: { url: string; cause: unknown }) => void;
 }
 
 /**

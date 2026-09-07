@@ -29,7 +29,7 @@ export function readSchemaCacheTtlMs(env: Record<string, string | undefined> = p
 export function logBundledFallback(event: { url: string; cause: unknown }): void {
   logger.warn(
     { url: event.url, err: event.cause },
-    'Served the bundled copy of a UNTP artefact because its fetch failed',
+    'Served the bundled copy of a UNTP artefact because its fetch failed (snapshot listed in @uncefact/untp-utils artefacts/manifest.json; BUNDLED_ARTEFACTS_FALLBACK=false disables this)',
   );
 }
 

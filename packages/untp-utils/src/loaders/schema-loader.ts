@@ -71,11 +71,13 @@ async function fetchSchema<T extends object>(url: string): Promise<T> {
  * are never cached; a successfully fetched and parsed document is cached
  * even if it later fails Ajv compilation.
  *
- * When a fetch fails and the URL is one of the bundled UNTP artefacts, the
- * bundled copy is returned instead and `options.onBundledFallback` is told
- * (see {@link BundledFallbackOptions}); a bundled copy served this way is
- * cached like a fetched one. URLs the bundle does not carry fail exactly as
- * before.
+ * When the host cannot deliver a bundled UNTP artefact (see
+ * `isHostDeliveryFailure`: unreachable, non-2xx, bad body, size, redirect or
+ * time bounds), the bundled copy is returned instead and
+ * `options.onBundledFallback` is told (see {@link BundledFallbackOptions}); a
+ * bundled copy served this way is cached like a fetched one. A URL the SSRF
+ * guard refused, an unexpected error, and any URL the bundle does not carry
+ * fail exactly as before.
  *
  * @throws {SchemaLoaderError} on `load(url)` if the underlying fetch fails
  *   and no bundled copy stands in. The concrete subclass identifies which

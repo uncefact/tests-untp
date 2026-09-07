@@ -11,9 +11,11 @@
 import { findBundledArtefact } from './lookup.js';
 
 export { findBundledArtefact, normaliseArtefactUrl } from './lookup.js';
+export { isHostDeliveryFailure } from './fallback.js';
+export type { BundledFallbackEvent, BundledFallbackOptions } from './fallback.js';
 
 /** Every bundled artefact keyed by its published URL. */
-export async function loadBundledArtefacts(): Promise<ReadonlyMap<string, object>> {
+export async function loadBundledArtefacts(): Promise<ReadonlyMap<string, Record<string, unknown>>> {
   const { BUNDLED_ARTEFACTS } = await import('./index.js');
   return BUNDLED_ARTEFACTS;
 }
@@ -30,7 +32,7 @@ export async function bundledUntpVersions(): Promise<readonly string[]> {
  * bundle does not carry that version. `type` accepts the names
  * `buildUntpArtefactUrls` accepts.
  */
-export async function bundledSchema(type: string, version: string): Promise<object | undefined> {
+export async function bundledSchema(type: string, version: string): Promise<Record<string, unknown> | undefined> {
   const { buildUntpArtefactUrls } = await import('../artefacts/urls.js');
   return findBundledArtefact(buildUntpArtefactUrls(type, version).schemaUrl);
 }
@@ -39,24 +41,24 @@ export async function bundledSchema(type: string, version: string): Promise<obje
  * The bundled JSON-LD context a UNTP credential type declares at a version:
  * the per-type context before 0.7.0, the unified UNTP context from 0.7.0.
  */
-export async function bundledContext(type: string, version: string): Promise<object | undefined> {
+export async function bundledContext(type: string, version: string): Promise<Record<string, unknown> | undefined> {
   const { buildUntpArtefactUrls } = await import('../artefacts/urls.js');
   return findBundledArtefact(buildUntpArtefactUrls(type, version).contextUrl);
 }
 
 /** The bundled Identity Resolver link set schema for a UNTP version (published from 0.7.0). */
-export async function bundledLinkSetSchema(version: string): Promise<object | undefined> {
+export async function bundledLinkSetSchema(version: string): Promise<Record<string, unknown> | undefined> {
   return findBundledArtefact(`https://untp.unece.org/artefacts/schema/v${version}/idr/LinksetSchema.json`);
 }
 
 /** The W3C Verifiable Credentials Data Model context for a major version (`'2'` today). */
-export async function bundledVcdmContext(version: '2'): Promise<object | undefined> {
+export async function bundledVcdmContext(version: '2'): Promise<Record<string, unknown> | undefined> {
   return findBundledArtefact(`https://www.w3.org/ns/credentials/v${version}`);
 }
 
 /** The W3C Verifiable Credentials Data Model JSON Schema for a major version (`'2'` today). */
-export async function bundledVcdmSchema(version: '2'): Promise<object | undefined> {
-  if (version !== '2') return undefined;
+export async function bundledVcdmSchema(version: '2'): Promise<Record<string, unknown> | undefined> {
+  void version;
   return findBundledArtefact(
     'https://w3c.github.io/vc-data-model/schema/verifiable-credential/verifiable-credential-schema.json',
   );

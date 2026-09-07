@@ -1,3 +1,4 @@
+import type { BundledFallbackOptions } from '@uncefact/untp-utils/loaders';
 import type { TtlCache } from '@uncefact/untp-utils/cache';
 import type { LoadedRemoteDocument, SchemaLoader } from '@uncefact/untp-utils/loaders';
 import type { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
@@ -77,8 +78,8 @@ export interface ResolveAndParseConformitySchemeInput {
    * Whether a bundled UNTP context stands in when its fetch fails (default on),
    * and who is told when it does; forwarded to `validateJsonLd`.
    */
-  bundledFallback?: boolean;
-  onBundledFallback?: (event: { url: string; cause: unknown }) => void;
+  bundledFallback?: BundledFallbackOptions['bundledFallback'];
+  onBundledFallback?: BundledFallbackOptions['onBundledFallback'];
 }
 
 /** Outcome of a successful run; everything the caller needs to upsert the row. */

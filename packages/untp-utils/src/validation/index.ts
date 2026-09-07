@@ -10,3 +10,4 @@ export {
 export { validateJsonLd, type ValidateJsonLdOptions } from './validate-jsonld.js';
 export { validateAgainstSchemas, type SchemaReference } from './validate-against-schemas.js';
 export { describeJsonLdFailure, type JsonLdFailureDescription } from './describe-jsonld-failure.js';
+export type { BundledFallbackEvent, BundledFallbackOptions } from '../bundle/fallback.js';

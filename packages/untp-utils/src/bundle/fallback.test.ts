@@ -1,5 +1,8 @@
 import { jest } from '@jest/globals';
-import { withBundledFallback } from './fallback.js';
+import { isHostDeliveryFailure, withBundledFallback } from './fallback.js';
+import { ResolverHttpError, ResolverNetworkError } from '../resolvers/errors.js';
+import { PrivateAddressError } from '../node/errors.js';
+import { SchemaLoaderNetworkError } from '../loaders/errors.js';
 
 const BUNDLED = 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json';
 const UNBUNDLED = 'https://untp.unece.org/artefacts/schema/v9.9.9/dpp/DigitalProductPassport.json';
@@ -14,7 +17,7 @@ describe('withBundledFallback', () => {
 
   it('serves the bundled copy and reports the cause when the fetch of a bundled URL fails', async () => {
     const onBundledFallback = jest.fn();
-    const cause = new Error('getaddrinfo ENOTFOUND untp.unece.org');
+    const cause = new ResolverNetworkError(BUNDLED, new Error('getaddrinfo ENOTFOUND untp.unece.org'));
     const result = (await withBundledFallback(BUNDLED, { onBundledFallback }, async () => {
       throw cause;
     })) as object;
@@ -23,7 +26,7 @@ describe('withBundledFallback', () => {
   });
 
   it('rethrows when the URL is not bundled', async () => {
-    const cause = new Error('boom');
+    const cause = new ResolverHttpError(UNBUNDLED, 503);
     await expect(
       withBundledFallback(UNBUNDLED, {}, async () => {
         throw cause;
@@ -32,7 +35,7 @@ describe('withBundledFallback', () => {
   });
 
   it('rethrows when the fallback is switched off, even for a bundled URL', async () => {
-    const cause = new Error('boom');
+    const cause = new ResolverHttpError(BUNDLED, 503);
     const onBundledFallback = jest.fn();
     await expect(
       withBundledFallback(BUNDLED, { bundledFallback: false, onBundledFallback }, async () => {
@@ -40,5 +43,65 @@ describe('withBundledFallback', () => {
       }),
     ).rejects.toBe(cause);
     expect(onBundledFallback).not.toHaveBeenCalled();
+  });
+
+  it('never covers a URL the SSRF guard refused, even when wrapped by the schema loader', async () => {
+    const onBundledFallback = jest.fn();
+    const guard = new PrivateAddressError(BUNDLED, ['10.0.0.5']);
+    await expect(
+      withBundledFallback(BUNDLED, { onBundledFallback }, async () => {
+        throw guard;
+      }),
+    ).rejects.toBe(guard);
+    const wrapped = new SchemaLoaderNetworkError(BUNDLED, guard);
+    await expect(
+      withBundledFallback(BUNDLED, { onBundledFallback }, async () => {
+        throw wrapped;
+      }),
+    ).rejects.toBe(wrapped);
+    expect(onBundledFallback).not.toHaveBeenCalled();
+  });
+
+  it('never covers an error that is not a typed resolver or loader failure', async () => {
+    const bug = new TypeError('cannot read properties of undefined');
+    await expect(
+      withBundledFallback(BUNDLED, {}, async () => {
+        throw bug;
+      }),
+    ).rejects.toBe(bug);
+  });
+
+  it('still serves the copy when the listener throws', async () => {
+    const result = await withBundledFallback(
+      BUNDLED,
+      {
+        onBundledFallback: () => {
+          throw new Error('logger down');
+        },
+      },
+      async () => {
+        throw new ResolverHttpError(BUNDLED, 403);
+      },
+    );
+    expect(JSON.stringify(result)).toContain('DigitalProductPassport');
+  });
+});
+
+describe('isHostDeliveryFailure', () => {
+  it.each([
+    ['resolver network', new ResolverNetworkError(BUNDLED, new Error('ENOTFOUND')), true],
+    ['resolver http 403', new ResolverHttpError(BUNDLED, 403), true],
+    ['schema loader network', new SchemaLoaderNetworkError(BUNDLED, new Error('ENOTFOUND')), true],
+    ['guard rejection', new PrivateAddressError(BUNDLED, ['127.0.0.1']), false],
+    [
+      'guard rejection wrapped',
+      new SchemaLoaderNetworkError(BUNDLED, new PrivateAddressError(BUNDLED, ['127.0.0.1'])),
+      false,
+    ],
+    ['plain Error', new Error('boom'), false],
+    ['TypeError', new TypeError('boom'), false],
+    ['not an error', 'boom', false],
+  ])('%s -> %s', (_label, error, expected) => {
+    expect(isHostDeliveryFailure(error)).toBe(expected);
   });
 });

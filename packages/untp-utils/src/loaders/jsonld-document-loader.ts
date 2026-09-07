@@ -23,11 +23,12 @@ export interface JsonLdDocumentLoaderOptions extends ResolveDocumentOptions, Bun
   /**
    * Optional cache, keyed by URL, for resolved `@context` documents. When
    * supplied, a document fetched once is reused for the cache's TTL rather
-   * than re-fetched on every expansion. Only successful fetches are cached
+   * than re-fetched on every expansion. Only successful loads are cached
    * (the {@link TtlCache} contract does not cache rejected fetches), so a
-   * URL the guard rejects is re-checked every time. A successfully fetched
-   * and parsed document is cached even if downstream JSON-LD processing
-   * later rejects it.
+   * URL the guard rejects is re-checked every time; a bundled copy served
+   * after a host failure counts as a successful load and is cached like a
+   * fetched one. A successfully loaded document is cached even if
+   * downstream JSON-LD processing later rejects it.
    */
   cache?: TtlCache<LoadedRemoteDocument>;
 }

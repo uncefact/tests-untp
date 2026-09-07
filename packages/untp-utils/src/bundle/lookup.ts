@@ -16,12 +16,12 @@ export function normaliseArtefactUrl(url: string): string {
   }
 }
 
-let index: Promise<ReadonlyMap<string, object>> | undefined;
+let index: Promise<ReadonlyMap<string, Record<string, unknown>>> | undefined;
 
-async function bundledByNormalisedUrl(): Promise<ReadonlyMap<string, object>> {
+async function bundledByNormalisedUrl(): Promise<ReadonlyMap<string, Record<string, unknown>>> {
   if (!index) {
     index = import('./index.js').then(({ BUNDLED_ARTEFACTS }) => {
-      const map = new Map<string, object>();
+      const map = new Map<string, Record<string, unknown>>();
       for (const [url, artefact] of BUNDLED_ARTEFACTS) map.set(normaliseArtefactUrl(url), artefact);
       return map;
     });
@@ -30,6 +30,6 @@ async function bundledByNormalisedUrl(): Promise<ReadonlyMap<string, object>> {
 }
 
 /** The bundled copy of the artefact published at `url`, or `undefined` when the bundle does not carry it. */
-export async function findBundledArtefact(url: string): Promise<object | undefined> {
+export async function findBundledArtefact(url: string): Promise<Record<string, unknown> | undefined> {
   return (await bundledByNormalisedUrl()).get(normaliseArtefactUrl(url));
 }

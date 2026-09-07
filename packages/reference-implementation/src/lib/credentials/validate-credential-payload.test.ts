@@ -26,7 +26,7 @@ jest.mock('@uncefact/untp-utils/validation', () => {
 
 import { validateCredentialPayload } from './validate-credential-payload';
 import { contextCache } from './context-cache';
-import { bundledArtefactsFallback } from './schema-loader';
+import { logBundledFallback } from './schema-loader';
 
 const payload = { '@context': ['https://www.w3.org/ns/credentials/v2'], type: ['DigitalProductPassport'] };
 const schemaUrls = ['https://example.com/schema.json'];
@@ -50,7 +50,11 @@ describe('validateCredentialPayload', () => {
 
     expect(callOrder).toEqual(['schema', 'jsonld']);
     expect(mockValidateAgainstSchemas).toHaveBeenCalledWith(payload, schemaUrls, loader);
-    expect(mockValidateJsonLd).toHaveBeenCalledWith(payload, { contextCache, ...bundledArtefactsFallback });
+    expect(mockValidateJsonLd).toHaveBeenCalledWith(payload, {
+      contextCache,
+      bundledFallback: true,
+      onBundledFallback: logBundledFallback,
+    });
   });
 
   it('passes the same shared context cache on every call, so repeated validations reuse fetched contexts', async () => {
@@ -156,12 +160,5 @@ describe('validateCredentialPayload', () => {
     mockValidateAgainstSchemas.mockRejectedValue(unexpected);
 
     await expect(validateCredentialPayload(payload, schemaUrls, loader)).rejects.toBe(unexpected);
-  });
-
-  it('asks the JSON-LD validation to log when a bundled context stands in for a failed fetch', async () => {
-    mockValidateAgainstSchemas.mockResolvedValue(undefined);
-    mockValidateJsonLd.mockResolvedValue(undefined);
-    await validateCredentialPayload(payload, schemaUrls, loader);
-    expect(mockValidateJsonLd).toHaveBeenCalledWith(payload, { contextCache, ...bundledArtefactsFallback });
   });
 });

@@ -82,6 +82,9 @@
       ],
       "common": [
         "./build/common/index.d.ts"
+      ],
+      "bundled-artefacts": [
+        "./build/bundle/public.d.ts"
       ]
     }
   },

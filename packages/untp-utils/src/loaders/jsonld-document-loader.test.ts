@@ -1,5 +1,6 @@
-import { jest } from '@jest/globals';
+import { ResolverNetworkError } from '../resolvers/errors.js';
 import { createInMemoryTtlCache } from '../cache/in-memory-ttl-cache.js';
+import { jest } from '@jest/globals';
 import type { LoadedRemoteDocument } from './jsonld-document-loader.js';
 
 const resolveJsonDocument = jest.fn();
@@ -108,8 +109,12 @@ describe('createJsonLdDocumentLoader', () => {
 describe('createJsonLdDocumentLoader bundled fallback', () => {
   const CONTEXT_URL = 'https://vocabulary.uncefact.org/untp/0.7.0/context/';
 
+  beforeEach(() => {
+    resolveJsonDocument.mockReset();
+  });
+
   it('serves the bundled context under the requested URL when its fetch fails', async () => {
-    resolveJsonDocument.mockRejectedValue(new Error('ENOTFOUND') as never);
+    resolveJsonDocument.mockRejectedValue(new ResolverNetworkError(CONTEXT_URL, new Error('ENOTFOUND')) as never);
     const onBundledFallback = jest.fn();
     const load = createJsonLdDocumentLoader({ onBundledFallback });
     const result = await load(CONTEXT_URL);
@@ -119,9 +124,23 @@ describe('createJsonLdDocumentLoader bundled fallback', () => {
   });
 
   it('rethrows for a context the bundle does not carry', async () => {
-    const cause = new Error('ENOTFOUND');
+    const cause = new ResolverNetworkError('https://example.com/context.jsonld', new Error('ENOTFOUND'));
     resolveJsonDocument.mockRejectedValue(cause as never);
     const load = createJsonLdDocumentLoader();
     await expect(load('https://example.com/context.jsonld')).rejects.toBe(cause);
+  });
+
+  it('rethrows when the fallback is switched off', async () => {
+    const cause = new ResolverNetworkError(CONTEXT_URL, new Error('ENOTFOUND'));
+    resolveJsonDocument.mockRejectedValue(cause as never);
+    await expect(createJsonLdDocumentLoader({ bundledFallback: false })(CONTEXT_URL)).rejects.toBe(cause);
+  });
+
+  it('caches a bundled context so the next load does not retry the network', async () => {
+    resolveJsonDocument.mockRejectedValue(new ResolverNetworkError(CONTEXT_URL, new Error('ENOTFOUND')) as never);
+    const load = createJsonLdDocumentLoader({ cache: createInMemoryTtlCache({ ttlMs: 60_000 }) });
+    await load(CONTEXT_URL);
+    await load(CONTEXT_URL);
+    expect(resolveJsonDocument).toHaveBeenCalledTimes(1);
   });
 });
