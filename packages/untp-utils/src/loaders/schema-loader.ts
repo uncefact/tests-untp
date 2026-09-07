@@ -1,3 +1,5 @@
+import type { BundledFallbackOptions } from '../bundle/fallback.js';
+import { withBundledFallback } from '../bundle/fallback.js';
 import type { TtlCache } from '../cache/ttl-cache.js';
 import { ResolverHttpError, ResolverInvalidJsonError, ResolverNetworkError } from '../resolvers/errors.js';
 import { SchemaLoaderHttpError, SchemaLoaderInvalidJsonError, SchemaLoaderNetworkError } from './errors.js';
@@ -69,12 +71,23 @@ async function fetchSchema<T extends object>(url: string): Promise<T> {
  * are never cached; a successfully fetched and parsed document is cached
  * even if it later fails Ajv compilation.
  *
- * @throws {SchemaLoaderError} on `load(url)` if the underlying fetch fails.
- *   The concrete subclass identifies which step failed.
+ * When a fetch fails and the URL is one of the bundled UNTP artefacts, the
+ * bundled copy is returned instead and `options.onBundledFallback` is told
+ * (see {@link BundledFallbackOptions}); a bundled copy served this way is
+ * cached like a fetched one. URLs the bundle does not carry fail exactly as
+ * before.
+ *
+ * @throws {SchemaLoaderError} on `load(url)` if the underlying fetch fails
+ *   and no bundled copy stands in. The concrete subclass identifies which
+ *   step failed.
  */
-export function createSchemaLoader<T extends object = object>(cache?: TtlCache<T>): SchemaLoader<T> {
+export function createSchemaLoader<T extends object = object>(
+  cache?: TtlCache<T>,
+  options?: BundledFallbackOptions,
+): SchemaLoader<T> {
+  const load = (url: string) => withBundledFallback(url, options, () => fetchSchema<T>(url));
   if (!cache) {
-    return { load: (url) => fetchSchema<T>(url) };
+    return { load };
   }
-  return { load: (url) => cache.get(url, () => fetchSchema<T>(url)) };
+  return { load: (url) => cache.get(url, () => load(url)) };
 }

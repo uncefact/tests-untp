@@ -23,6 +23,7 @@ import { resolveAppUrl } from './lib/config/app-url.config';
 import { startSeededSchemeRefreshInterval } from './lib/cvc/seeded-refresh-interval';
 import { validateHttpUserAgentOnBoot } from './lib/config/http-user-agent.config';
 import { validateCacheMaxEntriesOnBoot } from './lib/config/cache-max-entries.config';
+import { validateBundledArtefactsFallbackOnBoot } from '@/lib/config/bundled-artefacts-fallback.config';
 import { validateStaleClaimOnBoot } from './lib/config/idempotency-claim.config';
 import { validateMaxRequestBodyBytesOnBoot } from './lib/config/request-body-limit.config';
 import { startJobQueue, stopJobQueue } from './lib/jobs/app-job-queue';
@@ -37,6 +38,7 @@ export async function registerNode(): Promise<void> {
   validateHttpUserAgentOnBoot();
   // Fail the boot on an invalid CACHE_MAX_ENTRIES override; unset uses the default.
   validateCacheMaxEntriesOnBoot();
+  validateBundledArtefactsFallbackOnBoot();
   validateStaleClaimOnBoot();
   validateMaxRequestBodyBytesOnBoot();
   await validateEncryptionKeyOnBoot();

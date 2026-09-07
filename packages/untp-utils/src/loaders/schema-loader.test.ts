@@ -197,3 +197,52 @@ describe('createSchemaLoader', () => {
     });
   });
 });
+
+describe('createSchemaLoader bundled fallback', () => {
+  const BUNDLED_URL = 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json';
+
+  beforeEach(() => {
+    resolveJsonDocument.mockReset();
+  });
+
+  it('serves the bundled schema when the fetch of a bundled URL fails, and reports it', async () => {
+    resolveJsonDocument.mockRejectedValue(new ResolverNetworkError(BUNDLED_URL, new Error('ENOTFOUND')) as never);
+    const onBundledFallback = jest.fn();
+    const loader = createSchemaLoader(undefined, { onBundledFallback });
+    const schema = await loader.load(BUNDLED_URL);
+    expect(JSON.stringify(schema)).toContain('DigitalProductPassport');
+    expect(onBundledFallback).toHaveBeenCalledTimes(1);
+    expect(onBundledFallback.mock.calls[0][0]).toMatchObject({
+      url: BUNDLED_URL,
+      cause: expect.any(SchemaLoaderNetworkError),
+    });
+  });
+
+  it('falls back on an upstream HTTP failure too, since the artefact is immutable once published', async () => {
+    resolveJsonDocument.mockRejectedValue(new ResolverHttpError(BUNDLED_URL, 403) as never);
+    const loader = createSchemaLoader();
+    await expect(loader.load(BUNDLED_URL)).resolves.toBeDefined();
+  });
+
+  it('caches a bundled copy so the next load does not retry the network', async () => {
+    resolveJsonDocument.mockRejectedValue(new ResolverNetworkError(BUNDLED_URL, new Error('ENOTFOUND')) as never);
+    const loader = createSchemaLoader(createInMemoryTtlCache<object>({ ttlMs: 60_000 }));
+    await loader.load(BUNDLED_URL);
+    await loader.load(BUNDLED_URL);
+    expect(resolveJsonDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it('still fails exactly as before for a URL the bundle does not carry', async () => {
+    resolveJsonDocument.mockRejectedValue(new ResolverNetworkError(SCHEMA_URL, new Error('ENOTFOUND')) as never);
+    const onBundledFallback = jest.fn();
+    const loader = createSchemaLoader(undefined, { onBundledFallback });
+    await expect(loader.load(SCHEMA_URL)).rejects.toBeInstanceOf(SchemaLoaderNetworkError);
+    expect(onBundledFallback).not.toHaveBeenCalled();
+  });
+
+  it('can be switched off', async () => {
+    resolveJsonDocument.mockRejectedValue(new ResolverNetworkError(BUNDLED_URL, new Error('ENOTFOUND')) as never);
+    const loader = createSchemaLoader(undefined, { bundledFallback: false });
+    await expect(loader.load(BUNDLED_URL)).rejects.toBeInstanceOf(SchemaLoaderNetworkError);
+  });
+});

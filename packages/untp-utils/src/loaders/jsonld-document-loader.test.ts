@@ -104,3 +104,24 @@ describe('createJsonLdDocumentLoader', () => {
     });
   });
 });
+
+describe('createJsonLdDocumentLoader bundled fallback', () => {
+  const CONTEXT_URL = 'https://vocabulary.uncefact.org/untp/0.7.0/context/';
+
+  it('serves the bundled context under the requested URL when its fetch fails', async () => {
+    resolveJsonDocument.mockRejectedValue(new Error('ENOTFOUND') as never);
+    const onBundledFallback = jest.fn();
+    const load = createJsonLdDocumentLoader({ onBundledFallback });
+    const result = await load(CONTEXT_URL);
+    expect(result.documentUrl).toBe(CONTEXT_URL);
+    expect(Object.keys(result.document as object)).toContain('@context');
+    expect(onBundledFallback).toHaveBeenCalledWith({ url: CONTEXT_URL, cause: expect.any(Error) });
+  });
+
+  it('rethrows for a context the bundle does not carry', async () => {
+    const cause = new Error('ENOTFOUND');
+    resolveJsonDocument.mockRejectedValue(cause as never);
+    const load = createJsonLdDocumentLoader();
+    await expect(load('https://example.com/context.jsonld')).rejects.toBe(cause);
+  });
+});

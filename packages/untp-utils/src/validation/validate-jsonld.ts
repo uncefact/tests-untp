@@ -15,6 +15,12 @@ export interface ValidateJsonLdOptions {
    * document is cached even if expansion later rejects it.
    */
   contextCache?: TtlCache<LoadedRemoteDocument>;
+  /**
+   * Whether a bundled UNTP context stands in when its fetch fails (default
+   * on), and who is told when it does. See `BundledFallbackOptions`.
+   */
+  bundledFallback?: boolean;
+  onBundledFallback?: (event: { url: string; cause: unknown }) => void;
 }
 
 /**
@@ -93,7 +99,11 @@ export async function validateJsonLd(document: unknown, options?: ValidateJsonLd
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const jsonld = ('default' in jsonldModule ? (jsonldModule as any).default : jsonldModule) as typeof import('jsonld');
   const { createJsonLdDocumentLoader } = await import('../loaders/jsonld-document-loader.js');
-  const documentLoader = createJsonLdDocumentLoader({ cache: options?.contextCache });
+  const documentLoader = createJsonLdDocumentLoader({
+    cache: options?.contextCache,
+    bundledFallback: options?.bundledFallback,
+    onBundledFallback: options?.onBundledFallback,
+  });
 
   // Recorded for rehydrateJsonLdCause's fallback: the last error the loader
   // threw during this call (undefined if every fetch it made succeeded).

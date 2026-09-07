@@ -10,3 +10,4 @@ export {
   type JsonLdDocumentLoaderOptions,
   type LoadedRemoteDocument,
 } from './jsonld-document-loader.js';
+export type { BundledFallbackEvent, BundledFallbackOptions } from '../bundle/fallback.js';

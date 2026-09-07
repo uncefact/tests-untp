@@ -1,4 +1,6 @@
 import type { ResolveDocumentOptions } from '../resolvers/index.js';
+import type { BundledFallbackOptions } from '../bundle/fallback.js';
+import { withBundledFallback } from '../bundle/fallback.js';
 import type { TtlCache } from '../cache/ttl-cache.js';
 
 /**
@@ -15,7 +17,7 @@ export interface LoadedRemoteDocument {
 }
 
 /** Options for {@link createJsonLdDocumentLoader}. */
-export interface JsonLdDocumentLoaderOptions extends ResolveDocumentOptions {
+export interface JsonLdDocumentLoaderOptions extends ResolveDocumentOptions, BundledFallbackOptions {
   /** `Accept` header for `@context` fetches. Defaults to JSON-LD then JSON. */
   accept?: string;
   /**
@@ -52,9 +54,9 @@ const CONTEXT_ACCEPT_HEADER = 'application/ld+json, application/json;q=0.9';
 export function createJsonLdDocumentLoader(
   options?: JsonLdDocumentLoaderOptions,
 ): (url: string) => Promise<LoadedRemoteDocument> {
-  const { cache, accept, ...resolverOptions } = options ?? {};
+  const { cache, accept, bundledFallback, onBundledFallback, ...resolverOptions } = options ?? {};
 
-  const load = async (url: string): Promise<LoadedRemoteDocument> => {
+  const fetchContext = async (url: string): Promise<LoadedRemoteDocument> => {
     // Lazy import: the resolver stack pulls in undici, which jsdom test
     // environments cannot evaluate, so it loads at fetch time to keep this
     // module importable there.
@@ -64,6 +66,19 @@ export function createJsonLdDocumentLoader(
       accept: accept ?? CONTEXT_ACCEPT_HEADER,
     });
     return { documentUrl: finalUrl, document: json };
+  };
+
+  // A bundled context is served under the URL that was requested, since no
+  // redirect was followed to reach it.
+  const load = async (url: string): Promise<LoadedRemoteDocument> => {
+    const fetched = await withBundledFallback<LoadedRemoteDocument | object>(
+      url,
+      { bundledFallback, onBundledFallback },
+      () => fetchContext(url),
+    );
+    return 'documentUrl' in fetched && 'document' in fetched
+      ? (fetched as LoadedRemoteDocument)
+      : { documentUrl: url, document: fetched };
   };
 
   return cache ? (url) => cache.get(url, () => load(url)) : load;

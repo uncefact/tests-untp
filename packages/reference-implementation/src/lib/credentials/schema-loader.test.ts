@@ -11,7 +11,7 @@ jest.mock('@/lib/api/logger', () => ({
   },
 }));
 
-import { readSchemaCacheTtlMs } from './schema-loader';
+import { logBundledFallback, readSchemaCacheTtlMs } from './schema-loader';
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 
@@ -60,5 +60,19 @@ describe('readSchemaCacheTtlMs', () => {
         expect.stringContaining('falling back'),
       );
     });
+  });
+});
+
+describe('logBundledFallback', () => {
+  it('warns with the URL and the fetch error so an outage is visible in the log', () => {
+    const cause = new Error('getaddrinfo ENOTFOUND untp.unece.org');
+    logBundledFallback({
+      url: 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
+      cause,
+    });
+    expect(mockWarn).toHaveBeenCalledWith(
+      { url: 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json', err: cause },
+      'Served the bundled copy of a UNTP artefact because its fetch failed',
+    );
   });
 });
