@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect, useRef } from 'react';
 import { SchemeTestResults } from '@/components/SchemeTestResults';
+import { SchemaFetchError } from '@/lib/schemeValidation';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
 import { upsert } from '@/lib/artefactCollection';
 import { schemeContentHash } from '@/lib/schemeCollection';
@@ -77,6 +78,22 @@ describe('SchemeTestResults', () => {
     expect(await screen.findByText(/Could not detect a UNTP version from the @context/)).toBeInTheDocument();
     // Both the schema-validation and context-validation steps are skipped.
     expect(screen.getAllByText('Skipped: version detection failed.')).toHaveLength(2);
+  });
+
+  it('shows the schema service category when the schema could not be fetched', async () => {
+    (validateSchemeSchema as jest.Mock).mockRejectedValue(
+      new SchemaFetchError(
+        'https://untp.unece.org/x.json',
+        'network',
+        'Schema host returned status 503 (https://untp.unece.org/x.json).',
+      ),
+    );
+    render(<Harness schemes={[scheme({ id: 'x', name: 'Host Down Scheme' })]} />);
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+
+    expect(await screen.findByText(/Schema host returned status 503/)).toBeInTheDocument();
+    expect(screen.queryByText(/We could not reach the schema service/)).not.toBeInTheDocument();
   });
 
   it('removes a card only after the confirmation dialog is confirmed', async () => {
