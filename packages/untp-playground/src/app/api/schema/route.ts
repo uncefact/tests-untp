@@ -10,13 +10,13 @@ import { NextResponse } from 'next/server';
 
 // The schema route's callers (`schemaURLConstructor` and `VCDM_SCHEMA_URLS` in
 // `src/lib/schemaValidation.ts`, `schemeSchemaUrl` in `src/lib/schemeValidation.ts`)
-// build URLs pointing at this fixed set of hosts. Allowlisting them at the route
-// layer turns the SSRF surface into a closed set: an attacker can substitute the
-// `url` query parameter, but it will be rejected unless its hostname is one of
-// these. The loader below applies the shared `validatePublicUrl` guard as a
-// second layer (public scheme, non-private address, IP-pinned, size, redirect
-// and timeout bounds). That guard has no opt-out, so a private or loopback
-// schema host cannot be reached through this route even in local development.
+// build URLs pointing at this fixed set of hosts. Allowlisting the initial
+// hostname at the route layer closes the `url` query parameter to attacker
+// substitution. Redirects are not re-checked against this list; the loader
+// below applies the shared `validatePublicUrl` guard to every hop instead
+// (public scheme, non-private address, IP-pinned, size, redirect and timeout
+// bounds). That guard has no opt-out, so a private or loopback schema host
+// cannot be reached through this route even in local development.
 const ALLOWED_SCHEMA_HOSTS: ReadonlySet<string> = new Set([
   'untp.unece.org',
   'test.uncefact.org',
@@ -67,24 +67,34 @@ export async function GET(request: Request) {
     // The loader's typed errors carry the upstream URL and transport detail;
     // that is operator diagnostic, so it goes to the log and the client gets
     // the category. A 502 says the failure was upstream of this route. The
-    // structured `code` is logged by name so an SSRF rejection by the guard
-    // (`url-validation.*`) is greppable apart from an availability failure.
+    // loader's own code is `schema-loader.*`; the guard's rejection code
+    // (`url.private-address` and siblings) sits on the cause, so both are
+    // logged by name and an SSRF rejection is greppable apart from an outage.
     if (error instanceof SchemaLoaderError) {
-      console.error('Schema fetch failed', { url: schemaUrl, code: error.code, cause: error.cause });
+      const cause = error.cause as { code?: string } | undefined;
+      console.error('Schema fetch failed', { url: schemaUrl, code: error.code, causeCode: cause?.code, cause });
     } else {
       console.error('Unexpected schema loader failure', { url: schemaUrl, error });
     }
     if (error instanceof SchemaLoaderHttpError) {
       return NextResponse.json(
-        { error: `Schema host returned status ${error.status}`, upstreamStatus: error.status },
+        { error: `Schema host returned status ${error.status}`, code: 'upstream-status', upstreamStatus: error.status },
         { status: 502 },
       );
     }
     if (error instanceof SchemaLoaderInvalidJsonError) {
-      return NextResponse.json({ error: 'Schema host returned a body that is not valid JSON' }, { status: 502 });
+      return NextResponse.json(
+        { error: 'Schema host returned a body that is not valid JSON', code: 'invalid-json' },
+        { status: 502 },
+      );
     }
     if (error instanceof SchemaLoaderNetworkError) {
-      return NextResponse.json({ error: 'Schema host could not be reached' }, { status: 502 });
+      // Also covers the guard's rejections and the size, redirect and timeout
+      // bounds, so the wording claims only that the load did not complete.
+      return NextResponse.json(
+        { error: 'The schema could not be loaded from its host', code: 'unreachable' },
+        { status: 502 },
+      );
     }
     return NextResponse.json({ error: 'Failed to fetch schema' }, { status: 500 });
   }

@@ -21,28 +21,59 @@ addFormats(ajv);
 /**
  * A schema the proxy route could not deliver. `message` carries the route's
  * own category (host unreachable, upstream status, not JSON, host not on the
- * allowlist) so the verifier sees why, not just that it failed.
+ * allowlist) so the verifier sees why, not just that it failed. `upstreamStatus`
+ * is the schema host's own status when the route reported one.
  */
 export class SchemaFetchError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly upstreamStatus?: number,
   ) {
     super(message);
     this.name = 'SchemaFetchError';
   }
 }
 
+/**
+ * What the verifier can do about a schema fetch failure. A 4xx from the schema
+ * host (or a URL the route refused) means the host has nothing at the URL built
+ * from the type and version the credential declares, which the credential's own
+ * `@context` may be causing. The published hosts answer 403, not 404, for a
+ * missing path, so the whole 4xx range is read that way. Anything else is the
+ * host, and the credential is unassessed rather than cleared.
+ */
+export function schemaFetchFailureAdvice(error: SchemaFetchError): { missingValue: string; solution: string } {
+  const upstream = error.upstreamStatus;
+  if ((upstream !== undefined && upstream >= 400 && upstream < 500) || error.status === 400) {
+    return {
+      missingValue:
+        'The schema host has no schema at the URL built from the type and UNTP version this credential declares.',
+      solution:
+        "Check the credential's type and the UNTP version in its '@context'. If both are right, the host may be refusing requests: retry in a moment, then report the message above to the Playground operator.",
+    };
+  }
+  return {
+    missingValue: 'The schema could not be loaded, so this check could not determine whether the credential conforms.',
+    solution: 'Retry in a moment. If it keeps failing, report the message above to the Playground operator.',
+  };
+}
+
 // The proxy names the failure category in its body; fall back to the transport
 // status when the body is missing or not the shape this route publishes.
-async function readErrorReason(response: Response): Promise<string> {
+async function readErrorBody(response: Response): Promise<{ reason: string; upstreamStatus?: number }> {
   try {
     const body = await response.json();
-    if (typeof body?.error === 'string') return body.error;
+    if (typeof body?.error === 'string') {
+      return {
+        reason: body.error,
+        ...(typeof body.upstreamStatus === 'number' && { upstreamStatus: body.upstreamStatus }),
+      };
+    }
   } catch {
     // Fall through to the transport status below.
   }
-  return `${response.status} ${response.statusText}`;
+  return { reason: `${response.status} ${response.statusText}` };
 }
 
 export const schemaCache = new Map<string, any>();
@@ -65,7 +96,8 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
     try {
       const response = await fetch(proxyUrl);
       if (!response.ok) {
-        throw new SchemaFetchError(`Failed to fetch schema: ${await readErrorReason(response)}`, response.status);
+        const { reason, upstreamStatus } = await readErrorBody(response);
+        throw new SchemaFetchError(`Failed to fetch schema: ${reason}`, response.status, upstreamStatus);
       }
       const schema = await response.json();
       schemaCache.set(schemaUrl, schema);
@@ -145,7 +177,9 @@ export async function validateCredentialSchema(credential: any): Promise<{
 
   const version = extension?.core?.version || detectVersion(credential);
 
-  if (!version) {
+  // detectVersion reports a missing or unparseable UNTP context as the string
+  // 'unknown', which must not become a schema URL.
+  if (!version || version === 'unknown') {
     throw new Error('Unsupported version');
   }
 

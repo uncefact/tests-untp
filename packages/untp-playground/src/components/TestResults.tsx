@@ -26,7 +26,13 @@ import {
 } from '@/lib/credentialCollection';
 import { decodeEnvelopedCredential, isEnvelopedProof } from '@/lib/credentialService';
 import { newId } from '@/lib/id';
-import { detectExtension, SchemaFetchError, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
+import {
+  detectExtension,
+  SchemaFetchError,
+  schemaFetchFailureAdvice,
+  validateCredentialSchema,
+  validateExtension,
+} from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
@@ -336,20 +342,16 @@ async function runCredentialPipeline(
       }
     } catch (error) {
       console.error('Schema validation error:', error);
-      // A SchemaFetchError means the schema host, not the credential, is at
-      // fault: say so rather than blaming the credential's @context.
+      // A SchemaFetchError carries the schema service's own category, so the
+      // advice can say whether the credential's declared version or the host
+      // is the likely cause instead of always blaming the @context.
       const fetchError = error instanceof SchemaFetchError ? error : undefined;
       const detail = {
         keyword: 'schema',
         instancePath: '',
         message: fetchError ? fetchError.message : 'Failed to fetch schema',
         params: fetchError
-          ? {
-              missingValue: 'The UNTP schema could not be fetched from its publishing host.',
-              solution:
-                'Nothing in the credential needs changing. Retry in a moment; if it keeps failing, report the message above to the Playground operator.',
-              receivedValue: stored,
-            }
+          ? { ...schemaFetchFailureAdvice(fetchError), receivedValue: stored }
           : {
               missingValue: 'The schema could not be loaded due to missing UNTP context IRIs.',
               solution: "Ensure the credential includes the required UNTP context IRIs in the '@context' field.",
@@ -416,31 +418,30 @@ async function runCredentialPipeline(
           return;
         }
       } catch (error) {
-        console.log('Extension schema validation error:', error);
+        console.error('Extension schema validation error:', error);
+        const fetchError = error instanceof SchemaFetchError ? error : undefined;
+        const detail = {
+          keyword: 'schema',
+          instancePath: '',
+          message: fetchError ? fetchError.message : 'Failed to fetch extension schema',
+          params: fetchError
+            ? { ...schemaFetchFailureAdvice(fetchError), receivedValue: stored }
+            : {
+                missingValue: 'The schema could not be loaded due to missing extension context IRIs.',
+                solution: "Ensure the credential includes the required extension context IRIs in the '@context' field.",
+                allowedValue: allowedExtensionValue,
+                receivedValue: stored,
+              },
+        };
         if (
           !setStep(TestCaseStepId.EXTENSION_SCHEMA_VALIDATION, {
             status: TestCaseStatus.FAILURE,
-            details: {
-              errors: [
-                {
-                  keyword: 'schema',
-                  message: 'Failed to fetch extension schema',
-                  instancePath: '',
-                  params: {
-                    missingValue: 'The schema could not be loaded due to missing extension context IRIs.',
-                    solution:
-                      "Ensure the credential includes the required extension context IRIs in the '@context' field.",
-                    allowedValue: allowedExtensionValue,
-                    receivedValue: stored,
-                  },
-                },
-              ],
-            },
+            details: { errors: [detail] },
           })
         ) {
           return;
         }
-        toast.error('Failed to fetch extension schema. Please try again.');
+        toast.error(fetchError ? fetchError.message : 'Failed to fetch extension schema. Please try again.');
       }
     }
   } catch (error) {

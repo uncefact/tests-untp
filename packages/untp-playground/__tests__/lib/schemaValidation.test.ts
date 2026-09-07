@@ -2,6 +2,8 @@ import { detectCredentialType, detectVersion } from '@/lib/credentialService';
 import {
   detectExtension,
   schemaCache,
+  SchemaFetchError,
+  schemaFetchFailureAdvice,
   validateCredentialSchema,
   validateExtension,
   validateVcAgainstSchema,
@@ -458,8 +460,60 @@ describe('schemaValidation', () => {
       await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toMatchObject({
         name: 'SchemaFetchError',
         status: 502,
+        upstreamStatus: 404,
         message: 'Failed to fetch schema: Schema host returned status 404',
       });
+    });
+
+    it('rejects a credential whose UNTP version could not be detected before fetching', async () => {
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      (detectVersion as jest.Mock).mockReturnValue('unknown');
+
+      await expect(validateCredentialSchema({ type: 'DigitalProductPassport' })).rejects.toThrow('Unsupported version');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('treats a credential whose only failures are additionalProperties as valid', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: { type: { type: 'string' } },
+            additionalProperties: false,
+          }),
+      });
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      (detectVersion as jest.Mock).mockReturnValue('0.7.0');
+
+      const result = await validateCredentialSchema({ type: 'DigitalProductPassport', extra: 'field' });
+      expect(result.valid).toBe(true);
+      expect(result.errors?.map((error) => error.keyword)).toEqual(['additionalProperties']);
+    });
+
+    it('relaxes the DPP 0.5.0 type and context constraints for a DLP credential', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: {
+              type: { type: 'array', items: { enum: ['DigitalProductPassport'] } },
+              '@context': { type: 'array', items: { enum: ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'] } },
+            },
+          }),
+      });
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
+      (detectVersion as jest.Mock).mockReturnValue('0.4.0');
+
+      const result = await validateCredentialSchema({
+        type: ['DigitalLivestockPassport'],
+        '@context': ['https://aatp.foodagility.com/vocabulary/aatp/dlp/0.4.0'],
+      });
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
     });
 
     it('should handle network errors during schema fetch', async () => {
@@ -603,6 +657,34 @@ describe('schemaValidation', () => {
       expect(cached).toBeDefined();
       expect(cached.properties.type.const).toEqual(['DigitalProductPassport', 'VerifiableCredential']);
       expect(cached.$id).toBe('https://example.com/dpp-0.5.0.json');
+    });
+  });
+
+  describe('schemaFetchFailureAdvice', () => {
+    it.each([404, 403])('points at the declared type and version when the schema host returned %s', (status) => {
+      const advice = schemaFetchFailureAdvice(
+        new SchemaFetchError(`Failed to fetch schema: status ${status}`, 502, status),
+      );
+      expect(advice.solution).toMatch(/UNTP version in its '@context'/);
+      expect(advice.missingValue).toMatch(/has no schema at the URL/);
+    });
+
+    it('does not blame the credential for an upstream 5xx', () => {
+      const advice = schemaFetchFailureAdvice(new SchemaFetchError('Failed to fetch schema: status 503', 502, 503));
+      expect(advice.missingValue).toMatch(/could not determine whether the credential conforms/);
+    });
+
+    it('treats a route rejection of the URL the same way', () => {
+      const advice = schemaFetchFailureAdvice(
+        new SchemaFetchError('Failed to fetch schema: not on the allowlist', 400),
+      );
+      expect(advice.solution).toMatch(/UNTP version in its '@context'/);
+    });
+
+    it('says the credential is unassessed, not cleared, when the host failed', () => {
+      const advice = schemaFetchFailureAdvice(new SchemaFetchError('Failed to fetch schema: could not be loaded', 502));
+      expect(advice.missingValue).toMatch(/could not determine whether the credential conforms/);
+      expect(advice.solution).not.toMatch(/Nothing in the credential/);
     });
   });
 });

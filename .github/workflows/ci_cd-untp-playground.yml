@@ -10,6 +10,8 @@ on:
       - 'untp-playground-v*'
     paths:
       - 'packages/untp-playground/**'
+      - 'packages/untp-utils/**'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/ci_cd-untp-playground.yml'
 
 jobs:

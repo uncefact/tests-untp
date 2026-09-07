@@ -46,15 +46,25 @@ async function fetchSchema(schemaUrl: string): Promise<any> {
         signal: controller.signal,
       });
       if (!response.ok) {
-        // The proxy answers 502 for any upstream failure and names the upstream
-        // status in its body, so a missing schema is read from there.
+        // The proxy answers 502 for any upstream failure and names the category
+        // and the upstream status in its body, so both are read from there.
         const body = await response.json().catch(() => null);
-        const upstreamStatus = typeof body?.upstreamStatus === 'number' ? body.upstreamStatus : undefined;
-        if (upstreamStatus === 404) {
-          throw new SchemaFetchError(schemaUrl, 'not-found', `No schema published at ${schemaUrl}.`);
+        // The published hosts answer 403, not 404, for a missing path, so any
+        // upstream 4xx is read as "nothing published at this URL".
+        const upstream = typeof body?.upstreamStatus === 'number' ? body.upstreamStatus : undefined;
+        if (upstream !== undefined && upstream >= 400 && upstream < 500) {
+          throw new SchemaFetchError(
+            schemaUrl,
+            'not-found',
+            `No schema published at ${schemaUrl} (status ${upstream}).`,
+          );
         }
         const reason = typeof body?.error === 'string' ? body.error : `Schema service returned ${response.status}`;
-        throw new SchemaFetchError(schemaUrl, 'network', `${reason} (${schemaUrl}).`);
+        throw new SchemaFetchError(
+          schemaUrl,
+          body?.code === 'invalid-json' ? 'parse' : 'network',
+          `${reason} (${schemaUrl}).`,
+        );
       }
       let schema: unknown;
       try {

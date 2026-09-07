@@ -472,8 +472,46 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     });
     await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
     await userEvent.click(await screen.findByText('Fix validation error'));
-    expect(await screen.findByText(/Nothing in the credential needs changing/)).toBeInTheDocument();
+    expect(await screen.findByText(/Retry in a moment/)).toBeInTheDocument();
     expect(screen.queryByText(/required UNTP context IRIs/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nothing in the credential/)).not.toBeInTheDocument();
+  });
+
+  it('points at the declared type and version when the schema host has nothing at the built URL', async () => {
+    (validateCredentialSchema as jest.Mock).mockRejectedValue(
+      new SchemaFetchError('Failed to fetch schema: Schema host returned status 403', 502, 403),
+    );
+
+    render(<Harness credentials={[makeStored({ id: 'untp-schema-404' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
+    await userEvent.click(await screen.findByText('Fix validation error'));
+    expect(await screen.findByText(/UNTP version in its '@context'/)).toBeInTheDocument();
+  });
+
+  it('blames the extension schema host, not the credential, when that schema could not be fetched', async () => {
+    (detectExtension as jest.Mock).mockReturnValue({
+      core: { type: 'DigitalProductPassport', version: '0.5.0' },
+      extension: { type: 'DigitalLivestockPassport', version: '0.4.0' },
+    });
+    (validateExtension as jest.Mock).mockRejectedValue(
+      new SchemaFetchError('Failed to fetch schema: The schema could not be loaded from its host', 502),
+    );
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'extension-host-down' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to fetch schema: The schema could not be loaded from its host');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('extension-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
   });
 
   it('validates against context and reports failure with the preserved toast copy', async () => {

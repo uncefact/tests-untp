@@ -223,7 +223,9 @@ function schemaFetchError(err: unknown): DisplayableError {
         };
       case 'network':
       default:
-        return { message: 'We could not reach the schema service. Please try again.', supportable: true };
+        // The message carries the schema service's own category (upstream
+        // status, could not be loaded), which says more than a generic outage.
+        return { message: `${err.message} Please try again.`, supportable: true };
     }
   }
   return {

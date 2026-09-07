@@ -51,18 +51,28 @@ describe('schemeValidation', () => {
       global.fetch = originalFetch;
     });
 
-    it('reports a missing schema when the proxy names an upstream 404', async () => {
+    it.each([404, 403])('reports a missing schema when the proxy names an upstream %s', async (status) => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: false,
         status: 502,
-        json: async () => ({ error: 'Schema host returned status 404', upstreamStatus: 404 }),
+        json: async () => ({ error: `Schema host returned status ${status}`, upstreamStatus: status }),
       }) as unknown as typeof fetch;
 
-      await expect(validateSchemeSchema({}, '9.9.9')).rejects.toMatchObject({
+      await expect(validateSchemeSchema({}, `9.9.${status}`)).rejects.toMatchObject({
         name: 'SchemaFetchError',
         reason: 'not-found',
         message: expect.stringContaining('No schema published at'),
       });
+    });
+
+    it('maps the proxy invalid-json category to the parse reason', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => ({ error: 'Schema host returned a body that is not valid JSON', code: 'invalid-json' }),
+      }) as unknown as typeof fetch;
+
+      await expect(validateSchemeSchema({}, '9.9.7')).rejects.toMatchObject({ reason: 'parse' });
     });
 
     it('carries the proxy error category for any other upstream failure', async () => {

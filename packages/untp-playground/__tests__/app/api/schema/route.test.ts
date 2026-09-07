@@ -101,27 +101,53 @@ describe('GET /api/schema', () => {
     mockLoad.mockRejectedValueOnce(new SchemaLoaderHttpError(SCHEMA_URL, 404));
     const response = await GET(makeRequest(SCHEMA_URL));
     expect(response.status).toBe(502);
-    expect(await response.json()).toEqual({ error: 'Schema host returned status 404', upstreamStatus: 404 });
+    expect(await response.json()).toEqual({
+      error: 'Schema host returned status 404',
+      code: 'upstream-status',
+      upstreamStatus: 404,
+    });
   });
 
   it('reports an unparseable upstream body as 502', async () => {
     mockLoad.mockRejectedValueOnce(new SchemaLoaderInvalidJsonError(SCHEMA_URL, new SyntaxError('bad json')));
     const response = await GET(makeRequest(SCHEMA_URL));
     expect(response.status).toBe(502);
-    expect(await response.json()).toEqual({ error: 'Schema host returned a body that is not valid JSON' });
+    expect(await response.json()).toEqual({
+      error: 'Schema host returned a body that is not valid JSON',
+      code: 'invalid-json',
+    });
   });
 
-  it('reports an unreachable schema host as 502 without the transport detail', async () => {
+  it('reports a failed load as 502 without the transport detail', async () => {
     const cause = new Error('getaddrinfo ENOTFOUND');
     mockLoad.mockRejectedValueOnce(new SchemaLoaderNetworkError(SCHEMA_URL, cause));
     const response = await GET(makeRequest(SCHEMA_URL));
     expect(response.status).toBe(502);
-    expect(await response.json()).toEqual({ error: 'Schema host could not be reached' });
+    expect(await response.json()).toEqual({
+      error: 'The schema could not be loaded from its host',
+      code: 'unreachable',
+    });
     expect(consoleError).toHaveBeenCalledWith('Schema fetch failed', {
       url: SCHEMA_URL,
       code: 'schema-loader.network-error',
+      causeCode: undefined,
       cause,
     });
+  });
+
+  it('logs the guard rejection code when the loader refused a private address', async () => {
+    const guardRejection = Object.assign(new Error('resolves to a private address'), { code: 'url.private-address' });
+    mockLoad.mockRejectedValueOnce(new SchemaLoaderNetworkError(SCHEMA_URL, guardRejection));
+    const response = await GET(makeRequest(SCHEMA_URL));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      error: 'The schema could not be loaded from its host',
+      code: 'unreachable',
+    });
+    expect(consoleError).toHaveBeenCalledWith(
+      'Schema fetch failed',
+      expect.objectContaining({ url: SCHEMA_URL, causeCode: 'url.private-address' }),
+    );
   });
 
   it('reports any other failure as 500', async () => {
