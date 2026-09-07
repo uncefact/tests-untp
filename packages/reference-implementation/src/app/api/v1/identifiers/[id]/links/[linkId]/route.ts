@@ -173,7 +173,11 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                 description: HTTP method used to retrieve the link target. The current Identity Resolver adapter does not apply this field on update.
  *               encryptionMethod:
  *                 type: string
- *                 description: Encryption method identifier for the target resource. The current Identity Resolver adapter does not apply this field on update.
+ *                 enum:
+ *                   - none
+ *                   - AES-128
+ *                   - AES-256
+ *                 description: Encryption method for the target resource, forwarded to the Identity Resolver. A value outside the listed set is rejected with a 400 naming the field.
  *               additionalRels:
  *                 type: array
  *                 items:
@@ -223,6 +227,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *                   type: array
  *                   items:
  *                     type: string
+ *                 encryptionMethod:
+ *                   type: string
+ *                   enum:
+ *                     - none
+ *                     - AES-128
+ *                     - AES-256
  *       400:
  *         description: Validation error
  *         content:

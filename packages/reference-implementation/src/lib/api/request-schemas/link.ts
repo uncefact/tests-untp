@@ -7,8 +7,8 @@ export const linkSchema = z.object({
   href: z.string().url(),
   // nonBlankString guards the fields the IDR routes on, where a blank value
   // produces a registration nothing can look up. The remaining free-text
-  // fields (title, context, encryptionMethod) are carried through and
-  // displayed, so a blank one costs the caller only a blank label.
+  // fields (title, context) are carried through and displayed, so a blank
+  // one costs the caller only a blank label.
   rel: nonBlankString,
   type: nonBlankString,
   title: z.string().optional(),
@@ -20,7 +20,10 @@ export const linkSchema = z.object({
   context: z.string().optional(),
   default: z.boolean().optional(),
   method: z.enum(['GET', 'POST']).optional(),
-  encryptionMethod: z.string().optional(),
+  // Forwarded to the Identity Resolver, which validates it against this
+  // same list and rejects the whole registration otherwise; rejecting here
+  // turns that into a 400 naming the field instead of a 502 from upstream.
+  encryptionMethod: z.enum(['none', 'AES-128', 'AES-256']).optional(),
   accessRole: z.array(z.nativeEnum(AccessRole)).optional(),
   additionalRels: z.array(nonBlankString).optional(),
   public: z.boolean().optional(),

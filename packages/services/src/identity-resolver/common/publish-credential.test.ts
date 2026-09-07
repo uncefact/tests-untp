@@ -1,6 +1,7 @@
 import { buildPublishLinks } from './publish-credential';
 import type { BuildPublishLinksOptions } from './publish-credential';
 import type { StorageRecord } from '../../storage/types';
+import { EncryptionAlgorithm } from '../../encryption/encryption.interface';
 import { AccessRole } from '../types';
 
 // Mock constructVerifyURL so we don't depend on window.location or URL construction details
@@ -216,4 +217,55 @@ describe('buildPublishLinks', () => {
     expect(links[0]).not.toHaveProperty('hreflang');
     expect(links[0]).not.toHaveProperty('additionalRels');
   });
+
+  it('declares the linkset encryptionMethod on the credential link when the storage record names an algorithm', () => {
+    const encrypted = makeStorage({ decryptionKey: 'secret', encryptionAlgorithm: EncryptionAlgorithm.AES_256_GCM });
+
+    const links = buildPublishLinks(encrypted, linkTitle);
+
+    expect(links[0].encryptionMethod).toBe('AES-256');
+  });
+
+  it('never puts encryptionMethod on the verification links', () => {
+    const encrypted = makeStorage({ decryptionKey: 'secret', encryptionAlgorithm: EncryptionAlgorithm.AES_256_GCM });
+
+    const links = buildPublishLinks(encrypted, linkTitle, {
+      machineVerificationUrl: 'https://vckit.example.com/verify',
+      humanVerificationUrl: 'https://verify.example.com',
+    });
+
+    expect(links).toHaveLength(3);
+    expect(links[0]).not.toHaveProperty('encryptionMethod'); // machine verification
+    expect(links[1].encryptionMethod).toBe('AES-256'); // credential
+    expect(links[2]).not.toHaveProperty('encryptionMethod'); // human verification
+  });
+
+  it('omits encryptionMethod when the storage record reports no algorithm', () => {
+    const links = buildPublishLinks(makeStorage(), linkTitle);
+
+    expect(links[0]).not.toHaveProperty('encryptionMethod');
+  });
+
+  it('keys the declaration on the algorithm, not on the presence of a decryption key', () => {
+    const algorithmOnly = makeStorage({ encryptionAlgorithm: EncryptionAlgorithm.AES_256_GCM });
+    expect(buildPublishLinks(algorithmOnly, linkTitle)[0].encryptionMethod).toBe('AES-256');
+
+    const keyOnly = makeStorage({ decryptionKey: 'secret' });
+    expect(buildPublishLinks(keyOnly, linkTitle)[0]).not.toHaveProperty('encryptionMethod');
+  });
+
+  it('throws rather than silently omitting when a caller bypasses the type with an unknown algorithm', () => {
+    const bogus = makeStorage({ encryptionAlgorithm: 'chacha20-poly1305' as unknown as EncryptionAlgorithm });
+
+    expect(() => buildPublishLinks(bogus, linkTitle)).toThrow('No linkset encryptionMethod is defined');
+  });
+
+  it.each(['toString', 'constructor', '__proto__'])(
+    'throws for an inherited object-property name (%s) rather than publishing whatever the prototype holds',
+    (name) => {
+      const bogus = makeStorage({ encryptionAlgorithm: name as unknown as EncryptionAlgorithm });
+
+      expect(() => buildPublishLinks(bogus, linkTitle)).toThrow('No linkset encryptionMethod is defined');
+    },
+  );
 });

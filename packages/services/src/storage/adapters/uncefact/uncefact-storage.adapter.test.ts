@@ -267,10 +267,18 @@ describe('UncefactStorageAdapter', () => {
         uri: 'https://storage.example.com/credentials/xyz-789',
         digestMultibase: MULTIBASE_B,
         decryptionKey: 'decryption-key-abc',
+        encryptionAlgorithm: 'aes-256-gcm',
         externalId: MOCK_UUID,
         bucket: 'private-data',
         mimeType: 'application/json',
       });
+    });
+
+    it('should omit encryptionAlgorithm when storing unencrypted', async () => {
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      const result = await adapter.store(mockCredential);
+
+      expect(result).not.toHaveProperty('encryptionAlgorithm');
     });
 
     it('should return client-generated UUID as externalId', async () => {
@@ -903,10 +911,18 @@ describe('UncefactStorageAdapter', () => {
         uri: 'https://storage.example.com/documents/binary-456',
         digestMultibase: MULTIBASE_A,
         decryptionKey: 'decrypt-key-xyz',
+        encryptionAlgorithm: 'aes-256-gcm',
         externalId: MOCK_UUID,
         bucket: 'priv-bucket',
         mimeType: 'text/html',
       });
+    });
+
+    it('should omit encryptionAlgorithm when uploading unencrypted', async () => {
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      const result = await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+      expect(result).not.toHaveProperty('encryptionAlgorithm');
     });
 
     it('should return client-generated UUID as externalId', async () => {

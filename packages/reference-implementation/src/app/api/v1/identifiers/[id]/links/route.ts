@@ -75,7 +75,11 @@ const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
  *                       description: HTTP method used to retrieve the link target. The current Identity Resolver adapter does not publish this field.
  *                     encryptionMethod:
  *                       type: string
- *                       description: Encryption method identifier for the target resource. The current Identity Resolver adapter does not publish this field.
+ *                       enum:
+ *                         - none
+ *                         - AES-128
+ *                         - AES-256
+ *                       description: Encryption method for the target resource, forwarded to the Identity Resolver. A value outside the listed set is rejected with a 400 naming the field.
  *                     accessRole:
  *                       type: array
  *                       items:

@@ -292,6 +292,44 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(body.responses[1]).not.toHaveProperty('accessRole');
     });
 
+    it('carries the encryptionMethod that buildPublishLinks derives from an encrypted storage record through to the resolver payload', async () => {
+      const { buildPublishLinks } = await import('../../common/publish-credential');
+      const { EncryptionAlgorithm } = await import('../../../encryption/encryption.interface');
+      const links = buildPublishLinks(
+        {
+          uri: 'https://storage.example.com/cred.json',
+          digestMultibase: 'zabc',
+          decryptionKey: 'secret',
+          encryptionAlgorithm: EncryptionAlgorithm.AES_256_GCM,
+          externalId: 'ext-1',
+          mimeType: 'application/json',
+        },
+        'Digital Product Passport',
+        { humanVerificationUrl: 'https://verify.example.com' },
+      );
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks('abn', '51824753556', links, undefined, mockOptions);
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.responses[0].encryptionMethod).toBe('AES-256'); // credential link
+      expect(body.responses[1]).not.toHaveProperty('encryptionMethod'); // human verification link
+    });
+
+    it('should include `encryptionMethod` on the variant when set on the link', async () => {
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.publishLinks(
+        'abn',
+        '51824753556',
+        [{ ...mockLinks[0], encryptionMethod: 'AES-256' }, { ...mockLinks[1] }],
+        undefined,
+        mockOptions,
+      );
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.responses[0].encryptionMethod).toBe('AES-256');
+      expect(body.responses[1]).not.toHaveProperty('encryptionMethod');
+    });
+
     it('should include `rel` (additional rels) on the variant when set on the link', async () => {
       const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
       await adapter.publishLinks(
@@ -574,6 +612,36 @@ describe('PyxIdentityResolverAdapter', () => {
       expect(result.public).toBe(false);
     });
 
+    it('should map `encryptionMethod` from the response when present, omitting it when absent', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/dpp.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+          encryptionMethod: 'AES-256',
+        }),
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      const result = await adapter.getLinkById('link-123');
+
+      expect(result.encryptionMethod).toBe('AES-256');
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          targetUrl: 'https://example.com/dpp.json',
+          linkType: 'untp:dpp',
+          mimeType: 'application/json',
+        }),
+      });
+
+      const plain = await adapter.getLinkById('link-456');
+
+      expect(plain).not.toHaveProperty('encryptionMethod');
+    });
+
     it('should throw IdrLinkNotFoundError on HTTP 404', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -742,6 +810,20 @@ describe('PyxIdentityResolverAdapter', () => {
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body).toEqual({ public: false });
+    });
+
+    it('should forward `encryptionMethod` in the PUT payload when set', async () => {
+      mockUpdateAckThenLink({
+        targetUrl: 'https://example.com/resource.json',
+        linkType: 'untp:dpp',
+        mimeType: 'application/json',
+      });
+
+      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+      await adapter.updateLink('link-123', { encryptionMethod: 'AES-256' });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).toEqual({ encryptionMethod: 'AES-256' });
     });
 
     it('should send accessRole in the update payload and read it back from the follow-up fetch', async () => {

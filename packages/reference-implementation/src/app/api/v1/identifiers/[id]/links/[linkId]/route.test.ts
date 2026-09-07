@@ -315,6 +315,42 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
   });
 
+  it('returns the resolver-side encryptionMethod on GET without stripping it', async () => {
+    MOCK_IDR_SERVICE.getLinkById.mockResolvedValueOnce({
+      href: 'https://example.com/cred.json',
+      rel: 'untp:dpp',
+      type: 'application/json',
+      title: 'DPP',
+      encryptionMethod: 'AES-256',
+    });
+
+    const res = await GET(createFakeRequest(), createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.link.encryptionMethod).toBe('AES-256');
+  });
+
+  it('forwards encryptionMethod to updateLink', async () => {
+    const req = createFakeRequest({ encryptionMethod: 'AES-256' });
+    await PATCH(req, createContext());
+
+    expect(MOCK_IDR_SERVICE.updateLink).toHaveBeenCalledWith(
+      'idr-link-1',
+      expect.objectContaining({ encryptionMethod: 'AES-256' }),
+    );
+  });
+
+  it('returns 400 when encryptionMethod is outside the resolver vocabulary', async () => {
+    const req = createFakeRequest({ encryptionMethod: 'AES-256-GCM' });
+    const res = await PATCH(req, createContext());
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/encryptionMethod/);
+    expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
+  });
+
   it('forwards hreflang, additionalRels, and public to updateLink', async () => {
     const req = createFakeRequest({
       hreflang: ['en', 'de'],
