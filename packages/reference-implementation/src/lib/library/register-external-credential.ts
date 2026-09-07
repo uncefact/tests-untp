@@ -156,7 +156,21 @@ export type RegisterModeOptions = { mode: 'register' };
  * excluded from the content lookup so its own content never reads as a
  * duplicate of itself.
  */
-export type RecoverModeOptions = { mode: 'recover'; currentRecordId: string };
+export type RecoverModeOptions = {
+  mode: 'recover';
+  currentRecordId: string;
+  /**
+   * Whether the reservation's snapshot of this record already held a content
+   * identity (`contentDigest` or `duplicateOfRecordId`) before this fetch
+   * ran. A response that does not open a credential is never allowed to
+   * replace that identity, so when this is true, storing such a response at
+   * all is pointless work the finaliser will only discard and orphan-log;
+   * the store is skipped instead. A record with no identity to protect
+   * (`false`) still stores a non-credential response, exactly as
+   * registration does.
+   */
+  holdsIdentity: boolean;
+};
 
 /** Who is calling {@link settleInRequest}, and what that mode needs from them. */
 export type SettleInRequestOptions = RegisterModeOptions | RecoverModeOptions;
@@ -209,6 +223,7 @@ export type UnobservedOutcome = {
   contentDigest?: undefined;
   duplicateOfRecordId?: undefined;
   observedContentDigest?: undefined;
+  storageSkipped?: undefined;
 };
 
 /**
@@ -226,6 +241,17 @@ export type NonCredentialOutcome = {
   storage?: ExternalStorageInput;
   details: ExternalDetailsCapture;
   checkRun: InitialCheckRunInput;
+  /**
+   * Set only in `recover` mode, only when the reservation's own identity
+   * snapshot already held a content identity, so storing this response was
+   * skipped as pointless work the finaliser would only discard. The
+   * finaliser re-reads identity at commit time under its own lock: if it has
+   * since been cleared (a concurrent write during the fetch), this marker is
+   * what tells the finaliser its stored failure was never actually earned by
+   * an identity conflict, and to settle a moved-identity failure instead of
+   * consuming this one.
+   */
+  storageSkipped?: 'identity-held';
 };
 
 /**
@@ -251,6 +277,8 @@ export type CredentialOutcome = {
   storage?: ExternalStorageInput;
   details: ExternalDetailsCapture;
   checkRun: InitialCheckRunInput;
+  /** A successfully opened credential is never skipped: it always attempts to store, or fails storing genuinely. */
+  storageSkipped?: undefined;
 } & (
   | { contentDigest?: string; duplicateOfRecordId?: undefined; observedContentDigest?: undefined }
   | { contentDigest?: undefined; duplicateOfRecordId: string; observedContentDigest: string }
@@ -360,7 +388,7 @@ export async function settleInRequest(
   const reading = readExternalArtefact(document.bytes, input.decryptionKey);
 
   if (reading.outcome !== 'opened') {
-    return settleUnopened(reading, sourceDigest, document, tenantId, sourceUrl, deps);
+    return settleUnopened(reading, sourceDigest, document, tenantId, sourceUrl, deps, options);
   }
 
   const { content, encrypted, keyUnused } = reading;
@@ -385,6 +413,55 @@ export async function settleInRequest(
   }
   const identity = identityOf(content, contentDigest, duplicateOfRecordId);
 
+  const decryption = encrypted ? CheckResult.PASS : CheckResult.NOT_RUN;
+  // The contract's digest check belongs to the signed form; a body that is
+  // not a credential has none to digest, so the check did not apply.
+  const digest = content.kind === ExternalContentKind.CREDENTIAL ? CheckResult.PASS : CheckResult.NOT_RUN;
+
+  // A response that did not open the credential this row's reservation
+  // already held an identity for is rejected by the finaliser regardless of
+  // what this function returns (the fetched-content rule keeps that
+  // identity, custody and details exactly as they were). Storing this body
+  // anyway, only to have the finaliser discard it and log an orphan, is a
+  // storage object every re-verify of a permanently wrong source repeats
+  // forever. Skipped here instead, before the preflight even runs, since
+  // there is nothing left for that preflight to protect: case (c) (no
+  // identity to protect) still stores, exactly as a fresh registration
+  // would.
+  if (options.mode === 'recover' && options.holdsIdentity && content.kind !== ExternalContentKind.CREDENTIAL) {
+    return {
+      sourceDigest,
+      encrypted,
+      // Not `...identity`: `identity`'s static type is the full
+      // `ObservedContentIdentity` union (computed once, above, before this
+      // branch's own narrower guard), so spreading it here would carry the
+      // credential-shaped arm's type along with it even though `content.kind`
+      // is confirmed non-credential in this exact branch. `identityOf`
+      // returns exactly `{ contentKind: content.kind }` for a non-credential
+      // body, so stating that directly is both correct and properly narrowed.
+      contentKind: content.kind,
+      decryptionKeyUnused: keyUnused,
+      details,
+      storageSkipped: 'identity-held',
+      // The finaliser's rejected-replacement branch always takes over an
+      // outcome shaped this way (`holdsIdentity` true, a non-credential
+      // `contentKind`) and settles its own failure from
+      // `rejectedReplacementFailure`, never reading this one, UNLESS the row's
+      // identity has since been cleared, in which case `storageSkipped`
+      // above tells the finaliser to settle a moved-identity failure instead;
+      // this checkRun exists only to satisfy the outcome type with something
+      // honest rather than a fabricated success.
+      checkRun: failedRun(
+        { retrieval: CheckResult.PASS, decryption, digest },
+        {
+          code: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL,
+          message: 'The re-fetched source did not return the credential this record already holds.',
+          retryable: true,
+        },
+      ),
+    };
+  }
+
   // The D10 preflight, immediately before the one store that asks the
   // storage service for a key; a failure here creates no record. Keeping it
   // after the duplicate check means a duplicate answers 409 even where this
@@ -395,11 +472,6 @@ export async function settleInRequest(
     throw new EncryptionUnavailableError(error);
   }
 
-  const decryption = encrypted ? CheckResult.PASS : CheckResult.NOT_RUN;
-  // The contract's digest check belongs to the signed form; a body that is
-  // not a credential has none to digest, so the check did not apply.
-  const digest = content.kind === ExternalContentKind.CREDENTIAL ? CheckResult.PASS : CheckResult.NOT_RUN;
-
   const stored = await storeOpened(content, document, tenantId, sourceUrl, deps);
   if (stored.outcome === 'failed') {
     return {
@@ -408,7 +480,7 @@ export async function settleInRequest(
       ...identity,
       decryptionKeyUnused: keyUnused,
       details,
-      checkRun: failedRun({ retrieval: CheckResult.PASS, decryption }, stored.failure),
+      checkRun: failedRun({ retrieval: CheckResult.PASS, decryption }, openedStorageFailure(stored.failure, encrypted)),
     };
   }
   return {
@@ -479,6 +551,7 @@ async function settleUnopened(
   tenantId: string,
   sourceUrl: string,
   deps: RegisterExternalCredentialDependencies,
+  options: SettleInRequestOptions,
 ): Promise<InRequestOutcome> {
   const decryptionFailure = decryptionFailureOf(reading);
   const base = {
@@ -490,20 +563,85 @@ async function settleUnopened(
   };
   const checks = { retrieval: CheckResult.PASS, decryption: CheckResult.FAIL };
 
+  // An identity-holding row's reservation is refused by the finaliser
+  // regardless of what this returns (unopened ciphertext never replaces an
+  // existing identity), so storing it here would only be discarded and
+  // orphan-logged. Skipped for the same reason the opened-but-not-a-credential
+  // case is skipped above: case (c), no identity to protect, still stores.
+  if (options.mode === 'recover' && options.holdsIdentity) {
+    return { ...base, storageSkipped: 'identity-held', checkRun: failedRun(checks, decryptionFailure) };
+  }
+
   const stored = await storeAsFetched(reading.bytes, document, false, tenantId, sourceUrl, deps);
   if (stored.outcome === 'failed') {
-    // Two failures on one row. STORAGE_FAILED wins because its recovery (a
-    // bodyless re-verify that fetches again) is the one that restores the
-    // ciphertext copy; the message says the key problem is still waiting.
+    // Two failures on one row: no copy was written, and this service holds
+    // no key to open one anyway. STORAGE_FAILED wins the code, retryable
+    // flag and outcome, unchanged from before; only the message text below
+    // is composed for this branch. A re-verify of this row (once it holds no
+    // identity, this branch's premise) fetches again and, once storage
+    // recovers, keeps the ciphertext copy as fetched; it still cannot open
+    // it, because a re-fetch supplies no key. Supplying one needs the
+    // key-bearing route this service does not offer yet (#958).
     return {
       ...base,
       checkRun: failedRun(checks, {
         ...stored.failure,
-        message: `${stored.failure.message} ${decryptionFailure.message}`,
+        // Not `${stored.failure.message} ...`: that generic text (shared with
+        // the plaintext storage-failure path, which this branch must not
+        // touch) says a re-verify will store the copy. For an encrypted
+        // record that is false, so this message is composed fresh instead of
+        // built on top of it, from two local helpers that keep the storage
+        // refusal-versus-outage distinction and name the right key cause for
+        // whichever of the three unopened readings this is.
+        message: `${unstoredCopyCause(stored.failure)} ${unopenedKeyCause(
+          reading,
+        )} Re-verification will fetch again and, once storage succeeds, will keep the fetched copy; it still cannot open that copy until a key can be supplied (#958).`,
       }),
     };
   }
   return { ...base, storage: stored.storage, checkRun: failedRun(checks, decryptionFailure) };
+}
+
+/**
+ * The storage half of an unopened row's message. Keeps the refusal and outage
+ * distinction that `store()` draws, composed fresh here because the generic
+ * text does not name the key problem this row also has.
+ */
+function unstoredCopyCause(failure: CheckRunFailure): string {
+  return failure.retryable
+    ? 'The durable copy could not be written to storage.'
+    : 'The storage service refused the durable copy (its upload rules do not accept this content), and an operator must allow it before any copy can be stored.';
+}
+
+/** The key half, without the stored-copy path's "the copy is kept as fetched". */
+function unopenedKeyCause(reading: Exclude<ArtefactReading, { outcome: 'opened' }>): string {
+  if (reading.outcome === 'encrypted-no-key')
+    return 'This credential is also encrypted and this service holds no key that opens it.';
+  if (reading.reason === 'key-mismatch') return 'The supplied decryption key also did not open this credential.';
+  return 'This encrypted envelope is also corrupted, so no key will open it unless the source changes.';
+}
+
+/**
+ * A credential this request just opened failed to store. The plaintext
+ * message is unchanged (a plain re-fetch by re-verify can recover it). An
+ * opened-with-key credential is different: recover mode never supplies a
+ * key, so once this attempt's own decrypted bytes are gone (nothing was
+ * stored), a later re-fetch of this still-encrypted source produces only
+ * unopenable ciphertext again, and by then the fetched-content rule treats
+ * that unopened ciphertext as a response that did not open a credential,
+ * refusing to replace whatever identity this row may hold by then rather
+ * than storing it. Recovering it needs the source to start serving
+ * plaintext, or the key-bearing route this service does not offer yet
+ * (#958).
+ */
+function openedStorageFailure(failure: CheckRunFailure, encrypted: boolean): CheckRunFailure {
+  if (!encrypted) return failure;
+  return {
+    ...failure,
+    message: `${unstoredCopyCause(
+      failure,
+    )} This credential was opened with a supplied key, but a re-fetch by re-verify cannot supply one again, so it can only recover this record once the source serves plaintext or a key-bearing route exists (#958).`,
+  };
 }
 
 /**
@@ -604,10 +742,15 @@ async function store(
     record = await write(resolved.service);
   } catch (error) {
     // Any failure to write the copy is the contract's STORAGE_FAILED row:
-    // the record exists, its digest is kept, and recovery fetches again.
-    // A refusal (the service rejected the content, typically a content type
-    // its upload allowlist does not carry) is not an outage: the same
-    // request fails the same way until an operator changes the service.
+    // the record exists, its digest is kept, and a bodyless re-verify fetches
+    // again to recover it, except when the fetched content is encrypted: a
+    // re-verify still fetches again and keeps the ciphertext copy once
+    // storage recovers, but it cannot open it, because a re-fetch supplies
+    // no key; recovering it needs the key-bearing route this service does
+    // not offer yet (#958). A refusal (the service rejected the content,
+    // typically a content type its upload allowlist does not carry) is not
+    // an outage: the same request fails the same way until an operator
+    // changes the service.
     logger.error(
       { error: safeError(error), tenantId, source: originOf(sourceUrl) },
       'Durable copy could not be stored',

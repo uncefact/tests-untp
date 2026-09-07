@@ -15,7 +15,7 @@ const logger = apiLogger.child({ module: 'reconcile-pending-runs-job' });
 
 export type ReconcilePendingRunsDependencies = {
   findAbandoned: (cutoff: Date) => Promise<CheckRun[]>;
-  settleAbandoned: (run: CheckRun) => Promise<CheckRunSettleOutcome>;
+  settleAbandoned: (run: CheckRun, cutoff: Date) => Promise<CheckRunSettleOutcome>;
   now: () => Date;
 };
 
@@ -82,7 +82,7 @@ export function reconcilePendingRunsHandler(
       // failure would put the same row at the head of every later tick and
       // no abandoned generation would ever settle again.
       try {
-        const outcome = await deps.settleAbandoned(run);
+        const outcome = await deps.settleAbandoned(run, cutoff);
         if (outcome.outcome === 'applied') settled += 1;
         else unchanged += 1;
         reportSettlement(run, outcome);

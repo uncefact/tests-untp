@@ -6,6 +6,7 @@ import {
   isForeignKeyViolation,
   isForeignKeyViolationOn,
   isRecordNotFound,
+  isTransactionDeadlock,
   isDatabaseError,
   mapDatabaseError,
 } from './db-errors';
@@ -13,6 +14,8 @@ import {
   prismaUniqueConstraintError,
   prismaForeignKeyViolationError,
   prismaRecordNotFoundError,
+  prismaTransactionWriteConflictError,
+  prismaRawQueryError,
 } from './db-errors.fixtures';
 
 /** Runs a throwing function and returns the thrown value, for identity assertions. */
@@ -105,6 +108,29 @@ describe('isRecordNotFound', () => {
   it('rejects a non-Prisma error carrying a matching code property', () => {
     const impostor = Object.assign(new Error('not from the ORM'), { code: 'P2025' });
     expect(isRecordNotFound(impostor)).toBe(false);
+  });
+});
+
+describe('isTransactionDeadlock', () => {
+  it('matches P2034, the interactive-transaction wrapping', () => {
+    expect(isTransactionDeadlock(prismaTransactionWriteConflictError())).toBe(true);
+  });
+
+  it('matches a raw-query P2010 whose meta carries the Postgres deadlock code 40P01', () => {
+    expect(isTransactionDeadlock(prismaRawQueryError('40P01'))).toBe(true);
+  });
+
+  it('does not retry an arbitrary P2010 with a different underlying code', () => {
+    expect(isTransactionDeadlock(prismaRawQueryError('42601'))).toBe(false);
+  });
+
+  it('does not match an unrelated Prisma error', () => {
+    expect(isTransactionDeadlock(prismaUniqueConstraintError())).toBe(false);
+  });
+
+  it('rejects a non-Prisma error carrying a matching code property', () => {
+    const impostor = Object.assign(new Error('not from the ORM'), { code: 'P2034' });
+    expect(isTransactionDeadlock(impostor)).toBe(false);
   });
 });
 

@@ -577,7 +577,13 @@ async function readStoredCopy(
       // The copy is present and intact, so this is not an object an operator
       // can repair. What is missing is a key, and the form that carries one
       // is not built yet, so the caller is told that rather than sent to
-      // storage. Same wording as the route's DECRYPTION_REQUIRED refusal.
+      // storage. This message describes a record that does have a durable
+      // copy: the route's own DECRYPTION_REQUIRED refusal
+      // (`DecryptionRequiredError` in reverify-library-record.ts) covers that
+      // same has-a-copy case synchronously, before this worker code ever
+      // runs, not a no-copy sibling; a no-copy record is always reserved and
+      // fetched rather than refused this way. The two deliberately share
+      // this exact wording, so keep them in sync.
       throw new TerminalVerificationError({
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
         message:

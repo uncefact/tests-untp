@@ -225,16 +225,57 @@ export class ContentDigestPromotionRacedError extends Error {
   }
 }
 
+/**
+ * The create-time twin of `detailsColumns` in `check-run.repository.ts`. This
+ * one omits the explicit nulls that twin sets on a non-EXTRACTED status: a
+ * `create` leaves an unset column at the schema default (already null),
+ * while the twin's `update` must state every column so it overwrites a row
+ * that may already carry EXTRACTED values from an earlier attempt.
+ */
+/**
+ * The EXTRACTED status's own columns, shared by this file's create-time
+ * `detailsColumns` (which leaves a non-EXTRACTED status's columns at the
+ * schema's null default) and `check-run.repository.ts`'s update-time twin
+ * (which must state every column's null explicitly to clear a stale
+ * EXTRACTED value). One field list serves both, so an eighth extracted
+ * field is one edit rather than two that can drift apart.
+ */
+export function extractedDetailsColumns(
+  capture: Extract<ExternalDetailsCapture, { status: typeof CredentialDetailsStatus.EXTRACTED }>,
+) {
+  return {
+    ...capture.fields,
+    credentialType: capture.credentialType,
+    coreCredentialType: capture.coreCredentialType,
+    coreDataModelVersion: capture.coreDataModelVersion,
+  };
+}
+
+/**
+ * The null default for every column {@link extractedDetailsColumns} states,
+ * for `check-run.repository.ts`'s update-time twin to clear a stale
+ * EXTRACTED value on a non-EXTRACTED update. The mapped type over
+ * `extractedDetailsColumns`'s own return shape, rather than a hand-written
+ * key list, means an eighth extracted field is a compile error here until
+ * this constant states its null default too.
+ */
+export const EXTRACTED_DETAILS_NULL_COLUMNS: { [K in keyof ReturnType<typeof extractedDetailsColumns>]: null } = {
+  name: null,
+  issuerName: null,
+  issuerDid: null,
+  subjectName: null,
+  subjectId: null,
+  validFrom: null,
+  validUntil: null,
+  credentialType: null,
+  coreCredentialType: null,
+  coreDataModelVersion: null,
+};
+
 function detailsColumns(capture: ExternalDetailsCapture) {
   switch (capture.status) {
     case CredentialDetailsStatus.EXTRACTED:
-      return {
-        ...capture.fields,
-        credentialType: capture.credentialType,
-        coreCredentialType: capture.coreCredentialType,
-        coreDataModelVersion: capture.coreDataModelVersion,
-        detailsStatus: capture.status,
-      };
+      return { ...extractedDetailsColumns(capture), detailsStatus: capture.status };
     case CredentialDetailsStatus.EXTRACTION_FAILED:
       return { detailsStatus: capture.status, detailsError: capture.error };
     case CredentialDetailsStatus.EXTRACTION_PENDING:
@@ -331,7 +372,7 @@ async function createExternalCredentialOnce(input: CreateExternalCredentialInput
  * The error code alone would also catch the idempotency and record indexes,
  * whose collisions mean something else entirely.
  */
-function isContentDigestUniqueViolation(error: unknown): boolean {
+export function isContentDigestUniqueViolation(error: unknown): boolean {
   if (!isUniqueConstraintViolation(error)) return false;
   const meta = (error as { meta?: { target?: unknown } }).meta;
   const target = meta?.target;
@@ -421,13 +462,23 @@ export async function createExternalCredential(
  * The partial unique index means at most one row can hold the digest, so the
  * ordering is a tie-break for the window in which a promotion is in flight
  * rather than a choice between rows that are expected to coexist.
+ *
+ * Defaults to the global client for a caller with no transaction of its own.
+ * A caller already inside an interactive transaction must pass its `tx`: the
+ * global client holds its own separate connection, so calling it while a
+ * transaction is open borrows a second connection from the pool for the
+ * duration of that transaction, which can starve the pool under concurrent
+ * finalisations and, for a one-connection pool, deadlocks outright (the
+ * transaction's own connection is blocked waiting for a second one that will
+ * never free while the first is held).
  */
 export async function findExternalByContentDigest(
   tenantId: string,
   contentDigest: string,
   currentRecordId?: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ): Promise<string | null> {
-  const row = await prisma.externalCredential.findFirst({
+  const row = await client.externalCredential.findFirst({
     where: {
       tenantId,
       contentDigest,
@@ -515,6 +566,14 @@ export async function promoteExternalCredentialDigest(
   });
   if (updated.count !== 1) throw new ContentDigestPromotionRacedError(advisory.id);
 
+  // Read the exact set about to be repointed before the write changes it, so
+  // the parent-timestamp bump below touches precisely the rows this
+  // promotion moved, not every row that happens to point at the promoted
+  // advisory for an unrelated reason.
+  const toRepoint = await client.externalCredential.findMany({
+    where: { tenantId: input.tenantId, duplicateOfRecordId: input.recordId, contentDigest: null },
+    select: { id: true },
+  });
   // Every other advisory row of the former owner now points at the row
   // holding the identity, so it survives the owner's deletion and cannot be
   // handed a later, unrelated digest of that owner's.
@@ -526,6 +585,18 @@ export async function promoteExternalCredentialDigest(
     },
     data: { duplicateOfRecordId: advisory.id },
   });
+
+  // ADR-053 decision 1: a write to a child touches its parent in the same
+  // transaction. This helper's own writers (the caller who released the
+  // canonical row, and every LibraryRecord id below) must already hold each
+  // of these parents locked before calling it; this helper never acquires a
+  // lock itself.
+  const now = new Date(Date.now());
+  await client.libraryRecord.updateMany({
+    where: { tenantId: input.tenantId, id: { in: [advisory.id, ...toRepoint.map((row) => row.id)] } },
+    data: { updatedAt: now },
+  });
+
   return { outcome: 'promoted', recordId: advisory.id, repointed: repointed.count };
 }
 
@@ -564,9 +635,10 @@ export async function getExternalCredentialById(
  * exactly as it is, and the newest generation's failure is the record's
  * statement that the copy is gone (ADR-055).
  *
- * Called by the re-fetch recovery branch, which lands with the shared
- * recover-mode helper of
- * [uncefact/tests-untp#956](https://github.com/uncefact/tests-untp/issues/956).
+ * Called by `finaliseRecoveryGenerationAttempt` in `check-run.repository.ts`,
+ * inside the same locked transaction that appends the re-verification
+ * generation, so the custody replacement and the generation it belongs to
+ * commit or roll back together.
  */
 export async function replaceCustody(
   tx: Prisma.TransactionClient,

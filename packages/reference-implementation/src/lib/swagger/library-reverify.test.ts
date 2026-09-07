@@ -1,6 +1,7 @@
 import { getApiDocs } from './swagger';
 import { oneLine } from './published-document';
 import { BODY_MUST_BE_EMPTY_MESSAGE } from '@/lib/library/reverify-messages';
+import { credentialRecordSchema } from '@/lib/library/credential-record-projection';
 
 type Response = {
   $ref?: string;
@@ -70,8 +71,26 @@ describe('published POST /library/{id}/verify contract', () => {
         'joinedPendingGeneration',
         'nativeSecondGeneration',
         'settledWithUnchangedSource',
+        'recoveredWithoutDurableCopy',
+        'recoveredDuplicateContent',
+        'recoveredRejectedReplacement',
       ]),
     );
+  });
+
+  it('publishes every 202 example as a complete record the CredentialRecord schema accepts', () => {
+    // Fails if a published recovery example regresses
+    // to a fragment the schema would refuse.
+    const examples = operation.responses?.['202']?.content?.['application/json']?.examples ?? {};
+    const entries = Object.entries(examples);
+    expect(entries.length).toBeGreaterThan(0);
+
+    for (const [name, example] of entries) {
+      const parsed = credentialRecordSchema.safeParse(example.value);
+      expect(
+        parsed.success ? [] : parsed.error.issues.map((issue) => `${name}: ${issue.path.join('.')} ${issue.message}`),
+      ).toEqual([]);
+    }
   });
 
   it('publishes both 400 bodies with the codes a client branches on', () => {

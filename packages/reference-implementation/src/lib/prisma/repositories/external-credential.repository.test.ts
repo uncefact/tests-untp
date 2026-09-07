@@ -13,11 +13,13 @@ jest.mock('../prisma', () => {
     libraryRecord: {
       create: jest.fn(async () => ({ id: 'rec-1' })),
       update: jest.fn(async () => ({ id: 'rec-1' })),
+      updateMany: jest.fn(async () => ({ count: 1 })),
     },
     externalCredential: {
       create: jest.fn(async () => ({ id: 'rec-1' })),
       update: jest.fn(async () => ({ id: 'rec-1' })),
       findFirst: jest.fn(async () => null),
+      findMany: jest.fn(async () => []),
       updateMany: jest.fn(async () => ({ count: 1 })),
     },
     checkRun: { create: jest.fn(async () => ({ id: 'run-1', generation: 1 })) },
@@ -49,6 +51,10 @@ const mockExternalFindFirst = (prisma as unknown as { externalCredential: { find
   .findFirst;
 const mockExternalUpdateMany = (prisma as unknown as { externalCredential: { updateMany: jest.Mock } })
   .externalCredential.updateMany;
+const mockExternalFindMany = (prisma as unknown as { externalCredential: { findMany: jest.Mock } }).externalCredential
+  .findMany;
+const mockLibraryRecordUpdateMany = (prisma as unknown as { libraryRecord: { updateMany: jest.Mock } }).libraryRecord
+  .updateMany;
 
 function contentDigestConflict(target: unknown = CONTENT_DIGEST_UNIQUE_INDEX): Error {
   const error = new Error('Unique constraint failed') as Error & {
@@ -268,6 +274,25 @@ describe('external content identity', () => {
     expect(mockExternalUpdateMany).toHaveBeenNthCalledWith(3, {
       where: { tenantId: 'tenant-1', duplicateOfRecordId: 'canonical-1', contentDigest: null },
       data: { duplicateOfRecordId: 'advisory-1' },
+    });
+  });
+
+  it('bumps the promoted and every repointed parent updatedAt in the same transaction', async () => {
+    // ADR-053 decision 1: a child write touches its parent. Fails if the
+    // promoted advisory's or a repointed advisory's parent is left with a
+    // stale `updatedAt` despite its visible content identity changing.
+    mockExternalFindFirst.mockResolvedValueOnce({ id: 'advisory-1' });
+    mockExternalFindMany.mockResolvedValueOnce([{ id: 'other-1' }, { id: 'other-2' }]);
+
+    await promoteExternalCredentialDigest(prisma as never, {
+      tenantId: 'tenant-1',
+      recordId: 'canonical-1',
+      contentDigest: 'zDigest',
+    });
+
+    expect(mockLibraryRecordUpdateMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', id: { in: ['advisory-1', 'other-1', 'other-2'] } },
+      data: { updatedAt: expect.any(Date) },
     });
   });
 

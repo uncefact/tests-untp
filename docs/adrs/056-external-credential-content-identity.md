@@ -2,6 +2,7 @@
 
 - **Date:** 2026-09-07
 - **Status:** accepted
+- **Update (2026-09-09):** #957 is the first writer of `duplicateOfRecordId` and `contentDigest` outside registration. A recovery whose re-fetch observes content other than the identity the record held gives up that old digest, and where an advisory row pointed at this record for it, promotes that row's oldest member to canonical in the same transaction (`reconcileIdentity` in `check-run.repository.ts`, through `promoteExternalCredentialDigest`). Where the newly observed content is already held by another record in the tenant, the recovering record takes a `duplicateOfRecordId` pointer at that holder and leaves its own `contentDigest` null. Registration meets the same content match differently, and the two should not be read as behaving alike. Registration (`DuplicateCredentialError`) rejects the request outright, so no record is created, no digest changes and nothing is promoted. Recovery cannot reject that way, because the record it is updating already exists and its reservation must still be settled one way or the other. What the two share is the pointer-plus-cleared-digest shape they write, not whether the request itself succeeds.
 
 ## Context
 

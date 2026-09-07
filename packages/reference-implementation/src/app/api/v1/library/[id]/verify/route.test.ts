@@ -85,7 +85,8 @@ import {
 import { NotFoundError } from '@/lib/api/errors';
 import { CredentialRecordProjectionError } from '@/lib/library/credential-record-projection';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
-import { DecryptionRequiredError, ReverifyBranchNotBuiltError } from '@/lib/library/reverify-library-record';
+import { DecryptionRequiredError } from '@/lib/library/reverify-library-record';
+import { EncryptionUnavailableError } from '@/lib/library/register-external-credential';
 import { BODY_MUST_BE_EMPTY_MESSAGE } from '@/lib/library/reverify-messages';
 import { LIBRARY_VERIFY_JOB, VERIFY_JOB_ENQUEUE_OPTIONS } from '@/lib/library/verify-generation-job';
 import { POST } from './route';
@@ -447,6 +448,22 @@ describe('POST /api/v1/library/:id/verify', () => {
     );
   });
 
+  it('answers a coded 500 when the D10 encryption preflight fails during recovery', async () => {
+    // The no-copy branch can now reach registration's own encryption
+    // preflight when it opens a credential. Fails if this maps to the
+    // catch-all 500 register's own route does not use for the same error.
+    const cause = new Error('DATA_ENCRYPTION_KEY is not set');
+    mockReverifyLibraryRecord.mockRejectedValue(new EncryptionUnavailableError(cause));
+
+    const response = await post();
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      error: 'Credential storage encryption is not available.',
+      code: 'CREDENTIALS_ENCRYPTION_UNAVAILABLE',
+    });
+  });
+
   it('creates generation two and enqueues only a reference payload', async () => {
     // Fails if the route sends a key or credential content to the durable
     // queue, or if it does not use the transactional send options.
@@ -469,26 +486,4 @@ describe('POST /api/v1/library/:id/verify', () => {
     );
     expect(response.body).toEqual(RESPONSE);
   });
-
-  it('maps an unbuilt branch to a sanitised 500 with the record named only in the log', async () => {
-    // Fails if the unbuilt re-fetch branch leaks its internal error or is
-    // silently treated as a successful empty-copy re-verification. The log
-    // carries the error's name and message only, never its cause chain.
-    const error = new ReverifyBranchNotBuiltError(RECORD_ID);
-    mockReverifyLibraryRecord.mockRejectedValue(error);
-
-    const response = await post();
-
-    expect(response.status).toBe(500);
-    expect(response.body).toEqual({ error: 'An unexpected error has occurred.' });
-    expect(loggerCalls.error).toHaveBeenCalledWith(
-      { error: { name: 'ReverifyBranchNotBuiltError', message: error.message } },
-      'The external re-verification branch is not built',
-    );
-  });
-
-  // Blocked on #956's shared settleInRequest recover mode. When that lands,
-  // the branch stub is replaced by fetch, custody replacement and
-  // recovery-mode dedupe coverage.
-  it.todo('re-fetches an external record without a durable copy');
 });

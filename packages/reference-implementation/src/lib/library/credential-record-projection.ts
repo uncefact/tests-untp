@@ -514,9 +514,10 @@ export function toCredentialRecord(
   const now = options.now ?? new Date(Date.now());
   const { record: parent, external, checkRun } = record;
   const warnings: CredentialRecordWarning[] = [];
-  // The pointer is written by recovery (#957) and by promotion (#960); no
-  // path in this release sets it, so this warning is reachable only once one
-  // of those lands.
+  // The pointer is written by recovery (#957, this release) and by
+  // promotion (#960, not yet landed), so this warning is currently reachable
+  // only through a re-verification that recovers a record onto content
+  // another record already holds.
   if (external.duplicateOfRecordId !== null) {
     warnings.push({
       code: 'DUPLICATE_CONTENT',
