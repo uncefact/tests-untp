@@ -16,6 +16,7 @@ import type { CreateExternalCredentialInput } from '@/lib/prisma/repositories/ex
 import {
   EncryptionUnavailableError,
   registerExternalCredential,
+  settleInRequest,
   SourceRejectedError,
   StorageKeyMissingError,
   type RegisterExternalCredentialDependencies,
@@ -40,9 +41,16 @@ jest.mock('@uncefact/untp-utils/resolvers', () => ({
 // digested, which is the pipeline's rule (raw bytes, before any decrypt).
 jest.mock('@uncefact/untp-utils/multibase-digest', () => {
   const { createHash } = jest.requireActual('node:crypto') as typeof import('node:crypto');
+  const fromData = async (data: Uint8Array) => ({
+    toString: () => `z${createHash('sha256').update(data).digest('hex')}`,
+  });
   return {
     MultibaseDigest: {
-      fromData: async (data: Uint8Array) => ({ toString: () => `z${createHash('sha256').update(data).digest('hex')}` }),
+      fromData,
+      // The pipeline digests the raw bytes through `fromData` and the signed
+      // JWT through `fromText`. Both stand-ins hash the same way, so the test
+      // can recompute either.
+      fromText: async (text: string) => fromData(new TextEncoder().encode(text)),
     },
   };
 });
@@ -141,6 +149,7 @@ function deps(overrides: Partial<RegisterExternalCredentialDependencies> = {}) {
     assertEncryptionReady: () => undefined,
     enqueueVerification,
     persist,
+    findExistingExternal: async () => null,
     ...overrides,
   };
   return { deps: built, store, storeBinary, persist, enqueueVerification };
@@ -158,6 +167,10 @@ function input(overrides: Partial<RegisterExternalCredentialInput> = {}): Regist
 
 async function digestOf(text: string): Promise<string> {
   return `z${createHash('sha256').update(bytes(text)).digest('hex')}`;
+}
+
+async function signedContentDigestOf(text: string): Promise<string> {
+  return digestOf(JSON.parse(text).id.split(',')[1]);
 }
 
 /** The create input the pipeline handed the repository, which the fake persist returns unchanged. */
@@ -181,6 +194,7 @@ describe('registerExternalCredential', () => {
     expect(created.tenantId).toBe('tenant-1');
     expect(created.idempotencyClaimId).toBe('claim-1');
     expect(created.sourceDigest).toBe(await digestOf(PLAINTEXT));
+    expect(created.contentDigest).toBe(await signedContentDigestOf(PLAINTEXT));
     expect(created.encrypted).toBe(false);
     expect(created.contentKind).toBe(ExternalContentKind.CREDENTIAL);
     expect(created.decryptionKeyUnused).toBe(false);
@@ -226,6 +240,47 @@ describe('registerExternalCredential', () => {
     const { created } = await persisted({ decryptionKey: SUPPLIER_KEY });
     expect(created.decryptionKeyUnused).toBe(true);
     expect(created.checkRun.state).toBe(CheckRunState.PENDING);
+  });
+
+  it('rejects a duplicate after extraction and before encryption preflight or storage', async () => {
+    // Fails if the duplicate check moves after the encryption preflight or
+    // after the store, either of which would write a copy the request then
+    // throws away.
+    const assertEncryptionReady = jest.fn();
+    const d = deps({
+      assertEncryptionReady,
+      findExistingExternal: async () => 'existing-record',
+    });
+
+    await expect(registerExternalCredential(input(), d.deps)).rejects.toMatchObject({
+      name: 'DuplicateCredentialError',
+      existingRecordId: 'existing-record',
+    });
+    expect(assertEncryptionReady).not.toHaveBeenCalled();
+    expect(d.store).not.toHaveBeenCalled();
+    expect(d.storeBinary).not.toHaveBeenCalled();
+    expect(d.persist).not.toHaveBeenCalled();
+  });
+
+  it('refuses an encrypted duplicate without exposing the supplier key in log lines', async () => {
+    // Fails if the duplicate breadcrumb carries the request key or if the
+    // duplicate path continues into storage after opening the envelope.
+    const d = deps({
+      fetchDocument: async () => ({ bytes: bytes(ENCRYPTED), contentType: 'application/json', finalUrl: 'x' }),
+      findExistingExternal: async () => 'existing-record',
+    });
+
+    await expect(registerExternalCredential(input({ decryptionKey: SUPPLIER_KEY }), d.deps)).rejects.toMatchObject({
+      existingRecordId: 'existing-record',
+    });
+    const { apiLogger } = jest.requireMock('@/lib/api/logger') as { apiLogger: Record<string, jest.Mock> };
+    expect(apiLogger.info).toHaveBeenCalledWith(
+      { tenantId: 'tenant-1', source: 'https://supplier.example', existingRecordId: 'existing-record' },
+      'Credential content is already registered',
+    );
+    expect(JSON.stringify(apiLogger.info.mock.calls)).not.toContain(SUPPLIER_KEY);
+    expect(d.store).not.toHaveBeenCalled();
+    expect(d.storeBinary).not.toHaveBeenCalled();
   });
 
   it('keeps an encrypted source with no key as the unopened ciphertext and fails DECRYPTION_REQUIRED', async () => {
@@ -407,6 +462,7 @@ describe('registerExternalCredential', () => {
 
       expect(created.storage).toBeUndefined();
       expect(created.sourceDigest).toBe(await digestOf(PLAINTEXT));
+      expect(created.contentDigest).toBe(await signedContentDigestOf(PLAINTEXT));
       expect(created.encrypted).toBe(false);
       expect(created.details).toMatchObject({ status: CredentialDetailsStatus.EXTRACTED });
       expect(created.checkRun).toEqual({
@@ -487,6 +543,7 @@ describe('registerExternalCredential', () => {
       status: CredentialDetailsStatus.EXTRACTION_FAILED,
       error: CredentialDetailsError.BRIDGE_ERROR,
     });
+    expect(created.contentDigest).toBe(await signedContentDigestOf(noCore));
     expect(created.checkRun.state).toBe(CheckRunState.PENDING);
   });
 
@@ -565,7 +622,7 @@ describe('registerExternalCredential byte fidelity and orphaned copies', () => {
     const { apiLogger } = jest.requireMock('@/lib/api/logger') as { apiLogger: Record<string, jest.Mock> };
     expect(apiLogger.error).toHaveBeenCalledWith(
       {
-        err: failure,
+        error: { name: 'Error', message: 'transaction rolled back' },
         tenantId: 'tenant-1',
         storageUri: 'https://storage.example/private/copy',
         storageExternalId: 'copy-1',
@@ -593,5 +650,100 @@ describe('registerExternalCredential byte fidelity and orphaned copies', () => {
       String(message).includes('the copy is orphaned'),
     );
     expect(orphanLines).toHaveLength(0);
+  });
+});
+
+describe('settleInRequest in recover mode', () => {
+  it('returns a refused source as a failed retrieval run instead of throwing', async () => {
+    // Register answers a guard refusal with a 400 and creates nothing. A
+    // record already exists here, so the refusal is something to record on
+    // it. Fails if the recover branch starts throwing SourceRejectedError.
+    const failure: DocumentFetchFailure = {
+      kind: 'rejected',
+      reason: 'source-not-permitted',
+      error: new Error('Hostname resolves to a private or reserved address'),
+    };
+    const d = deps({ fetchDocument: fetchFailure(failure) });
+
+    const outcome = await settleInRequest(input(), d.deps, { mode: 'recover', currentRecordId: 'record-1' });
+
+    expect(outcome).toEqual({
+      encrypted: null,
+      details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+      checkRun: {
+        state: CheckRunState.FAILED,
+        checks: { retrieval: CheckResult.FAIL },
+        failure: {
+          code: CheckRunFailureCode.RETRIEVAL_FAILED,
+          message: 'Hostname resolves to a private or reserved address',
+          retryable: false,
+        },
+      },
+    });
+    const { apiLogger } = jest.requireMock('@/lib/api/logger') as { apiLogger: Record<string, jest.Mock> };
+    expect(apiLogger.warn).toHaveBeenCalledWith(
+      { tenantId: 'tenant-1', source: 'https://supplier.example', reason: 'source-not-permitted' },
+      'The stored source was refused by the guard on re-verification',
+    );
+  });
+
+  it('stores the copy and records a run when the content belongs to another record', async () => {
+    // The record being recovered still needs its copy and its generation.
+    // What it gives up is the identity. Fails if the duplicate returns early
+    // again, which would leave the record as broken as it was.
+    const d = deps({ findExistingExternal: async () => 'existing-record' });
+
+    const outcome = await settleInRequest(input(), d.deps, { mode: 'recover', currentRecordId: 'record-1' });
+
+    expect(outcome.duplicateOfRecordId).toBe('existing-record');
+    expect(outcome.observedContentDigest).toBe(await signedContentDigestOf(PLAINTEXT));
+    expect(outcome.contentDigest).toBeUndefined();
+    expect(outcome.contentKind).toBe(ExternalContentKind.CREDENTIAL);
+    expect(outcome.storage).toMatchObject({ uri: 'https://storage.example/private/copy' });
+    expect(outcome.checkRun).toMatchObject({ state: CheckRunState.PENDING });
+    expect(d.store).toHaveBeenCalledWith(JSON.parse(PLAINTEXT), true);
+  });
+
+  it('still reports the pointer and the observed identity when the store fails', async () => {
+    // The digest the caller revalidates against has to survive the branch
+    // that writes no copy, or a recovery whose store failed would have no way
+    // to check the pointer it is about to write.
+    const d = deps({ findExistingExternal: async () => 'existing-record' });
+    d.store.mockRejectedValueOnce(new StorageStoreError(503, 'unavailable'));
+
+    const outcome = await settleInRequest(input(), d.deps, { mode: 'recover', currentRecordId: 'record-1' });
+
+    expect(outcome.duplicateOfRecordId).toBe('existing-record');
+    expect(outcome.observedContentDigest).toBe(await signedContentDigestOf(PLAINTEXT));
+    expect(outcome.contentDigest).toBeUndefined();
+    expect(outcome.storage).toBeUndefined();
+    expect(outcome.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failure: { code: CheckRunFailureCode.STORAGE_FAILED },
+    });
+  });
+
+  it('excludes the record being recovered so its own content is not its own duplicate', async () => {
+    const findExistingExternal = jest.fn(async () => null);
+    const d = deps({ findExistingExternal });
+
+    const outcome = await settleInRequest(input(), d.deps, { mode: 'recover', currentRecordId: 'record-1' });
+
+    expect(findExistingExternal).toHaveBeenCalledWith('tenant-1', await signedContentDigestOf(PLAINTEXT), 'record-1');
+    expect(outcome.contentDigest).toBe(await signedContentDigestOf(PLAINTEXT));
+    expect(outcome.duplicateOfRecordId).toBeUndefined();
+    expect(outcome.observedContentDigest).toBeUndefined();
+  });
+
+  it('does not let register mode pass a record id, or recover mode leave one out', async () => {
+    // The lookup excludes whatever id it is given, so a registration handed
+    // one could be told a record is not a duplicate of the very record it
+    // matches, and a recovery without one matches itself.
+    const d = deps();
+
+    // @ts-expect-error register mode has no record to exclude
+    await settleInRequest(input(), d.deps, { mode: 'register', currentRecordId: 'record-1' });
+    // @ts-expect-error recover mode must name the record being recovered
+    await settleInRequest(input(), d.deps, { mode: 'recover' });
   });
 });

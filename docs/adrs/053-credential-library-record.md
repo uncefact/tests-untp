@@ -96,7 +96,7 @@ Negative:
 - How a `pending` generation is worked, claimed, and recovered after a crash. ADR-054 decides it.
 - Who holds keys for external credentials, and what the record looks like while a credential is held but unopened. ADR-055 decides it; the `hasKey` state named above is defined there.
 - How a retried registration is kept from creating two records. ADR-051's idempotency claims guard it; the `Idempotency-Key` header is required on register.
-- Whether a duplicate-detection digest should also match a tenant re-registering a credential it issued itself. Open; it needs the native issuance digest computed canonically first.
+- Whether a duplicate-detection digest should also match a tenant re-registering a credential it issued itself. Open; it needs the native issuance digest computed canonically first. ADR-056 decides the external identity and leaves this question open.
 - Per-tenant storage quotas for durable copies. Tracked separately.
 - The registered-data-model fallback for an external record's core kind (decision 8), and where the list's indexes for its issuer and date filters are tuned. #962 owns both against the real list query.
 

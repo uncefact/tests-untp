@@ -122,7 +122,11 @@ export const SHARED_STATUS_EXAMPLES: Record<string, Record<string, ErrorExample>
 };
 
 /**
- * Messages the routes and repositories actually throw for a 404, a 409, or a 422.
+ * Messages the routes and repositories actually throw for a 404, a 409, or a
+ * 422, plus the few a route composes inline. A composed message appears here
+ * with a placeholder record id, so the published example shows the shape a
+ * caller must parse against, and it is the only kind of entry that is not a
+ * literal.
  *
  * Where an operation's documented description is exactly one of these, the
  * description is quoting the thrown message, so it can be published as that
@@ -134,9 +138,10 @@ export const SHARED_STATUS_EXAMPLES: Record<string, Record<string, ErrorExample>
  *
  * To refresh, collect the `new NotFoundError('...')`,
  * `new ConflictError('...')`, and `new UnprocessableError('...')`
- * arguments under `src/app/api/v1`, plus the `notFound`, `conflict` and
+ * arguments under `src/app/api/v1`, the `notFound`, `conflict` and
  * `invalidReference` values handed to `mapDatabaseError` in the
- * repositories.
+ * repositories, and the error bodies built directly with
+ * `NextResponse.json`.
  */
 export const VERIFIED_ERROR_MESSAGES = new Set([
   'A DID record with this DID already exists',
@@ -150,6 +155,7 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'A request with this Idempotency-Key is still being processed. Retry shortly.',
   "Another request now holds this Idempotency-Key. Retry to receive that request's result.",
   'The record this Idempotency-Key produced was deleted while this request was being answered; retry the request.',
+  'This credential is already registered as record clw0dup1ic4terecord000001.',
   'Credential not found',
   'No such credential record.',
   'DID not found',

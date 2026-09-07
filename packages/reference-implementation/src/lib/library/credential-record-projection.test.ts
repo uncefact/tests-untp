@@ -73,6 +73,8 @@ function external(overrides: Partial<ExternalCredential> = {}): ExternalCredenti
     origin: LibraryRecordOrigin.EXTERNAL,
     sourceUrl: 'https://supplier.example/credential-a',
     sourceDigest: null,
+    contentDigest: null,
+    duplicateOfRecordId: null,
     encrypted: null,
     contentKind: null,
     storageUri: null,
@@ -441,6 +443,32 @@ describe('toCredentialRecord', () => {
       'DECLARED_TYPE_MISMATCH',
     ]);
     expect(projected.warnings[1].message).toContain('declared as DPP');
+  });
+
+  it('projects an advisory duplicate pointer as a warning naming the record it matches', () => {
+    // An advisory row carries the pointer and no digest of its own, because
+    // the two are exclusive in the database. Fails if the pointer stops
+    // reaching the consumer warning.
+    const projected = toCredentialRecord(record({ external: { duplicateOfRecordId: 'canonical-record' } }));
+
+    expect(projected.warnings).toContainEqual({
+      code: 'DUPLICATE_CONTENT',
+      message: 'The credential content matches record canonical-record.',
+      relatedRecordId: 'canonical-record',
+    });
+  });
+
+  it('keeps the content digest out of the record a caller reads', () => {
+    // The digest is how this service recognises the content again, and no
+    // part of the contract publishes it. Fails if the column is ever spread
+    // into the response rather than each field being named.
+    const projected = toCredentialRecord(
+      record({ external: { contentDigest: 'zQmNm1WVEofWeBPTTaFWtFNbdjSXcqiA8Hn3wn6M9739JF7' } }),
+    );
+
+    expect(projected).not.toHaveProperty('contentDigest');
+    expect(JSON.stringify(projected)).not.toContain('zQmNm1WVEofWeBPTTaFWtFNbdjSXcqiA8Hn3wn6M9739JF7');
+    expect(projected.warnings.map((warning) => warning.code)).not.toContain('DUPLICATE_CONTENT');
   });
 
   it('projects an extraction failure with its error class', () => {

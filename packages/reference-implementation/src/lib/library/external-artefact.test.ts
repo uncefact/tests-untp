@@ -435,10 +435,10 @@ describe('readExternalArtefact logging', () => {
 
     readExternalArtefact(bytes(raw), OTHER_KEY);
 
-    // The realm's Error is not the one node's crypto throws, so the cause is
-    // matched on the message it carries rather than on its constructor.
+    // Reduced to a name and a message before it is logged, because a crypto
+    // failure's cause chain can hold the key that produced it.
     expect(loggerCalls.warn).toHaveBeenCalledWith(
-      { err: expect.objectContaining({ message: expect.any(String) }) },
+      { error: { name: expect.any(String), message: expect.any(String) } },
       'The supplied key did not open the fetched envelope',
     );
   });
@@ -456,7 +456,7 @@ describe('readExternalArtefact logging', () => {
     if (reading.outcome !== 'opened') return;
     expect(reading.content.kind).toBe(ExternalContentKind.JSON_OBJECT);
     expect(loggerCalls.warn).toHaveBeenCalledWith(
-      { err: expect.objectContaining({ message: expect.stringContaining('Invalid Compact JWS') }) },
+      { error: { name: 'VcDecodeError', message: expect.stringContaining('Invalid Compact JWS') } },
       'The fetched JSON object is not a decodable enveloped credential',
     );
   });

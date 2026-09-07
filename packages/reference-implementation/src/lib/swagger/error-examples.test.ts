@@ -12,7 +12,12 @@ import { getApiDocs } from './swagger';
 import { PAYLOAD_TOO_LARGE_RESPONSE_REF, SHARED_STATUS_EXAMPLES, VERIFIED_ERROR_MESSAGES } from './error-examples';
 
 type MediaType = { schema?: { $ref?: string }; examples?: Record<string, { summary: string; value: unknown }> };
-type ResponseObject = { $ref?: string; description?: string; content?: Record<string, MediaType> };
+type ResponseObject = {
+  $ref?: string;
+  description?: string;
+  headers?: Record<string, { description?: string; schema?: { type?: string } }>;
+  content?: Record<string, MediaType>;
+};
 type Spec = {
   paths?: Record<string, Record<string, { requestBody?: unknown; responses?: Record<string, ResponseObject> }>>;
   components?: { responses?: Record<string, ResponseObject> };
@@ -70,6 +75,20 @@ describe('published error response examples', () => {
     expect(values).toContainEqual({
       error: 'The request body exceeds the maximum of 5242880 bytes.',
       code: 'REQUEST_BODY_TOO_LARGE',
+    });
+  });
+
+  it('pins the library duplicate response body and Location header', () => {
+    const response = spec.paths?.['/library']?.post?.responses?.['409'];
+
+    expect(response?.headers?.Location).toEqual({
+      description:
+        "Present only on `DUPLICATE_CREDENTIAL`. Relative path of the\nexisting library record holding the credential's content.\n",
+      schema: { type: 'string' },
+    });
+    expect(response?.content?.['application/json']?.examples?.duplicateCredential?.value).toEqual({
+      error: 'This credential is already registered as record clw0dup1ic4terecord000001.',
+      code: 'DUPLICATE_CREDENTIAL',
     });
   });
 

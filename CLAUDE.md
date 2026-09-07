@@ -182,6 +182,8 @@ External integrations use interfaces + implementations:
 2. Run `cd packages/reference-implementation && pnpm prisma migrate dev`
 3. Restart the reference implementation
 
+A few database objects live only as raw SQL in a migration, because `schema.prisma` cannot express them. Examples are the partial unique indexes on `CheckRun` and `ExternalCredential`, that table's composite foreign key and check constraint, and the library record triggers. `prisma migrate dev` diffs the schema against the database and proposes dropping every such object, so read the generated SQL and restore anything it removed.
+
 ### Configuration Changes
 - Tenant configuration is managed via the database
 

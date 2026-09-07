@@ -17,6 +17,7 @@ import { PgBossJobQueue } from '../../src/lib/jobs/pg-boss-job-queue';
 import type { JobContext } from '../../src/lib/jobs/types';
 import {
   createExternalCredential,
+  findExternalByContentDigest,
   getExternalCredentialById,
   type VerifyJobReference,
 } from '../../src/lib/prisma/repositories/external-credential.repository';
@@ -158,6 +159,7 @@ describe('register an external credential, end to end', () => {
     },
     enqueueVerification: (sql, job) => queue.enqueueWithin(sql, LIBRARY_VERIFY_JOB, job, VERIFY_JOB_ENQUEUE_OPTIONS),
     persist: createExternalCredential,
+    findExistingExternal: findExternalByContentDigest,
   };
 
   const handler = verifyGenerationHandler({

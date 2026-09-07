@@ -362,23 +362,45 @@ model IdempotencyKey {
  * rest exactly like Credential.decryptionKey; null means no openable copy yet.
  */
 model ExternalCredential {
-  id           String               @id
-  tenantId     String
+  id                  String               @id
+  tenantId            String
   /// Always EXTERNAL (a database CHECK pins it); part of the composite
   /// foreign key so this child can only attach to an EXTERNAL parent of its
   /// own tenant.
-  origin       LibraryRecordOrigin  @default(EXTERNAL)
+  origin              LibraryRecordOrigin  @default(EXTERNAL)
   /// Canonical WHATWG href the credential was fetched from. Nullable because
   /// the record contract admits later intake modes with no URL; the v1
   /// register route requires one.
-  sourceUrl    String?
+  sourceUrl           String?
   /// Multibase digest of the raw bytes as fetched, before any decrypt. Null
   /// until a fetch succeeded.
-  sourceDigest String?
+  sourceDigest        String?
+  /// Multibase digest of the accepted signed JWT segment, unique per tenant.
+  /// Null for a failed fetch, a non-credential body, unopened ciphertext, an
+  /// advisory row, a record whose digest was promoted away, and records
+  /// registered before the content-identity migration. Database-only, and
+  /// never projected onto the record contract.
+  ///
+  /// Three objects on these two columns live in
+  /// 20260906000000_external_credential_content_identity as raw SQL, because
+  /// this schema cannot express any of them: the partial unique index
+  /// ExternalCredential_tenantId_contentDigest_key on (tenantId,
+  /// contentDigest) WHERE contentDigest IS NOT NULL; the composite foreign
+  /// key ExternalCredential_duplicateOfRecordId_tenantId_fkey to
+  /// LibraryRecord (id, tenantId), whose ON DELETE SET NULL names
+  /// duplicateOfRecordId alone so a deleted target cannot null tenantId; and
+  /// the CHECK ExternalCredential_content_identity_exclusive_check, which
+  /// keeps a row from being canonical and advisory at once. Regenerating this
+  /// model must not drop them.
+  contentDigest       String?
+  /// A record found to carry the same signed credential when this record was
+  /// recovered without becoming the canonical digest holder. Advisory rows
+  /// keep this pointer and a null contentDigest.
+  duplicateOfRecordId String?
   /// Whether the fetched body was an encrypted envelope. Null until a body
   /// was observed, so a failed fetch never claims to have seen one.
-  encrypted    Boolean?
-  contentKind  ExternalContentKind?
+  encrypted           Boolean?
+  contentKind         ExternalContentKind?
 
   /// The durable copy, all null until one was stored. The storage instance,
   /// object id and bucket are recorded so a later read or deletion targets the
@@ -417,6 +439,7 @@ model ExternalCredential {
   @@unique([id, tenantId, origin])
   @@index([tenantId])
   @@index([tenantId, declaredCredentialType])
+  @@index([tenantId, duplicateOfRecordId, createdAt, id])
 }
 
 /**

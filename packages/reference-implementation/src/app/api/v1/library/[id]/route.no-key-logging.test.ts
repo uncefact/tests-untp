@@ -88,6 +88,8 @@ function view(storedKey: string | null): LibraryRecordDetailView {
     origin: LibraryRecordOrigin.EXTERNAL,
     sourceUrl: 'https://supplier.example/credential',
     sourceDigest: 'zSourceDigest',
+    contentDigest: null,
+    duplicateOfRecordId: null,
     encrypted: false,
     contentKind: ExternalContentKind.CREDENTIAL,
     storageUri: 'https://storage.example/credential',

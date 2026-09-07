@@ -9,7 +9,7 @@ The Reference Implementation uses a PostgreSQL database to store all of its data
 
 ## Provisioning
 
-When using the Docker Compose configuration from the [repository](https://github.com/uncefact/tests-untp), a PostgreSQL instance (`ri-db`) is provisioned automatically. Organisations using the [Reference Implementation Docker image](https://github.com/orgs/uncefact/packages/container/package/tests-untp%2Freference-implementation) directly will need to provision their own PostgreSQL instance (version 17 or later recommended).
+When using the Docker Compose configuration from the [repository](https://github.com/uncefact/tests-untp), a PostgreSQL instance (`ri-db`) is provisioned automatically. Organisations using the [Reference Implementation Docker image](https://github.com/orgs/uncefact/packages/container/package/tests-untp%2Freference-implementation) directly will need to provision their own PostgreSQL instance, version 15 or later, with version 17 or later recommended. A migration declares a foreign key whose `ON DELETE SET NULL` names a single column, a form PostgreSQL added in 15, so on an earlier version the startup migration step fails on that statement.
 
 ## Configuration
 

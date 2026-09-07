@@ -12,7 +12,10 @@ import {
 import { createRigClient, truncateApplicationTables } from './rig/db';
 import { insertNativeCredential } from './fixtures';
 import { protectDecryptionKey, revealDecryptionKey } from '../../src/lib/credentials/decryption-key-protection';
-import { createExternalCredential } from '../../src/lib/prisma/repositories/external-credential.repository';
+import {
+  createExternalCredential,
+  findExternalByContentDigest,
+} from '../../src/lib/prisma/repositories/external-credential.repository';
 import { getLibraryRecordById } from '../../src/lib/prisma/repositories/library-record.repository';
 import { LibraryRecordShapeError } from '../../src/lib/library/library-record-view';
 import { toCredentialRecordDetail } from '../../src/lib/library/credential-record-projection';
@@ -208,6 +211,7 @@ async function registerEncryptedSource(): Promise<{ id: string; supplierKey: str
     },
     enqueueVerification: async () => undefined,
     persist: createExternalCredential,
+    findExistingExternal: findExternalByContentDigest,
   };
   const registered = await registerExternalCredential(
     {
