@@ -14,6 +14,7 @@ import { versionsMatchingContext } from '@/lib/credentials/bridge-version';
 import { bridgeNameOf, coreCredentialTypeFromTypes } from './core-credential-type';
 import type { ExternalDetailsCapture } from '@/lib/prisma/repositories/external-credential.repository';
 import { apiLogger } from '@/lib/api/logger';
+import { safeError } from '@/lib/api/safe-error';
 
 const logger = apiLogger.child({ module: 'external-artefact' });
 
@@ -28,9 +29,27 @@ export type OpenedContent =
       bytes: Uint8Array;
       credential: EnvelopedVerifiableCredential;
       decoded: UNTPVerifiableCredential;
+      /**
+       * The signed JWT the envelope's `id` carries, as the decoder accepted
+       * it. Carried here so the content identity is taken from the same
+       * segment the decode ran on rather than derived a second time (#956, D1).
+       */
+      acceptedJwt: string;
     }
-  | { kind: typeof ExternalContentKind.JSON_OBJECT; bytes: Uint8Array; credential?: undefined; decoded?: undefined }
-  | { kind: typeof ExternalContentKind.OPAQUE; bytes: Uint8Array; credential?: undefined; decoded?: undefined };
+  | {
+      kind: typeof ExternalContentKind.JSON_OBJECT;
+      bytes: Uint8Array;
+      credential?: undefined;
+      decoded?: undefined;
+      acceptedJwt?: undefined;
+    }
+  | {
+      kind: typeof ExternalContentKind.OPAQUE;
+      bytes: Uint8Array;
+      credential?: undefined;
+      decoded?: undefined;
+      acceptedJwt?: undefined;
+    };
 
 /**
  * `bytes` is what a durable copy holds: the body exactly as fetched for one
@@ -80,9 +99,11 @@ export function readExternalArtefact(bytes: Uint8Array, decryptionKey: string | 
         type: parsed.type,
       });
     } catch (error) {
-      // The cause is logged (it never carries the key) so a wrong key can be
-      // told from a damaged ciphertext when a caller reports the failure.
-      logger.warn({ err: error }, 'The supplied key did not open the fetched envelope');
+      // The failure's name and message are recorded, reduced by `safeError`,
+      // so a wrong key can be told from a damaged ciphertext when a caller
+      // reports it. Nothing deeper is rendered, because a crypto failure's
+      // cause chain can hold the key that produced it.
+      logger.warn({ error: safeError(error) }, 'The supplied key did not open the fetched envelope');
       return { outcome: 'encrypted-key-failed', bytes, reason: 'key-mismatch' };
     }
     return {
@@ -119,11 +140,19 @@ function classify(bytes: Uint8Array, parsed: unknown): OpenedContent {
     if (decoded === null || typeof decoded !== 'object') {
       return { kind: ExternalContentKind.JSON_OBJECT, bytes };
     }
-    return { kind: ExternalContentKind.CREDENTIAL, bytes, credential, decoded };
+    // `decodeCredential` reached the payload through this same segment, so
+    // it is present and non-empty here.
+    return {
+      kind: ExternalContentKind.CREDENTIAL,
+      bytes,
+      credential,
+      decoded,
+      acceptedJwt: credential.id.split(',')[1],
+    };
   } catch (error) {
     // Not an enveloped credential, or one whose JWT cannot be read: either
     // way there is no signed artefact to extract from. The cause says which.
-    logger.warn({ err: error }, 'The fetched JSON object is not a decodable enveloped credential');
+    logger.warn({ error: safeError(error) }, 'The fetched JSON object is not a decodable enveloped credential');
     return { kind: ExternalContentKind.JSON_OBJECT, bytes };
   }
 }

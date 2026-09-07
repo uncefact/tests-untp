@@ -14,6 +14,7 @@ import { PrismaClient } from '../../src/lib/prisma/generated/index.js';
 import { createRigClient } from './rig/db';
 
 const MIGRATION = '20260902000000_library_records';
+const MIGRATION_AFTER_LIBRARY_RECORDS = '20260906000000_external_credential_content_identity';
 const SYSTEM_TENANT = 'caq0ibyulrnh85itqtbgusfp3';
 const UPGRADE_DB = 'ri_library_records_upgrade';
 const DEPLOY_FAILURE_DB = 'ri_library_records_deploy_failure';
@@ -81,9 +82,16 @@ describe('library records migration on a populated database', () => {
 
     await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${UPGRADE_DB}" WITH (FORCE)`);
     await admin.$executeRawUnsafe(`CREATE DATABASE "${UPGRADE_DB}"`);
-    // Marking this migration applied makes deploy stop at the previous one;
-    // the file itself is applied below, once the rows exist.
+    // Deploy applies every migration this database has not recorded, so each
+    // migration from the library-records one onwards is marked applied by
+    // hand to hold the schema at the state just before it. A migration added
+    // after the last one named here must be added to this list. The library
+    // migration itself is applied below, once the rows exist.
     prismaCli(['migrate', 'resolve', '--applied', MIGRATION, '--config', 'prisma/prisma.config.ts'], upgradeUrl);
+    prismaCli(
+      ['migrate', 'resolve', '--applied', MIGRATION_AFTER_LIBRARY_RECORDS, '--config', 'prisma/prisma.config.ts'],
+      upgradeUrl,
+    );
     prismaCli(['migrate', 'deploy', '--config', 'prisma/prisma.config.ts'], upgradeUrl);
 
     upgrade = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
@@ -302,6 +310,10 @@ describe('deploying against a claim that names another tenant credential', () =>
     await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${DEPLOY_FAILURE_DB}" WITH (FORCE)`);
     await admin.$executeRawUnsafe(`CREATE DATABASE "${DEPLOY_FAILURE_DB}"`);
     prismaCli(['migrate', 'resolve', '--applied', MIGRATION, '--config', 'prisma/prisma.config.ts'], targetUrl);
+    prismaCli(
+      ['migrate', 'resolve', '--applied', MIGRATION_AFTER_LIBRARY_RECORDS, '--config', 'prisma/prisma.config.ts'],
+      targetUrl,
+    );
     prismaCli(['migrate', 'deploy', '--config', 'prisma/prisma.config.ts'], targetUrl);
 
     target = new PrismaClient({ datasources: { db: { url: targetUrl } } });

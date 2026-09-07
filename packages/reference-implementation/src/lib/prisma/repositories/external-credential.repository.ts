@@ -6,10 +6,14 @@ import {
   type CoreCredentialType,
   type CredentialDetailsError,
   type ExternalContentKind,
+  type Prisma,
 } from '../generated';
 import { prisma } from '../prisma';
 import { linkClaimToRecord } from './idempotency-key.repository';
 import { noChecksRun, type CheckResults, type CheckRunFailure } from './check-run.repository';
+import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
+import { apiLogger } from '@/lib/api/logger';
+import { safeError } from '@/lib/api/safe-error';
 import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
 import type { ProtectedDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 // From the module, not the jobs barrel: the barrel loads pg-boss, whose
@@ -22,6 +26,8 @@ import {
   narrowExternalRecord,
   type ExternalLibraryRecordView,
 } from '@/lib/library/library-record-view';
+
+const logger = apiLogger.child({ module: 'external-credential.repository' });
 
 /**
  * The durable copy a registration stored, all or nothing. `decryptionKey` is
@@ -125,6 +131,8 @@ export type CreateExternalCredentialInput = {
   tenantId: string;
   sourceUrl: string;
   sourceDigest?: string;
+  contentDigest?: string | null;
+  duplicateOfRecordId?: string | null;
   /**
    * Null (or omitted) until a body was observed; never false after a failed
    * fetch. The register route, which walks the fetch outcomes, is what keeps
@@ -168,6 +176,49 @@ export type CreateExternalCredentialInput = {
  */
 export type { ExternalLibraryRecordView as ExternalCredentialRecord };
 
+/** Created by `prisma/migrations/20260906000000_external_credential_content_identity/migration.sql`. */
+export const CONTENT_DIGEST_UNIQUE_INDEX = 'ExternalCredential_tenantId_contentDigest_key';
+
+/**
+ * Thrown when the opened credential's content already belongs to an external
+ * record in the tenant. `existingRecordId` names that record. The sentence a
+ * caller reads is composed by the route, so this class carries the id alone
+ * and nothing here can drift from the published wording.
+ */
+export class DuplicateCredentialError extends Error {
+  readonly existingRecordId: string;
+
+  constructor(existingRecordId: string) {
+    super(`Duplicate external credential content, already held by record ${existingRecordId}`);
+    this.name = 'DuplicateCredentialError';
+    this.existingRecordId = existingRecordId;
+  }
+}
+
+/**
+ * Thrown when a digest promotion is asked to release a digest the named
+ * record does not hold, so the caller's premise about the row is wrong and
+ * its transaction must not continue.
+ */
+export class ContentDigestNotHeldError extends Error {
+  constructor(recordId: string, tenantId: string) {
+    super(`Record ${recordId} in tenant ${tenantId} does not hold the content digest being relinquished`);
+    this.name = 'ContentDigestNotHeldError';
+  }
+}
+
+/**
+ * Thrown when the advisory row chosen for promotion changed under the
+ * promotion, so the digest would be released with nobody holding it. The
+ * caller's transaction rolls back and the digest stays with its owner.
+ */
+export class ContentDigestPromotionRacedError extends Error {
+  constructor(advisoryRecordId: string) {
+    super(`Advisory record ${advisoryRecordId} changed before it could take the released content digest`);
+    this.name = 'ContentDigestPromotionRacedError';
+  }
+}
+
 function detailsColumns(capture: ExternalDetailsCapture) {
   switch (capture.status) {
     case CredentialDetailsStatus.EXTRACTED:
@@ -185,23 +236,8 @@ function detailsColumns(capture: ExternalDetailsCapture) {
   }
 }
 
-/**
- * Creates an external credential: its library record, its `ExternalCredential`
- * child and its generation 1 check run (ADR-053 decisions 1, 2 and 3), linking
- * the idempotency claim and, for a PENDING run, running the run's `enqueue`
- * inside the same transaction.
- *
- * Database errors are not translated here, unlike `createCredential`: no
- * violation on this path is caller-caused (the record id is minted, a first
- * generation cannot collide, and a tenant or claim foreign key failing is a
- * defect), so a sanitised 500 and a log line are the honest answer, which the
- * route owes by mapping these and the repository's own invariant errors
- * rather than echoing them. The duplicate-content 409 the surface will gain
- * is #956's, not this path's.
- */
-export async function createExternalCredential(
-  input: CreateExternalCredentialInput,
-): Promise<ExternalLibraryRecordView> {
+/** One attempt at the create transaction; see {@link createExternalCredential} for the contract. */
+async function createExternalCredentialOnce(input: CreateExternalCredentialInput): Promise<ExternalLibraryRecordView> {
   // One instant for every timestamp the rows carry, so the record can never
   // read as updated, or enqueued, before it was created.
   const now = new Date(Date.now());
@@ -229,6 +265,8 @@ export async function createExternalCredential(
           updatedAt: now,
           sourceUrl: input.sourceUrl,
           sourceDigest: input.sourceDigest ?? null,
+          contentDigest: input.contentDigest ?? null,
+          duplicateOfRecordId: input.duplicateOfRecordId ?? null,
           encrypted: input.encrypted ?? null,
           contentKind: input.contentKind ?? null,
           storageUri: input.storage?.uri ?? null,
@@ -278,6 +316,211 @@ export async function createExternalCredential(
     },
     { maxWait: 5_000, timeout: 15_000 },
   );
+}
+
+/**
+ * Whether a unique violation came from the content-identity index. Prisma
+ * reports the target as the constraint name for an index created in raw SQL
+ * and as the field list for one it generated, so both shapes are accepted.
+ * The error code alone would also catch the idempotency and record indexes,
+ * whose collisions mean something else entirely.
+ */
+function isContentDigestUniqueViolation(error: unknown): boolean {
+  if (!isUniqueConstraintViolation(error)) return false;
+  const meta = (error as { meta?: { target?: unknown } }).meta;
+  const target = meta?.target;
+  if (target === CONTENT_DIGEST_UNIQUE_INDEX) return true;
+  return Array.isArray(target) && target.length === 2 && target[0] === 'tenantId' && target[1] === 'contentDigest';
+}
+
+/** Reads the record now holding a digest, keeping the collision that prompted the read on any failure. */
+async function findWinnerAfterCollision(tenantId: string, contentDigest: string, collision: unknown) {
+  try {
+    return await findExternalByContentDigest(tenantId, contentDigest);
+  } catch (error) {
+    // The database is what has just rejected the insert, so a failure here
+    // is likely the same fault. The collision travels with it rather than
+    // being replaced by it.
+    if (error instanceof Error && error.cause === undefined) error.cause = collision;
+    throw error;
+  }
+}
+
+/**
+ * Creates an external credential: its library record, its `ExternalCredential`
+ * child and its generation 1 check run (ADR-053 decisions 1, 2 and 3), linking
+ * the idempotency claim and, for a PENDING run, running the run's `enqueue`
+ * inside the same transaction.
+ *
+ * Most database errors are not translated here, unlike `createCredential`. A
+ * minted record id cannot collide, a first generation cannot collide, and a
+ * tenant or claim foreign key failing is a defect, so a sanitised 500 and a
+ * log line are the honest answer, which the route owes by mapping these and
+ * the repository's own invariant errors rather than echoing them.
+ *
+ * The one caller-caused violation is the content-identity index, which two
+ * concurrent registrations of the same credential can hit. It is read back
+ * under the tenant and thrown as `DuplicateCredentialError` naming the
+ * winner. When the winner has disappeared before it could be read, the
+ * create is attempted once more, and a second collision is read back the
+ * same way. Only a collision whose winner cannot be found either time
+ * escapes as the raw database error.
+ */
+export async function createExternalCredential(
+  input: CreateExternalCredentialInput,
+): Promise<ExternalLibraryRecordView> {
+  const contentDigest = input.contentDigest ?? undefined;
+  let firstCollision: unknown;
+  try {
+    return await createExternalCredentialOnce(input);
+  } catch (error) {
+    if (!isContentDigestUniqueViolation(error) || contentDigest === undefined) throw error;
+    firstCollision = error;
+  }
+
+  const firstWinner = await findWinnerAfterCollision(input.tenantId, contentDigest, firstCollision);
+  if (firstWinner !== null) throw new DuplicateCredentialError(firstWinner);
+
+  logger.info(
+    { tenantId: input.tenantId },
+    'Content identity collided and no record holds it after rollback; retrying the registration once',
+  );
+  try {
+    return await createExternalCredentialOnce(input);
+  } catch (error) {
+    if (!isContentDigestUniqueViolation(error)) {
+      // The retry failed for another reason, and the collision that caused
+      // the retry is the context that failure would otherwise lose.
+      if (error instanceof Error && error.cause === undefined) error.cause = firstCollision;
+      throw error;
+    }
+    const secondWinner = await findWinnerAfterCollision(input.tenantId, contentDigest, error);
+    if (secondWinner !== null) throw new DuplicateCredentialError(secondWinner);
+    // Two collisions and no holder either time means records under this
+    // content are being created and removed as fast as this request runs.
+    // The caller gets the sanitised 500; this is the line an operator needs.
+    logger.error(
+      { error: safeError(error), tenantId: input.tenantId },
+      'Content identity collided twice and no record holds it after rollback',
+    );
+    throw error;
+  }
+}
+
+/**
+ * Finds the external record in one tenant holding this content identity.
+ * Native records are never considered, and an optional current id supports
+ * recovery without treating a record's own content as a duplicate (#957).
+ *
+ * The partial unique index means at most one row can hold the digest, so the
+ * ordering is a tie-break for the window in which a promotion is in flight
+ * rather than a choice between rows that are expected to coexist.
+ */
+export async function findExternalByContentDigest(
+  tenantId: string,
+  contentDigest: string,
+  currentRecordId?: string,
+): Promise<string | null> {
+  const row = await prisma.externalCredential.findFirst({
+    where: {
+      tenantId,
+      contentDigest,
+      ...(currentRecordId === undefined ? {} : { id: { not: currentRecordId } }),
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true },
+  });
+  return row?.id ?? null;
+}
+
+/** The record relinquishing a content identity, and the identity it is giving up. */
+export type PromoteExternalCredentialDigestInput = {
+  tenantId: string;
+  recordId: string;
+  contentDigest: string;
+};
+
+/**
+ * Where the relinquished identity ended up. `promoted` names the row that
+ * took it and counts the other advisory rows moved to point at that row;
+ * `none` means no advisory row was waiting for it.
+ */
+export type DigestPromotion = { outcome: 'promoted'; recordId: string; repointed: number } | { outcome: 'none' };
+
+/**
+ * Gives a relinquished digest to the oldest advisory row that points at its
+ * former owner, and moves every other advisory row of that owner to point at
+ * the promoted row. Callers run this in the same transaction as the delete or
+ * digest change, before the foreign key can clear the pointer (#956, D2).
+ *
+ * The repoint is what keeps the identity whole. Without it a second advisory
+ * row still points at the former owner, so deleting that owner nulls the
+ * pointer and leaves the row with no identity at all, and giving that owner a
+ * different digest later would hand the second row a digest for content it
+ * does not hold.
+ *
+ * Throws rather than reporting a partial result. A record that does not hold
+ * the digest means the caller's premise is wrong, and an advisory row that
+ * changed between the read and the write would leave the identity released
+ * with nobody holding it. Both roll the caller's transaction back, so the
+ * digest stays where it is and the next registration still collides with it.
+ *
+ * Locking is shared with the callers. A writer attaching a new advisory row
+ * to a record must revalidate, under its own lock, that the target still
+ * holds the digest it observed, because a promotion may have moved that
+ * digest to another row in between.
+ */
+export async function promoteExternalCredentialDigest(
+  client: Prisma.TransactionClient,
+  input: PromoteExternalCredentialDigestInput,
+): Promise<DigestPromotion> {
+  // Release the canonical row first. The partial unique index otherwise
+  // rejects the advisory promotion while both rows briefly carry the
+  // digest. The caller deletes or changes this row in the same transaction.
+  const released = await client.externalCredential.updateMany({
+    where: {
+      id: input.recordId,
+      tenantId: input.tenantId,
+      contentDigest: input.contentDigest,
+    },
+    data: { contentDigest: null },
+  });
+  if (released.count !== 1) throw new ContentDigestNotHeldError(input.recordId, input.tenantId);
+
+  const advisory = await client.externalCredential.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      duplicateOfRecordId: input.recordId,
+      contentDigest: null,
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true },
+  });
+  if (advisory === null) return { outcome: 'none' };
+
+  const updated = await client.externalCredential.updateMany({
+    where: {
+      id: advisory.id,
+      tenantId: input.tenantId,
+      duplicateOfRecordId: input.recordId,
+      contentDigest: null,
+    },
+    data: { contentDigest: input.contentDigest, duplicateOfRecordId: null },
+  });
+  if (updated.count !== 1) throw new ContentDigestPromotionRacedError(advisory.id);
+
+  // Every other advisory row of the former owner now points at the row
+  // holding the identity, so it survives the owner's deletion and cannot be
+  // handed a later, unrelated digest of that owner's.
+  const repointed = await client.externalCredential.updateMany({
+    where: {
+      tenantId: input.tenantId,
+      duplicateOfRecordId: input.recordId,
+      contentDigest: null,
+    },
+    data: { duplicateOfRecordId: advisory.id },
+  });
+  return { outcome: 'promoted', recordId: advisory.id, repointed: repointed.count };
 }
 
 /**

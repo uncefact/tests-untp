@@ -140,6 +140,8 @@ function external(overrides: Partial<ExternalCredential> = {}): ExternalCredenti
     origin: LibraryRecordOrigin.EXTERNAL,
     sourceUrl: 'https://supplier.example/credential-a',
     sourceDigest: 'zQmSourceDigest',
+    contentDigest: null,
+    duplicateOfRecordId: null,
     encrypted: false,
     contentKind: ExternalContentKind.CREDENTIAL,
     storageUri: STORAGE_URI,

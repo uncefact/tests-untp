@@ -419,11 +419,44 @@ describe('library record constraints', () => {
           'Credential_origin_check',
           'ExternalCredential_origin_check',
           'CheckRun_generation_check',
+          'ExternalCredential_content_identity_exclusive_check',
         ]),
       );
-      await expect(names(`SELECT indexname AS name FROM pg_indexes WHERE schemaname = 'public'`)).resolves.toEqual(
-        expect.arrayContaining(['CheckRun_one_pending_per_record', 'LibraryRecord_tenantId_lower_issuerName_idx']),
+      await expect(names(`SELECT conname AS name FROM pg_constraint WHERE contype = 'f'`)).resolves.toEqual(
+        expect.arrayContaining(['ExternalCredential_duplicateOfRecordId_tenantId_fkey']),
       );
+      await expect(names(`SELECT indexname AS name FROM pg_indexes WHERE schemaname = 'public'`)).resolves.toEqual(
+        expect.arrayContaining([
+          'CheckRun_one_pending_per_record',
+          'LibraryRecord_tenantId_lower_issuerName_idx',
+          'ExternalCredential_tenantId_contentDigest_key',
+        ]),
+      );
+    });
+
+    it('keeps the content-identity index on the WHERE predicate the migration chose', async () => {
+      // PostgreSQL already treats nulls as distinct in an ordinary unique
+      // index, so digest-less rows would coexist without the predicate. The
+      // predicate is the object the migration chose, and this pins it, so a
+      // migration that recreated the index without it keeps the name and is
+      // caught here.
+      const [index] = await prisma.$queryRawUnsafe<{ indexdef: string }[]>(
+        `SELECT indexdef FROM pg_indexes WHERE indexname = 'ExternalCredential_tenantId_contentDigest_key'`,
+      );
+
+      expect(index?.indexdef).toContain('WHERE ("contentDigest" IS NOT NULL)');
+    });
+
+    it('names only duplicateOfRecordId in the SET NULL action of the advisory pointer foreign key', async () => {
+      // The unqualified form would try to null tenantId as well, and the
+      // column is NOT NULL, so deleting a canonical record with a surviving
+      // advisory row would fail outright.
+      const [constraint] = await prisma.$queryRawUnsafe<{ definition: string }[]>(
+        `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+         WHERE conname = 'ExternalCredential_duplicateOfRecordId_tenantId_fkey'`,
+      );
+
+      expect(constraint?.definition).toContain('ON DELETE SET NULL ("duplicateOfRecordId")');
     });
 
     it('keeps the issuer-name index on the lower-cased expression the case-insensitive filter needs', async () => {

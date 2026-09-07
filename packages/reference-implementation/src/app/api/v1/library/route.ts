@@ -2,6 +2,7 @@ import { TextDecoder } from 'node:util';
 import { NextResponse } from 'next/server';
 import { getRequestContext } from '@uncefact/untp-ri-services/logging';
 import { apiLogger } from '@/lib/api/logger';
+import { safeError } from '@/lib/api/safe-error';
 import {
   ConflictError,
   NotFoundError,
@@ -34,6 +35,7 @@ import {
   releaseIdempotencyKey,
 } from '@/lib/prisma/repositories/idempotency-key.repository';
 import {
+  DuplicateCredentialError,
   getExternalCredentialById,
   type ExternalCredentialRecord,
 } from '@/lib/prisma/repositories/external-credential.repository';
@@ -112,7 +114,7 @@ function rethrowAsValidationFailed(error: unknown): never {
  * mapper's fallback would otherwise echo.
  */
 function sanitisedServerError(error: Error, detail: string): Response {
-  logger.error({ err: error }, detail);
+  logger.error({ error: safeError(error) }, detail);
   return NextResponse.json({ error: unexpectedErrorMessage(getRequestContext()?.correlationId) }, { status: 500 });
 }
 
@@ -159,7 +161,20 @@ function sanitisedServerError(error: Error, detail: string): Response {
  *       was rejected before a record was written (any `400`, any `500`
  *       other than a failure to project a record that was already written)
  *       is not consumed by that request and may be reused once the problem
- *       is corrected. Redirects
+ *       is corrected.
+ *
+ *       If the opened signed credential already belongs to an external
+ *       record in this tenant, the request is rejected with
+ *       `DUPLICATE_CREDENTIAL`. The response names the existing record, and
+ *       its `Location` header carries that record's path. The key is not
+ *       consumed by this rejection, so the same key may be reused once the
+ *       duplicate is resolved. The comparison runs after decryption and
+ *       extraction, before the durable copy is stored. Native records are
+ *       outside this comparison. A record whose durable copy failed to
+ *       store, or whose credential could not be read, still holds the
+ *       content's identity and still blocks a fresh registration of it.
+ *
+ *       Redirects
  *       are followed; the record keeps the requested URL, in its canonical
  *       form, as `sourceUrl`. `sourceUrl` is at most 2048 characters,
  *       `annotations.displayName` at most 200, `annotations.notes` at most
@@ -228,7 +243,21 @@ function sanitisedServerError(error: Error, detail: string): Response {
  *           ran; retry to receive that request's result.
  *           `IDEMPOTENCY_KEY_RECORD_DELETED`: the record this key produced
  *           was deleted while this request was being answered; retry the
- *           request.
+ *           request. `DUPLICATE_CREDENTIAL` means the opened signed
+ *           credential already belongs to an external record in this tenant.
+ *           The `Location` header names that record. A record whose durable
+ *           copy failed to store, or whose credential could not be read,
+ *           still holds the content's identity and still blocks a fresh
+ *           registration of it. The request's Idempotency-Key is not
+ *           consumed by this rejection, so the same key may be reused once
+ *           the duplicate is resolved.
+ *         headers:
+ *           Location:
+ *             description: |
+ *               Present only on `DUPLICATE_CREDENTIAL`. Relative path of the
+ *               existing library record holding the credential's content.
+ *             schema:
+ *               type: string
  *         content:
  *           application/json:
  *             schema:
@@ -246,6 +275,10 @@ function sanitisedServerError(error: Error, detail: string): Response {
  *                 value:
  *                   error: The record this Idempotency-Key produced was deleted while this request was being answered; retry the request.
  *                   code: IDEMPOTENCY_KEY_RECORD_DELETED
+ *               duplicateCredential:
+ *                 value:
+ *                   error: This credential is already registered as record clw0dup1ic4terecord000001.
+ *                   code: DUPLICATE_CREDENTIAL
  *       422:
  *         description: '`IDEMPOTENCY_KEY_MISMATCH`: this key was already used with a different request body.'
  *         content:
@@ -284,7 +317,14 @@ export const POST = withTenantAuth(async (req, context) => {
     // sanitised here before it reaches the mapper.
     if (isMappedRouteError(error)) throw error;
     if (error instanceof EncryptionUnavailableError) {
-      logger.error({ err: error, tenantId: context.tenantId }, 'Encryption is not available; no record was created');
+      // The wrapper's own message says only that encryption is unavailable.
+      // The reason an operator can act on, a missing or unusable
+      // DATA_ENCRYPTION_KEY, is on its cause, so that one level is carried
+      // too. Reduced the same way, so nothing deeper than it is rendered.
+      logger.error(
+        { error: safeError(error), cause: safeError(error.cause), tenantId: context.tenantId },
+        'Encryption is not available; no record was created',
+      );
       return NextResponse.json({ error: error.message, code: 'CREDENTIALS_ENCRYPTION_UNAVAILABLE' }, { status: 500 });
     }
     return sanitisedServerError(error instanceof Error ? error : new Error(String(error)), 'Registration failed');
@@ -411,6 +451,23 @@ async function register(req: Request, tenantId: string): Promise<Response> {
       throw new ConflictError(IDEMPOTENCY_KEY_HELD_ELSEWHERE_MESSAGE, 'IDEMPOTENCY_KEY_IN_FLIGHT');
     }
     await releaseClaim(claimId, idempotencyKey);
+    if (error instanceof DuplicateCredentialError) {
+      // Built here rather than through the shared mapper, which sets no
+      // headers. That bypasses the mapper's conflict log line too, so this
+      // rejection logs its own, covering the in-request lookup and the
+      // database index alike.
+      logger.warn({ tenantId, source, existingRecordId: error.existingRecordId }, 'Duplicate credential content');
+      return NextResponse.json(
+        {
+          error: `This credential is already registered as record ${error.existingRecordId}.`,
+          code: 'DUPLICATE_CREDENTIAL',
+        },
+        {
+          status: 409,
+          headers: { Location: `/api/v1/library/${error.existingRecordId}` },
+        },
+      );
+    }
     if (error instanceof SourceRejectedError) {
       throw new ValidationError(error.message, {
         code: error.failure.reason === 'source-not-permitted' ? 'SOURCE_NOT_PERMITTED' : 'VALIDATION_FAILED',
@@ -418,7 +475,12 @@ async function register(req: Request, tenantId: string): Promise<Response> {
       });
     }
     if (error instanceof EncryptionUnavailableError) {
-      logger.error({ err: error, tenantId, source }, 'Encryption preflight failed; no record was created');
+      // Same as the listing path above: the actionable reason is the cause,
+      // and only its name and message are rendered.
+      logger.error(
+        { error: safeError(error), cause: safeError(error.cause), tenantId, source },
+        'Encryption preflight failed; no record was created',
+      );
       return NextResponse.json({ error: error.message, code: 'CREDENTIALS_ENCRYPTION_UNAVAILABLE' }, { status: 500 });
     }
     if (error instanceof IdempotencyClaimOperationMismatchError) {
@@ -438,7 +500,7 @@ async function register(req: Request, tenantId: string): Promise<Response> {
     await completeIdempotencyKey({ claimId, recordId: record.record.id, responseBody: null });
   } catch (error) {
     logger.error(
-      { err: error, claimId, recordId: record.record.id },
+      { error: safeError(error), claimId, recordId: record.record.id },
       'Failed to finalise the register Idempotency-Key',
     );
   }
@@ -458,7 +520,7 @@ async function releaseClaim(claimId: string, idempotencyKey: string): Promise<vo
     }
   } catch (releaseError) {
     logger.error(
-      { err: releaseError, claimId, idempotencyKeyLength: idempotencyKey.length },
+      { error: safeError(releaseError), claimId, idempotencyKeyLength: idempotencyKey.length },
       'Failed to release the register Idempotency-Key',
     );
   }

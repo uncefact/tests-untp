@@ -12,6 +12,8 @@ import {
 } from '@/lib/prisma/generated';
 import {
   createExternalCredential,
+  DuplicateCredentialError,
+  findExternalByContentDigest,
   type CreateExternalCredentialInput,
   type ExternalCredentialRecord,
   type ExternalDetailsCapture,
@@ -33,22 +35,26 @@ import { getEncryptionService } from '@/lib/encryption/encryption';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import type { SqlExecutor } from '@/lib/jobs/types';
 import { apiLogger } from '@/lib/api/logger';
+import { safeError } from '@/lib/api/safe-error';
 import {
   captureExternalDetails,
   readExternalArtefact,
   type ArtefactReading,
   type OpenedContent,
 } from './external-artefact';
+import { contentDigestOf } from './content-digest';
 
 /**
  * The in-request half of registering a credential received from a third
  * party (#955): the guarded fetch, the decrypt with the supplier's key, the
- * extraction, the durable-copy store, and the one transaction that writes
- * the record with its generation 1 check run (ADR-053, ADR-054 decision 4).
- * Only the verifier call runs later, on the worker, against the copy stored
- * here. Every outcome of the discovery contract's register table is a branch
- * of {@link settleInRequest}, which is the single place a row's checks,
- * failure, custody and details are assembled together.
+ * extraction, the content-identity lookup that refuses a credential the
+ * tenant already holds (#956), the durable-copy store, and the one
+ * transaction that writes the record with its generation 1 check run
+ * (ADR-053, ADR-054 decision 4). Only the verifier call runs later, on the
+ * worker, against the copy stored here. Every outcome of the discovery
+ * contract's register table is a branch of {@link settleInRequest}, which is
+ * the single place a row's checks, failure, custody and details are
+ * assembled together, and which re-verification reuses in `recover` mode.
  *
  * The supplier's key crosses this module as an argument only: it is never
  * written, logged or enqueued (ADR-055 decision 1).
@@ -84,6 +90,11 @@ export type RegisterExternalCredentialDependencies = {
   /** Enqueues the verify job for a pending generation, inside the record's transaction. */
   enqueueVerification: (sql: SqlExecutor, job: VerifyJobReference) => Promise<void>;
   persist: (input: CreateExternalCredentialInput) => Promise<ExternalCredentialRecord>;
+  /**
+   * Returns the external record in this tenant already holding this content
+   * identity, excluding `currentRecordId` so a recovery never matches itself.
+   */
+  findExistingExternal: (tenantId: string, contentDigest: string, currentRecordId?: string) => Promise<string | null>;
 };
 
 export function defaultRegisterDependencies(
@@ -97,6 +108,7 @@ export function defaultRegisterDependencies(
     },
     enqueueVerification,
     persist: createExternalCredential,
+    findExistingExternal: findExternalByContentDigest,
   };
 }
 
@@ -135,11 +147,25 @@ export class StorageKeyMissingError extends Error {
   }
 }
 
+/** A new registration. A refused source and a content match both stop the request. */
+export type RegisterModeOptions = { mode: 'register' };
+
+/**
+ * A re-verification of an existing record. Both of those are outcomes to
+ * record rather than reasons to stop, and the record being recovered is
+ * excluded from the content lookup so its own content never reads as a
+ * duplicate of itself.
+ */
+export type RecoverModeOptions = { mode: 'recover'; currentRecordId: string };
+
+/** Who is calling {@link settleInRequest}, and what that mode needs from them. */
+export type SettleInRequestOptions = RegisterModeOptions | RecoverModeOptions;
+
 export async function registerExternalCredential(
   input: RegisterExternalCredentialInput,
   deps: RegisterExternalCredentialDependencies,
 ): Promise<ExternalCredentialRecord> {
-  const outcome = await settleInRequest(input, deps);
+  const outcome = await settleInRequest(input, deps, { mode: 'register' });
   try {
     return await deps.persist({
       tenantId: input.tenantId,
@@ -155,7 +181,7 @@ export async function registerExternalCredential(
     if (outcome.storage !== undefined) {
       logger.error(
         {
-          err: error,
+          error: safeError(error),
           tenantId: input.tenantId,
           storageUri: outcome.storage.uri,
           storageExternalId: outcome.storage.externalId,
@@ -169,31 +195,91 @@ export async function registerExternalCredential(
 }
 
 /**
- * The fields of the create input that depend on how far the in-request work
- * got, closed per branch: a fetch that returned nothing has no digest and
- * no observation, and every branch that fetched states its digest, what it
- * observed, what kind of body it was and whether a key went unused, so no
- * branch can leave one of those to a default it did not choose.
+ * A fetch that returned nothing, so there is no digest and no observation,
+ * and `encrypted` stays null rather than claiming a body was seen.
  */
-type InRequestOutcome =
-  | {
-      encrypted: null;
-      details: ExternalDetailsCapture;
-      checkRun: InitialCheckRunInput;
-      sourceDigest?: undefined;
-      contentKind?: undefined;
-      storage?: undefined;
-      decryptionKeyUnused?: undefined;
-    }
-  | {
-      sourceDigest: string;
-      encrypted: boolean;
-      contentKind: ExternalContentKind;
-      decryptionKeyUnused: boolean;
-      storage?: ExternalStorageInput;
-      details: ExternalDetailsCapture;
-      checkRun: InitialCheckRunInput;
-    };
+export type UnobservedOutcome = {
+  encrypted: null;
+  details: ExternalDetailsCapture;
+  checkRun: InitialCheckRunInput;
+  sourceDigest?: undefined;
+  contentKind?: undefined;
+  storage?: undefined;
+  decryptionKeyUnused?: undefined;
+  contentDigest?: undefined;
+  duplicateOfRecordId?: undefined;
+  observedContentDigest?: undefined;
+};
+
+/**
+ * A body that was reached and is not a signed credential, so there is no
+ * signed artefact to take an identity from and nothing it can duplicate.
+ */
+export type NonCredentialOutcome = {
+  sourceDigest: string;
+  encrypted: boolean;
+  contentKind: typeof ExternalContentKind.JSON_OBJECT | typeof ExternalContentKind.OPAQUE;
+  decryptionKeyUnused: boolean;
+  contentDigest?: undefined;
+  duplicateOfRecordId?: undefined;
+  observedContentDigest?: undefined;
+  storage?: ExternalStorageInput;
+  details: ExternalDetailsCapture;
+  checkRun: InitialCheckRunInput;
+};
+
+/**
+ * A signed credential this request opened. It carries the content identity
+ * unless another record in the tenant already holds it, in which case the
+ * identity stays with that record and `duplicateOfRecordId` names it.
+ *
+ * The duplicate arm also reports `observedContentDigest`, the identity this
+ * request computed, which is never written to the advisory row. It is what
+ * the recover caller revalidates against. At commit, under its own lock, that
+ * caller confirms the named record still holds `observedContentDigest`. If it
+ * no longer does, the caller resolves the current holder by tenant and digest,
+ * excluding itself, and points at that row instead. If nobody holds it, the
+ * caller persists the digest with no pointer. A recover collision is never
+ * routed through `createExternalCredential`, whose collision mapping answers
+ * a registration rather than a recovery.
+ */
+export type CredentialOutcome = {
+  sourceDigest: string;
+  encrypted: boolean;
+  contentKind: typeof ExternalContentKind.CREDENTIAL;
+  decryptionKeyUnused: boolean;
+  storage?: ExternalStorageInput;
+  details: ExternalDetailsCapture;
+  checkRun: InitialCheckRunInput;
+} & (
+  | { contentDigest?: string; duplicateOfRecordId?: undefined; observedContentDigest?: undefined }
+  | { contentDigest?: undefined; duplicateOfRecordId: string; observedContentDigest: string }
+);
+
+/**
+ * The fields of the create input that depend on how far the in-request work
+ * got, closed per branch: every branch that fetched states its digest, what
+ * it observed, what kind of body it was and whether a key went unused, so no
+ * branch can leave one of those to a default it did not choose.
+ *
+ * `duplicateOfRecordId` is written straight onto the record, and
+ * `observedContentDigest` is not a create-input field at all. Only `recover`
+ * mode produces either, so a registration is typed never to receive one.
+ */
+export type InRequestOutcome = UnobservedOutcome | NonCredentialOutcome | CredentialOutcome;
+
+/** What `register` mode returns. No branch of it points at another record. */
+export type RegisterInRequestOutcome =
+  | UnobservedOutcome
+  | NonCredentialOutcome
+  | (Omit<CredentialOutcome, 'contentDigest' | 'duplicateOfRecordId' | 'observedContentDigest'> & {
+      contentDigest?: string;
+      duplicateOfRecordId?: undefined;
+      observedContentDigest?: undefined;
+    });
+
+/** What `recover` mode returns, the duplicate pointer included. */
+export type RecoverInRequestOutcome = InRequestOutcome;
 
 const pendingDetails: ExternalDetailsCapture = { status: CredentialDetailsStatus.EXTRACTION_PENDING };
 
@@ -201,10 +287,29 @@ const pendingDetails: ExternalDetailsCapture = { status: CredentialDetailsStatus
  * Walks the register outcome table, one branch per row, and returns the
  * whole row-dependent part of the record at once so no branch can leave a
  * field to a default it did not choose.
+ *
+ * `mode` says who is calling. In `register` mode two branches stop the
+ * request and both throw, a source the guard refused and content already
+ * registered in the tenant. In `recover` mode both come back as outcomes
+ * instead, because a record already exists and the caller is updating it. A
+ * recovered record that matches another still fetches, stores and records a
+ * run. What it gives up is the content identity, which stays with the record
+ * that already holds it and is named on the outcome as `duplicateOfRecordId`.
  */
-async function settleInRequest(
+export async function settleInRequest(
   input: RegisterExternalCredentialInput,
   deps: RegisterExternalCredentialDependencies,
+  options: RegisterModeOptions,
+): Promise<RegisterInRequestOutcome>;
+export async function settleInRequest(
+  input: RegisterExternalCredentialInput,
+  deps: RegisterExternalCredentialDependencies,
+  options: RecoverModeOptions,
+): Promise<RecoverInRequestOutcome>;
+export async function settleInRequest(
+  input: RegisterExternalCredentialInput,
+  deps: RegisterExternalCredentialDependencies,
+  options: SettleInRequestOptions,
 ): Promise<InRequestOutcome> {
   const { tenantId, sourceUrl } = input;
 
@@ -214,6 +319,24 @@ async function settleInRequest(
   } catch (error) {
     if (!(error instanceof CredentialDocumentFetchError)) throw error;
     if (error.failure.kind === 'rejected') {
+      if (options.mode === 'recover') {
+        logger.warn(
+          { tenantId, source: originOf(sourceUrl), reason: error.failure.reason },
+          'The stored source was refused by the guard on re-verification',
+        );
+        return {
+          encrypted: null,
+          details: pendingDetails,
+          checkRun: failedRun(
+            { retrieval: CheckResult.FAIL },
+            {
+              code: CheckRunFailureCode.RETRIEVAL_FAILED,
+              message: error.failure.error.message,
+              retryable: false,
+            },
+          ),
+        };
+      }
       throw new SourceRejectedError(error.failure);
     }
     // The transient and the deterministic retrieval rows: nothing observed,
@@ -240,16 +363,38 @@ async function settleInRequest(
     return settleUnopened(reading, sourceDigest, document, tenantId, sourceUrl, deps);
   }
 
+  const { content, encrypted, keyUnused } = reading;
+  const details = detailsOf(content, sourceUrl);
+  const contentDigest = await contentDigestOf(content);
+
+  let duplicateOfRecordId: string | undefined;
+  if (contentDigest !== undefined) {
+    const existingRecordId = await deps.findExistingExternal(
+      tenantId,
+      contentDigest,
+      options.mode === 'recover' ? options.currentRecordId : undefined,
+    );
+    if (existingRecordId !== null) {
+      logger.info(
+        { tenantId, source: originOf(sourceUrl), existingRecordId },
+        'Credential content is already registered',
+      );
+      if (options.mode === 'register') throw new DuplicateCredentialError(existingRecordId);
+      duplicateOfRecordId = existingRecordId;
+    }
+  }
+  const identity = identityOf(content, contentDigest, duplicateOfRecordId);
+
   // The D10 preflight, immediately before the one store that asks the
-  // storage service for a key; a failure here creates no record.
+  // storage service for a key; a failure here creates no record. Keeping it
+  // after the duplicate check means a duplicate answers 409 even where this
+  // deployment's encryption key is misconfigured.
   try {
     deps.assertEncryptionReady();
   } catch (error) {
     throw new EncryptionUnavailableError(error);
   }
 
-  const { content, encrypted, keyUnused } = reading;
-  const details = detailsOf(content, sourceUrl);
   const decryption = encrypted ? CheckResult.PASS : CheckResult.NOT_RUN;
   // The contract's digest check belongs to the signed form; a body that is
   // not a credential has none to digest, so the check did not apply.
@@ -260,7 +405,7 @@ async function settleInRequest(
     return {
       sourceDigest,
       encrypted,
-      contentKind: content.kind,
+      ...identity,
       decryptionKeyUnused: keyUnused,
       details,
       checkRun: failedRun({ retrieval: CheckResult.PASS, decryption }, stored.failure),
@@ -269,7 +414,7 @@ async function settleInRequest(
   return {
     sourceDigest,
     encrypted,
-    contentKind: content.kind,
+    ...identity,
     storage: stored.storage,
     decryptionKeyUnused: keyUnused,
     details,
@@ -279,6 +424,46 @@ async function settleInRequest(
       enqueue: deps.enqueueVerification,
     },
   };
+}
+
+/**
+ * What the observed body says about content identity. A signed credential
+ * carries the identity, or gives it up to the record already holding it and
+ * names that record instead, reporting the identity it observed so the caller
+ * can revalidate the pointer before writing it. The digest column and the
+ * pointer are exclusive, in the type and in the database. A body that is not
+ * a credential carries neither.
+ */
+type ObservedContentIdentity =
+  | {
+      contentKind: typeof ExternalContentKind.CREDENTIAL;
+      contentDigest?: string;
+      duplicateOfRecordId?: undefined;
+      observedContentDigest?: undefined;
+    }
+  | {
+      contentKind: typeof ExternalContentKind.CREDENTIAL;
+      contentDigest?: undefined;
+      duplicateOfRecordId: string;
+      observedContentDigest: string;
+    }
+  | {
+      contentKind: typeof ExternalContentKind.JSON_OBJECT | typeof ExternalContentKind.OPAQUE;
+      contentDigest?: undefined;
+      duplicateOfRecordId?: undefined;
+      observedContentDigest?: undefined;
+    };
+
+function identityOf(
+  content: OpenedContent,
+  contentDigest: string | undefined,
+  duplicateOfRecordId: string | undefined,
+): ObservedContentIdentity {
+  if (content.kind !== ExternalContentKind.CREDENTIAL) return { contentKind: content.kind };
+  if (duplicateOfRecordId !== undefined && contentDigest !== undefined) {
+    return { contentKind: content.kind, duplicateOfRecordId, observedContentDigest: contentDigest };
+  }
+  return { contentKind: content.kind, ...(contentDigest === undefined ? {} : { contentDigest }) };
 }
 
 /**
@@ -419,7 +604,10 @@ async function store(
     // A refusal (the service rejected the content, typically a content type
     // its upload allowlist does not carry) is not an outage: the same
     // request fails the same way until an operator changes the service.
-    logger.error({ err: error, tenantId, source: originOf(sourceUrl) }, 'Durable copy could not be stored');
+    logger.error(
+      { error: safeError(error), tenantId, source: originOf(sourceUrl) },
+      'Durable copy could not be stored',
+    );
     const refused = error instanceof StoragePayloadError;
     return {
       outcome: 'failed',
@@ -449,7 +637,7 @@ async function store(
     // reference it: the same orphan line as every other post-store failure.
     logger.error(
       {
-        err: error,
+        error: safeError(error),
         tenantId,
         storageUri: record.uri,
         storageExternalId: record.externalId,

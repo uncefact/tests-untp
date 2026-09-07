@@ -8,7 +8,9 @@ const jestConfig = {
   // Integration-layer files run only via jest.integration.config.mjs; the
   // unit run must never collect them (they expect the rig's database).
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '\\.integration\\.test\\.'],
-  transformIgnorePatterns: ['node_modules/(?!@reference-implementation|uuid)'],
+  // `multiformats` ships ES modules only. It is let through so the transform
+  // below can rewrite it, in both the pnpm store layout and a hoisted one.
+  transformIgnorePatterns: ['node_modules/(?!@reference-implementation|uuid|\\.pnpm/multiformats|multiformats/)'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
@@ -25,6 +27,11 @@ const jestConfig = {
     '^@uncefact/untp-ri-services/verifiable-credential$': '<rootDir>/../services/build/verifiable-credential/index.js',
     '^@uncefact/untp-ri-services/key-provider$': '<rootDir>/../services/build/key-provider/index.js',
     '^@uncefact/untp-ri-services$': '<rootDir>/../services/build/index.js',
+    // Reached only by a suite that opts into the real multibase digest
+    // utility in place of the stub below. `multiformats` publishes an
+    // `import` condition only, which this resolver cannot follow, so its
+    // subpaths are pointed at the package's files directly.
+    '^multiformats/(.*)$': '<rootDir>/../untp-utils/node_modules/multiformats/dist/src/$1.js',
     '^@uncefact/untp-utils/multibase-digest$': '<rootDir>/src/__mocks__/uncefact/multibase-digest.ts',
     // Mapped to TypeScript source (not the ESM build) so tests can
     // `jest.requireActual` the canonical SSRF guard's error classes.
@@ -45,6 +52,12 @@ const jestConfig = {
       '<rootDir>/node_modules/@reference-implementation/components/build/index.js',
   },
   transform: {
+    // Listed first: jest uses the first matching pattern. ts-jest leaves the
+    // `import` statements of a JavaScript file in place, so `multiformats`
+    // goes through the same rewrite the integration rig uses for its own
+    // ESM-only dependencies.
+    'node_modules/(?:\\.pnpm/)?multiformats@?.*\\.js$':
+      '<rootDir>/__tests__/integration/rig/esm-to-cjs-transformer.mjs',
     '^.+\\.m?[tj]sx?$': [
       'ts-jest',
       {

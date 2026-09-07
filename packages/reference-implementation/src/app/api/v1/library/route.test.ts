@@ -1,8 +1,11 @@
 // Mock next/server before importing the route handler (jsdom lacks Request/Response)
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: (body: unknown, init?: { status?: number }) => ({
+    json: (body: unknown, init?: { status?: number; headers?: Record<string, string> }) => ({
       status: init?.status ?? 200,
+      headers: {
+        get: (name: string) => init?.headers?.[name] ?? null,
+      },
       json: async () => body,
     }),
   },
@@ -61,9 +64,13 @@ jest.mock('@/lib/prisma/repositories/idempotency-key.repository', () => {
 });
 
 const mockGetExternalCredentialById = jest.fn();
-jest.mock('@/lib/prisma/repositories/external-credential.repository', () => ({
-  getExternalCredentialById: (...args: unknown[]) => mockGetExternalCredentialById(...args),
-}));
+jest.mock('@/lib/prisma/repositories/external-credential.repository', () => {
+  const actual = jest.requireActual('@/lib/prisma/repositories/external-credential.repository');
+  return {
+    DuplicateCredentialError: actual.DuplicateCredentialError,
+    getExternalCredentialById: (...args: unknown[]) => mockGetExternalCredentialById(...args),
+  };
+});
 
 // register-external-credential reaches the resolvers barrel, whose
 // multiformats subpath exports do not resolve under jest; the resolver itself
@@ -105,6 +112,7 @@ import {
   type ExternalCredential,
   type LibraryRecord,
 } from '@/lib/prisma/generated';
+import { DuplicateCredentialError } from '@/lib/prisma/repositories/external-credential.repository';
 import type { ExternalCredentialRecord } from '@/lib/prisma/repositories/external-credential.repository';
 import {
   EncryptionUnavailableError,
@@ -186,9 +194,10 @@ const AUTH_CONTEXT = { tenantId: 'tenant-1', params: Promise.resolve({}) };
 async function post(req: Request) {
   const response = (await POST(req as never, AUTH_CONTEXT as never)) as unknown as {
     status: number;
+    headers: { get: (name: string) => string | null };
     json: () => Promise<Record<string, unknown>>;
   };
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, headers: response.headers, body: await response.json() };
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +253,8 @@ function external(overrides: Partial<ExternalCredential> = {}): ExternalCredenti
     origin: LibraryRecordOrigin.EXTERNAL,
     sourceUrl: SOURCE_URL,
     sourceDigest: 'zQmSourceDigest',
+    contentDigest: null,
+    duplicateOfRecordId: null,
     encrypted: false,
     contentKind: ExternalContentKind.CREDENTIAL,
     storageUri: 'https://storage.example/objects/abc',
@@ -351,6 +362,19 @@ describe('POST /api/v1/library idempotency header', () => {
     expect(status).toBe(400);
     expect(body.code).toBe('VALIDATION_FAILED');
     expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+  });
+
+  it('answers 422 for a key already used with a different body, before the pipeline runs', async () => {
+    // The body is valid, so nothing but the key settles this request. Fails
+    // if the mismatch is answered after the source has been fetched, which
+    // would let a changed body reach the supplier before being refused.
+    mockFindIdempotencyKey.mockResolvedValue({ outcome: 'mismatch' });
+    const { status, body } = await post(registerRequest(validBody()));
+
+    expect(status).toBe(422);
+    expect(body.code).toBe('IDEMPOTENCY_KEY_MISMATCH');
+    expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+    expect(mockRegisterExternalCredential).not.toHaveBeenCalled();
   });
 
   it('answers 422 for a key already used with a different body, before parsing this one', async () => {
@@ -583,7 +607,13 @@ describe('POST /api/v1/library registration failures', () => {
   });
 
   it('answers 500 CREDENTIALS_ENCRYPTION_UNAVAILABLE and releases the claim when encryption is not available', async () => {
-    mockRegisterExternalCredential.mockRejectedValue(new EncryptionUnavailableError(new Error('no key material')));
+    // The wrapper's message says only that encryption is unavailable, so the
+    // operator's line has to carry the reason from its cause. Fails if that
+    // one level stops being logged, or if anything deeper than it is.
+    const reason = new Error('Missing required DATA_ENCRYPTION_KEY environment variable.', {
+      cause: new Error('a deeper failure nobody should see'),
+    });
+    mockRegisterExternalCredential.mockRejectedValue(new EncryptionUnavailableError(reason));
     const { status, body } = await post(registerRequest(validBody()));
 
     expect(status).toBe(500);
@@ -592,6 +622,38 @@ describe('POST /api/v1/library registration failures', () => {
       code: 'CREDENTIALS_ENCRYPTION_UNAVAILABLE',
     });
     expect(mockReleaseIdempotencyKey).toHaveBeenCalledWith({ claimId: 'claim-1' });
+    expect(loggerCalls.error).toHaveBeenCalledWith(
+      {
+        error: { name: 'EncryptionUnavailableError', message: 'Credential storage encryption is not available.' },
+        cause: { name: 'Error', message: 'Missing required DATA_ENCRYPTION_KEY environment variable.' },
+        tenantId: 'tenant-1',
+        source: 'https://supplier.example',
+      },
+      'Encryption preflight failed; no record was created',
+    );
+  });
+
+  it('answers the named duplicate conflict, points at the existing record, and releases the unused claim', async () => {
+    // Fails if duplicate registration consumes the retry key, loses the
+    // existing id, or lets the shared mapper discard the Location header.
+    mockRegisterExternalCredential.mockRejectedValueOnce(new DuplicateCredentialError(RECORD_ID));
+
+    const response = await post(registerRequest(validBody()));
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      error: `This credential is already registered as record ${RECORD_ID}.`,
+      code: 'DUPLICATE_CREDENTIAL',
+    });
+    expect(response.headers.get('Location')).toBe(`/api/v1/library/${RECORD_ID}`);
+    expect(mockReleaseIdempotencyKey).toHaveBeenCalledWith({ claimId: 'claim-1' });
+    // Building the response here bypasses the shared mapper, and with it the
+    // conflict line every other 409 on this route leaves. Fails if this
+    // rejection goes back to being the one conflict with no log entry.
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      { tenantId: 'tenant-1', source: 'https://supplier.example', existingRecordId: RECORD_ID },
+      'Duplicate credential content',
+    );
   });
 
   it('answers 409 without releasing when another request took the claim', async () => {

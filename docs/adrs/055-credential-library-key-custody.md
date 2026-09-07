@@ -72,7 +72,7 @@ Negative:
 ## Not decided here
 
 - Where and how the background work that uses these keys runs. The background-work ADR in this set decides the substrate; decision 6 only registers the non-retryable class with it.
-- Duplicate detection for a record whose content only becomes readable after a late key. The advisory-warning shape ships with #956; the open native-cross-match question stays open there.
+- Duplicate detection for a record whose content only becomes readable after a late key. ADR-056 decides the identity and the advisory pointer shape (#956); the writer for the late-key case lands with #957, and the native-cross-match question stays open.
 - Per-tenant storage quotas for durable copies, opened or not. Tracked separately.
 
 ## References
