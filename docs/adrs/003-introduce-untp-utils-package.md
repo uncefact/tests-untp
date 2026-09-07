@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-09-07):** The package now also carries the UNTP schemas and JSON-LD contexts it serves as an offline fallback (#1006), alongside the earlier UNTP-specific modules under `src/artefacts/` and `src/conformity-vocabulary/`. The original "anything that knows about UNTP credentials" exclusion no longer describes the package; shared, versioned knowledge of the published UNTP artefacts lives here, while credential business logic and adapter wiring stay in `@uncefact/untp-ri-services`.
 - **Update (2026-05-13):** The `@uncefact/untp-*` scope established here applies to **publishable libraries only**. With the pnpm migration (ADR 030), private apps (`untp-reference-implementation`, `untp-playground`) were renamed to unscoped names since they are deployed Docker images, not npm packages, and the scope was misleading. Publishable libraries (`@uncefact/untp-utils`, `@uncefact/untp-ri-services`) keep the scope.
 
 ## Context

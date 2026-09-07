@@ -140,6 +140,8 @@ Every outbound document fetch the application makes (remote JSON-LD `@context` d
 
 Remote `@context` documents fetched during credential issuance are cached in memory. `CONTEXT_CACHE_TTL_MS` controls how long a fetched context is reused (default one hour; `0` disables caching), matching `SCHEMA_CACHE_TTL_MS` for JSON Schemas. A change to a remote context document is therefore observed at most one TTL after it is published. Both caches also bound how many entries they retain: `CACHE_MAX_ENTRIES` (default 1000, applied to each cache) caps the entry count, evicting expired entries first and then the least recently used. When it is set, startup validates it is a positive integer and fails with a message naming the variable otherwise.
 
+### Bundled Artefact Fallback Validation
+
 The UNTP schemas and contexts for every release from 0.6.0 onwards, and the Verifiable Credentials Data Model v2 context, are bundled with the service and stand in when their publishing host cannot deliver them. `BUNDLED_ARTEFACTS_FALLBACK=false` turns that off; any other value than `true` or `false` fails startup with a message naming the variable. See [Bundled UNTP Artefacts](./bundled-untp-artefacts.md).
 
 ### Idempotency Claim Window Validation

@@ -5,7 +5,7 @@ title: Bundled UNTP Artefacts
 
 # Bundled UNTP Artefacts
 
-Issuing a credential validates its payload against the UNTP JSON Schema and JSON-LD context for the version it declares. Those artefacts are published on the UNTP hosts (`untp.unece.org` from 0.7.0, `test.uncefact.org` and `vocabulary.uncefact.org` for earlier versions and the unified context) and, for the Verifiable Credentials Data Model, on `www.w3.org` (context) and `w3c.github.io` (schema), and the service fetches them on demand. An outage at one of those hosts used to fail every issuance with `SCHEMA_FETCH_FAILED` or `JSONLD_CONTEXT_FETCH_FAILED` until the host came back, even though the artefacts had not changed.
+Issuing a credential validates its payload against the UNTP JSON Schema and JSON-LD context for the version it declares. Those artefacts are published on the UNTP hosts (`untp.unece.org` for the 0.7.0 schemas, `vocabulary.uncefact.org` for the 0.7.0 unified context, `test.uncefact.org` for everything earlier) and, for the Verifiable Credentials Data Model, on `www.w3.org` (context) and `w3c.github.io` (schema), and the service fetches them on demand. An outage at one of those hosts used to fail every issuance with `SCHEMA_FETCH_FAILED` or `JSONLD_CONTEXT_FETCH_FAILED` until the host came back, even though the artefacts had not changed.
 
 Published artefacts are immutable once released, so a copy of each one ships inside the service and stands in when the host cannot deliver it. This is on by default and needs no configuration.
 
