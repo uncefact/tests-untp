@@ -146,6 +146,22 @@ describe('validateCredentialPayload', () => {
     expect((error as Error).cause).toBe(wrapped);
   });
 
+  it('maps a fetched-but-unusable context (context-invalid) to JSONLD_CONTEXT_FETCH_FAILED, not a document fault', async () => {
+    mockValidateAgainstSchemas.mockResolvedValue(undefined);
+    mockValidateJsonLd.mockRejectedValue(new JsonLdExpansionFailedError(new Error('wrapped')));
+    mockDescribeJsonLdFailure.mockReturnValue({
+      kind: 'context-invalid',
+      detail: 'a remote @context document was fetched but could not be used as a context',
+      code: 'invalid remote context',
+      url: 'https://example.com/ctx',
+    });
+
+    const error = await validateCredentialPayload(payload, schemaUrls, loader).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).code).toBe('JSONLD_CONTEXT_FETCH_FAILED');
+    expect((error as ValidationError).message).toContain('could not be used as a context');
+  });
+
   it('attaches the schema failure as the cause of the mapped ValidationError', async () => {
     const schemaError = new SchemaPayloadError([{ code: 'schema.payload-invalid', message: 'Missing "id"' }]);
     mockValidateAgainstSchemas.mockRejectedValue(schemaError);

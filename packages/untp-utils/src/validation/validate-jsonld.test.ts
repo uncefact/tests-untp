@@ -4,12 +4,14 @@ import type { LoadedRemoteDocument } from '../loaders/jsonld-document-loader.js'
 import { JsonLdExpansionFailedError, JsonLdInvalidShapeError, JsonLdValidationError } from './errors.js';
 
 const toRDF = jest.fn();
+const expand = jest.fn();
 const documentLoader = jest.fn();
 const createJsonLdDocumentLoader = jest.fn(() => documentLoader);
 
 jest.unstable_mockModule('jsonld', () => ({
-  default: { toRDF },
+  default: { toRDF, expand },
   toRDF,
+  expand,
 }));
 
 // The loader factory is mocked so this suite can assert the option threading
@@ -19,11 +21,12 @@ jest.unstable_mockModule('../loaders/jsonld-document-loader.js', () => ({
   createJsonLdDocumentLoader,
 }));
 
-const { validateJsonLd } = await import('./validate-jsonld.js');
+const { validateJsonLd, expandJsonLd } = await import('./validate-jsonld.js');
 
 describe('validateJsonLd', () => {
   beforeEach(() => {
     toRDF.mockReset();
+    expand.mockReset();
     documentLoader.mockReset();
     createJsonLdDocumentLoader.mockClear();
   });
@@ -271,5 +274,50 @@ describe('validateJsonLd', () => {
     await expect(validateJsonLd(null)).rejects.toBeInstanceOf(JsonLdValidationError);
     toRDF.mockRejectedValue(new Error('x') as never);
     await expect(validateJsonLd({})).rejects.toBeInstanceOf(JsonLdValidationError);
+  });
+});
+
+describe('expandJsonLd', () => {
+  beforeEach(() => {
+    expand.mockReset();
+    createJsonLdDocumentLoader.mockClear();
+  });
+
+  it('returns the expanded document from jsonld.expand run in safe mode through the guarded loader', async () => {
+    const expanded = [{ '@type': ['https://example.com/T'] }];
+    expand.mockResolvedValue(expanded as never);
+    await expect(expandJsonLd({ '@context': 'https://example.com', type: 'T' })).resolves.toBe(expanded);
+    expect(expand).toHaveBeenCalledWith(
+      { '@context': 'https://example.com', type: 'T' },
+      expect.objectContaining({ safe: true, documentLoader: expect.any(Function) }),
+    );
+    expect(createJsonLdDocumentLoader).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a document that is not an object with JsonLdInvalidShapeError', async () => {
+    await expect(expandJsonLd('nope')).rejects.toBeInstanceOf(JsonLdInvalidShapeError);
+    expect(expand).not.toHaveBeenCalled();
+  });
+
+  it('wraps a jsonld rejection as JsonLdExpansionFailedError with the loader failure as its cause', async () => {
+    const loaderFailure = new Error('refused');
+    documentLoader.mockRejectedValue(loaderFailure as never);
+    expand.mockImplementation((async (_doc: unknown, opts: { documentLoader: (url: string) => Promise<unknown> }) => {
+      await opts.documentLoader('https://example.com');
+    }) as never);
+    const error = await expandJsonLd({ '@context': 'https://example.com' }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonLdExpansionFailedError);
+    expect((error as Error).cause).toBe(loaderFailure);
+  });
+
+  it('uses a caller-supplied document loader instead of building one', async () => {
+    const supplied = jest.fn(async (url: string) => ({ documentUrl: url, document: {} }));
+    expand.mockImplementation((async (_doc: unknown, opts: { documentLoader: (url: string) => Promise<unknown> }) => {
+      await opts.documentLoader('https://example.com');
+      return [];
+    }) as never);
+    await expandJsonLd({ '@context': 'https://example.com' }, { documentLoader: supplied });
+    expect(supplied).toHaveBeenCalledWith('https://example.com');
+    expect(createJsonLdDocumentLoader).not.toHaveBeenCalled();
   });
 });
