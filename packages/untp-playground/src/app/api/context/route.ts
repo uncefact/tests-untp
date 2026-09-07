@@ -1,12 +1,8 @@
 import { createInMemoryTtlCache } from '@uncefact/untp-utils/cache';
 import { createJsonLdDocumentLoader, type LoadedRemoteDocument } from '@uncefact/untp-utils/loaders';
-import {
-  describeJsonLdFailure,
-  expandJsonLd,
-  JsonLdValidationError,
-  type JsonLdFailureDescription,
-} from '@uncefact/untp-utils/validation';
+import { describeJsonLdFailure, expandJsonLd, JsonLdValidationError } from '@uncefact/untp-utils/validation';
 import { NextResponse } from 'next/server';
+import type { ContextFailure } from '@/lib/contextFailure';
 
 // The guarded document loader resolves DNS and pins connections through
 // undici, which needs the Node runtime (as `/api/fetch` does).
@@ -23,13 +19,6 @@ const CONTEXT_CACHE_MAX_ENTRIES = 200;
  * document was not judged. Everything else (422) is the classifier's
  * description of why the document or its contexts could not be expanded.
  */
-export interface ContextServiceFailure {
-  kind: 'request' | 'service';
-  detail: string;
-}
-
-export type ContextFailure = JsonLdFailureDescription | ContextServiceFailure;
-
 /**
  * 200 carries the expanded form. Every failure carries the description's
  * detail as `error` (the repo's `{ error, code? }` convention, as

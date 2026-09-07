@@ -590,9 +590,6 @@ importers:
       handlebars:
         specifier: ^4.7.9
         version: 4.7.9
-      jsonld:
-        specifier: ^8.3.3
-        version: 8.3.3(web-streams-polyfill@3.3.3)
       jwt-decode:
         specifier: ^4.0.0
         version: 4.0.0
@@ -633,9 +630,6 @@ importers:
       '@types/canvas-confetti':
         specifier: ^1.6.4
         version: 1.9.0
-      '@types/jsonld':
-        specifier: ^1.5.15
-        version: 1.5.15
       '@types/node':
         specifier: ^20
         version: 20.10.6

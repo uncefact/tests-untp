@@ -43,7 +43,8 @@ export async function validateCredentialPayload(
       // the full cause chain rides on the ValidationError for the server log.
       const failure = describeJsonLdFailure(e);
       const code = failure.kind === 'document' ? 'JSONLD_DOCUMENT_INVALID' : 'JSONLD_CONTEXT_FETCH_FAILED';
-      throw new ValidationError(`JSON-LD validation failed: ${failure.detail}`, { code, cause: e });
+      const where = 'url' in failure && failure.url ? ` (@context ${failure.url})` : '';
+      throw new ValidationError(`JSON-LD validation failed: ${failure.detail}${where}`, { code, cause: e });
     }
     throw e;
   }

@@ -1,9 +1,6 @@
-import type {
-  JsonLdContextFailure,
-  JsonLdDocumentFailure,
-  JsonLdFailureDescription,
-} from '@uncefact/untp-utils/validation';
+import type { JsonLdContextFailure, JsonLdDocumentFailure } from '@uncefact/untp-utils/validation';
 import { ValidationError } from '@/types';
+import type { ContextFailure, ContextServiceFailure } from './contextFailure';
 import { API_BASE_PATH } from '../../constants';
 
 interface ValidationResult {
@@ -11,12 +8,6 @@ interface ValidationResult {
   /** The expanded JSON-LD form (an array of node objects) when valid. */
   data?: unknown[];
   error?: ValidationError;
-}
-
-/** A failure the context service reports about the request or itself, rather than about the document. */
-interface ServiceFailure {
-  kind: 'request' | 'service';
-  detail: string;
 }
 
 interface RequiredFieldsResult {
@@ -52,13 +43,11 @@ export async function validateContext(credential: Record<string, any>): Promise<
   } catch (error) {
     return {
       valid: false,
-      error: {
-        keyword: 'unknown',
-        message: `The Playground's context service could not be reached (${
+      error: serviceError(
+        `The Playground's context service could not be reached (${
           error instanceof Error ? error.message : String(error)
         }). Retry in a moment.`,
-        instancePath: '',
-      },
+      ),
     };
   }
 
@@ -68,15 +57,21 @@ export async function validateContext(credential: Record<string, any>): Promise<
   } catch {
     return {
       valid: false,
-      error: {
-        keyword: 'unknown',
-        message: `The Playground's context service answered ${response.status} without a readable result. Retry in a moment.`,
-        instancePath: '',
-      },
+      error: serviceError(
+        `The Playground's context service answered ${response.status} without a readable result. Retry in a moment.`,
+      ),
     };
   }
   if (response.ok) {
-    return { valid: true, data: Array.isArray(payload.expanded) ? payload.expanded : [payload.expanded] };
+    if (!Array.isArray(payload?.expanded)) {
+      return {
+        valid: false,
+        error: serviceError(
+          `The Playground's context service answered ${response.status} without an expanded document. Retry in a moment.`,
+        ),
+      };
+    }
+    return { valid: true, data: payload.expanded };
   }
   return { valid: false, error: describeJsonLdError(payload.failure) };
 }
@@ -99,13 +94,7 @@ export function validateRequiredFields(credential: Record<string, any>): Require
  * description's own detail.
  */
 export function describeJsonLdError(failure: unknown): ValidationError {
-  if (!isFailureDescription(failure)) {
-    return {
-      keyword: 'unknown',
-      message: 'Failed to validate the JSON-LD context. The context service returned no diagnostic information.',
-      instancePath: '',
-    };
-  }
+  if (!isFailureDescription(failure)) return NO_DIAGNOSTIC;
 
   switch (failure.kind) {
     case 'context-fetch':
@@ -116,16 +105,30 @@ export function describeJsonLdError(failure: unknown): ValidationError {
     case 'request':
     case 'service':
       // The service did not judge the document at all.
-      return {
-        keyword: 'unknown',
-        message: `The Playground's context service could not process the request: ${failure.detail}`,
-        instancePath: '',
-        params: { kind: failure.kind },
-      };
+      return serviceError(
+        `The Playground's context service could not process the request: ${failure.detail}`,
+        failure.kind,
+      );
+    default:
+      return NO_DIAGNOSTIC;
   }
 }
 
-function isFailureDescription(value: unknown): value is JsonLdFailureDescription | ServiceFailure {
+const NO_DIAGNOSTIC: ValidationError = {
+  keyword: 'unknown',
+  message: 'Failed to validate the JSON-LD context. The context service returned no diagnostic information.',
+  instancePath: '',
+};
+
+/** The service, not the credential, failed: the dialog keys its heading and tip on this keyword. */
+function serviceError(
+  message: string,
+  kind: ContextServiceFailure['kind'] | 'unreachable' = 'unreachable',
+): ValidationError {
+  return { keyword: 'jsonldService', message, instancePath: '', params: { kind } };
+}
+
+function isFailureDescription(value: unknown): value is ContextFailure {
   if (typeof value !== 'object' || value === null) return false;
   const { kind, detail } = value as { kind?: unknown; detail?: unknown };
   return (
@@ -144,8 +147,8 @@ function describeContextFailure(failure: JsonLdContextFailure): ValidationError 
   let message: string;
   if (failure.kind === 'context-invalid') {
     message = url
-      ? `The @context at "${url}" was fetched but isn't a usable JSON-LD context (it must be a JSON object carrying "@context").`
-      : 'A @context URL was fetched but isn\'t a usable JSON-LD context (it must be a JSON object carrying "@context").';
+      ? `The @context at "${url}" was fetched but isn't a usable JSON-LD context. Reported cause: ${failure.detail}.`
+      : `A @context URL was fetched but isn't a usable JSON-LD context. Reported cause: ${failure.detail}.`;
   } else if (url) {
     message = `Couldn't load the @context at "${url}". Common causes: the URL is unreachable, is not https, resolves to a private address, redirected too many times, or returned a non-JSON-LD response. Reported cause: ${failure.detail}.`;
   } else {
@@ -156,7 +159,7 @@ function describeContextFailure(failure: JsonLdContextFailure): ValidationError 
     keyword: 'jsonldUrl',
     message,
     instancePath: '@context',
-    params: { code, url, cause: failure.detail },
+    params: { kind: failure.kind, code, url, cause: failure.detail },
   };
 }
 

@@ -160,6 +160,7 @@ describe('validateCredentialPayload', () => {
     expect(error).toBeInstanceOf(ValidationError);
     expect((error as ValidationError).code).toBe('JSONLD_CONTEXT_FETCH_FAILED');
     expect((error as ValidationError).message).toContain('could not be used as a context');
+    expect((error as ValidationError).message).toContain('(@context https://example.com/ctx)');
   });
 
   it('attaches the schema failure as the cause of the mapped ValidationError', async () => {

@@ -26,13 +26,17 @@ const getReadableKeyword = (keyword: string) => {
     jsonldUrl: 'JSON-LD context URL',
     jsonldSyntax: 'JSON-LD syntax',
     jsonldValidation: 'JSON-LD validation',
+    jsonldService: 'context service',
     unknown: 'unknown error',
   };
   return keywords[keyword] || keyword;
 };
 
 const isJsonLdKeyword = (keyword: string) =>
-  keyword === 'jsonldUrl' || keyword === 'jsonldSyntax' || keyword === 'jsonldValidation';
+  keyword === 'jsonldUrl' ||
+  keyword === 'jsonldSyntax' ||
+  keyword === 'jsonldValidation' ||
+  keyword === 'jsonldService';
 
 const jsType = (value: unknown): string => {
   if (value === null) return 'null';
@@ -65,8 +69,21 @@ const correctiveExample = (mainError: { params?: Record<string, any>; data?: unk
   return null;
 };
 
+// A resolver code means the URL passed the guard and the host failed to
+// deliver; a guard refusal carries no code and an untyped load failure
+// carries jsonld's own, so both stay "fix the URL".
+const isHostDeliveryFailure = (params?: Record<string, any>) =>
+  params?.kind === 'context-fetch' && typeof params?.code === 'string' && params.code.startsWith('resolver.');
+
 const jsonLdHeaderText = (mainError: { keyword: string; params?: Record<string, any> }) => {
-  if (mainError.keyword === 'jsonldUrl') return 'Fix the @context URL';
+  if (mainError.keyword === 'jsonldService') return 'Context service unavailable';
+  if (mainError.keyword === 'jsonldUrl') {
+    // The kind and code carried on params separate a URL the verifier can
+    // fix from a remote artefact that is down or unusable.
+    if (mainError.params?.kind === 'context-invalid') return 'Remote @context is not usable';
+    if (isHostDeliveryFailure(mainError.params)) return 'Remote @context could not be fetched';
+    return 'Fix the @context URL';
+  }
   if (mainError.keyword === 'jsonldSyntax') return 'Fix the @context';
   switch (mainError.params?.code) {
     case 'invalid property':
@@ -139,7 +156,15 @@ const getTipMessage = (mainError: ValidationError) => {
     case 'conflictingProperties':
       return 'Resolve the conflict by removing the conflicting field or updating it to a unique one.';
     case 'jsonldUrl':
+      if (mainError.params?.kind === 'context-invalid') {
+        return 'The document at that URL is not a JSON-LD context. This is a problem with the published artefact, not with your credential; contact its publisher, or use a different @context.';
+      }
+      if (isHostDeliveryFailure(mainError.params)) {
+        return 'The context host did not deliver the document. Retry in a moment; if it keeps failing, the host may be down.';
+      }
       return 'Open the URL in a browser. If it does not return JSON-LD, or it requires login, the playground cannot use it as a context.';
+    case 'jsonldService':
+      return 'The Playground could not run the context check. Your credential was not judged. Retry in a moment.';
     case 'jsonldSyntax':
       return mainError.params?.term
         ? `Find "${mainError.params.term}" in your @context and either rename it or remove the redefinition.`

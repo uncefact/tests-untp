@@ -318,6 +318,54 @@ describe('ErrorDialog', () => {
 
       expect(screen.getByText(/Open the URL in a browser/i)).toBeInTheDocument();
     });
+
+    it('shows a host-delivery header and tip when the context host failed after passing the guard', () => {
+      const errors = [
+        {
+          keyword: 'jsonldUrl',
+          instancePath: '@context',
+          message: 'Couldn\'t load the @context at "https://example.invalid/ctx".',
+          params: { kind: 'context-fetch', code: 'resolver.http-error', url: 'https://example.invalid/ctx' },
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button', { name: /remote @context could not be fetched/i }));
+
+      expect(screen.getByText(/the host may be down/i)).toBeInTheDocument();
+    });
+
+    it('shows an unusable-artefact header and tip for a fetched context that is not a context', () => {
+      const errors = [
+        {
+          keyword: 'jsonldUrl',
+          instancePath: '@context',
+          message: 'The @context at "https://example.invalid/ctx" was fetched but isn\'t a usable JSON-LD context.',
+          params: { kind: 'context-invalid', code: 'invalid remote context', url: 'https://example.invalid/ctx' },
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button', { name: /remote @context is not usable/i }));
+
+      expect(screen.getByText(/not with your credential/i)).toBeInTheDocument();
+    });
+
+    it('shows a service header and tip when the context service itself failed', () => {
+      const errors = [
+        {
+          keyword: 'jsonldService',
+          instancePath: '',
+          message: "The Playground's context service could not be reached (Failed to fetch). Retry in a moment.",
+          params: { kind: 'unreachable' },
+        },
+      ] as any;
+
+      render(<ErrorDialog errors={errors} />);
+      fireEvent.click(screen.getByRole('button', { name: /context service unavailable/i }));
+
+      expect(screen.getByText(/Your credential was not judged/i)).toBeInTheDocument();
+    });
   });
 
   describe('AJV verbose data', () => {

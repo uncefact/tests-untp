@@ -62,6 +62,7 @@ describe('contextValidation', () => {
             'Couldn\'t load the @context at "https://no-such-host.invalid/ctx.jsonld". Common causes: the URL is unreachable, is not https, resolves to a private address, redirected too many times, or returned a non-JSON-LD response. Reported cause: could not fetch a remote @context: HTTP 503 from https://no-such-host.invalid/ctx.jsonld.',
           instancePath: '@context',
           params: {
+            kind: 'context-fetch',
             code: 'resolver.http-error',
             url: 'https://no-such-host.invalid/ctx.jsonld',
             cause: 'could not fetch a remote @context: HTTP 503 from https://no-such-host.invalid/ctx.jsonld',
@@ -91,7 +92,12 @@ describe('contextValidation', () => {
         });
         expect(result.keyword).toBe('jsonldUrl');
         expect(result.message).toContain('"https://example.com/ctx" was fetched but isn\'t a usable JSON-LD context');
-        expect(result.params).toMatchObject({ code: 'invalid remote context', url: 'https://example.com/ctx' });
+        expect(result.message).not.toContain('carrying');
+        expect(result.params).toMatchObject({
+          kind: 'context-invalid',
+          code: 'invalid remote context',
+          url: 'https://example.com/ctx',
+        });
       });
     });
 
@@ -220,7 +226,7 @@ describe('contextValidation', () => {
       it('reports a request or service failure as the service not judging the document', () => {
         const result = describeJsonLdError({ kind: 'request', detail: 'Body must carry a JSON object as "document".' });
         expect(result).toEqual({
-          keyword: 'unknown',
+          keyword: 'jsonldService',
           message:
             'The Playground\'s context service could not process the request: Body must carry a JSON object as "document".',
           instancePath: '',
@@ -319,7 +325,8 @@ describe('contextValidation', () => {
       fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
       const result = await validateContext({ '@context': ['https://www.w3.org/ns/credentials/v2'] });
       expect(result.valid).toBe(false);
-      expect(result.error?.keyword).toBe('unknown');
+      expect(result.error?.keyword).toBe('jsonldService');
+      expect(result.error?.params).toEqual({ kind: 'unreachable' });
       expect(result.error?.message).toContain('context service could not be reached');
     });
 
@@ -332,7 +339,19 @@ describe('contextValidation', () => {
       } as unknown as Response);
       const result = await validateContext({ '@context': ['https://www.w3.org/ns/credentials/v2'] });
       expect(result.valid).toBe(false);
+      expect(result.error?.keyword).toBe('jsonldService');
       expect(result.error?.message).toContain('answered 502');
     });
+
+    it.each([[{}], [{ expanded: 'bad' }], [null]])(
+      'refuses a 200 whose body is not an expanded array (%j)',
+      async (body) => {
+        answer(200, body);
+        const result = await validateContext({ '@context': ['https://www.w3.org/ns/credentials/v2'] });
+        expect(result.valid).toBe(false);
+        expect(result.error?.keyword).toBe('jsonldService');
+        expect(result.error?.message).toContain('without an expanded document');
+      },
+    );
   });
 });

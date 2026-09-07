@@ -1,6 +1,6 @@
 import { describeJsonLdFailure } from './describe-jsonld-failure.js';
 import { JsonLdExpansionFailedError, JsonLdInvalidShapeError } from './errors.js';
-import { ResolverHttpError, ResolverTimedOutError } from '../resolvers/errors.js';
+import { ResolverHttpError, ResolverInvalidJsonError, ResolverTimedOutError } from '../resolvers/errors.js';
 import { PrivateAddressError, ResolutionFailedError } from '../node/errors.js';
 
 /** Builds an error shaped like jsonld.js's JsonLdError (which never sets native `cause`). */
@@ -79,6 +79,39 @@ describe('describeJsonLdFailure', () => {
   });
 
   describe('context-invalid: fetched but unusable remote contexts', () => {
+    it('classifies a response body that is not JSON as context-invalid, ahead of the general resolver branch', () => {
+      const invalid = new ResolverInvalidJsonError('https://example.com/ctx', new SyntaxError('Unexpected token <'));
+      const failure = describeJsonLdFailure(new JsonLdExpansionFailedError(new Error('wrapper', { cause: invalid })));
+      expect(failure).toMatchObject({ kind: 'context-invalid', code: 'resolver.invalid-json' });
+      expect(failure.detail).not.toContain('Unexpected token');
+    });
+
+    it('classifies an unusable term-scoped remote context as context-invalid with the term', () => {
+      const processor = jsonLdError('jsonld.SyntaxError', 'Invalid JSON-LD syntax; invalid scoped context.', {
+        code: 'invalid scoped context',
+        term: 'x',
+      });
+      expect(describeJsonLdFailure(new JsonLdExpansionFailedError(processor))).toEqual({
+        kind: 'context-invalid',
+        detail: 'a remote @context response could not be used as a JSON-LD context',
+        code: 'invalid scoped context',
+        fields: { term: 'x' },
+      });
+    });
+
+    it('classifies a remote context chain that overflows or refers to itself as context-fetch', () => {
+      const processor = jsonLdError('jsonld.ContextUrlError', 'Maximum number of @context URLs exceeded.', {
+        code: 'context overflow',
+        url: 'https://example.com/ctx',
+      });
+      expect(describeJsonLdFailure(new JsonLdExpansionFailedError(processor))).toEqual({
+        kind: 'context-fetch',
+        detail:
+          'the remote @context chain could not be resolved: too many remote contexts, or a remote context refers back to itself',
+        code: 'context overflow',
+      });
+    });
+
     it('classifies non-object remote context content as context-invalid, naming the code and URL', () => {
       const processor = jsonLdError(
         'jsonld.InvalidUrl',
@@ -90,7 +123,7 @@ describe('describeJsonLdFailure', () => {
 
       expect(failure).toEqual({
         kind: 'context-invalid',
-        detail: 'a remote @context document was fetched but could not be used as a context',
+        detail: 'a remote @context response could not be used as a JSON-LD context',
         code: 'invalid remote context',
         url: 'https://example.com/ctx',
       });
@@ -134,16 +167,6 @@ describe('describeJsonLdFailure', () => {
         code: 'loading remote context failed',
         url: 'https://example.com/ctx',
       });
-    });
-
-    it('leaves the shared "loading remote context failed" code document-class for other error names', () => {
-      // jsonld.ContextUrlError reuses the code for the JSON-LD 1.0 context
-      // limit; only jsonld.InvalidUrl carries the remote-content meaning.
-      const processor = jsonLdError('jsonld.ContextUrlError', 'Maximum number of @context URLs exceeded.', {
-        code: 'loading remote context failed',
-      });
-
-      expect(describeJsonLdFailure(new JsonLdExpansionFailedError(processor))).toMatchObject({ kind: 'document' });
     });
   });
 
@@ -201,7 +224,26 @@ describe('describeJsonLdFailure', () => {
       expect(JSON.stringify(failure)).not.toContain('urn:secret:batch-7734');
     });
 
-    it('passes a jsonld syntax-error message through (library-authored fixed strings)', () => {
+    it('never echoes a syntax-error message, which jsonld.js may interpolate caller values into', () => {
+      const processor = jsonLdError(
+        'jsonld.SyntaxError',
+        'Invalid JSON-LD syntax; container mapping for "secret-field-value" on term "x".',
+        { code: 'invalid @index value', term: 'x' },
+      );
+
+      const failure = describeJsonLdFailure(new JsonLdExpansionFailedError(processor));
+
+      expect(failure).toEqual({
+        kind: 'document',
+        detail: 'Invalid JSON-LD syntax; invalid @index value.',
+        source: 'syntax-error',
+        code: 'invalid @index value',
+        fields: { term: 'x' },
+      });
+      expect(JSON.stringify(failure)).not.toContain('secret-field-value');
+    });
+
+    it('classifies a syntax error from a code and its allowlisted fields', () => {
       const processor = jsonLdError('jsonld.SyntaxError', 'Invalid JSON-LD syntax; @type value must be a string.', {
         code: 'invalid type value',
       });
@@ -209,7 +251,7 @@ describe('describeJsonLdFailure', () => {
       const failure = describeJsonLdFailure(new JsonLdExpansionFailedError(processor));
 
       expect(failure.kind).toBe('document');
-      expect(failure.detail).toBe('Invalid JSON-LD syntax; @type value must be a string.');
+      expect(failure.detail).toBe('Invalid JSON-LD syntax; invalid type value.');
       expect(failure).toMatchObject({ source: 'syntax-error' });
       expect(failure.code).toBe('invalid type value');
     });
