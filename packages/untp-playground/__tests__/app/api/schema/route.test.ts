@@ -55,8 +55,30 @@ describe('GET /api/schema', () => {
       expect(createCache).toHaveBeenCalledTimes(1);
       expect(createCache).toHaveBeenCalledWith({ ttlMs: 60 * 60 * 1000, maxEntries: 200 });
       expect(createLoader).toHaveBeenCalledTimes(1);
-      expect(createLoader).toHaveBeenCalledWith(expect.objectContaining({ get: expect.any(Function) }));
+      expect(createLoader).toHaveBeenCalledWith(
+        expect.objectContaining({ get: expect.any(Function) }),
+        expect.objectContaining({ onBundledFallback: expect.any(Function) }),
+      );
     });
+  });
+
+  it('logs a warning naming the URL and cause code when the bundled copy stands in', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.isolateModules(() => {
+      const { createSchemaLoader: createLoader } = jest.requireMock('@uncefact/untp-utils/loaders');
+      createLoader.mockClear();
+      jest.requireActual('@/app/api/schema/route');
+      const { onBundledFallback } = createLoader.mock.calls[0][1];
+      onBundledFallback({
+        url: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.7.0.json',
+        cause: Object.assign(new Error('HTTP 503'), { code: 'resolver.http-error' }),
+      });
+    });
+    expect(warn).toHaveBeenCalledWith('Served the bundled copy of a schema because its fetch failed', {
+      url: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.7.0.json',
+      code: 'resolver.http-error',
+    });
+    warn.mockRestore();
   });
 
   it('returns the schema the loader fetched', async () => {

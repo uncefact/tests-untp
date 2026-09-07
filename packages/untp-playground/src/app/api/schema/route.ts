@@ -26,6 +26,14 @@ const SCHEMA_CACHE_MAX_ENTRIES = 200;
 // round trip, so it has to outlive a single request.
 const schemaLoader = createSchemaLoader(
   createInMemoryTtlCache<object>({ ttlMs: SCHEMA_CACHE_TTL_MS, maxEntries: SCHEMA_CACHE_MAX_ENTRIES }),
+  {
+    // The bundled copy stands in when the schema host is down; say so in the
+    // server log, because the verifier's result then rests on a snapshot.
+    onBundledFallback: ({ url, cause }) => {
+      const code = cause instanceof Error && 'code' in cause ? (cause as { code?: unknown }).code : undefined;
+      console.warn('Served the bundled copy of a schema because its fetch failed', { url, code });
+    },
+  },
 );
 
 export async function GET(request: Request) {
