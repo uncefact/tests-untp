@@ -1,7 +1,11 @@
-// @ts-expect-error: the script is plain ESM JavaScript with no declaration file.
-import { classify } from './refresh-artefacts.mjs';
+// The refresh script is plain ESM JavaScript outside `src/`, so it is loaded
+// at runtime rather than imported statically (tsc's rootDir is `src`).
+const scriptUrl = new URL('../../scripts/refresh-artefacts.mjs', import.meta.url).href;
+const { classify } = (await import(scriptUrl)) as {
+  classify: (bundled: string | undefined, fetched: string) => string;
+};
 
-describe('classify', () => {
+describe('refresh-artefacts classify', () => {
   it('reports a copy the bundle does not have', () => {
     expect(classify(undefined, '{"a":1}')).toBe('missing');
   });

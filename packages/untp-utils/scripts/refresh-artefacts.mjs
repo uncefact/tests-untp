@@ -172,6 +172,13 @@ async function writeBundleModules(entries) {
   await writeFile(join(BUNDLE_DIR, 'index.ts'), lines.join('\n'));
 }
 
+/** The one-word outcome reported for an artefact on this run. */
+function describeOutcome(state, check, write) {
+  if (state === 'same') return 'same';
+  if (state === 'missing') return check ? 'would add' : 'added';
+  return write && !check ? 'overwritten' : 'would refuse';
+}
+
 async function main() {
   const check = process.argv.includes('--check');
   const write = process.argv.includes('--force');
@@ -197,17 +204,7 @@ async function main() {
     if (willWrite) pending.push({ file: entry.file, text: fetched });
     const text = willWrite || state === 'missing' ? fetched : bundled;
     manifest.push({ url: entry.url, file: entry.file, source: entry.source, sha256: contentHash(text) });
-    const label =
-      state === 'same'
-        ? 'same'
-        : state === 'missing'
-          ? check
-            ? 'would add'
-            : 'added'
-          : write && !check
-            ? 'overwritten'
-            : 'would refuse';
-    console.log(`${label.padEnd(13)} ${entry.file}`);
+    console.log(`${describeOutcome(state, check, write).padEnd(13)} ${entry.file}`);
   }
   if (problems.length) {
     console.error('\nRefresh refused:\n' + problems.map((p) => `  - ${p}`).join('\n'));

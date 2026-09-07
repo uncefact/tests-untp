@@ -1,6 +1,5 @@
-import type { BundledFallbackOptions } from '@uncefact/untp-utils/loaders';
 import type { TtlCache } from '@uncefact/untp-utils/cache';
-import type { LoadedRemoteDocument, SchemaLoader } from '@uncefact/untp-utils/loaders';
+import type { BundledFallbackOptions, LoadedRemoteDocument, SchemaLoader } from '@uncefact/untp-utils/loaders';
 import type { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import type { ConformityScheme } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { ConformitySchemeResolveError } from './errors.js';
