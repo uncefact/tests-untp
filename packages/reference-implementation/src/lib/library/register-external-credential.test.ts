@@ -315,7 +315,7 @@ describe('registerExternalCredential', () => {
       checks: { retrieval: CheckResult.PASS, decryption: CheckResult.FAIL },
       failure: {
         code: CheckRunFailureCode.DECRYPTION_REQUIRED,
-        message: expect.stringContaining('no decryption key'),
+        message: expect.stringContaining('holds no key that opens it'),
         retryable: true,
       },
     });
@@ -491,7 +491,7 @@ describe('registerExternalCredential', () => {
       failure: {
         code: CheckRunFailureCode.STORAGE_FAILED,
         retryable: true,
-        message: expect.stringMatching(/storage[\s\S]*no decryption key/),
+        message: expect.stringMatching(/storage[\s\S]*holds no key that opens it/),
       },
     });
   });

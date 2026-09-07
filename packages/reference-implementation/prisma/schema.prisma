@@ -487,11 +487,23 @@ model CheckRun {
   failureMessage   String?
   failureRetryable Boolean?
 
+  /// Whether the supplier source differed from the pinned copy's sourceDigest
+  /// when this generation was created. Null when the comparison was attempted
+  /// and the source could not be read.
+  sourceChanged     Boolean?
+  /// When the comparison above was attempted. Null means no comparison was
+  /// made, which is every native run and every external generation created
+  /// before re-verification existed. The projection decides whether to
+  /// publish the two freshness fields from this column, so a later custody
+  /// change cannot hide a comparison that was recorded.
+  lastSourceCheckAt DateTime?
+
   requestedAt    DateTime  @default(now())
   completedAt    DateTime?
   /// When the verify job for this run was last enqueued. The column and its
-  /// index exist for a reconciliation sweep that will re-enqueue PENDING rows
-  /// whose marker is stale; no sweep runs yet. Written from the application
+  /// index let the worker's reconciliation sweep identify PENDING rows whose
+  /// job may have been lost. The sweep settles those rows as retryable
+  /// failures rather than re-enqueuing them. Written from the application
   /// clock, like requestedAt on the same row, so the sweep computes its
   /// cutoff in the application too rather than in SQL.
   lastEnqueuedAt DateTime?

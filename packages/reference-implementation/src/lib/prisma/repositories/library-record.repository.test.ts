@@ -41,6 +41,8 @@ const CHECK_RUN = {
   requestedAt: new Date('2026-09-05T00:00:00.000Z'),
   completedAt: null,
   lastEnqueuedAt: null,
+  sourceChanged: null,
+  lastSourceCheckAt: null,
 };
 
 function row(overrides: Record<string, unknown> = {}) {

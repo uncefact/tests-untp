@@ -31,7 +31,7 @@ export {
 export { AesGcmEncryptionAdapter } from './encryption/adapters/aes-gcm/aes-gcm.adapter.js';
 export { EncryptionAlgorithm, assertPermittedAlgorithm } from './encryption/encryption.interface.js';
 export type { EncryptedEnvelope, IEncryptionService } from './encryption/encryption.interface.js';
-export { decryptCredential } from './encryption/decrypt-credential.js';
+export { decryptCredential, decryptCredentialToBytes } from './encryption/decrypt-credential.js';
 export type { DecryptionParams } from './encryption/decrypt-credential.js';
 export { isEncryptedEnvelope, hasValidEnvelopeStructure } from './encryption/is-encrypted-envelope.js';
 export type { IKeyGenerator, IKeyStore } from './key-provider/key-provider.interface.js';

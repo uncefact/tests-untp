@@ -126,6 +126,8 @@ function view(storedKey: string | null): LibraryRecordDetailView {
     requestedAt: now,
     completedAt: now,
     lastEnqueuedAt: null,
+    sourceChanged: null,
+    lastSourceCheckAt: null,
   };
   return { origin: LibraryRecordOrigin.EXTERNAL, record, external, checkRun };
 }

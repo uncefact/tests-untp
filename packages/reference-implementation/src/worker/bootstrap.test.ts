@@ -8,6 +8,7 @@ jest.mock('@/lib/api/logger', () => {
 // The handler graph reaches the services server barrel, whose DID stack
 // cannot resolve under jest; the boot's own order is what is under test.
 jest.mock('@/lib/library/verify-generation-job', () => ({ registerLibraryJobs: jest.fn() }));
+jest.mock('@/lib/library/reconcile-pending-runs-job', () => ({ registerPendingRunReconciliation: jest.fn() }));
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: { $queryRawUnsafe: jest.fn(async () => []), $disconnect: jest.fn() },
 }));

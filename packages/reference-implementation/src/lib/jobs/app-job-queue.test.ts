@@ -196,15 +196,24 @@ describe('startJobQueue', () => {
     expect(constructed[0].declareQueue).toHaveBeenCalledTimes(2);
   });
 
-  it('logs through the module logger when the queue reports an error', async () => {
+  it('logs the reported error name and message, and never its cause chain', async () => {
+    // Handler failures reach this channel too, including the ones the
+    // verification handler rethrows for a retry, and those wrap the storage,
+    // crypto or verifier exception that caused them. Pino's `err` serialiser
+    // folds a whole chain of causes into one message, so logging the
+    // exception itself here would publish text the settling attempt took
+    // care not to publish. Fails if the channel goes back to `err`.
     process.env.RI_DATABASE_URL = 'postgresql://ri:secret@db.test:5432/ri?schema=public';
     const { startJobQueue } = loadModule();
     await startJobQueue();
 
-    const reported = new Error('lost the connection');
+    const reported = new Error('lost the connection', { cause: new Error('key aaaa-bbbb rejected') });
     constructed[0].options.onError?.(reported);
 
-    expect(logError).toHaveBeenCalledWith({ err: reported }, 'Job queue reported an error');
+    expect(logError).toHaveBeenCalledWith(
+      { error: { name: 'Error', message: 'lost the connection' } },
+      'Job queue reported an error',
+    );
   });
 });
 

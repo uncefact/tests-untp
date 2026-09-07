@@ -37,14 +37,13 @@ import {
   ExternalContentKind,
   LibraryRecordOrigin,
   type CheckRun,
+  type Credential,
   type ExternalCredential,
   type LibraryRecord,
 } from '@/lib/prisma/generated';
-import type { CheckResults } from '@/lib/prisma/repositories/check-run.repository';
-import type {
-  ExternalCredentialRecord,
-  VerifyJobReference,
-} from '@/lib/prisma/repositories/external-credential.repository';
+import type { LibraryRecordDetailView, NativeLibraryRecordView } from '@/lib/library/library-record-view';
+import { noChecksRun, type CheckResults } from '@/lib/prisma/repositories/check-run.repository';
+import type { VerifyJobReference } from '@/lib/prisma/repositories/external-credential.repository';
 import type { JobContext, JobQueue } from '@/lib/jobs/types';
 import {
   LIBRARY_VERIFY_JOB,
@@ -82,25 +81,30 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     tenantId: TENANT_ID,
     generation: 1,
     state: CheckRunState.PENDING,
-    retrieval: CheckResult.PASS,
-    decryption: CheckResult.NOT_RUN,
-    digest: CheckResult.PASS,
-    proof: CheckResult.NOT_RUN,
-    status: CheckResult.NOT_RUN,
-    temporal: CheckResult.NOT_RUN,
-    schemaConformance: CheckResult.NOT_RUN,
+    // A re-verification generation is inserted with every check NOT_RUN, so
+    // that is what the worker actually picks up. A register generation 1
+    // arrives with retrieval and digest already recorded, and the tests that
+    // exercise that shape set it themselves.
+    ...noChecksRun(),
     failureCode: null,
     failureMessage: null,
     failureRetryable: null,
     requestedAt: new Date('2026-09-03T11:00:00.000Z'),
     completedAt: null,
     lastEnqueuedAt: new Date('2026-09-03T11:00:00.000Z'),
+    sourceChanged: null,
+    lastSourceCheckAt: null,
     ...overrides,
   };
 }
 
-/** The run fixture's own checks, which every settlement merges its results into. */
-const STORED_CHECKS: CheckResults = {
+/**
+ * What the worker establishes for itself once it has read the copy back and
+ * checked its stored digest. Nothing on the run row carries these; a
+ * settlement that reported them from the fixture would pass whatever the
+ * handler did.
+ */
+const ESTABLISHED_CHECKS: CheckResults = {
   retrieval: CheckResult.PASS,
   decryption: CheckResult.NOT_RUN,
   digest: CheckResult.PASS,
@@ -164,12 +168,41 @@ function external(overrides: Partial<ExternalCredential> = {}): ExternalCredenti
 
 function record(
   overrides: { parent?: Partial<LibraryRecord>; external?: Partial<ExternalCredential>; run?: Partial<CheckRun> } = {},
-): ExternalCredentialRecord {
+): LibraryRecordDetailView {
   return {
     origin: LibraryRecordOrigin.EXTERNAL,
     record: parent(overrides.parent),
     external: external(overrides.external),
     checkRun: run(overrides.run),
+  };
+}
+
+function nativeCredential(overrides: Partial<Credential> = {}): Credential {
+  return {
+    id: RECORD_ID,
+    tenantId: TENANT_ID,
+    origin: LibraryRecordOrigin.NATIVE,
+    storageUri: 'https://storage.example/native/credential-a',
+    digestMultibase: 'zQmNativeDigest',
+    decryptionKey: null,
+    isPublished: false,
+    organisationId: null,
+    facilityId: null,
+    productId: null,
+    createdAt: new Date('2026-09-03T11:00:00.000Z'),
+    updatedAt: new Date('2026-09-03T11:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function nativeRecord(
+  overrides: { credential?: Partial<Credential>; run?: CheckRun | null } = {},
+): NativeLibraryRecordView {
+  return {
+    origin: LibraryRecordOrigin.NATIVE,
+    record: parent({ origin: LibraryRecordOrigin.NATIVE }),
+    credential: nativeCredential(overrides.credential),
+    checkRun: overrides.run === undefined ? run({ generation: 2 }) : overrides.run,
   };
 }
 
@@ -204,14 +237,20 @@ function encryptedCopy(plaintext: string, key = REAL_KEY): EncryptedEnvelope {
   return adapter.encrypt(plaintext, 'aes-256-gcm' as never);
 }
 
+/** The reader hands back bytes, so every fixture does too. */
+function storedBytes(text: string): Uint8Array {
+  return new TextEncoder().encode(text);
+}
+
 const verifier = { verify: jest.fn() };
 
 function dependencies(overrides: Partial<VerifyGenerationDependencies> = {}): VerifyGenerationDependencies {
   return {
     findRun: jest.fn().mockResolvedValue(run()),
     getRecord: jest.fn().mockResolvedValue(record()),
-    fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(CREDENTIAL)),
+    fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes(JSON.stringify(CREDENTIAL))),
     revealStoredKey: jest.fn().mockReturnValue(REAL_KEY),
+    verifyDigest: jest.fn().mockResolvedValue(true),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolveVerifier: jest.fn().mockResolvedValue(verifier as any),
     settleComplete: jest.fn().mockResolvedValue({ outcome: 'applied' }),
@@ -377,13 +416,182 @@ describe('verifyGenerationHandler on a copy that is not a credential', () => {
       expect(deps.settleComplete).toHaveBeenCalledWith({
         id: RUN_ID,
         tenantId: TENANT_ID,
-        checks: { ...STORED_CHECKS, proof: CheckResult.FAIL },
+        checks: { ...ESTABLISHED_CHECKS, proof: CheckResult.FAIL },
       });
-      expect(deps.fetchStoredCopy).not.toHaveBeenCalled();
+      expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+      expect(deps.verifyDigest).toHaveBeenCalled();
       expect(verifier.verify).not.toHaveBeenCalled();
       expect(deps.settleFailed).not.toHaveBeenCalled();
     },
   );
+
+  it('reads an intact opaque copy, checks its stored digest, and records proof failure', async () => {
+    // Fails if the worker skips the custody read for non-credentials or tries
+    // to parse opaque bytes before it can check their stored digest.
+    const deps = dependencies({
+      getRecord: jest.fn().mockResolvedValue(record({ external: { contentKind: ExternalContentKind.OPAQUE } })),
+      fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes('<html>supplier page</html>')),
+    });
+    await verifyGenerationHandler(deps)(JOB, context());
+
+    expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+    const digestInput = (deps.verifyDigest as jest.Mock).mock.calls[0][1] as Uint8Array;
+    expect(deps.verifyDigest).toHaveBeenCalledWith('zQmStoredDigest', digestInput);
+    expect(Buffer.from(digestInput).toString('utf8')).toBe('<html>supplier page</html>');
+    expect(deps.settleComplete).toHaveBeenCalledWith({
+      id: RUN_ID,
+      tenantId: TENANT_ID,
+      checks: { ...ESTABLISHED_CHECKS, proof: CheckResult.FAIL },
+    });
+  });
+
+  it.each([
+    ['HTML', ExternalContentKind.OPAQUE, '<html><body><h1>Not a credential</h1></body></html>'],
+    ['a JSON object that is not a credential', ExternalContentKind.JSON_OBJECT, '{"note":"not a credential"}'],
+    ['binary', ExternalContentKind.OPAQUE, 'binary \u0080\u00ff tail'],
+  ])(
+    'digests the bytes underneath an encrypted %s copy, which the service serves as base64',
+    async (_label, contentKind, body) => {
+      // The storage service takes a non-credential body through its binary
+      // endpoint, whose envelope decrypts to the base64 of the stored bytes
+      // rather than to the bytes. Its digest still covers the bytes. Fails if
+      // the worker digests the base64 text, which settles every encrypted
+      // non-credential copy as proven corruption.
+      const original = Buffer.from(body, 'latin1');
+      const deps = dependencies({
+        getRecord: jest
+          .fn()
+          .mockResolvedValue(record({ external: { contentKind, encrypted: true, decryptionKey: PROTECTED_KEY } })),
+        fetchStoredCopy: jest
+          .fn()
+          .mockResolvedValue(storedBytes(JSON.stringify(encryptedCopy(original.toString('base64'))))),
+      });
+
+      await verifyGenerationHandler(deps)(JOB, context());
+
+      const digestInput = (deps.verifyDigest as jest.Mock).mock.calls[0][1] as Uint8Array;
+      expect(Array.from(digestInput)).toEqual(Array.from(original));
+      expect(deps.settleComplete).toHaveBeenCalledWith(
+        expect.objectContaining({ checks: expect.objectContaining({ digest: CheckResult.PASS }) }),
+      );
+    },
+  );
+
+  it('refuses an encrypted non-credential copy whose plaintext is not the encoding the service serves', async () => {
+    // The sibling, so the decode above cannot be satisfied by one that
+    // accepts anything. Fails if a plaintext that is not base64 is digested
+    // as whatever a lenient decoder salvaged from it.
+    const deps = dependencies({
+      getRecord: jest.fn().mockResolvedValue(
+        record({
+          external: { contentKind: ExternalContentKind.OPAQUE, encrypted: true, decryptionKey: PROTECTED_KEY },
+        }),
+      ),
+      fetchStoredCopy: jest
+        .fn()
+        .mockResolvedValue(storedBytes(JSON.stringify(encryptedCopy('<html>raw, not base64</html>')))),
+    });
+
+    await verifyGenerationHandler(deps)(JOB, context());
+
+    expect(deps.settleComplete).not.toHaveBeenCalled();
+    expect(deps.settleFailed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: expect.objectContaining({
+          message:
+            'The durable copy could not be opened (its decrypted content is not the encoded copy the service serves); this needs an operator to inspect the stored object.',
+          retryable: false,
+        }),
+      }),
+    );
+  });
+});
+
+describe('verifyGenerationHandler when the digest cannot be checked', () => {
+  it.each([
+    ['a re-verification generation', CheckResult.NOT_RUN],
+    ['a registration generation whose digest already passed', CheckResult.PASS],
+    ['a registration generation whose digest already failed', CheckResult.FAIL],
+  ])('keeps the digest result %s arrived with', async (_label, digest) => {
+    // The comparison never ran, so it changes nothing: a mismatch records
+    // FAIL, a comparison that could not be attempted leaves whatever the row
+    // held. Fails if this path invents a result of its own in either
+    // direction.
+    const deps = dependencies({
+      findRun: jest.fn().mockResolvedValue(run({ generation: 2, retrieval: CheckResult.NOT_RUN, digest })),
+      verifyDigest: jest.fn().mockRejectedValue(new Error('the recorded digest is not a multibase value')),
+    });
+
+    await verifyGenerationHandler(deps)({ ...JOB, generation: 2 }, context({ isFinalAttempt: true }));
+
+    expect(deps.settleFailed).toHaveBeenCalledWith({
+      id: RUN_ID,
+      tenantId: TENANT_ID,
+      checks: expect.objectContaining({ retrieval: CheckResult.PASS, digest }),
+      failure: {
+        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        message: 'The durable copy integrity digest could not be checked; an operator must inspect the stored record.',
+        retryable: false,
+      },
+    });
+  });
+});
+
+describe('verifyGenerationHandler on native records', () => {
+  it('reads a native stored copy and settles its first real re-verification generation', async () => {
+    // Fails if native records remain on the synthetic issuance assertion or
+    // if the worker still only handles external child rows.
+    verifier.verify.mockResolvedValue(verified());
+    const deps = dependencies({
+      findRun: jest.fn().mockResolvedValue(run({ generation: 2 })),
+      getRecord: jest.fn().mockResolvedValue(nativeRecord()),
+      fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes(JSON.stringify(CREDENTIAL))),
+    });
+
+    await verifyGenerationHandler(deps)({ ...JOB, generation: 2 }, context());
+
+    expect(deps.fetchStoredCopy).toHaveBeenCalledWith('https://storage.example/native/credential-a');
+    expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+    expect(deps.settleComplete).toHaveBeenCalledWith({
+      id: RUN_ID,
+      tenantId: TENANT_ID,
+      checks: {
+        ...ESTABLISHED_CHECKS,
+        proof: CheckResult.PASS,
+        status: CheckResult.PASS,
+        temporal: CheckResult.PASS,
+      },
+    });
+  });
+
+  it('settles native custody digest mismatch without changing the stored copy', async () => {
+    // Fails if digest verification is omitted or a native integrity failure
+    // is allowed to reach the verifier as a successful generation.
+    const deps = dependencies({
+      findRun: jest.fn().mockResolvedValue(run({ generation: 2 })),
+      getRecord: jest.fn().mockResolvedValue(nativeRecord()),
+      verifyDigest: jest.fn().mockResolvedValue(false),
+    });
+
+    await verifyGenerationHandler(deps)({ ...JOB, generation: 2 }, context());
+
+    // The copy was fetched intact and its digest comparison ran and answered
+    // no, so the settlement says retrieval passed and the digest failed.
+    // Fails if a failed settlement reports the run row's stored checks, which
+    // would call the digest a pass beside a digest-failure message, or if a
+    // comparison that ran is recorded as not run.
+    expect(deps.settleFailed).toHaveBeenCalledWith({
+      id: RUN_ID,
+      tenantId: TENANT_ID,
+      checks: { ...ESTABLISHED_CHECKS, digest: CheckResult.FAIL },
+      failure: {
+        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        message: 'The durable copy failed its integrity digest check; an operator must inspect the stored object.',
+        retryable: false,
+      },
+    });
+    expect(deps.resolveVerifier).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -403,7 +611,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
       id: RUN_ID,
       tenantId: TENANT_ID,
       checks: {
-        ...STORED_CHECKS,
+        ...ESTABLISHED_CHECKS,
         proof: CheckResult.PASS,
         status: CheckResult.PASS,
         temporal: CheckResult.PASS,
@@ -425,7 +633,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
       id: RUN_ID,
       tenantId: TENANT_ID,
       checks: {
-        ...STORED_CHECKS,
+        ...ESTABLISHED_CHECKS,
         proof: CheckResult.NOT_RUN,
         status: CheckResult.NOT_RUN,
         temporal: CheckResult.NOT_RUN,
@@ -448,7 +656,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
-      checks: { ...STORED_CHECKS, proof: CheckResult.FAIL },
+      checks: { ...ESTABLISHED_CHECKS, proof: CheckResult.FAIL },
     });
   });
 
@@ -460,7 +668,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
-      checks: { ...STORED_CHECKS, proof: CheckResult.FAIL },
+      checks: { ...ESTABLISHED_CHECKS, proof: CheckResult.FAIL },
     });
   });
 
@@ -469,7 +677,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     const envelope = encryptedCopy(JSON.stringify(CREDENTIAL));
     const deps = dependencies({
       getRecord: jest.fn().mockResolvedValue(record({ external: { encrypted: true, decryptionKey: PROTECTED_KEY } })),
-      fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(envelope)),
+      fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes(JSON.stringify(envelope))),
       revealStoredKey: jest.fn().mockReturnValue(REAL_KEY),
     });
     await verifyGenerationHandler(deps)(JOB, context());
@@ -480,7 +688,8 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
       id: RUN_ID,
       tenantId: TENANT_ID,
       checks: {
-        ...STORED_CHECKS,
+        ...ESTABLISHED_CHECKS,
+        decryption: CheckResult.PASS,
         proof: CheckResult.PASS,
         status: CheckResult.PASS,
         temporal: CheckResult.PASS,
@@ -511,7 +720,7 @@ describe('verifyGenerationHandler on a transient failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
-      checks: STORED_CHECKS,
+      checks: noChecksRun(),
       failure: {
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
         message: 'The durable copy could not be read back from storage; re-verify once storage is available.',
@@ -532,6 +741,11 @@ describe('verifyGenerationHandler on a transient failure', () => {
   });
 
   it('settles the generation as retryable VERIFICATION_UNAVAILABLE when the verifier fails on the final attempt', async () => {
+    // The run row arrives with every check NOT_RUN, as a re-verification
+    // generation does. Fails if a failed settlement reports the row's stored
+    // checks, which would tell the caller the copy was never retrieved on a
+    // generation whose copy was retrieved and digest-checked before the
+    // verifier was asked.
     verifier.verify.mockRejectedValue(new Error('vckit unreachable'));
     const deps = dependencies();
     await verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true }));
@@ -539,7 +753,7 @@ describe('verifyGenerationHandler on a transient failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
-      checks: STORED_CHECKS,
+      checks: ESTABLISHED_CHECKS,
       failure: {
         code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
         message: 'The verification service could not be reached or failed; re-verify once it is available.',
@@ -616,19 +830,21 @@ describe('verifyGenerationHandler on a terminal failure', () => {
   }
 
   it('settles at once when the stored copy is not JSON', async () => {
-    const deps = dependencies({ fetchStoredCopy: jest.fn().mockResolvedValue('<html>not a credential</html>') });
+    const deps = dependencies({
+      fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes('<html>not a credential</html>')),
+    });
     await settleTerminal(deps);
 
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
-      checks: STORED_CHECKS,
+      checks: noChecksRun(),
       failure: terminalFailure('it is not valid JSON'),
     });
   });
 
   it('settles at once when the copy is JSON but not an object', async () => {
-    const deps = dependencies({ fetchStoredCopy: jest.fn().mockResolvedValue('["a credential list"]') });
+    const deps = dependencies({ fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes('["a credential list"]')) });
     await settleTerminal(deps);
 
     expect(deps.settleFailed).toHaveBeenCalledWith(
@@ -640,13 +856,25 @@ describe('verifyGenerationHandler on a terminal failure', () => {
   it('settles at once when the copy is encrypted and no key is held', async () => {
     const deps = dependencies({
       getRecord: jest.fn().mockResolvedValue(record({ external: { encrypted: true, decryptionKey: null } })),
-      fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL)))),
+      fetchStoredCopy: jest
+        .fn()
+        .mockResolvedValue(storedBytes(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL))))),
     });
     await settleTerminal(deps);
 
     expect(deps.revealStoredKey).not.toHaveBeenCalled();
+    // The copy is present and intact, so the caller must not be told to have
+    // an operator inspect storage. Fails if this case is folded back into the
+    // generic unreadable-object message.
     expect(deps.settleFailed).toHaveBeenCalledWith(
-      expect.objectContaining({ failure: terminalFailure('it is encrypted and no key is held for it') }),
+      expect.objectContaining({
+        failure: {
+          code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+          message:
+            "This service holds no usable key for the record's durable copy. Re-verification with a caller-supplied key is not supported yet.",
+          retryable: false,
+        },
+      }),
     );
   });
 
@@ -657,7 +885,7 @@ describe('verifyGenerationHandler on a terminal failure', () => {
     const envelope = { ...encryptedCopy(JSON.stringify(CREDENTIAL)), iv: 'AAAA' };
     const deps = dependencies({
       getRecord: jest.fn().mockResolvedValue(record({ external: { encrypted: true, decryptionKey: PROTECTED_KEY } })),
-      fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(envelope)),
+      fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes(JSON.stringify(envelope))),
     });
     await settleTerminal(deps);
 
@@ -672,7 +900,9 @@ describe('verifyGenerationHandler on a terminal failure', () => {
     // the null check goes and an empty key is handed to the decrypt.
     const deps = dependencies({
       getRecord: jest.fn().mockResolvedValue(record({ external: { encrypted: true, decryptionKey: PROTECTED_KEY } })),
-      fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL)))),
+      fetchStoredCopy: jest
+        .fn()
+        .mockResolvedValue(storedBytes(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL))))),
       revealStoredKey: jest.fn().mockReturnValue(null),
     });
     await settleTerminal(deps);
@@ -683,25 +913,44 @@ describe('verifyGenerationHandler on a terminal failure', () => {
     expect(verifier.verify).not.toHaveBeenCalled();
   });
 
-  it('settles at once when the stored key cannot be unwrapped', async () => {
+  it('retries when the stored key cannot be unwrapped and settles retryably on the final attempt', async () => {
+    // The envelope may be valid while the deployment key is unavailable or
+    // damaged. Fails if this case is treated as deterministic corruption and
+    // made permanently unrecoverable before the operator restores access.
     const deps = dependencies({
       getRecord: jest.fn().mockResolvedValue(record({ external: { encrypted: true, decryptionKey: PROTECTED_KEY } })),
-      fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL)))),
+      fetchStoredCopy: jest
+        .fn()
+        .mockResolvedValue(storedBytes(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL))))),
       revealStoredKey: jest.fn().mockImplementation(() => {
         throw new Error('key protection unavailable');
       }),
     });
-    await settleTerminal(deps);
+    await expect(verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: false }))).rejects.toThrow(
+      'The service could not unlock its stored decryption key; contact the operator, then re-verify once access is restored.',
+    );
+    expect(deps.settleFailed).not.toHaveBeenCalled();
+
+    await verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true }));
 
     expect(deps.settleFailed).toHaveBeenCalledWith(
-      expect.objectContaining({ failure: terminalFailure('the stored key could not be unwrapped') }),
+      expect.objectContaining({
+        failure: {
+          code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+          message:
+            'The service could not unlock its stored decryption key; contact the operator, then re-verify once access is restored.',
+          retryable: true,
+        },
+      }),
     );
   });
 
   it('settles at once when the held key does not open the copy', async () => {
     const deps = dependencies({
       getRecord: jest.fn().mockResolvedValue(record({ external: { encrypted: true, decryptionKey: PROTECTED_KEY } })),
-      fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL)))),
+      fetchStoredCopy: jest
+        .fn()
+        .mockResolvedValue(storedBytes(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL))))),
       revealStoredKey: jest.fn().mockReturnValue('b'.repeat(64)),
     });
     await settleTerminal(deps);
@@ -715,7 +964,7 @@ describe('verifyGenerationHandler on a terminal failure', () => {
   it('settles at once when the decrypted content is not JSON', async () => {
     const deps = dependencies({
       getRecord: jest.fn().mockResolvedValue(record({ external: { encrypted: true, decryptionKey: PROTECTED_KEY } })),
-      fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(encryptedCopy('not json at all'))),
+      fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes(JSON.stringify(encryptedCopy('not json at all')))),
     });
     await settleTerminal(deps);
 
@@ -734,7 +983,7 @@ describe('verifyGenerationHandler on a terminal failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
-      checks: STORED_CHECKS,
+      checks: noChecksRun(),
       failure: {
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
         message:
@@ -780,7 +1029,9 @@ describe('verifyGenerationHandler logging', () => {
     verifier.verify.mockRejectedValue(new Error(`upstream refused the request`));
     const deps = dependencies({
       getRecord: jest.fn().mockResolvedValue(record({ external: { encrypted: true, decryptionKey: PROTECTED_KEY } })),
-      fetchStoredCopy: jest.fn().mockResolvedValue(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL)))),
+      fetchStoredCopy: jest
+        .fn()
+        .mockResolvedValue(storedBytes(JSON.stringify(encryptedCopy(JSON.stringify(CREDENTIAL))))),
       revealStoredKey: jest.fn().mockReturnValue(REAL_KEY),
     });
     await verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true }));
@@ -858,7 +1109,18 @@ describe('the default stored-copy read', () => {
   it('reads a copy inside the limit', async () => {
     respond('{"a":1}', { 'content-length': '7' });
 
-    await expect(read()).resolves.toBe('{"a":1}');
+    expect(Buffer.from(await read()).toString('utf8')).toBe('{"a":1}');
+  });
+
+  it('returns the bytes it read, not a decoding of them', async () => {
+    // The copy's integrity digest covers the bytes the storage service was
+    // handed. Fails if the reader decodes to text, which turns any body that
+    // is not valid UTF-8 into different bytes and reports an intact copy as
+    // corrupt.
+    const served = new Uint8Array([...Buffer.from('binary '), 0x80, 0xff, ...Buffer.from(' tail')]);
+    global.fetch = jest.fn().mockResolvedValue(streamed(Buffer.from(served), {}).response) as never;
+
+    expect(Array.from(await read())).toEqual(Array.from(served));
   });
 
   it('reassembles a body delivered as several chunks', async () => {
@@ -867,7 +1129,7 @@ describe('the default stored-copy read', () => {
     const body = JSON.stringify({ padding: 'x'.repeat(200_000) });
     global.fetch = jest.fn().mockResolvedValue(streamed(Buffer.from(body, 'utf8'), {}, 1024).response) as never;
 
-    await expect(read()).resolves.toBe(body);
+    expect(Buffer.from(await read()).toString('utf8')).toBe(body);
   });
 
   it('refuses a copy whose declared length is over the limit, before reading the body', async () => {
@@ -972,7 +1234,7 @@ describe('verifyGenerationHandler on a stored-copy read failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
-      checks: STORED_CHECKS,
+      checks: noChecksRun(),
       failure: {
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
         message:
@@ -1014,7 +1276,7 @@ describe('verifyGenerationHandler when the verifier cannot be reached', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
-      checks: STORED_CHECKS,
+      checks: ESTABLISHED_CHECKS,
       failure: {
         code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
         message: 'The verification service could not be reached or failed; re-verify once it is available.',
@@ -1050,7 +1312,7 @@ describe('verifyGenerationHandler when the verifier cannot be reached', () => {
       expect(deps.settleFailed).toHaveBeenCalledWith({
         id: RUN_ID,
         tenantId: TENANT_ID,
-        checks: STORED_CHECKS,
+        checks: ESTABLISHED_CHECKS,
         failure: {
           code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
           message: 'The verification service could not be reached or failed; re-verify once it is available.',

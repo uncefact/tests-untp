@@ -115,6 +115,8 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     requestedAt: new Date('2026-09-03T11:00:00.000Z'),
     completedAt: null,
     lastEnqueuedAt: new Date('2026-09-03T11:00:00.000Z'),
+    sourceChanged: null,
+    lastSourceCheckAt: null,
     ...overrides,
   };
 }
@@ -185,9 +187,21 @@ describe('deriveCompleteSummary', () => {
     expect(deriveCompleteSummary({ ...all, [name]: 'fail' })).toBe('not_conformant');
   });
 
-  it('never reads an all-not_run blocking set as verified', () => {
+  it('reads a generation where nothing ran at all as not_conformant', () => {
+    // The empty generation, which is the only summary that is not about the
+    // credential. Fails if a generation that recorded nothing can read as
+    // verified.
     expect(deriveCompleteSummary(checks())).toBe('not_conformant');
-    expect(deriveCompleteSummary(checks({ temporal: 'pass', schemaConformance: 'pass' }))).toBe('not_conformant');
+  });
+
+  it('is verified when a non-blocking check is all that ran', () => {
+    // A native generation publishes its acquisition and custody checks as
+    // not_run whatever the worker recorded, so counting only blocking checks
+    // would make a native run not_conformant while the same worker outcome on
+    // an external record read verified. Fails if the "at least one ran" test
+    // goes back to spanning the blocking checks only.
+    expect(deriveCompleteSummary(checks({ temporal: 'pass', schemaConformance: 'pass' }))).toBe('verified');
+    expect(deriveCompleteSummary(checks({ temporal: 'fail' }))).toBe('verified');
   });
 
   it('lets temporal and schemaConformance fail without changing a verified summary', () => {
@@ -430,6 +444,77 @@ describe('toCredentialRecord', () => {
     ).toBe('not_conformant');
   });
 
+  it.each([
+    { sourceChanged: false, expected: false },
+    { sourceChanged: true, expected: true },
+    { sourceChanged: null, expected: null },
+  ])('publishes a settled freshness result when the comparison was attempted', ({ sourceChanged, expected }) => {
+    // Fails if a recorded source comparison is hidden by the current custody
+    // state, or if an unreachable source is confused with an unchanged one.
+    const projected = toCredentialRecord(
+      record({
+        run: {
+          state: CheckRunState.COMPLETE,
+          sourceChanged,
+          lastSourceCheckAt: new Date('2026-09-03T11:00:05.000Z'),
+          completedAt: new Date('2026-09-03T11:00:06.000Z'),
+          proof: CheckResult.PASS,
+        },
+      }),
+      { now: NOW },
+    );
+
+    expect(projected.verification).toMatchObject({
+      state: 'complete',
+      sourceChanged: expected,
+      lastSourceCheckAt: '2026-09-03T11:00:05.000Z',
+    });
+  });
+
+  it('publishes freshness on a failed generation too', () => {
+    // A settled re-fetch failure and a proven-lost copy both land on the
+    // failed variant, and both may have recorded a comparison. Fails if
+    // freshness is spread onto the complete variant only.
+    const projected = toCredentialRecord(
+      record({
+        run: {
+          state: CheckRunState.FAILED,
+          sourceChanged: true,
+          lastSourceCheckAt: new Date('2026-09-03T11:00:05.000Z'),
+          completedAt: new Date('2026-09-03T11:00:06.000Z'),
+          failureCode: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+          failureMessage: 'the durable copy could not be read',
+          failureRetryable: false,
+        },
+      }),
+      { now: NOW },
+    );
+
+    expect(projected.verification).toMatchObject({
+      state: 'failed',
+      sourceChanged: true,
+      lastSourceCheckAt: '2026-09-03T11:00:05.000Z',
+    });
+  });
+
+  it('omits freshness fields from a pending generation even when stale values are present in the row', () => {
+    // Fails if pending envelopes expose settlement-only source outcomes and
+    // make an in-flight comparison look final to a client.
+    const projected = toCredentialRecord(
+      record({
+        run: {
+          state: CheckRunState.PENDING,
+          sourceChanged: true,
+          lastSourceCheckAt: new Date('2026-09-03T11:00:05.000Z'),
+        },
+      }),
+      { now: NOW },
+    );
+
+    expect(projected.verification).not.toHaveProperty('sourceChanged');
+    expect(projected.verification).not.toHaveProperty('lastSourceCheckAt');
+  });
+
   it('warns when a key went unused and when the declared type disagrees with the extracted one', () => {
     const projected = toCredentialRecord(
       record({
@@ -630,6 +715,105 @@ describe('toNativeCredentialRecord', () => {
       generation: 3,
       state: 'failed',
       failure: { code: 'RETRIEVAL_FAILED' },
+    });
+  });
+
+  it('gives a temporal-only generation the same summary on a native and an external record', () => {
+    // The verifier reported a temporal failure and said nothing about proof
+    // or status. Native masking then blanks retrieval, decryption and digest,
+    // so a summary counting only blocking checks would call the native record
+    // not_conformant and the external one verified from one worker outcome.
+    // Fails if the summary is derived from anything but the published checks,
+    // or if the "at least one ran" test excludes temporal.
+    const worker = {
+      generation: 2,
+      state: CheckRunState.COMPLETE,
+      retrieval: CheckResult.PASS,
+      decryption: CheckResult.NOT_RUN,
+      digest: CheckResult.PASS,
+      proof: CheckResult.NOT_RUN,
+      status: CheckResult.NOT_RUN,
+      temporal: CheckResult.FAIL,
+      completedAt: new Date('2026-09-03T11:00:05.000Z'),
+    };
+
+    const native = toNativeCredentialRecord(nativeRecord({ run: run(worker) }), { now: NOW });
+    const external = toCredentialRecord(record({ run: worker }), { now: NOW });
+
+    expect(native.verification).toMatchObject({
+      state: 'complete',
+      summary: 'verified',
+      checks: checks({ temporal: 'fail' }),
+    });
+    expect(external.verification).toMatchObject({ state: 'complete', summary: 'verified' });
+    expect(native.verification.summary).toBe(external.verification.summary);
+  });
+
+  it('publishes no freshness for a native record, whatever the row carries', () => {
+    // A native record has no supplier source, so a comparison recorded on one
+    // of its runs is a data fault rather than something to publish. Fails if
+    // the projection's origin rule is set half at a time, so that a native
+    // envelope can carry a source comparison.
+    const native = toNativeCredentialRecord(
+      nativeRecord({
+        run: run({
+          generation: 2,
+          state: CheckRunState.COMPLETE,
+          proof: CheckResult.PASS,
+          sourceChanged: true,
+          lastSourceCheckAt: new Date('2026-09-03T11:00:05.000Z'),
+          completedAt: new Date('2026-09-03T11:00:06.000Z'),
+        }),
+      }),
+      { now: NOW },
+    );
+
+    expect(native.verification).not.toHaveProperty('sourceChanged');
+    expect(native.verification).not.toHaveProperty('lastSourceCheckAt');
+  });
+
+  it('projects native acquisition and custody checks as not_run while keeping the worker results in the row', () => {
+    // Fails if native generation 2 exposes retrieval or digest as evidence on
+    // the public contract, or if the projection discards the executed proof.
+    const native = toNativeCredentialRecord(
+      nativeRecord({
+        run: run({
+          generation: 2,
+          state: CheckRunState.COMPLETE,
+          retrieval: CheckResult.PASS,
+          decryption: CheckResult.PASS,
+          digest: CheckResult.PASS,
+          proof: CheckResult.PASS,
+          status: CheckResult.PASS,
+          temporal: CheckResult.PASS,
+          completedAt: new Date('2026-09-03T11:00:05.000Z'),
+        }),
+      }),
+      { now: NOW },
+    );
+
+    expect(native.verification).toMatchObject({
+      state: 'complete',
+      summary: 'verified',
+      checks: checks({ proof: 'pass', status: 'pass', temporal: 'pass' }),
+    });
+    expect(
+      toCredentialRecord(
+        record({
+          run: {
+            state: CheckRunState.COMPLETE,
+            retrieval: CheckResult.PASS,
+            digest: CheckResult.PASS,
+            proof: CheckResult.PASS,
+            status: CheckResult.PASS,
+            temporal: CheckResult.PASS,
+            completedAt: new Date('2026-09-03T11:00:05.000Z'),
+          },
+        }),
+        { now: NOW },
+      ).verification,
+    ).toMatchObject({
+      checks: checks({ retrieval: 'pass', digest: 'pass', proof: 'pass', status: 'pass', temporal: 'pass' }),
     });
   });
 

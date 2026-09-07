@@ -10,9 +10,13 @@ jest.mock('@/lib/jobs/prisma-sql-executor', () => ({ prismaSqlExecutor: () => 's
 
 jest.mock('../prisma', () => {
   const tx = {
-    libraryRecord: { create: jest.fn(async () => ({ id: 'rec-1' })) },
+    libraryRecord: {
+      create: jest.fn(async () => ({ id: 'rec-1' })),
+      update: jest.fn(async () => ({ id: 'rec-1' })),
+    },
     externalCredential: {
       create: jest.fn(async () => ({ id: 'rec-1' })),
+      update: jest.fn(async () => ({ id: 'rec-1' })),
       findFirst: jest.fn(async () => null),
       updateMany: jest.fn(async () => ({ count: 1 })),
     },
@@ -29,13 +33,14 @@ jest.mock('../prisma', () => {
 import { CheckRunState, CoreCredentialType, CredentialDetailsStatus } from '../generated';
 import { prisma } from '../prisma';
 import {
+  CONTENT_DIGEST_UNIQUE_INDEX,
   ContentDigestNotHeldError,
   ContentDigestPromotionRacedError,
-  CONTENT_DIGEST_UNIQUE_INDEX,
   createExternalCredential,
   DuplicateCredentialError,
   findExternalByContentDigest,
   promoteExternalCredentialDigest,
+  replaceCustody,
   type CreateExternalCredentialInput,
 } from './external-credential.repository';
 
@@ -316,5 +321,62 @@ describe('external content identity', () => {
     // The throw comes before the repoint, so no other advisory row is moved
     // onto a row that never took the identity.
     expect(mockExternalUpdateMany).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('replaceCustody', () => {
+  it('writes every custody coordinate and the parent timestamp through the supplied transaction client', async () => {
+    // Fails if a re-fetch can leave a half-replaced tuple, or if the key is
+    // written outside the transaction that records the new generation. The
+    // client handed in is a distinct object from the module's own, so an
+    // escaped write to the global client is visible here rather than
+    // indistinguishable from a write to the transaction.
+    const externalUpdate = jest.fn(async () => ({ id: 'rec-1', storageUri: 'https://storage.example/new' }));
+    const parentUpdate = jest.fn(async () => ({ id: 'rec-1' }));
+    const transactionClient = {
+      externalCredential: { update: externalUpdate },
+      libraryRecord: { update: parentUpdate },
+    };
+    const globalExternalUpdate = (prisma as unknown as { externalCredential: { update: jest.Mock } }).externalCredential
+      .update;
+    const globalParentUpdate = (prisma as unknown as { libraryRecord: { update: jest.Mock } }).libraryRecord.update;
+
+    await replaceCustody(transactionClient as never, {
+      recordId: 'rec-1',
+      tenantId: 'tenant-1',
+      storage: {
+        uri: 'https://storage.example/new',
+        digestMultibase: 'zNewDigest',
+        serviceInstanceId: 'svc-2',
+        externalId: 'new-object',
+        bucket: 'library',
+        decryptionKey: 'protected-new-key' as never,
+      },
+    });
+
+    expect(externalUpdate).toHaveBeenCalledWith({
+      where: {
+        id_tenantId_origin: {
+          id: 'rec-1',
+          tenantId: 'tenant-1',
+          origin: 'EXTERNAL',
+        },
+      },
+      data: {
+        storageUri: 'https://storage.example/new',
+        storageDigestMultibase: 'zNewDigest',
+        storageServiceInstanceId: 'svc-2',
+        storageExternalId: 'new-object',
+        storageBucket: 'library',
+        decryptionKey: 'protected-new-key',
+      },
+    });
+    expect(parentUpdate).toHaveBeenCalledWith({
+      where: { id_tenantId: { id: 'rec-1', tenantId: 'tenant-1' } },
+      data: { updatedAt: expect.any(Date) },
+    });
+    // Both writes go to the transaction and neither to the module's client.
+    expect(globalExternalUpdate).not.toHaveBeenCalled();
+    expect(globalParentUpdate).not.toHaveBeenCalled();
   });
 });

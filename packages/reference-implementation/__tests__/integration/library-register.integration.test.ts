@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { AesGcmEncryptionAdapter, EncryptionAlgorithm } from '@uncefact/untp-ri-services/encryption';
+import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import type { IStorageService, IVerifiableCredentialService, StorageRecord } from '@uncefact/untp-ri-services';
 import {
   CheckResult,
@@ -108,42 +109,64 @@ describe('register an external credential, end to end', () => {
   let lastStoredContent: string | Uint8Array | undefined;
   /** The raw key the fake last handed back, so a test can prove what the row holds is not it. */
   let lastKey: string | undefined;
+  /**
+   * The two endpoints differ in what their envelope decrypts to, and the
+   * worker's read path depends on which one stored the copy. The credential
+   * endpoint's envelope decrypts to the credential JSON; the binary
+   * endpoint's decrypts to the base64 of the bytes it was handed. Both digest
+   * the bytes themselves. Observed against the running storage service and
+   * recorded in .claude/reviews/957-digest-preimage-evidence.md.
+   */
+  async function put(
+    content: string | Uint8Array,
+    contentType: string,
+    encrypt: boolean,
+    plaintextOf: (asGiven: Buffer) => string,
+  ): Promise<StorageRecord> {
+    if (storage.failNext) {
+      const error = storage.failNext;
+      storage.failNext = undefined;
+      throw error;
+    }
+    lastStoredContent = content;
+    const externalId = randomUUID();
+    const key = encrypt ? randomUUID().replace(/-/g, '').padEnd(64, '0') : undefined;
+    lastKey = key;
+    const asGiven = typeof content === 'string' ? Buffer.from(content, 'utf8') : Buffer.from(content);
+    const body = key
+      ? Buffer.from(
+          JSON.stringify(
+            new AesGcmEncryptionAdapter(key, quiet as never).encrypt(
+              plaintextOf(asGiven),
+              EncryptionAlgorithm.AES_256_GCM,
+            ),
+          ),
+          'utf8',
+        )
+      : asGiven;
+    stored.set(externalId, body);
+    fixtures.set(`/storage/${externalId}`, { body, contentType });
+    return {
+      uri: `${fixtures.baseUrl}/storage/${externalId}`,
+      // The digest covers what the service was handed, before this fake
+      // encrypted anything, because that is the preimage the verify job
+      // re-derives from the copy it reads back.
+      digestMultibase: (
+        await MultibaseDigest.fromData(asGiven, { algorithm: 'sha2-256', base: 'base58btc' })
+      ).toString(),
+      ...(key ? { decryptionKey: key } : {}),
+      externalId,
+      bucket: encrypt ? 'private' : 'public',
+      mimeType: contentType,
+    };
+  }
+
   const storage: IStorageService & { failNext?: Error } = {
     async store(credential, encrypt = false) {
-      return this.storeBinary(JSON.stringify(credential), 'credential.json', 'application/json', encrypt);
+      return put(JSON.stringify(credential), 'application/json', encrypt, (asGiven) => asGiven.toString('utf8'));
     },
     async storeBinary(content, _filename, contentType, encrypt = false): Promise<StorageRecord> {
-      if (storage.failNext) {
-        const error = storage.failNext;
-        storage.failNext = undefined;
-        throw error;
-      }
-      lastStoredContent = content;
-      const externalId = randomUUID();
-      const key = encrypt ? randomUUID().replace(/-/g, '').padEnd(64, '0') : undefined;
-      lastKey = key;
-      const asGiven = typeof content === 'string' ? Buffer.from(content, 'utf8') : Buffer.from(content);
-      const body = key
-        ? Buffer.from(
-            JSON.stringify(
-              new AesGcmEncryptionAdapter(key, quiet as never).encrypt(
-                asGiven.toString('utf8'),
-                EncryptionAlgorithm.AES_256_GCM,
-              ),
-            ),
-            'utf8',
-          )
-        : asGiven;
-      stored.set(externalId, body);
-      fixtures.set(`/storage/${externalId}`, { body, contentType });
-      return {
-        uri: `${fixtures.baseUrl}/storage/${externalId}`,
-        digestMultibase: `zdigest-${externalId}`,
-        ...(key ? { decryptionKey: key } : {}),
-        externalId,
-        bucket: encrypt ? 'private' : 'public',
-        mimeType: contentType,
-      };
+      return put(content, contentType, encrypt, (asGiven) => asGiven.toString('base64'));
     },
     async delete() {},
   };

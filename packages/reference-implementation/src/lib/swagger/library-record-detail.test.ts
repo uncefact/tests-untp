@@ -1,5 +1,6 @@
 import { credentialRecordDetailSchema } from '@/lib/library/credential-record-projection';
 import { getApiDocs } from './swagger';
+import { oneLine } from './published-document';
 
 type Response = {
   $ref?: string;
@@ -22,11 +23,6 @@ type Spec = { paths?: Record<string, Record<string, Operation>>; components?: { 
  * returns that same envelope for a generation 1 that really ran.
  */
 const ISSUANCE_ASSERTION = 'generation 1 is an issuance assertion rather than an executed run';
-
-/** The operation description is a wrapped block, so its sentences carry line breaks. */
-function oneLine(text: string | undefined): string {
-  return (text ?? '').replace(/\s+/g, ' ');
-}
 
 describe('published GET /library/{id} contract (#964)', () => {
   let operation: Operation;
@@ -102,7 +98,7 @@ describe('published GET /library/{id} contract (#964)', () => {
     expect(value.verification?.failure).toEqual({
       code: 'DECRYPTION_REQUIRED',
       message:
-        'The fetched credential is encrypted and no decryption key was supplied; re-verify with a key to open it.',
+        'The fetched credential is encrypted and this service holds no key that opens it. The copy is kept as fetched. Supplying a key later is not supported yet.',
       retryable: true,
     });
   });

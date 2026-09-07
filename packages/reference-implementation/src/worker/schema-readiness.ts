@@ -1,5 +1,5 @@
-import fs from 'node:fs';
 import path from 'node:path';
+import { listMigrationDirectories } from '../lib/prisma/migration-directories';
 import { WorkerBootError } from './errors';
 
 /** The one query the check needs, so it can be driven by Prisma or by a fake. */
@@ -14,9 +14,9 @@ export interface MigrationRows {
  * migration.
  */
 export function listImageMigrations(migrationsDir: string): string[] {
-  let entries: fs.Dirent[];
+  let names: string[];
   try {
-    entries = fs.readdirSync(migrationsDir, { withFileTypes: true });
+    names = listMigrationDirectories(migrationsDir);
   } catch (error) {
     throw new WorkerBootError(
       'worker.migrations-unreadable',
@@ -24,10 +24,6 @@ export function listImageMigrations(migrationsDir: string): string[] {
       error,
     );
   }
-  const names = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
   if (names.length === 0) {
     // An empty directory would make the membership check below pass having
     // compared nothing; this build ships migrations, so none found is a

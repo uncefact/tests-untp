@@ -295,6 +295,8 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     requestedAt: new Date('2026-09-03T11:00:00.000Z'),
     completedAt: null,
     lastEnqueuedAt: new Date('2026-09-03T11:00:00.000Z'),
+    sourceChanged: null,
+    lastSourceCheckAt: null,
     ...overrides,
   };
 }
@@ -320,6 +322,8 @@ const FAILED_RUN: Partial<CheckRun> = {
   failureRetryable: true,
   completedAt: new Date('2026-09-03T11:00:01.000Z'),
   lastEnqueuedAt: null,
+  sourceChanged: null,
+  lastSourceCheckAt: null,
 };
 
 const DEPS_MARKER = { deps: 'register-dependencies' };

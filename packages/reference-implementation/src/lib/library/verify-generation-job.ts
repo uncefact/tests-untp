@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import {
-  decryptCredential,
+  decryptCredentialToBytes,
   hasValidEnvelopeStructure,
   isEncryptedEnvelope,
   type EnvelopedVerifiableCredential,
@@ -12,13 +13,14 @@ import {
   CheckRunFailureCode,
   CheckRunState,
   ExternalContentKind,
+  LibraryRecordOrigin,
   type CheckRun,
 } from '@/lib/prisma/generated';
 import {
   findCheckRun,
   settleCheckRunComplete,
   settleCheckRunFailed,
-  CHECK_NAMES,
+  checksOf,
   noChecksRun,
   type CheckResults,
   type CheckRunFailure,
@@ -26,16 +28,15 @@ import {
   type SettleCheckRunCompleteInput,
   type SettleCheckRunFailedInput,
 } from '@/lib/prisma/repositories/check-run.repository';
-import {
-  getExternalCredentialById,
-  type ExternalCredentialRecord,
-  type VerifyJobReference,
-} from '@/lib/prisma/repositories/external-credential.repository';
+import { type VerifyJobReference } from '@/lib/prisma/repositories/external-credential.repository';
+import { getLibraryRecordById } from '@/lib/prisma/repositories/library-record.repository';
+import type { LibraryRecordDetailView } from '@/lib/library/library-record-view';
 import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import type { EnqueueOptions, JobContext, JobHandler, JobQueue } from '@/lib/jobs/types';
 import { LIBRARY_VERIFY_JOB } from '@/lib/jobs/queue-names';
 import { apiLogger } from '@/lib/api/logger';
+import { safeError } from '@/lib/api/safe-error';
 
 /**
  * The asynchronous half of registration (#955, ADR-054): the verifier call
@@ -115,10 +116,17 @@ export class StoredCopyReadError extends Error {
 
 export type VerifyGenerationDependencies = {
   findRun: (recordId: string, generation: number, tenantId: string) => Promise<CheckRun | null>;
-  getRecord: (recordId: string, tenantId: string) => Promise<ExternalCredentialRecord | null>;
-  /** Reads the stored copy back as text. The copy lives on this deployment's own storage service. */
-  fetchStoredCopy: (uri: string) => Promise<string>;
+  getRecord: (recordId: string, tenantId: string) => Promise<LibraryRecordDetailView | null>;
+  /**
+   * Reads the stored copy back as bytes. The copy lives on this deployment's
+   * own storage service. Bytes rather than text because an OPAQUE copy is
+   * whatever the supplier served, and its integrity digest covers those exact
+   * bytes: a UTF-8 decode and re-encode would change any body that is not
+   * valid UTF-8 and report an intact copy as corrupt.
+   */
+  fetchStoredCopy: (uri: string) => Promise<Uint8Array>;
   revealStoredKey: (stored: string) => string | null;
+  verifyDigest: (expected: string, data: Uint8Array) => Promise<boolean>;
   resolveVerifier: (tenantId: string) => Promise<IVerifiableCredentialService>;
   settleComplete: (input: SettleCheckRunCompleteInput) => Promise<CheckRunSettleOutcome>;
   settleFailed: (input: SettleCheckRunFailedInput) => Promise<CheckRunSettleOutcome>;
@@ -127,14 +135,23 @@ export type VerifyGenerationDependencies = {
 export function defaultVerifyGenerationDependencies(): VerifyGenerationDependencies {
   return {
     findRun: findCheckRun,
-    getRecord: getExternalCredentialById,
-    fetchStoredCopy: fetchStoredCopyText,
+    getRecord: getLibraryRecordById,
+    fetchStoredCopy: fetchStoredCopyBytes,
     revealStoredKey: revealDecryptionKey,
+    verifyDigest: async (expected, data) => MultibaseDigest.fromString(expected).verify(data),
     resolveVerifier: async (tenantId) => (await resolveVcService(tenantId)).service,
     settleComplete: settleCheckRunComplete,
     settleFailed: settleCheckRunFailed,
   };
 }
+
+/**
+ * What an operator must be told when a failure settles, beyond the caller's
+ * own message. `classification` names what was observed, so a log search can
+ * separate an absent object from one that failed its digest. Absent when the
+ * failure is the caller's to resolve and nothing in the deployment is wrong.
+ */
+type OperatorSignal = { classification: string; message: string };
 
 /**
  * A verification that could not run, carrying the failure the run settles
@@ -145,25 +162,40 @@ export function defaultVerifyGenerationDependencies(): VerifyGenerationDependenc
  */
 abstract class VerificationError extends Error {
   readonly failure: CheckRunFailure;
+  readonly operator?: OperatorSignal;
+  /**
+   * What the worker had established when this was thrown: the copy was
+   * retrieved, decrypted, and its digest checked. A failed settlement records
+   * those results rather than the run's stored ones, so a generation created
+   * with every check NOT_RUN does not report the copy as never fetched
+   * beside a failure that only makes sense once it was.
+   */
+  checks?: CheckResults;
 
-  constructor(failure: Omit<CheckRunFailure, 'retryable'>, retryable: boolean, cause: unknown) {
+  constructor(
+    failure: Omit<CheckRunFailure, 'retryable'>,
+    retryable: boolean,
+    cause: unknown,
+    operator?: OperatorSignal,
+  ) {
     super(failure.message, cause !== undefined ? { cause } : undefined);
     this.failure = { ...failure, retryable };
+    this.operator = operator;
   }
 }
 
 /** The copy or the verifier was unreachable: rethrown while retries remain, settled on the final attempt. */
 class TransientVerificationError extends VerificationError {
-  constructor(failure: Omit<CheckRunFailure, 'retryable'>, cause: unknown) {
-    super(failure, true, cause);
+  constructor(failure: Omit<CheckRunFailure, 'retryable'>, cause: unknown, operator?: OperatorSignal) {
+    super(failure, true, cause, operator);
     this.name = 'TransientVerificationError';
   }
 }
 
 /** A failure no retry can change: the run settles FAILED with it at once. */
 class TerminalVerificationError extends VerificationError {
-  constructor(failure: Omit<CheckRunFailure, 'retryable'>, cause?: unknown) {
-    super(failure, false, cause);
+  constructor(failure: Omit<CheckRunFailure, 'retryable'>, cause?: unknown, operator?: OperatorSignal) {
+    super(failure, false, cause, operator);
     this.name = 'TerminalVerificationError';
   }
 }
@@ -203,6 +235,13 @@ export function verifyGenerationHandler(deps: VerifyGenerationDependencies): Job
       log.warn('Verify job names a run that does not exist; the record was probably deleted');
       return;
     }
+    if (run.id !== job.checkRunId) {
+      log.error(
+        { expectedCheckRunId: job.checkRunId, actualCheckRunId: run.id },
+        'Verify job reference does not match the stored generation; nothing was settled',
+      );
+      return;
+    }
     if (run.state !== CheckRunState.PENDING) {
       log.info({ state: run.state }, 'Verify job found its run already settled; nothing to do');
       return;
@@ -218,12 +257,30 @@ export function verifyGenerationHandler(deps: VerifyGenerationDependencies): Job
       checks = await verifyStoredCopy(record, run, deps, context);
     } catch (error) {
       if (error instanceof TransientVerificationError && !context.isFinalAttempt) {
-        log.warn({ err: error, code: error.failure.code }, 'Verification could not run; the job will be retried');
+        log.warn(
+          { error: safeError(error), code: error.failure.code },
+          'Verification could not run; the job will be retried',
+        );
         throw error;
       }
-      if (error instanceof TransientVerificationError || error instanceof TerminalVerificationError) {
+      if (error instanceof VerificationError) {
+        if (error.operator !== undefined) {
+          // The caller's message tells them to re-verify; this line is the
+          // separate signal for whoever runs the deployment, at a level their
+          // alerting reads, carrying what was observed rather than a guess at
+          // the cause. The child logger already binds the record, tenant,
+          // generation and run.
+          log.error(
+            {
+              classification: error.operator.classification,
+              code: error.failure.code,
+              readFailure: storedCopyReadDetail(error),
+            },
+            error.operator.message,
+          );
+        }
         log.warn(
-          { err: error, code: error.failure.code },
+          { error: safeError(error), code: error.failure.code, readFailure: storedCopyReadDetail(error) },
           'Verification could not run; settling the generation as failed',
         );
         report(
@@ -231,7 +288,7 @@ export function verifyGenerationHandler(deps: VerifyGenerationDependencies): Job
           await deps.settleFailed({
             id: run.id,
             tenantId: job.tenantId,
-            checks: checksOf(run),
+            checks: error.checks ?? checksOf(run),
             failure: error.failure,
           }),
         );
@@ -257,38 +314,149 @@ function report(log: typeof logger, outcome: CheckRunSettleOutcome): void {
   }
 }
 
-/** The run's stored checks, the base every settlement merges its results into. */
-function checksOf(run: CheckRun): CheckResults {
-  return Object.fromEntries(CHECK_NAMES.map((name) => [name, run[name]])) as CheckResults;
+/**
+ * The storage read failure behind a verification failure, or null. The
+ * caller-facing message says only that the copy could not be read; the
+ * attempt that settles the generation is the one an operator reads, and on
+ * that attempt nothing else names the HTTP status or the size that caused it.
+ * Only the wrapper's own message is taken, never the chain below it.
+ */
+function storedCopyReadDetail(error: VerificationError): string | null {
+  return error.cause instanceof StoredCopyReadError ? error.cause.message : null;
 }
 
+/**
+ * Runs the checks over the record's pinned copy, and hands whatever it had
+ * established to the failure it raises. A re-verification generation is
+ * created with every check NOT_RUN (#957), so without this a verifier outage
+ * would tell the caller the copy was never retrieved and a digest mismatch
+ * would report its own check as not run.
+ */
 async function verifyStoredCopy(
-  record: ExternalCredentialRecord,
+  record: LibraryRecordDetailView,
   run: CheckRun,
   deps: VerifyGenerationDependencies,
   context: JobContext,
 ): Promise<CheckResults> {
-  const base = checksOf(run);
-  const { external } = record;
+  const progress: { checks: CheckResults } = { checks: checksOf(run) };
+  try {
+    return await runStoredCopyChecks(record, deps, context, progress);
+  } catch (error) {
+    if (error instanceof VerificationError) error.checks = progress.checks;
+    throw error;
+  }
+}
 
-  if (external.storageUri === null) {
+async function runStoredCopyChecks(
+  record: LibraryRecordDetailView,
+  deps: VerifyGenerationDependencies,
+  context: JobContext,
+  progress: { checks: CheckResults },
+): Promise<CheckResults> {
+  const base = progress.checks;
+  const copy = copyOf(record);
+
+  if (copy.storageUri === null) {
     // A pending generation is only ever created alongside a stored copy, so
     // this is a broken invariant; it settles as a copy that cannot be read.
-    throw new TerminalVerificationError({
-      code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
-      message:
-        'No durable copy exists for this record, so there is nothing to verify; re-verify to fetch the source again.',
-    });
+    throw new TerminalVerificationError(
+      {
+        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        message:
+          'No durable copy exists for this record, so there is nothing to verify; re-verify to fetch the source again.',
+      },
+      undefined,
+      {
+        classification: 'no-durable-copy',
+        message: 'A pending verification generation exists for a record with no durable copy recorded',
+      },
+    );
   }
 
-  if (external.contentKind !== ExternalContentKind.CREDENTIAL) {
-    // The body was fetched and stored but is not an enveloped credential (a
-    // page, an empty body, JSON of another shape). The proof check fails by
-    // definition; the verifier is not asked to sign off on a non-credential.
-    return { ...base, proof: CheckResult.FAIL };
+  // Read the object before using the recorded content kind. A missing or
+  // corrupt object must be reported as a custody failure even when the row
+  // says it once held HTML or another non-credential body.
+  const stored = await readStoredCopy(
+    copy.storageUri,
+    copy.decryptionKey,
+    copy.contentKind === ExternalContentKind.CREDENTIAL,
+    deps,
+    context,
+  );
+  const checks = {
+    ...base,
+    retrieval: CheckResult.PASS,
+    decryption: stored.encrypted ? CheckResult.PASS : base.decryption,
+  };
+  progress.checks = checks;
+  if (copy.storageDigestMultibase === null) {
+    throw new TerminalVerificationError(
+      {
+        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        message: 'The durable copy has no integrity digest recorded; an operator must inspect the stored record.',
+      },
+      undefined,
+      {
+        classification: 'digest-missing',
+        message: 'A durable copy is recorded with no integrity digest, so it cannot be checked',
+      },
+    );
+  }
+  let digestMatches: boolean;
+  try {
+    digestMatches = await deps.verifyDigest(copy.storageDigestMultibase, stored.digestInput);
+  } catch (error) {
+    throw new TerminalVerificationError(
+      {
+        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        message: 'The durable copy integrity digest could not be checked; an operator must inspect the stored record.',
+      },
+      error,
+      {
+        classification: 'digest-uncheckable',
+        message: 'The recorded integrity digest could not be read, so the durable copy could not be checked',
+      },
+    );
+  }
+  if (!digestMatches) {
+    // The comparison ran and answered no, so the check failed rather than
+    // going unrun. Recorded before the throw so the settlement carries it.
+    progress.checks = { ...checks, digest: CheckResult.FAIL };
+    throw new TerminalVerificationError(
+      {
+        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        message: 'The durable copy failed its integrity digest check; an operator must inspect the stored object.',
+      },
+      undefined,
+      {
+        classification: 'digest-mismatch',
+        message: 'A durable copy read back does not match the digest recorded when it was stored',
+      },
+    );
+  }
+  const checked = { ...checks, digest: CheckResult.PASS };
+  progress.checks = checked;
+
+  if (copy.contentKind !== ExternalContentKind.CREDENTIAL) {
+    // The body was fetched and stored but is not an enveloped credential. The
+    // proof check fails by definition; the verifier is not asked to sign off.
+    return { ...checked, proof: CheckResult.FAIL };
+  }
+  const credential = stored.credential;
+  if (credential === null) {
+    throw new TerminalVerificationError(
+      {
+        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        message: 'The durable copy does not contain a readable credential; an operator must inspect the stored object.',
+      },
+      undefined,
+      {
+        classification: 'copy-not-a-credential',
+        message: 'A copy recorded as a credential read back intact and holds no credential',
+      },
+    );
   }
 
-  const credential = await readCredential(external.storageUri, external.decryptionKey, deps, context);
   let result: VerifyResult;
   try {
     // Resolving the tenant's verifier and calling it are one unavailability
@@ -313,18 +481,49 @@ async function verifyStoredCopy(
   // caught here, after the call, rather than settling a result the queue
   // already counts as failed.
   throwIfAborted(context);
-  return { ...base, ...verifierChecks(result) };
+  return { ...checked, ...verifierChecks(result) };
 }
 
-async function readCredential(
+type StoredCopy = {
+  encrypted: boolean;
+  digestInput: Uint8Array;
+  credential: EnvelopedVerifiableCredential | null;
+};
+
+type CopyMetadata = {
+  storageUri: string | null;
+  storageDigestMultibase: string | null;
+  decryptionKey: string | null;
+  contentKind: ExternalContentKind | null;
+};
+
+function copyOf(record: LibraryRecordDetailView): CopyMetadata {
+  if (record.origin === LibraryRecordOrigin.NATIVE) {
+    return {
+      storageUri: record.credential.storageUri,
+      storageDigestMultibase: record.credential.digestMultibase,
+      decryptionKey: record.credential.decryptionKey,
+      contentKind: ExternalContentKind.CREDENTIAL,
+    };
+  }
+  return {
+    storageUri: record.external.storageUri,
+    storageDigestMultibase: record.external.storageDigestMultibase,
+    decryptionKey: record.external.decryptionKey,
+    contentKind: record.external.contentKind,
+  };
+}
+
+async function readStoredCopy(
   uri: string,
   storedKey: string | null,
+  expectsCredential: boolean,
   deps: VerifyGenerationDependencies,
   context: JobContext,
-): Promise<EnvelopedVerifiableCredential> {
-  let text: string;
+): Promise<StoredCopy> {
+  let bytes: Uint8Array;
   try {
-    text = await deps.fetchStoredCopy(uri);
+    bytes = await deps.fetchStoredCopy(uri);
   } catch (error) {
     if (error instanceof StoredCopyReadError && error.kind === 'terminal') {
       throw new TerminalVerificationError(
@@ -333,6 +532,10 @@ async function readCredential(
           message: `The durable copy could not be read back from storage (${error.message}); this needs an operator to inspect the stored object.`,
         },
         error,
+        {
+          classification: 'copy-absent-or-refused',
+          message: 'A durable copy could not be read back from storage and no retry will change that',
+        },
       );
     }
     throw new TransientVerificationError(
@@ -352,27 +555,65 @@ async function readCredential(
         message: `The durable copy could not be opened (${detail}); this needs an operator to inspect the stored object.`,
       },
       cause,
+      {
+        classification: 'copy-unreadable',
+        message: `A durable copy was retrieved and could not be opened (${detail})`,
+      },
     );
 
+  // The bytes are the copy. They are decoded only to classify (is this JSON,
+  // is it an encrypted envelope, is it a credential object), and the decoded
+  // text is never digested or re-encoded back into a digest input.
   let parsed: unknown;
+  let encrypted = false;
+  let plaintextBytes = bytes;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(asText(bytes));
   } catch (error) {
-    throw unreadable('it is not valid JSON', error);
+    if (expectsCredential) throw unreadable('it is not valid JSON', error);
+    return { encrypted: false, digestInput: plaintextBytes, credential: null };
   }
   if (isEncryptedEnvelope(parsed)) {
-    if (storedKey === null) throw unreadable('it is encrypted and no key is held for it');
+    encrypted = true;
+    if (storedKey === null) {
+      // The copy is present and intact, so this is not an object an operator
+      // can repair. What is missing is a key, and the form that carries one
+      // is not built yet, so the caller is told that rather than sent to
+      // storage. Same wording as the route's DECRYPTION_REQUIRED refusal.
+      throw new TerminalVerificationError({
+        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        message:
+          "This service holds no usable key for the record's durable copy. Re-verification with a caller-supplied key is not supported yet.",
+      });
+    }
     if (!hasValidEnvelopeStructure(parsed)) throw unreadable('its encrypted envelope is corrupted');
     let key: string | null;
     try {
       key = deps.revealStoredKey(storedKey);
     } catch (error) {
-      throw unreadable('the stored key could not be unwrapped', error);
+      throw new TransientVerificationError(
+        {
+          code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+          message:
+            'The service could not unlock its stored decryption key; contact the operator, then re-verify once access is restored.',
+        },
+        error,
+        {
+          // A rotated-away key and a damaged envelope fail identically here,
+          // so this says what was observed and points at the command that
+          // tells the two apart, rather than asserting either.
+          classification: 'stored-key-unwrap-failed',
+          message:
+            'A stored decryption key did not unwrap under the active DATA_ENCRYPTION_KEY; run audit:encryption to see which stored envelopes are affected',
+        },
+      );
     }
     if (key === null) throw unreadable('the stored key is empty');
-    let plaintext: string;
     try {
-      plaintext = decryptCredential({
+      // Bytes, not the string form: the storage service digested the
+      // plaintext it was handed, and a copy whose plaintext is not valid
+      // UTF-8 does not survive a decode and re-encode.
+      plaintextBytes = decryptCredentialToBytes({
         cipherText: parsed.cipherText,
         key,
         iv: parsed.iv,
@@ -382,16 +623,43 @@ async function readCredential(
     } catch (error) {
       throw unreadable('the held key does not open it', error);
     }
+    if (!expectsCredential) {
+      // The storage service takes a non-credential body through its binary
+      // endpoint, and the envelope that endpoint serves back decrypts to the
+      // base64 of the stored bytes rather than to the bytes. A credential
+      // goes through the credential endpoint instead and decrypts to its own
+      // JSON. So the recorded content kind decides the encoding, and the
+      // digest covers the bytes underneath it either way. Both observations
+      // are pinned against the running service in
+      // .claude/reviews/957-digest-preimage-evidence.md.
+      const decoded = decodeBase64(asText(plaintextBytes));
+      if (decoded === null) throw unreadable('its decrypted content is not the encoded copy the service serves');
+      plaintextBytes = decoded;
+    }
     try {
-      parsed = JSON.parse(plaintext);
+      parsed = JSON.parse(asText(plaintextBytes));
     } catch (error) {
-      throw unreadable('its decrypted content is not valid JSON', error);
+      if (expectsCredential) throw unreadable('its decrypted content is not valid JSON', error);
+      return { encrypted, digestInput: plaintextBytes, credential: null };
     }
   }
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  if (expectsCredential && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))) {
     throw unreadable('its content is not a JSON object');
   }
-  return parsed as EnvelopedVerifiableCredential;
+  // The storage service digests what it was handed, before it encrypts, so an
+  // encrypted and a plain store of the same body return the same digest. A
+  // credential was handed over as the compact JSON of the object, so it is
+  // re-serialised here to reproduce that preimage. Everything else was handed
+  // over as bytes, so those bytes are the preimage exactly, once the base64
+  // an encrypted non-credential copy is served as has been decoded above.
+  // Pinned by the vector in verify-generation-job.digest-preimage.test.ts,
+  // which carries a digest the storage service itself produced.
+  const digestInput = expectsCredential ? new TextEncoder().encode(JSON.stringify(parsed)) : plaintextBytes;
+  return {
+    encrypted,
+    digestInput,
+    credential: expectsCredential ? (parsed as EnvelopedVerifiableCredential) : null,
+  };
 }
 
 /**
@@ -434,7 +702,7 @@ function verifierChecks(result: VerifyResult): Pick<CheckResults, 'proof' | 'sta
  * written by our storage adapter, not supplied by a caller, and a
  * deployment's storage service legitimately lives on a private address.
  */
-async function fetchStoredCopyText(uri: string): Promise<string> {
+async function fetchStoredCopyBytes(uri: string): Promise<Uint8Array> {
   let response: Response;
   try {
     response = await fetch(uri, { signal: AbortSignal.timeout(10_000) });
@@ -472,7 +740,30 @@ async function fetchStoredCopyText(uri: string): Promise<string> {
       chunks.push(value);
     }
   }
-  return Buffer.concat(chunks).toString('utf8');
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+/**
+ * The copy decoded for classification only. Invalid sequences become U+FFFD,
+ * which is what makes this unusable as a digest input and harmless as a way
+ * to ask whether the body is JSON.
+ */
+function asText(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString('utf8');
+}
+
+/**
+ * The bytes a base64 string encodes, or null when the string is not base64.
+ * `Buffer.from(text, 'base64')` accepts almost anything and silently drops
+ * what it cannot read, so the result is re-encoded and compared: a string
+ * that does not round-trip was never base64, and the copy is unreadable
+ * rather than quietly digested as whatever survived.
+ */
+function decodeBase64(text: string): Uint8Array | null {
+  const encoded = text.trim();
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 !== 0) return null;
+  const bytes = new Uint8Array(Buffer.from(encoded, 'base64'));
+  return Buffer.from(bytes).toString('base64') === encoded ? bytes : null;
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
