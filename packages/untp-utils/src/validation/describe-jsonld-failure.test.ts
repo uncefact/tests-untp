@@ -130,7 +130,7 @@ describe('describeJsonLdFailure', () => {
 
       expect(failure).toEqual({
         kind: 'context-fetch',
-        detail: 'a remote @context document was fetched but could not be used as a context',
+        detail: 'a remote @context document could not be loaded',
         code: 'loading remote context failed',
         url: 'https://example.com/ctx',
       });
@@ -164,9 +164,9 @@ describe('describeJsonLdFailure', () => {
       expect(failure.kind).toBe('document');
       expect(failure.detail).toContain('Dropping property that did not expand');
       expect(failure.detail).toContain('unknownTerm');
-      expect(failure.source).toBe('safe-mode-event');
+      expect(failure).toMatchObject({ source: 'safe-mode-event' });
       expect(failure.code).toBe('invalid property');
-      expect(failure.fields).toEqual({ property: 'unknownTerm', expandedProperty: 'unknownTerm' });
+      expect(failure).toMatchObject({ fields: { property: 'unknownTerm', expandedProperty: 'unknownTerm' } });
     });
 
     it('never echoes non-allowlisted event fields, which can carry credential content', () => {
@@ -182,7 +182,22 @@ describe('describeJsonLdFailure', () => {
 
       expect(failure.kind).toBe('document');
       expect(failure.detail).not.toContain('urn:secret:batch-7734');
-      expect(failure.fields).toBeUndefined();
+      expect(failure).not.toHaveProperty('fields');
+      expect(JSON.stringify(failure)).not.toContain('urn:secret:batch-7734');
+    });
+
+    it('echoes only allowlisted event fields even when a non-allowlisted one is a plain string', () => {
+      const processor = jsonLdError('jsonld.ValidationError', 'Safe mode validation error.', {
+        event: {
+          code: 'invalid property',
+          message: 'Dropping property that did not expand into an absolute IRI or keyword.',
+          details: { property: 'batchId', value: 'urn:secret:batch-7734' },
+        },
+      });
+
+      const failure = describeJsonLdFailure(new JsonLdExpansionFailedError(processor));
+
+      expect(failure).toMatchObject({ fields: { property: 'batchId' } });
       expect(JSON.stringify(failure)).not.toContain('urn:secret:batch-7734');
     });
 
@@ -195,7 +210,7 @@ describe('describeJsonLdFailure', () => {
 
       expect(failure.kind).toBe('document');
       expect(failure.detail).toBe('Invalid JSON-LD syntax; @type value must be a string.');
-      expect(failure.source).toBe('syntax-error');
+      expect(failure).toMatchObject({ source: 'syntax-error' });
       expect(failure.code).toBe('invalid type value');
     });
 

@@ -8,6 +8,11 @@ import type { LoadedRemoteDocument } from '@uncefact/untp-utils/loaders';
 
 const mockLoad = jest.fn<Promise<LoadedRemoteDocument>, [string]>();
 
+jest.mock('@uncefact/untp-utils/validation', () => {
+  const actual = jest.requireActual('@uncefact/untp-utils/validation');
+  return { ...actual, expandJsonLd: jest.fn(actual.expandJsonLd) };
+});
+
 jest.mock('@uncefact/untp-utils/loaders', () => {
   const actual = jest.requireActual('@uncefact/untp-utils/loaders');
   return { ...actual, createJsonLdDocumentLoader: jest.fn(() => (url: string) => mockLoad(url)) };
@@ -50,9 +55,9 @@ describe('POST /api/context', () => {
 
   it('expands a credential whose contexts resolve, returning the expanded document', async () => {
     const response = await POST(post({ document: dpp }));
-    const json = (await response.json()) as { ok: boolean; expanded: unknown[] };
+    const json = (await response.json()) as { expanded: unknown[] };
     expect(response.status).toBe(200);
-    expect(json.ok).toBe(true);
+
     expect(Array.isArray(json.expanded)).toBe(true);
     expect(JSON.stringify(json.expanded)).toContain('https://www.w3.org/2018/credentials#issuer');
     expect(mockLoad).toHaveBeenCalledWith(VCDM);
@@ -66,7 +71,7 @@ describe('POST /api/context', () => {
   ])('rejects %s with 400 before loading anything', async (_label, request) => {
     const response = await POST(request);
     expect(response.status).toBe(400);
-    expect(((await response.json()) as { ok: boolean }).ok).toBe(false);
+    expect(((await response.json()) as { failure: { kind: string } }).failure.kind).toBe('request');
     expect(mockLoad).not.toHaveBeenCalled();
   });
 
@@ -76,9 +81,9 @@ describe('POST /api/context', () => {
     const response = await POST(
       post({ document: { '@context': [VCDM], type: ['VerifiableCredential'], mediaQuery: 'foo' } }),
     );
-    const json = (await response.json()) as { ok: false; error: Record<string, unknown> };
+    const json = (await response.json()) as { error: string; failure: Record<string, unknown> };
     expect(response.status).toBe(422);
-    expect(json.error).toMatchObject({
+    expect(json.failure).toMatchObject({
       kind: 'document',
       source: 'safe-mode-event',
       code: 'invalid property',
@@ -88,9 +93,9 @@ describe('POST /api/context', () => {
 
   it('reports a malformed @context entry as a document syntax failure with its code', async () => {
     const response = await POST(post({ document: { '@context': [VCDM, 42], type: ['VerifiableCredential'] } }));
-    const json = (await response.json()) as { ok: false; error: Record<string, unknown> };
+    const json = (await response.json()) as { error: string; failure: Record<string, unknown> };
     expect(response.status).toBe(422);
-    expect(json.error).toMatchObject({ kind: 'document', source: 'syntax-error', code: 'invalid local context' });
+    expect(json.failure).toMatchObject({ kind: 'document', source: 'syntax-error', code: 'invalid local context' });
   });
 
   it("reports the loader's refusal as a context-fetch failure that names the URL but not the address", async () => {
@@ -100,14 +105,69 @@ describe('POST /api/context', () => {
       return bundledLoader(url);
     });
     const response = await POST(post({ document: { '@context': [VCDM, blocked], type: ['VerifiableCredential'] } }));
-    const json = (await response.json()) as { ok: false; error: Record<string, unknown> };
+    const json = (await response.json()) as { error: string; failure: Record<string, unknown> };
     expect(response.status).toBe(422);
-    expect(json.error).toEqual({
+    expect(json.failure).toEqual({
       kind: 'context-fetch',
       detail: "a remote @context URL was rejected by this service's URL policy or could not be resolved",
       url: blocked,
     });
-    expect(JSON.stringify(json.error)).not.toContain('10.0.0.9');
+    expect(JSON.stringify(json.failure)).not.toContain('10.0.0.9');
+  });
+
+  it('logs the typed cause of a 422 server-side, with the guard code, while the response stays flat', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const blocked = 'https://internal.example/ctx.jsonld';
+    mockLoad.mockImplementation(async (url) => {
+      if (url === blocked) throw new PrivateAddressError('internal.example', ['10.0.0.9']);
+      return bundledLoader(url);
+    });
+    const response = await POST(post({ document: { '@context': [VCDM, blocked], type: ['VerifiableCredential'] } }));
+    expect(response.status).toBe(422);
+    expect(warn).toHaveBeenCalledWith(
+      'JSON-LD expansion failed',
+      expect.objectContaining({ kind: 'context-fetch', url: blocked, code: 'url.private-address' }),
+    );
+    warn.mockRestore();
+  });
+
+  it('warns when a bundled context stands in for a failed fetch, naming the URL and codes', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.isolateModules(() => {
+      const { createJsonLdDocumentLoader: createLoader } = jest.requireMock('@uncefact/untp-utils/loaders');
+      createLoader.mockClear();
+      jest.requireActual('@/app/api/context/route');
+      const { onBundledFallback, allowedSchemes } = createLoader.mock.calls[0][0];
+      expect(allowedSchemes).toEqual(['https']);
+      onBundledFallback({
+        url: 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+        cause: Object.assign(new Error('HTTP 503'), { code: 'resolver.http-error', cause: { code: 'inner' } }),
+      });
+    });
+    expect(warn).toHaveBeenCalledWith('Served the bundled copy of a JSON-LD context because its fetch failed', {
+      url: 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+      code: 'resolver.http-error',
+      causeCode: 'inner',
+    });
+    warn.mockRestore();
+  });
+
+  it('answers 500 with a service message, never a document fault, when expansion throws a non-JSON-LD error', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    // A loader throw is rehydrated into the JSON-LD error class, so the
+    // non-JSON-LD throw has to come from the module boundary itself.
+    const { expandJsonLd } = jest.requireMock('@uncefact/untp-utils/validation');
+    (expandJsonLd as jest.Mock).mockRejectedValueOnce(new RangeError('out of memory'));
+    const response = await POST(post({ document: { '@context': [VCDM], type: ['VerifiableCredential'] } }));
+    const json = (await response.json()) as { error: string; failure: Record<string, unknown> };
+    expect(response.status).toBe(500);
+    expect(json.failure).toEqual({
+      kind: 'service',
+      detail: 'The context service hit an internal error. Retry in a moment.',
+    });
+    expect(JSON.stringify(json.failure)).not.toContain('out of memory');
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it('reports a fetched but unusable context as context-invalid', async () => {
@@ -119,8 +179,8 @@ describe('POST /api/context', () => {
     const response = await POST(
       post({ document: { '@context': [VCDM, notAContext], type: ['VerifiableCredential'] } }),
     );
-    const json = (await response.json()) as { ok: false; error: Record<string, unknown> };
+    const json = (await response.json()) as { error: string; failure: Record<string, unknown> };
     expect(response.status).toBe(422);
-    expect(json.error).toMatchObject({ kind: 'context-invalid', code: 'invalid remote context', url: notAContext });
+    expect(json.failure).toMatchObject({ kind: 'context-invalid', code: 'invalid remote context', url: notAContext });
   });
 });

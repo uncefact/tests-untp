@@ -9,14 +9,10 @@ import { UrlValidationError } from '../node/errors.js';
  * fetched or used (an environment or upstream condition; the payload may be
  * fine).
  */
-export interface JsonLdFailureDescription {
-  /**
-   * `context-fetch`: a remote `@context` could not be fetched (host down,
-   * URL refused, bounds exceeded). `context-invalid`: a remote `@context`
-   * was fetched but is not usable as a context. `document`: the contexts
-   * are fine and the document itself fails against them.
-   */
-  kind: 'context-fetch' | 'context-invalid' | 'document';
+/** The event and syntax-error identifiers the classifier is allowed to echo, see {@link SAFE_EVENT_FIELDS}. */
+export type SafeJsonLdFields = Partial<Record<(typeof SAFE_EVENT_FIELDS)[number], string>>;
+
+interface JsonLdFailureDescriptionBase {
   /**
    * Human-facing reason, safe to return to the caller. Every branch below
    * must preserve that property: detail comes only from explicitly
@@ -27,40 +23,58 @@ export interface JsonLdFailureDescription {
    * a generic message and the full chain stays on `cause` for the log.
    */
   detail: string;
+}
+
+/**
+ * A remote `@context` could not be used. `context-fetch`: it could not be
+ * fetched (host down, URL refused, bounds exceeded). `context-invalid`: it
+ * was fetched but is not usable as a context.
+ */
+export interface JsonLdContextFailure extends JsonLdFailureDescriptionBase {
+  kind: 'context-fetch' | 'context-invalid';
   /**
-   * The recognised jsonld.js code (`details.code` of a syntax or URL error,
-   * or the safe-mode event code) or the resolver's structured code. Never
-   * set for a URL-policy rejection, whose subclasses must stay
-   * indistinguishable to the caller.
+   * The resolver's structured code or the recognised jsonld.js code. Absent
+   * for a URL-policy rejection on purpose: its subclasses must stay
+   * indistinguishable to the caller (see {@link describeJsonLdFailure}), so
+   * do not tighten this.
    */
   code?: string;
   /** The `@context` URL that failed, when jsonld.js names one; it comes from the caller's own document. */
   url?: string;
+}
+
+/** The contexts are fine and the document itself fails against them. */
+export interface JsonLdDocumentFailure extends JsonLdFailureDescriptionBase {
+  kind: 'document';
+  /** The jsonld.js syntax-error or safe-mode event code, when one was recognised. */
+  code?: string;
   /**
-   * For `document` failures: whether jsonld.js rejected the context
-   * definitions themselves (`syntax-error`) or the document's content under
-   * them (`safe-mode-event`). A verifier tells its user to fix the @context
-   * in the first case and the credential in the second.
+   * Whether jsonld.js rejected the context definitions themselves
+   * (`syntax-error`) or the document's content under them
+   * (`safe-mode-event`). A verifier tells its user to fix the @context in
+   * the first case and the credential in the second. Absent when neither
+   * shape was recognised.
    */
   source?: 'syntax-error' | 'safe-mode-event';
-  /** Allowlisted identifiers from a safe-mode event or syntax error (property, term, id, type, language, vocab). */
-  fields?: Partial<Record<(typeof SAFE_EVENT_FIELDS)[number], string>>;
+  /** Allowlisted identifiers from the event or syntax error, see {@link SAFE_EVENT_FIELDS}. */
+  fields?: SafeJsonLdFields;
 }
+
+export type JsonLdFailureDescription = JsonLdContextFailure | JsonLdDocumentFailure;
 
 const GENERIC_DOCUMENT_DETAIL = 'the document could not be expanded as valid JSON-LD';
 const GENERIC_REMOTE_CONTEXT_DETAIL = 'a remote @context document was fetched but could not be used as a context';
+const GENERIC_REMOTE_CONTEXT_LOAD_DETAIL = 'a remote @context document could not be loaded';
 const FLAT_URL_POLICY_DETAIL =
   "a remote @context URL was rejected by this service's URL policy or could not be resolved";
 
 /** Event `details` fields safe to echo: identifiers from the caller's own document or a public context, never free-form values that can carry credential content. */
-const SAFE_EVENT_FIELDS = ['property', 'expandedProperty', 'id', 'type', 'term', 'language', 'vocab'] as const;
+/** The only jsonld.js event and syntax-error detail fields ever echoed to a caller; everything else may carry document content. */
+export const SAFE_EVENT_FIELDS = ['property', 'expandedProperty', 'id', 'type', 'term', 'language', 'vocab'] as const;
 const MAX_FIELD_LENGTH = 200;
 
 interface JsonLdProcessorError extends Error {
-  details?: {
-    code?: unknown;
-    url?: unknown;
-    term?: unknown;
+  details?: Record<string, unknown> & {
     event?: { code?: unknown; message?: unknown; details?: Record<string, unknown> };
   };
 }
@@ -70,8 +84,8 @@ function isJsonLdProcessorError(value: unknown): value is JsonLdProcessorError {
 }
 
 /** The allowlisted string fields present on a details object, truncated. */
-function safeFields(details: Record<string, unknown> | undefined): JsonLdFailureDescription['fields'] | undefined {
-  const fields: Partial<Record<(typeof SAFE_EVENT_FIELDS)[number], string>> = {};
+function safeFields(details: Record<string, unknown> | undefined): SafeJsonLdFields | undefined {
+  const fields: SafeJsonLdFields = {};
   for (const field of SAFE_EVENT_FIELDS) {
     const value = details?.[field];
     if (typeof value === 'string' && value !== '') fields[field] = value.slice(0, MAX_FIELD_LENGTH);
@@ -109,14 +123,15 @@ function* causeChain(error: unknown): Generator<unknown> {
  * (native `.cause` hops; the chain is rehydrated by `validateJsonLd`, see
  * issue #773).
  *
- * The two passes run in a load-bearing order. The rehydrated chain nests
- * the guarded loader's error BENEATH jsonld.js's own wrapper
+ * The passes run in a load-bearing order. The rehydrated chain nests the
+ * guarded loader's error BENEATH jsonld.js's own wrapper
  * (`JsonLdExpansionFailedError` -> `jsonld.InvalidUrl` -> the loader's
- * `UrlValidationError`), and the wrapper's message contains the URL, so the
- * typed-loader pass must exhaust the whole chain before any jsonld.js shape
- * is considered; matching the wrapper first would echo its message and
+ * `UrlValidationError`), and the wrapper's message contains the URL, so no
+ * jsonld.js message may become `detail` until the typed-loader pass has
+ * exhausted the whole chain; matching the wrapper's message first would
  * reopen the per-hostname reconnaissance oracle the flat message exists to
- * close.
+ * close. The URL scan that runs before the typed-loader pass reads only the
+ * wrapper's `details.url`, which is the caller's own document's URL.
  *
  * `UrlValidationError` deliberately collapses to one flat message: its
  * subclasses distinguish "does not resolve" from "resolves to a private
@@ -176,8 +191,10 @@ export function describeJsonLdFailure(error: JsonLdValidationError): JsonLdFailu
       return { kind: 'context-invalid', detail: GENERIC_REMOTE_CONTEXT_DETAIL, code, ...(url && { url }) };
     }
     if (node.name === 'jsonld.InvalidUrl' && code === 'loading remote context failed') {
-      // Rejected by an untyped loader path: could not be loaded at all.
-      return { kind: 'context-fetch', detail: GENERIC_REMOTE_CONTEXT_DETAIL, code, ...(url && { url }) };
+      // Rejected by an untyped loader path, so the typed pass found nothing:
+      // the context could not be loaded, and the wrapper's message (which
+      // names the URL) is not echoed.
+      return { kind: 'context-fetch', detail: GENERIC_REMOTE_CONTEXT_LOAD_DETAIL, code, ...(url && { url }) };
     }
     if (node.name === 'jsonld.ValidationError' && node.details?.event !== undefined) {
       const event = node.details.event;
@@ -194,7 +211,7 @@ export function describeJsonLdFailure(error: JsonLdValidationError): JsonLdFailu
       // jsonld.js syntax-error messages are library-authored fixed strings
       // (the variable parts live in details; only the allowlisted identifiers
       // are echoed).
-      const fields = safeFields(node.details as Record<string, unknown> | undefined);
+      const fields = safeFields(node.details);
       return {
         kind: 'document',
         detail: node.message,

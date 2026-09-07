@@ -15,7 +15,7 @@ describe('contextValidation', () => {
   });
 
   const answer = (status: number, body: unknown) =>
-    fetchMock.mockResolvedValueOnce({ status, json: async () => body } as unknown as Response);
+    fetchMock.mockResolvedValueOnce({ ok: status < 400, status, json: async () => body } as unknown as Response);
 
   describe('validateRequiredFields', () => {
     it('returns valid when @context is present', () => {
@@ -59,7 +59,7 @@ describe('contextValidation', () => {
         ).toEqual({
           keyword: 'jsonldUrl',
           message:
-            'Couldn\'t load the @context at "https://no-such-host.invalid/ctx.jsonld". Common causes: the URL is unreachable, resolves to a private address, redirected too many times, or returned a non-JSON-LD response. could not fetch a remote @context: HTTP 503 from https://no-such-host.invalid/ctx.jsonld.',
+            'Couldn\'t load the @context at "https://no-such-host.invalid/ctx.jsonld". Common causes: the URL is unreachable, is not https, resolves to a private address, redirected too many times, or returned a non-JSON-LD response. Reported cause: could not fetch a remote @context: HTTP 503 from https://no-such-host.invalid/ctx.jsonld.',
           instancePath: '@context',
           params: {
             code: 'resolver.http-error',
@@ -76,7 +76,7 @@ describe('contextValidation', () => {
         });
         expect(result.keyword).toBe('jsonldUrl');
         expect(result.message).toBe(
-          "Couldn't load a @context URL: a remote @context URL was rejected by this service's URL policy or could not be resolved.",
+          "Couldn't load a @context URL. Reported cause: a remote @context URL was rejected by this service's URL policy or could not be resolved.",
         );
       });
     });
@@ -171,14 +171,7 @@ describe('contextValidation', () => {
           message:
             'Property "mediaQuery" appears in the credential but isn\'t defined by any @context. Either add a definition for it to a @context, or remove the property from the credential.',
           instancePath: '',
-          params: {
-            code: 'invalid property',
-            property: 'mediaQuery',
-            id: undefined,
-            type: undefined,
-            term: undefined,
-            language: undefined,
-          },
+          params: { code: 'invalid property', property: 'mediaQuery' },
         });
       });
 
@@ -224,14 +217,24 @@ describe('contextValidation', () => {
     });
 
     describe('unknown shapes', () => {
-      it('passes the detail through for an unrecognised kind', () => {
+      it('reports a request or service failure as the service not judging the document', () => {
         const result = describeJsonLdError({ kind: 'request', detail: 'Body must carry a JSON object as "document".' });
         expect(result).toEqual({
           keyword: 'unknown',
-          message: 'Body must carry a JSON object as "document".',
+          message:
+            'The Playground\'s context service could not process the request: Body must carry a JSON object as "document".',
           instancePath: '',
-          params: { kind: 'request', code: undefined },
+          params: { kind: 'request' },
         });
+        expect(describeJsonLdError({ kind: 'service', detail: 'internal' }).message).toContain(
+          'could not process the request',
+        );
+      });
+
+      it('treats an unrecognised kind as no diagnostic information', () => {
+        const result = describeJsonLdError({ kind: 'something-new', detail: 'x' });
+        expect(result.keyword).toBe('unknown');
+        expect(result.message).toContain('returned no diagnostic information');
       });
 
       it('handles null/undefined input and shapes without a detail', () => {
@@ -248,7 +251,7 @@ describe('contextValidation', () => {
     it('returns valid when expansion succeeds', async () => {
       const credential = { '@context': ['https://schema.org'], name: 'Test' };
       const expanded = [{ 'https://schema.org/name': [{ '@value': 'Test' }] }];
-      answer(200, { ok: true, expanded });
+      answer(200, { expanded });
 
       const result = await validateContext(credential);
 
@@ -276,8 +279,8 @@ describe('contextValidation', () => {
 
     it('surfaces a clear message when the service reports an expansion failure', async () => {
       answer(422, {
-        ok: false,
-        error: {
+        error: 'x',
+        failure: {
           kind: 'document',
           source: 'safe-mode-event',
           detail: 'Dropping property that did not expand into an absolute IRI or keyword. (property: "mediaQuery")',
@@ -298,8 +301,8 @@ describe('contextValidation', () => {
 
     it('translates a guard refusal the service relays into the existing URL error copy', async () => {
       answer(422, {
-        ok: false,
-        error: {
+        error: 'x',
+        failure: {
           kind: 'context-fetch',
           detail: "a remote @context URL was rejected by this service's URL policy or could not be resolved",
           url: 'https://internal.example/ctx.jsonld',

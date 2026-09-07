@@ -38,9 +38,9 @@ export async function validateCredentialPayload(
       // Two caller-facing classes (the 400's `code` distinguishes them): a
       // document problem carries the processor's detail so the caller knows
       // what to fix; a context problem (could not be fetched, or fetched but
-      // not usable as a context) names the URL and condition in the typed
-      // diagnostic's terms. Either way the full cause chain rides on the
-      // ValidationError for the server-side log.
+      // not usable as a context) carries the typed diagnostic's condition,
+      // which for a URL-policy refusal deliberately names nothing. Either way
+      // the full cause chain rides on the ValidationError for the server log.
       const failure = describeJsonLdFailure(e);
       const code = failure.kind === 'document' ? 'JSONLD_DOCUMENT_INVALID' : 'JSONLD_CONTEXT_FETCH_FAILED';
       throw new ValidationError(`JSON-LD validation failed: ${failure.detail}`, { code, cause: e });
