@@ -26,9 +26,11 @@ Ensure you have completed the [prerequisites](../../../README.md#prerequisites) 
 
 > **Important**: The standard `docker-compose.yml` stack's `ri-db` service and this E2E stack's `e2e-ri-db` service both bind to host port 5433. Stop the standard stack (or its `ri-db` service) before starting the E2E stack below, otherwise the E2E stack fails to bind that port and does not start.
 
+> **Important**: This suite needs the Playground as well as the RI. The `v0.7-issue-verify-matrix` API spec issues a credential through the RI and then verifies it through the Playground, so both profiles must be active. Starting the `ri` profile alone leaves nothing listening on port 4000 and that spec fails for every credential type. Pass both profiles to every compose invocation, including teardown, so the Playground container is removed with the rest of the stack.
+
 ```bash
-# Start the E2E stack (the `ri` profile activates the RI app + its dependencies)
-docker compose -f docker-compose.e2e.yml --profile ri up -d --build
+# Start the E2E stack (`ri` activates the RI app + its dependencies, `playground` adds the Playground)
+docker compose -f docker-compose.e2e.yml --profile ri --profile playground up -d --build
 
 # Run tests (from repo root)
 pnpm test:e2e:ri             # Headless (default: open mode)
@@ -36,7 +38,7 @@ pnpm test:e2e:ri:open        # Explicit open mode
 pnpm test:e2e:ri:open-ui     # Interactive UI
 
 # Teardown; use -v to remove volumes for a clean DB next time
-docker compose -f docker-compose.e2e.yml --profile ri down -v
+docker compose -f docker-compose.e2e.yml --profile ri --profile playground down -v
 ```
 
 > **Important**: Always use `-v` when tearing down. Without it, stale user records persist in the database and cause `OAuthAccountNotLinked` errors on the next run.
@@ -46,9 +48,9 @@ docker compose -f docker-compose.e2e.yml --profile ri down -v
 Both `-f` flags must be passed together on every compose invocation for closed mode, including any later ad-hoc command such as restarting a single service. Dropping the `docker-compose.e2e-closed.yml` override reverts `TENANT_MODE` to open.
 
 ```bash
-docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri up -d --build
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri --profile playground up -d --build
 pnpm test:e2e:ri:closed
-docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri down -v
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri --profile playground down -v
 ```
 
 ## Testing a Deployed Instance

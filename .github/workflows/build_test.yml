@@ -190,10 +190,11 @@ jobs:
           RI_DATABASE_URL: postgresql://placeholder:placeholder@localhost:9/placeholder
         run: pnpm exec turbo run test:integration --filter='untp-reference-implementation...[origin/next]'
 
-  # Per-app image build jobs run in parallel after qa. Each downstream E2E
-  # job depends only on its own image-build job so the playground E2E starts
-  # as soon as the playground image is ready (not blocked on the RI image),
-  # and the RI E2E matrix starts as soon as the RI image is ready.
+  # Per-app image build jobs run in parallel after qa. The playground E2E
+  # job depends only on the playground image job, so it starts as soon as
+  # that image is ready rather than waiting on the RI image. The RI E2E
+  # matrix waits on both, because its issue-and-verify spec also drives the
+  # Playground.
   build-e2e-image-ri:
     name: Build E2E image (RI)
     if: github.event_name == 'pull_request'
@@ -359,28 +360,45 @@ jobs:
         run: |
           set -euo pipefail
 
-          json=$(pnpm --silent turbo run build --filter='untp-playground...[origin/next]' --dry-run=json)
-          if [ -z "$json" ]; then
-            echo "::error::turbo dry-run produced empty output"
-            exit 1
-          fi
-          count=$(echo "$json" | jq '.tasks | length')
-          if ! [[ "$count" =~ ^[0-9]+$ ]]; then
-            echo "::error::Could not parse turbo task count: '$count'"
-            echo "--- Raw output ---"
-            echo "$json"
-            exit 1
-          fi
+          # Two dry-runs. This image is built when the playground itself is
+          # affected, and also when the RI E2E matrix will run, because that
+          # matrix's issue-and-verify spec drives the Playground too. Without
+          # the second one a PR that only touches reference implementation
+          # source exports nothing here, so its matrix legs cannot rely on a warm
+          # cache from this run and may each build the Playground cold. This
+          # gate is a superset of the RI E2E job's own gate (its filter and
+          # paths, plus the playground-only triggers), so a change to that
+          # gate belongs here as well.
+          counts=()
+          for filter in 'untp-playground...[origin/next]' 'untp-reference-implementation...[origin/next]'; do
+            json=$(pnpm --silent turbo run build --filter="$filter" --dry-run=json)
+            if [ -z "$json" ]; then
+              echo "::error::turbo dry-run for '$filter' produced empty output"
+              exit 1
+            fi
+            task_count=$(echo "$json" | jq '.tasks | length')
+            if ! [[ "$task_count" =~ ^[0-9]+$ ]]; then
+              echo "::error::Could not parse turbo task count for '$filter': '$task_count'"
+              echo "--- Raw output ---"
+              echo "$json"
+              exit 1
+            fi
+            counts+=("$task_count")
+          done
+          count=${counts[0]}
+          ri_count=${counts[1]}
 
           extra=$(git diff --name-only origin/next...HEAD -- \
             'packages/untp-playground/e2e/**' \
+            'packages/reference-implementation/e2e/**' \
             'docker-compose.e2e.yml' \
+            'docker-compose.e2e-closed.yml' \
             '.github/workflows/build_test.yml' \
             | wc -l | tr -d ' ')
 
-          if [ "$count" -gt 0 ] || [ "$extra" -gt 0 ]; then
+          if [ "$count" -gt 0 ] || [ "$ri_count" -gt 0 ] || [ "$extra" -gt 0 ]; then
             echo "result=true" >> "$GITHUB_OUTPUT"
-            echo "Playground image will be built. turbo task_count=$count, extra=$extra."
+            echo "Playground image will be built. turbo task_count=$count, ri_task_count=$ri_count, extra=$extra."
           else
             echo "result=false" >> "$GITHUB_OUTPUT"
             echo "Playground image skipped."
@@ -407,7 +425,13 @@ jobs:
     name: E2E RI (${{ matrix.mode }})
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    needs: [quality, qa, build-e2e-image-ri]
+    # `v0.7-issue-verify-matrix.cy.ts` issues through the RI and verifies
+    # through the Playground, so this job builds both images from the
+    # branch. Depending on the playground image job puts that job's cache
+    # export ahead of the read here. It also means a failure there skips
+    # this matrix, which is right, because the spec cannot run without a
+    # Playground image.
+    needs: [quality, qa, build-e2e-image-ri, build-e2e-image-playground]
     strategy:
       fail-fast: false
       matrix:
@@ -532,11 +556,21 @@ jobs:
           load: true
           cache-from: type=gha,scope=reference-implementation-e2e
 
-      - name: Pull latest published Playground image
+      # See the `Build RI image (with cache)` step above for why this uses
+      # `docker/build-push-action@v6` rather than `docker compose build`.
+      # It reads the cache scope that `build-e2e-image-playground` fills.
+      # The spec verifies against the branch's own Playground rather than
+      # the published `:latest` image, which only moves on a release tag or
+      # a manual rebuild and so can lag `next` by months.
+      - name: Build playground image (with cache)
         if: steps.affected.outputs.result == 'true'
-        run: |
-          docker pull ghcr.io/uncefact/tests-untp/untp-playground:latest
-          docker tag ghcr.io/uncefact/tests-untp/untp-playground:latest untp-playground:e2e
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/untp-playground/Dockerfile
+          tags: untp-playground:e2e
+          load: true
+          cache-from: type=gha,scope=untp-playground-e2e
 
       - name: Start RI stack (${{ matrix.mode }})
         if: steps.affected.outputs.result == 'true'
@@ -579,9 +613,9 @@ jobs:
           VERIFY_ALLOW_PRIVATE_URLS: 'true' # Skip SSRF E2E tests, Docker services use internal addresses
           CYPRESS_PLAYGROUND_BASE_URL: 'http://localhost:4000'
 
-      - name: Dump RI container logs on failure
+      - name: Dump RI and Playground container logs on failure
         if: failure() && steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app
+        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app untp-playground
 
       - name: Upload Cypress artifacts on failure
         if: failure() && steps.affected.outputs.result == 'true'

@@ -77,16 +77,16 @@ cd packages/reference-implementation && pnpm test:integration
 
 # E2E Testing (per-app suites; see packages/<app>/e2e/README.md for details)
 
-# RI open mode
-docker compose -f docker-compose.e2e.yml --profile ri up -d --build
+# RI open mode. The RI suite verifies through the Playground, so both profiles are required.
+docker compose -f docker-compose.e2e.yml --profile ri --profile playground up -d --build
 pnpm test:e2e:ri:open                                                          # or pnpm test:e2e:ri (default)
 pnpm test:e2e:ri:open-ui                                                       # Interactive UI
-docker compose -f docker-compose.e2e.yml --profile ri down -v
+docker compose -f docker-compose.e2e.yml --profile ri --profile playground down -v
 
 # RI closed mode — the closed-mode override MUST be passed to every compose verb
-docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri up -d --build
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri --profile playground up -d --build
 pnpm test:e2e:ri:closed
-docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri down -v
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri --profile playground down -v
 
 # Playground
 docker compose -f docker-compose.e2e.yml --profile playground up -d --build
