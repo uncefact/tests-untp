@@ -9,6 +9,7 @@ import {
 import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
 import { ValidationError } from '@/lib/api/validation';
 import { contextCache } from './context-cache';
+import { bundledArtefactsFallback } from './schema-loader';
 
 export async function validateCredentialPayload(
   credentialPayload: unknown,
@@ -31,7 +32,7 @@ export async function validateCredentialPayload(
   }
 
   try {
-    await validateJsonLd(credentialPayload, { contextCache });
+    await validateJsonLd(credentialPayload, { contextCache, ...bundledArtefactsFallback });
   } catch (e) {
     if (e instanceof JsonLdValidationError) {
       // Two caller-facing classes (the 400's `code` distinguishes them): a

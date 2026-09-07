@@ -94,7 +94,11 @@ export async function resolveAndParseConformityScheme(
   }
 
   try {
-    await validateJsonLd(parsedJson, { contextCache: input.contextCache });
+    await validateJsonLd(parsedJson, {
+      contextCache: input.contextCache,
+      bundledFallback: input.bundledFallback,
+      onBundledFallback: input.onBundledFallback,
+    });
   } catch (cause) {
     return failure(RESOLVE_FAILURE_STATUS.JsonLdExpansionFailed, input.sourceUrl, cause);
   }

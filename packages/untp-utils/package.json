@@ -48,6 +48,10 @@
     "./http-headers": {
       "types": "./build/http-headers/index.d.ts",
       "default": "./build/http-headers/index.js"
+    },
+    "./bundled-artefacts": {
+      "types": "./build/bundle/public.d.ts",
+      "default": "./build/bundle/public.js"
     }
   },
   "typesVersions": {
@@ -78,17 +82,23 @@
       ],
       "common": [
         "./build/common/index.d.ts"
+      ],
+      "bundled-artefacts": [
+        "./build/bundle/public.d.ts"
       ]
     }
   },
   "files": [
-    "build"
+    "build",
+    "artefacts"
   ],
   "scripts": {
     "build": "tsc --build --clean && tsc",
     "watch": "tsc -b --watch",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage"
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "artefacts:check": "node scripts/refresh-artefacts.mjs --check",
+    "artefacts:refresh": "node scripts/refresh-artefacts.mjs"
   },
   "type": "module",
   "keywords": [

@@ -1,5 +1,10 @@
 const mockWarn = jest.fn();
 
+jest.mock('@uncefact/untp-utils/loaders', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/loaders'),
+  createSchemaLoader: jest.fn(() => ({ load: jest.fn() })),
+}));
+
 jest.mock('@/lib/api/logger', () => ({
   apiLogger: {
     child: () => ({
@@ -11,7 +16,7 @@ jest.mock('@/lib/api/logger', () => ({
   },
 }));
 
-import { readSchemaCacheTtlMs } from './schema-loader';
+import { logBundledFallback, readSchemaCacheTtlMs } from './schema-loader';
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 
@@ -59,6 +64,33 @@ describe('readSchemaCacheTtlMs', () => {
         expect.objectContaining({ received: '-1' }),
         expect.stringContaining('falling back'),
       );
+    });
+  });
+});
+
+describe('logBundledFallback', () => {
+  it('warns with the URL and the fetch error so an outage is visible in the log', () => {
+    const cause = new Error('getaddrinfo ENOTFOUND untp.unece.org');
+    logBundledFallback({
+      url: 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
+      cause,
+    });
+    expect(mockWarn).toHaveBeenCalledWith(
+      { url: 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json', err: cause },
+      'Served the bundled copy of a UNTP artefact because its fetch failed (snapshot listed in @uncefact/untp-utils artefacts/manifest.json; BUNDLED_ARTEFACTS_FALLBACK=false disables this)',
+    );
+  });
+
+  it('builds the shared schema loader with the fallback switch and the log listener', () => {
+    jest.isolateModules(() => {
+      const loaders = jest.requireMock('@uncefact/untp-utils/loaders') as { createSchemaLoader: jest.Mock };
+      loaders.createSchemaLoader.mockClear();
+      const mod = jest.requireActual('./schema-loader') as typeof import('./schema-loader');
+      expect(loaders.createSchemaLoader).toHaveBeenCalledTimes(1);
+      expect(loaders.createSchemaLoader).toHaveBeenCalledWith(expect.anything(), {
+        bundledFallback: true,
+        onBundledFallback: mod.logBundledFallback,
+      });
     });
   });
 });

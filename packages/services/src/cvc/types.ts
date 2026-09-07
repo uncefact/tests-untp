@@ -1,5 +1,5 @@
 import type { TtlCache } from '@uncefact/untp-utils/cache';
-import type { LoadedRemoteDocument, SchemaLoader } from '@uncefact/untp-utils/loaders';
+import type { BundledFallbackOptions, LoadedRemoteDocument, SchemaLoader } from '@uncefact/untp-utils/loaders';
 import type { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import type { ConformityScheme } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { ConformitySchemeResolveError } from './errors.js';
@@ -73,6 +73,12 @@ export interface ResolveAndParseConformitySchemeInput {
    * path's (see the reference implementation's `context-cache.ts`).
    */
   contextCache?: TtlCache<LoadedRemoteDocument>;
+  /**
+   * Whether a bundled UNTP context stands in when its fetch fails (default on),
+   * and who is told when it does; forwarded to `validateJsonLd`.
+   */
+  bundledFallback?: BundledFallbackOptions['bundledFallback'];
+  onBundledFallback?: BundledFallbackOptions['onBundledFallback'];
 }
 
 /** Outcome of a successful run; everything the caller needs to upsert the row. */

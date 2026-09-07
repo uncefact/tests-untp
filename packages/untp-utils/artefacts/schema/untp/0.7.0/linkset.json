@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://untp.unece.org/schema/idr/linkset-schema",
+  "title": "UNTP linkset schema extending RFC 9264 with UNTP link object properties",
+  "description": "A linkset schema aligned with the GS1 resolver linkset schema (https://ref.gs1.org/standards/resolver/linkset-schema) and extended with UNTP-specific link object properties for versioning, access control, and link creation. A UNTP-conformant linkset that omits the UNTP extension properties will also validate against the GS1 schema.",
+  "type": "object",
+  "properties": {
+    "linkset": {
+      "description": "The linkset",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "anchor": {
+            "description": "The URL at the root of the linkset, a.k.a the link context",
+            "type": "string",
+            "pattern": "^https?:\\/\\/[a-zA-Z0-9./]+"
+          },
+          "itemDescription": {
+            "name": "Item description",
+            "description": "A description of the item. Deprecated in favour of description.",
+            "type": "string"
+          },
+          "description": {
+            "name": "Description",
+            "description": "A description of the item. Preferred alternative to itemDescription.",
+            "type": "string"
+          }
+        },
+        "patternProperties": {
+          "(?!(anchor|itemDescription|description))^([a-z-]+$)|(^https?:\\/\\/[a-zA-Z0-9./]+$)": {
+            "title": "Link object schema",
+            "description": "The schema for each link context object for each link relation type. Link relation types are either IANA-registered short names (lowercase alphabetic with hyphens) or full URLs as defined in RFC 8288.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "href": {
+                  "name": "href",
+                  "description": "The target URL",
+                  "type": "string",
+                  "pattern": "^https?:\\/\\/[a-zA-Z0-9./]+"
+                },
+                "title": {
+                  "title": "title",
+                  "description": "A human-readable title for the link",
+                  "type": "string"
+                },
+                "hreflang": {
+                  "name": "hreflang",
+                  "description": "The human language(s) of the target resource",
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "(^\\w{2}$)|(^\\w{2}-\\w{2}$)"
+                  }
+                },
+                "type": {
+                  "name": "Type",
+                  "description": "The content type (MIME type) of the target resource",
+                  "type": "string",
+                  "pattern": "\\w+/[-+.\\w]+"
+                },
+                "context": {
+                  "name": "Context",
+                  "description": "Any additional descriptor for the link, typically a geography or jurisdiction in which the link applies",
+                  "type": "array"
+                },
+                "fwqs": {
+                  "name": "Forward query strings",
+                  "type": "boolean"
+                },
+                "public": {
+                  "name": "Link can be shared publicly",
+                  "type": "boolean"
+                },
+                "rel": {
+                  "name": "Additional link relations",
+                  "description": "An array of additional IANA or extension link relation types that qualify this link, such as predecessor-version or edit.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "method": {
+                  "name": "HTTP method",
+                  "description": "An array whose first element is the HTTP method (e.g. POST) and subsequent elements are required HTTP header names (e.g. X-API-Key). Used to describe how a client should interact with the target to create or update a linked resource.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "encryptionMethod": {
+                  "name": "Encryption method",
+                  "description": "The encryption algorithm used to protect the target resource (e.g. AES-128). Indicates that the target requires a decryption key or proof of authorised role to access.",
+                  "type": "string"
+                },
+                "accessRole": {
+                  "name": "Access roles",
+                  "description": "An array of role identifiers that are authorised to access the encrypted target resource.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": ["href", "title"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["anchor"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["linkset"],
+  "additionalProperties": false
+}

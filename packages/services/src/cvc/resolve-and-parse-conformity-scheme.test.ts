@@ -123,7 +123,24 @@ describe('resolveAndParseConformityScheme', () => {
       mockParseConformityScheme.mockReturnValue(fakeScheme());
 
       await resolveAndParseConformityScheme(baseInput({ contextCache }));
-      expect(mockValidateJsonLd).toHaveBeenCalledWith(expect.anything(), { contextCache });
+      expect(mockValidateJsonLd).toHaveBeenCalledWith(expect.anything(), {
+        contextCache,
+        bundledFallback: undefined,
+        onBundledFallback: undefined,
+      });
+    });
+
+    it('forwards the bundled-fallback switch and listener to validateJsonLd', async () => {
+      const onBundledFallback = jest.fn();
+      mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('{"id":"x"}'));
+      mockValidateJsonLd.mockResolvedValue(undefined);
+      mockValidateAgainstSchemas.mockResolvedValue(undefined);
+      mockParseConformityScheme.mockReturnValue(fakeScheme());
+      await resolveAndParseConformityScheme(baseInput({ bundledFallback: false, onBundledFallback }));
+      expect(mockValidateJsonLd).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ bundledFallback: false, onBundledFallback }),
+      );
     });
 
     it('passes an empty object to resolveDocumentIfChanged when no cached resource is supplied', async () => {
