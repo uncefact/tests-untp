@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-09-07):** `build-e2e-images` was split into `build-e2e-image-ri` and `build-e2e-image-playground` by #612. Since #693 the `e2e-ri` matrix also runs the Playground, for its issue-and-verify spec, which lives in `packages/reference-implementation/e2e/` rather than the dedicated cross-package package this ADR deferred to; that placement has not been revisited as a decision. For a period it pulled the published `untp-playground:latest` image for that. It now builds `untp-playground:e2e` from the branch against the shared cache scope, and depends on the playground image job.
 
 ## Context
 

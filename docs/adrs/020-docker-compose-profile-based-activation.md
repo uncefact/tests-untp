@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-09-07):** The `ri` and `playground` profiles are no longer alternatives where the reference implementation's E2E stack is concerned. That suite issues through the RI and verifies through the Playground, so CI and local runs activate both profiles together. The `e2e-playground` job still starts the `playground` profile on its own. See ADR 025.
 - **Update (2026-05-13):** Walking skeleton for OpenTelemetry (#592) introduced the `observability` and `local-observability` profiles on the root `docker-compose.yml`, with `otel-agent` (sidecar, both profiles), `tempo` and `grafana` (local LGTM, `local-observability` only). Apps and shared services remain untagged so default-profile runs are unaffected. The Adoption notes below describe the prior state at the time of the decision.
 
 ## Context
