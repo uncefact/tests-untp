@@ -512,6 +512,25 @@ describe('validateRotationKeys', () => {
   it('names the missing active variable', async () => {
     const result = await validate({ OUTGOING_DATA_ENCRYPTION_KEY: OUTGOING_KEY });
     expect(result).toEqual({ ok: false, error: expect.stringContaining('DATA_ENCRYPTION_KEY (the new key)') });
+    expect((result as { error: string }).error).not.toContain('SERVICE_ENCRYPTION_KEY');
+  });
+
+  it('treats a whitespace-only SERVICE_ENCRYPTION_KEY as unset and adds no rename hint', async () => {
+    const result = await validate({ SERVICE_ENCRYPTION_KEY: '   ', OUTGOING_DATA_ENCRYPTION_KEY: OUTGOING_KEY });
+    expect((result as { error: string }).error).not.toContain('SERVICE_ENCRYPTION_KEY');
+  });
+
+  it('adds the rename hint when the key lives only under the removed SERVICE_ENCRYPTION_KEY name', async () => {
+    const result = await validate({
+      SERVICE_ENCRYPTION_KEY: ACTIVE_KEY,
+      OUTGOING_DATA_ENCRYPTION_KEY: OUTGOING_KEY,
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: expect.stringContaining(
+        'SERVICE_ENCRYPTION_KEY is set but no longer read; rename it to DATA_ENCRYPTION_KEY',
+      ),
+    });
   });
 
   it('names the missing outgoing variable rather than failing on a generic format message', async () => {

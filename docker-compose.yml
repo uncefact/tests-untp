@@ -108,10 +108,12 @@ services:
       TENANT_CLAIM_FORMAT: ${TENANT_CLAIM_FORMAT:-array_first}
       # Encryption at rest (service instance configs and credential decryption keys).
       # Both names pass through unchanged so the application sees exactly what the
-      # host set: the deprecated-name fallback and the divergent-values hard fail
-      # happen in one place (resolve-data-encryption-key.ts), not in compose
-      # interpolation. The local-development value comes from .env (see
-      # .env.example), which the quick start copies.
+      # host set. SERVICE_ENCRYPTION_KEY is no longer read as a key: it is forwarded
+      # so startup can name the required rename when the removed name is the only
+      # one set, and refuse to start when it holds a value that differs from
+      # DATA_ENCRYPTION_KEY (resolve-data-encryption-key.ts owns both checks). The
+      # local-development value comes from .env (see .env.example), which the quick
+      # start copies.
       DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-}
       SERVICE_ENCRYPTION_KEY: ${SERVICE_ENCRYPTION_KEY:-}
       # Set only for the duration of a key rotation; see the Encryption Key

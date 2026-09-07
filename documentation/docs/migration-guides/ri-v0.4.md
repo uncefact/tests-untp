@@ -132,6 +132,11 @@ beforehand.
 
 ### `SERVICE_ENCRYPTION_KEY` is renamed to `DATA_ENCRYPTION_KEY`
 
+:::note[Removed in v0.5]
+The fallback behaviour described in this section is how **v0.4** behaves. v0.5 removes
+the fallback entirely. See the [v0.5 guide](./ri-v0.5).
+:::
+
 The name changed to reflect its broadened role. It now protects service instance
 configurations and credential decryption keys.
 
@@ -619,7 +624,9 @@ Where it sits in the upgrade:
 
 Renaming `SERVICE_ENCRYPTION_KEY` to `DATA_ENCRYPTION_KEY` can happen before or after this
 step. The application and the backfill resolve the active key the same way whichever name
-holds it, so the backfill does not depend on the rename having been done.
+holds it, so the backfill does not depend on the rename having been done. v0.5 stops
+reading the old name altogether, so do the rename before upgrading further (see the
+[v0.5 guide](./ri-v0.5)).
 
 The commands for a source checkout and for the Docker image, the preflight that aborts
 on a wrong key, when `--force` applies, and what the run reports are in the

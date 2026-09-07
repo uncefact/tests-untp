@@ -209,10 +209,11 @@ export async function main() {
   };
 
   try {
-    // Resolved before any write: divergent DATA_ENCRYPTION_KEY and
-    // SERVICE_ENCRYPTION_KEY values throw here, so the seed cannot
-    // re-encrypt service instance configurations under a key that splits
-    // the database. Resolved inside the try (not at module load) so this
+    // Resolved before any write: a SERVICE_ENCRYPTION_KEY that is the only
+    // name set, or that differs from DATA_ENCRYPTION_KEY, throws here with
+    // its remediation, so the seed can neither run keyless while the operator
+    // holds the key under the removed name nor write under a value the
+    // operator has not chosen. Resolved inside the try (not at module load) so this
     // failure is covered by the same summary-and-rethrow the rest of a
     // mid-run failure gets, instead of an uncaught exception at import
     // time with no summary at all.

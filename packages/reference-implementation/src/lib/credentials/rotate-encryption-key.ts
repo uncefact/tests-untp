@@ -24,9 +24,10 @@ import { reportLines, type Report, type ReportLine } from './operator-report';
  * resolves keys from the environment: the caller decides which key is
  * active and which is outgoing. The CLI builds both adapters directly from
  * DATA_ENCRYPTION_KEY and OUTGOING_DATA_ENCRYPTION_KEY; it deliberately
- * avoids getEncryptionService(), whose resolver rejects a stale
- * SERVICE_ENCRYPTION_KEY alias that a rotation environment legitimately
- * still carries.
+ * avoids getEncryptionService(), whose resolver refuses a leftover
+ * SERVICE_ENCRYPTION_KEY that differs from DATA_ENCRYPTION_KEY, a state a
+ * rotation environment legitimately carries until the leftover is removed
+ * (see validateRotationKeys).
  */
 export type RotationServices = {
   activeService: IEncryptionService;
@@ -376,19 +377,27 @@ export type RotationKeyValidation =
  * while the keys do not).
  *
  * Deliberately reads the two variables directly rather than through
- * resolveDataEncryptionKey: that resolver rejects a SERVICE_ENCRYPTION_KEY
- * alias differing from DATA_ENCRYPTION_KEY, and a rotation environment
- * legitimately still carries the stale alias. The alias check remains in
- * force for application startup.
+ * resolveDataEncryptionKey: that resolver refuses a SERVICE_ENCRYPTION_KEY
+ * whose value differs from DATA_ENCRYPTION_KEY, and a rotation environment
+ * legitimately still carries the old value under that name until the
+ * operator removes it. The refusal stays in force for application startup.
  */
 export function validateRotationKeys(
   env: Record<string, string | undefined>,
   logger: LoggerService,
 ): RotationKeyValidation {
-  const activeKey = env.DATA_ENCRYPTION_KEY;
+  // Whitespace-only counts as unset, matching the application resolver, so
+  // the rename hint below applies on the same inputs it applies to there.
+  const activeKey = env.DATA_ENCRYPTION_KEY?.trim() ? env.DATA_ENCRYPTION_KEY : undefined;
   const outgoingKey = env.OUTGOING_DATA_ENCRYPTION_KEY;
   if (!activeKey) {
-    return { ok: false, error: 'DATA_ENCRYPTION_KEY (the new key) is not set.' };
+    // The one command-level nod to the removed v0.4 name: an operator whose
+    // key still lives under it should be told the fix is a rename, not a
+    // missing key.
+    const staleHint = env.SERVICE_ENCRYPTION_KEY?.trim()
+      ? ' SERVICE_ENCRYPTION_KEY is set but no longer read; rename it to DATA_ENCRYPTION_KEY.'
+      : '';
+    return { ok: false, error: `DATA_ENCRYPTION_KEY (the new key) is not set.${staleHint}` };
   }
   if (!outgoingKey) {
     return { ok: false, error: 'OUTGOING_DATA_ENCRYPTION_KEY (the previous key) is not set.' };

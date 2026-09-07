@@ -29,7 +29,7 @@ docker compose exec -w /app ri node_modules/.bin/tsx scripts/audit-encryption.ts
 
 ### Running with the application stopped
 
-Before a [rotation](./encryption-key-rotation), after a [restore](./key-management#recovery), and in any state where writers must stay stopped, the audit runs as a one-off container instead. The key under test is whatever `DATA_ENCRYPTION_KEY` holds in `.env`, exactly as for the serving application, so the command needs no key arguments. The `SKIP_` variables stop the image's entrypoint running migrations, backfills, and the seed first, with `SKIP_MIGRATIONS=true` covering the backfills as well, because they run inside the same guard. The entrypoint otherwise writes to the database before the audit has gated anything, and against a database the configured key cannot yet read the seed's own key validation fails outright. The empty `SERVICE_ENCRYPTION_KEY` override neutralises a stale deprecated alias the compose file would otherwise forward (the audit refuses to run while the two names disagree):
+Before a [rotation](./encryption-key-rotation), after a [restore](./key-management#recovery), and in any state where writers must stay stopped, the audit runs as a one-off container instead. The key under test is whatever `DATA_ENCRYPTION_KEY` holds in `.env`, exactly as for the serving application, so the command needs no key arguments. The `SKIP_` variables stop the image's entrypoint running migrations, backfills, and the seed first, with `SKIP_MIGRATIONS=true` covering the backfills as well, because they run inside the same guard. The entrypoint otherwise writes to the database before the audit has gated anything, and against a database the configured key cannot yet read the seed's own key validation fails outright. The empty `SERVICE_ENCRYPTION_KEY` override neutralises a leftover old-name value the compose file would otherwise forward. The audit resolves its key the way the application does, which refuses to run while that leftover differs from `DATA_ENCRYPTION_KEY`, the state a deployment is in between a rotation and the leftover's removal:
 
 ```bash
 docker compose run --rm \
@@ -40,7 +40,7 @@ docker compose run --rm \
 
 To audit under a key other than the one in `.env` (verifying a historical backup's key, for example), forward it for this one run by name-only `-e DATA_ENCRYPTION_KEY` with the value loaded from your secret store by command substitution (`DATA_ENCRYPTION_KEY="$(...)" docker compose run ... -e DATA_ENCRYPTION_KEY ...`); never type the literal key into the command, which records it in shell history.
 
-On a source checkout, `pnpm audit:encryption` needs no entrypoint handling, but a stale `SERVICE_ENCRYPTION_KEY` must likewise be unset or overridden.
+On a source checkout, `pnpm audit:encryption` needs no entrypoint handling, but a leftover `SERVICE_ENCRYPTION_KEY` must likewise be unset or overridden when it differs from `DATA_ENCRYPTION_KEY`. It is never read as a key, and the run fails with a rename instruction if it is the only name set.
 
 The command needs `DATA_ENCRYPTION_KEY` and a database target: a pre-set `RI_DATABASE_URL` is honoured as given, and the `RI_POSTGRES_*` variables are used to construct one only when it is absent (the same rule the application and the backfill follow).
 

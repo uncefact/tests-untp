@@ -150,18 +150,18 @@ function classifyCategory(missingVars: string[], otherReason: string | undefined
 function resolveEncryptionCategory(env: NodeJS.ProcessEnv): CategoryResult {
   try {
     const resolved = resolveDataEncryptionKey(env);
-    // resolveDataEncryptionKey() is a shared utility (also used at app
-    // startup) that already treats an empty string as absent via `||`; a
-    // whitespace-only value is not, so it is normalised here rather than
-    // by changing that function's own semantics.
-    if (!normalizeEnvValue(resolved.key)) {
-      return { status: 'missing', missingVars: ['DATA_ENCRYPTION_KEY (or the deprecated SERVICE_ENCRYPTION_KEY)'] };
+    // The resolver already treats empty and whitespace-only values as
+    // absent (its normalizeWhitespaceOnly mirrors normalizeEnvValue), so a
+    // resolved key is either undefined or usable.
+    if (!resolved.key) {
+      return { status: 'missing', missingVars: ['DATA_ENCRYPTION_KEY'] };
     }
     return { status: 'ok' };
   } catch (error) {
-    // Divergent DATA_ENCRYPTION_KEY / SERVICE_ENCRYPTION_KEY values: not a
-    // missing variable, so it does not trigger the fail-loud posture here.
-    // The reason is still carried, and the same divergence throws again
+    // The resolver's own refusals (SERVICE_ENCRYPTION_KEY set with no
+    // DATA_ENCRYPTION_KEY, or the two set to different values): not a
+    // missing variable, so they do not trigger the fail-loud posture here.
+    // The reason is still carried, and the same condition throws again
     // when the seed resolves the key for real, where the outer handler
     // reports it with the run's summary.
     return { status: 'other', reason: error instanceof Error ? error.message : String(error) };
@@ -309,8 +309,8 @@ export function runSeedPreflight(env: NodeJS.ProcessEnv = process.env): SeedPref
       missingByCategory[name] = result.missingVars ?? [];
     }
     // Collected whenever a reason is present, not only when the same
-    // category is also 'missing': an 'other' category (for example,
-    // divergent DATA_ENCRYPTION_KEY/SERVICE_ENCRYPTION_KEY values) carries
+    // category is also 'missing': an 'other' category (for example, a
+    // stale SERVICE_ENCRYPTION_KEY with no DATA_ENCRYPTION_KEY) carries
     // its own reason with no missing variable attached, and an unrelated
     // missing variable elsewhere must not make that reason disappear from
     // the run's record.
@@ -397,7 +397,7 @@ export function buildOutcomeSummary(
     // "skipped" when the run reached the point of deciding not to run it
     // (a gate it depends on was unmet). One never reached at all, because
     // an earlier, unrelated failure aborted the run first, is reported as
-    // 'notRun' instead, so a divergent-key failure before the tenant
+    // 'notRun' instead, so a key-resolution failure before the tenant
     // upsert does not mislabel every later category "skipped".
     else if (notRunSet.has(category)) categoriesNotRun.push(category);
     else categoriesSkipped.push(category);
@@ -434,8 +434,8 @@ export class SeedConfigurationError extends Error {
       const suffix = invalidSibling ? ` (also: ${invalidSibling})` : '';
       return `  - ${category}: ${vars.join(', ')}${suffix}`;
     });
-    // A category can carry a reason (for example, divergent
-    // DATA_ENCRYPTION_KEY/SERVICE_ENCRYPTION_KEY values) without itself
+    // A category can carry a reason (for example, a stale
+    // SERVICE_ENCRYPTION_KEY with no DATA_ENCRYPTION_KEY) without itself
     // having a missing variable, so it never appears in the loop above.
     // Listed here on its own line, so an unrelated missing variable
     // elsewhere never makes that reason vanish from the abort message.
