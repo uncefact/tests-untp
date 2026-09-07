@@ -53,11 +53,12 @@ export async function registerNode(): Promise<void> {
  * Skipped entirely when DATA_ENCRYPTION_KEY is not set: a deployment with no
  * encryption configured yet is a supported state (the seed and the service
  * resolution chain both already tolerate it), so there is nothing to
- * validate. `resolveDataEncryptionKey` still throws here for divergent
- * DATA_ENCRYPTION_KEY / SERVICE_ENCRYPTION_KEY values, same as it always
- * has — this just makes that failure surface at boot instead of on first
- * use. The deprecated-name warning is left to `getEncryptionService()`
- * below (it logs the same warning internally) rather than duplicated here.
+ * validate. `resolveDataEncryptionKey` still throws here when the removed
+ * SERVICE_ENCRYPTION_KEY name is the only one set, or holds a value that
+ * differs from DATA_ENCRYPTION_KEY; this just makes those failures surface
+ * at boot instead of on first use. The
+ * stale-name warning is left to `getEncryptionService()` below (it logs
+ * the same warning internally) rather than duplicated here.
  */
 async function validateEncryptionKeyOnBoot(): Promise<void> {
   const resolved = resolveDataEncryptionKey();

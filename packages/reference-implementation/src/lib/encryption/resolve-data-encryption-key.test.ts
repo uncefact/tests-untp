@@ -13,41 +13,46 @@ describe('resolveDataEncryptionKey', () => {
     expect(resolved).toEqual({ key: DATA_KEY, deprecatedName: 'absent' });
   });
 
-  it('falls back to the deprecated SERVICE_ENCRYPTION_KEY and flags it as the source', () => {
-    const resolved = resolveDataEncryptionKey(asEnv({ SERVICE_ENCRYPTION_KEY: SERVICE_KEY }));
-    expect(resolved).toEqual({ key: SERVICE_KEY, deprecatedName: 'source' });
+  it('throws the rename instruction when only the removed SERVICE_ENCRYPTION_KEY is set', () => {
+    expect(() => resolveDataEncryptionKey(asEnv({ SERVICE_ENCRYPTION_KEY: SERVICE_KEY }))).toThrow(
+      'Rename it to DATA_ENCRYPTION_KEY',
+    );
   });
 
-  it('accepts both names set to the same value, flagging the duplication', () => {
+  it('refuses to resolve when both names are set with different values, naming both remediations', () => {
+    let caught: Error | undefined;
+    try {
+      resolveDataEncryptionKey(asEnv({ DATA_ENCRYPTION_KEY: DATA_KEY, SERVICE_ENCRYPTION_KEY: SERVICE_KEY }));
+    } catch (error) {
+      caught = error as Error;
+    }
+    expect(caught?.message).toContain('both set with different values');
+    expect(caught?.message).toContain('set DATA_ENCRYPTION_KEY to that value and remove SERVICE_ENCRYPTION_KEY');
+    expect(caught?.message).toContain('including after a completed rotation');
+    // Never the v0.4 wording that led with "remove SERVICE_ENCRYPTION_KEY"
+    // or pointed an undecided operator at rotation.
+    expect(caught?.message).not.toContain('or set both to the same value');
+  });
+
+  it('flags a leftover SERVICE_ENCRYPTION_KEY as stale when it duplicates the active key', () => {
     const resolved = resolveDataEncryptionKey(
       asEnv({
         DATA_ENCRYPTION_KEY: DATA_KEY,
         SERVICE_ENCRYPTION_KEY: DATA_KEY,
       }),
     );
-    expect(resolved).toEqual({ key: DATA_KEY, deprecatedName: 'duplicate' });
-  });
-
-  it('throws when both names are set with different values', () => {
-    expect(() =>
-      resolveDataEncryptionKey(
-        asEnv({
-          DATA_ENCRYPTION_KEY: DATA_KEY,
-          SERVICE_ENCRYPTION_KEY: SERVICE_KEY,
-        }),
-      ),
-    ).toThrow('both set with different values');
+    expect(resolved).toEqual({ key: DATA_KEY, deprecatedName: 'stale' });
   });
 
   it('treats empty strings as unset', () => {
-    const resolved = resolveDataEncryptionKey(
-      asEnv({
-        DATA_ENCRYPTION_KEY: '',
-        SERVICE_ENCRYPTION_KEY: SERVICE_KEY,
-      }),
-    );
-    expect(resolved.key).toBe(SERVICE_KEY);
-    expect(resolved.deprecatedName).toBe('source');
+    expect(() =>
+      resolveDataEncryptionKey(
+        asEnv({
+          DATA_ENCRYPTION_KEY: '',
+          SERVICE_ENCRYPTION_KEY: SERVICE_KEY,
+        }),
+      ),
+    ).toThrow('Rename it to DATA_ENCRYPTION_KEY');
 
     expect(resolveDataEncryptionKey(asEnv({ DATA_ENCRYPTION_KEY: '', SERVICE_ENCRYPTION_KEY: '' }))).toEqual({
       key: undefined,
@@ -56,19 +61,27 @@ describe('resolveDataEncryptionKey', () => {
   });
 
   // A whitespace-only value has no legitimate meaning (the same rule
-  // seed-preflight's normalizeEnvValue applies) and must not be treated as
-  // a real, divergent alias value.
-  it('treats a whitespace-only DATA_ENCRYPTION_KEY as unset, not as diverging from a set SERVICE_ENCRYPTION_KEY', () => {
-    const resolved = resolveDataEncryptionKey(
-      asEnv({
-        DATA_ENCRYPTION_KEY: '   ',
-        SERVICE_ENCRYPTION_KEY: SERVICE_KEY,
-      }),
-    );
-    expect(resolved).toEqual({ key: SERVICE_KEY, deprecatedName: 'source' });
+  // seed-preflight's normalizeEnvValue applies), so it neither supplies a
+  // key nor counts as a set deprecated name.
+  it('treats a whitespace-only DATA_ENCRYPTION_KEY as unset, so a set SERVICE_ENCRYPTION_KEY still throws', () => {
+    expect(() =>
+      resolveDataEncryptionKey(
+        asEnv({
+          DATA_ENCRYPTION_KEY: '   ',
+          SERVICE_ENCRYPTION_KEY: SERVICE_KEY,
+        }),
+      ),
+    ).toThrow('Rename it to DATA_ENCRYPTION_KEY');
   });
 
-  it('treats a whitespace-only SERVICE_ENCRYPTION_KEY as unset, not as diverging from a set DATA_ENCRYPTION_KEY', () => {
+  it('treats a whitespace-only SERVICE_ENCRYPTION_KEY alone as nothing set, not as a rename failure', () => {
+    expect(resolveDataEncryptionKey(asEnv({ SERVICE_ENCRYPTION_KEY: '   ' }))).toEqual({
+      key: undefined,
+      deprecatedName: 'absent',
+    });
+  });
+
+  it('treats a whitespace-only SERVICE_ENCRYPTION_KEY as unset, not as a stale leftover', () => {
     const resolved = resolveDataEncryptionKey(
       asEnv({
         DATA_ENCRYPTION_KEY: DATA_KEY,
@@ -76,5 +89,9 @@ describe('resolveDataEncryptionKey', () => {
       }),
     );
     expect(resolved).toEqual({ key: DATA_KEY, deprecatedName: 'absent' });
+  });
+
+  it('resolves no key and no stale flag when neither name is set', () => {
+    expect(resolveDataEncryptionKey(asEnv({}))).toEqual({ key: undefined, deprecatedName: 'absent' });
   });
 });

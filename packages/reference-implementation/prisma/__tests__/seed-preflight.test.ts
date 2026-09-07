@@ -49,21 +49,22 @@ describe('runSeedPreflight', () => {
     expect(result.hasMissing).toBe(true);
     expect(result.categories.encryption).toMatchObject({
       status: 'missing',
-      missingVars: ['DATA_ENCRYPTION_KEY (or the deprecated SERVICE_ENCRYPTION_KEY)'],
+      missingVars: ['DATA_ENCRYPTION_KEY'],
     });
     expect(result.categories.idr).toMatchObject({ status: 'missing', gatedBy: 'encryption' });
     expect(result.categories.storage).toMatchObject({ status: 'missing', gatedBy: 'encryption' });
     expect(result.categories.vc).toMatchObject({ status: 'missing', gatedBy: 'encryption' });
   });
 
-  it('honours SERVICE_ENCRYPTION_KEY as the deprecated alias so encryption still resolves ok', () => {
+  it('reports a SERVICE_ENCRYPTION_KEY set without DATA_ENCRYPTION_KEY as the rename instruction, not as ok', () => {
     const env = fullEnv();
     delete env.DATA_ENCRYPTION_KEY;
     env.SERVICE_ENCRYPTION_KEY = 'a-real-key';
 
     const result = runSeedPreflight(env);
 
-    expect(result.categories.encryption.status).toBe('ok');
+    expect(result.categories.encryption.status).toBe('other');
+    expect(result.categories.encryption.reason).toMatch(/Rename it to DATA_ENCRYPTION_KEY/);
   });
 
   it('reports each missing IDR variable by its actual environment variable name', () => {
@@ -185,40 +186,40 @@ describe('runSeedPreflight', () => {
     expect(result.otherIssuesByCategory).not.toHaveProperty('encryption');
   });
 
-  it('surfaces a divergent encryption key reason even when the category itself is not "missing"', () => {
-    // resolveEncryptionCategory reports divergent DATA_ENCRYPTION_KEY /
-    // SERVICE_ENCRYPTION_KEY values as 'other', never 'missing'. An
+  it('surfaces the stale-name rename reason even when the category itself is not "missing"', () => {
+    // resolveEncryptionCategory reports a SERVICE_ENCRYPTION_KEY set
+    // without DATA_ENCRYPTION_KEY as 'other', never 'missing'. An
     // unrelated category that IS missing (here, SYSTEM_VC_API_KEY) must
-    // not make that divergence reason disappear from the run's record
+    // not make that reason disappear from the run's record
     // (Major finding 2 in the panel follow-up: previously the top-level
     // loop only collected a category's reason when that same category was
-    // 'missing', so encryption's divergence was silently dropped whenever
+    // 'missing', so encryption's reason was silently dropped whenever
     // paired with an unrelated missing variable elsewhere).
     const env = fullEnv();
-    env.DATA_ENCRYPTION_KEY = 'key-one';
-    env.SERVICE_ENCRYPTION_KEY = 'key-two';
+    delete env.DATA_ENCRYPTION_KEY;
+    env.SERVICE_ENCRYPTION_KEY = 'a-real-key';
     delete env.SYSTEM_VC_API_KEY;
 
     const result = runSeedPreflight(env);
 
     expect(result.categories.encryption.status).toBe('other');
-    expect(result.categories.encryption.reason).toMatch(/both set with different values/);
-    expect(result.otherIssuesByCategory.encryption).toMatch(/both set with different values/);
+    expect(result.categories.encryption.reason).toMatch(/Rename it to DATA_ENCRYPTION_KEY/);
+    expect(result.otherIssuesByCategory.encryption).toMatch(/Rename it to DATA_ENCRYPTION_KEY/);
     expect(result.hasMissing).toBe(true);
   });
 
-  it('does not abort preflight on a divergent encryption key alone (no other category missing)', () => {
+  it('does not abort preflight on a stale-name failure alone (no other category missing)', () => {
     // hasMissing stays false because 'other' is not the fail-loud status
-    // (ADR-045 decision 2); the divergence is still surfaced later, when
+    // (ADR-045 decision 2); the stale name is still surfaced later, when
     // main() calls resolveDataEncryptionKey() itself.
     const env = fullEnv();
-    env.DATA_ENCRYPTION_KEY = 'key-one';
-    env.SERVICE_ENCRYPTION_KEY = 'key-two';
+    delete env.DATA_ENCRYPTION_KEY;
+    env.SERVICE_ENCRYPTION_KEY = 'a-real-key';
 
     const result = runSeedPreflight(env);
 
     expect(result.categories.encryption.status).toBe('other');
-    expect(result.otherIssuesByCategory.encryption).toMatch(/both set with different values/);
+    expect(result.otherIssuesByCategory.encryption).toMatch(/Rename it to DATA_ENCRYPTION_KEY/);
     expect(result.hasMissing).toBe(false);
   });
 
@@ -382,7 +383,7 @@ describe('buildOutcomeSummary', () => {
     const summary = buildOutcomeSummary(
       'default',
       {
-        encryption: ['DATA_ENCRYPTION_KEY (or the deprecated SERVICE_ENCRYPTION_KEY)'],
+        encryption: ['DATA_ENCRYPTION_KEY'],
       },
       skippedOutcomes(),
       {},
@@ -476,8 +477,8 @@ describe('SeedConfigurationError', () => {
       categoriesSkipped: [],
       categoriesNotRun: EXECUTION_CATEGORIES,
       missingVariables: {
-        encryption: ['DATA_ENCRYPTION_KEY (or the deprecated SERVICE_ENCRYPTION_KEY)'],
-        idr: ['DATA_ENCRYPTION_KEY (or the deprecated SERVICE_ENCRYPTION_KEY)'],
+        encryption: ['DATA_ENCRYPTION_KEY'],
+        idr: ['DATA_ENCRYPTION_KEY'],
       },
       invalidSiblings: {},
       partialDetails: {},
@@ -531,7 +532,7 @@ describe('SeedConfigurationError', () => {
   });
 
   it('names a reason that has no missing variable of its own on a standalone line (Major finding 2)', () => {
-    // A divergent DATA_ENCRYPTION_KEY / SERVICE_ENCRYPTION_KEY pair
+    // A stale SERVICE_ENCRYPTION_KEY with no DATA_ENCRYPTION_KEY
     // classifies 'other', never 'missing', so encryption never appears in
     // missingVariables. Before this fix, the abort message dropped that
     // reason entirely whenever an unrelated category (here, idr) was the
@@ -544,7 +545,7 @@ describe('SeedConfigurationError', () => {
       categoriesNotRun: EXECUTION_CATEGORIES,
       missingVariables: { idr: ['SYSTEM_IDR_BASE_URL'] },
       invalidSiblings: {
-        encryption: 'DATA_ENCRYPTION_KEY and SERVICE_ENCRYPTION_KEY are both set with different values.',
+        encryption: 'SERVICE_ENCRYPTION_KEY is set but is no longer read.',
       },
       partialDetails: {},
     };
@@ -552,7 +553,7 @@ describe('SeedConfigurationError', () => {
     const error = new SeedConfigurationError(summary);
 
     expect(error.message).toMatch(/idr: SYSTEM_IDR_BASE_URL/);
-    expect(error.message).toMatch(/encryption: DATA_ENCRYPTION_KEY and SERVICE_ENCRYPTION_KEY are both set/);
+    expect(error.message).toMatch(/encryption: SERVICE_ENCRYPTION_KEY is set but is no longer read/);
     // Not folded into idr's "(also: ...)" suffix — it is its own category's line.
     expect(error.message).not.toMatch(/idr:.*also:/);
   });

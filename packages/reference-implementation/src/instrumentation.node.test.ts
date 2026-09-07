@@ -141,4 +141,19 @@ describe('registerNode boot wiring', () => {
     await expect(registerNode()).rejects.toThrow('RI_APP_URL');
     expect(mockValidateHttpUserAgentOnBoot).not.toHaveBeenCalled();
   });
+
+  it('fails the boot when the encryption key resolver throws (stale SERVICE_ENCRYPTION_KEY)', async () => {
+    // jest.clearAllMocks() in beforeEach keeps implementations, so drop the
+    // earlier tests' throwing validators before arming this one.
+    mockResolveAppUrl.mockReset();
+    mockValidateHttpUserAgentOnBoot.mockReset();
+    mockValidateMaxRequestBodyBytesOnBoot.mockReset();
+    mockValidateCacheMaxEntriesOnBoot.mockReset();
+    mockValidateStaleClaimOnBoot.mockReset();
+    mockResolveDataEncryptionKey.mockImplementation(() => {
+      throw new Error('SERVICE_ENCRYPTION_KEY is set but is no longer read');
+    });
+
+    await expect(registerNode()).rejects.toThrow('SERVICE_ENCRYPTION_KEY');
+  });
 });

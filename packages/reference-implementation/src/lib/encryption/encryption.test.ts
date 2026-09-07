@@ -68,19 +68,11 @@ describe('getEncryptionService', () => {
     expect(mockWarn).not.toHaveBeenCalled();
   });
 
-  it('falls back to the deprecated SERVICE_ENCRYPTION_KEY with a warning', async () => {
+  it('throws the rename instruction when only the removed SERVICE_ENCRYPTION_KEY is set', async () => {
     process.env.SERVICE_ENCRYPTION_KEY = VALID_KEY;
     const { getEncryptionService } = await import('./encryption');
-    const { AesGcmEncryptionAdapter, EncryptionAlgorithm } = await import('@uncefact/untp-ri-services/encryption');
 
-    const envelope = getEncryptionService().encrypt('payload', EncryptionAlgorithm.AES_256_GCM);
-
-    // Decrypting with an independent adapter built from SERVICE_ENCRYPTION_KEY
-    // proves the fallback value is the key actually used for crypto, not just
-    // that a warning fired.
-    const independent = new AesGcmEncryptionAdapter(VALID_KEY, mockLogger as never);
-    expect(independent.decrypt(envelope)).toBe('payload');
-    expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('deprecated'));
+    expect(() => getEncryptionService()).toThrow('Rename it to DATA_ENCRYPTION_KEY');
   });
 
   it('throws before constructing the adapter when both names are set with different values', async () => {
@@ -91,13 +83,25 @@ describe('getEncryptionService', () => {
     expect(() => getEncryptionService()).toThrow('both set with different values');
   });
 
-  it('warns to remove the deprecated name when both names carry the same value', async () => {
+  it('resolves the key from DATA_ENCRYPTION_KEY, never the same-valued leftover, and uses it for the crypto', async () => {
+    process.env.DATA_ENCRYPTION_KEY = VALID_KEY;
+    process.env.SERVICE_ENCRYPTION_KEY = VALID_KEY;
+    const { getEncryptionService } = await import('./encryption');
+    const { AesGcmEncryptionAdapter, EncryptionAlgorithm } = await import('@uncefact/untp-ri-services/encryption');
+
+    const envelope = getEncryptionService().encrypt('payload', EncryptionAlgorithm.AES_256_GCM);
+
+    const independent = new AesGcmEncryptionAdapter(VALID_KEY, mockLogger as never);
+    expect(independent.decrypt(envelope)).toBe('payload');
+  });
+
+  it('warns to remove a same-value leftover SERVICE_ENCRYPTION_KEY and still constructs the service', async () => {
     process.env.DATA_ENCRYPTION_KEY = VALID_KEY;
     process.env.SERVICE_ENCRYPTION_KEY = VALID_KEY;
     const { getEncryptionService } = await import('./encryption');
 
     expect(getEncryptionService()).toBeDefined();
-    expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('remove the deprecated name'));
+    expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('no longer read'));
   });
 
   it('caches the instance across calls', async () => {

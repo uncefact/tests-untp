@@ -76,19 +76,13 @@ async function withSeedEnv<T>(overrides: Record<string, string>, fn: () => Promi
 type SeedModule = typeof import('../../prisma/seed');
 
 /**
- * `seed.ts` resolves DATA_ENCRYPTION_KEY once at module load (so a
- * divergent DATA_ENCRYPTION_KEY / SERVICE_ENCRYPTION_KEY throws before
- * anything else runs, not partway through), which means the encryption
- * key `main()` actually uses cannot be changed by setting the environment
- * variable after the module the test file imports at the top has already
- * loaded. A scenario that needs a real encryption key therefore resets
- * Jest's module registry and re-imports `seed.ts` fresh, inside the same
- * environment window `withSeedEnv` opens, so this one load picks up the
- * key. The resulting module's own `main`, `prisma` and `logger` are
- * distinct objects from the ones imported at the top of this file (a
- * fresh class per reset also means its errors are not `instanceof` the
- * classes imported at the top, hence checking error identity by `.name`
- * rather than `instanceof` in the tests that use this).
+ * `main()` resolves the encryption key on every call, so a fresh module is
+ * not needed for the key itself. It is needed so the spies attach to the
+ * `logger` and `prisma` instances this invocation of `main()` actually uses
+ * (module-level singletons in `seed.ts`), and so a class thrown from it can
+ * be identified by `.name` rather than `instanceof`, since a fresh registry
+ * yields fresh classes distinct from the ones imported at the top of this
+ * file.
  */
 async function withFreshSeedModule<T>(
   overrides: Record<string, string>,
@@ -142,9 +136,10 @@ describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
     expect(await prisma.renderTemplate.count()).toBe(0);
   });
 
-  it('default mode: a divergent encryption key alongside an unrelated missing variable names BOTH in the abort message (Major finding 2)', async () => {
+  it('default mode: a stale encryption key name alongside an unrelated missing variable names BOTH in the abort message (Major finding 2)', async () => {
     // Before this fix, the preflight abort message and its `otherIssuesByCategory`
-    // dropped a divergent DATA_ENCRYPTION_KEY/SERVICE_ENCRYPTION_KEY pair
+    // dropped the encryption category's own reason (here, a
+    // SERVICE_ENCRYPTION_KEY set with no DATA_ENCRYPTION_KEY)
     // entirely whenever an unrelated category (here, SYSTEM_IDR_BASE_URL)
     // was the one that actually triggered `hasMissing`. Both problems must
     // be visible in the same boot cycle.
@@ -152,8 +147,7 @@ describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
     try {
       await withSeedEnv(
         {
-          DATA_ENCRYPTION_KEY: 'key-one',
-          SERVICE_ENCRYPTION_KEY: 'key-two',
+          SERVICE_ENCRYPTION_KEY: 'a-real-key',
         },
         runSeedMain,
       );
@@ -162,8 +156,8 @@ describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
     }
     expect(caught).toBeInstanceOf(SeedConfigurationError);
     expect(caught!.message).toMatch(/idr: SYSTEM_IDR_BASE_URL/);
-    expect(caught!.message).toMatch(/encryption: DATA_ENCRYPTION_KEY and SERVICE_ENCRYPTION_KEY are both set/);
-    expect(caught!.summary.invalidSiblings.encryption).toMatch(/both set with different values/);
+    expect(caught!.message).toMatch(/encryption: SERVICE_ENCRYPTION_KEY is set but is no longer read/);
+    expect(caught!.summary.invalidSiblings.encryption).toMatch(/Rename it to DATA_ENCRYPTION_KEY/);
     expect(await prisma.tenant.count()).toBe(0);
   });
 
@@ -184,7 +178,34 @@ describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
     }
   });
 
-  it('a divergent DATA_ENCRYPTION_KEY / SERVICE_ENCRYPTION_KEY still emits the summary once, rather than an uncaught exception with none at all (BLOCKER 2b)', async () => {
+  it('the seed warns about a stale SERVICE_ENCRYPTION_KEY left set alongside DATA_ENCRYPTION_KEY, and still runs', async () => {
+    // warnIfDeprecatedEncryptionKeyName exists so the app and the seed
+    // cannot drift onto different wording; this pins the seed's half of
+    // that pair (the app's is covered in encryption.test.ts).
+    await withFreshSeedModule(
+      {
+        DATA_ENCRYPTION_KEY: 'a'.repeat(64),
+        SERVICE_ENCRYPTION_KEY: 'a'.repeat(64),
+        SEED_ALLOW_PARTIAL: 'true',
+      },
+      async (seedModule) => {
+        const warnSpy = jest.spyOn(seedModule.logger, 'warn');
+        try {
+          await seedModule.main();
+        } finally {
+          const warned = warnSpy.mock.calls.some((call) =>
+            call.some(
+              (arg) => typeof arg === 'string' && arg.includes('SERVICE_ENCRYPTION_KEY is set but no longer read'),
+            ),
+          );
+          warnSpy.mockRestore();
+          expect(warned).toBe(true);
+        }
+      },
+    );
+  });
+
+  it('a stale SERVICE_ENCRYPTION_KEY with no DATA_ENCRYPTION_KEY still emits the summary once, rather than an uncaught exception with none at all (BLOCKER 2b)', async () => {
     // resolveDataEncryptionKey() used to run at module load, before main()
     // (and its try/catch) existed, so this failure was an unhandled
     // exception at import time with no summary and no structured log at
@@ -196,8 +217,7 @@ describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
 
     await withFreshSeedModule(
       {
-        DATA_ENCRYPTION_KEY: 'a-real-key',
-        SERVICE_ENCRYPTION_KEY: 'a-different-key',
+        SERVICE_ENCRYPTION_KEY: 'a-real-key',
         SEED_ALLOW_PARTIAL: 'true',
       },
       async (seedModule) => {
@@ -213,16 +233,16 @@ describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
       },
     );
 
-    expect((caught as Error)?.message).toMatch(
-      /DATA_ENCRYPTION_KEY and SERVICE_ENCRYPTION_KEY are both set with different values/,
-    );
+    expect((caught as Error)?.message).toMatch(/SERVICE_ENCRYPTION_KEY is set but is no longer read/);
     expect((caught as Error)?.name).not.toBe('SeedConfigurationError');
 
-    const summaryCall = errorCalls.find(
+    const summaryCalls = errorCalls.filter(
       ([, message]) => message === 'Seed failed partway through; the summary reflects what did complete',
     );
-    expect(summaryCall).toBeDefined();
-    const [{ summary }] = summaryCall as [{ summary: SeedRunSummary }, string];
+    // Exactly once: a second summary here would mean the mid-run handler
+    // and the CLI both reported the same failure.
+    expect(summaryCalls).toHaveLength(1);
+    const [{ summary }] = summaryCalls[0] as [{ summary: SeedRunSummary }, string];
     // The throw happens before even the tenant upsert, so nothing ran.
     expect(summary.categoriesSeeded).toEqual([]);
     expect(await prisma.tenant.count()).toBe(0);
@@ -244,9 +264,8 @@ describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
   });
 
   it('SEED_ALLOW_PARTIAL=true: a category with everything IT needs configured actually seeds, proving the encryption gate genuinely responds to DATA_ENCRYPTION_KEY rather than passing for an unrelated reason', async () => {
-    // DATA_ENCRYPTION_KEY is resolved once at module load (see
-    // `withFreshSeedModule`'s doc comment), so this scenario needs the
-    // fresh-module path: only that guarantees the real key this test sets
+    // Fresh module so the spies and thrown-class checks bind to the instances
+    // this run of `main()` uses (see `withFreshSeedModule`).
     // is the one `main()` actually uses, rather than whatever was resolved
     // before this test file's top-level import ran (typically nothing).
     await withFreshSeedModule(

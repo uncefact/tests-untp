@@ -35,9 +35,9 @@ const originalEnv = process.env;
 
 beforeEach(async () => {
   jest.resetModules();
-  // The resolver rejects a deprecated SERVICE_ENCRYPTION_KEY that disagrees
-  // with the active key, so an exported one in the runner's shell would fail
-  // these suites before they reached the behaviour under test.
+  // A SERVICE_ENCRYPTION_KEY exported in the runner's shell would draw the
+  // resolver's stale-name warning before these suites reached the
+  // behaviour under test.
   process.env = { ...originalEnv, DATA_ENCRYPTION_KEY: ACTIVE_KEY };
   delete process.env.SERVICE_ENCRYPTION_KEY;
   await truncateApplicationTables(client);
