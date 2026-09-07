@@ -440,8 +440,9 @@ async function publishIssuedCredential({
  *           a remote schema or `@context` could not be fetched or used,
  *           which reflects an upstream or configuration condition rather
  *           than a payload fault (the schema message names the schema URL;
- *           the context message carries the HTTP status or timeout where
- *           one applies).
+ *           the context message names the failing `@context` URL where one
+ *           was recorded, and carries the HTTP status or timeout where one
+ *           applies).
  *         content:
  *           application/json:
  *             schema:

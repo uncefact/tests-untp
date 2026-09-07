@@ -1,9 +1,12 @@
+import type { JsonLdContextFailure, JsonLdDocumentFailure } from '@uncefact/untp-utils/validation';
 import { ValidationError } from '@/types';
-import jsonld from 'jsonld';
+import type { ContextFailure, ContextServiceFailure } from './contextFailure';
+import { API_BASE_PATH } from '../../constants';
 
 interface ValidationResult {
   valid: boolean;
-  data?: Record<string, any>;
+  /** The expanded JSON-LD form (an array of node objects) when valid. */
+  data?: unknown[];
   error?: ValidationError;
 }
 
@@ -26,12 +29,51 @@ export async function validateContext(credential: Record<string, any>): Promise<
     };
   }
 
+  // Expansion runs server-side (`/api/context`), behind an SSRF guard with
+  // size, redirect and timeout bounds, and the bundled UNTP contexts stand in
+  // when a host is down. The route answers with utils' failure description,
+  // which describeJsonLdError turns into the verifier's copy.
+  let response: Response;
   try {
-    const expanded = await jsonld.expand(credential, { safe: true } as jsonld.Options.Expand);
-    return { valid: true, data: expanded };
-  } catch (error: any) {
-    return { valid: false, error: describeJsonLdError(error) };
+    response = await fetch(`${API_BASE_PATH}/api/context`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ document: credential }),
+    });
+  } catch (error) {
+    return {
+      valid: false,
+      error: serviceError(
+        `The Playground's context service could not be reached (${
+          error instanceof Error ? error.message : String(error)
+        }). Retry in a moment.`,
+      ),
+    };
   }
+
+  let payload: { expanded?: unknown; failure?: unknown };
+  try {
+    payload = (await response.json()) as typeof payload;
+  } catch {
+    return {
+      valid: false,
+      error: serviceError(
+        `The Playground's context service answered ${response.status} without a readable result. Retry in a moment.`,
+      ),
+    };
+  }
+  if (response.ok) {
+    if (!Array.isArray(payload?.expanded)) {
+      return {
+        valid: false,
+        error: serviceError(
+          `The Playground's context service answered ${response.status} without an expanded document. Retry in a moment.`,
+        ),
+      };
+    }
+    return { valid: true, data: payload.expanded };
+  }
+  return { valid: false, error: describeJsonLdError(payload.failure) };
 }
 
 export function validateRequiredFields(credential: Record<string, any>): RequiredFieldsResult {
@@ -44,65 +86,87 @@ export function validateRequiredFields(credential: Record<string, any>): Require
   return { valid: true };
 }
 
-export function describeJsonLdError(error: any): ValidationError {
-  if (!error || typeof error !== 'object') {
-    return {
-      keyword: 'unknown',
-      message: 'Failed to validate the JSON-LD context. The library returned no diagnostic information.',
-      instancePath: '',
-    };
-  }
+/**
+ * Turns the context route's failure description (utils' `describeJsonLdFailure`
+ * output, or the route's own request/service failure) into the verifier's
+ * error copy. The kind picks the keyword the error dialog keys on, and the
+ * recognised codes get plain-English guidance; anything else shows the
+ * description's own detail.
+ */
+export function describeJsonLdError(failure: unknown): ValidationError {
+  if (!isFailureDescription(failure)) return NO_DIAGNOSTIC;
 
-  switch (error.name) {
-    case 'jsonld.InvalidUrl':
-      return describeInvalidUrl(error);
-    case 'jsonld.SyntaxError':
-      return describeSyntaxError(error);
-    case 'jsonld.ValidationError':
-      return describeValidationEvent(error);
+  switch (failure.kind) {
+    case 'context-fetch':
+    case 'context-invalid':
+      return describeContextFailure(failure);
+    case 'document':
+      return failure.source === 'syntax-error' ? describeSyntaxError(failure) : describeValidationEvent(failure);
+    case 'request':
+    case 'service':
+      // The service did not judge the document at all.
+      return serviceError(
+        `The Playground's context service could not process the request: ${failure.detail}`,
+        failure.kind,
+      );
     default:
-      return {
-        keyword: 'unknown',
-        message:
-          error.name && error.message
-            ? `${error.name}: ${error.message}`
-            : error.message || `${error.name || 'Error'}: validation failed.`,
-        instancePath: '',
-        params: { name: error.name, details: error.details },
-      };
+      return NO_DIAGNOSTIC;
   }
 }
 
-function describeInvalidUrl(error: any): ValidationError {
-  const url: string | undefined = error?.details?.url ?? error?.url;
-  const code: string | undefined = error?.details?.code;
-  const cause = error?.details?.cause;
-  const causeMessage = typeof cause === 'string' ? cause : cause?.message;
+const NO_DIAGNOSTIC: ValidationError = {
+  keyword: 'unknown',
+  message: 'Failed to validate the JSON-LD context. The context service returned no diagnostic information.',
+  instancePath: '',
+};
+
+/** The service, not the credential, failed: the dialog keys its heading and tip on this keyword. */
+function serviceError(
+  message: string,
+  kind: ContextServiceFailure['kind'] | 'unreachable' = 'unreachable',
+): ValidationError {
+  return { keyword: 'jsonldService', message, instancePath: '', params: { kind } };
+}
+
+function isFailureDescription(value: unknown): value is ContextFailure {
+  if (typeof value !== 'object' || value === null) return false;
+  const { kind, detail } = value as { kind?: unknown; detail?: unknown };
+  return (
+    typeof detail === 'string' &&
+    (kind === 'context-fetch' ||
+      kind === 'context-invalid' ||
+      kind === 'document' ||
+      kind === 'request' ||
+      kind === 'service')
+  );
+}
+
+function describeContextFailure(failure: JsonLdContextFailure): ValidationError {
+  const { url, code } = failure;
 
   let message: string;
-  if (code === 'loading remote context failed' && url) {
-    message = `Couldn't load the @context at "${url}". Common causes: the URL is unreachable, blocked by CORS, redirected too many times, or returning a non-JSON-LD response.`;
+  if (failure.kind === 'context-invalid') {
+    message = url
+      ? `The @context at "${url}" was fetched but isn't a usable JSON-LD context. Reported cause: ${failure.detail}.`
+      : `A @context URL was fetched but isn't a usable JSON-LD context. Reported cause: ${failure.detail}.`;
   } else if (url) {
-    message = `Couldn't resolve the @context URL "${url}".`;
+    message = `Couldn't load the @context at "${url}". Common causes: the URL is unreachable, is not https, resolves to a private address, redirected too many times, or returned a non-JSON-LD response. Reported cause: ${failure.detail}.`;
   } else {
-    message = error?.message || `Couldn't resolve a @context URL.`;
-  }
-  if (causeMessage) {
-    message += ` Underlying cause: ${causeMessage}.`;
+    message = `Couldn't load a @context URL. Reported cause: ${failure.detail}.`;
   }
 
   return {
     keyword: 'jsonldUrl',
     message,
     instancePath: '@context',
-    params: { code, url, cause: causeMessage },
+    params: { kind: failure.kind, code, url, cause: failure.detail },
   };
 }
 
-function describeSyntaxError(error: any): ValidationError {
-  const code: string | undefined = error?.details?.code;
-  const term: string | undefined = error?.details?.term;
-  const baseMessage: string = error?.message || 'Invalid JSON-LD syntax.';
+function describeSyntaxError(failure: JsonLdDocumentFailure): ValidationError {
+  const code = failure.code;
+  const term = failure.fields?.term;
+  const baseMessage: string = failure.detail || 'Invalid JSON-LD syntax.';
 
   let message: string;
   if (code === 'protected term redefinition' && term) {
@@ -124,15 +188,14 @@ function describeSyntaxError(error: any): ValidationError {
   };
 }
 
-// jsonld safe-mode rejects on a fixed set of event codes (see node_modules/jsonld/lib/events.js).
-// We translate the common ones into plain English. Anything we don't know about falls through to
-// the library's own message so new codes still surface useful information.
-function describeValidationEvent(error: any): ValidationError {
-  const event = error?.details?.event;
-  const code: string | undefined = event?.code;
-  const eventMessage: string | undefined = event?.message;
-  const eventDetails: Record<string, any> = event?.details || {};
-  const fallback = eventMessage || error?.message || 'JSON-LD validation failed.';
+// jsonld safe-mode rejects on a fixed set of event codes (jsonld.js `lib/events.js`).
+// We translate the common ones into plain English. Anything we don't know about, including a
+// document failure that carries no code at all (the pre-expansion shape check, or an unrecognised
+// processor error), falls through to the description's own detail so it still surfaces something useful.
+function describeValidationEvent(failure: JsonLdDocumentFailure): ValidationError {
+  const code = failure.code;
+  const eventDetails = failure.fields ?? {};
+  const fallback = failure.detail || 'JSON-LD validation failed.';
 
   let message: string;
   switch (code) {
@@ -179,13 +242,6 @@ function describeValidationEvent(error: any): ValidationError {
     keyword: 'jsonldValidation',
     message,
     instancePath: '',
-    params: {
-      code,
-      property: eventDetails.property,
-      id: eventDetails.id,
-      type: eventDetails.type,
-      term: eventDetails.term,
-      language: eventDetails.language,
-    },
+    params: { code, ...eventDetails },
   };
 }

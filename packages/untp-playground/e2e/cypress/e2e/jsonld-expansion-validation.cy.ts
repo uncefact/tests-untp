@@ -59,7 +59,7 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.openValidationDetails('Fix the @context');
 
     cy.checkValidationErrorMessages([
-      'Invalid JSON-LD syntax; a term cannot be an empty string.',
+      'Invalid JSON-LD syntax; invalid term definition.',
       'Review your @context against the JSON-LD specification.',
     ]);
   });

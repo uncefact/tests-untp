@@ -4,7 +4,7 @@ import type { TtlCache } from '../cache/ttl-cache.js';
 import type { LoadedRemoteDocument } from '../loaders/jsonld-document-loader.js';
 import { JsonLdExpansionFailedError, JsonLdInvalidShapeError } from './errors.js';
 
-export interface ValidateJsonLdOptions extends BundledFallbackOptions {
+export interface ValidateJsonLdBuildLoaderOptions extends BundledFallbackOptions {
   /** Whether to use safe mode for JSON-LD expansion. Defaults to true. */
   safe?: boolean;
   /**
@@ -17,7 +17,28 @@ export interface ValidateJsonLdOptions extends BundledFallbackOptions {
    * document is cached even if expansion later rejects it.
    */
   contextCache?: TtlCache<LoadedRemoteDocument>;
+  documentLoader?: never;
 }
+
+/** A loader for a remote JSON-LD document, as {@link createJsonLdDocumentLoader} returns. */
+export type JsonLdDocumentLoader = (url: string) => Promise<LoadedRemoteDocument>;
+
+/**
+ * Options for {@link validateJsonLd} and {@link expandJsonLd}. Either a
+ * `documentLoader` the caller already holds (the same guarded loader shared
+ * across several operations, or a test double), or the pieces to build one
+ * from; the two are mutually exclusive at the type level, because a cache or
+ * fallback option passed beside a ready loader would be silently ignored.
+ */
+export type ValidateJsonLdOptions =
+  | ValidateJsonLdBuildLoaderOptions
+  | {
+      safe?: boolean;
+      documentLoader: JsonLdDocumentLoader;
+      contextCache?: never;
+      bundledFallback?: never;
+      onBundledFallback?: never;
+    };
 
 /**
  * jsonld.js's own `JsonLdError` wraps a document loader's rejection in the
@@ -65,6 +86,69 @@ function rehydrateJsonLdCause(error: unknown, fallback?: unknown): unknown {
   return error;
 }
 
+type JsonLdProcessorOptions = Parameters<typeof import('jsonld').expand>[1];
+
+/**
+ * Loads jsonld and the guarded document loader lazily, runs `operation` with
+ * a loader that records its last failure, and rethrows any rejection as a
+ * {@link JsonLdExpansionFailedError} whose cause is the loader's typed error
+ * where one was buried (see {@link rehydrateJsonLdCause}). Shared by
+ * {@link validateJsonLd} and {@link expandJsonLd}.
+ */
+async function withJsonLd<T>(
+  document: unknown,
+  options: ValidateJsonLdOptions | undefined,
+  operation: (
+    jsonld: typeof import('jsonld'),
+    document: JsonLdDocument,
+    processorOptions: JsonLdProcessorOptions,
+  ) => Promise<T>,
+): Promise<T> {
+  if (typeof document !== 'object' || document === null) {
+    throw new JsonLdInvalidShapeError(document);
+  }
+
+  // Dynamic import: jsonld pulls in undici/TextDecoder which aren't
+  // available in jsdom, so we load it lazily to allow test mocking. The
+  // guarded document loader is loaded lazily for the same reason (it depends
+  // on the resolvers/node stack, which uses undici and node:dns).
+  const jsonldModule = await import('jsonld');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const jsonld = ('default' in jsonldModule ? (jsonldModule as any).default : jsonldModule) as typeof import('jsonld');
+  const documentLoader =
+    options?.documentLoader ??
+    (await import('../loaders/jsonld-document-loader.js')).createJsonLdDocumentLoader({
+      cache: options?.contextCache,
+      bundledFallback: options?.bundledFallback,
+      onBundledFallback: options?.onBundledFallback,
+    });
+
+  // Recorded for rehydrateJsonLdCause's fallback: the last error the loader
+  // threw during this call (undefined if every fetch it made succeeded).
+  let lastLoaderError: unknown;
+  const trackedDocumentLoader: JsonLdDocumentLoader = async (url) => {
+    try {
+      return await documentLoader(url);
+    } catch (loaderError) {
+      lastLoaderError = loaderError;
+      throw loaderError;
+    }
+  };
+
+  // The cast bridges @types/jsonld, which types documentLoader with a legacy
+  // callback signature; jsonld.js itself accepts the single-argument
+  // promise-returning loader used here.
+  const processorOptions = {
+    safe: options?.safe ?? true,
+    documentLoader: trackedDocumentLoader,
+  } as unknown as JsonLdProcessorOptions;
+  try {
+    return await operation(jsonld, document as JsonLdDocument, processorOptions);
+  } catch (cause) {
+    throw new JsonLdExpansionFailedError(rehydrateJsonLdCause(cause, lastLoaderError));
+  }
+}
+
 /**
  * Catches malformed contexts, undefined terms, and structurally invalid
  * linked data by expanding to RDF in safe mode (unless explicitly disabled).
@@ -83,45 +167,15 @@ function rehydrateJsonLdCause(error: unknown, fallback?: unknown): unknown {
  *   see {@link rehydrateJsonLdCause}).
  */
 export async function validateJsonLd(document: unknown, options?: ValidateJsonLdOptions): Promise<void> {
-  if (typeof document !== 'object' || document === null) {
-    throw new JsonLdInvalidShapeError(document);
-  }
+  await withJsonLd(document, options, (jsonld, doc, processorOptions) => jsonld.toRDF(doc, processorOptions));
+}
 
-  // Dynamic import: jsonld pulls in undici/TextDecoder which aren't
-  // available in jsdom, so we load it lazily to allow test mocking. The
-  // guarded document loader is loaded lazily for the same reason (it depends
-  // on the resolvers/node stack, which uses undici and node:dns).
-  const jsonldModule = await import('jsonld');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const jsonld = ('default' in jsonldModule ? (jsonldModule as any).default : jsonldModule) as typeof import('jsonld');
-  const { createJsonLdDocumentLoader } = await import('../loaders/jsonld-document-loader.js');
-  const documentLoader = createJsonLdDocumentLoader({
-    cache: options?.contextCache,
-    bundledFallback: options?.bundledFallback,
-    onBundledFallback: options?.onBundledFallback,
-  });
-
-  // Recorded for rehydrateJsonLdCause's fallback: the last error the loader
-  // threw during this call (undefined if every fetch it made succeeded).
-  let lastLoaderError: unknown;
-  const trackedDocumentLoader = async (url: string): Promise<LoadedRemoteDocument> => {
-    try {
-      return await documentLoader(url);
-    } catch (loaderError) {
-      lastLoaderError = loaderError;
-      throw loaderError;
-    }
-  };
-
-  try {
-    // The options cast bridges @types/jsonld, which types documentLoader with
-    // a legacy callback signature; jsonld.js itself accepts the
-    // single-argument promise-returning loader used here.
-    await jsonld.toRDF(
-      document as JsonLdDocument,
-      { safe: options?.safe ?? true, documentLoader: trackedDocumentLoader } as Parameters<typeof jsonld.toRDF>[1],
-    );
-  } catch (cause) {
-    throw new JsonLdExpansionFailedError(rehydrateJsonLdCause(cause, lastLoaderError));
-  }
+/**
+ * Expands `document` with the same guarded loader, safe mode and error
+ * contract as {@link validateJsonLd}, and returns the expanded form for a
+ * caller that displays it (the Playground's context step). Throws the same
+ * errors as {@link validateJsonLd}.
+ */
+export async function expandJsonLd(document: unknown, options?: ValidateJsonLdOptions): Promise<unknown[]> {
+  return withJsonLd(document, options, (jsonld, doc, processorOptions) => jsonld.expand(doc, processorOptions));
 }
