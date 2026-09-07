@@ -53,8 +53,10 @@ Cypress.Commands.add(
 
 // Command to open error details
 Cypress.Commands.add('openErrorDetails', () => {
-  // Wait for button to be visible and clickable
-  cy.contains('View Details').should('be.visible').click();
+  // Target the button: a toast can also carry the words "View Details"
+  // ("Please check the View Details for more information") and sits earlier
+  // in the DOM, so a bare text match can click the toast instead.
+  cy.contains('button', 'View Details').should('be.visible').click();
   // Wait for the sheet content to be visible after animation
   cy.contains('Validation Details', { timeout: 15000 }).should('be.visible');
 });
