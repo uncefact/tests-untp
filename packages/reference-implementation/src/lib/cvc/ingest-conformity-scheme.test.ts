@@ -163,7 +163,11 @@ describe('ingestConformityScheme', () => {
       await ingestConformityScheme(baseInput()).catch(() => undefined);
 
       expect(mockResolveAndParseConformityScheme).toHaveBeenCalledWith(
-        expect.objectContaining({ contextCache: mockContextCache }),
+        expect.objectContaining({
+          contextCache: mockContextCache,
+          bundledFallback: true,
+          onBundledFallback: expect.any(Function),
+        }),
       );
     });
   });

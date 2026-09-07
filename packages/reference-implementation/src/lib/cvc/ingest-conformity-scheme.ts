@@ -12,6 +12,7 @@ import type {
 import { ConformityFetchStatus, ConformitySchemeSource, Prisma, SeedEntryKind } from '../prisma/generated';
 import { prisma } from '../prisma/prisma';
 import { contextCache } from '../credentials/context-cache';
+import { bundledArtefactsFallback } from '../credentials/schema-loader';
 import { acquireCvcStructuralLock } from './cvc-structural-lock';
 
 export interface IngestConformitySchemeInput {
@@ -96,6 +97,8 @@ export async function ingestConformityScheme(
     // Shared with the issuance path (uncefact/tests-untp#891): a pass over
     // many schemes fetches each remote @context once per TTL, not per scheme.
     contextCache,
+    // And the same bundled-artefact fallback switch and log (#1006).
+    ...bundledArtefactsFallback,
   });
 
   const now = new Date();

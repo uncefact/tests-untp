@@ -34,10 +34,7 @@ import context_untp_0_6_1_dte from './artefacts/context/untp/0.6.1/dte.js';
 /** Bundled artefacts keyed by the published URL consumers request. */
 export const BUNDLED_ARTEFACTS: ReadonlyMap<string, object> = new Map<string, object>([
   ['https://www.w3.org/ns/credentials/v2', context_vcdm_2_credentials],
-  [
-    'https://w3c.github.io/vc-data-model/schema/verifiable-credential/verifiable-credential-schema.json',
-    schema_vcdm_2_verifiable_credential,
-  ],
+  ['https://w3c.github.io/vc-data-model/schema/verifiable-credential/verifiable-credential-schema.json', schema_vcdm_2_verifiable_credential],
   ['https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json', schema_untp_0_7_0_dpp],
   ['https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json', schema_untp_0_7_0_dcc],
   ['https://untp.unece.org/artefacts/schema/v0.7.0/dfr/DigitalFacilityRecord.json', schema_untp_0_7_0_dfr],
@@ -69,4 +66,4 @@ export const BUNDLED_ARTEFACTS: ReadonlyMap<string, object> = new Map<string, ob
 ]);
 
 /** UNTP versions the bundle carries, ascending. */
-export const BUNDLED_UNTP_VERSIONS: readonly string[] = ['0.6.0', '0.6.1', '0.7.0'];
+export const BUNDLED_UNTP_VERSIONS: readonly string[] = ["0.6.0","0.6.1","0.7.0"];

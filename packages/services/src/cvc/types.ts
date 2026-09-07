@@ -73,6 +73,12 @@ export interface ResolveAndParseConformitySchemeInput {
    * path's (see the reference implementation's `context-cache.ts`).
    */
   contextCache?: TtlCache<LoadedRemoteDocument>;
+  /**
+   * Whether a bundled UNTP context stands in when its fetch fails (default on),
+   * and who is told when it does; forwarded to `validateJsonLd`.
+   */
+  bundledFallback?: boolean;
+  onBundledFallback?: (event: { url: string; cause: unknown }) => void;
 }
 
 /** Outcome of a successful run; everything the caller needs to upsert the row. */

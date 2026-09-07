@@ -98,7 +98,7 @@ export const ARTEFACTS = [
 ];
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
-/** Canonical form so whitespace differences between hosts never read as drift. */
+/** Stored form of a bundled artefact. */
 const canonical = (json) => JSON.stringify(json, null, 2) + '\n';
 
 async function fetchJson(url) {
@@ -118,11 +118,22 @@ async function readBundled(file) {
   }
 }
 
-/** Compares a fetched artefact with the bundled copy. Pure so it can be tested. */
+/**
+ * Compares a fetched artefact with the bundled copy by content, not bytes, so
+ * a formatter touching the bundled file never reads as upstream drift. Pure so
+ * it can be tested.
+ */
 export function classify(bundledText, fetchedText) {
   if (bundledText === undefined) return 'missing';
-  return bundledText === fetchedText ? 'same' : 'differs';
+  try {
+    return JSON.stringify(JSON.parse(bundledText)) === JSON.stringify(JSON.parse(fetchedText)) ? 'same' : 'differs';
+  } catch {
+    return 'differs';
+  }
 }
+
+/** Hash of the artefact's content in canonical form, independent of file formatting. */
+const contentHash = (text) => sha256(JSON.stringify(JSON.parse(text)));
 
 const moduleName = (file) => file.replace(/\.json$/, '').replace(/[^a-zA-Z0-9]+/g, '_');
 
@@ -176,7 +187,7 @@ async function main() {
       await writeFile(join(ARTEFACT_DIR, entry.file), fetched);
     }
     const text = state === 'same' || (state === 'differs' && !write) ? bundled : fetched;
-    manifest.push({ url: entry.url, file: entry.file, source: entry.source, sha256: sha256(text) });
+    manifest.push({ url: entry.url, file: entry.file, source: entry.source, sha256: contentHash(text) });
     const label =
       state === 'same'
         ? 'same'
