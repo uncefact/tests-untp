@@ -58,7 +58,6 @@ jest.mock('@/lib/library/reconcile-pending-runs-job', () => ({
   registerPendingRunReconciliation: jest.fn(() => {
     order.push('reconcile-register');
   }),
-  RECONCILE_PENDING_RUNS_CRON: '*/10 * * * *',
 }));
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: { $queryRawUnsafe: jest.fn(async () => []), $disconnect: jest.fn(async () => undefined) },

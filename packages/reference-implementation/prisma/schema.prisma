@@ -113,8 +113,10 @@ enum CheckResult {
 }
 
 /// Why a FAILED check run could not conclude (#955). The wire contract's
-/// closed set; STORED_COPY_UNAVAILABLE is emitted when a durable copy this
-/// system believed it held cannot be read back or no longer matches its digest.
+/// closed set plus STORED_COPY_CORRUPT (#957). STORED_COPY_UNAVAILABLE is
+/// emitted when a durable copy this system believed it held cannot be read
+/// back as the document it stored; STORED_COPY_CORRUPT when it reads back but
+/// no longer matches the digest recorded when it was stored.
 enum CheckRunFailureCode {
   RETRIEVAL_FAILED
   DECRYPTION_REQUIRED
@@ -122,6 +124,7 @@ enum CheckRunFailureCode {
   STORAGE_FAILED
   VERIFICATION_UNAVAILABLE
   STORED_COPY_UNAVAILABLE
+  STORED_COPY_CORRUPT
 }
 
 enum ServiceType {

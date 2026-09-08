@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readStoredCopyReadTimeoutMs } from '@/lib/config/stored-copy-read-timeout.config';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import {
   decryptCredentialToBytes,
@@ -424,7 +425,7 @@ async function runStoredCopyChecks(
     progress.checks = { ...checks, digest: CheckResult.FAIL };
     throw new TerminalVerificationError(
       {
-        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        code: CheckRunFailureCode.STORED_COPY_CORRUPT,
         message: 'The durable copy failed its integrity digest check; an operator must inspect the stored object.',
       },
       undefined,
@@ -442,20 +443,11 @@ async function runStoredCopyChecks(
     // proof check fails by definition; the verifier is not asked to sign off.
     return { ...checked, proof: CheckResult.FAIL };
   }
-  const credential = stored.credential;
-  if (credential === null) {
-    throw new TerminalVerificationError(
-      {
-        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
-        message: 'The durable copy does not contain a readable credential; an operator must inspect the stored object.',
-      },
-      undefined,
-      {
-        classification: 'copy-not-a-credential',
-        message: 'A copy recorded as a credential read back intact and holds no credential',
-      },
-    );
-  }
+  // readStoredCopy throws `unreadable` for a CREDENTIAL copy whose content is
+  // not a JSON object, so a copy that reaches this line always carries one.
+  // Whether that object is a verifiable credential is the verifier's call: an
+  // intact copy that is not one settles COMPLETE with the proof check failed.
+  const credential = stored.credential as EnvelopedVerifiableCredential;
 
   let result: VerifyResult;
   try {
@@ -548,6 +540,12 @@ async function readStoredCopy(
   }
   throwIfAborted(context);
 
+  // A copy that cannot be opened as the document that was stored is
+  // UNAVAILABLE rather than CORRUPT, even though a physical fault can produce
+  // either: the digest preimage of a credential copy is the compact JSON of
+  // the parsed object, so a body that does not parse has no preimage to
+  // compare and the digest check never runs. CORRUPT is reserved for a copy
+  // whose comparison ran and answered no.
   const unreadable = (detail: string, cause?: unknown) =>
     new TerminalVerificationError(
       {
@@ -705,7 +703,7 @@ function verifierChecks(result: VerifyResult): Pick<CheckResults, 'proof' | 'sta
 async function fetchStoredCopyBytes(uri: string): Promise<Uint8Array> {
   let response: Response;
   try {
-    response = await fetch(uri, { signal: AbortSignal.timeout(10_000) });
+    response = await fetch(uri, { signal: AbortSignal.timeout(readStoredCopyReadTimeoutMs()) });
   } catch (error) {
     throw new StoredCopyReadError('transient', 'storage could not be reached', error);
   }

@@ -29,7 +29,6 @@ import { CheckResult, CheckRunState, LibraryRecordOrigin, Prisma, type CheckRun 
 import { prisma } from '../prisma';
 import type { SqlExecutor } from '@/lib/jobs/types';
 import {
-  ABANDONED_PENDING_RUNS_PER_SWEEP,
   createReverificationGeneration,
   findAbandonedPendingCheckRuns,
   settleAbandonedCheckRun,
@@ -367,7 +366,7 @@ describe('pending-run reconciliation repository', () => {
     const findMany = prisma.checkRun.findMany as unknown as jest.Mock;
     findMany.mockResolvedValue([]);
 
-    await findAbandonedPendingCheckRuns(cutoff);
+    await findAbandonedPendingCheckRuns(cutoff, 500);
 
     expect(findMany).toHaveBeenCalledWith({
       where: {
@@ -375,8 +374,18 @@ describe('pending-run reconciliation repository', () => {
         OR: [{ lastEnqueuedAt: null, requestedAt: { lt: cutoff } }, { lastEnqueuedAt: { lt: cutoff } }],
       },
       orderBy: { requestedAt: 'asc' },
-      take: ABANDONED_PENDING_RUNS_PER_SWEEP,
+      take: 500,
     });
+  });
+
+  it('takes at most the limit it is given', async () => {
+    // Fails if the query keeps a fixed cap instead of the caller's.
+    const findMany = prisma.checkRun.findMany as unknown as jest.Mock;
+    findMany.mockResolvedValue([]);
+
+    await findAbandonedPendingCheckRuns(new Date('2026-09-07T00:00:00Z'), 25);
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 25 }));
   });
 
   it('gives a run with no marker the same grace as every other run', async () => {
@@ -387,7 +396,7 @@ describe('pending-run reconciliation repository', () => {
     const findMany = prisma.checkRun.findMany as unknown as jest.Mock;
     findMany.mockResolvedValue([]);
 
-    await findAbandonedPendingCheckRuns(cutoff);
+    await findAbandonedPendingCheckRuns(cutoff, 500);
 
     const where = findMany.mock.calls[0][0].where as { OR: Array<Record<string, unknown>> };
     const nullMarkerArm = where.OR.find((arm) => arm.lastEnqueuedAt === null);

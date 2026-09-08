@@ -8,6 +8,7 @@ export class WorkerBootError extends Error {
       | 'worker.encryption-key-missing'
       | 'worker.schema-not-ready'
       | 'worker.migrations-unreadable'
+      | 'worker.configuration-invalid'
       | 'worker.reconciliation-schedule-failed',
     message: string,
     cause?: unknown,

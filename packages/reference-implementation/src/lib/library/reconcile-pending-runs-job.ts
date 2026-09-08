@@ -6,10 +6,9 @@ import {
 import type { CheckRun } from '@/lib/prisma/generated';
 import type { JobHandler, JobQueue } from '@/lib/jobs/types';
 import { LIBRARY_RECONCILE_PENDING_RUNS_JOB } from '@/lib/jobs/queue-names';
+import { readReconcilePendingRunsBatchSize } from '@/lib/config/reconcile-pending-runs.config';
 import { VERIFY_JOB_ENQUEUE_OPTIONS } from './verify-generation-job';
 import { apiLogger } from '@/lib/api/logger';
-
-export const RECONCILE_PENDING_RUNS_CRON = '*/10 * * * *';
 
 const RECONCILIATION_BOUND_SECONDS = 30 * 60;
 const logger = apiLogger.child({ module: 'reconcile-pending-runs-job' });
@@ -22,7 +21,8 @@ export type ReconcilePendingRunsDependencies = {
 
 export function defaultReconcilePendingRunsDependencies(): ReconcilePendingRunsDependencies {
   return {
-    findAbandoned: findAbandonedPendingCheckRuns,
+    // The cap is read per tick, so the operator's setting is what each sweep uses.
+    findAbandoned: (cutoff) => findAbandonedPendingCheckRuns(cutoff, readReconcilePendingRunsBatchSize()),
     settleAbandoned: settleAbandonedCheckRun,
     now: () => new Date(Date.now()),
   };

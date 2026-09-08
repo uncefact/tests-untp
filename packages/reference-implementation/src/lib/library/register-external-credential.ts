@@ -101,7 +101,7 @@ export function defaultRegisterDependencies(
   enqueueVerification: RegisterExternalCredentialDependencies['enqueueVerification'],
 ): RegisterExternalCredentialDependencies {
   return {
-    fetchDocument: (href) => fetchCredentialDocument(href, { maxBytes: getMaxCredentialSize(), timeoutMs: 10_000 }),
+    fetchDocument: (href) => fetchCredentialDocument(href),
     resolveStorage: (tenantId) => resolveStorageService(tenantId),
     assertEncryptionReady: () => {
       getEncryptionService();

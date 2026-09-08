@@ -70,7 +70,8 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *       now. A later re-verification that proves the durable copy lost does
  *       not clear or change them, so a key can still be returned for a copy
  *       that no longer answers. The newest verification envelope reports
- *       `STORED_COPY_UNAVAILABLE` and its retryability instead.
+ *       `STORED_COPY_UNAVAILABLE` (or `STORED_COPY_CORRUPT` for a copy that
+ *       read back but failed its digest check) and its retryability instead.
  *
  *       For a native record, `verification` generation 1 is an issuance
  *       assertion rather than an executed run. `proof` reads `pass` because

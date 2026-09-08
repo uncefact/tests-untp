@@ -32,7 +32,6 @@ jest.mock('@/lib/api/logger', () => {
 jest.mock('@/lib/library/verify-generation-job', () => ({ registerLibraryJobs: jest.fn() }));
 jest.mock('@/lib/library/reconcile-pending-runs-job', () => ({
   registerPendingRunReconciliation: jest.fn(),
-  RECONCILE_PENDING_RUNS_CRON: '*/10 * * * *',
 }));
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: { $queryRawUnsafe: jest.fn(async () => []), $disconnect: jest.fn(async () => undefined) },
@@ -59,6 +58,9 @@ const OPTIONS = { sdk: { shutdown: async () => undefined }, migrationsDir: '/unu
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
+  delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_CRON;
+  delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE;
+  delete process.env.LIBRARY_STORED_COPY_READ_TIMEOUT_MS;
   fakeQueue.start.mockImplementation(async () => undefined);
   fakeQueue.schedule.mockImplementation(async () => undefined);
 });
@@ -69,6 +71,54 @@ describe('the reconciliation schedule at worker boot', () => {
       expect(fakeQueue.schedule).toHaveBeenCalledWith(LIBRARY_RECONCILE_PENDING_RUNS_JOB, '*/10 * * * *');
       expect(startHeartbeat).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('is recorded on the cadence LIBRARY_RECONCILE_PENDING_RUNS_CRON sets', async () => {
+    // The operator owns the sweep cadence (startup.md). Fails if the boot
+    // ignores the variable and records the default.
+    process.env.LIBRARY_RECONCILE_PENDING_RUNS_CRON = '*/5 * * * *';
+
+    await expect(runWorker(OPTIONS)).resolves.toBeUndefined();
+
+    expect(fakeQueue.schedule).toHaveBeenCalledWith(LIBRARY_RECONCILE_PENDING_RUNS_JOB, '*/5 * * * *');
+  });
+
+  it('fails the boot, naming the variable, before the queue exists when the cadence is malformed', async () => {
+    // A malformed cadence is caught before the queue is built, so the worker
+    // never starts a consumer it would then have to stop. Fails if the value
+    // reaches queue.schedule, or if the error is not the named boot error.
+    process.env.LIBRARY_RECONCILE_PENDING_RUNS_CRON = 'every ten minutes';
+
+    await expect(runWorker(OPTIONS)).rejects.toMatchObject({
+      code: 'worker.configuration-invalid',
+      message: expect.stringContaining('LIBRARY_RECONCILE_PENDING_RUNS_CRON'),
+    });
+
+    expect(fakeQueue.start).not.toHaveBeenCalled();
+    expect(fakeQueue.schedule).not.toHaveBeenCalled();
+    expect(startHeartbeat).not.toHaveBeenCalled();
+  });
+
+  it('fails the boot, naming the variable, when the sweep batch size is malformed', async () => {
+    process.env.LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE = 'lots';
+
+    await expect(runWorker(OPTIONS)).rejects.toMatchObject({
+      code: 'worker.configuration-invalid',
+      message: expect.stringContaining('LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE'),
+    });
+
+    expect(fakeQueue.start).not.toHaveBeenCalled();
+  });
+
+  it('fails the boot, naming the variable, when the stored-copy read budget is malformed', async () => {
+    process.env.LIBRARY_STORED_COPY_READ_TIMEOUT_MS = '10s';
+
+    await expect(runWorker(OPTIONS)).rejects.toMatchObject({
+      code: 'worker.configuration-invalid',
+      message: expect.stringContaining('LIBRARY_STORED_COPY_READ_TIMEOUT_MS'),
+    });
+
+    expect(fakeQueue.start).not.toHaveBeenCalled();
   });
 
   it('is skipped when a signal ran the shutdown steps during the queue start', async () => {

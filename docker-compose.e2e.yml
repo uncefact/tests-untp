@@ -140,6 +140,8 @@ services:
       - PYX_IDR_API_URL=http://identity-resolver-service:3000
       - PYX_IDR_API_KEY=test123
       - VERIFY_ALLOW_PRIVATE_URLS=true
+      - VERIFY_MAX_CREDENTIAL_SIZE=${VERIFY_MAX_CREDENTIAL_SIZE:-}
+      - VERIFY_FETCH_TIMEOUT_MS=${VERIFY_FETCH_TIMEOUT_MS:-}
       # Tenant mode (default: open — override to "closed" for closed mode tests)
       - TENANT_MODE=${TENANT_MODE:-open}
       - TENANT_CLAIM_NAME=${TENANT_CLAIM_NAME:-groups}
@@ -200,6 +202,9 @@ services:
       - RI_DATABASE_URL=postgresql://ri-postgres:ri-postgres@e2e-ri-db:5432/ri?schema=public
       - DATA_ENCRYPTION_KEY=dd1b7430915155b51c503806031f31f901e85563035f65421d707f042c75f44b
       - OTEL_SERVICE_NAME=reference-implementation-worker
+      - LIBRARY_RECONCILE_PENDING_RUNS_CRON=${LIBRARY_RECONCILE_PENDING_RUNS_CRON:-}
+      - LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE=${LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE:-}
+      - LIBRARY_STORED_COPY_READ_TIMEOUT_MS=${LIBRARY_STORED_COPY_READ_TIMEOUT_MS:-}
     extra_hosts:
       - 'localhost:host-gateway'
     depends_on:

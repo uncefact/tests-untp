@@ -211,7 +211,7 @@ describe('the credential copy digest preimage', () => {
       expect.objectContaining({
         checks: expect.objectContaining({ retrieval: CheckResult.PASS, digest: CheckResult.FAIL }),
         failure: expect.objectContaining({
-          code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+          code: CheckRunFailureCode.STORED_COPY_CORRUPT,
           retryable: false,
         }),
       }),

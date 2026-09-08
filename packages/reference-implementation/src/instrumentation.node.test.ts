@@ -12,6 +12,7 @@ const mockValidateCacheMaxEntriesOnBoot = jest.fn();
 const mockValidateBundledArtefactsFallbackOnBoot = jest.fn();
 const mockValidateStaleClaimOnBoot = jest.fn();
 const mockValidateMaxRequestBodyBytesOnBoot = jest.fn();
+const mockValidateFetchTimeoutOnBoot = jest.fn();
 
 jest.mock('@/lib/config/app-url.config', () => ({
   resolveAppUrl: (...args: unknown[]) => mockResolveAppUrl(...args),
@@ -31,6 +32,9 @@ jest.mock('@/lib/config/idempotency-claim.config', () => ({
 }));
 jest.mock('@/lib/config/request-body-limit.config', () => ({
   validateMaxRequestBodyBytesOnBoot: (...args: unknown[]) => mockValidateMaxRequestBodyBytesOnBoot(...args),
+}));
+jest.mock('@/lib/credentials/fetch-credential-document', () => ({
+  validateFetchTimeoutOnBoot: (...args: unknown[]) => mockValidateFetchTimeoutOnBoot(...args),
 }));
 jest.mock('@/lib/encryption/resolve-data-encryption-key', () => ({
   resolveDataEncryptionKey: (...args: unknown[]) => mockResolveDataEncryptionKey(...args),
@@ -94,6 +98,7 @@ describe('registerNode boot wiring', () => {
     expect(mockValidateBundledArtefactsFallbackOnBoot).toHaveBeenCalledTimes(1);
     expect(mockValidateStaleClaimOnBoot).toHaveBeenCalledTimes(1);
     expect(mockValidateMaxRequestBodyBytesOnBoot).toHaveBeenCalledTimes(1);
+    expect(mockValidateFetchTimeoutOnBoot).toHaveBeenCalledTimes(1);
   });
 
   it('starts the job queue before serving', async () => {
@@ -115,6 +120,26 @@ describe('registerNode boot wiring', () => {
     });
 
     await expect(registerNode()).rejects.toThrow('MAX_REQUEST_BODY_BYTES');
+  });
+
+  it('fails the boot when the credential fetch timeout override is invalid', async () => {
+    // jest.clearAllMocks() in beforeEach keeps implementations, so drop the
+    // earlier tests' throwing validators before arming this one, and drop
+    // this one afterwards whether or not the assertion holds.
+    mockResolveAppUrl.mockReset();
+    mockValidateHttpUserAgentOnBoot.mockReset();
+    mockValidateMaxRequestBodyBytesOnBoot.mockReset();
+    mockValidateCacheMaxEntriesOnBoot.mockReset();
+    mockValidateStaleClaimOnBoot.mockReset();
+    mockValidateFetchTimeoutOnBoot.mockImplementation(() => {
+      throw new Error('VERIFY_FETCH_TIMEOUT_MS must be a positive integer number of milliseconds when set');
+    });
+
+    try {
+      await expect(registerNode()).rejects.toThrow('VERIFY_FETCH_TIMEOUT_MS');
+    } finally {
+      mockValidateFetchTimeoutOnBoot.mockReset();
+    }
   });
 
   it('fails the boot when a cache entry-cap override is invalid', async () => {

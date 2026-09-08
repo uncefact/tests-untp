@@ -585,7 +585,7 @@ describe('verifyGenerationHandler on native records', () => {
       tenantId: TENANT_ID,
       checks: { ...ESTABLISHED_CHECKS, digest: CheckResult.FAIL },
       failure: {
-        code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        code: CheckRunFailureCode.STORED_COPY_CORRUPT,
         message: 'The durable copy failed its integrity digest check; an operator must inspect the stored object.',
         retryable: false,
       },

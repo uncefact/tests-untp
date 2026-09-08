@@ -15,9 +15,9 @@ import { insertNativeCredential, seedSystemTenant, SYSTEM_TENANT_ID } from './fi
 import { PgBossJobQueue } from '../../src/lib/jobs/pg-boss-job-queue';
 import type { JobContext } from '../../src/lib/jobs/types';
 import { LIBRARY_RECONCILE_PENDING_RUNS_JOB } from '../../src/lib/jobs/queue-names';
+import { DEFAULT_RECONCILE_PENDING_RUNS_CRON } from '../../src/lib/config/reconcile-pending-runs.config';
 import {
   defaultReconcilePendingRunsDependencies,
-  RECONCILE_PENDING_RUNS_CRON,
   registerPendingRunReconciliation,
 } from '../../src/lib/library/reconcile-pending-runs-job';
 import {
@@ -229,7 +229,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     await senderQueue.declareQueue(LIBRARY_VERIFY_JOB);
     registerPendingRunReconciliation(sweepQueue, defaultReconcilePendingRunsDependencies());
     await sweepQueue.start();
-    await sweepQueue.schedule(LIBRARY_RECONCILE_PENDING_RUNS_JOB, RECONCILE_PENDING_RUNS_CRON);
+    await sweepQueue.schedule(LIBRARY_RECONCILE_PENDING_RUNS_JOB, DEFAULT_RECONCILE_PENDING_RUNS_CRON);
   });
 
   beforeEach(async () => {
@@ -372,6 +372,42 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     await handler((await jobsFor(changedId))[0], context());
     const projected = toCredentialRecord((await getLibraryRecordById(changedId, SYSTEM_TENANT_ID)) as never);
     expect(projected.verification).toMatchObject({ state: 'complete', sourceChanged: true });
+  });
+
+  it('settles a protected copy that no longer matches its digest as STORED_COPY_CORRUPT', async () => {
+    // The copy reads back, so retrieval passes, but the body storage now
+    // serves is not what was digested when it was stored. Fails if a
+    // tampered copy shares STORED_COPY_UNAVAILABLE with an absent one, if the
+    // enum value the handler settles is not one the database accepts (this is
+    // the only test that writes it to Postgres), or if the verifier is asked
+    // about a copy that failed its integrity check.
+    const sourceDigest = await digest(new TextEncoder().encode(DPP_TEXT));
+    const storageDigest = sourceDigest;
+    fixtures.set('/supplier/tampered.json', { body: DPP_TEXT });
+    fixtures.set('/storage/tampered.json', { body: JSON.stringify({ ...DPP, id: 'urn:uuid:tampered' }) });
+    const recordId = await insertProtectedExternal({
+      sourcePath: '/supplier/tampered.json',
+      storagePath: '/storage/tampered.json',
+      sourceDigest,
+      storageDigest,
+    });
+    await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
+    const verifier: IVerifiableCredentialService = { sign: jest.fn(), verify: jest.fn() };
+    await verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    })((await jobsFor(recordId))[0], context({ isFinalAttempt: true }));
+
+    const corrupt = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    expect(corrupt?.checkRun).toMatchObject({
+      generation: 2,
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.STORED_COPY_CORRUPT,
+      failureRetryable: false,
+      retrieval: CheckResult.PASS,
+      digest: CheckResult.FAIL,
+    });
+    expect(verifier.verify).not.toHaveBeenCalled();
   });
 
   it('settles a missing protected copy as terminal and leaves custody for the next request', async () => {

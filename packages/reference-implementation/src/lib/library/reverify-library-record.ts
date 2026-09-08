@@ -3,7 +3,6 @@ import { LibraryRecordOrigin, CheckRunState } from '@/lib/prisma/generated';
 import {
   CredentialDocumentFetchError,
   fetchCredentialDocument,
-  getMaxCredentialSize,
   type FetchedDocument,
 } from '@/lib/credentials/fetch-credential-document';
 import { NotFoundError } from '@/lib/api/errors';
@@ -49,7 +48,7 @@ export type ReverifyLibraryRecordDependencies = {
 export function defaultReverifyLibraryRecordDependencies(): ReverifyLibraryRecordDependencies {
   return {
     getRecord: getLibraryRecordById,
-    fetchSource: (href) => fetchCredentialDocument(href, { maxBytes: getMaxCredentialSize(), timeoutMs: 10_000 }),
+    fetchSource: (href) => fetchCredentialDocument(href),
     createGeneration: createReverificationGeneration,
   };
 }

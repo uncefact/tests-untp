@@ -372,20 +372,19 @@ export async function findLatestCheckRun(recordId: string, tenantId: string): Pr
  * is: it is reached only from the worker's scheduled job, never from a
  * request, and each row it settles carries its own tenant to the settle.
  *
- * Capped rather than unbounded, so one tick over a large backlog cannot load
- * and settle every row inside one job attempt. The next tick takes the rest,
- * oldest first.
+ * Capped by `limit` rather than unbounded, so one tick over a large backlog
+ * cannot load and settle every row inside one job attempt. The next tick
+ * takes the rest, oldest first. The sweep resolves the limit from the
+ * operator's setting and passes it in.
  */
-export const ABANDONED_PENDING_RUNS_PER_SWEEP = 500;
-
-export async function findAbandonedPendingCheckRuns(cutoff: Date): Promise<CheckRun[]> {
+export async function findAbandonedPendingCheckRuns(cutoff: Date, limit: number): Promise<CheckRun[]> {
   return prisma.checkRun.findMany({
     where: {
       state: CheckRunState.PENDING,
       OR: [{ lastEnqueuedAt: null, requestedAt: { lt: cutoff } }, { lastEnqueuedAt: { lt: cutoff } }],
     },
     orderBy: { requestedAt: 'asc' },
-    take: ABANDONED_PENDING_RUNS_PER_SWEEP,
+    take: limit,
   });
 }
 

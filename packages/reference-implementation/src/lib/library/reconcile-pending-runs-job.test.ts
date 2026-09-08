@@ -9,12 +9,16 @@ jest.mock('@/lib/api/logger', () => {
   return { apiLogger: logger };
 });
 jest.mock('@/lib/services/resolve-vc-service', () => ({ resolveVcService: jest.fn() }));
+const mockFindAbandonedPendingCheckRuns = jest.fn();
+jest.mock('@/lib/prisma/repositories/check-run.repository', () => ({
+  findAbandonedPendingCheckRuns: (...args: unknown[]) => mockFindAbandonedPendingCheckRuns(...args),
+  settleAbandonedCheckRun: jest.fn(),
+}));
 
 import { apiLogger } from '@/lib/api/logger';
 import { CheckResult, CheckRunState, type CheckRun } from '@/lib/prisma/generated';
 import { LIBRARY_RECONCILE_PENDING_RUNS_JOB } from '@/lib/jobs/queue-names';
 import {
-  RECONCILE_PENDING_RUNS_CRON,
   defaultReconcilePendingRunsDependencies,
   reconcilePendingRunsHandler,
   registerPendingRunReconciliation,
@@ -195,6 +199,22 @@ describe('registerPendingRunReconciliation', () => {
     expect(queue.register).toHaveBeenCalledWith(LIBRARY_RECONCILE_PENDING_RUNS_JOB, expect.any(Function), {
       concurrency: 1,
     });
-    expect(RECONCILE_PENDING_RUNS_CRON).toBe('*/10 * * * *');
+  });
+});
+
+describe('defaultReconcilePendingRunsDependencies', () => {
+  it('passes the operator batch size to the repository on each sweep', async () => {
+    // The operator owns the per-tick cap (startup.md). Fails if the default
+    // dependencies pin a cap or the setting is read anywhere but per tick.
+    process.env.LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE = '25';
+    mockFindAbandonedPendingCheckRuns.mockResolvedValue([]);
+    const cutoff = new Date('2026-09-07T00:00:00Z');
+    try {
+      await defaultReconcilePendingRunsDependencies().findAbandoned(cutoff);
+    } finally {
+      delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE;
+    }
+
+    expect(mockFindAbandonedPendingCheckRuns).toHaveBeenCalledWith(cutoff, 25);
   });
 });
