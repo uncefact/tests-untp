@@ -108,6 +108,40 @@ describe('AesGcmEncryptionAdapter', () => {
     });
   });
 
+  describe('decryptToBytes', () => {
+    let adapter: AesGcmEncryptionAdapter;
+
+    beforeEach(() => {
+      adapter = new AesGcmEncryptionAdapter(TEST_KEY, mockLogger);
+    });
+
+    it('returns the exact bytes that were encrypted, including ones no UTF-8 decode survives', () => {
+      // A lone 0x80 decodes to U+FFFD and re-encodes as three different
+      // bytes, so a caller that digests the plaintext cannot go through the
+      // string form. Fails if decryptToBytes is implemented as decrypt with
+      // an encode on the end.
+      const plaintext = new Uint8Array([...Buffer.from('binary '), 0x80, 0xff, ...Buffer.from(' tail')]);
+      const iv = new Uint8Array(12).fill(7);
+      const cipher = crypto.createCipheriv(ALG, new Uint8Array(Buffer.from(TEST_KEY, 'hex')), iv);
+      const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()] as unknown as Uint8Array[]);
+      const envelope = {
+        cipherText: encrypted.toString('base64'),
+        iv: Buffer.from(iv).toString('base64'),
+        tag: cipher.getAuthTag().toString('base64'),
+        type: ALG,
+      };
+
+      expect(Array.from(adapter.decryptToBytes(envelope))).toEqual(Array.from(plaintext));
+      expect(Array.from(Buffer.from(adapter.decrypt(envelope), 'utf8'))).not.toEqual(Array.from(plaintext));
+    });
+
+    it('agrees with decrypt for text that does survive a UTF-8 round trip', () => {
+      const envelope = adapter.encrypt('a plain message', ALG);
+
+      expect(Buffer.from(adapter.decryptToBytes(envelope)).toString('utf8')).toBe(adapter.decrypt(envelope));
+    });
+  });
+
   describe('decrypt errors', () => {
     let adapter: AesGcmEncryptionAdapter;
 

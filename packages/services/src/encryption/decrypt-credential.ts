@@ -20,8 +20,17 @@ export interface DecryptionParams {
  * rather than constructing an adapter instance. Prefer using IEncryptionService
  * directly in new code.
  */
-export const decryptCredential = ({ cipherText, key, iv, tag, type }: DecryptionParams): string => {
+export const decryptCredential = ({ cipherText, key, iv, tag, type }: DecryptionParams): string =>
+  Buffer.from(decryptCredentialToBytes({ cipherText, key, iv, tag, type })).toString('utf8');
+
+/**
+ * The same decryption, returning the plaintext bytes. A caller that digests
+ * or re-stores what it decrypted takes these rather than {@link
+ * decryptCredential}, whose UTF-8 decode is lossy for a payload that is not
+ * valid UTF-8 and would change the bytes an integrity digest is taken over.
+ */
+export const decryptCredentialToBytes = ({ cipherText, key, iv, tag, type }: DecryptionParams): Uint8Array => {
   assertPermittedAlgorithm(type);
   const adapter = new AesGcmEncryptionAdapter(key, logger);
-  return adapter.decrypt({ cipherText, iv, tag, type });
+  return adapter.decryptToBytes({ cipherText, iv, tag, type });
 };

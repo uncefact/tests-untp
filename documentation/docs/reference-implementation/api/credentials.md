@@ -407,3 +407,4 @@ Decryption happens on the server, so a `decryptionKey` travels in the request bo
 |----------|---------|-------------|
 | `VERIFY_ALLOW_PRIVATE_URLS` | `false` | Set to `true` to bypass SSRF checks (development only) |
 | `VERIFY_MAX_CREDENTIAL_SIZE` | `10485760` (10 MB) | Maximum credential response size in bytes |
+| `VERIFY_FETCH_TIMEOUT_MS` | `10000` | Time budget for fetching the credential, in milliseconds, covering connect, redirects and body (maximum 120000). Also applies when registering or re-verifying an external library credential. Startup fails on a value that is not a positive integer within that ceiling. |

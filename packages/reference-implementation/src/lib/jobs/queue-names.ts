@@ -8,4 +8,7 @@
 /** Generation-1 verification of a registered external credential (#955). */
 export const LIBRARY_VERIFY_JOB = 'library.verify-generation';
 
+/** Scheduled reconciliation of pending verification generations (#957). */
+export const LIBRARY_RECONCILE_PENDING_RUNS_JOB = 'library.reconcile-pending-runs';
+
 export const SENDING_QUEUES = [LIBRARY_VERIFY_JOB] as const;

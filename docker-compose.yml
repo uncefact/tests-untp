@@ -124,6 +124,8 @@ services:
       DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential
       # Credential verification
       VERIFY_ALLOW_PRIVATE_URLS: "true"
+      VERIFY_MAX_CREDENTIAL_SIZE: ${VERIFY_MAX_CREDENTIAL_SIZE:-}
+      VERIFY_FETCH_TIMEOUT_MS: ${VERIFY_FETCH_TIMEOUT_MS:-}
       # System default service instances (used by seed.ts)
       SYSTEM_VC_BASE_URL: http://vckit-api:3332
       SYSTEM_VC_API_KEY: ${SYSTEM_VC_API_KEY:-test123}
@@ -210,6 +212,9 @@ services:
       LOG_REDACT_PATHS: ${LOG_REDACT_PATHS:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
       OTEL_SERVICE_NAME: ${OTEL_WORKER_SERVICE_NAME:-reference-implementation-worker}
+      LIBRARY_RECONCILE_PENDING_RUNS_CRON: ${LIBRARY_RECONCILE_PENDING_RUNS_CRON:-}
+      LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE: ${LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE:-}
+      LIBRARY_STORED_COPY_READ_TIMEOUT_MS: ${LIBRARY_STORED_COPY_READ_TIMEOUT_MS:-}
     depends_on:
       ri-db:
         condition: service_healthy

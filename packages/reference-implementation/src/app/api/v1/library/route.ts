@@ -130,10 +130,13 @@ function sanitisedServerError(error: Error, detail: string): Response {
  *       record whose generation 1 verification is settled in this call for
  *       every outcome except the verifier call itself, which runs in the
  *       background, on the worker process, and settles the record from
- *       `pending`. `pending` has no upper bound: it settles when a worker
- *       runs the check, and a deployment with no worker running leaves it
- *       `pending`. Re-poll `GET /api/v1/library/{id}` to read the settled
- *       state.
+ *       `pending`. A deployment with no worker running leaves it `pending`.
+ *       Where a worker is running and the generation has not settled within
+ *       the sweep's bound, its reconciliation sweep settles the generation as
+ *       retryable `VERIFICATION_UNAVAILABLE`. The bound is a policy of at
+ *       least 30 minutes, not proof the job is gone, and the sweep does not
+ *       re-enqueue the job. Re-poll `GET /api/v1/library/{id}` to read the
+ *       settled state.
  *
  *       Every branch's outcome is on the returned record's `verification`
  *       envelope. A source that could not be fetched is `RETRIEVAL_FAILED`

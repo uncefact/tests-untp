@@ -4,7 +4,12 @@
  */
 export class WorkerBootError extends Error {
   constructor(
-    readonly code: 'worker.encryption-key-missing' | 'worker.schema-not-ready' | 'worker.migrations-unreadable',
+    readonly code:
+      | 'worker.encryption-key-missing'
+      | 'worker.schema-not-ready'
+      | 'worker.migrations-unreadable'
+      | 'worker.configuration-invalid'
+      | 'worker.reconciliation-schedule-failed',
     message: string,
     cause?: unknown,
   ) {

@@ -57,15 +57,21 @@ export const BLOCKING_CHECKS = [
 
 /**
  * The contract's derivation rule for a complete generation: any blocking
- * `fail` is `not_conformant`; otherwise every blocking check that ran passed,
- * which is `verified` only when at least one of them actually ran. An
- * all-`not_run` blocking set can never read as verified.
+ * `fail` is `not_conformant`; otherwise `verified`, as long as at least one
+ * check of any kind ran. A generation where nothing ran at all is the only
+ * other `not_conformant`.
+ *
+ * The "at least one" test spans every check rather than the blocking ones,
+ * because the published checks are what this reads and a native generation
+ * publishes its acquisition and custody results as `not_run` whatever the
+ * worker recorded. Counting only blocking checks would call a native run
+ * `not_conformant` while the identical worker outcome on an external record
+ * read `verified`, which is a statement about the record's origin dressed up
+ * as a statement about its credential.
  */
 export function deriveCompleteSummary(checks: VerificationChecks): 'verified' | 'not_conformant' {
-  const blocking = BLOCKING_CHECKS.map((name) => checks[name]);
-  if (blocking.includes('fail')) return 'not_conformant';
-  if (blocking.every((result) => result === 'not_run')) return 'not_conformant';
-  return 'verified';
+  if (BLOCKING_CHECKS.some((name) => checks[name] === 'fail')) return 'not_conformant';
+  return CHECK_NAMES.some((name) => checks[name] !== 'not_run') ? 'verified' : 'not_conformant';
 }
 
 const envelopeBase = {
@@ -80,12 +86,24 @@ const pendingEnvelopeSchema = z
   .object({ ...envelopeBase, state: z.literal('pending'), summary: z.literal('pending') })
   .strict();
 
+/**
+ * Present together or not at all on a settled envelope, which the union's
+ * refinement enforces. They are absent, rather than null, when no comparison
+ * was attempted, which is every native generation and every external
+ * generation created before re-verification existed.
+ */
+const settledFreshnessFields = {
+  sourceChanged: z.boolean().nullable().optional(),
+  lastSourceCheckAt: z.string().datetime().optional(),
+};
+
 const completeEnvelopeSchema = z
   .object({
     ...envelopeBase,
     state: z.literal('complete'),
     completedAt: z.string().datetime(),
     summary: z.enum(['verified', 'not_conformant']),
+    ...settledFreshnessFields,
   })
   .strict();
 
@@ -95,6 +113,7 @@ const failedEnvelopeSchema = z
     state: z.literal('failed'),
     completedAt: z.string().datetime(),
     summary: z.literal('failed'),
+    ...settledFreshnessFields,
     failure: z
       .object({
         code: failureCodeSchema,
@@ -106,7 +125,7 @@ const failedEnvelopeSchema = z
   .strict();
 
 const verificationEnvelopeDescription =
-  'Discriminated by `state`. A `pending` envelope has neither `completedAt` nor `failure`; `complete` has `completedAt` and no `failure`; `failed` has both. A `complete` summary is derived from the blocking checks (retrieval, decryption, digest, proof, status): any `fail` is `not_conformant`, otherwise `verified` when at least one of them ran. `temporal` and `schemaConformance` never change it.';
+  'Discriminated by `state`. A `pending` envelope has neither `completedAt` nor `failure`; `complete` has `completedAt` and no `failure`; `failed` has both. A `complete` summary is derived from the published checks. Any failed blocking check (retrieval, decryption, digest, proof, status) is `not_conformant`. Otherwise it is `verified`, as long as at least one check ran; a generation where nothing ran is `not_conformant`. A failed `temporal` or `schemaConformance` never makes it `not_conformant`. A settled external generation that attempted a source comparison also carries `sourceChanged` and `lastSourceCheckAt`, together or not at all. `sourceChanged` is null when the comparison was attempted and the source could not be checked.';
 
 /**
  * What the record schemas add to the envelope's own description, and why it
@@ -130,7 +149,20 @@ export const verificationEnvelopeSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['summary'],
-        message: 'summary must be derived from the blocking checks',
+        message:
+          'summary must be derived from the published checks: not_conformant when a blocking check failed or nothing ran, otherwise verified',
+      });
+    }
+    if (envelope.state === 'pending') return;
+    // The timestamp decides whether the pair is published, so a result
+    // without one would be recorded and then hidden, and a timestamp without
+    // a result would say a comparison was made and refuse to say what it
+    // found. Neither half is publishable alone.
+    if ('sourceChanged' in envelope !== (envelope.lastSourceCheckAt !== undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['lastSourceCheckAt'],
+        message: 'sourceChanged and lastSourceCheckAt are present together or not at all',
       });
     }
   })
@@ -298,12 +330,38 @@ const WIRE_RESULT: Record<CheckResult, VerificationChecks[CheckName]> = {
   [CheckResult.NOT_RUN]: 'not_run',
 };
 
-function wireChecks(run: CheckRun): VerificationChecks {
-  return Object.fromEntries(CHECK_NAMES.map((name) => [name, WIRE_RESULT[run[name]]])) as VerificationChecks;
+function wireChecks(run: CheckRun, native: boolean): VerificationChecks {
+  const checks = Object.fromEntries(CHECK_NAMES.map((name) => [name, WIRE_RESULT[run[name]]])) as VerificationChecks;
+  if (!native) return checks;
+  // Native records retain the worker's real results in the row, but the
+  // public contract keeps acquisition and custody checks as not_run. The
+  // executed proof, status, temporal and schemaConformance results remain
+  // visible.
+  return { ...checks, retrieval: 'not_run', decryption: 'not_run', digest: 'not_run' };
 }
 
-function envelopeOf(run: CheckRun): VerificationEnvelope {
-  const base = { generation: run.generation, requestedAt: run.requestedAt.toISOString(), checks: wireChecks(run) };
+function freshnessOf(
+  run: CheckRun,
+): { sourceChanged: boolean | null; lastSourceCheckAt: string } | Record<string, never> {
+  if (run.lastSourceCheckAt === null) return {};
+  return { sourceChanged: run.sourceChanged, lastSourceCheckAt: run.lastSourceCheckAt.toISOString() };
+}
+
+/**
+ * The origin decides both projection rules at once: which checks a native
+ * envelope blanks, and that only an external one publishes a source
+ * comparison. Deriving them from one discriminant keeps a caller from setting
+ * half the rule, which would publish a native run's custody results or drop an
+ * external run's recorded comparison.
+ */
+function envelopeOf(run: CheckRun, options: { origin: 'native' | 'external' }): VerificationEnvelope {
+  const native = options.origin === 'native';
+  const base = {
+    generation: run.generation,
+    requestedAt: run.requestedAt.toISOString(),
+    checks: wireChecks(run, native),
+  };
+  const freshness = native ? {} : freshnessOf(run);
   const completedAt = () => {
     if (run.completedAt === null) {
       throw new CredentialRecordProjectionError(
@@ -318,7 +376,13 @@ function envelopeOf(run: CheckRun): VerificationEnvelope {
     case CheckRunState.PENDING:
       return { ...base, state: 'pending', summary: 'pending' };
     case CheckRunState.COMPLETE:
-      return { ...base, state: 'complete', completedAt: completedAt(), summary: deriveCompleteSummary(base.checks) };
+      return {
+        ...base,
+        ...freshness,
+        state: 'complete',
+        completedAt: completedAt(),
+        summary: deriveCompleteSummary(base.checks),
+      };
     case CheckRunState.FAILED: {
       if (run.failureCode === null || run.failureMessage === null || run.failureRetryable === null) {
         throw new CredentialRecordProjectionError(
@@ -328,6 +392,7 @@ function envelopeOf(run: CheckRun): VerificationEnvelope {
       }
       return {
         ...base,
+        ...freshness,
         state: 'failed',
         completedAt: completedAt(),
         summary: 'failed',
@@ -419,7 +484,7 @@ export function toNativeCredentialRecord(
     issuedAt: isoDateTime(parent.validFrom),
     encrypted: credential.decryptionKey !== null,
     hasKey: credential.decryptionKey !== null,
-    verification: checkRun ? envelopeOf(checkRun) : issuanceAssertionEnvelope(parent),
+    verification: checkRun ? envelopeOf(checkRun, { origin: 'native' }) : issuanceAssertionEnvelope(parent),
     currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, options.now ?? new Date(Date.now())),
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,
@@ -498,7 +563,7 @@ export function toCredentialRecord(
     issuedAt: isoDateTime(parent.validFrom),
     encrypted: external.encrypted,
     hasKey: external.decryptionKey !== null,
-    verification: envelopeOf(checkRun),
+    verification: envelopeOf(checkRun, { origin: 'external' }),
     currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, now),
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,

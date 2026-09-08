@@ -27,6 +27,7 @@ import {
 import {
   CredentialDocumentFetchError,
   fetchCredentialDocument,
+  getFetchTimeoutMs,
   getMaxCredentialSize,
   isRetryable,
   type DocumentFetchFailure,
@@ -59,7 +60,36 @@ describe('fetchCredentialDocument', () => {
     global.fetch = originalFetch;
   });
 
+  describe('getFetchTimeoutMs', () => {
+    it('returns 10 seconds when VERIFY_FETCH_TIMEOUT_MS is unset or blank', () => {
+      expect(getFetchTimeoutMs({})).toBe(10_000);
+      expect(getFetchTimeoutMs({ VERIFY_FETCH_TIMEOUT_MS: '  ' })).toBe(10_000);
+    });
+
+    it('parses a positive integer number of milliseconds', () => {
+      expect(getFetchTimeoutMs({ VERIFY_FETCH_TIMEOUT_MS: '2500' })).toBe(2_500);
+    });
+
+    it.each(['0', '-1', '1.5', '10s', 'Infinity', '120001'])('throws on %s, naming the variable', (raw) => {
+      expect(() => getFetchTimeoutMs({ VERIFY_FETCH_TIMEOUT_MS: raw })).toThrow(/VERIFY_FETCH_TIMEOUT_MS/);
+    });
+  });
+
   describe('through the guarded resolver', () => {
+    it('uses the VERIFY_FETCH_TIMEOUT_MS budget when the caller passes no timeout', async () => {
+      // Every route and job that fetches a credential URL relies on this
+      // default, so an operator's override must reach the resolver from here.
+      // Fails if the helper keeps a fixed budget or reads the variable elsewhere.
+      process.env.VERIFY_FETCH_TIMEOUT_MS = '3210';
+      mockResolveDocument.mockResolvedValue({ body: new Uint8Array(), status: 200, finalUrl: HREF });
+      try {
+        await fetchCredentialDocument(HREF, { maxBytes: 512 });
+      } finally {
+        delete process.env.VERIFY_FETCH_TIMEOUT_MS;
+      }
+      expect(mockResolveDocument).toHaveBeenCalledWith(HREF, { maxResponseBytes: 512, totalTimeoutMs: 3_210 });
+    });
+
     it('returns the bytes, final URL and content type, passing the cap and timeout to the resolver', async () => {
       const body = new TextEncoder().encode('{"a":1}');
       mockResolveDocument.mockResolvedValue({

@@ -26,6 +26,7 @@ import { validateCacheMaxEntriesOnBoot } from './lib/config/cache-max-entries.co
 import { validateBundledArtefactsFallbackOnBoot } from '@/lib/config/bundled-artefacts-fallback.config';
 import { validateStaleClaimOnBoot } from './lib/config/idempotency-claim.config';
 import { validateMaxRequestBodyBytesOnBoot } from './lib/config/request-body-limit.config';
+import { validateFetchTimeoutOnBoot } from './lib/credentials/fetch-credential-document';
 import { startJobQueue, stopJobQueue } from './lib/jobs/app-job-queue';
 
 export async function registerNode(): Promise<void> {
@@ -41,6 +42,8 @@ export async function registerNode(): Promise<void> {
   validateBundledArtefactsFallbackOnBoot();
   validateStaleClaimOnBoot();
   validateMaxRequestBodyBytesOnBoot();
+  // Fail the boot on an invalid VERIFY_FETCH_TIMEOUT_MS override; unset uses 10 seconds.
+  validateFetchTimeoutOnBoot();
   await validateEncryptionKeyOnBoot();
   await startJobQueueOnBoot();
   startOpenTelemetry();

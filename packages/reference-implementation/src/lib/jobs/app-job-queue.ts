@@ -1,4 +1,5 @@
 import { apiLogger } from '@/lib/api/logger';
+import { safeError } from '@/lib/api/safe-error';
 import { databaseUrlFromEnvParts } from '@/lib/prisma/database-url';
 import { JobQueueError } from './errors';
 import { PgBossJobQueue } from './pg-boss-job-queue';
@@ -45,8 +46,28 @@ export function resolveQueueConnectionString(): string {
 export function createJobQueue(): PgBossJobQueue {
   return new PgBossJobQueue({
     connectionString: resolveQueueConnectionString(),
-    onError: (error) => logger.error({ err: error }, 'Job queue reported an error'),
+    onError: reportQueueError,
   });
+}
+
+/**
+ * The queue's error channel. It receives the queue's own faults and every
+ * exception a handler throws, including the ones a handler rethrows so the
+ * queue will retry it.
+ *
+ * Only the error's own name and message are logged, never its cause chain.
+ * The verification handler's failures wrap the storage, crypto and verifier
+ * exception that caused them, and pino's `err` serialiser folds a whole chain
+ * of causes into one message, so logging the exception itself here would
+ * publish text this process took care not to publish on the attempt that
+ * settles the run. The top-level message is the queue's own diagnosis for its
+ * own faults, and the caller-facing failure for a handler's.
+ *
+ * Exported so the containment can be exercised at the call site the queue
+ * actually uses, rather than at a copy of it.
+ */
+export function reportQueueError(error: Error): void {
+  logger.error({ error: safeError(error) }, 'Job queue reported an error');
 }
 
 function getJobQueue(): PgBossJobQueue {

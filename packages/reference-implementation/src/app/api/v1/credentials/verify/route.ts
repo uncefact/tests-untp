@@ -239,7 +239,7 @@ export const POST = withPublicRoute(async (req) => {
   const maxSize = getMaxCredentialSize();
   let responseText: string;
   try {
-    const document = await fetchCredentialDocument(credentialUri, { maxBytes: maxSize, timeoutMs: 10_000 });
+    const document = await fetchCredentialDocument(credentialUri, { maxBytes: maxSize });
     responseText = new TextDecoder().decode(document.bytes);
   } catch (e: unknown) {
     if (!(e instanceof CredentialDocumentFetchError)) throw e;

@@ -200,6 +200,7 @@ describe('published error response examples', () => {
       'post /dids/{id}/verify 404',
       'post /facilities 404',
       'post /identifiers 404',
+      'post /library/{id}/verify 404',
       'post /organisations 404',
       'post /products 404',
       'post /registrars 404',

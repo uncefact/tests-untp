@@ -48,7 +48,7 @@ On startup, the Reference Implementation automatically applies database migratio
 
 Some of what a request sets in motion finishes after the response. Registering a credential received from a third party ([Library API](./api/library)) does its fetching, opening and copying inside the request, then leaves the signature and status check to run later, so the record is returned in a `pending` state that settles afterwards.
 
-That later work is carried by a job queue that lives in the same PostgreSQL database as everything else, so a job and the record whose state it will settle are committed together and neither can exist without the other. The application process that serves requests only places jobs on the queue. Taking them off and running them is the worker's job: a second container from the same image (`ri-worker` in the Compose stack) with a different entrypoint, no port and no HTTP, sharing the database. A deployment with no worker running leaves records waiting rather than losing them, and they settle when one starts; a job interrupted by a worker dying is retried by the queue once its attempt expires, and only a job that exhausts its retries, or that the queue's retention drops first, is left for re-verification (#957) to recover. The worker never migrates or seeds the database; it checks at boot that the schema it expects is there, and refuses to start without the data encryption key, because every job it runs needs it. The reasoning behind this shape is recorded in [ADR-054](https://github.com/uncefact/tests-untp/blob/next/docs/adrs/054-background-work-runs-on-a-worker.md). See [Startup](./operations/startup#job-queue-start) for what happens to the queue when a process boots.
+That later work is carried by a job queue that lives in the same PostgreSQL database as everything else, so a job and the record whose state it will settle are committed together and neither can exist without the other. The application process that serves requests only places jobs on the queue. Taking them off and running them is the worker's job: a second container from the same image (`ri-worker` in the Compose stack) with a different entrypoint, no port and no HTTP, sharing the database. A deployment with no worker running leaves records waiting rather than losing them, and they settle when one starts. A job interrupted by a worker dying is retried by the queue once its attempt expires. A job that exhausts its retries, or that the queue's retention drops first, is settled by the worker's reconciliation sweep as a retryable `VERIFICATION_UNAVAILABLE` failure, and the caller re-verifies to create the next generation. The worker never migrates or seeds the database; it checks at boot that the schema it expects is there, and refuses to start without the data encryption key, because every job it runs needs it. The reasoning behind this shape is recorded in [ADR-054](https://github.com/uncefact/tests-untp/blob/next/docs/adrs/054-background-work-runs-on-a-worker.md). See [Startup](./operations/startup#job-queue-start) for what happens to the queue when a process boots.
 
 ### Federated IDP (Identity Provider)
 
@@ -58,11 +58,11 @@ The Reference Implementation delegates authentication to a federated identity pr
 
 The Reference Implementation requires three external services to operate. Each must be available for the system to issue, store, and resolve credentials:
 
-| Service | What It Does |
-|---------|-------------|
-| [Verifiable Credential Service](./services/verifiable-credential-service) | Signs and verifies W3C Verifiable Credentials; manages DIDs and cryptographic key material |
-| [Storage Service](./services/storage-service) | Stores credentials, render templates, and other binary data |
-| [Identity Resolver Service](./services/identity-resolver-service) | Registers links for a given identifier so that related information, such as credentials, can be discovered |
+| Service                                                                   | What It Does                                                                                               |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [Verifiable Credential Service](./services/verifiable-credential-service) | Signs and verifies W3C Verifiable Credentials; manages DIDs and cryptographic key material                 |
+| [Storage Service](./services/storage-service)                             | Stores credentials, render templates, and other binary data                                                |
+| [Identity Resolver Service](./services/identity-resolver-service)         | Registers links for a given identifier so that related information, such as credentials, can be discovered |
 
 Organisations can replace any service independently as they progress along the [adoption ramp](./overview#incremental-adoption). See [Service Architecture](./services/service-architecture) for how the service registry and adapter pattern enable this.
 

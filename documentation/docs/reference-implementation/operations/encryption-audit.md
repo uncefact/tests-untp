@@ -11,7 +11,7 @@ Run it:
 
 - before rotating `DATA_ENCRYPTION_KEY`, to confirm the current key decrypts everything the rotation will re-encrypt (see [Encryption Key Rotation](./encryption-key-rotation));
 - after restoring a database backup, to confirm the restored data and the configured key still match (use the [stopped-writers form](#running-with-the-application-stopped) below, as the [recovery procedure](./key-management#recovery) directs);
-- during incident triage, when decryption errors suggest a key or data problem and you need the full extent rather than the one row a request tripped over.
+- during incident triage, when decryption errors suggest a key or data problem and you need the full extent rather than the one row a request tripped over. A [library](../api/library) verification that settles as `STORED_COPY_UNAVAILABLE` while the worker logs `stored-key-unwrap-failed` is one such trigger, because the key held for that record's durable copy did not open under the active key.
 
 ## Running the audit
 

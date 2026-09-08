@@ -43,6 +43,12 @@ export type ExternalStorageInput = {
   decryptionKey?: ProtectedDecryptionKey;
 };
 
+export type ReplaceCustodyInput = {
+  recordId: string;
+  tenantId: string;
+  storage: ExternalStorageInput;
+};
+
 /**
  * What reading the artefact produced, on the same terms as the native row's
  * capture (#952): extracted with values, failed with a reason, or pending
@@ -546,4 +552,48 @@ export async function getExternalCredentialById(
     throw new LibraryRecordShapeError(id, 'is EXTERNAL but has no check run');
   }
   return { ...view, checkRun };
+}
+
+/**
+ * Replaces an external record's complete custody tuple in one transaction, so
+ * a concurrent reader sees the whole old copy or the whole new one and never a
+ * half-written mixture. The parent timestamp moves with the tuple, while
+ * annotations and the descriptive fields remain untouched.
+ *
+ * There is no clearing form. A copy proven lost leaves the record's custody
+ * exactly as it is, and the newest generation's failure is the record's
+ * statement that the copy is gone (ADR-055).
+ *
+ * Called by the re-fetch recovery branch, which lands with the shared
+ * recover-mode helper of
+ * [uncefact/tests-untp#956](https://github.com/uncefact/tests-untp/issues/956).
+ */
+export async function replaceCustody(
+  tx: Prisma.TransactionClient,
+  input: ReplaceCustodyInput,
+): Promise<ExternalLibraryRecordView['external']> {
+  const now = new Date(Date.now());
+  const storage = input.storage;
+  const external = await tx.externalCredential.update({
+    where: {
+      id_tenantId_origin: {
+        id: input.recordId,
+        tenantId: input.tenantId,
+        origin: LibraryRecordOrigin.EXTERNAL,
+      },
+    },
+    data: {
+      storageUri: storage.uri,
+      storageDigestMultibase: storage.digestMultibase,
+      storageServiceInstanceId: storage.serviceInstanceId,
+      storageExternalId: storage.externalId,
+      storageBucket: storage.bucket ?? null,
+      decryptionKey: storage.decryptionKey ?? null,
+    },
+  });
+  await tx.libraryRecord.update({
+    where: { id_tenantId: { id: input.recordId, tenantId: input.tenantId } },
+    data: { updatedAt: now },
+  });
+  return external;
 }

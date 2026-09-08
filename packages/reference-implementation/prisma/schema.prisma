@@ -113,8 +113,10 @@ enum CheckResult {
 }
 
 /// Why a FAILED check run could not conclude (#955). The wire contract's
-/// closed set; STORED_COPY_UNAVAILABLE is emitted when a durable copy this
-/// system believed it held cannot be read back or no longer matches its digest.
+/// closed set plus STORED_COPY_CORRUPT (#957). STORED_COPY_UNAVAILABLE is
+/// emitted when a durable copy this system believed it held cannot be read
+/// back as the document it stored; STORED_COPY_CORRUPT when it reads back but
+/// no longer matches the digest recorded when it was stored.
 enum CheckRunFailureCode {
   RETRIEVAL_FAILED
   DECRYPTION_REQUIRED
@@ -122,6 +124,7 @@ enum CheckRunFailureCode {
   STORAGE_FAILED
   VERIFICATION_UNAVAILABLE
   STORED_COPY_UNAVAILABLE
+  STORED_COPY_CORRUPT
 }
 
 enum ServiceType {
@@ -487,11 +490,23 @@ model CheckRun {
   failureMessage   String?
   failureRetryable Boolean?
 
+  /// Whether the supplier source differed from the pinned copy's sourceDigest
+  /// when this generation was created. Null when the comparison was attempted
+  /// and the source could not be read.
+  sourceChanged     Boolean?
+  /// When the comparison above was attempted. Null means no comparison was
+  /// made, which is every native run and every external generation created
+  /// before re-verification existed. The projection decides whether to
+  /// publish the two freshness fields from this column, so a later custody
+  /// change cannot hide a comparison that was recorded.
+  lastSourceCheckAt DateTime?
+
   requestedAt    DateTime  @default(now())
   completedAt    DateTime?
   /// When the verify job for this run was last enqueued. The column and its
-  /// index exist for a reconciliation sweep that will re-enqueue PENDING rows
-  /// whose marker is stale; no sweep runs yet. Written from the application
+  /// index let the worker's reconciliation sweep identify PENDING rows whose
+  /// job may have been lost. The sweep settles those rows as retryable
+  /// failures rather than re-enqueuing them. Written from the application
   /// clock, like requestedAt on the same row, so the sweep computes its
   /// cutoff in the application too rather than in SQL.
   lastEnqueuedAt DateTime?

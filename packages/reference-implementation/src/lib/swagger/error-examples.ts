@@ -1,5 +1,6 @@
 import { requestBodyTooLargeMessage } from '@/lib/api/request-body';
 import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config';
+import { BODY_MUST_BE_EMPTY_MESSAGE } from '@/lib/library/reverify-messages';
 
 /**
  * Example error bodies for the published OpenAPI document.
@@ -175,6 +176,8 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'The identifier scheme has identifiers and cannot be deleted',
   'The registrar has schemes with identifiers and cannot be deleted',
   'This Idempotency-Key was already used with a different request body.',
+  BODY_MUST_BE_EMPTY_MESSAGE,
+  "This service holds no usable key for the record's durable copy. Re-verification with a caller-supplied key is not supported yet.",
 ]);
 
 /**

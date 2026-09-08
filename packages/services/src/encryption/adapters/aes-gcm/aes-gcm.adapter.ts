@@ -43,6 +43,18 @@ export class AesGcmEncryptionAdapter extends BaseServiceAdapter implements IEncr
   }
 
   decrypt(envelope: EncryptedEnvelope): string {
+    return Buffer.from(this.decryptToBytes(envelope)).toString('utf8');
+  }
+
+  /**
+   * The plaintext as bytes, for callers that must not put it through a UTF-8
+   * round trip. {@link decrypt} is this with a UTF-8 decode on the end, which
+   * is lossy for any payload that is not valid UTF-8: a lone 0x80 decodes to
+   * U+FFFD and re-encodes as three different bytes, so an integrity digest
+   * taken over the re-encoded string would not match the one taken over what
+   * was encrypted. A caller that digests or stores the plaintext takes bytes.
+   */
+  decryptToBytes(envelope: EncryptedEnvelope): Uint8Array {
     assertPermittedAlgorithm(envelope.type);
     this.logger.debug({ algorithm: envelope.type }, 'Decrypting data');
 
@@ -60,6 +72,6 @@ export class AesGcmEncryptionAdapter extends BaseServiceAdapter implements IEncr
 
     this.logger.debug({ algorithm: envelope.type, decryptedLength: decrypted.length }, 'Data decrypted successfully');
 
-    return decrypted.toString('utf8');
+    return new Uint8Array(decrypted);
   }
 }

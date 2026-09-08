@@ -55,7 +55,10 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *       storage-integrity digest, and the key that opens that copy when this
  *       service holds one. This is also the verification poll target.
  *       While `verification.state` is `pending`, re-poll this endpoint until
- *       it settles to `complete` or `failed`.
+ *       it settles to `complete` or `failed`. A worker reconciliation sweep
+ *       settles a pending generation that has not reported a result within
+ *       its bound. It records a retryable `VERIFICATION_UNAVAILABLE` failure,
+ *       and a re-verification then creates the next generation.
  *
  *       `storageUri` is the Reference Implementation's durable-copy location
  *       and is distinct from an external record's `sourceUrl`. An external
@@ -65,15 +68,19 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *
  *       `hasKey` and `decryptionKey` report the stored custody state as it is
  *       now. A later re-verification that proves the durable copy lost does
- *       not yet clear them, so a key can still be returned for a copy that no
- *       longer answers. That transition is tracked by
- *       uncefact/tests-untp#957.
+ *       not clear or change them, so a key can still be returned for a copy
+ *       that no longer answers. The newest verification envelope reports
+ *       `STORED_COPY_UNAVAILABLE` (or `STORED_COPY_CORRUPT` for a copy that
+ *       read back but failed its digest check) and its retryability instead.
  *
  *       For a native record, `verification` generation 1 is an issuance
  *       assertion rather than an executed run. `proof` reads `pass` because
  *       this service signed the artefact moments earlier, and no check was
  *       run. Generation 2 onward is executed. Every generation of an external
- *       record is executed.
+ *       record is executed. A settled external generation may also carry
+ *       `sourceChanged` and `lastSourceCheckAt` when its supplier source was
+ *       checked against the pinned copy's source digest. The fields are
+ *       absent from pending generations.
  *
  *       The response is never cached. A missing id and an id owned by another
  *       tenant return the same 404 response.
@@ -199,7 +206,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   issuedAt: null
  *                   encrypted: true
  *                   hasKey: false
- *                   verification: { generation: 1, state: failed, requestedAt: '2026-08-30T11:05:00.000Z', completedAt: '2026-08-30T11:05:02.000Z', checks: { retrieval: pass, decryption: fail, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: DECRYPTION_REQUIRED, message: 'The fetched credential is encrypted and no decryption key was supplied; re-verify with a key to open it.', retryable: true } }
+ *                   verification: { generation: 1, state: failed, requestedAt: '2026-08-30T11:05:00.000Z', completedAt: '2026-08-30T11:05:02.000Z', checks: { retrieval: pass, decryption: fail, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: DECRYPTION_REQUIRED, message: 'The fetched credential is encrypted and this service holds no key that opens it. The copy is kept as fetched. Supplying a key later is not supported yet.', retryable: true } }
  *                   currencyStatus: unknown
  *                   detailsStatus: EXTRACTION_PENDING
  *                   detailsError: null

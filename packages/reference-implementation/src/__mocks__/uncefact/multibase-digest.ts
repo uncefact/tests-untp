@@ -6,6 +6,11 @@
  * the RI's Jest CJS resolver cannot unpack without a bigger toolchain
  * change. Production code consumes the real package; only tests see this
  * stub. Round-trip multibase encoding coverage lives in `@uncefact/untp-utils`.
+ *
+ * `verify` answers against the same hash `fromData` produces, so a digest
+ * comparison under this stub still distinguishes changed bytes from
+ * unchanged ones. A stub that always verified would make every such
+ * comparison pass whatever it was handed.
  */
 
 import { Buffer } from 'node:buffer';
@@ -57,7 +62,7 @@ export class MultibaseDigest {
     return this.encoded;
   }
 
-  async verify(_data: Uint8Array): Promise<boolean> {
-    return true;
+  async verify(data: Uint8Array): Promise<boolean> {
+    return this.encoded === `zTEST${createHash('sha256').update(data).digest('hex')}`;
   }
 }

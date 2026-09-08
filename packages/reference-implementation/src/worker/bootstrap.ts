@@ -17,7 +17,14 @@ import { apiLogger } from '../lib/api/logger';
 import { validateConfiguredEncryptionKey } from '../lib/encryption/encryption-key-boot';
 import { resolveDataEncryptionKey } from '../lib/encryption/resolve-data-encryption-key';
 import { createJobQueue, resolveQueueConnectionString } from '../lib/jobs/app-job-queue';
-import { LIBRARY_VERIFY_JOB } from '../lib/jobs/queue-names';
+import type { JobQueue } from '../lib/jobs/types';
+import { LIBRARY_RECONCILE_PENDING_RUNS_JOB, LIBRARY_VERIFY_JOB } from '../lib/jobs/queue-names';
+import {
+  readReconcilePendingRunsBatchSize,
+  readReconcilePendingRunsCron,
+} from '../lib/config/reconcile-pending-runs.config';
+import { readStoredCopyReadTimeoutMs } from '../lib/config/stored-copy-read-timeout.config';
+import { registerPendingRunReconciliation } from '../lib/library/reconcile-pending-runs-job';
 import { registerLibraryJobs } from '../lib/library/verify-generation-job';
 import { prisma } from '../lib/prisma/prisma';
 import { WorkerBootError } from './errors';
@@ -49,6 +56,44 @@ export async function requireEncryptionKeyOnBoot(): Promise<void> {
   await validateConfiguredEncryptionKey(resolved.key);
 }
 
+/**
+ * Records the reconciliation cron against the live queue. Every other boot
+ * step fails with a message naming what is wrong, so this one does too rather
+ * than taking the worker down with a raw driver error.
+ */
+async function scheduleReconciliation(queue: JobQueue, cron: string): Promise<void> {
+  try {
+    await queue.schedule(LIBRARY_RECONCILE_PENDING_RUNS_JOB, cron);
+  } catch (error) {
+    throw new WorkerBootError(
+      'worker.reconciliation-schedule-failed',
+      `The ${LIBRARY_RECONCILE_PENDING_RUNS_JOB} schedule (${cron}) could not be recorded, so pending verification generations would never be reconciled`,
+      error,
+    );
+  }
+}
+
+/**
+ * Reads the worker's settings before the queue is constructed, so a
+ * malformed value fails the boot with the variable named instead of starting
+ * a consumer and failing on the first tick or the first job: the sweep
+ * cadence, which the schedule step needs, the per-tick cap, which the sweep
+ * reads on each tick, and the stored-copy read budget, which every verify
+ * job reads. The reader's message already names the variable and the fix,
+ * so it is the boot error's message and no cause is attached that would
+ * print it twice.
+ */
+function resolveWorkerConfiguration(): { reconciliationCron: string } {
+  try {
+    const reconciliationCron = readReconcilePendingRunsCron();
+    readReconcilePendingRunsBatchSize();
+    readStoredCopyReadTimeoutMs();
+    return { reconciliationCron };
+  } catch (error) {
+    throw new WorkerBootError('worker.configuration-invalid', error instanceof Error ? error.message : String(error));
+  }
+}
+
 export async function runWorker(options: RunWorkerOptions): Promise<void> {
   const logger = apiLogger.child({ module: 'worker' });
 
@@ -64,9 +109,11 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
 
   await assertSchemaReady(prismaMigrationRows(prisma), imageMigrations);
   await requireEncryptionKeyOnBoot();
+  const { reconciliationCron } = resolveWorkerConfiguration();
 
   const queue = createJobQueue();
   registerLibraryJobs(queue);
+  registerPendingRunReconciliation(queue);
 
   let heartbeat: Heartbeat | undefined;
   let shuttingDown = false;
@@ -95,11 +142,27 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
 
   await queue.start();
 
-  // A signal during queue.start() has already run the shutdown steps; do not
-  // start proving health for a process that is on its way out.
+  // A signal during queue.start() has already run the shutdown steps, which
+  // stop the queue; do not schedule work on a released pool, and do not start
+  // proving health for a process that is on its way out. The flag is read
+  // again after the schedule, because a signal can arrive while that call is
+  // in flight and the heartbeat would then outlive the shutdown that has
+  // already stopped it.
+  if (!shuttingDown) {
+    await scheduleReconciliation(queue, reconciliationCron);
+  }
   if (!shuttingDown) {
     heartbeat = startHeartbeat({ logger, probe: () => queue.probe() });
   }
 
-  logger.info({ queues: [LIBRARY_VERIFY_JOB] }, 'Worker ready; handlers registered, queue started, heartbeat on');
+  logger.info(
+    {
+      queues: [LIBRARY_VERIFY_JOB, LIBRARY_RECONCILE_PENDING_RUNS_JOB],
+      reconciliationCron,
+      heartbeat: heartbeat !== undefined,
+    },
+    heartbeat === undefined
+      ? 'Worker handlers registered and queue started; shutting down before the heartbeat began'
+      : 'Worker ready; handlers registered, queue started, heartbeat on',
+  );
 }

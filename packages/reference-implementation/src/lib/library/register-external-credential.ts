@@ -101,7 +101,7 @@ export function defaultRegisterDependencies(
   enqueueVerification: RegisterExternalCredentialDependencies['enqueueVerification'],
 ): RegisterExternalCredentialDependencies {
   return {
-    fetchDocument: (href) => fetchCredentialDocument(href, { maxBytes: getMaxCredentialSize(), timeoutMs: 10_000 }),
+    fetchDocument: (href) => fetchCredentialDocument(href),
     resolveStorage: (tenantId) => resolveStorageService(tenantId),
     assertEncryptionReady: () => {
       getEncryptionService();
@@ -509,21 +509,25 @@ async function settleUnopened(
 /**
  * Which of the three encrypted rows this is: no key at all, a key that did
  * not open the envelope, or an envelope too damaged for any key. Only the
- * last is terminal, because the other two are corrected by re-verifying.
+ * last is terminal. The other two are retryable because a later attempt with
+ * the right key would succeed, not because this release offers a way to
+ * supply one. The messages say so rather than naming a route that refuses
+ * every body it is given.
  */
 function decryptionFailureOf(reading: Exclude<ArtefactReading, { outcome: 'opened' }>): CheckRunFailure {
   if (reading.outcome === 'encrypted-no-key') {
     return {
       code: CheckRunFailureCode.DECRYPTION_REQUIRED,
       message:
-        'The fetched credential is encrypted and no decryption key was supplied; re-verify with a key to open it.',
+        'The fetched credential is encrypted and this service holds no key that opens it. The copy is kept as fetched. Supplying a key later is not supported yet.',
       retryable: true,
     };
   }
   if (reading.reason === 'key-mismatch') {
     return {
       code: CheckRunFailureCode.DECRYPTION_FAILED,
-      message: 'The supplied decryption key did not decrypt the credential; check the key and re-verify.',
+      message:
+        'The supplied decryption key did not open the fetched credential. The copy is kept as fetched. Supplying a key later is not supported yet.',
       retryable: true,
     };
   }

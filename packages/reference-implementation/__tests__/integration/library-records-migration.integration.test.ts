@@ -12,9 +12,9 @@ import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import path from 'node:path';
 import { PrismaClient } from '../../src/lib/prisma/generated/index.js';
 import { createRigClient } from './rig/db';
+import { listMigrationDirectories } from '../../src/lib/prisma/migration-directories';
 
 const MIGRATION = '20260902000000_library_records';
-const MIGRATION_AFTER_LIBRARY_RECORDS = '20260906000000_external_credential_content_identity';
 const SYSTEM_TENANT = 'caq0ibyulrnh85itqtbgusfp3';
 const UPGRADE_DB = 'ri_library_records_upgrade';
 const DEPLOY_FAILURE_DB = 'ri_library_records_deploy_failure';
@@ -37,6 +37,18 @@ const ENVELOPE_KEY = 'v1.aaaabbbbccccdddd.eeeeffff00001111.2222333344445555';
 /** Stands for a pre-#697 key held in plaintext. */
 const PLAINTEXT_KEY = 'b'.repeat(64);
 const packageRoot = path.resolve(__dirname, '../..');
+/**
+ * Every migration that comes after MIGRATION. They are marked applied
+ * alongside it so `migrate deploy` stops at the migration before MIGRATION
+ * instead of running a later one against a schema MIGRATION has not built
+ * yet. Read from the directory rather than listed here, because a hand-kept
+ * list is one a migration author has to remember to extend, and forgetting
+ * fails every case in this suite on deploy. Prisma's timestamp prefix makes
+ * the lexical comparison the applied order.
+ */
+const LATER_MIGRATIONS = listMigrationDirectories(path.join(packageRoot, 'prisma', 'migrations')).filter(
+  (name) => name > MIGRATION,
+);
 
 interface CliOutcome {
   failed: boolean;
@@ -71,6 +83,13 @@ function prismaCli(args: string[], url: string): void {
   throw new Error(`prisma ${args.slice(0, 2).join(' ')} failed${detail ? `:\n${detail}` : ''}`);
 }
 
+/** Marks the data move and everything after it applied, so deploy stops at the migration before it. */
+function markStopPoint(url: string): void {
+  for (const migration of [MIGRATION, ...LATER_MIGRATIONS]) {
+    prismaCli(['migrate', 'resolve', '--applied', migration, '--config', 'prisma/prisma.config.ts'], url);
+  }
+}
+
 describe('library records migration on a populated database', () => {
   const admin = createRigClient();
   let upgrade: PrismaClient;
@@ -82,16 +101,9 @@ describe('library records migration on a populated database', () => {
 
     await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${UPGRADE_DB}" WITH (FORCE)`);
     await admin.$executeRawUnsafe(`CREATE DATABASE "${UPGRADE_DB}"`);
-    // Deploy applies every migration this database has not recorded, so each
-    // migration from the library-records one onwards is marked applied by
-    // hand to hold the schema at the state just before it. A migration added
-    // after the last one named here must be added to this list. The library
-    // migration itself is applied below, once the rows exist.
-    prismaCli(['migrate', 'resolve', '--applied', MIGRATION, '--config', 'prisma/prisma.config.ts'], upgradeUrl);
-    prismaCli(
-      ['migrate', 'resolve', '--applied', MIGRATION_AFTER_LIBRARY_RECORDS, '--config', 'prisma/prisma.config.ts'],
-      upgradeUrl,
-    );
+    // Marking this migration applied makes deploy stop at the previous one;
+    // the file itself is applied below, once the rows exist.
+    markStopPoint(upgradeUrl);
     prismaCli(['migrate', 'deploy', '--config', 'prisma/prisma.config.ts'], upgradeUrl);
 
     upgrade = new PrismaClient({ datasources: { db: { url: upgradeUrl } } });
@@ -309,17 +321,13 @@ describe('deploying against a claim that names another tenant credential', () =>
 
     await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${DEPLOY_FAILURE_DB}" WITH (FORCE)`);
     await admin.$executeRawUnsafe(`CREATE DATABASE "${DEPLOY_FAILURE_DB}"`);
-    prismaCli(['migrate', 'resolve', '--applied', MIGRATION, '--config', 'prisma/prisma.config.ts'], targetUrl);
-    prismaCli(
-      ['migrate', 'resolve', '--applied', MIGRATION_AFTER_LIBRARY_RECORDS, '--config', 'prisma/prisma.config.ts'],
-      targetUrl,
-    );
+    markStopPoint(targetUrl);
     prismaCli(['migrate', 'deploy', '--config', 'prisma/prisma.config.ts'], targetUrl);
 
     target = new PrismaClient({ datasources: { db: { url: targetUrl } } });
-    // That marker stopped deploy at the previous migration. Dropping it makes
-    // this migration pending again, so the deploy below is a real first run
-    // of it rather than a replay of a recorded one.
+    // Those markers stopped deploy at the previous migration. Dropping the
+    // data move's makes it pending again, so the deploy below is a real first
+    // run of it rather than a replay of a recorded one.
     await target.$executeRawUnsafe(`DELETE FROM "_prisma_migrations" WHERE migration_name = '${MIGRATION}'`);
 
     await target.$executeRawUnsafe(

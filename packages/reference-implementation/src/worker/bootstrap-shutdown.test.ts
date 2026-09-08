@@ -54,6 +54,11 @@ jest.mock('@/lib/library/verify-generation-job', () => ({
     order.push('register');
   }),
 }));
+jest.mock('@/lib/library/reconcile-pending-runs-job', () => ({
+  registerPendingRunReconciliation: jest.fn(() => {
+    order.push('reconcile-register');
+  }),
+}));
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: { $queryRawUnsafe: jest.fn(async () => []), $disconnect: jest.fn(async () => undefined) },
 }));
@@ -62,6 +67,9 @@ const fakeQueue = {
   probe: jest.fn(async () => ({ consumers: [] })),
   start: jest.fn(async () => {
     order.push('start');
+  }),
+  schedule: jest.fn(async () => {
+    order.push('schedule');
   }),
   stop: jest.fn(async () => undefined),
 };
@@ -91,8 +99,20 @@ describe('the shutdown steps runWorker wires', () => {
   it('booted in the designed order: image migrations, database target, schema, key, construct, register, start', () => {
     // register before start is a hard rule (the queue throws after start);
     // schema and key before start is what keeps a misconfigured worker from
-    // ever claiming a job. Fails if any of those move.
-    expect(order).toEqual(['migrations', 'database-target', 'schema', 'key', 'construct', 'register', 'start']);
+    // ever claiming a job. Scheduling comes after start because pg-boss
+    // records a cron row against a live queue, while registering the handler
+    // still has to happen before start. Fails if any of those move.
+    expect(order).toEqual([
+      'migrations',
+      'database-target',
+      'schema',
+      'key',
+      'construct',
+      'register',
+      'reconcile-register',
+      'start',
+      'schedule',
+    ]);
   });
 
   it('installed the shutdown handlers before the queue started, and the heartbeat after', () => {
