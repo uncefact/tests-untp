@@ -1,3 +1,8 @@
+---
+sidebar_position: 4
+title: Decrypting encrypted credentials
+---
+
 # Decrypting encrypted credentials
 
 An encrypted credential added to the Playground (uploaded, fetched by URL, or verified from a link set) becomes a locked card under an Encrypted heading on the Credentials tab. Decryption happens entirely in your browser: the key is used for the one decrypt call, is never stored, logged or sent anywhere, and clearing or refreshing the page discards it along with every card.

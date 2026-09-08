@@ -149,4 +149,13 @@ describe('GenerateReportDialog', () => {
     rerender(<GenerateReportDialog />);
     expect(screen.getByTestId('confirm-generate-dialog-button')).toBeDisabled();
   });
+
+  it('records the implementation name trimmed, as it was validated', async () => {
+    const user = userEvent.setup();
+    render(<GenerateReportDialog />);
+    await user.click(screen.getByText('Generate Report'));
+    await user.type(screen.getByTestId('implementation-name-input'), '  Acme Verifier  ');
+    await user.click(screen.getByTestId('confirm-generate-dialog-button'));
+    expect(mockGenerateReport).toHaveBeenCalledWith('Acme Verifier');
+  });
 });

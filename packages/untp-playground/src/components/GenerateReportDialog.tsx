@@ -23,7 +23,8 @@ export function GenerateReportDialog() {
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      await generateReport(implementationName);
+      // The name is validated trimmed, so it is recorded trimmed too.
+      await generateReport(implementationName.trim());
       setOpen(false);
     } finally {
       setIsGenerating(false);
