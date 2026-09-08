@@ -5,7 +5,9 @@ title: Validating link sets
 
 # How the Playground validates a link set
 
-A link set added on the Link Sets tab, whether resolved from an identity resolver or uploaded as a file, runs one validation step: `Schema Validation`. The step checks the document against the UNTP Identity Resolver linkset JSON Schema and settles to success or failure. The card's subtitle names the version it was checked against, so the record of what was checked stays with the card rather than following the selector.
+A link set added on the Link Sets tab, whether resolved from an identity resolver or uploaded as a file, runs two steps: `Schema Validation`, which checks the document's shape, and `Link Type Coverage`, which checks that each credential reached through a UNTP relation is the kind of credential the relation claims. The first is described here, the second under [Link type coverage](#link-type-coverage).
+
+`Schema Validation` checks the document against the UNTP Identity Resolver linkset JSON Schema and settles to success or failure. The card's subtitle names the version it was checked against, so the record of what was checked stays with the card rather than following the selector.
 
 ## Which schema and version
 
@@ -45,4 +47,20 @@ If the schema service does not answer in time or cannot be reached, `Schema Vali
 Schema validation is about the shape of the document. It does not check:
 
 - whether a relation name is a recognised UNTP relation (`dpp`, `dcc`, `dfr`, `dte`);
-- whether the document a link points at is the kind of credential its relation claims, or whether it is a valid credential at all. Verifying a linked credential runs it through the Credentials tab pipeline.
+- whether the document a link points at is a valid credential. Verifying a linked credential runs it through the Credentials tab pipeline.
+
+Whether a linked document is the kind of credential its relation claims is the second step's job, described next.
+
+## Link type coverage
+
+The UNTP Identity Resolver specification says a link relation states the intended content of its target, and that the actual content can only be confirmed by fetching it. The `Link Type Coverage` step does that confirmation. For every link the card lists as a credential link under a `dpp`, `dcc`, `dfr` or `dte` relation, once that credential has been fetched by URL (from the card's Verify action, or by pasting the same URL on the Credentials tab), the credential type the Credentials tab detected is compared with the relation it was linked under. A `dcc` link that resolves to a Digital Product Passport is a mismatch. So is a credential whose type the Playground does not recognise, and a recognised type no relation names, such as a Digital Identity Anchor: an uncomparable type counts as a mismatch rather than leaving the link unchecked. A recognised extension is compared on the core type it extends, so a Digital Livestock Passport matches a `dpp` link while the mismatch line, when one is shown, names the extension.
+
+The step shows how many of the link set's relation links have been checked, for example `1 of 3 credential links checked`. It fails as soon as any link mismatches, listing each mismatch as `<relation> link resolved to <detected type>` with the link's `href`, and each checked row says whether its type matched, beside its verified state. It succeeds when every relation link has been verified and matches. While links remain unverified it stays pending; a pending coverage step does not put the card into a verifying state, does not block removing the card, and does not change the card's overall status. Only a mismatch does.
+
+What the step does not do:
+
+- A link listed as a credential link only because its target declares a verifiable-credential media type, with no UNTP relation, is not counted. There is no claimed type to compare against.
+- The comparison is about type, not validity. A credential can match its relation and still fail its own validation on the Credentials tab, and the row will say both.
+- An encrypted credential that has not been decrypted yet has no type to compare, so its link stays unchecked until it is decrypted.
+- A link set with no UNTP-relation credential links has nothing to check; the step succeeds and says so.
+- A fetch of a linked URL that returns nothing acceptable (the fetch fails, or the document is refused), whether from the card's Verify or from the Credentials tab's URL input, forgets the earlier result for that URL: the row goes back to Verify and the link counts as unchecked again. The credential card that was loaded earlier stays on the Credentials tab. If the same URL was fetched again successfully while the failing attempt was still in flight, that newer result is kept.

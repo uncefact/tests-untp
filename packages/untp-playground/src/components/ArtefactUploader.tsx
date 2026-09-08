@@ -41,12 +41,22 @@ export function ArtefactUploader({
   onArtefactUpload,
   setFileCount,
   beforeInputs,
+  urlAttempts,
 }: {
   family: UploaderFamilyConfig;
-  onArtefactUpload: (artefact: unknown, source: ArtefactSource) => void;
+  onArtefactUpload: (
+    artefact: unknown,
+    source: ArtefactSource,
+  ) => void | { accepted: boolean } | Promise<void | { accepted: boolean }>;
   setFileCount: (count: number) => void;
   /** Family-specific input rendered under the heading, before the dropzone (the link set version selector, #988). */
   beforeInputs?: React.ReactNode;
+  /**
+   * Fetch-mode URL attempts reported to the page (#1007): `begin` when a fetch starts, `rejected`
+   * with every URL the attempt touched (typed and post-redirect) when it produced nothing the page
+   * accepted, so the page can forget what it knew about those URLs.
+   */
+  urlAttempts?: { begin: () => number; rejected: (urls: Array<string | undefined>, startedAt: number) => void };
 }) {
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const { resetErrors } = useError();
@@ -133,6 +143,10 @@ export function ArtefactUploader({
     resetErrors();
     setFetchError(null);
     setIsFetching(true);
+    const startedAt = family.urlMode === 'fetch' ? urlAttempts?.begin() : undefined;
+    const rejected = (finalUrl?: string) => {
+      if (startedAt !== undefined) urlAttempts?.rejected([trimmed, finalUrl], startedAt);
+    };
     try {
       if (family.urlMode === 'resolve') {
         const result = await resolveLinkSet(trimmed);
@@ -156,6 +170,7 @@ export function ArtefactUploader({
         | { ok: false; error: string; message: string };
 
       if (!payload.ok) {
+        rejected();
         setFetchError(fetchErrorMessage(payload.error, payload.message));
         return;
       }
@@ -167,7 +182,12 @@ export function ArtefactUploader({
         // A non-JSON body can still be an encrypted envelope (a compact JWE): hand it to
         // ingestion, whose shared classifier names it encrypted on the error surface (#812).
         if (isEncryptedEnvelope(payload.body)) {
-          onArtefactUpload(payload.body, { kind: 'url', url: payload.finalUrl, requestedUrl: trimmed });
+          const outcome = await onArtefactUpload(payload.body, {
+            kind: 'url',
+            url: payload.finalUrl,
+            requestedUrl: trimmed,
+          });
+          if (outcome && outcome.accepted === false) rejected(payload.finalUrl);
           setUrlInput('');
           return;
         }
@@ -175,6 +195,7 @@ export function ArtefactUploader({
         // human viewing page; name the next step instead of a bare parse error (#812). Compare
         // the MIME essence, not a prefix, so text/htmlfoo does not count and xhtml does.
         const essence = payload.contentType?.split(';', 1)[0].trim().toLowerCase();
+        rejected(payload.finalUrl);
         setFetchError(
           essence === 'text/html' || essence === 'application/xhtml+xml'
             ? 'The URL returned a web page, not a JSON document. If this is an identity resolver link, resolve it on the Link Sets tab.'
@@ -184,15 +205,17 @@ export function ArtefactUploader({
       }
 
       setFileCount(1);
-      onArtefactUpload(parsed, { kind: 'url', url: payload.finalUrl, requestedUrl: trimmed });
+      const outcome = await onArtefactUpload(parsed, { kind: 'url', url: payload.finalUrl, requestedUrl: trimmed });
+      if (outcome && outcome.accepted === false) rejected(payload.finalUrl);
       setUrlInput('');
     } catch (err) {
       console.error('ArtefactUploader: URL submission failed', err);
+      rejected();
       setFetchError('Could not reach the URL. Check the address and try again.');
     } finally {
       setIsFetching(false);
     }
-  }, [urlInput, family.urlMode, onArtefactUpload, resetErrors, setFileCount]);
+  }, [urlInput, family.urlMode, onArtefactUpload, urlAttempts, resetErrors, setFileCount]);
 
   return (
     <div className='space-y-3'>

@@ -111,7 +111,7 @@ describe('linkedCredentialRows', () => {
         },
       ],
     });
-    expect(rows).toEqual([
+    expect(rows).toMatchObject([
       {
         label: 'Digital Product Passport',
         href: 'https://x.example.org/dpp.json',
@@ -133,7 +133,7 @@ describe('linkedCredentialRows', () => {
     const rows = linkedCredentialRows({
       linkset: [{ rel: [{ href: 'https://x.example.org/creds/dte-88.json' }] }],
     });
-    expect(rows).toEqual([
+    expect(rows).toMatchObject([
       {
         label: 'dte-88.json',
         href: 'https://x.example.org/creds/dte-88.json',
@@ -148,7 +148,7 @@ describe('linkedCredentialRows', () => {
     const rows = linkedCredentialRows({
       linkset: [{ anchor: 'https://id.example.org/01/1', rel: [{ title: 'no href' }] }],
     });
-    expect(rows).toEqual([]);
+    expect(rows).toMatchObject([]);
   });
 
   it('returns no rows for a document without a linkset array', () => {
@@ -210,5 +210,38 @@ describe('secondary resolver links (#974)', () => {
     const [row] = rows('idr', { type: 'application/linkset+json' });
     expect(row.secondary).toBe(true);
     expect(row.credential).toBe(false);
+  });
+});
+
+describe('row relation, expected type and occurrence (#1007)', () => {
+  it('records the relation as spelled, the claimed type for UNTP relations only, and the position', () => {
+    const rows = linkedCredentialRows({
+      linkset: [
+        {
+          anchor: 'https://id.example.org/01/1',
+          'https://test.uncefact.org/voc/untp/dpp': [{ href: 'https://x/a' }, { href: 'https://x/b' }],
+          'https://ref.gs1.org/voc/certificationInfo': [{ href: 'https://x/m', type: 'application/vc+jwt' }],
+        },
+        { anchor: 'https://id.example.org/01/2', 'untp:dcc': [{ href: 'https://x/c' }] },
+      ],
+    });
+    expect(rows.map((row) => [row.relation, row.expectedType, row.occurrence])).toEqual([
+      [
+        'https://test.uncefact.org/voc/untp/dpp',
+        'dpp',
+        { contextIndex: 0, relation: 'https://test.uncefact.org/voc/untp/dpp', targetIndex: 0 },
+      ],
+      [
+        'https://test.uncefact.org/voc/untp/dpp',
+        'dpp',
+        { contextIndex: 0, relation: 'https://test.uncefact.org/voc/untp/dpp', targetIndex: 1 },
+      ],
+      [
+        'https://ref.gs1.org/voc/certificationInfo',
+        undefined,
+        { contextIndex: 0, relation: 'https://ref.gs1.org/voc/certificationInfo', targetIndex: 0 },
+      ],
+      ['untp:dcc', 'dcc', { contextIndex: 1, relation: 'untp:dcc', targetIndex: 0 }],
+    ]);
   });
 });

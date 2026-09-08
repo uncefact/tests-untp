@@ -43,6 +43,19 @@ export function resolveBoundInstance<P, R>(
   return items.find((item) => item.instanceId === instanceId);
 }
 
+/**
+ * Forgets a URL's binding (#1007). A Verify of an already-bound href that produces no accepted
+ * credential (the fetch failed, or the body was refused) is evidence that the previous result no
+ * longer describes what is at the URL, so the row fails open to Verify and coverage reverts to
+ * pending instead of repeating a stale match.
+ */
+export function dropUrlBinding(bindings: UrlBindings, url: string): UrlBindings {
+  if (!bindings.has(url)) return bindings;
+  const next = new Map(bindings);
+  next.delete(url);
+  return next;
+}
+
 /** Returns new bindings with every URL that pointed at fromId now pointing at toId (#813 merge). */
 export function remapUrlBindings(bindings: UrlBindings, fromId: InstanceId, toId: InstanceId): UrlBindings {
   const next = new Map(bindings);

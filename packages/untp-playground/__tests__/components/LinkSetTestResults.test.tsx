@@ -1,12 +1,14 @@
 import { LinkSetTestResults } from '@/components/LinkSetTestResults';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
 import { upsert } from '@/lib/artefactCollection';
-import { linkSetKey } from '@/lib/linkSetCollection';
+import { linkedCredentialRows, linkSetKey } from '@/lib/linkSetCollection';
+import { deriveLinkTypeCoverage, linkSetAssessment, type LinkSetAssessment } from '@/lib/linkTypeCoverage';
 import { newId } from '@/lib/id';
 import type { StoredLinkSet, TestStep } from '@/types';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
+import { TestCaseStatus } from '../../constants';
+import { useEffect, useMemo } from 'react';
 
 jest.mock('@/lib/fetchLinkedCredential', () => ({
   fetchLinkedCredential: jest.fn(),
@@ -58,6 +60,7 @@ const LINK_SET = {
 };
 
 const mockOnVerifyCredential = jest.fn();
+const mockOnVerifyRejected = jest.fn();
 const mockOnResolveSecondary = jest.fn(async () => {});
 
 function Harness({
@@ -65,13 +68,28 @@ function Harness({
   reingest,
   credentialItems = [],
   urlBindings = new Map(),
+  assessmentsOverride,
 }: {
   initial: Array<{ payload: StoredLinkSet }>;
   reingest?: StoredLinkSet;
   credentialItems?: any[];
   urlBindings?: Map<string, string>;
+  /** Hand the card a projection other than the derived one, or an empty map (#1007 tests). */
+  assessmentsOverride?: (derived: Map<string, LinkSetAssessment>) => Map<string, LinkSetAssessment>;
 }) {
   const linkSet = useArtefactCollection<StoredLinkSet, TestStep[]>();
+  // The same projection the page computes (#1007), so the card is exercised with real assessments.
+  const assessments = useMemo(() => {
+    const map = new Map<string, LinkSetAssessment>();
+    for (const item of linkSet.state.items) {
+      const rows = linkedCredentialRows(item.payload.decoded).filter((row) => row.credential);
+      map.set(
+        item.instanceId,
+        linkSetAssessment(item.result, deriveLinkTypeCoverage(rows, urlBindings, credentialItems)),
+      );
+    }
+    return assessmentsOverride ? assessmentsOverride(map) : map;
+  }, [linkSet.state.items, urlBindings, credentialItems, assessmentsOverride]);
   useEffect(() => {
     for (const entry of initial) {
       linkSet.dispatch((state) =>
@@ -99,7 +117,10 @@ function Harness({
         dispatch={linkSet.dispatch}
         credentialItems={credentialItems}
         urlBindings={urlBindings}
+        assessments={assessments}
         onVerifyCredential={mockOnVerifyCredential}
+        beginUrlAttempt={() => 7}
+        onVerifyRejected={mockOnVerifyRejected}
         onResolveSecondary={mockOnResolveSecondary}
       />
     </>
@@ -1207,5 +1228,309 @@ describe('Undo during an unfinished run (#988, ADR-047 update)', () => {
     await screen.findByTestId('linkset-card-header');
     expect(screen.getAllByTestId(/status-icon-success/).length).toBeGreaterThan(0);
     expect(mockValidate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Link Type Coverage (#1007)', () => {
+  const source = { kind: 'url', url: 'https://r.example.org/01/1?linkType=all' } as const;
+  const DPP = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiableCredential', 'DigitalProductPassport'],
+  };
+  const DCC = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiableCredential', 'DigitalConformityCredential'],
+  };
+  const settled = (status: TestCaseStatus = TestCaseStatus.SUCCESS) => [
+    { id: 'untp-schema-validation', name: 'UNTP Schema Validation', status },
+  ];
+  const credentialSlot = (instanceId: string, decoded: Record<string, unknown>, result: any) => ({
+    instanceId,
+    contentHash: instanceId,
+    runId: 'run',
+    payload: { original: decoded, decoded },
+    result,
+  });
+  const doc = {
+    linkset: [
+      {
+        anchor: 'https://id.example.org/01/1',
+        dpp: [
+          { href: 'https://x/a', title: 'A' },
+          { href: 'https://x/b', title: 'B' },
+        ],
+        dcc: [{ href: 'https://x/c', title: 'C' }],
+      },
+    ],
+  };
+  const payload = (d = doc): StoredLinkSet => ({ original: d, decoded: d, source, validationVersion: '0.7.0' });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidate.mockImplementation(validDocument);
+  });
+
+  it('lists the coverage step after schema validation, pending with a count, and keeps the card successful and removable', async () => {
+    render(
+      <Harness
+        initial={[{ payload: payload() }]}
+        urlBindings={new Map([['https://x/a', 'A']])}
+        credentialItems={[credentialSlot('A', DPP, settled())]}
+      />,
+    );
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-success`);
+    fireEvent.click(header);
+    const names = screen.getAllByText(/^(Schema Validation|Link Type Coverage)$/).map((el) => el.textContent);
+    expect(names).toEqual(['Schema Validation', 'Link Type Coverage']);
+    expect(screen.getByTestId('linkset-link-type-coverage-status-icon-pending')).toBeInTheDocument();
+    expect(screen.getByTestId('linkset-coverage-count')).toHaveTextContent('1 of 3 credential links checked.');
+    expect(screen.queryAllByTestId(/status-icon-in-progress/)).toHaveLength(0);
+    // The matched row says so beside its verified state.
+    expect(screen.getByTestId('linked-credential-coverage-match')).toHaveTextContent('Type matches dpp');
+    // Removal is not blocked by pending coverage: it happens.
+    fireEvent.click(screen.getByLabelText('Remove r.example.org/01/1'));
+    await waitFor(() => expect(screen.queryByTestId('linkset-card-header')).not.toBeInTheDocument());
+  });
+
+  it('renders the assessment it is given rather than re-deriving one', async () => {
+    // No bindings and no credentials: re-derivation would give a pending step and a successful
+    // card. The supplied projection says mismatch, and that is what the card must show.
+    const override = (derived: Map<string, LinkSetAssessment>) => {
+      const out = new Map<string, LinkSetAssessment>();
+      for (const [id, a] of derived) {
+        const mismatch = {
+          occurrence: { contextIndex: 0, relation: 'dcc', targetIndex: 0 },
+          expectedType: 'dcc' as const,
+          detectedType: 'DigitalProductPassport',
+          href: 'https://x/c',
+        };
+        const step = {
+          ...a.coverage.step,
+          status: TestCaseStatus.FAILURE,
+          details: { total: 3, checked: 1, mismatches: [mismatch] },
+        };
+        out.set(id, {
+          ...a,
+          overallStatus: TestCaseStatus.FAILURE,
+          steps: [...a.steps.slice(0, -1), step],
+          coverage: { ...a.coverage, total: 3, checked: 1, mismatches: [mismatch], step },
+        });
+      }
+      return out;
+    };
+    render(<Harness initial={[{ payload: payload() }]} assessmentsOverride={override} />);
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-failure`);
+    fireEvent.click(header);
+    expect(screen.getByTestId('linkset-coverage-mismatches')).toHaveTextContent(
+      'dcc link resolved to DigitalProductPassport',
+    );
+  });
+
+  it('falls back to the stored schema steps when no assessment exists for the instance yet', async () => {
+    render(<Harness initial={[{ payload: payload() }]} assessmentsOverride={() => new Map()} />);
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-success`);
+    fireEvent.click(header);
+    expect(screen.getByText('Schema Validation')).toBeInTheDocument();
+    expect(screen.queryByText('Link Type Coverage')).not.toBeInTheDocument();
+  });
+
+  it('fails the step and the card on a mismatch, listing the relation, the detected type and the href, and marks the row', async () => {
+    render(
+      <Harness
+        initial={[{ payload: payload() }]}
+        urlBindings={new Map([['https://x/c', 'C']])}
+        credentialItems={[credentialSlot('C', DPP, settled())]}
+      />,
+    );
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-failure`);
+    fireEvent.click(header);
+    expect(screen.getByTestId('linkset-schema-validation-status-icon-success')).toBeInTheDocument();
+    expect(screen.getByTestId('linkset-link-type-coverage-status-icon-failure')).toBeInTheDocument();
+    expect(screen.getByTestId('linkset-coverage-mismatches')).toHaveTextContent(
+      'dcc link resolved to DigitalProductPassport',
+    );
+    expect(screen.getByTestId('linkset-coverage-mismatches')).toHaveTextContent('https://x/c');
+    expect(screen.getByTestId('linked-credential-coverage-mismatch')).toHaveTextContent(
+      'dcc link resolved to DigitalProductPassport',
+    );
+  });
+
+  it('succeeds with 3 of 3 when every link resolved to its type', async () => {
+    render(
+      <Harness
+        initial={[{ payload: payload() }]}
+        urlBindings={
+          new Map([
+            ['https://x/a', 'A'],
+            ['https://x/b', 'B'],
+            ['https://x/c', 'C'],
+          ])
+        }
+        credentialItems={[
+          credentialSlot('A', DPP, settled()),
+          credentialSlot('B', DPP, settled()),
+          credentialSlot('C', DCC, settled()),
+        ]}
+      />,
+    );
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-success`);
+    fireEvent.click(header);
+    expect(screen.getByTestId('linkset-link-type-coverage-status-icon-success')).toBeInTheDocument();
+    expect(screen.getByTestId('linkset-coverage-count')).toHaveTextContent('3 of 3 credential links checked.');
+  });
+
+  it('still derives coverage after Schema Validation failed (AC5)', async () => {
+    mockValidate.mockResolvedValue({
+      kind: 'document',
+      valid: false,
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+      errors: [{ keyword: 'required', instancePath: '/linkset/0', params: { missingProperty: 'anchor' } }] as any,
+    });
+    render(
+      <Harness
+        initial={[{ payload: payload() }]}
+        urlBindings={new Map([['https://x/c', 'C']])}
+        credentialItems={[credentialSlot('C', DPP, settled())]}
+      />,
+    );
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-failure`);
+    fireEvent.click(header);
+    expect(screen.getByTestId('linkset-schema-validation-status-icon-failure')).toBeInTheDocument();
+    expect(screen.getByTestId('linkset-coverage-count')).toHaveTextContent('1 of 3 credential links checked.');
+    expect(screen.getByTestId('linkset-coverage-mismatches')).toHaveTextContent(
+      'dcc link resolved to DigitalProductPassport',
+    );
+    expect(screen.getAllByTestId('linked-credential-verify').length).toBeGreaterThan(0);
+  });
+
+  it('updates coverage when a link is verified after Schema Validation has already failed (AC5)', async () => {
+    mockValidate.mockResolvedValue({
+      kind: 'document',
+      valid: false,
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+      errors: [{ keyword: 'required', instancePath: '/linkset/0', params: { missingProperty: 'anchor' } }] as any,
+    });
+    const { rerender } = render(<Harness initial={[{ payload: payload() }]} />);
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-failure`);
+    fireEvent.click(header);
+    expect(screen.getByTestId('linkset-coverage-count')).toHaveTextContent('0 of 3 credential links checked.');
+    expect(screen.getAllByTestId('linked-credential-verify').length).toBe(3);
+
+    // The verifier verifies the dcc link now: the page binds it and the credential settles.
+    rerender(
+      <Harness
+        initial={[{ payload: payload() }]}
+        urlBindings={new Map([['https://x/c', 'C']])}
+        credentialItems={[credentialSlot('C', DPP, settled())]}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('linkset-coverage-count')).toHaveTextContent('1 of 3 credential links checked.'),
+    );
+    expect(screen.getByTestId('linkset-coverage-mismatches')).toHaveTextContent(
+      'dcc link resolved to DigitalProductPassport',
+    );
+    expect(screen.getByTestId('linkset-schema-validation-status-icon-failure')).toBeInTheDocument();
+  });
+
+  it('says so when a link set has no UNTP-relation credential links', async () => {
+    const mediaOnly = {
+      linkset: [
+        {
+          anchor: 'https://id.example.org/01/1',
+          'https://ref.gs1.org/voc/certificationInfo': [
+            { href: 'https://x/m', title: 'M', type: 'application/vc+jwt' },
+          ],
+        },
+      ],
+    };
+    render(<Harness initial={[{ payload: payload(mediaOnly) }]} />);
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-success`);
+    fireEvent.click(header);
+    expect(screen.getByTestId('linkset-link-type-coverage-status-icon-success')).toBeInTheDocument();
+    expect(screen.getByTestId('linkset-coverage-count')).toHaveTextContent(
+      'No UNTP-relation credential links to check.',
+    );
+    expect(screen.getAllByTestId('linked-credential-row')).toHaveLength(1);
+  });
+});
+
+describe('rejected re-verify forgets the binding (#1007)', () => {
+  const source = { kind: 'url', url: 'https://r.example.org/01/1?linkType=all' } as const;
+  const DPP = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiableCredential', 'DigitalProductPassport'],
+  };
+  const doc = { linkset: [{ anchor: 'https://id.example.org/01/1', dpp: [{ href: 'https://x/a', title: 'A' }] }] };
+  const bound = {
+    instanceId: 'A',
+    contentHash: 'A',
+    runId: 'run',
+    payload: { original: DPP, decoded: DPP },
+    result: [{ id: 'untp-schema-validation', name: 'x', status: TestCaseStatus.SUCCESS }],
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidate.mockImplementation(validDocument);
+  });
+
+  it.each([
+    ['the fetch fails', () => (fetchLinkedCredential as jest.Mock).mockResolvedValue({ ok: false, message: 'gone' })],
+    [
+      'the document is refused',
+      () => {
+        (fetchLinkedCredential as jest.Mock).mockResolvedValue({ ok: true, credential: { type: [] } });
+        mockOnVerifyCredential.mockReturnValue({ accepted: false });
+      },
+    ],
+    [
+      'ingestion throws',
+      () => {
+        (fetchLinkedCredential as jest.Mock).mockResolvedValue({ ok: true, credential: { type: [] } });
+        mockOnVerifyCredential.mockImplementation(() => {
+          throw new Error('boom');
+        });
+      },
+    ],
+  ])('tells the page to drop the href when %s', async (_label, arrange) => {
+    arrange();
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(
+        <Harness
+          initial={[{ payload: { original: doc, decoded: doc, source, validationVersion: '0.7.0' } }]}
+          urlBindings={new Map([['https://x/a', 'A']])}
+          credentialItems={[bound]}
+        />,
+      );
+      const header = await screen.findByTestId('linkset-card-header');
+      fireEvent.click(header);
+      // Bound and matched before the re-verify.
+      expect(screen.getByTestId('linked-credential-coverage-match')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('linked-credential-verify-again'));
+      // The tick taken when Verify started travels with the rejection.
+      await waitFor(() => expect(mockOnVerifyRejected).toHaveBeenCalledWith(['https://x/a'], 7));
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

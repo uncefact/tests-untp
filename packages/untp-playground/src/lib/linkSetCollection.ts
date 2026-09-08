@@ -73,6 +73,33 @@ export interface LinkedCredentialRow {
   encrypted: boolean;
   /** Whether the link points at a secondary identity resolver (see isSecondaryResolverLink, #974). */
   secondary: boolean;
+  /** The relation member the target was listed under, exactly as the link set spells it. */
+  relation: string;
+  /**
+   * The UNTP credential type the relation claims (#1007), when the relation is one of the four
+   * registered credential relations. A link identified as a credential only by its media type has
+   * no expectation and is not type-checked. Invariant: set only when `credential` is true; the
+   * constructor below guarantees it and every consumer gates on `credential` first.
+   */
+  expectedType?: UntpCredentialRelation;
+  /**
+   * Where the target sits in the document (#1007). The same href can appear under `dpp` and
+   * `dcc`, and those are two assertions with two outcomes, so identity is the position, not the
+   * href: the context's index, the relation member, and the target's index within that member.
+   */
+  occurrence: LinkOccurrence;
+}
+
+export type UntpCredentialRelation = 'dpp' | 'dcc' | 'dfr' | 'dte';
+
+export interface LinkOccurrence {
+  contextIndex: number;
+  relation: string;
+  targetIndex: number;
+}
+
+export function occurrenceKey(occurrence: LinkOccurrence): string {
+  return `${occurrence.contextIndex}\u0000${occurrence.relation}\u0000${occurrence.targetIndex}`;
 }
 
 function declaresEncryption(target: object): boolean {
@@ -91,7 +118,7 @@ function declaresEncryption(target: object): boolean {
  * spec calls these hints about intended content, not guarantees: actual content is validated
  * after dereferencing, which is what the Verify flow's detection does (#812).
  */
-const UNTP_CREDENTIAL_LINK_RELATIONS = ['dpp', 'dcc', 'dfr', 'dte'];
+const UNTP_CREDENTIAL_LINK_RELATIONS: UntpCredentialRelation[] = ['dpp', 'dcc', 'dfr', 'dte'];
 const VC_MEDIA_TYPES = ['application/vc+jwt', 'application/vc+ld+json'];
 
 /**
@@ -121,7 +148,13 @@ export function isUntpCredentialLink(relation: string, targetMediaType: string |
   if (mediaType && VC_MEDIA_TYPES.includes(mediaType)) return true;
   if (mediaType === 'text/html') return false;
 
-  return UNTP_CREDENTIAL_LINK_RELATIONS.includes(relationName(relation));
+  return expectedCredentialType(relation) !== undefined;
+}
+
+/** The credential type a UNTP credential relation claims, or undefined for any other relation. */
+export function expectedCredentialType(relation: string): UntpCredentialRelation | undefined {
+  const name = relationName(relation);
+  return UNTP_CREDENTIAL_LINK_RELATIONS.find((candidate) => candidate === name);
 }
 
 /**
@@ -149,14 +182,14 @@ export function linkedCredentialRows(decoded: Record<string, unknown>): LinkedCr
   if (!Array.isArray(contexts)) return [];
 
   const rows: LinkedCredentialRow[] = [];
-  for (const context of contexts) {
+  for (const [contextIndex, context] of contexts.entries()) {
     if (typeof context !== 'object' || context === null) {
       console.warn('linkedCredentialRows: skipping a link context that is not an object', context);
       continue;
     }
     for (const [relation, value] of Object.entries(context as Record<string, unknown>)) {
       if (relation === 'anchor' || !Array.isArray(value)) continue;
-      for (const target of value) {
+      for (const [targetIndex, target] of value.entries()) {
         if (typeof target !== 'object' || target === null) continue;
         const href = (target as { href?: unknown }).href;
         if (typeof href !== 'string') {
@@ -173,12 +206,16 @@ export function linkedCredentialRows(decoded: Record<string, unknown>): LinkedCr
           href;
         const mediaType = typeof type === 'string' ? type : undefined;
         const secondary = isSecondaryResolverLink(relation, mediaType);
+        const credential = !secondary && isUntpCredentialLink(relation, mediaType);
         rows.push({
           label,
           href,
-          credential: !secondary && isUntpCredentialLink(relation, mediaType),
+          credential,
           encrypted: declaresEncryption(target),
           secondary,
+          relation,
+          expectedType: credential ? expectedCredentialType(relation) : undefined,
+          occurrence: { contextIndex, relation, targetIndex },
         });
       }
     }
