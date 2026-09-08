@@ -5,7 +5,13 @@ import { StatusIcon } from '@/components/StatusIcon';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { beginRun, commitResult, remove, restore } from '@/lib/artefactCollection';
-import { linkedCredentialRows, linkSetSubtitle, linkSetTitle } from '@/lib/linkSetCollection';
+import { linkedCredentialRows, linkSetSubtitle, linkSetTitle, occurrenceKey } from '@/lib/linkSetCollection';
+import {
+  mismatchText,
+  NO_RELATION_LINKS_NOTE,
+  type LinkSetAssessment,
+  type RowCoverageOutcome,
+} from '@/lib/linkTypeCoverage';
 
 import { formatValidationError, pointerSegments } from '@/lib/formatValidationErrors';
 import {
@@ -51,6 +57,21 @@ interface LinkSetTestResultsProps {
   /** Which instance each URL's latest accepted ingestion produced (page-owned; see urlBindings.ts). */
   urlBindings: UrlBindings;
   /**
+   * One assessment per link set instance (#1007): the stored schema step plus the derived Link
+   * Type Coverage step and the card status, computed by the page from the same inputs the tab
+   * indicator reads (and the report will, #814). The card renders it and never re-derives
+   * (linkTypeCoverage.ts).
+   */
+  assessments: ReadonlyMap<InstanceId, LinkSetAssessment>;
+  /** Marks the start of a Verify attempt on the page's attempt clock (#1007). */
+  beginUrlAttempt: () => number;
+  /**
+   * A Verify of this href produced no accepted credential (#1007). The page forgets the href's
+   * binding unless it was bound again after `startedAt`, so a previous result cannot stand in
+   * for content that is no longer there and a slow failure cannot erase a newer success.
+   */
+  onVerifyRejected: (urls: Array<string | undefined>, startedAt: number) => void;
+  /**
    * Routes a fetched linked credential into the credentials pipeline (page.tsx owns ingestion).
    * Returns the outcome; a rejection has already been dispatched to the error surface, so the row
    * only gates its own feedback on it.
@@ -72,7 +93,10 @@ export function LinkSetTestResults({
   dispatch,
   credentialItems,
   urlBindings,
+  assessments,
   onVerifyCredential,
+  beginUrlAttempt,
+  onVerifyRejected,
   onResolveSecondary,
 }: LinkSetTestResultsProps) {
   // In-flight fetches live at the list level, keyed by operation plus href ("verify:<href>" /
@@ -153,9 +177,12 @@ export function LinkSetTestResults({
           key={item.instanceId}
           item={item}
           onRemove={() => handleRemove(item)}
+          assessment={assessments.get(item.instanceId)}
           credentialItems={credentialItems}
           urlBindings={urlBindings}
           onVerifyCredential={onVerifyCredential}
+          beginUrlAttempt={beginUrlAttempt}
+          onVerifyRejected={onVerifyRejected}
           onResolveSecondary={onResolveSecondary}
           fetchingHrefs={fetchingHrefs}
           setHrefFetching={setHrefFetching}
@@ -289,9 +316,12 @@ function schemaStepMessages(
 function LinkSetCard({
   item,
   onRemove,
+  assessment,
   credentialItems,
   urlBindings,
   onVerifyCredential,
+  beginUrlAttempt,
+  onVerifyRejected,
   onResolveSecondary,
   fetchingHrefs,
   setHrefFetching,
@@ -300,12 +330,15 @@ function LinkSetCard({
 }: {
   item: LinkSetSlot;
   onRemove: () => void;
+  assessment: LinkSetAssessment | undefined;
   credentialItems: CredentialSlot[];
   urlBindings: UrlBindings;
   onVerifyCredential: (
     rawArtefact: unknown,
     source: ArtefactSource,
   ) => { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true };
+  beginUrlAttempt: () => number;
+  onVerifyRejected: (urls: Array<string | undefined>, startedAt: number) => void;
   onResolveSecondary: (href: string) => Promise<void>;
   fetchingHrefs: ReadonlySet<string>;
   setHrefFetching: (href: string, fetching: boolean) => void;
@@ -314,7 +347,9 @@ function LinkSetCard({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const linkSet = item.payload;
-  const steps = item.result ?? [];
+  // The page supplies the composed steps and status; a caller that supplies no assessment for this
+  // instance gets the stored schema steps alone.
+  const steps = assessment?.steps ?? item.result ?? [];
   const title = linkSetTitle(linkSet);
   const allRows = linkedCredentialRows(linkSet.decoded);
   // Split by the UNTP Identity Resolver spec's credential-link rule (relation dpp/dcc/dfr/dte or
@@ -326,9 +361,10 @@ function LinkSetCard({
   const secondaryRows = allRows.filter((row) => row.secondary);
   const otherLinkCount = allRows.length - credentialRows.length - secondaryRows.length;
 
-  // The stored result is the schema step only, so the ordinary roll-up applies: a fresh or
-  // running instance shows the spinner, a settled one its outcome.
-  const overallStatus = instanceStatus(item.result);
+  // Schema roll-up, overridden by a coverage mismatch; pending coverage never spins (#1007).
+  const overallStatus = assessment?.overallStatus ?? instanceStatus(item.result);
+  const rowOutcome = (row: LinkedCredentialRow): RowCoverageOutcome | undefined =>
+    assessment?.coverage.outcomes.get(occurrenceKey(row.occurrence));
 
   return (
     <Card className='group relative overflow-hidden p-4'>
@@ -372,6 +408,30 @@ function LinkSetCard({
                     ))}
                   </ul>
                 )}
+              {step.id === TestCaseStepId.LINKSET_LINK_TYPE_COVERAGE && assessment && (
+                <div className='mt-1 pl-6 text-sm' data-testid='linkset-coverage'>
+                  <p className='text-muted-foreground' data-testid='linkset-coverage-count'>
+                    {assessment.coverage.total === 0
+                      ? NO_RELATION_LINKS_NOTE
+                      : `${assessment.coverage.checked} of ${assessment.coverage.total} credential ${
+                          assessment.coverage.total === 1 ? 'link' : 'links'
+                        } checked.`}
+                  </p>
+                  {assessment.coverage.mismatches.length > 0 && (
+                    <ul
+                      className='mt-1 list-disc space-y-1 pl-6 text-red-600'
+                      data-testid='linkset-coverage-mismatches'
+                    >
+                      {assessment.coverage.mismatches.map((mismatch) => (
+                        <li key={occurrenceKey(mismatch.occurrence)}>
+                          {mismatchText(mismatch)}{' '}
+                          <span className='break-all font-mono text-xs text-muted-foreground'>{mismatch.href}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           <p className='text-xs text-muted-foreground'>
@@ -382,7 +442,7 @@ function LinkSetCard({
               className='underline'
               data-testid='linkset-validation-docs'
             >
-              What Schema Validation checks
+              What the link set checks cover
             </a>
           </p>
           {credentialRows.length > 0 && (
@@ -397,9 +457,12 @@ function LinkSetCard({
                   <LinkedCredentialRowView
                     key={`${row.href}-${index}`}
                     row={row}
+                    coverage={rowOutcome(row)}
                     credentialItems={credentialItems}
                     urlBindings={urlBindings}
                     onVerifyCredential={onVerifyCredential}
+                    beginUrlAttempt={beginUrlAttempt}
+                    onVerifyRejected={onVerifyRejected}
                     isFetching={fetchingHrefs.has(`verify:${row.href}`)}
                     setFetching={(fetching) => setHrefFetching(`verify:${row.href}`, fetching)}
                     discoveredEncrypted={discoveredEncryptedHrefs.has(row.href)}
@@ -473,21 +536,28 @@ function LinkSetCard({
  */
 function LinkedCredentialRowView({
   row,
+  coverage,
   credentialItems,
   urlBindings,
   onVerifyCredential,
+  beginUrlAttempt,
+  onVerifyRejected,
   isFetching,
   setFetching,
   discoveredEncrypted,
   setDiscoveredEncrypted,
 }: {
   row: LinkedCredentialRow;
+  /** This row's Link Type Coverage outcome (#1007), shown beside its verification state. */
+  coverage: RowCoverageOutcome | undefined;
   credentialItems: CredentialSlot[];
   urlBindings: UrlBindings;
   onVerifyCredential: (
     rawArtefact: unknown,
     source: ArtefactSource,
   ) => { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true };
+  beginUrlAttempt: () => number;
+  onVerifyRejected: (urls: Array<string | undefined>, startedAt: number) => void;
   isFetching: boolean;
   setFetching: (fetching: boolean) => void;
   discoveredEncrypted: boolean;
@@ -503,10 +573,13 @@ function LinkedCredentialRowView({
   const showEncryptedTag = row.encrypted || (instance ? locked : discoveredEncrypted);
 
   const handleVerify = async () => {
+    // Taken before the fetch: a rejection reported later only forgets bindings older than this.
+    const startedAt = beginUrlAttempt();
     setFetching(true);
     try {
       const result = await fetchLinkedCredential(row.href);
       if (!result.ok) {
+        onVerifyRejected([row.href], startedAt);
         toast.error(result.message);
         return;
       }
@@ -528,12 +601,14 @@ function LinkedCredentialRowView({
       } else {
         // The rejection details are already on the error surface (View Upload Detail); the toast
         // keeps the row's own feedback honest instead of announcing a verification that never began.
+        onVerifyRejected([row.href], startedAt);
         toast.error('That link did not return an accepted credential. Open View Upload Detail for the reason.');
       }
     } catch (err) {
       // Ingestion is called raw here (not through the uploader's guarded wrapper), so a throw
       // anywhere in the pipeline chain must not vanish as an unhandled rejection.
       console.error('LinkedCredentialRowView: verify failed', err);
+      onVerifyRejected([row.href], startedAt);
       toast.error('Could not process that credential. Check the link and try again.');
     } finally {
       setFetching(false);
@@ -571,6 +646,11 @@ function LinkedCredentialRowView({
           )}
         </p>
         <p className='truncate font-mono text-xs text-muted-foreground'>{row.href}</p>
+        {coverage?.kind === 'excluded' && (
+          <p className='text-xs text-muted-foreground' data-testid='linked-credential-coverage-excluded'>
+            Not checked: no UNTP credential relation
+          </p>
+        )}
       </div>
       {isFetching ? (
         <span
@@ -596,6 +676,15 @@ function LinkedCredentialRowView({
           >
             {!settled ? 'Verifying in Credentials tab' : failed ? 'Failed in Credentials tab' : 'Verified'}
           </span>
+          {/* Only a settled instance has a type to compare; an unsettled one already reads "Verifying". */}
+          {settled && coverage && (coverage.kind === 'match' || coverage.kind === 'mismatch') && (
+            <span
+              className={`text-xs ${coverage.kind === 'mismatch' ? 'text-red-600' : 'text-muted-foreground'}`}
+              data-testid={`linked-credential-coverage-${coverage.kind}`}
+            >
+              {coverage.kind === 'match' ? `Type matches ${coverage.expectedType}` : mismatchText(coverage)}
+            </span>
+          )}
           {/* A settled row can re-fetch (the target may have drifted); a running one cannot. */}
           {settled && verifyAction('Verify again')}
         </span>

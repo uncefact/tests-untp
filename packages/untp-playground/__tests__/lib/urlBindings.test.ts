@@ -1,4 +1,10 @@
-import { emptyUrlBindings, recordUrlBinding, remapUrlBindings, resolveBoundInstance } from '@/lib/urlBindings';
+import {
+  dropUrlBinding,
+  emptyUrlBindings,
+  recordUrlBinding,
+  remapUrlBindings,
+  resolveBoundInstance,
+} from '@/lib/urlBindings';
 
 describe('urlBindings', () => {
   it('records later ingestions over earlier ones and ignores empty urls', () => {
@@ -27,5 +33,15 @@ describe('remapUrlBindings (#813 collision merge)', () => {
     expect(next.get('https://a.example.org/1')).toBe('id-survivor');
     expect(next.get('https://b.example.org/2')).toBe('id-survivor');
     expect(next.get('https://c.example.org/3')).toBe('id-other');
+  });
+});
+
+describe('dropUrlBinding (#1007)', () => {
+  it('forgets one URL and leaves the rest, returning the same map when nothing changes', () => {
+    const bindings = recordUrlBinding(emptyUrlBindings, ['https://x/a', 'https://x/b'], 'A' as any);
+    const dropped = dropUrlBinding(bindings, 'https://x/a');
+    expect(dropped.has('https://x/a')).toBe(false);
+    expect(dropped.get('https://x/b')).toBe('A');
+    expect(dropUrlBinding(dropped, 'https://x/none')).toBe(dropped);
   });
 });

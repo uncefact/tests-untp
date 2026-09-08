@@ -1,13 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ArtefactUploader, type ArtefactSource } from '@/components/ArtefactUploader';
 import { UPLOADER_FAMILIES } from '@/lib/uploaderFamilies';
 import { isEncryptedEnvelope } from '@/lib/encryptedEnvelope';
 import { resolveLinkSet } from '@/lib/resolveLinkSet';
-import { emptyUrlBindings, recordUrlBinding, remapUrlBindings, type UrlBindings } from '@/lib/urlBindings';
+import {
+  dropUrlBinding,
+  emptyUrlBindings,
+  recordUrlBinding,
+  remapUrlBindings,
+  type UrlBindings,
+} from '@/lib/urlBindings';
 import { DownloadCredential } from '@/components/DownloadCredential';
 import { EmptyState } from '@/components/EmptyState';
 import { LinkSetTestResults } from '@/components/LinkSetTestResults';
@@ -29,7 +35,7 @@ import {
   instanceStatus,
 } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
-import { linkSetKey, linkSetTitle } from '@/lib/linkSetCollection';
+import { linkedCredentialRows, linkSetKey, linkSetTitle } from '@/lib/linkSetCollection';
 import { schemeContentHash, schemeTitle } from '@/lib/schemeCollection';
 import {
   acceptedArtefactFamilies,
@@ -40,6 +46,8 @@ import {
 import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, StoredLinkSet, StoredScheme, TestStep } from '@/types';
 import { LinkSetVersionSelect } from '@/components/LinkSetVersionSelect';
+import { deriveLinkTypeCoverage, linkSetAssessment, type LinkSetAssessment } from '@/lib/linkTypeCoverage';
+import type { InstanceId } from '@/types/artefact';
 import { useError } from '@/contexts/ErrorContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -139,7 +147,23 @@ export default function Home() {
     (item) => instanceStatus(item.result) === TestCaseStatus.FAILURE,
   );
   const schemesFailing = scheme.state.items.some((item) => instanceStatus(item.result) === TestCaseStatus.FAILURE);
-  const linkSetsFailing = linkSet.state.items.some((item) => instanceStatus(item.result) === TestCaseStatus.FAILURE);
+  // One Link Type Coverage assessment per link set (#1007), derived from the link set's rows, the
+  // URL bindings and the credential instances. Derived here, not stored, so the card and the tab dot
+  // (and, with #814, the report) read one projection and no second writer races the schema runner.
+  const linkSetAssessments = useMemo(() => {
+    const map = new Map<InstanceId, LinkSetAssessment>();
+    for (const item of linkSet.state.items) {
+      const rows = linkedCredentialRows(item.payload.decoded).filter((row) => row.credential);
+      map.set(
+        item.instanceId,
+        linkSetAssessment(item.result, deriveLinkTypeCoverage(rows, urlBindings, credential.state.items)),
+      );
+    }
+    return map;
+  }, [linkSet.state.items, urlBindings, credential.state.items]);
+  const linkSetsFailing = [...linkSetAssessments.values()].some(
+    (assessment) => assessment.overallStatus === TestCaseStatus.FAILURE,
+  );
   const credentialsVerifying = credential.state.items.some((item) => !credentialIsTerminal(item.result ?? []));
 
   // Recomputed only when the instances change (add, replace, remove, or a result commit), so an
@@ -177,6 +201,35 @@ export default function Home() {
     if (outcome.kind === 'replaced') {
       toast.success(`Replaced ${linkSetTitle(stored)}`);
     }
+  };
+
+  // URL attempts and bindings share one clock (#1007). Every binding write stamps its URLs with
+  // the tick it happened at; every fetch attempt (a card's Verify, the Credentials tab's URL
+  // fetch) takes a tick when it starts. A rejection then forgets only the URLs bound BEFORE the
+  // attempt started: a newer binding recorded while the attempt was in flight is kept, so a slow
+  // failure cannot erase a newer success. Refs, not state: ticks are compared, never rendered.
+  const attemptClock = useRef(0);
+  const nextTick = () => ++attemptClock.current;
+  const boundAt = useRef(new Map<string, number>());
+  const stampBindings = (urls: Array<string | undefined>) => {
+    const tick = nextTick();
+    for (const url of urls) if (url) boundAt.current.set(url, tick);
+  };
+  /** Marks the start of a fetch attempt; pass the returned tick to `handleUrlRejected` on failure. */
+  const beginUrlAttempt = () => nextTick();
+  /**
+   * A fetch attempt produced no accepted credential (#1007): the card's Verify, and the
+   * Credentials tab's URL fetch (a transport failure, an unusable body, or a refused document)
+   * all land here with every URL that attempt would have bound (the typed URL and the
+   * post-redirect one). Forgets those bindings so the row goes back to Verify and Link Type
+   * Coverage stops vouching for content that is gone, except any URL bound again since the
+   * attempt started.
+   */
+  const handleUrlRejected = (urls: Array<string | undefined>, startedAt: number) => {
+    const stale = urls.filter((url): url is string => !!url && (boundAt.current.get(url) ?? 0) < startedAt);
+    if (stale.length === 0) return;
+    stampBindings(stale);
+    setUrlBindings((bindings) => stale.reduce((acc, url) => dropUrlBinding(acc, url), bindings));
   };
 
   // A secondary resolver link's Resolve (#974) is the resolve input's flow verbatim: the same
@@ -245,6 +298,11 @@ export default function Home() {
       if (outcome.twinId) {
         const twinId = outcome.twinId;
         // Every registry that pointed at the removed twin follows the survivor.
+        // The remapped URLs now point at the survivor: that is a fresh binding for each of them.
+        // Stamped from the bindings this handler sees, BEFORE the update is queued, like every
+        // other binding write: a rejection decides which URLs are stale when it runs, so a stamp
+        // taken inside the updater would land too late for a rejection batched ahead of it.
+        stampBindings([...urlBindings.entries()].filter(([, id]) => id === twinId).map(([url]) => url));
         setUrlBindings((bindings) => remapUrlBindings(bindings, twinId, item.instanceId));
         setEnvelopeAliases((aliases) => {
           const next = new Map(aliases);
@@ -297,6 +355,7 @@ export default function Home() {
         : undefined;
       if (aliasInstance && !aliasInstance.payload.encryptedEnvelope) {
         if (source?.kind === 'url') {
+          stampBindings([source.url, source.requestedUrl]);
           setUrlBindings((bindings) =>
             recordUrlBinding(bindings, [source.url, source.requestedUrl], aliasInstance.instanceId),
           );
@@ -321,6 +380,7 @@ export default function Home() {
         );
       }
       if (source?.kind === 'url') {
+        stampBindings([source.url, source.requestedUrl]);
         setUrlBindings((bindings) => recordUrlBinding(bindings, [source.url, source.requestedUrl], outcome.instanceId));
       }
       return { accepted: true, instanceId: outcome.instanceId, encrypted: true };
@@ -364,6 +424,7 @@ export default function Home() {
     if (source?.kind === 'url') {
       // Both the requested URL and the post-redirect final URL name this ingestion, so a link set
       // row finds its instance whichever form it holds.
+      stampBindings([source.url, source.requestedUrl]);
       setUrlBindings((bindings) => recordUrlBinding(bindings, [source.url, source.requestedUrl], outcome.instanceId));
     }
     if (outcome.kind === 'replaced' && !(source?.kind === 'url' && source.via === 'link-set')) {
@@ -399,25 +460,33 @@ export default function Home() {
     ingestLinkSet(rawArtefact, source);
   };
 
-  const uploadHandlers: Record<TabId, (rawArtefact: any, source?: ArtefactSource) => void> = {
+  const uploadHandlers: Record<TabId, (rawArtefact: any, source?: ArtefactSource) => void | { accepted: boolean }> = {
     credentials: handleCredentialUpload,
     schemes: handleSchemeUpload,
     linksets: handleLinkSetUpload,
   };
 
-  const handleArtefactUpload = async (rawArtefact: any, source?: ArtefactSource) => {
+  // Returns whether ingestion accepted the artefact (undefined for families that do not say),
+  // so the uploader can treat a refused URL fetch as a failed attempt (#1007).
+  const handleArtefactUpload = async (
+    rawArtefact: any,
+    source?: ArtefactSource,
+  ): Promise<{ accepted: boolean } | void> => {
     try {
       // No family can do anything with ciphertext: gate encrypted envelopes before the tab
       // routing, so a JWE dropped on Conformity Schemes is named honestly instead of persisting
       // a string as a scheme card.
       if (isEncryptedEnvelope(rawArtefact)) {
-        handleCredentialUpload(rawArtefact, source);
-        return;
+        return { accepted: handleCredentialUpload(rawArtefact, source).accepted };
       }
-      uploadHandlers[activeTab](rawArtefact, source);
+      const outcome = uploadHandlers[activeTab](rawArtefact, source);
+      return outcome && typeof outcome === 'object' && 'accepted' in outcome
+        ? { accepted: outcome.accepted }
+        : undefined;
     } catch (error) {
       console.error(error);
       toast.error('Failed to process artefact');
+      return { accepted: false };
     }
   };
 
@@ -429,6 +498,9 @@ export default function Home() {
         family={UPLOADER_FAMILIES[activeTab]}
         onArtefactUpload={handleArtefactUpload}
         setFileCount={setFileCount}
+        // Only the Credentials tab's URL fetches bear on credential bindings; a failed scheme
+        // fetch of a URL that also happens to be a credential href must not forget that credential.
+        urlAttempts={activeTab === 'credentials' ? { begin: beginUrlAttempt, rejected: handleUrlRejected } : undefined}
         // The version is an input to adding a link set, so it sits under the heading, before the
         // dropzone (#988).
         beforeInputs={
@@ -535,7 +607,10 @@ export default function Home() {
                       // verifying/verified state without switching tabs (#812).
                       credentialItems={credential.state.items}
                       urlBindings={urlBindings}
+                      assessments={linkSetAssessments}
                       onVerifyCredential={handleCredentialUpload}
+                      beginUrlAttempt={beginUrlAttempt}
+                      onVerifyRejected={handleUrlRejected}
                       onResolveSecondary={handleResolveSecondary}
                     />
                   )}

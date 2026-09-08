@@ -109,6 +109,7 @@ export enum TestCaseStepId {
   SCHEME_VERSION_DETECTION = 'scheme-version-detection',
   SCHEME_SCHEMA_VALIDATION = 'scheme-schema-validation',
   LINKSET_SCHEMA_VALIDATION = 'linkset-schema-validation',
+  LINKSET_LINK_TYPE_COVERAGE = 'linkset-link-type-coverage',
 }
 
 const commonContextUrls = [

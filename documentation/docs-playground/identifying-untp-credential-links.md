@@ -22,7 +22,7 @@ Identification is separate from schema validation. The Playground can identify c
 
 ## Hints, not guarantees
 
-The specification is explicit that the link relation and media type indicate the intended content, not a guarantee of it. The Playground follows the same rule: identification decides what is listed as a credential link, and the actual content is validated when the credential is fetched and run through the validation pipeline.
+The specification is explicit that the link relation and media type indicate the intended content, not a guarantee of it. The Playground follows the same rule: identification decides what is listed as a credential link, and the actual content is validated when the credential is fetched and run through the validation pipeline. Fetching a credential also settles whether it is the kind its relation claimed, which the link set card reports as [link type coverage](./validating-link-sets.md#link-type-coverage).
 
 ## Encrypted targets
 

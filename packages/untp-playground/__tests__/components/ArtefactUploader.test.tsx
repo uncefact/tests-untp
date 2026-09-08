@@ -518,3 +518,146 @@ describe('callback capture at operation start (#988)', () => {
     expect(second).not.toHaveBeenCalled();
   });
 });
+
+describe('URL fetch attempts reported to the page (#1007)', () => {
+  const mockOnArtefactUpload = jest.fn();
+  const originalFetch = global.fetch;
+  const attempts = () => ({ begin: jest.fn(() => 41), rejected: jest.fn() });
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  const submit = () => {
+    fireEvent.change(screen.getByTestId('artefact-url-input'), { target: { value: 'https://x/typed' } });
+    fireEvent.click(screen.getByTestId('artefact-url-fetch'));
+  };
+
+  it.each([
+    ['the proxy refuses', async () => ({ ok: false, error: 'blocked', message: 'blocked' }), undefined],
+    [
+      'the body is not JSON',
+      async () => ({ ok: true, body: 'not json', contentType: 'text/plain', finalUrl: 'https://x/final' }),
+      'https://x/final',
+    ],
+    [
+      'the body is a web page',
+      async () => ({ ok: true, body: '<html></html>', contentType: 'text/html', finalUrl: 'https://x/final' }),
+      'https://x/final',
+    ],
+  ])('reports the attempt with the typed and post-redirect URLs when %s', async (_label, json, finalUrl) => {
+    global.fetch = jest.fn().mockResolvedValue({ json }) as unknown as typeof fetch;
+    const urlAttempts = attempts();
+    render(
+      <ArtefactUploader
+        family={credentialsFamily}
+        onArtefactUpload={mockOnArtefactUpload}
+        setFileCount={() => {}}
+        urlAttempts={urlAttempts}
+      />,
+    );
+    submit();
+    await waitFor(() => expect(urlAttempts.rejected).toHaveBeenCalledWith(['https://x/typed', finalUrl], 41));
+    expect(urlAttempts.begin).toHaveBeenCalledTimes(1);
+    expect(mockOnArtefactUpload).not.toHaveBeenCalled();
+  });
+
+  it('reports a refused document with both URLs, using the tick taken before the fetch', async () => {
+    // The fetch is held open so the clock can move between the start and the failure: the tick
+    // reported must be the one taken before fetching, and the page's admission is a Promise, so
+    // the uploader must await it to see the refusal.
+    let releaseFetch: (value: unknown) => void = () => {};
+    global.fetch = jest
+      .fn()
+      .mockReturnValue(new Promise((resolve) => (releaseFetch = resolve))) as unknown as typeof fetch;
+    mockOnArtefactUpload.mockReturnValue(Promise.resolve({ accepted: false }));
+    let tick = 41;
+    const urlAttempts = { begin: jest.fn(() => tick), rejected: jest.fn() };
+    render(
+      <ArtefactUploader
+        family={credentialsFamily}
+        onArtefactUpload={mockOnArtefactUpload}
+        setFileCount={() => {}}
+        urlAttempts={urlAttempts}
+      />,
+    );
+    submit();
+    await waitFor(() => expect(urlAttempts.begin).toHaveBeenCalledTimes(1));
+    tick = 99;
+    await act(async () => {
+      releaseFetch({
+        json: async () => ({
+          ok: true,
+          body: JSON.stringify({ type: [] }),
+          contentType: 'application/json',
+          finalUrl: 'https://x/final',
+        }),
+      });
+    });
+    await waitFor(() => expect(urlAttempts.rejected).toHaveBeenCalledWith(['https://x/typed', 'https://x/final'], 41));
+    expect(mockOnArtefactUpload).toHaveBeenCalledWith(
+      { type: [] },
+      { kind: 'url', url: 'https://x/final', requestedUrl: 'https://x/typed' },
+    );
+  });
+
+  it('does not report an accepted document, and does not report resolve-mode attempts', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: async () => ({
+        ok: true,
+        body: JSON.stringify({ type: ['x'] }),
+        contentType: 'application/json',
+        finalUrl: 'https://x/final',
+      }),
+    }) as unknown as typeof fetch;
+    mockOnArtefactUpload.mockReturnValue({ accepted: true });
+    const urlAttempts = attempts();
+    const { unmount } = render(
+      <ArtefactUploader
+        family={credentialsFamily}
+        onArtefactUpload={mockOnArtefactUpload}
+        setFileCount={() => {}}
+        urlAttempts={urlAttempts}
+      />,
+    );
+    submit();
+    await waitFor(() => expect(mockOnArtefactUpload).toHaveBeenCalled());
+    expect(urlAttempts.rejected).not.toHaveBeenCalled();
+    unmount();
+
+    (resolveLinkSet as jest.Mock).mockResolvedValue({ ok: false, message: 'no' });
+    const resolveAttempts = attempts();
+    render(
+      <ArtefactUploader
+        family={linkSetsFamily}
+        onArtefactUpload={mockOnArtefactUpload}
+        setFileCount={() => {}}
+        urlAttempts={resolveAttempts}
+      />,
+    );
+    submit();
+    await waitFor(() => expect(screen.getByText('no')).toBeInTheDocument());
+    expect(resolveAttempts.begin).not.toHaveBeenCalled();
+    expect(resolveAttempts.rejected).not.toHaveBeenCalled();
+  });
+
+  it('reports the attempt when the proxy cannot be reached', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('down')) as unknown as typeof fetch;
+    const urlAttempts = attempts();
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(
+        <ArtefactUploader
+          family={credentialsFamily}
+          onArtefactUpload={mockOnArtefactUpload}
+          setFileCount={() => {}}
+          urlAttempts={urlAttempts}
+        />,
+      );
+      submit();
+      await waitFor(() => expect(urlAttempts.rejected).toHaveBeenCalledWith(['https://x/typed', undefined], 41));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

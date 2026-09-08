@@ -2,6 +2,7 @@
 
 - **Date:** 2026-08-24
 - **Status:** accepted
+- **Update (2026-09-08):** #1007 adds a third way a URL unbinds. A fetch of an already-bound URL that produces no accepted credential, from either entry point, forgets that URL's binding (`dropUrlBinding`), because the registry's claim is about what the URL produces now. Ordering is settled by a page-held attempt counter rather than by arrival: each binding records the tick it was written at, and a rejection forgets only URLs bound before that attempt started, so a slow failure cannot erase a newer binding.
 
 ## Context
 

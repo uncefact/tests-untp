@@ -1713,3 +1713,379 @@ describe('link set spec version selection (#988)', () => {
     await waitFor(() => expect(storedVersion()).toEqual(['0.7.0', '0.7.0']));
   });
 });
+
+describe('link type coverage on the tab (#1007)', () => {
+  it('shows the Link Sets failing dot from the derived assessment when a linked credential mismatches its relation', async () => {
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() =>
+            onArtefactUpload(
+              { linkset: [{ anchor: 'https://id.example.org/01/1', dcc: [{ href: 'https://x/c', title: 'C' }] }] },
+              { kind: 'file', filename: 'linkset.json' },
+            )
+          }
+        >
+          Upload link set
+        </button>
+      ),
+    );
+    // The mocked credentials panel settles every instance so the projection can compare types.
+    (TestResults as jest.Mock).mockImplementation(({ collection, dispatch }: any) => (
+      <button
+        data-testid='mock-settle-credentials'
+        onClick={() => {
+          collection.items.forEach((item: any, index: number) => {
+            const { runId } = dispatch((state: any) => beginRun(state, item.instanceId, [], () => `run-${index}`));
+            dispatch((state: any) =>
+              commitResult(state, {
+                instanceId: item.instanceId,
+                runId,
+                result: [
+                  { id: 'untp-schema-validation', name: 'UNTP Schema Validation', status: TestCaseStatus.SUCCESS },
+                ],
+              }),
+            );
+          });
+        }}
+      >
+        Settle
+      </button>
+    ));
+
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+
+    // Before any verification the assessment is pending and the tab is quiet.
+    let props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    const instanceId = props.collection.items[0].instanceId;
+    expect(props.assessments.get(instanceId).coverage).toMatchObject({ total: 1, checked: 0 });
+    expect(screen.queryByTestId('linksets-tab-failing-dot')).not.toBeInTheDocument();
+
+    // Verify the dcc link: the fetched document is a DPP.
+    await act(async () => {
+      props.onVerifyCredential(
+        { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+        { kind: 'url', url: 'https://x/c', via: 'link-set' },
+      );
+    });
+    fireEvent.click(screen.getByTestId('mock-settle-credentials'));
+
+    await waitFor(() => {
+      props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+      expect(props.assessments.get(instanceId).coverage.mismatches).toHaveLength(1);
+    });
+    expect(props.assessments.get(instanceId).overallStatus).toBe(TestCaseStatus.FAILURE);
+    expect(await screen.findByTestId('linksets-tab-failing-dot')).toBeInTheDocument();
+  });
+
+  it('forgets a binding when a re-verify is rejected, so coverage reverts to pending and the dot clears', async () => {
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() =>
+            onArtefactUpload(
+              { linkset: [{ anchor: 'https://id.example.org/01/1', dcc: [{ href: 'https://x/c', title: 'C' }] }] },
+              { kind: 'file', filename: 'linkset.json' },
+            )
+          }
+        >
+          Upload link set
+        </button>
+      ),
+    );
+    (TestResults as jest.Mock).mockImplementation(({ collection, dispatch }: any) => (
+      <button
+        data-testid='mock-settle-credentials'
+        onClick={() => {
+          collection.items.forEach((item: any, index: number) => {
+            const { runId } = dispatch((state: any) => beginRun(state, item.instanceId, [], () => `run-${index}`));
+            dispatch((state: any) =>
+              commitResult(state, {
+                instanceId: item.instanceId,
+                runId,
+                result: [
+                  { id: 'untp-schema-validation', name: 'UNTP Schema Validation', status: TestCaseStatus.SUCCESS },
+                ],
+              }),
+            );
+          });
+        }}
+      >
+        Settle
+      </button>
+    ));
+
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+    let props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    const instanceId = props.collection.items[0].instanceId;
+    await act(async () => {
+      props.onVerifyCredential(
+        { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+        { kind: 'url', url: 'https://x/c', via: 'link-set' },
+      );
+    });
+    fireEvent.click(screen.getByTestId('mock-settle-credentials'));
+    await screen.findByTestId('linksets-tab-failing-dot');
+
+    props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    await act(async () => {
+      props.onVerifyRejected(['https://x/c'], props.beginUrlAttempt());
+    });
+    await waitFor(() => {
+      props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+      expect(props.assessments.get(instanceId).coverage).toMatchObject({ total: 1, checked: 0, mismatches: [] });
+    });
+    expect(props.urlBindings.has('https://x/c')).toBe(false);
+    expect(screen.queryByTestId('linksets-tab-failing-dot')).not.toBeInTheDocument();
+  });
+
+  it('forgets every URL an attempt touched, including the post-redirect key, unless bound again since the attempt began', async () => {
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    let attempts: {
+      begin: () => number;
+      rejected: (urls: Array<string | undefined>, startedAt: number) => void;
+    } | null = null;
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({
+        onArtefactUpload,
+        urlAttempts,
+      }: {
+        onArtefactUpload: (artefact: any, source: any) => void;
+        urlAttempts: any;
+      }) => {
+        attempts = urlAttempts ?? attempts;
+        return (
+          <button
+            data-testid='mock-upload-linkset-file'
+            onClick={() =>
+              onArtefactUpload(
+                {
+                  linkset: [{ anchor: 'https://id.example.org/01/1', dpp: [{ href: 'https://x/typed', title: 'A' }] }],
+                },
+                { kind: 'file', filename: 'linkset.json' },
+              )
+            }
+          >
+            Upload link set
+          </button>
+        );
+      },
+    );
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+    // The attempt API is offered on the Credentials tab only (a scheme fetch must not touch credential bindings).
+    await userEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
+    let props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+
+    // A Credentials-tab fetch of the typed URL redirected to a final URL and was accepted: both
+    // keys are bound (#812).
+    await act(async () => {
+      props.onVerifyCredential(
+        { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+        { kind: 'url', url: 'https://x/final', requestedUrl: 'https://x/typed' },
+      );
+    });
+    props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    expect(props.urlBindings.get('https://x/typed')).toBe(props.urlBindings.get('https://x/final'));
+
+    // An attempt that began BEFORE that binding and fails later is stale: nothing is forgotten.
+    const staleTick = 0;
+    await act(async () => {
+      attempts!.rejected(['https://x/typed', 'https://x/final'], staleTick);
+    });
+    props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    expect(props.urlBindings.has('https://x/typed')).toBe(true);
+    expect(props.urlBindings.has('https://x/final')).toBe(true);
+
+    // An attempt that began after the binding and fails forgets both keys.
+    const tick = attempts!.begin();
+    await act(async () => {
+      attempts!.rejected(['https://x/typed', 'https://x/final'], tick);
+    });
+    await waitFor(() => {
+      props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+      expect(props.urlBindings.has('https://x/typed')).toBe(false);
+    });
+    expect(props.urlBindings.has('https://x/final')).toBe(false);
+    expect(props.assessments.get(props.collection.items[0].instanceId).coverage).toMatchObject({
+      total: 1,
+      checked: 0,
+    });
+  });
+
+  it('keeps a binding recorded by a newer Verify when an older Credentials-tab attempt fails late', async () => {
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    let attempts: {
+      begin: () => number;
+      rejected: (urls: Array<string | undefined>, startedAt: number) => void;
+    } | null = null;
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({
+        onArtefactUpload,
+        urlAttempts,
+      }: {
+        onArtefactUpload: (artefact: any, source: any) => void;
+        urlAttempts: any;
+      }) => {
+        attempts = urlAttempts ?? attempts;
+        return (
+          <button
+            data-testid='mock-upload-linkset-file'
+            onClick={() =>
+              onArtefactUpload(
+                { linkset: [{ anchor: 'https://id.example.org/01/1', dpp: [{ href: 'https://x/a', title: 'A' }] }] },
+                { kind: 'file', filename: 'linkset.json' },
+              )
+            }
+          >
+            Upload link set
+          </button>
+        );
+      },
+    );
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+    // The attempt API is offered on the Credentials tab only (a scheme fetch must not touch credential bindings).
+    await userEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
+    let props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+
+    const olderAttempt = attempts!.begin();
+    // A newer Verify from the card binds the href while the older attempt is still in flight.
+    await act(async () => {
+      props.onVerifyCredential(
+        { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+        { kind: 'url', url: 'https://x/a', via: 'link-set' },
+      );
+    });
+    await act(async () => {
+      attempts!.rejected(['https://x/a', undefined], olderAttempt);
+    });
+    props = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+    expect(props.urlBindings.has('https://x/a')).toBe(true);
+  });
+});
+
+describe('binding stamps and batched updates (#1007 panel ruling)', () => {
+  const envelope = {
+    cipherText: 'SGVsbG8=',
+    iv: 'nLUYsnXBY8bbXY45',
+    tag: '7j0RRSoEIm2FAo52m1pyow==',
+    type: 'aes-256-gcm',
+  };
+  const dpp = (id: string) => ({
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiableCredential', 'DigitalProductPassport'],
+    issuer: 'did:example:issuer',
+    id,
+  });
+
+  it('keeps a URL remapped by a decrypt merge when an older rejection lands in the same batch', async () => {
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    let attempts: {
+      begin: () => number;
+      rejected: (urls: Array<string | undefined>, startedAt: number) => void;
+    } | null = null;
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload, urlAttempts }: { onArtefactUpload: (a: any, s: any) => void; urlAttempts: any }) => {
+        attempts = urlAttempts ?? attempts;
+        return (
+          <div>
+            <button
+              data-testid='mock-upload-plain-url'
+              onClick={() => onArtefactUpload(dpp('urn:same'), { kind: 'url', url: 'https://x/plain' })}
+            >
+              plain by url
+            </button>
+            <button
+              data-testid='mock-upload-envelope'
+              onClick={() => onArtefactUpload(envelope, { kind: 'url', url: 'https://x/enc' })}
+            >
+              env
+            </button>
+            <button
+              data-testid='mock-upload-linkset'
+              onClick={() =>
+                onArtefactUpload(
+                  { linkset: [{ anchor: 'https://id/1', dpp: [{ href: 'https://x/plain', title: 'P' }] }] },
+                  { kind: 'file', filename: 'ls.json' },
+                )
+              }
+            >
+              linkset
+            </button>
+          </div>
+        );
+      },
+    );
+    const testResultsProps = () => (TestResults as jest.Mock).mock.lastCall?.[0];
+    render(<Home />);
+    // A link set card is what exposes the bindings to observe, and it lists the twin's URL.
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset'));
+    await screen.findByTestId('mock-linkset-results');
+    await userEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
+
+    // The plaintext twin arrives by URL (bound), settles, then the envelope arrives (bound, locked).
+    fireEvent.click(screen.getByTestId('mock-upload-plain-url'));
+    await screen.findByRole('tab', { name: /Credentials.*1/ });
+    let props = testResultsProps();
+    const twin = props.collection.items[0];
+    await act(async () => {
+      const { runId } = props.dispatch((state: any) => beginRun(state, twin.instanceId, [], newId));
+      props.dispatch((state: any) =>
+        commitResult(state, {
+          instanceId: twin.instanceId,
+          runId,
+          result: [{ id: 'proof-type', name: 'Proof Type Detection', status: 'success' }],
+        }),
+      );
+    });
+    fireEvent.click(screen.getByTestId('mock-upload-envelope'));
+    await screen.findByRole('tab', { name: /Credentials.*2/ });
+    props = testResultsProps();
+    const locked = props.collection.items.find((i: any) => i.payload.encryptedEnvelope);
+
+    // An attempt on the twin's URL began before the merge.
+    const olderAttempt = attempts!.begin();
+    // The decrypt merges the twin into the locked slot (remapping the twin's URL) and, in the same
+    // batch before React renders, the older attempt reports its failure.
+    await act(async () => {
+      expect(props.onDecrypted(locked, dpp('urn:same'))).toBe(true);
+      attempts!.rejected(['https://x/plain', undefined], olderAttempt);
+    });
+
+    // The remap is a newer binding than the attempt: the URL stays bound, to the survivor.
+    const bindings: Map<string, string> = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0].urlBindings;
+    expect(testResultsProps().collection.items).toHaveLength(1);
+    expect(bindings.get('https://x/plain')).toBe(locked.instanceId);
+  });
+});
