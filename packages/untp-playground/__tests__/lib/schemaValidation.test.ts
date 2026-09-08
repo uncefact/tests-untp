@@ -653,7 +653,11 @@ describe('schemaValidation', () => {
       await validateCredentialSchema(dlpCredential);
 
       // The cached schema must be untouched: const + items.enum still present.
-      const cached = schemaCache.get('https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json');
+      // A cache hit never calls the loader, so a throwing loader proves the schema was cached.
+      const cached = await schemaCache.get(
+        'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json',
+        () => Promise.reject(new Error('not cached')),
+      );
       expect(cached).toBeDefined();
       expect(cached.properties.type.const).toEqual(['DigitalProductPassport', 'VerifiableCredential']);
       expect(cached.$id).toBe('https://example.com/dpp-0.5.0.json');
