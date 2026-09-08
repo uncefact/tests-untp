@@ -1,4 +1,4 @@
-import { formatValidationError } from '@/lib/formatValidationErrors';
+import { formatValidationError, pointerSegments } from '@/lib/formatValidationErrors';
 
 describe('formatValidationError', () => {
   // Required field tests
@@ -135,7 +135,8 @@ describe('formatValidationError', () => {
       instancePath: '/user/@personal/email',
       params: { type: 'string' },
     };
-    expect(formatValidationError(error)).toBe('Invalid type for user → personal → email: expected string');
+    // Member names are shown as they are: `@personal` is the property's name.
+    expect(formatValidationError(error)).toBe('Invalid type for user → @personal → email: expected string');
   });
 
   // Test for complex nested path
@@ -146,7 +147,65 @@ describe('formatValidationError', () => {
       params: { allowedValue: 'dark' },
     };
     expect(formatValidationError(error)).toBe(
-      'Invalid value for users → 0 → details → settings → theme: must be one of [dark]',
+      'Invalid value for users → 0 → @details → settings → theme: must be one of [dark]',
+    );
+  });
+
+  // JSON Pointer handling (#988): a link set names relations by URL, so keys contain `/`.
+  test('names the location of an additional property below the root', () => {
+    const error = {
+      keyword: 'additionalProperties',
+      instancePath: '/linkset/0/dpp/0',
+      params: { additionalProperty: 'colour' },
+    };
+    expect(formatValidationError(error)).toBe('Unknown field at linkset → 0 → dpp → 0: colour');
+  });
+
+  test('decodes an escaped URL relation key in the path', () => {
+    const error = {
+      keyword: 'required',
+      instancePath: '/linkset/0/https:~1~1test.uncefact.org~1voc~1untp~1dpp/0',
+      params: { missingProperty: 'title' },
+    };
+    expect(formatValidationError(error)).toBe(
+      'Missing required field: linkset → 0 → https://test.uncefact.org/voc/untp/dpp → 0 → title',
+    );
+  });
+
+  test('keeps an empty pointer token rather than collapsing the location', () => {
+    expect(pointerSegments('/a//b')).toEqual(['a', '', 'b']);
+    expect(pointerSegments('')).toEqual([]);
+    expect(pointerSegments('/x~0y')).toEqual(['x~y']);
+  });
+
+  test('appends the location to the default message', () => {
+    const error = {
+      keyword: 'minItems',
+      instancePath: '/linkset',
+      message: 'must NOT have fewer than 1 items',
+      params: {},
+    };
+    expect(formatValidationError(error)).toBe('must NOT have fewer than 1 items at linkset');
+  });
+
+  test('renders an empty member name explicitly and decodes ~0 after ~1', () => {
+    expect(formatValidationError({ keyword: 'type', instancePath: '/', params: { type: 'array' } })).toBe(
+      'Invalid type for "": expected array',
+    );
+    expect(formatValidationError({ keyword: 'type', instancePath: '/~01', params: { type: 'array' } })).toBe(
+      'Invalid type for ~1: expected array',
+    );
+    expect(formatValidationError({ keyword: 'type', instancePath: '/@context', params: { type: 'array' } })).toBe(
+      'Invalid type for @context: expected array',
+    );
+  });
+
+  test('names an empty offending member explicitly', () => {
+    expect(
+      formatValidationError({ keyword: 'additionalProperties', instancePath: '', params: { additionalProperty: '' } }),
+    ).toBe('Unknown field: ""');
+    expect(formatValidationError({ keyword: 'required', instancePath: '', params: { missingProperty: '' } })).toBe(
+      'Missing required field: ""',
     );
   });
 });

@@ -39,11 +39,20 @@ import {
 } from '@/lib/credentialService';
 import { isPermittedCredentialType, validateNormalizedCredential } from '@/lib/utils';
 import type { PermittedCredentialType, StoredCredential, StoredLinkSet, StoredScheme, TestStep } from '@/types';
+import { LinkSetVersionSelect } from '@/components/LinkSetVersionSelect';
 import { useError } from '@/contexts/ErrorContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Link2, Loader2, Server } from 'lucide-react';
-import { ArtefactKind, permittedCredentialTypes, TestCaseStatus, TestCaseStepId, type TabId } from '../../constants';
+import {
+  ArtefactKind,
+  permittedCredentialTypes,
+  TestCaseStatus,
+  TestCaseStepId,
+  type TabId,
+  DEFAULT_LINK_SET_SPEC_VERSION,
+  type LinkSetSpecVersion,
+} from '../../constants';
 
 /**
  * Quiet per-tab meta (final hi-fi, canvas section 08): a muted tabular-nums instance count, a
@@ -104,6 +113,11 @@ export default function Home() {
   // rows read their state through this rather than matching sources, because content-hash
   // identity can append or re-source instances underneath a URL. See urlBindings.ts.
   const [urlBindings, setUrlBindings] = useState<UrlBindings>(emptyUrlBindings);
+  // The UNTP spec version link sets are validated against (#988): a link set names no version of
+  // its own. The selection applies to link sets added from now on; each stored link set carries
+  // the value it was added under (StoredLinkSet.validationVersion), so changing this never
+  // relabels or re-runs an existing card. Default: the latest version that publishes a schema.
+  const [linkSetSpecVersion, setLinkSetSpecVersion] = useState<LinkSetSpecVersion>(DEFAULT_LINK_SET_SPEC_VERSION);
   // Which decrypted instance each envelope (by its content hash) produced (#813): a re-verify of
   // the same ciphertext rebinds to the decrypted instance instead of appending a second locked
   // card. Session-level like the URL bindings, failing open when the instance is gone; a Map
@@ -148,8 +162,15 @@ export default function Home() {
   // Shared ingestion for both link set entry points (file upload on the Link Sets tab, resolve via the
   // Link Sets tab). Identity is the resolver URL, else the filename (#811), so re-resolving the
   // same identifier replaces the card in place even when the response body changed.
+  // The version is read from this render's closure: an upload or resolve captures the handler at
+  // the moment it starts, so a selector change while the fetch is in flight does not reach it.
   const ingestLinkSet = (payload: Record<string, unknown>, source?: ArtefactSource) => {
-    const stored: StoredLinkSet = { original: payload, decoded: payload, source };
+    const stored: StoredLinkSet = {
+      original: payload,
+      decoded: payload,
+      source,
+      validationVersion: linkSetSpecVersion,
+    };
     const { outcome } = linkSet.dispatch((state) =>
       upsert(state, { payload: stored, contentHash: linkSetKey(source), mintInstanceId: newId }),
     );
@@ -408,6 +429,13 @@ export default function Home() {
         family={UPLOADER_FAMILIES[activeTab]}
         onArtefactUpload={handleArtefactUpload}
         setFileCount={setFileCount}
+        // The version is an input to adding a link set, so it sits under the heading, before the
+        // dropzone (#988).
+        beforeInputs={
+          activeTab === 'linksets' ? (
+            <LinkSetVersionSelect value={linkSetSpecVersion} onChange={setLinkSetSpecVersion} />
+          ) : undefined
+        }
       />
       {shouldDisplayUploadDetailBtn && (
         <div>

@@ -7,17 +7,33 @@ import { Card } from '@/components/ui/card';
 import { beginRun, commitResult, remove, restore } from '@/lib/artefactCollection';
 import { linkedCredentialRows, linkSetSubtitle, linkSetTitle } from '@/lib/linkSetCollection';
 
-import { linkSetValidationSteps } from '@/lib/linkSetValidation';
+import { formatValidationError, pointerSegments } from '@/lib/formatValidationErrors';
+import {
+  linkSetSchemaStepDetails,
+  linkSetSchemaUrl,
+  linkSetValidationSteps,
+  toLinkSetSchemaStepDetails,
+  validateLinkSetSchema,
+  type LinkSetSchemaStepDetails,
+} from '@/lib/linkSetValidation';
+import type { ErrorObject } from 'ajv';
+import { credentialIsTerminal, instanceStatus } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { fetchLinkedCredential } from '@/lib/fetchLinkedCredential';
 import { resolveBoundInstance, type UrlBindings } from '@/lib/urlBindings';
 import type { LinkedCredentialRow } from '@/lib/linkSetCollection';
-import type { ArtefactSlot, CollectionState } from '@/types/artefact';
+import type { ArtefactSlot, CollectionState, InstanceId, RunId } from '@/types/artefact';
 import type { ArtefactSource, StoredCredential, StoredLinkSet, TestStep } from '@/types';
 import { ChevronDown, ChevronRight, Loader2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CREDENTIAL_LINKS_DOCS_URL, TERMINAL_STATUSES, TestCaseStatus } from '../../constants';
+import {
+  CREDENTIAL_LINKS_DOCS_URL,
+  LINK_SET_VALIDATION_DOCS_URL,
+  TERMINAL_STATUSES,
+  TestCaseStatus,
+  TestCaseStepId,
+} from '../../constants';
 
 type LinkSetCollection = CollectionState<StoredLinkSet, TestStep[]>;
 type LinkSetDispatch = <Res extends { state: LinkSetCollection }>(
@@ -87,18 +103,14 @@ export function LinkSetTestResults({
       return next;
     });
   };
-  // Settle every fresh instance immediately with the stubbed step list: schema validation has not
-  // landed yet (#811), so there is no async pipeline to run. Committing the result straight away
-  // is what keeps a landed link set removable and its card out of the mid-run spinner state.
+  // Start the pipeline for any instance that has no live run and no result yet (freshly added,
+  // replaced, or restored idle by Undo). beginRun no-ops on an already-running slot, so a repeated
+  // effect cannot double-start.
   useEffect(() => {
     for (const item of collection.items) {
       if (item.runId === null && item.result === undefined) {
         const { runId } = dispatch((state) => beginRun(state, item.instanceId, linkSetValidationSteps(), newId));
-        if (runId) {
-          dispatch((state) =>
-            commitResult(state, { instanceId: item.instanceId, runId, result: linkSetValidationSteps() }),
-          );
-        }
+        if (runId) void runLinkSetPipeline(item.instanceId, runId, item.payload, dispatch);
       }
     }
   }, [collection.items, dispatch]);
@@ -107,6 +119,14 @@ export function LinkSetTestResults({
   // at its old position. restore() no-ops when the same link set was re-added before undoing.
   const handleRemove = (item: LinkSetSlot) => {
     const index = collection.items.findIndex((candidate) => candidate.instanceId === item.instanceId);
+    // What Undo puts back (#988, ADR-047 update): a settled result is restored intact, but a run
+    // still in flight is restored idle. Once the slot is removed, the run's later commits are
+    // rejected by the run guard, so restoring its token would leave the card spinning forever;
+    // an idle slot makes the begin-run effect start a fresh run instead. The captured version
+    // travels with the payload, so the restart validates against the same schema.
+    const snapshot: LinkSetSlot = credentialIsTerminal(item.result ?? [])
+      ? item
+      : { ...item, runId: null, result: undefined };
     dispatch((state) => remove(state, item.instanceId));
     // A stable toast id makes a newer removal replace the previous toast, enforcing ADR-047's
     // single-level undo instead of stacking several live Undo actions.
@@ -115,7 +135,7 @@ export function LinkSetTestResults({
       action: {
         label: 'Undo',
         onClick: () => {
-          const { restored } = dispatch((state) => restore(state, item, index));
+          const { restored } = dispatch((state) => restore(state, snapshot, index));
           if (!restored) {
             // restore() no-ops when the same link set was re-added before the undo; say so rather
             // than letting a user-initiated action appear to do nothing.
@@ -144,6 +164,125 @@ export function LinkSetTestResults({
         />
       ))}
     </section>
+  );
+}
+
+/**
+ * Runs the link set pipeline for one instance. Mirrors runSchemePipeline: the only write path is
+ * `setStep`, which commits the whole step list through the run guard and reports false once the
+ * run has been superseded (replaced, removed) so a stale run stops writing. Every throw settles
+ * the step; a link set never sits IN_PROGRESS because something unexpected escaped.
+ */
+async function runLinkSetPipeline(
+  instanceId: InstanceId,
+  runId: RunId,
+  stored: StoredLinkSet,
+  dispatch: LinkSetDispatch,
+): Promise<void> {
+  const steps = linkSetValidationSteps();
+  const setStep = (stepId: TestCaseStepId, patch: Partial<TestStep>): boolean => {
+    const index = steps.findIndex((step) => step.id === stepId);
+    if (index !== -1) steps[index] = { ...steps[index], ...patch };
+    const { applied } = dispatch((state) =>
+      commitResult(state, { instanceId, runId, result: steps.map((step) => ({ ...step })) }),
+    );
+    return applied;
+  };
+
+  if (!setStep(TestCaseStepId.LINKSET_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS })) return;
+  try {
+    const result = await validateLinkSetSchema(stored.decoded, stored.validationVersion);
+    const details = toLinkSetSchemaStepDetails(result);
+    setStep(TestCaseStepId.LINKSET_SCHEMA_VALIDATION, {
+      status: result.kind === 'document' && result.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+      details,
+    });
+  } catch (err) {
+    // Only a bug reaches here (the validator settles every expected failure into a result), so
+    // the log carries what an operator needs to find it, and the card still names the URL.
+    const schemaUrl = linkSetSchemaUrl(stored.validationVersion);
+    console.error('runLinkSetPipeline: schema validation threw', {
+      instanceId,
+      version: stored.validationVersion,
+      schemaUrl,
+      err,
+    });
+    setStep(TestCaseStepId.LINKSET_SCHEMA_VALIDATION, {
+      status: TestCaseStatus.FAILURE,
+      details: {
+        kind: 'schema-unusable',
+        version: stored.validationVersion,
+        schemaUrl,
+        message: err instanceof Error ? err.message : 'Schema validation failed for an unknown reason.',
+      } satisfies LinkSetSchemaStepDetails,
+    });
+  }
+}
+
+/**
+ * The v0.7.0 schema names link relations by a pattern (a lowercase name of letters and hyphens
+ * outside the `anchor`, `description` and `itemDescription` prefixes, or an http(s) URL of
+ * letters, digits, dots and slashes) and refuses every other member of a
+ * link context as an unknown field. To the verifier, "Unknown field: untp:dpp" reads as a typo;
+ * the rejected member is in fact a relation the published schema does not admit, so the card
+ * says so. The rule is applied only to context-level additionalProperties errors, and only to
+ * describe the error, never to re-validate.
+ */
+function isRelationRejection(error: ErrorObject, decoded: Record<string, unknown>): boolean {
+  if (error.keyword !== 'additionalProperties') return false;
+  const segments = pointerSegments(error.instancePath);
+  if (segments.length !== 2 || segments[0] !== 'linkset') return false;
+  // Relation-shaped means the rejected member holds an array of link targets, which is what a
+  // relation is under RFC 9264; a scalar or object member (`lastUpdated`, `@context`) is an
+  // ordinary unknown field and gets the ordinary sentence.
+  const contexts = (decoded as { linkset?: unknown }).linkset;
+  const context = Array.isArray(contexts) ? contexts[Number(segments[1])] : undefined;
+  const key = String((error.params as { additionalProperty?: unknown })?.additionalProperty);
+  return typeof context === 'object' && context !== null && Array.isArray((context as Record<string, unknown>)[key]);
+}
+
+function schemaStepMessages(
+  details: LinkSetSchemaStepDetails | undefined,
+  decoded: Record<string, unknown>,
+): Array<{ text: string; relationRule?: true }> {
+  if (!details) return [];
+  if (details.kind === 'schema-unavailable') {
+    // The bundled copy already stood in server-side for anything the host could not deliver, so
+    // a 4xx or a non-JSON body reaching the browser usually means the version has no usable
+    // schema; but a body read can also be cut off client-side, so the copy names the attempt and
+    // withholds the retry promise without asserting that nothing exists.
+    const retryable = details.reason === 'timeout' || details.reason === 'network';
+    const detail = details.message.replace(/\.$/, '');
+    return [
+      {
+        text: retryable
+          ? `The link set schema for UNTP v${details.version} could not be loaded, so this check could not determine whether the link set conforms. Details: ${detail}. Resolve or upload the link set again to retry.`
+          : `The link set schema for UNTP v${details.version} could not be loaded, so this check could not determine whether the link set conforms. Details: ${detail}. If this keeps happening, report it to the Playground operator and include the schema URL: ${details.schemaUrl}.`,
+      },
+    ];
+  }
+  if (details.kind === 'schema-unusable') {
+    return [
+      {
+        text: `The link set schema for UNTP v${
+          details.version
+        } could not be used, so this check could not determine whether the link set conforms. Report this problem to the Playground operator and include the schema URL: ${
+          details.schemaUrl
+        }. The schema loader reported: ${details.message.replace(/\.$/, '')}.`,
+      },
+    ];
+  }
+  return details.errors.map((error: ErrorObject) =>
+    isRelationRejection(error, decoded)
+      ? {
+          text: `${formatValidationError(error)}. The published UNTP v${
+            details.version
+          } schema rejects the relation "${String(
+            error.params?.additionalProperty,
+          )}": relation keys must be a lowercase name (letters and hyphens, not starting with "anchor", "description" or "itemDescription") or an http(s) URL made of letters, digits, "." and "/". This is a known restriction of the published schema. This error concerns the relation name only; any credential links listed on this card can still be verified.`,
+          relationRule: true,
+        }
+      : { text: formatValidationError(error) },
   );
 }
 
@@ -187,14 +326,9 @@ function LinkSetCard({
   const secondaryRows = allRows.filter((row) => row.secondary);
   const otherLinkCount = allRows.length - credentialRows.length - secondaryRows.length;
 
-  // Pending steps mean "validation not yet available", not "still running": there is no live
-  // pipeline this phase, so the card shows the quiet pending state rather than a spinner.
-  const overallStatus =
-    steps.length > 0 && steps.some((step) => step.status === TestCaseStatus.FAILURE)
-      ? TestCaseStatus.FAILURE
-      : steps.every((step) => step.status === TestCaseStatus.SUCCESS) && steps.length > 0
-        ? TestCaseStatus.SUCCESS
-        : TestCaseStatus.PENDING;
+  // The stored result is the schema step only, so the ordinary roll-up applies: a fresh or
+  // running instance shows the spinner, a settled one its outcome.
+  const overallStatus = instanceStatus(item.result);
 
   return (
     <Card className='group relative overflow-hidden p-4'>
@@ -208,7 +342,9 @@ function LinkSetCard({
           {isExpanded ? <ChevronDown className='h-4 w-4 shrink-0' /> : <ChevronRight className='h-4 w-4 shrink-0' />}
           <div className='flex min-w-0 flex-col'>
             <h3 className='truncate font-semibold'>{title}</h3>
-            <span className='truncate text-xs text-gray-500'>{linkSetSubtitle()}</span>
+            <span className='truncate text-xs text-gray-500' data-testid='linkset-subtitle'>
+              {linkSetSubtitle(linkSet)}
+            </span>
           </div>
         </div>
         <StatusIcon status={overallStatus} testId={item.instanceId} />
@@ -221,14 +357,34 @@ function LinkSetCard({
               <div className='flex items-center gap-2'>
                 <StatusIcon status={step.status} testId={step.id} />
                 <span>{step.name}</span>
-                {step.status === TestCaseStatus.PENDING && (
-                  <span className='text-xs text-muted-foreground' data-testid='linkset-validation-note'>
-                    not yet run: link set validation is coming in v0.4
-                  </span>
-                )}
               </div>
+              {step.id === TestCaseStepId.LINKSET_SCHEMA_VALIDATION &&
+                step.status === TestCaseStatus.FAILURE &&
+                step.details && (
+                  <ul
+                    className='mt-1 list-disc space-y-1 pl-6 text-sm text-red-600'
+                    data-testid='linkset-schema-errors'
+                  >
+                    {schemaStepMessages(linkSetSchemaStepDetails(step), linkSet.decoded).map((message, idx) => (
+                      <li key={idx} data-relation-rule={message.relationRule ? 'true' : undefined}>
+                        {message.text}
+                      </li>
+                    ))}
+                  </ul>
+                )}
             </div>
           ))}
+          <p className='text-xs text-muted-foreground'>
+            <a
+              href={LINK_SET_VALIDATION_DOCS_URL}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='underline'
+              data-testid='linkset-validation-docs'
+            >
+              What Schema Validation checks
+            </a>
+          </p>
           {credentialRows.length > 0 && (
             <div className='pt-2' data-testid='linked-credentials'>
               <p className='text-xs font-semibold text-muted-foreground'>

@@ -9,7 +9,7 @@ import { fetchErrorMessage } from '@/lib/fetchErrorMessages';
 import { resolveLinkSet } from '@/lib/resolveLinkSet';
 import { jwtDecode } from 'jwt-decode';
 import { Loader2, Upload } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { API_BASE_PATH } from '../../constants';
@@ -40,10 +40,13 @@ export function ArtefactUploader({
   family,
   onArtefactUpload,
   setFileCount,
+  beforeInputs,
 }: {
   family: UploaderFamilyConfig;
   onArtefactUpload: (artefact: unknown, source: ArtefactSource) => void;
   setFileCount: (count: number) => void;
+  /** Family-specific input rendered under the heading, before the dropzone (the link set version selector, #988). */
+  beforeInputs?: React.ReactNode;
 }) {
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const { resetErrors } = useError();
@@ -196,6 +199,7 @@ export function ArtefactUploader({
       <h2 className='text-xl font-semibold' data-testid='uploader-heading'>
         {family.heading}
       </h2>
+      {beforeInputs}
       <Card
         {...getRootProps()}
         className='p-8 min-h-[200px] border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors flex flex-col items-center justify-center gap-3'

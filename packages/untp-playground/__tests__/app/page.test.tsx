@@ -1,3 +1,4 @@
+import React from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
@@ -1586,5 +1587,129 @@ describe('alias remap across a decrypt collision (#813 follow-up blocker)', () =
     expect(props().collection.items).toHaveLength(1);
     expect(props().collection.items[0].instanceId).toBe(survivor);
     expect(props().collection.items[0].payload.encryptedEnvelope).toBeUndefined();
+  });
+});
+
+// Version capture (#988). A second, synthetic version is injected because production publishes a
+// single one, and the selector is replaced with a plain <select> so the change can be driven in
+// jsdom; the real selector has its own test.
+jest.mock('../../constants', () => ({
+  ...jest.requireActual('../../constants'),
+  LINK_SET_SPEC_VERSIONS: ['0.7.0', '0.8.0'],
+  DEFAULT_LINK_SET_SPEC_VERSION: '0.8.0',
+}));
+jest.mock('@/components/LinkSetVersionSelect', () => ({
+  LinkSetVersionSelect: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <select data-testid='mock-version-select' value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value='0.7.0'>v0.7.0</option>
+      <option value='0.8.0'>v0.8.0</option>
+    </select>
+  ),
+}));
+
+describe('link set spec version selection (#988)', () => {
+  // The uploader mock splits an operation into "start" (the moment the handler is captured, as
+  // the real uploader captures it when the drop or Resolve click happens) and "finish" (when the
+  // parsed document reaches the page), so a selector change in between is observable.
+  let captured: ((artefact: any, source: any) => void) | null = null;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    captured = null;
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({
+        onArtefactUpload,
+        beforeInputs,
+      }: {
+        onArtefactUpload: (artefact: any, source: any) => void;
+        beforeInputs?: React.ReactNode;
+      }) => (
+        <div>
+          {beforeInputs}
+          <button data-testid='mock-start-upload' onClick={() => (captured = onArtefactUpload)}>
+            Start
+          </button>
+          <button
+            data-testid='mock-finish-file'
+            onClick={() =>
+              captured?.({ linkset: [{ anchor: 'https://id.example.org/01/1' }] }, { kind: 'file', filename: 'a.json' })
+            }
+          >
+            Finish file
+          </button>
+          <button
+            data-testid='mock-finish-resolve'
+            onClick={() => captured?.({ linkset: [] }, { kind: 'url', url: 'https://r.example.org/01/1?linkType=all' })}
+          >
+            Finish resolve
+          </button>
+        </div>
+      ),
+    );
+  });
+
+  const storedVersion = () =>
+    (LinkSetTestResults as jest.Mock).mock.lastCall?.[0]?.collection.items.map((i: any) => i.payload.validationVersion);
+
+  it('defaults to the latest version in the list and stamps it on an added link set', async () => {
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    expect(screen.getByTestId('mock-version-select')).toHaveValue('0.8.0');
+
+    fireEvent.click(screen.getByTestId('mock-start-upload'));
+    fireEvent.click(screen.getByTestId('mock-finish-file'));
+    await screen.findByTestId('mock-linkset-results');
+    expect(storedVersion()).toEqual(['0.8.0']);
+  });
+
+  // The resolve path goes through the same captured handler as a file drop (ArtefactUploader calls
+  // onArtefactUpload after awaiting resolveLinkSet), so one row covers both; the secondary
+  // resolve, which the page owns, has its own case below.
+  it('keeps the version selected when an upload started, not the one selected when it finished', async () => {
+    const finish = 'mock-finish-file';
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.change(screen.getByTestId('mock-version-select'), { target: { value: '0.7.0' } });
+
+    fireEvent.click(screen.getByTestId('mock-start-upload'));
+    fireEvent.change(screen.getByTestId('mock-version-select'), { target: { value: '0.8.0' } });
+    fireEvent.click(screen.getByTestId(finish));
+
+    await screen.findByTestId('mock-linkset-results');
+    expect(storedVersion()).toEqual(['0.7.0']);
+
+    // The next operation uses the new selection, and re-adding the same identity replaces the
+    // instance under the new version rather than keeping the old stamp.
+    fireEvent.click(screen.getByTestId('mock-start-upload'));
+    fireEvent.click(screen.getByTestId(finish));
+    await waitFor(() => expect(storedVersion()).toEqual(['0.8.0']));
+  });
+
+  it('stamps a secondary resolver resolve with the version selected when it started', async () => {
+    let release: (value: any) => void = () => {};
+    (resolveLinkSet as jest.Mock).mockReturnValue(new Promise((resolve) => (release = resolve)));
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.change(screen.getByTestId('mock-version-select'), { target: { value: '0.7.0' } });
+
+    // Land one link set so the results component (and its onResolveSecondary prop) exists.
+    fireEvent.click(screen.getByTestId('mock-start-upload'));
+    fireEvent.click(screen.getByTestId('mock-finish-file'));
+    await screen.findByTestId('mock-linkset-results');
+
+    const onResolveSecondary = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0]?.onResolveSecondary;
+    const pending = onResolveSecondary('https://second.example.org/01/2');
+    fireEvent.change(screen.getByTestId('mock-version-select'), { target: { value: '0.8.0' } });
+    await act(async () => {
+      release({
+        ok: true,
+        payload: { linkset: [] },
+        requestUrl: 'https://second.example.org/01/2?linkType=all',
+        finalUrl: '',
+      });
+      await pending;
+    });
+
+    await waitFor(() => expect(storedVersion()).toEqual(['0.7.0', '0.7.0']));
   });
 });

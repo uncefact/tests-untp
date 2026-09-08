@@ -56,6 +56,9 @@
   },
   "typesVersions": {
     "*": {
+      "artefacts": [
+        "./build/artefacts/index.d.ts"
+      ],
       "multibase-digest": [
         "./build/multibase-digest/index.d.ts"
       ],

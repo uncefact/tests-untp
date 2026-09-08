@@ -4,6 +4,7 @@ import {
   UNTP_SHORT_CREDENTIAL_TYPES,
   UNTP_CORE_SCHEMA_FILENAMES,
   UNTP_SPECIFICATION_PAGE_SLUGS,
+  buildLinkSetSchemaUrl,
 } from './urls';
 
 describe('buildUntpArtefactUrls', () => {
@@ -131,5 +132,19 @@ describe('buildSpecificationPageUrl', () => {
 
   it('keeps the slug set aligned with the short-code map', () => {
     expect(Object.keys(UNTP_SPECIFICATION_PAGE_SLUGS).sort()).toEqual(Object.keys(UNTP_SHORT_CREDENTIAL_TYPES).sort());
+  });
+});
+
+describe('buildLinkSetSchemaUrl', () => {
+  it('builds the artefacts-layout idr schema URL the manifest pins for v0.7.0', () => {
+    expect(buildLinkSetSchemaUrl('0.7.0')).toBe(
+      'https://untp.unece.org/artefacts/schema/v0.7.0/idr/LinksetSchema.json',
+    );
+  });
+
+  it('uses the same layout for a later version', () => {
+    expect(buildLinkSetSchemaUrl('0.8.0')).toBe(
+      'https://untp.unece.org/artefacts/schema/v0.8.0/idr/LinksetSchema.json',
+    );
   });
 });

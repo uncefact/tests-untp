@@ -39,4 +39,13 @@ export interface StoredLinkSet {
   original: any;
   decoded: Record<string, any>;
   source?: ArtefactSource;
+  /**
+   * The UNTP spec version the verifier had selected when this link set was added (#988). A link
+   * set names no version itself, so this is the validation input the pipeline and the card
+   * subtitle read; changing the selector later never rewrites it. Re-adding the same link set
+   * under another version replaces the instance with a new value here. Deliberately a plain
+   * string, not `LinkSetSpecVersion`: that union describes what the selector offers now, while
+   * this records what was selected then, and the report will serialise it.
+   */
+  validationVersion: string;
 }
