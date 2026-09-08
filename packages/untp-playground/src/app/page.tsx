@@ -24,8 +24,16 @@ import { SchemeTestResults } from '@/components/SchemeTestResults';
 import { SectionHeader } from '@/components/SectionHeader';
 import { TestResults } from '@/components/TestResults';
 import { TestReportProvider } from '@/contexts/TestReportContext';
+import type { LinkSetReportInput } from '@/types';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
-import { admitDecrypted, beginRun, commitResult, replacePayload, upsert } from '@/lib/artefactCollection';
+import {
+  admitDecrypted,
+  beginRun,
+  commitResult,
+  replacePayload,
+  upsert,
+  updatePayload,
+} from '@/lib/artefactCollection';
 import type { ArtefactSlot, CollectionState } from '@/types/artefact';
 import {
   credentialContentHash,
@@ -111,6 +119,9 @@ function TabMeta({
   );
 }
 
+// A stable empty input so a page with no link sets does not reset the report on unrelated changes.
+const NO_LINK_SET_REPORT_INPUTS: LinkSetReportInput[] = [];
+
 export default function Home() {
   const credential = useArtefactCollection<StoredCredential, TestStep[]>();
   const scheme = useArtefactCollection<StoredScheme, TestStep[]>();
@@ -181,6 +192,19 @@ export default function Home() {
   const schemeInstances = useMemo(
     () => scheme.state.items.map((item) => ({ scheme: item.payload, steps: item.result ?? [] })),
     [scheme.state.items],
+  );
+  // The report's link set input (#814): each stored link set with the assessment its card shows.
+  // Depending on the assessments map means this identity changes whenever a link set, a URL
+  // binding or a credential instance changes, which is exactly when a generated report is stale.
+  const linkSetInstances = useMemo(
+    () =>
+      linkSet.state.items.length === 0
+        ? NO_LINK_SET_REPORT_INPUTS
+        : linkSet.state.items.map((item) => ({
+            linkSet: item.payload,
+            assessment: linkSetAssessments.get(item.instanceId),
+          })),
+    [linkSet.state.items, linkSetAssessments],
   );
 
   // Shared ingestion for both link set entry points (file upload on the Link Sets tab, resolve via the
@@ -283,17 +307,26 @@ export default function Home() {
       const envelopeHash = item.contentHash;
       // One atomic transition: the twin lookup runs against the collection's CURRENT state, never
       // this render's closure, and the absorb/replace lands in the same dispatch.
-      const { outcome } = credential.dispatch((state: CollectionState<StoredCredential, TestStep[]>) =>
-        admitDecrypted<StoredCredential, TestStep[]>(state, {
+      const { outcome } = credential.dispatch((state: CollectionState<StoredCredential, TestStep[]>) => {
+        // A plaintext twin that was verified from a link set carries that provenance; the
+        // decrypting slot keeps its own origin and inherits the link set when it has none (#814).
+        const twinSource = state.items.find(
+          (slot) => slot.contentHash === newHash && slot.instanceId !== item.instanceId,
+        )?.payload.source;
+        const payload: StoredCredential =
+          twinSource?.via === 'link-set' && stored.source && !stored.source.linkSet
+            ? { ...stored, source: { ...stored.source, via: 'link-set', linkSet: twinSource.linkSet } }
+            : stored;
+        return admitDecrypted<StoredCredential, TestStep[]>(state, {
           instanceId: item.instanceId,
-          payload: stored,
+          payload,
           contentHash: newHash,
           leadingStep: { id: TestCaseStepId.DECRYPTION, name: 'Decryption', status: TestCaseStatus.SUCCESS },
           isTerminal: (result) => credentialIsTerminal(result ?? []),
           leadsWithDecryption: (result) => result[0]?.id === TestCaseStepId.DECRYPTION,
           mintRunId: newId,
-        }),
-      );
+        });
+      });
       if (outcome.kind === 'missing') return true; // removed mid-decrypt; the panel is unmounting
       if (outcome.twinId) {
         const twinId = outcome.twinId;
@@ -358,6 +391,18 @@ export default function Home() {
           stampBindings([source.url, source.requestedUrl]);
           setUrlBindings((bindings) =>
             recordUrlBinding(bindings, [source.url, source.requestedUrl], aliasInstance.instanceId),
+          );
+        }
+        // Reached through a link set: keep the instance, its result and its original origin, but
+        // record the link set on the source so the card and the report can trace it (#814). Only
+        // a change to the recorded link set writes, so a repeat Verify is not a payload change.
+        if (source?.via === 'link-set' && aliasInstance.payload.source?.linkSet !== source.linkSet) {
+          const linkSet = source.linkSet;
+          credential.dispatch((state: CollectionState<StoredCredential, TestStep[]>) =>
+            updatePayload(state, aliasInstance.instanceId, (payload) => ({
+              ...payload,
+              source: payload.source ? { ...payload.source, via: 'link-set', linkSet } : source,
+            })),
           );
         }
         return { accepted: true, instanceId: aliasInstance.instanceId, alreadyDecrypted: true };
@@ -525,7 +570,11 @@ export default function Home() {
     <div className='min-h-screen flex flex-col'>
       <Header />
       <main className='container mx-auto p-8 max-w-7xl flex-1'>
-        <TestReportProvider credentialInstances={credentialInstances} schemeInstances={schemeInstances}>
+        <TestReportProvider
+          credentialInstances={credentialInstances}
+          schemeInstances={schemeInstances}
+          linkSetInstances={linkSetInstances}
+        >
           <SectionHeader title='Test artefacts'>
             <ReportActions />
           </SectionHeader>
@@ -595,7 +644,7 @@ export default function Home() {
                     <EmptyState
                       icon={<Link2 size={28} />}
                       title='No link sets yet'
-                      guidance='Add a link set from the panel on the right. Drop a JSON file or resolve from an identity resolver service. Each link set you add appears here.'
+                      guidance='Add a link set from the panel on the right. Drop a JSON file or resolve from an identity resolver service. Each link set you add appears here and in the generated report.'
                     />
                   ) : (
                     <LinkSetTestResults

@@ -5,24 +5,29 @@ import { StatusIcon } from '@/components/StatusIcon';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { beginRun, commitResult, remove, restore } from '@/lib/artefactCollection';
-import { linkedCredentialRows, linkSetSubtitle, linkSetTitle, occurrenceKey } from '@/lib/linkSetCollection';
 import {
+  linkedCredentialRows,
+  linkSetKey,
+  linkSetSubtitle,
+  linkSetTitle,
+  occurrenceKey,
+} from '@/lib/linkSetCollection';
+import {
+  coverageCountText,
   mismatchText,
-  NO_RELATION_LINKS_NOTE,
   type LinkSetAssessment,
   type RowCoverageOutcome,
 } from '@/lib/linkTypeCoverage';
 
-import { formatValidationError, pointerSegments } from '@/lib/formatValidationErrors';
 import {
   linkSetSchemaStepDetails,
   linkSetSchemaUrl,
   linkSetValidationSteps,
+  schemaStepMessages,
   toLinkSetSchemaStepDetails,
   validateLinkSetSchema,
   type LinkSetSchemaStepDetails,
 } from '@/lib/linkSetValidation';
-import type { ErrorObject } from 'ajv';
 import { credentialIsTerminal, instanceStatus } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { fetchLinkedCredential } from '@/lib/fetchLinkedCredential';
@@ -246,72 +251,8 @@ async function runLinkSetPipeline(
   }
 }
 
-/**
- * The v0.7.0 schema names link relations by a pattern (a lowercase name of letters and hyphens
- * outside the `anchor`, `description` and `itemDescription` prefixes, or an http(s) URL of
- * letters, digits, dots and slashes) and refuses every other member of a
- * link context as an unknown field. To the verifier, "Unknown field: untp:dpp" reads as a typo;
- * the rejected member is in fact a relation the published schema does not admit, so the card
- * says so. The rule is applied only to context-level additionalProperties errors, and only to
- * describe the error, never to re-validate.
- */
-function isRelationRejection(error: ErrorObject, decoded: Record<string, unknown>): boolean {
-  if (error.keyword !== 'additionalProperties') return false;
-  const segments = pointerSegments(error.instancePath);
-  if (segments.length !== 2 || segments[0] !== 'linkset') return false;
-  // Relation-shaped means the rejected member holds an array of link targets, which is what a
-  // relation is under RFC 9264; a scalar or object member (`lastUpdated`, `@context`) is an
-  // ordinary unknown field and gets the ordinary sentence.
-  const contexts = (decoded as { linkset?: unknown }).linkset;
-  const context = Array.isArray(contexts) ? contexts[Number(segments[1])] : undefined;
-  const key = String((error.params as { additionalProperty?: unknown })?.additionalProperty);
-  return typeof context === 'object' && context !== null && Array.isArray((context as Record<string, unknown>)[key]);
-}
-
-function schemaStepMessages(
-  details: LinkSetSchemaStepDetails | undefined,
-  decoded: Record<string, unknown>,
-): Array<{ text: string; relationRule?: true }> {
-  if (!details) return [];
-  if (details.kind === 'schema-unavailable') {
-    // The bundled copy already stood in server-side for anything the host could not deliver, so
-    // a 4xx or a non-JSON body reaching the browser usually means the version has no usable
-    // schema; but a body read can also be cut off client-side, so the copy names the attempt and
-    // withholds the retry promise without asserting that nothing exists.
-    const retryable = details.reason === 'timeout' || details.reason === 'network';
-    const detail = details.message.replace(/\.$/, '');
-    return [
-      {
-        text: retryable
-          ? `The link set schema for UNTP v${details.version} could not be loaded, so this check could not determine whether the link set conforms. Details: ${detail}. Resolve or upload the link set again to retry.`
-          : `The link set schema for UNTP v${details.version} could not be loaded, so this check could not determine whether the link set conforms. Details: ${detail}. If this keeps happening, report it to the Playground operator and include the schema URL: ${details.schemaUrl}.`,
-      },
-    ];
-  }
-  if (details.kind === 'schema-unusable') {
-    return [
-      {
-        text: `The link set schema for UNTP v${
-          details.version
-        } could not be used, so this check could not determine whether the link set conforms. Report this problem to the Playground operator and include the schema URL: ${
-          details.schemaUrl
-        }. The schema loader reported: ${details.message.replace(/\.$/, '')}.`,
-      },
-    ];
-  }
-  return details.errors.map((error: ErrorObject) =>
-    isRelationRejection(error, decoded)
-      ? {
-          text: `${formatValidationError(error)}. The published UNTP v${
-            details.version
-          } schema rejects the relation "${String(
-            error.params?.additionalProperty,
-          )}": relation keys must be a lowercase name (letters and hyphens, not starting with "anchor", "description" or "itemDescription") or an http(s) URL made of letters, digits, "." and "/". This is a known restriction of the published schema. This error concerns the relation name only; any credential links listed on this card can still be verified.`,
-          relationRule: true,
-        }
-      : { text: formatValidationError(error) },
-  );
-}
+/** The card's relation-rule message ends with what the verifier can still do here; the report omits it. */
+const VERIFY_HINT = ' Any credential links listed on this card can still be verified.';
 
 function LinkSetCard({
   item,
@@ -403,7 +344,7 @@ function LinkSetCard({
                   >
                     {schemaStepMessages(linkSetSchemaStepDetails(step), linkSet.decoded).map((message, idx) => (
                       <li key={idx} data-relation-rule={message.relationRule ? 'true' : undefined}>
-                        {message.text}
+                        {message.relationRule ? `${message.text}${VERIFY_HINT}` : message.text}
                       </li>
                     ))}
                   </ul>
@@ -411,11 +352,7 @@ function LinkSetCard({
               {step.id === TestCaseStepId.LINKSET_LINK_TYPE_COVERAGE && assessment && (
                 <div className='mt-1 pl-6 text-sm' data-testid='linkset-coverage'>
                   <p className='text-muted-foreground' data-testid='linkset-coverage-count'>
-                    {assessment.coverage.total === 0
-                      ? NO_RELATION_LINKS_NOTE
-                      : `${assessment.coverage.checked} of ${assessment.coverage.total} credential ${
-                          assessment.coverage.total === 1 ? 'link' : 'links'
-                        } checked.`}
+                    {coverageCountText(assessment.coverage)}
                   </p>
                   {assessment.coverage.mismatches.length > 0 && (
                     <ul
@@ -457,6 +394,7 @@ function LinkSetCard({
                   <LinkedCredentialRowView
                     key={`${row.href}-${index}`}
                     row={row}
+                    linkSetId={linkSetKey(linkSet.source)}
                     coverage={rowOutcome(row)}
                     credentialItems={credentialItems}
                     urlBindings={urlBindings}
@@ -536,6 +474,7 @@ function LinkSetCard({
  */
 function LinkedCredentialRowView({
   row,
+  linkSetId,
   coverage,
   credentialItems,
   urlBindings,
@@ -548,6 +487,8 @@ function LinkedCredentialRowView({
   setDiscoveredEncrypted,
 }: {
   row: LinkedCredentialRow;
+  /** The link set's identity (resolver request URL or filename), recorded on the verified credential's source. */
+  linkSetId: string;
   /** This row's Link Type Coverage outcome (#1007), shown beside its verification state. */
   coverage: RowCoverageOutcome | undefined;
   credentialItems: CredentialSlot[];
@@ -583,7 +524,12 @@ function LinkedCredentialRowView({
         toast.error(result.message);
         return;
       }
-      const outcome = onVerifyCredential(result.credential, { kind: 'url', url: row.href, via: 'link-set' });
+      const outcome = onVerifyCredential(result.credential, {
+        kind: 'url',
+        url: row.href,
+        via: 'link-set',
+        linkSet: linkSetId,
+      });
       if (outcome.accepted && outcome.alreadyDecrypted) {
         // A known envelope rebinding to its decrypted instance: no pipeline restarted, so neither
         // the verifying nor the key toast would be honest.

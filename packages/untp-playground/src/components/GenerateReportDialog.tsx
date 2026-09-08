@@ -23,7 +23,8 @@ export function GenerateReportDialog() {
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      await generateReport(implementationName);
+      // The name is validated trimmed, so it is recorded trimmed too.
+      await generateReport(implementationName.trim());
       setOpen(false);
     } finally {
       setIsGenerating(false);
@@ -36,7 +37,7 @@ export function GenerateReportDialog() {
     report !== null
       ? 'A report has already been generated'
       : !canGenerateReport
-        ? 'Upload and validate a credential or conformity scheme to generate a conformance report'
+        ? 'Add a credential, conformity scheme or link set and let it finish validating to generate a conformance report'
         : 'Generate UNTP conformance report';
 
   return (
@@ -82,7 +83,7 @@ export function GenerateReportDialog() {
             >
               <Button
                 onClick={handleGenerate}
-                disabled={!isValid || isGenerating}
+                disabled={!isValid || isGenerating || !canGenerateReport}
                 data-testid='confirm-generate-dialog-button'
               >
                 {isGenerating ? (

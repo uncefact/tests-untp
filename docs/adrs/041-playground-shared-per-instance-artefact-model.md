@@ -2,6 +2,7 @@
 
 - **Date:** 2026-07-15
 - **Status:** accepted
+- **Update (2026-09-08):** amends the Decision's report-readiness rule. For the downloadable report (#814) a loaded link set is a reportable family whose stored result, the Schema Validation step, must be terminal; its derived Link Type Coverage step (#1007) may be recorded as pending and does not change the link set's status, while a coverage failure fails the link set and the report. Still-encrypted credential instances are excluded from the report and do not hold generation (#813). A generated report is invalidated when link set instances, URL bindings, credential instances or scheme instances change.
 - **Update (2026-08-20):** two rules recorded here became per-family with #811. Identity: link sets key by the normalised resolver request URL rather than a content hash, per [ADR-046](./046-link-set-identity-is-the-resolver-request-url.md). Removal: link sets remove immediately with a toast-and-Undo (the model gained a pure `restore` operation), per [ADR-047](./047-link-set-removal-is-undoable-not-confirmed.md), which supersedes this record's rejection of delete-with-undo for that family. Credentials and schemes keep content-hash identity and dialog-confirmed removal as recorded here.
 
 ## Context

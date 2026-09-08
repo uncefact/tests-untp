@@ -212,3 +212,32 @@ describe('step details round trip', () => {
     expect(linkSetSchemaStepDetails({ ...step, details: undefined })).toBeUndefined();
   });
 });
+
+describe('linkSetSchemaStepDetails field checks (#814)', () => {
+  const step = (details: unknown) =>
+    ({ id: 'linkset-schema-validation', name: 'Schema Validation', status: 'failure', details }) as any;
+  it('rejects a kind with no attempt fields, and each variant missing a required field', () => {
+    expect(linkSetSchemaStepDetails(step({ kind: 'document' }))).toBeUndefined();
+    expect(linkSetSchemaStepDetails(step({ kind: 'document', version: '0.7.0', schemaUrl: 'u' }))).toBeUndefined();
+    expect(
+      linkSetSchemaStepDetails(step({ kind: 'schema-unavailable', version: '0.7.0', schemaUrl: 'u', message: 'm' })),
+    ).toBeUndefined();
+    expect(
+      linkSetSchemaStepDetails(step({ kind: 'schema-unusable', version: '0.7.0', schemaUrl: 'u' })),
+    ).toBeUndefined();
+    expect(linkSetSchemaStepDetails(step({ kind: 'document', version: '0.7.0', schemaUrl: 'u', errors: [] }))).toEqual({
+      kind: 'document',
+      version: '0.7.0',
+      schemaUrl: 'u',
+      errors: [],
+    });
+    expect(
+      linkSetSchemaStepDetails(
+        step({ kind: 'schema-unavailable', version: '0.7.0', schemaUrl: 'u', message: 'm', reason: 'timeout' }),
+      ),
+    ).toMatchObject({ reason: 'timeout' });
+    expect(
+      linkSetSchemaStepDetails(step({ kind: 'schema-unusable', version: '0.7.0', schemaUrl: 'u', message: 'm' })),
+    ).toMatchObject({ message: 'm' });
+  });
+});

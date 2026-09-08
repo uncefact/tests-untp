@@ -4,6 +4,20 @@ These are the user-facing release notes for the UNTP Playground. They focus
 on what's new for you, the person using the playground, not on the internal
 mechanics. For a technical, per-change log see [CHANGELOG.md](./CHANGELOG.md).
 
+## Unreleased
+
+### Link sets in your report
+
+A generated report now includes every link set you loaded, with the UNTP version it was checked against, the schema result, and how many of its credential links you verified and whether each was the kind of credential its link claimed. You can generate a report from a link set alone, and you do not have to verify every link first: the coverage line records what you checked.
+
+### Credentials grouped by type
+
+The HTML report lists credentials under a heading per type, with a count, and titles each block the way its card is titled: a credential by its filename or the last part of its URL, a scheme by its name, a link set by the resolver address.
+
+### One JSON field renamed
+
+The JSON report's scheme array is now `conformitySchemes` (it was `conformitySchemeResults`), and the `linkSets` array joins it. All three family arrays are always present, and every entry now carries one `status` field (the duplicate `overallStatus` is gone). If a tool of yours reads the old names, update it.
+
 ## 0.3.0 — 2026-05-15
 
 This release brings the playground up to

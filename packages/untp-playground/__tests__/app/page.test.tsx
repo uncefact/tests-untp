@@ -13,7 +13,7 @@ import { ArtefactUploader } from '@/components/ArtefactUploader';
 import { SchemeTestResults } from '@/components/SchemeTestResults';
 import { TestResults } from '@/components/TestResults';
 import { LinkSetTestResults } from '@/components/LinkSetTestResults';
-import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
+import { beginRun, commitResult, remove, restore, updatePayload } from '@/lib/artefactCollection';
 import { newId } from '@/lib/id';
 import { resolveLinkSet } from '@/lib/resolveLinkSet';
 import Home from '@/app/page';
@@ -1474,11 +1474,19 @@ describe('decrypt admission, collision and re-verify identity (#813 panel ruling
 
   it('absorbs a settled twin on collision: identity, bindings and a leading Decryption step', async () => {
     render(<Home />);
-    // Load the plaintext twin and settle it manually through the collection.
+    // Load the plaintext twin (as a link set Verify would) and settle it manually through the collection.
     fireEvent.click(screen.getByTestId('mock-upload-plain'));
     await screen.findByRole('tab', { name: /Credentials.*1/ });
     let props = testResultsProps();
     const twin = props.collection.items[0];
+    await act(async () => {
+      props.dispatch((state: any) =>
+        updatePayload(state, twin.instanceId, (payload: any) => ({
+          ...payload,
+          source: { ...payload.source, via: 'link-set', linkSet: 'https://r.example.org/01/9?linkType=all' },
+        })),
+      );
+    });
     await act(async () => {
       const { runId } = props.dispatch((state: any) => beginRun(state, twin.instanceId, [], newId));
       props.dispatch((state: any) =>
@@ -1507,6 +1515,13 @@ describe('decrypt admission, collision and re-verify identity (#813 panel ruling
     expect(props.collection.items[0].instanceId).toBe(locked.instanceId);
     expect(props.collection.items[0].result[0]).toMatchObject({ id: 'decryption', status: 'success' });
     expect(props.collection.items[0].result[1]).toMatchObject({ id: 'proof-type' });
+    // The survivor keeps its own origin and inherits the twin's link set provenance (#814).
+    expect(props.collection.items[0].payload.source).toEqual({
+      kind: 'url',
+      url: 'https://x.example.org/enc.json',
+      via: 'link-set',
+      linkSet: 'https://r.example.org/01/9?linkType=all',
+    });
     expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Merged with the already-loaded'));
     // Binding remap is pinned at the unit layer (remapUrlBindings); the collection state above is
     // the page-level observable contract.
@@ -1533,6 +1548,94 @@ describe('decrypt admission, collision and re-verify identity (#813 panel ruling
     expect(items[0].instanceId).toBe(locked.instanceId);
     expect(items[0].payload.encryptedEnvelope).toBeUndefined();
     expect(items[0].payload.decryptedFromEnvelope).toBe(true);
+  });
+});
+
+describe('a known envelope verified from a link set records the link set on its source (#814)', () => {
+  const envelope = {
+    cipherText: 'SGVsbG8=',
+    iv: 'nLUYsnXBY8bbXY45',
+    tag: '7j0RRSoEIm2FAo52m1pyow==',
+    type: 'aes-256-gcm',
+  };
+  const dpp = (id: string) => ({
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiableCredential', 'DigitalProductPassport'],
+    id,
+  });
+  const linkSetSource = {
+    kind: 'url',
+    url: 'https://x.example.org/enc.json',
+    via: 'link-set',
+    linkSet: 'https://r.example.org/01/1?linkType=all',
+  };
+
+  beforeEach(() => {
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (a: any, s: any) => void }) => (
+        <div>
+          <button
+            data-testid='mock-upload-envelope-file'
+            onClick={() => onArtefactUpload(envelope, { kind: 'file', filename: 'encrypted-upload.json' })}
+          >
+            upload
+          </button>
+          <button
+            data-testid='mock-verify-envelope-from-linkset'
+            onClick={() => onArtefactUpload(envelope, linkSetSource)}
+          >
+            verify
+          </button>
+        </div>
+      ),
+    );
+  });
+  const testResultsProps = () => (TestResults as jest.Mock).mock.lastCall?.[0];
+
+  it('keeps the decrypted instance, its result and its file origin, and adds via and linkSet; a repeat Verify changes nothing', async () => {
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload-envelope-file'));
+    await screen.findByRole('tab', { name: /Credentials.*1/ });
+    const locked = testResultsProps().collection.items[0];
+    await act(async () => {
+      testResultsProps().onDecrypted(locked, dpp('urn:decrypted'));
+    });
+    await act(async () => {
+      const { runId } = testResultsProps().dispatch((state: any) => beginRun(state, locked.instanceId, [], newId));
+      testResultsProps().dispatch((state: any) =>
+        commitResult(state, {
+          instanceId: locked.instanceId,
+          runId,
+          result: [{ id: 'proof-type', name: 'Proof Type Detection', status: 'success' }],
+        }),
+      );
+    });
+    const decrypted = testResultsProps().collection.items[0];
+    expect(decrypted.payload.source).toEqual({ kind: 'file', filename: 'encrypted-upload.json' });
+    expect(decrypted.result).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('mock-verify-envelope-from-linkset'));
+    });
+    const items = testResultsProps().collection.items;
+    expect(items).toHaveLength(1);
+    expect(items[0].instanceId).toBe(locked.instanceId);
+    expect(items[0].result).toBe(decrypted.result);
+    expect(items[0].payload.source).toEqual({
+      kind: 'file',
+      filename: 'encrypted-upload.json',
+      via: 'link-set',
+      linkSet: 'https://r.example.org/01/1?linkType=all',
+    });
+    const afterFirst = items[0].payload;
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('mock-verify-envelope-from-linkset'));
+    });
+    expect(testResultsProps().collection.items[0].payload).toBe(afterFirst);
   });
 });
 
@@ -2087,5 +2190,135 @@ describe('binding stamps and batched updates (#1007 panel ruling)', () => {
     const bindings: Map<string, string> = (LinkSetTestResults as jest.Mock).mock.lastCall?.[0].urlBindings;
     expect(testResultsProps().collection.items).toHaveLength(1);
     expect(bindings.get('https://x/plain')).toBe(locked.instanceId);
+  });
+});
+
+describe('report inputs for link sets (#814)', () => {
+  const uploadLinkSet = () => {
+    (isEnvelopedProof as jest.Mock).mockReturnValue(false);
+    (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
+    (detectExtension as jest.Mock).mockReturnValue(undefined);
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
+        <button
+          data-testid='mock-upload-linkset-file'
+          onClick={() =>
+            onArtefactUpload(
+              { linkset: [{ anchor: 'https://id.example.org/01/1', dpp: [{ href: 'https://x/c', title: 'C' }] }] },
+              { kind: 'file', filename: 'linkset.json' },
+            )
+          }
+        >
+          Upload link set
+        </button>
+      ),
+    );
+    (TestResults as jest.Mock).mockImplementation(({ collection, dispatch }: any) => (
+      <button
+        data-testid='mock-settle-credentials'
+        onClick={() => {
+          collection.items.forEach((item: any, index: number) => {
+            if (item.result?.length) return;
+            const { runId } = dispatch((state: any) => beginRun(state, item.instanceId, [], () => `run-${index}`));
+            dispatch((state: any) =>
+              commitResult(state, {
+                instanceId: item.instanceId,
+                runId,
+                result: [
+                  { id: 'untp-schema-validation', name: 'UNTP Schema Validation', status: TestCaseStatus.SUCCESS },
+                ],
+              }),
+            );
+          });
+        }}
+      >
+        Settle
+      </button>
+    ));
+  };
+  const providerInputs = () => (TestReportProvider as jest.Mock).mock.lastCall?.[0].linkSetInstances;
+  const cardProps = () => (LinkSetTestResults as jest.Mock).mock.lastCall?.[0];
+
+  it('hands the provider the same empty input while no link set is loaded, whatever else changes', async () => {
+    uploadLinkSet();
+    render(<Home />);
+    const empty = (TestReportProvider as jest.Mock).mock.lastCall?.[0].linkSetInstances;
+    expect(empty).toEqual([]);
+    await userEvent.click(screen.getByRole('tab', { name: /Conformity Schemes/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
+    expect((TestReportProvider as jest.Mock).mock.lastCall?.[0].linkSetInstances).toBe(empty);
+  });
+
+  it('hands the provider one input per link set carrying the assessment the card shows', async () => {
+    uploadLinkSet();
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+    const props = cardProps();
+    const inputs = providerInputs();
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0].linkSet).toBe(props.collection.items[0].payload);
+    expect(inputs[0].assessment).toBe(props.assessments.get(props.collection.items[0].instanceId));
+  });
+
+  it('rebuilds the input when a binding alone changes (a rejected re-verify), with credential items untouched', async () => {
+    uploadLinkSet();
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+    const verify = async () => {
+      await act(async () => {
+        cardProps().onVerifyCredential(
+          { type: ['VerifiableCredential', 'DigitalProductPassport'] },
+          { kind: 'url', url: 'https://x/c', via: 'link-set' },
+        );
+      });
+    };
+    await verify();
+    const beforeSettle = providerInputs();
+    // Settling the credential changes credential items only (no binding write): a new input.
+    fireEvent.click(screen.getByTestId('mock-settle-credentials'));
+    await waitFor(() => expect(cardProps().assessments.values().next().value.coverage.checked).toBe(1));
+    const bound = providerInputs();
+    expect(bound).not.toBe(beforeSettle);
+    // An unrelated render (tab switch and back) keeps the same input reference.
+    await userEvent.click(screen.getByRole('tab', { name: /Credentials/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /Link Sets/ }));
+    expect(providerInputs()).toBe(bound);
+    // (A repeat Verify of the same href re-runs the credential pipeline by design, so it is a
+    // credential change, not a binding-only one; binding identity itself is pinned in
+    // urlBindings.test.ts.)
+
+    // A rejected re-verify drops the binding: a binding-only change, credential items untouched.
+    const items = cardProps().credentialItems;
+    await act(async () => {
+      cardProps().onVerifyRejected(['https://x/c'], cardProps().beginUrlAttempt());
+    });
+    await waitFor(() => expect(providerInputs()).not.toBe(bound));
+    expect(cardProps().credentialItems).toBe(items);
+    expect(providerInputs()[0].assessment.coverage.checked).toBe(0);
+  });
+
+  it('rebuilds the input when a link set is removed and again when it is restored', async () => {
+    uploadLinkSet();
+    render(<Home />);
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-file'));
+    await screen.findByTestId('mock-linkset-results');
+    const props = cardProps();
+    const before = providerInputs();
+    const slot = props.collection.items[0];
+    await act(async () => {
+      props.dispatch((state: any) => remove(state, slot.instanceId));
+    });
+    await waitFor(() => expect(providerInputs()).toEqual([]));
+    await act(async () => {
+      props.dispatch((state: any) => restore(state, slot, 0));
+    });
+    await waitFor(() => expect(providerInputs()).toHaveLength(1));
+    expect(providerInputs()).not.toBe(before);
   });
 });

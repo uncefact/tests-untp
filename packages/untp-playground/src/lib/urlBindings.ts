@@ -15,16 +15,20 @@ export type UrlBindings = ReadonlyMap<string, InstanceId>;
 
 export const emptyUrlBindings: UrlBindings = new Map();
 
-/** Returns new bindings with each url pointing at the instance; later recordings win. */
+/**
+ * Returns bindings with each url pointing at the instance; later recordings win. When every url
+ * already points at the instance the same Map comes back, so a repeat Verify of an href that is
+ * already bound does not read as a change downstream (the report resets on binding identity, #814).
+ */
 export function recordUrlBinding(
   bindings: UrlBindings,
   urls: Array<string | undefined>,
   instanceId: InstanceId,
 ): UrlBindings {
+  const wanted = urls.filter((url): url is string => typeof url === 'string' && url.length > 0);
+  if (wanted.every((url) => bindings.get(url) === instanceId)) return bindings;
   const next = new Map(bindings);
-  for (const url of urls) {
-    if (typeof url === 'string' && url.length > 0) next.set(url, instanceId);
-  }
+  for (const url of wanted) next.set(url, instanceId);
   return next;
 }
 

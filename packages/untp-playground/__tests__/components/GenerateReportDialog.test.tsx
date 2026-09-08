@@ -51,7 +51,7 @@ describe('GenerateReportDialog', () => {
         const tooltipContent = screen.getByTestId('generate-report-button-tooltip-content');
         expect(tooltipContent).toBeInTheDocument();
         expect(tooltipContent).toHaveTextContent(
-          'Upload and validate a credential or conformity scheme to generate a conformance report',
+          'Add a credential, conformity scheme or link set and let it finish validating to generate a conformance report',
         );
       },
       { timeout: 2000 },
@@ -132,5 +132,30 @@ describe('GenerateReportDialog', () => {
 
     fireEvent.click(screen.getByText('Generate Report'));
     expect(screen.getByText('Generate')).toBeDisabled();
+  });
+
+  it('disables the confirm button when the inputs stop being ready while the dialog is open (#814)', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<GenerateReportDialog />);
+    await user.click(screen.getByText('Generate Report'));
+    await user.type(screen.getByTestId('implementation-name-input'), 'Acme');
+    expect(screen.getByTestId('confirm-generate-dialog-button')).toBeEnabled();
+
+    (useTestReport as jest.Mock).mockReturnValue({
+      canGenerateReport: false,
+      generateReport: mockGenerateReport,
+      report: null,
+    });
+    rerender(<GenerateReportDialog />);
+    expect(screen.getByTestId('confirm-generate-dialog-button')).toBeDisabled();
+  });
+
+  it('records the implementation name trimmed, as it was validated', async () => {
+    const user = userEvent.setup();
+    render(<GenerateReportDialog />);
+    await user.click(screen.getByText('Generate Report'));
+    await user.type(screen.getByTestId('implementation-name-input'), '  Acme Verifier  ');
+    await user.click(screen.getByTestId('confirm-generate-dialog-button'));
+    expect(mockGenerateReport).toHaveBeenCalledWith('Acme Verifier');
   });
 });

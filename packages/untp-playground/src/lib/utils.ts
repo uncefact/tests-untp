@@ -1,18 +1,7 @@
-import handlebars from 'handlebars';
 import { PermittedCredentialType } from '@/types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import templateContent from '@/lib/templates/untp-comformance-report-template.hbs';
 import { CredentialType, permittedCredentialTypes, VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
-
-handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
-
-handlebars.registerHelper('formatDate', (value: unknown) => {
-  if (typeof value !== 'string') return value;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -59,7 +48,8 @@ export function isUntpV070OrAbove(version: string): boolean {
   return major > 0 || (major === 0 && minor >= 7);
 }
 
-const downloadFile = (content: string, filename: string, mimeType: string) => {
+/** Triggers a browser download of `content` under `filename`. The report renderers build on it. */
+export const downloadFile = (content: string, filename: string, mimeType: string) => {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -81,26 +71,7 @@ export const downloadJson = (data: Record<string, any>, filename: string) => {
     const jsonContent = JSON.stringify(data, null, 2);
     downloadFile(jsonContent, filename, 'application/json');
   } catch (error) {
-    throw new Error('Data is not JSON-serializable');
-  }
-};
-
-/**
- * Downloads an HTML report with the provided data.
- * @param data The data to display in the report.
- * @param filename The name of the file to download.
- */
-export const downloadHtml = async (data: Record<string, any>, filename: string) => {
-  if (!filename.endsWith('.html')) {
-    filename = `${filename}.html`;
-  }
-
-  try {
-    const template = handlebars.compile(templateContent);
-    const html = template({ credentialSubject: data });
-    downloadFile(html, filename, 'text/html');
-  } catch (error) {
-    throw new Error('Failed to download HTML report');
+    throw new Error('Data is not JSON-serializable', { cause: error });
   }
 };
 

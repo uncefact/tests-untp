@@ -11,7 +11,7 @@
 import { hashContent } from '@/lib/hash';
 import { detectCredentialType, detectVersion } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
-import type { Credential, StoredCredential, TestStep } from '@/types';
+import type { Credential, StoredCredential, TestReportStep, TestStep } from '@/types';
 import { TERMINAL_STATUSES, TestCaseStatus } from '../../constants';
 
 /**
@@ -28,7 +28,7 @@ export function credentialContentHash(decoded: Record<string, unknown>): string 
  * `TERMINAL_STATUSES` so the remove gate agrees with report readiness on whether WARNING counts as
  * settled (they must, or a finished instance could be readable in the report yet non-removable).
  */
-export function credentialIsTerminal(steps: TestStep[]): boolean {
+export function credentialIsTerminal(steps: TestStep[]): steps is TestReportStep[] {
   return steps.length > 0 && steps.every((step) => TERMINAL_STATUSES.includes(step.status));
 }
 

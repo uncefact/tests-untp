@@ -5,6 +5,37 @@ format is loosely based on [Keep a Changelog](https://keepachangelog.com/)
 and the version numbers follow semantic versioning. Production releases are
 shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 
+## [Unreleased]
+
+### Added
+
+- **Link sets in the report.** The generated report gains an `Identity
+Resolver Link Sets` section, one block per link set, with the version it
+  was validated against, its `Schema Validation` outcome and errors, and its
+  `Link Type Coverage` count and mismatches. A link set alone can generate a
+  report once its schema step has settled; coverage may be recorded as
+  pending. The JSON report gains a `linkSets` array.
+- **Credentials grouped by type.** The HTML report groups credential blocks
+  under a heading per type with an instance count, and every block (credential,
+  scheme or link set) is titled the way its card is. The JSON report gains a
+  `title` on every entry, and a credential verified from a link set records
+  that link set's resolver URL or filename on its `source.linkSet`.
+
+### Changed
+
+- **`conformitySchemeResults` is now `conformitySchemes`** in the JSON report,
+  and the three family arrays (`verifiableCredentials`, `conformitySchemes`,
+  `linkSets`) are always present, empty when nothing of that family is loaded.
+  The HTML report heads a scheme block with `title` (the scheme's name, else
+  the final path segment of its URL, else its filename) instead of falling
+  back to the type and version; the JSON `name` field is unchanged. Every
+  entry drops the duplicate `overallStatus` field; `status` remains.
+- A generated report is also discarded when a link set or a URL binding changes,
+  so verifying a linked credential from a link set card invalidates it. Credential
+  and scheme changes already did.
+- Generate Report's disabled-state hint names link sets, and the dialog's
+  confirm button follows readiness while it is open.
+
 ## [0.3.0] - 2026-05-15
 
 ### Added

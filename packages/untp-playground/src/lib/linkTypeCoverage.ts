@@ -5,7 +5,7 @@
  * This is derived state, not a pipeline stage. Its inputs are the link set's rows, the page's URL
  * bindings and the credential instances those bindings point at, all of which change on the
  * Credentials tab, so the page derives one assessment per link set on every relevant change and
- * hands it to the card, the tab indicator and (later, #814) the report. Nothing here is written
+ * hands it to the card, the tab indicator and the report (#814). Nothing here is written
  * back into the link set's stored result: the stored result stays the schema step alone, because
  * two writers on one result race (the schema runner commits whole-list snapshots).
  */
@@ -79,6 +79,15 @@ export function linkTypeCoverageStepDetails(step: TestStep): LinkTypeCoverageSte
     return undefined;
   }
   return details as LinkTypeCoverageStepDetails;
+}
+
+/**
+ * The coverage count line the card and the report (#814) both show: the note when there was
+ * nothing to check, else `n of m credential link(s) checked.`
+ */
+export function coverageCountText(details: Pick<LinkTypeCoverageStepDetails, 'total' | 'checked' | 'note'>): string {
+  if (details.total === 0) return details.note ?? NO_RELATION_LINKS_NOTE;
+  return `${details.checked} of ${details.total} credential ${details.total === 1 ? 'link' : 'links'} checked.`;
 }
 
 /** The mismatch line the ticket asks for, e.g. `dcc link resolved to DigitalProductPassport`. */

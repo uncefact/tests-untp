@@ -147,6 +147,23 @@ export function replacePayload<P, R>(
 }
 
 /**
+ * Rewrites a slot's payload without touching its result, run token or position (#814): for a
+ * change that does not alter the document, such as recording where a loaded credential was
+ * reached from. Returns the state unchanged when the instance is not present.
+ */
+export function updatePayload<P, R>(
+  state: CollectionState<P, R>,
+  instanceId: InstanceId,
+  update: (payload: P) => P,
+): { state: CollectionState<P, R>; updated: boolean } {
+  const index = state.items.findIndex((item) => item.instanceId === instanceId);
+  if (index === -1) return { state, updated: false };
+  const items = [...state.items];
+  items[index] = { ...items[index], payload: update(items[index].payload) };
+  return { state: { items }, updated: true };
+}
+
+/**
  * Decrypt-collision merge for a COMPLETED twin (#813): the locked slot that was just decrypted
  * keeps its identity, provenance and position, adopts the twin's finished result (the caller
  * prepends the successful Decryption step), and the twin is removed in the same transition so
