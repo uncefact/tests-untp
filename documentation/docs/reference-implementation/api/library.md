@@ -7,7 +7,7 @@ title: Library
 
 The library holds every credential a tenant has, whether the tenant issued it through this Reference Implementation or received it from someone else. A record for a credential the tenant issued is a **native** record. A record for a credential received from a third party is an **external** record: the tenant gives the credential's location, the Reference Implementation fetches it, checks it, and keeps its own copy, so the credential is still available if the supplier later takes it offline.
 
-This page covers listing the library, registering an external credential, retrieving one record and re-verifying a record. Annotating and deleting records are separate operations that arrive with the rest of the library epic.
+This page covers listing the library, registering an external credential, retrieving one record, updating its recipient annotations and re-verifying a record. Deleting a record is a separate operation that arrives with the rest of the library epic.
 
 :::tip[Interactive API documentation]
 The Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) carries the exact request and response schemas for the operations on this page. This page explains the behaviour, and Swagger carries the payload shapes. Every library endpoint requires authentication. See [Authentication](../authentication#obtaining-a-token) for how to obtain a Bearer token.
@@ -310,6 +310,39 @@ The example below shows the custody fields alongside the record id and origin. E
 An unknown id and an id belonging to another tenant both return `404 NOT_FOUND` with the same body. The detail route does not distinguish those cases.
 
 If a stored key cannot be revealed, or a stored value resembles an encryption envelope but is invalid, the route returns a sanitised `500` with the request correlation id. The settled response for that case is tracked by [uncefact/tests-untp#769](https://github.com/uncefact/tests-untp/issues/769).
+
+## Update recipient annotations
+
+```
+PATCH /api/v1/library/{id}
+If-Version: <annotationVersion>
+```
+
+This operation updates the recipient-owned annotations on an external record. The request may include any combination of `displayName`, `declaredCredentialType`, `dateReceived` and `notes`. `displayName` and `declaredCredentialType` are required on the stored record and cannot be cleared. `dateReceived` and `notes` accept an explicit `null` to clear their current values. Omitting either field leaves it unchanged. An empty body and a body containing only unknown fields are `400 VALIDATION_FAILED`, and unknown fields are stripped.
+
+The body bounds are the same as registration: `displayName` is between 1 and 200 characters and cannot be only whitespace, `notes` is at most 2000 characters, and `dateReceived` is a real `YYYY-MM-DD` calendar date. The two text fields cannot contain a NUL character. The declared type is one of `DFR`, `DCC`, `DPP`, `DTE` or `DIA`.
+
+An empty string is a valid `notes` value. It is stored and returned as an empty string, which is a different state from `null`. Send `null`, not `""`, to clear the field.
+
+The `If-Version` header is required and is compared with `annotations.annotationVersion`. It accepts a signed decimal integer after trimming whitespace, including leading zeroes and a leading `+`, within `1` to `2147483647`. Missing, malformed and out-of-range values return `400 INVALID_IF_VERSION`. A well-formed value that does not match the stored version returns `409 VERSION_CONFLICT`. Re-read the record and retry with its current version. A successful update advances the version by one.
+
+The tenant-scoped lookup happens before header or body validation. An absent or foreign-tenant id returns the same `404 NOT_FOUND`. A native record is visible but read-only and returns `403 NATIVE_CREDENTIAL_NOT_ANNOTATABLE`. No request body is read for either of those earlier outcomes. The header is validated before the body, so a request whose `If-Version` and body are both invalid reports `400 INVALID_IF_VERSION`.
+
+The response is the keyless `CredentialRecord` shape. Updating an annotation never changes `credential.*`, custody fields, verification runs or the verification queue.
+
+Two things beyond the annotations themselves do move. A successful update advances the record's `updatedAt`, so a client using that timestamp to detect change or key a cache sees an annotation edit. And changing `declaredCredentialType` adds or removes the `DECLARED_TYPE_MISMATCH` warning in the record the request returns, because that warning is derived at projection time by comparing the declared type with the type extracted from the credential. Neither of those writes anything else. A response projection failure can happen after the database transaction has committed and is returned as a sanitised `500`. Re-read the record to discover its advanced version before retrying. Retrying with the old version then returns `409 VERSION_CONFLICT`.
+
+A `500` covers three cases: the record could not be read, so nothing was attempted; the update failed and rolled back, so nothing was committed; or the response projection failed after the update had committed. Only the last leaves a new stored version behind, which is why a retry with the old token would answer `409`. Re-read the record first and retry with the version it reports. Under heavy contention an update can also exceed its lock wait and answer `500`. The same re-read and retry applies.
+
+Responses:
+
+- `200` with the updated keyless record.
+- `401` when the request carries no valid token, as on every library operation.
+- `400 INVALID_IF_VERSION` for a missing, malformed or out-of-range header; `400 VALIDATION_FAILED` for an invalid body; `413 REQUEST_BODY_TOO_LARGE` when the body exceeds the configured request size limit.
+- `403 NATIVE_CREDENTIAL_NOT_ANNOTATABLE` with `This is a native credential record; it has no recipient annotations to update.` for a native record, or the shared tenant-assignment refusal from authentication.
+- `404 NOT_FOUND` for an absent or foreign-tenant id.
+- `409 VERSION_CONFLICT` for a stale version, with no annotation change.
+- Sanitised `500` for a read failure, an update that rolled back, or a projection failure after a committed update. A record that has reached its maximum annotation version cannot be annotated further and answers this response. Contact the operator.
 
 ## Re-verify a library record
 

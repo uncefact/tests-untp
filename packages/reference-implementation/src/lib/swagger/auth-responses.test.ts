@@ -29,6 +29,7 @@ const COMBINED_FORBIDDEN_OPERATIONS = new Map([
   // A tenant may not delete a system-default service instance, and is refused
   // before the reference count so the counts never reach a non-owner.
   ['delete /services/{id}', 'system default'],
+  ['patch /library/{id}', 'no recipient annotations'],
 ]);
 
 // This exemption can only go stale in the safe direction: an entry for a route
@@ -41,7 +42,7 @@ type Response = {
   description?: string;
   content?: Record<string, { schema?: { $ref?: string } }>;
 };
-type Operation = { responses?: Record<string, Response> };
+type Operation = { requestBody?: unknown; responses?: Record<string, Response> };
 type Spec = {
   paths?: Record<string, Record<string, Operation>>;
   components?: { responses?: Record<string, unknown>; schemas?: Record<string, unknown> };
@@ -207,6 +208,22 @@ describe('shared auth responses', () => {
     }
 
     expect({ missing, inlined }).toEqual({ missing: [], inlined: [] });
+  });
+
+  it('keeps PATCH annotations as a generated component plus a hand-written anyOf', () => {
+    const requestBody = spec.paths?.['/library/{id}']?.patch?.requestBody as {
+      content?: { 'application/json'?: { schema?: { allOf?: unknown[]; anyOf?: Array<{ required?: string[] }> } } };
+    };
+    const schema = requestBody.content?.['application/json']?.schema;
+
+    expect(schema?.allOf).toEqual([{ $ref: '#/components/schemas/UpdateLibraryAnnotationsRequest' }]);
+    expect(schema?.anyOf).toEqual([
+      { required: ['displayName'] },
+      { required: ['declaredCredentialType'] },
+      { required: ['dateReceived'] },
+      { required: ['notes'] },
+    ]);
+    expect(spec.components?.schemas).toHaveProperty('UpdateLibraryAnnotationsRequest');
   });
 
   it('never advertises auth responses on an operation no auth wrapper guards', () => {

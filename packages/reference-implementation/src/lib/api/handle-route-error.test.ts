@@ -72,6 +72,16 @@ describe('handleRouteError', () => {
     expect(body).toEqual({ error: 'not allowed' });
   });
 
+  it('includes the ForbiddenError code in the 403 body when present', async () => {
+    const res = handleRouteError(
+      new ForbiddenError('native records are read-only', 'NATIVE_CREDENTIAL_NOT_ANNOTATABLE'),
+    );
+
+    expect(res.status).toBe(403);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({ error: 'native records are read-only', code: 'NATIVE_CREDENTIAL_NOT_ANNOTATABLE' });
+  });
+
   it('maps NotFoundError to 404', async () => {
     const res = handleRouteError(new NotFoundError('missing'));
 

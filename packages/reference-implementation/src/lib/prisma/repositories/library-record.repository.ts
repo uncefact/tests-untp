@@ -13,6 +13,7 @@ import {
   type ExternalRecordView,
   type NativeRecordView,
   type LibraryRecordView,
+  type ExternalLibraryRecordView,
   type LibraryRecordDetailView,
 } from '@/lib/library/library-record-view';
 import { BLOCKING_CHECKS, CHECK_NAMES, isNativeMasked, type LibraryCheckName } from '@/lib/library/check-rules';
@@ -386,6 +387,101 @@ export async function listLibraryRecords(
   }
 }
 
+type LibraryRecordReadClient = Pick<Prisma.TransactionClient, 'libraryRecord'>;
+
+/**
+ * An invariant this write transaction had already established failed inside
+ * it: the parent lock was held and the row matched, yet the conditional write
+ * did not land the single row it had been proved to own, or the record it had
+ * just written could not be read back in the shape it was written in.
+ *
+ * Every throw of this error happens inside the open transaction, so the
+ * transaction rolls back and nothing is committed. That is what separates it
+ * from `LibraryRecordShapeError`, which names a committed row whose stored
+ * shape is broken. A caller answering this one can tell its own caller that
+ * the update did not happen, rather than that it may have.
+ */
+export class LibraryRecordWriteAnomalyError extends Error {
+  constructor(recordId: string, detail: string) {
+    super(`Library record ${recordId} ${detail}`);
+    this.name = 'LibraryRecordWriteAnomalyError';
+  }
+}
+
+export type LibraryRecordAnnotationChanges = {
+  displayName?: string;
+  declaredCredentialType?: CoreCredentialType;
+  dateReceived?: Date | null;
+  notes?: string | null;
+};
+
+export type UpdateLibraryRecordAnnotationsResult =
+  | { outcome: 'updated'; view: ExternalLibraryRecordView }
+  | { outcome: 'missing' }
+  | { outcome: 'native' }
+  | { outcome: 'version_conflict'; currentVersion: number };
+
+/**
+ * Reads and validates one tenant-owned record on the supplied transaction
+ * client, so the detail read and the annotation write share one definition of
+ * a well-formed record rather than each restating the invariant.
+ */
+async function readLibraryRecordFromClient(
+  tx: LibraryRecordReadClient,
+  id: string,
+  tenantId: string,
+): Promise<LibraryRecordDetailView | null> {
+  const row = await tx.libraryRecord.findFirst({
+    where: { id, tenantId },
+    include: LIBRARY_RECORD_INCLUDE,
+  });
+  if (!row) return null;
+
+  const { checkRuns, ...withChildren } = row;
+  const view = narrowLibraryRecord(withChildren);
+  const checkRun = checkRuns[0] ?? null;
+  if (view.origin === LibraryRecordOrigin.NATIVE) {
+    assertLibraryRecordCheckRun(view, checkRun);
+    return { ...view, checkRun };
+  }
+  assertLibraryRecordCheckRun(view, checkRun);
+  return { ...view, checkRun };
+}
+
+/**
+ * Takes a `FOR UPDATE` row lock on one tenant-owned `LibraryRecord` parent and
+ * reports whether the row exists, so a caller can compare and write its child
+ * without another writer changing the row in between.
+ *
+ * `tx` must be an interactive transaction client. The parameter type also
+ * admits the global client, which compiles and returns the same value, but a
+ * `SELECT ... FOR UPDATE` outside a transaction runs in its own autocommit
+ * transaction and releases the lock as the statement returns, so the caller
+ * would hold nothing. A branded client that made that unrepresentable is a
+ * follow-up, tracked with the adoption below.
+ *
+ * The convention this helper carries is parent before child. Its callers today
+ * are `updateLibraryRecordAnnotations` in this file and, as a character-for-
+ * character inline copy pending adoption, `createReverificationGeneration` in
+ * `check-run.repository.ts`. `replaceCustody` in
+ * `external-credential.repository.ts` takes no parent lock at all, so an
+ * annotation update is not serialised against a custody replacement today.
+ * That divergence is a recorded follow-up, and `replaceCustody` has no
+ * non-test caller yet.
+ */
+export async function lockLibraryRecordForUpdate(
+  tx: Prisma.TransactionClient,
+  id: string,
+  tenantId: string,
+): Promise<boolean> {
+  const locked = await tx.$queryRawUnsafe<Array<{ id: string }>>(
+    'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
+    id,
+    tenantId,
+  );
+  return locked.length > 0;
+}
+
 /**
  * Reads one tenant-owned library record with the single child its origin has
  * (ADR-053 decision 1) and its newest verification run.
@@ -402,24 +498,125 @@ export async function listLibraryRecords(
  * Both fail here rather than being projected into a plausible answer.
  */
 export async function getLibraryRecordById(id: string, tenantId: string): Promise<LibraryRecordDetailView | null> {
+  return prisma.$transaction((tx) => readLibraryRecordFromClient(tx, id, tenantId), {
+    isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+  });
+}
+
+/**
+ * Updates only recipient annotations and the two timestamps in one
+ * Read-Committed transaction. The parent lock makes the version comparison
+ * observe the state immediately before this write and serialises it with
+ * cascading deletion.
+ *
+ * The post-write view is read inside this Read-Committed transaction, so the
+ * newest check run it carries can be newer than the annotations beside it: a
+ * settlement that commits between the included statements is visible to the
+ * run statement. Only the response representation can pair two moments this
+ * way; no stored value is ever wrong, and the annotations and the parent
+ * timestamp are covered by the parent lock. Repeatable Read would close the
+ * pairing and is deliberately not used: a writer queued behind the parent lock
+ * would then fail with a serialization error in place of the 409 this contract
+ * promises. The read path in `getLibraryRecordById` keeps Repeatable Read,
+ * because it takes no lock and has no conflict to lose.
+ *
+ * `maxWait` bounds a different wait from `timeout`: it is how long the caller
+ * queues for a pooled connection before the transaction has begun, while the
+ * 15 s `timeout` is the budget for the work once it holds one. The pair matches
+ * the other write repositories, so a saturated pool fails fast here while a
+ * writer contending for the parent row still has room to acquire it.
+ */
+export async function updateLibraryRecordAnnotations(input: {
+  recordId: string;
+  tenantId: string;
+  expectedVersion: number;
+  changes: LibraryRecordAnnotationChanges;
+}): Promise<UpdateLibraryRecordAnnotationsResult> {
   return prisma.$transaction(
     async (tx) => {
-      const row = await tx.libraryRecord.findFirst({
-        where: { id, tenantId },
-        include: LIBRARY_RECORD_INCLUDE,
-      });
-      if (!row) return null;
-
-      const { checkRuns, ...withChildren } = row;
-      const view = narrowLibraryRecord(withChildren);
-      const checkRun = checkRuns[0] ?? null;
-      if (view.origin === LibraryRecordOrigin.NATIVE) {
-        assertLibraryRecordCheckRun(view, checkRun);
-        return { ...view, checkRun };
+      if (!(await lockLibraryRecordForUpdate(tx, input.recordId, input.tenantId))) {
+        return { outcome: 'missing' };
       }
-      assertLibraryRecordCheckRun(view, checkRun);
-      return { ...view, checkRun };
+
+      const view = await readLibraryRecordFromClient(tx, input.recordId, input.tenantId);
+      if (view === null) return { outcome: 'missing' };
+      if (view.origin === LibraryRecordOrigin.NATIVE) return { outcome: 'native' };
+
+      const currentVersion = view.external.annotationVersion;
+      if (currentVersion !== input.expectedVersion) {
+        return { outcome: 'version_conflict', currentVersion };
+      }
+
+      const now = new Date(Date.now());
+      const update = await tx.externalCredential.updateMany({
+        where: {
+          id: input.recordId,
+          tenantId: input.tenantId,
+          origin: LibraryRecordOrigin.EXTERNAL,
+          annotationVersion: input.expectedVersion,
+        },
+        data: {
+          ...input.changes,
+          annotationVersion: { increment: 1 },
+          updatedAt: now,
+        },
+      });
+      if (update.count !== 1) {
+        throw new LibraryRecordWriteAnomalyError(
+          input.recordId,
+          'was not updated despite holding its parent lock and matching its annotation version',
+        );
+      }
+
+      await tx.libraryRecord.update({
+        where: {
+          id_tenantId_origin: {
+            id: input.recordId,
+            tenantId: input.tenantId,
+            origin: LibraryRecordOrigin.EXTERNAL,
+          },
+        },
+        data: { updatedAt: now },
+      });
+
+      // The read before the write can legitimately meet committed corruption
+      // that predates this transaction, so it keeps `LibraryRecordShapeError`
+      // and the "could not be read" classification the pre-check read has. The
+      // read-back cannot: the row it inspects is the one this transaction has
+      // just written, so a broken shape here is this write's own invariant
+      // failing, and the transaction rolls back. Only that call is wrapped, and
+      // the original detail is carried across so the log still names it.
+      let updatedView: LibraryRecordDetailView | null;
+      try {
+        updatedView = await readLibraryRecordFromClient(tx, input.recordId, input.tenantId);
+      } catch (error) {
+        if (error instanceof LibraryRecordShapeError) {
+          throw new LibraryRecordWriteAnomalyError(
+            input.recordId,
+            `was written and read back in a shape the write paths never produce: ${error.message}`,
+          );
+        }
+        throw error;
+      }
+      if (updatedView === null) {
+        throw new LibraryRecordWriteAnomalyError(
+          input.recordId,
+          'disappeared before the annotation transaction completed',
+        );
+      }
+      // Only an EXTERNAL record reaches this point, so the narrowing states an
+      // invariant this transaction has already established rather than
+      // handling a case. It also spares every caller a re-check of an origin
+      // the repository has proved.
+      if (updatedView.origin !== LibraryRecordOrigin.EXTERNAL) {
+        throw new LibraryRecordWriteAnomalyError(input.recordId, 'was updated as EXTERNAL but read back as NATIVE');
+      }
+      return { outcome: 'updated', view: updatedView };
     },
-    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5_000,
+      timeout: 15_000,
+    },
   );
 }

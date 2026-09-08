@@ -35,9 +35,12 @@ export class NotFoundError extends Error {
 }
 
 export class ForbiddenError extends Error {
-  constructor(message: string) {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
     super(message);
     this.name = 'ForbiddenError';
+    if (code !== undefined) this.code = code;
   }
 }
 

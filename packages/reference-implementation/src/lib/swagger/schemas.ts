@@ -26,7 +26,10 @@ import {
 } from '@uncefact/untp-ri-services';
 import { paginationMetaSchema } from '@/lib/api/pagination';
 import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
-import { registerExternalCredentialRequestSchema } from '@/lib/api/request-schemas/library';
+import {
+  registerExternalCredentialRequestSchema,
+  updateLibraryAnnotationsRequestSchema,
+} from '@/lib/api/request-schemas/library';
 import {
   credentialRecordSchema,
   credentialRecordDetailSchema,
@@ -573,6 +576,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     // (ADR-053 decision 7), so the published shapes cannot drift from the
     // enforced ones.
     RegisterExternalCredentialRequest: registerExternalCredentialRequestSchema,
+    UpdateLibraryAnnotationsRequest: updateLibraryAnnotationsRequestSchema,
     CredentialRecord: credentialRecordSchema,
     CredentialRecordDetail: credentialRecordDetailSchema,
     VerificationEnvelope: verificationEnvelopeSchema,
@@ -599,7 +603,11 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     // would document those same requests as rejected, so the request
     // component drops that assertion at every nesting level. Response
     // components keep it: their shapes are server-produced and closed.
-    if (name === 'CredentialIssueRequest' || name === 'RegisterExternalCredentialRequest') {
+    if (
+      name === 'CredentialIssueRequest' ||
+      name === 'RegisterExternalCredentialRequest' ||
+      name === 'UpdateLibraryAnnotationsRequest'
+    ) {
       stripAdditionalPropertiesFalse(schemaObj);
     }
     openAPISchemas[name] = schemaObj as OpenAPISchema;
