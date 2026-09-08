@@ -11,7 +11,7 @@ import {
   type LibraryRecord,
 } from '@/lib/prisma/generated';
 import { looksEnvelopeLikeButInvalid } from '@/lib/credentials/decryption-key-protection';
-import { CHECK_NAMES, type CheckName } from '@/lib/prisma/repositories/check-run.repository';
+import { CHECK_NAMES, BLOCKING_CHECKS, isNativeMasked, type LibraryCheckName as CheckName } from './check-rules';
 import type { ExternalCredentialRecord } from '@/lib/prisma/repositories/external-credential.repository';
 import { type LibraryRecordDetailView, type NativeLibraryRecordView } from './library-record-view';
 
@@ -26,6 +26,17 @@ import { type LibraryRecordDetailView, type NativeLibraryRecordView } from './li
  */
 
 const checkResultSchema = z.enum(['pass', 'fail', 'not_run']);
+
+/** The core credential kind values published by the keyless library record. */
+export const credentialTypeSchema = z.nativeEnum(CoreCredentialType);
+
+/** The two origins published by the keyless library record. */
+export const originSchema = z.enum(['native', 'external']);
+export type LibraryOrigin = z.infer<typeof originSchema>;
+
+/** The summary values a list caller may filter on. */
+export const verificationSummarySchema = z.enum(['pending', 'verified', 'not_conformant', 'failed']);
+export type VerificationSummary = z.infer<typeof verificationSummarySchema>;
 
 export const verificationChecksSchema = z
   .object({
@@ -42,18 +53,8 @@ export const verificationChecksSchema = z
 
 export type VerificationChecks = z.infer<typeof verificationChecksSchema>;
 
-/**
- * The checks whose failure makes a complete generation `not_conformant`.
- * `temporal` is evidence only (currency is reported on the record) and
- * `schemaConformance` is advisory, so neither is here.
- */
-export const BLOCKING_CHECKS = [
-  'retrieval',
-  'decryption',
-  'digest',
-  'proof',
-  'status',
-] as const satisfies readonly CheckName[];
+// Shared check sets are defined beside the roster for the projector and list SQL.
+export { BLOCKING_CHECKS, NATIVE_MASKED_CHECKS } from './check-rules';
 
 /**
  * The contract's derivation rule for a complete generation: any blocking
@@ -193,11 +194,11 @@ export type CredentialRecordWarning = z.infer<typeof credentialRecordWarningSche
 export const credentialRecordSchema = z
   .object({
     id: z.string().describe('Opaque; never parse or derive meaning from it.'),
-    origin: z.enum(['native', 'external']),
+    origin: originSchema,
     credential: z
       .object({
         name: nullableString,
-        credentialType: z.nativeEnum(CoreCredentialType).nullable(),
+        credentialType: credentialTypeSchema.nullable(),
         issuerName: nullableString,
         issuerDid: nullableString,
         subjectName: nullableString,
@@ -211,7 +212,7 @@ export const credentialRecordSchema = z
       .object({
         annotationVersion: z.number().int().min(1),
         displayName: z.string(),
-        declaredCredentialType: z.nativeEnum(CoreCredentialType),
+        declaredCredentialType: credentialTypeSchema,
         dateReceived: z.string().date().nullable(),
         notes: nullableString,
       })
@@ -337,7 +338,9 @@ function wireChecks(run: CheckRun, native: boolean): VerificationChecks {
   // public contract keeps acquisition and custody checks as not_run. The
   // executed proof, status, temporal and schemaConformance results remain
   // visible.
-  return { ...checks, retrieval: 'not_run', decryption: 'not_run', digest: 'not_run' };
+  return Object.fromEntries(
+    CHECK_NAMES.map((name) => [name, isNativeMasked(name) ? 'not_run' : checks[name]]),
+  ) as VerificationChecks;
 }
 
 function freshnessOf(

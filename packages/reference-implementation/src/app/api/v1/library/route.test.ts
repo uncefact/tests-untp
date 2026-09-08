@@ -72,6 +72,16 @@ jest.mock('@/lib/prisma/repositories/external-credential.repository', () => {
   };
 });
 
+const mockListLibraryRecords = jest.fn();
+jest.mock('@/lib/prisma/repositories/library-record.repository', () => {
+  const actual = jest.requireActual('@/lib/prisma/repositories/library-record.repository');
+  return {
+    LibraryRecordListError: actual.LibraryRecordListError,
+    LIBRARY_LIST_SORTS: actual.LIBRARY_LIST_SORTS,
+    listLibraryRecords: (...args: unknown[]) => mockListLibraryRecords(...args),
+  };
+});
+
 // register-external-credential reaches the resolvers barrel, whose
 // multiformats subpath exports do not resolve under jest; the resolver itself
 // is never called here, only the module's error classes are needed.
@@ -108,12 +118,16 @@ import {
   ExternalContentKind,
   IdempotencyOperation,
   LibraryRecordOrigin,
+  type Credential,
   type CheckRun,
   type ExternalCredential,
   type LibraryRecord,
 } from '@/lib/prisma/generated';
 import { DuplicateCredentialError } from '@/lib/prisma/repositories/external-credential.repository';
 import type { ExternalCredentialRecord } from '@/lib/prisma/repositories/external-credential.repository';
+import { LibraryRecordListError } from '@/lib/prisma/repositories/library-record.repository';
+import { credentialRecordSchema } from '@/lib/library/credential-record-projection';
+import type { NativeLibraryRecordView } from '@/lib/library/library-record-view';
 import {
   EncryptionUnavailableError,
   SourceRejectedError,
@@ -126,7 +140,7 @@ import {
 } from '@/lib/prisma/repositories/idempotency-key.repository';
 import { LIBRARY_VERIFY_JOB, VERIFY_JOB_ENQUEUE_OPTIONS } from '@/lib/library/verify-generation-job';
 import { digestRequestBody } from '@/lib/api/idempotency';
-import { POST } from './route';
+import { GET, POST } from './route';
 
 // ---------------------------------------------------------------------------
 // Request helpers, as the credentials route suite builds them
@@ -193,6 +207,23 @@ const AUTH_CONTEXT = { tenantId: 'tenant-1', params: Promise.resolve({}) };
 
 async function post(req: Request) {
   const response = (await POST(req as never, AUTH_CONTEXT as never)) as unknown as {
+    status: number;
+    headers: { get: (name: string) => string | null };
+    json: () => Promise<Record<string, unknown>>;
+  };
+  return { status: response.status, headers: response.headers, body: await response.json() };
+}
+
+function listRequest(url: string): Request {
+  return {
+    method: 'GET',
+    url,
+    headers: stubHeaders({}),
+  } as unknown as Request;
+}
+
+async function get(url: string) {
+  const response = (await GET(listRequest(url) as never, AUTH_CONTEXT as never)) as unknown as {
     status: number;
     headers: { get: (name: string) => string | null };
     json: () => Promise<Record<string, unknown>>;
@@ -312,6 +343,39 @@ function record(
   };
 }
 
+function nativeCredential(overrides: Partial<Credential> = {}): Credential {
+  return {
+    id: RECORD_ID,
+    tenantId: 'tenant-1',
+    origin: LibraryRecordOrigin.NATIVE,
+    storageUri: 'https://storage.example/objects/native',
+    digestMultibase: 'zQmNativeDigest',
+    decryptionKey: null,
+    isPublished: false,
+    organisationId: null,
+    facilityId: null,
+    productId: null,
+    createdAt: new Date('2026-09-03T11:00:00.000Z'),
+    updatedAt: new Date('2026-09-03T11:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function nativeRecord(
+  overrides: { parent?: Partial<LibraryRecord>; credential?: Partial<Credential>; checkRun?: CheckRun | null } = {},
+): NativeLibraryRecordView {
+  return {
+    origin: LibraryRecordOrigin.NATIVE,
+    record: parent({
+      origin: LibraryRecordOrigin.NATIVE,
+      coreCredentialType: CoreCredentialType.DPP,
+      ...overrides.parent,
+    }),
+    credential: nativeCredential(overrides.credential),
+    checkRun: overrides.checkRun ?? null,
+  };
+}
+
 /** A generation the register call already settled as failed, for the replay read. */
 const FAILED_RUN: Partial<CheckRun> = {
   state: CheckRunState.FAILED,
@@ -342,6 +406,7 @@ beforeEach(() => {
   mockDefaultRegisterDependencies.mockReturnValue(DEPS_MARKER);
   mockGetExternalCredentialById.mockResolvedValue(record());
   mockStartJobQueue.mockResolvedValue({ enqueueWithin: (...args: unknown[]) => mockEnqueueWithin(...args) });
+  mockListLibraryRecords.mockResolvedValue({ data: [], total: 0 });
 });
 
 // ---------------------------------------------------------------------------
@@ -814,5 +879,118 @@ describe('POST /api/v1/library logging', () => {
       { tenantId: 'tenant-1', source: 'https://supplier.example' },
       'Registering an external credential',
     );
+  });
+});
+
+describe('GET /api/v1/library', () => {
+  it('returns the standard paginated, keyless envelope and prevents caching', async () => {
+    mockListLibraryRecords.mockResolvedValue({ data: [record()], total: 1 });
+
+    const response = await get('http://localhost/api/v1/library');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.body.pagination).toEqual({ total: 1, limit: 20, offset: 0, hasMore: false });
+    const listed = (response.body.data as Record<string, unknown>[])[0];
+    expect(listed).toEqual(expect.objectContaining({ id: RECORD_ID, origin: 'external' }));
+    expect(listed).not.toHaveProperty('decryptionKey');
+    expect(listed).not.toHaveProperty('storageUri');
+    expect(listed).not.toHaveProperty('digestMultibase');
+    expect(credentialRecordSchema.safeParse(listed).success).toBe(true);
+  });
+
+  it('projects a native row through the handler with the keyless native envelope', async () => {
+    mockListLibraryRecords.mockResolvedValue({ data: [nativeRecord()], total: 1 });
+
+    const response = await get('http://localhost/api/v1/library');
+    const listed = (response.body.data as unknown[])[0] as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(listed).toEqual(expect.objectContaining({ id: RECORD_ID, origin: 'native' }));
+    expect(listed).not.toHaveProperty('decryptionKey');
+    expect(credentialRecordSchema.safeParse(listed).success).toBe(true);
+  });
+
+  it('passes repeatable type and the filters through after full validation', async () => {
+    await get(
+      'http://localhost/api/v1/library?type=DPP&type=DFR&origin=external&organisationId=organisation-1&facilityId=facility-1&productId=product-1&issuer=Acme&encrypted=false&status=pending&issuedFrom=2026-01-01&issuedTo=2026-01-31&sort=createdAt:asc&limit=4&offset=2',
+    );
+
+    expect(mockListLibraryRecords).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      type: [CoreCredentialType.DPP, CoreCredentialType.DFR],
+      origin: 'external',
+      organisationId: 'organisation-1',
+      facilityId: 'facility-1',
+      productId: 'product-1',
+      issuer: 'Acme',
+      encrypted: false,
+      status: 'pending',
+      sort: 'createdAt:asc',
+      limit: 4,
+      offset: 2,
+      issuedFrom: new Date('2026-01-01T00:00:00.000Z'),
+      issuedTo: new Date('2026-01-31T23:59:59.999Z'),
+    });
+  });
+
+  it('rejects every present q form before any other query validation', async () => {
+    for (const query of ['?q', '?q=', '?q=   ', '?q=a&q=b']) {
+      mockListLibraryRecords.mockClear();
+      const response = await get(`http://localhost/api/v1/library${query}&limit=not-an-integer`);
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'Free-text search is not yet available in v1.',
+        code: 'FREE_TEXT_SEARCH_DEFERRED',
+      });
+      expect(mockListLibraryRecords).not.toHaveBeenCalled();
+    }
+  });
+
+  it('returns the named page-limit error without querying the repository', async () => {
+    const response = await get('http://localhost/api/v1/library?limit=101');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({ code: 'PAGE_LIMIT_EXCEEDED' });
+    expect(response.body.error).toContain('limit: must not exceed the maximum of');
+    expect(mockListLibraryRecords).not.toHaveBeenCalled();
+  });
+
+  it.each(['issuer', 'organisationId', 'facilityId', 'productId'])(
+    'returns an empty page for a NUL %s filter after validation, without sending it to Postgres',
+    async (key) => {
+      mockListLibraryRecords.mockClear();
+      const response = await get(`http://localhost/api/v1/library?${key}=${encodeURIComponent('\0')}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: [],
+        pagination: { total: 0, limit: 20, offset: 0, hasMore: false },
+      });
+      expect(mockListLibraryRecords).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['a non-Error throw', 'internal list failure'],
+    ['a list invariant error', new LibraryRecordListError('the total was inconsistent')],
+  ])('sanitises %s', async (_description, failure) => {
+    mockListLibraryRecords.mockRejectedValue(failure);
+
+    const response = await get('http://localhost/api/v1/library');
+
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('An unexpected error has occurred.');
+    expect(response.body.error).not.toContain(String(failure));
+  });
+
+  it('sanitises an unclassified Error from the list path', async () => {
+    mockListLibraryRecords.mockRejectedValue(new Error('Database error'));
+
+    const response = await get('http://localhost/api/v1/library');
+
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('An unexpected error has occurred.');
+    expect(response.body.error).not.toContain('Database error');
   });
 });

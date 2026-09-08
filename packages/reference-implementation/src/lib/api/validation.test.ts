@@ -500,6 +500,40 @@ describe('parseQueryParams', () => {
     expect(() => parseQueryParams(params, paginationQuerySchema)).toThrow(ValidationError);
     expect(() => parseQueryParams(params, paginationQuerySchema)).toThrow('limit: must be a positive integer');
   });
+
+  it('promotes a schema-authored code from a custom issue on any key', () => {
+    const schema = z.object({ status: z.string().optional() }).superRefine((_value, ctx) => {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['status'],
+        message: 'status is not available',
+        params: { code: 'STATUS_UNAVAILABLE' },
+      });
+    });
+
+    let error: unknown;
+    try {
+      parseQueryParams(new URLSearchParams({ status: 'pending' }), schema);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error).toMatchObject({ code: 'STATUS_UNAVAILABLE' });
+    expect((error as Error).message).toBe('status: status is not available');
+  });
+
+  it('leaves the code absent when a schema issue has no code marker', () => {
+    const schema = z.object({ status: z.enum(['pending', 'failed']) });
+
+    let error: unknown;
+    try {
+      parseQueryParams(new URLSearchParams({ status: 'unknown' }), schema);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error).not.toHaveProperty('code');
+  });
 });
 
 describe('definedFields', () => {
