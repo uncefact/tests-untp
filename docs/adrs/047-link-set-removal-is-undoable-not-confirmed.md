@@ -2,6 +2,7 @@
 
 - **Date:** 2026-08-20
 - **Status:** accepted
+- **Update (2026-09-08):** #988 gives link sets a real asynchronous schema validation run, so a removed card can be mid-run. Undo restores a settled result intact as recorded here. A run still in flight is restored idle (no run token, no result) so the standard begin-run effect starts it again under the same stored version. Restoring the in-flight token is unsafe in both orderings: if the run completed while the card was absent its commit was rejected and the card would stay spinning, and if Undo came first the abandoned run could still write over the slot.
 
 ## Context
 

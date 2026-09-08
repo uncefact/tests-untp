@@ -39,10 +39,9 @@ describe('UPLOADER_FAMILIES (#676 contract table)', () => {
       urlPlaceholder: 'https://resolver.example.org/01/09520123456788',
       urlAction: 'Resolve',
       urlMode: 'resolve',
-      // Deliberately not the ticket's draft sentence: schema validation is a pending stub, so
-      // the helper states what the app does today.
+      // Present tense since #988: schema validation runs against the selected version.
       helper:
-        'Point at an identity resolver. The playground requests the link set with ?linkType=all and checks the response is an RFC 9264 link set. Schema validation is coming in v0.4.',
+        "Choose a UNTP spec version, then drop a link set file or resolve an identifier. The playground requests the link set with ?linkType=all and validates it against that version's published schema.",
     });
   });
 });

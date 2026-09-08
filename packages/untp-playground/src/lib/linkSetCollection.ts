@@ -44,8 +44,14 @@ export function linkSetTitle(linkSet: StoredLinkSet): string {
   return LINK_SET_FAMILY_LABEL;
 }
 
-export function linkSetSubtitle(): string {
-  return LINK_SET_FAMILY_LABEL;
+/**
+ * Card subtitle: the family label, then the spec version the link set is validated against
+ * (primary-then-secondary rule from the design handoff, #988). The version comes from the stored
+ * instance, not the live selector, so the card records what was checked (and #814's report can
+ * carry the same value).
+ */
+export function linkSetSubtitle(linkSet: Pick<StoredLinkSet, 'validationVersion'>): string {
+  return `${LINK_SET_FAMILY_LABEL} · v${linkSet.validationVersion}`;
 }
 
 /** One link the link set carries, as the expanded card lists it (#811; Verify is #812). */

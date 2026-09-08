@@ -48,7 +48,8 @@ export async function bundledContext(type: string, version: string): Promise<Rec
 
 /** The bundled Identity Resolver link set schema for a UNTP version (published from 0.7.0). */
 export async function bundledLinkSetSchema(version: string): Promise<Record<string, unknown> | undefined> {
-  return findBundledArtefact(`https://untp.unece.org/artefacts/schema/v${version}/idr/LinksetSchema.json`);
+  const { buildLinkSetSchemaUrl } = await import('../artefacts/urls.js');
+  return findBundledArtefact(buildLinkSetSchemaUrl(version));
 }
 
 /** The W3C Verifiable Credentials Data Model context for a major version (`'2'` today). */

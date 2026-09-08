@@ -18,6 +18,8 @@ Both signals come from the [UNTP Identity Resolver specification](https://untp.u
 
 One exception: resolvers often list a credential's human viewing page beside the credential document, under the same relation, with a `text/html` target type. A `text/html` target is a page about the credential rather than the credential itself, so it is counted with the other links even when its relation names a credential.
 
+Identification is separate from schema validation. The Playground can identify credential links from bare names, CURIEs and URI suffixes, but identification does not establish that a relation key passes the selected UNTP linkset schema. See [Validating link sets](./validating-link-sets.md) for the relation-name rule that schema applies.
+
 ## Hints, not guarantees
 
 The specification is explicit that the link relation and media type indicate the intended content, not a guarantee of it. The Playground follows the same rule: identification decides what is listed as a credential link, and the actual content is validated when the credential is fetched and run through the validation pipeline.

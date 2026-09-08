@@ -8,6 +8,7 @@ import {
   VCDMVersion,
 } from '../../constants';
 import { detectCredentialType, detectVersion } from './credentialService';
+import { schemaCache } from './schemaFetch';
 import { isUntpV070OrAbove } from './utils';
 
 const ajv = new Ajv2020({
@@ -76,38 +77,21 @@ async function readErrorBody(response: Response): Promise<{ reason: string; upst
   return { reason: `${response.status} ${response.statusText}` };
 }
 
-export const schemaCache = new Map<string, any>();
-// Stores the in-flight Promise for each URL so concurrent callers requesting the same URL
-// await one shared fetch. Without this, the existing `has`/`set` cache check leaves a
-// window where N callers can each see "not cached" and each issue their own fetch.
-const inflightSchemaFetches = new Map<string, Promise<any>>();
+// The session cache lives in schemaFetch.ts (the utils TTL cache) so every family shares it; the
+// export stays here for the callers and tests that read it from this module. The cache also
+// de-duplicates concurrent requests for one URL, so this module keeps no in-flight map of its own.
+export { schemaCache };
 
-async function fetchSchema(schemaUrl: string): Promise<any> {
-  if (schemaCache.has(schemaUrl)) {
-    return schemaCache.get(schemaUrl);
-  }
-  const inflight = inflightSchemaFetches.get(schemaUrl);
-  if (inflight) {
-    return inflight;
-  }
-  const proxyUrl = `${API_BASE_PATH}/api/schema?url=${encodeURIComponent(schemaUrl)}`;
-  // Evict the in-flight entry once settled so a transient failure doesn't poison the cache.
-  const promise = (async () => {
-    try {
-      const response = await fetch(proxyUrl);
-      if (!response.ok) {
-        const { reason, upstreamStatus } = await readErrorBody(response);
-        throw new SchemaFetchError(`Failed to fetch schema: ${reason}`, response.status, upstreamStatus);
-      }
-      const schema = await response.json();
-      schemaCache.set(schemaUrl, schema);
-      return schema;
-    } finally {
-      inflightSchemaFetches.delete(schemaUrl);
+function fetchSchema(schemaUrl: string): Promise<any> {
+  return schemaCache.get(schemaUrl, async () => {
+    const proxyUrl = `${API_BASE_PATH}/api/schema?url=${encodeURIComponent(schemaUrl)}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      const { reason, upstreamStatus } = await readErrorBody(response);
+      throw new SchemaFetchError(`Failed to fetch schema: ${reason}`, response.status, upstreamStatus);
     }
-  })();
-  inflightSchemaFetches.set(schemaUrl, promise);
-  return promise;
+    return response.json();
+  });
 }
 
 interface CoreVersion {

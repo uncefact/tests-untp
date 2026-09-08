@@ -140,6 +140,23 @@ export const DECRYPTION_DOCS_URL =
   process.env.NEXT_PUBLIC_DECRYPTION_DOCS_URL ||
   'https://github.com/uncefact/tests-untp/blob/next/documentation/docs-playground/decrypting-encrypted-credentials.md';
 
+// The docs page explaining what the link set Schema Validation step checks, which schema and
+// version it uses, and what the schema does not check (#988). Same operator-override pattern.
+export const LINK_SET_VALIDATION_DOCS_URL =
+  process.env.NEXT_PUBLIC_LINK_SET_VALIDATION_DOCS_URL ||
+  'https://github.com/uncefact/tests-untp/blob/next/documentation/docs-playground/validating-link-sets.md';
+
+/**
+ * UNTP spec versions that publish an Identity Resolver link set schema, oldest first. A link set
+ * carries no version marker of its own, so the verifier picks one (#988); the list is hand-kept
+ * because `bundledUntpVersions()` also names 0.6.x, which never published a linkset schema.
+ */
+export const LINK_SET_SPEC_VERSIONS = ['0.7.0'] as const;
+export type LinkSetSpecVersion = (typeof LINK_SET_SPEC_VERSIONS)[number];
+/** The selector's default: the latest entry, which the oldest-first order makes the last one. */
+export const DEFAULT_LINK_SET_SPEC_VERSION: LinkSetSpecVersion =
+  LINK_SET_SPEC_VERSIONS[LINK_SET_SPEC_VERSIONS.length - 1];
+
 export const CREDENTIAL_LINKS_DOCS_URL =
   process.env.NEXT_PUBLIC_CREDENTIAL_LINKS_DOCS_URL ||
   'https://github.com/uncefact/tests-untp/blob/next/documentation/docs-playground/identifying-untp-credential-links.md';

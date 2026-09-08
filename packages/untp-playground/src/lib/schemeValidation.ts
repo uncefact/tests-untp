@@ -1,12 +1,11 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
-import {
-  API_BASE_PATH,
-  UNTP_CONTEXT_DOMAINS,
-  UNTP_CORE_SCHEMA_FILENAMES,
-  UNTP_SHORT_CREDENTIAL_TYPES,
-} from '../../constants';
-import { schemaCache } from './schemaValidation';
+import { UNTP_CONTEXT_DOMAINS, UNTP_CORE_SCHEMA_FILENAMES, UNTP_SHORT_CREDENTIAL_TYPES } from '../../constants';
+import { fetchSchema, SchemaFetchError } from './schemaFetch';
+
+// Re-exported as the same binding: SchemeTestResults narrows on `instanceof SchemaFetchError`
+// through this module, and the transport moved to schemaFetch.ts without changing that contract.
+export { SchemaFetchError };
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -15,87 +14,6 @@ const ajv = new Ajv2020({
   verbose: true,
 });
 addFormats(ajv);
-
-const SCHEMA_FETCH_TIMEOUT_MS = 15_000;
-
-const inflightFetches = new Map<string, Promise<any>>();
-
-export class SchemaFetchError extends Error {
-  constructor(
-    public readonly schemaUrl: string,
-    public readonly reason: 'timeout' | 'not-found' | 'network' | 'parse',
-    message: string,
-  ) {
-    super(message);
-    this.name = 'SchemaFetchError';
-  }
-}
-
-async function fetchSchema(schemaUrl: string): Promise<any> {
-  if (schemaCache.has(schemaUrl)) {
-    return schemaCache.get(schemaUrl);
-  }
-  const inflight = inflightFetches.get(schemaUrl);
-  if (inflight) return inflight;
-
-  const fetchPromise = (async () => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), SCHEMA_FETCH_TIMEOUT_MS);
-    try {
-      const response = await fetch(`${API_BASE_PATH}/api/schema?url=${encodeURIComponent(schemaUrl)}`, {
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        // The proxy answers 502 for any upstream failure and names the category
-        // and the upstream status in its body, so both are read from there.
-        const body = await response.json().catch(() => null);
-        // The published hosts answer 403, not 404, for a missing path, so any
-        // upstream 4xx is read as "nothing published at this URL".
-        const upstream = typeof body?.upstreamStatus === 'number' ? body.upstreamStatus : undefined;
-        if (upstream !== undefined && upstream >= 400 && upstream < 500) {
-          throw new SchemaFetchError(
-            schemaUrl,
-            'not-found',
-            `No schema published at ${schemaUrl} (status ${upstream}).`,
-          );
-        }
-        const reason = typeof body?.error === 'string' ? body.error : `Schema service returned ${response.status}`;
-        throw new SchemaFetchError(
-          schemaUrl,
-          body?.code === 'invalid-json' ? 'parse' : 'network',
-          `${reason} (${schemaUrl}).`,
-        );
-      }
-      let schema: unknown;
-      try {
-        schema = await response.json();
-      } catch {
-        throw new SchemaFetchError(schemaUrl, 'parse', `Schema at ${schemaUrl} is not valid JSON.`);
-      }
-      schemaCache.set(schemaUrl, schema);
-      return schema;
-    } catch (err) {
-      if (err instanceof SchemaFetchError) throw err;
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw new SchemaFetchError(
-          schemaUrl,
-          'timeout',
-          `Schema fetch timed out after ${SCHEMA_FETCH_TIMEOUT_MS / 1000}s.`,
-        );
-      }
-      throw new SchemaFetchError(schemaUrl, 'network', err instanceof Error ? err.message : 'Unknown network error.');
-    } finally {
-      clearTimeout(timeout);
-    }
-  })();
-
-  inflightFetches.set(schemaUrl, fetchPromise);
-  try {
-    return await fetchPromise;
-  } finally {
-    inflightFetches.delete(schemaUrl);
-  }
-}
 
 export function schemeSchemaUrl(version: string): string {
   const shortType = UNTP_SHORT_CREDENTIAL_TYPES.ConformityScheme;

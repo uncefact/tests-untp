@@ -450,3 +450,71 @@ describe('ArtefactUploader component', () => {
     });
   });
 });
+
+describe('callback capture at operation start (#988)', () => {
+  // The page stamps a link set with the version selected when the operation started. That holds
+  // only if the uploader completes an operation with the callback it captured at the start, not
+  // with whatever prop it holds at completion.
+  it('completes a file read with the callback captured when the file was dropped', async () => {
+    const first = jest.fn();
+    const second = jest.fn();
+    const { rerender } = render(
+      <ArtefactUploader family={credentialsFamily} onArtefactUpload={first} setFileCount={() => {}} />,
+    );
+    const inputElement = screen.getByRole('presentation').querySelector('input[type="file"]');
+    const file = new File([JSON.stringify({ linkset: [] })], 'a.json', { type: 'application/json' });
+
+    // Hold the read open, swap the prop, then release.
+    const originalReadAsText = FileReader.prototype.readAsText;
+    let release: (() => void) | undefined;
+    FileReader.prototype.readAsText = function (this: FileReader) {
+      release = () => originalReadAsText.call(this, file);
+    };
+    try {
+      fireEvent.change(inputElement as Element, { target: { files: [file] } });
+      // react-dropzone validates the drop asynchronously before onDrop runs; wait until the read
+      // has actually started (and been held) before swapping the callback.
+      await waitFor(() => expect(release).toBeDefined());
+      rerender(<ArtefactUploader family={credentialsFamily} onArtefactUpload={second} setFileCount={() => {}} />);
+      await act(async () => {
+        release?.();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    } finally {
+      FileReader.prototype.readAsText = originalReadAsText;
+    }
+
+    await waitFor(() => expect(first).toHaveBeenCalledWith({ linkset: [] }, { kind: 'file', filename: 'a.json' }));
+    expect(second).not.toHaveBeenCalled();
+  });
+
+  it('completes a resolve with the callback captured when Resolve was clicked', async () => {
+    let release: (value: unknown) => void = () => {};
+    (resolveLinkSet as jest.Mock).mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const first = jest.fn();
+    const second = jest.fn();
+    const { rerender } = render(
+      <ArtefactUploader family={linkSetsFamily} onArtefactUpload={first} setFileCount={() => {}} />,
+    );
+    fireEvent.change(screen.getByTestId('artefact-url-input'), { target: { value: 'https://r.example.org/01/1' } });
+    fireEvent.click(screen.getByTestId('artefact-url-fetch'));
+    rerender(<ArtefactUploader family={linkSetsFamily} onArtefactUpload={second} setFileCount={() => {}} />);
+
+    await act(async () => {
+      release({
+        ok: true,
+        payload: { linkset: [] },
+        requestUrl: 'https://r.example.org/01/1?linkType=all',
+        finalUrl: '',
+      });
+    });
+
+    await waitFor(() =>
+      expect(first).toHaveBeenCalledWith(
+        { linkset: [] },
+        { kind: 'url', url: 'https://r.example.org/01/1?linkType=all' },
+      ),
+    );
+    expect(second).not.toHaveBeenCalled();
+  });
+});

@@ -15,6 +15,18 @@ jest.mock('@/lib/fetchLinkedCredential', () => ({
 // eslint-disable-next-line import/first
 import { fetchLinkedCredential } from '@/lib/fetchLinkedCredential';
 
+// The schema fetch is replaced with a controllable promise: the transport and the real schema are
+// covered in linkSetValidation.test.ts; here the card's lifecycle around the run is what matters.
+jest.mock('@/lib/linkSetValidation', () => ({
+  ...jest.requireActual('@/lib/linkSetValidation'),
+  validateLinkSetSchema: jest.fn(),
+}));
+import { validateLinkSetSchema } from '@/lib/linkSetValidation';
+const mockValidate = validateLinkSetSchema as jest.MockedFunction<typeof validateLinkSetSchema>;
+const SCHEMA_URL = 'https://untp.unece.org/artefacts/schema/v0.7.0/idr/LinksetSchema.json';
+const validDocument = () =>
+  Promise.resolve({ kind: 'document' as const, valid: true, errors: [], version: '0.7.0', schemaUrl: SCHEMA_URL });
+
 jest.mock('sonner', () => ({
   toast: {
     success: jest.fn(),
@@ -94,18 +106,20 @@ function Harness({
   );
 }
 
-const storedLinkSet = (source: StoredLinkSet['source']): StoredLinkSet => ({
+const storedLinkSet = (source: StoredLinkSet['source'], validationVersion = '0.7.0'): StoredLinkSet => ({
   original: LINK_SET,
   decoded: LINK_SET,
   source,
+  validationVersion,
 });
 
 describe('LinkSetTestResults', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockValidate.mockImplementation(validDocument);
   });
 
-  it('settles a fresh link set immediately with the pending stub step, never a spinner', async () => {
+  it('runs Schema Validation against the stored version and settles the card to success', async () => {
     render(
       <Harness
         initial={[{ payload: storedLinkSet({ kind: 'url', url: 'https://r.example.org/01/1?linkType=all' }) }]}
@@ -113,16 +127,18 @@ describe('LinkSetTestResults', () => {
     );
 
     const header = await screen.findByTestId('linkset-card-header');
-    // The stub settles the instance instantly: the card shows the quiet pending state, not the
-    // in-progress spinner, and the pending step is visible when expanded.
-    expect(screen.queryAllByTestId(/status-icon-in-progress/)).toHaveLength(0);
-    expect(screen.getAllByTestId(/status-icon-pending/).length).toBeGreaterThan(0);
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    // The card's own icon (keyed by instance id), not only the step's: AC1 is about the card.
+    await screen.findByTestId(`${instanceId}-status-icon-success`);
+    expect(mockValidate).toHaveBeenCalledWith(LINK_SET, '0.7.0');
+    expect(screen.getByTestId('linkset-subtitle')).toHaveTextContent('Link Set · v0.7.0');
 
     fireEvent.click(header);
     expect(screen.getByText('Schema Validation')).toBeInTheDocument();
-    // The pending stub explains itself, so grey reads as "not built yet" rather than "stuck".
-    expect(screen.getByTestId('linkset-validation-note')).toHaveTextContent(
-      'not yet run: link set validation is coming in v0.4',
+    expect(screen.queryByTestId('linkset-schema-errors')).not.toBeInTheDocument();
+    expect(screen.getByTestId('linkset-validation-docs')).toHaveAttribute(
+      'href',
+      expect.stringContaining('validating-link-sets'),
     );
   });
 
@@ -135,7 +151,7 @@ describe('LinkSetTestResults', () => {
 
     const header = await screen.findByTestId('linkset-card-header');
     expect(screen.getByText('r.example.org/01/1')).toBeInTheDocument();
-    expect(screen.getByText('Link Set')).toBeInTheDocument();
+    expect(screen.getByTestId('linkset-subtitle')).toHaveTextContent('Link Set · v0.7.0');
 
     fireEvent.click(header);
     expect(screen.getByText(/https:\/\/r\.example\.org\/01\/1\?linkType=all/)).toBeInTheDocument();
@@ -180,6 +196,7 @@ describe('LinkSetTestResults', () => {
         ],
       },
       source: { kind: 'url', url: 'https://r.example.org/01/2?linkType=all' },
+      validationVersion: '0.7.0',
     };
     render(<Harness initial={[{ payload: productOnly }]} />);
 
@@ -280,6 +297,7 @@ describe('LinkSetTestResults', () => {
         ],
       },
       source,
+      validationVersion: '0.7.0',
     };
 
     render(<Harness initial={[{ payload: storedLinkSet(source) }]} reingest={updated} />);
@@ -309,7 +327,7 @@ describe('linked-credential Verify (#812)', () => {
     instanceId,
     runId: null,
     contentHash: `hash-${instanceId}`,
-    payload: { original: {}, decoded: {}, source: { kind: 'url', url: sourceUrl, via: 'link-set' } },
+    payload: { original: {}, decoded: {}, source: { kind: 'url', url: sourceUrl, via: 'link-set' } }, // a credential slot, not a link set
     result: statuses.map((status, index) => ({ id: `step-${index}`, name: `Step ${index}`, status })),
   });
 
@@ -709,7 +727,13 @@ describe('secondary resolver section rendering (#974 review findings)', () => {
         },
       ],
     };
-    render(<Harness initial={[{ payload: { original: withoutIdr, decoded: withoutIdr, source: urlSource } }]} />);
+    render(
+      <Harness
+        initial={[
+          { payload: { original: withoutIdr, decoded: withoutIdr, source: urlSource, validationVersion: '0.7.0' } },
+        ]}
+      />,
+    );
     expandCard();
 
     expect(screen.queryByTestId('secondary-resolvers')).not.toBeInTheDocument();
@@ -727,7 +751,11 @@ describe('secondary resolver section rendering (#974 review findings)', () => {
         },
       ],
     };
-    render(<Harness initial={[{ payload: { original: twoIdr, decoded: twoIdr, source: urlSource } }]} />);
+    render(
+      <Harness
+        initial={[{ payload: { original: twoIdr, decoded: twoIdr, source: urlSource, validationVersion: '0.7.0' } }]}
+      />,
+    );
     expandCard();
 
     expect(screen.getByTestId('secondary-resolvers')).toHaveTextContent('Secondary resolvers · 2');
@@ -767,7 +795,11 @@ describe('secondary resolver panel rulings (#974 r2)', () => {
         },
       ],
     };
-    render(<Harness initial={[{ payload: { original: twoSame, decoded: twoSame, source: urlSource } }]} />);
+    render(
+      <Harness
+        initial={[{ payload: { original: twoSame, decoded: twoSame, source: urlSource, validationVersion: '0.7.0' } }]}
+      />,
+    );
     expandCard();
 
     expect(
@@ -793,7 +825,11 @@ describe('secondary resolver panel rulings (#974 r2)', () => {
     let releaseVerify: (value: unknown) => void = () => {};
     (fetchLinkedCredential as jest.Mock).mockReturnValue(new Promise((resolve) => (releaseVerify = resolve)));
 
-    render(<Harness initial={[{ payload: { original: doc, decoded: doc, source: urlSource } }]} />);
+    render(
+      <Harness
+        initial={[{ payload: { original: doc, decoded: doc, source: urlSource, validationVersion: '0.7.0' } }]}
+      />,
+    );
     expandCard();
 
     // Start the Resolve: only the secondary row goes busy; the credential row keeps Verify.
@@ -842,5 +878,334 @@ describe('already-decrypted re-verify feedback (#813)', () => {
       );
     });
     expect(toast.success).not.toHaveBeenCalled();
+  });
+});
+
+describe('Schema Validation outcomes (#988)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const source = { kind: 'url', url: 'https://r.example.org/01/1?linkType=all' } as const;
+
+  it('shows the spinner while the schema fetch is in flight, then the outcome', async () => {
+    let release: (value: Awaited<ReturnType<typeof validateLinkSetSchema>>) => void = () => {};
+    mockValidate.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+
+    await screen.findByTestId('linkset-card-header');
+    expect(screen.getAllByTestId(/status-icon-in-progress/).length).toBeGreaterThan(0);
+
+    await act(async () => release(await validDocument()));
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-success/).length).toBeGreaterThan(0));
+    expect(screen.queryAllByTestId(/status-icon-in-progress/)).toHaveLength(0);
+  });
+
+  it('lists each offending path with the rule it broke, decoding URL relation keys', async () => {
+    mockValidate.mockResolvedValue({
+      kind: 'document',
+      valid: false,
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+      errors: [
+        { keyword: 'required', instancePath: '/linkset/0', params: { missingProperty: 'anchor' } },
+        {
+          keyword: 'required',
+          instancePath: '/linkset/0/https:~1~1test.uncefact.org~1voc~1untp~1dpp/0',
+          params: { missingProperty: 'title' },
+        },
+        { keyword: 'additionalProperties', instancePath: '/linkset/0/dpp/0', params: { additionalProperty: 'colour' } },
+      ] as any,
+    });
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+
+    const header = await screen.findByTestId('linkset-card-header');
+    const instanceId = header.getAttribute('data-instance-id') as string;
+    await screen.findByTestId(`${instanceId}-status-icon-failure`);
+    fireEvent.click(header);
+    const items = within(screen.getByTestId('linkset-schema-errors')).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([
+      'Missing required field: linkset → 0 → anchor',
+      'Missing required field: linkset → 0 → https://test.uncefact.org/voc/untp/dpp → 0 → title',
+      'Unknown field at linkset → 0 → dpp → 0: colour',
+    ]);
+  });
+
+  it('explains a relation the published schema rejects instead of calling it an unknown field', async () => {
+    const withCurie = {
+      linkset: [{ anchor: 'https://id.example.org/01/1', 'untp:dpp': [{ href: 'https://x.example/a', title: 't' }] }],
+    };
+    mockValidate.mockResolvedValue({
+      kind: 'document',
+      valid: false,
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+      errors: [
+        { keyword: 'additionalProperties', instancePath: '/linkset/0', params: { additionalProperty: 'untp:dpp' } },
+      ] as any,
+    });
+    render(
+      <Harness
+        initial={[{ payload: { original: withCurie, decoded: withCurie, source, validationVersion: '0.7.0' } }]}
+      />,
+    );
+
+    const header = await screen.findByTestId('linkset-card-header');
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+    fireEvent.click(header);
+    const item = within(screen.getByTestId('linkset-schema-errors')).getByRole('listitem');
+    expect(item).toHaveAttribute('data-relation-rule', 'true');
+    // The plain path-and-rule line stays; the explanation follows it.
+    expect(item).toHaveTextContent(
+      'Unknown field at linkset → 0: untp:dpp. The published UNTP v0.7.0 schema rejects the relation "untp:dpp"',
+    );
+    expect(item).toHaveTextContent('not starting with "anchor", "description" or "itemDescription"');
+    expect(item).toHaveTextContent('known restriction of the published schema');
+    expect(item).toHaveTextContent('concerns the relation name only');
+    expect(item).not.toHaveTextContent('not a problem with the credential');
+    // The failure card still offers the docs link and Verify on its credential rows.
+    expect(screen.getByTestId('linkset-validation-docs')).toHaveAttribute(
+      'href',
+      expect.stringContaining('validating-link-sets'),
+    );
+    expect(screen.getAllByTestId('linked-credential-verify').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the plain unknown-field sentence for a context member that is not relation-shaped', async () => {
+    const withScalar = {
+      linkset: [
+        {
+          anchor: 'https://id.example.org/01/1',
+          lastUpdated: '2026-01-01',
+          dpp: [{ href: 'https://x.example/a', title: 't' }],
+        },
+      ],
+    };
+    mockValidate.mockResolvedValue({
+      kind: 'document',
+      valid: false,
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+      errors: [
+        { keyword: 'additionalProperties', instancePath: '/linkset/0', params: { additionalProperty: 'lastUpdated' } },
+      ] as any,
+    });
+    render(
+      <Harness
+        initial={[{ payload: { original: withScalar, decoded: withScalar, source, validationVersion: '0.7.0' } }]}
+      />,
+    );
+    const header = await screen.findByTestId('linkset-card-header');
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+    fireEvent.click(header);
+    const item = within(screen.getByTestId('linkset-schema-errors')).getByRole('listitem');
+    expect(item).not.toHaveAttribute('data-relation-rule');
+    expect(item).toHaveTextContent('Unknown field at linkset → 0: lastUpdated');
+    expect(item).not.toHaveTextContent('rejects the relation');
+  });
+
+  it.each([
+    ['not-found', 'No schema published at https://untp.unece.org/x (status 403).'],
+    ['parse', 'Schema at https://untp.unece.org/x is not valid JSON.'],
+  ] as const)('names the attempt without promising a retry when the service answered %s', async (reason, message) => {
+    mockValidate.mockResolvedValue({
+      kind: 'schema-unavailable',
+      reason,
+      message,
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+    });
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+    const header = await screen.findByTestId('linkset-card-header');
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+    fireEvent.click(header);
+    const text = screen.getByTestId('linkset-schema-errors').textContent ?? '';
+    expect(text).toContain('The link set schema for UNTP v0.7.0 could not be loaded');
+    expect(text).toContain('If this keeps happening, report it to the Playground operator');
+    expect(text).toContain(`Details: ${message.replace(/\.$/, '')}.`);
+    expect(text).toContain(SCHEMA_URL);
+    expect(text).not.toContain('again to retry');
+  });
+
+  it('shows the loader message on an unusable schema so the operator has something to act on', async () => {
+    mockValidate.mockResolvedValue({
+      kind: 'schema-unusable',
+      message: 'schema is invalid: data/type must be equal to one of the allowed values',
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+    });
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+    const header = await screen.findByTestId('linkset-card-header');
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+    fireEvent.click(header);
+    expect(screen.getByTestId('linkset-schema-errors')).toHaveTextContent(
+      'The schema loader reported: schema is invalid: data/type must be equal to one of the allowed values.',
+    );
+  });
+
+  it("lets a replacement mid-run win: the old run's late result is rejected", async () => {
+    let releaseFirst: (value: Awaited<ReturnType<typeof validateLinkSetSchema>>) => void = () => {};
+    mockValidate.mockReturnValueOnce(new Promise((resolve) => (releaseFirst = resolve)));
+    mockValidate.mockImplementation(() =>
+      Promise.resolve({
+        kind: 'document' as const,
+        valid: false,
+        errors: [{ keyword: 'required', instancePath: '/linkset/0', params: { missingProperty: 'anchor' } }] as any,
+        version: '0.7.0',
+        schemaUrl: SCHEMA_URL,
+      }),
+    );
+    const replacement: StoredLinkSet = {
+      original: { linkset: [] },
+      decoded: { linkset: [] },
+      source,
+      validationVersion: '0.7.0',
+    };
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} reingest={replacement} />);
+    await screen.findByTestId('linkset-card-header');
+    expect(screen.getAllByTestId(/status-icon-in-progress/).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByTestId('harness-reingest'));
+    await waitFor(() => expect(mockValidate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+
+    await act(async () => releaseFirst(await validDocument()));
+    expect(screen.queryAllByTestId(/status-icon-success/)).toHaveLength(0);
+    expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0);
+  });
+
+  it('fails with the could-not-be-loaded copy when the schema is unavailable, and stays removable', async () => {
+    mockValidate.mockResolvedValue({
+      kind: 'schema-unavailable',
+      reason: 'network',
+      message: 'Schema host unreachable (https://untp.unece.org/...).',
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+    });
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+
+    const header = await screen.findByTestId('linkset-card-header');
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+    fireEvent.click(header);
+    expect(screen.getByTestId('linkset-schema-errors')).toHaveTextContent(
+      'The link set schema for UNTP v0.7.0 could not be loaded, so this check could not determine whether the link set conforms. Details: Schema host unreachable (https://untp.unece.org/...). Resolve or upload the link set again to retry.',
+    );
+    expect(screen.getByLabelText('Remove r.example.org/01/1')).toBeEnabled();
+  });
+
+  it('names an unusable schema as an operator problem, without retry advice', async () => {
+    mockValidate.mockResolvedValue({
+      kind: 'schema-unusable',
+      message: 'schema is invalid',
+      version: '0.7.0',
+      schemaUrl: SCHEMA_URL,
+    });
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+
+    const header = await screen.findByTestId('linkset-card-header');
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+    fireEvent.click(header);
+    const text = screen.getByTestId('linkset-schema-errors').textContent ?? '';
+    expect(text).toContain('could not be used');
+    expect(text).toContain('Report this problem to the Playground operator');
+    expect(text).toContain(SCHEMA_URL);
+    expect(text).not.toContain('again to retry');
+  });
+
+  it('settles the step as a failure when validation throws, never leaving the card spinning', async () => {
+    mockValidate.mockRejectedValue(new Error('boom'));
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+      await screen.findByTestId('linkset-card-header');
+      await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+      expect(screen.queryAllByTestId(/status-icon-in-progress/)).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('subtitles the card with the stored version, not a default', async () => {
+    render(<Harness initial={[{ payload: storedLinkSet(source, '0.8.0') }]} />);
+    await screen.findByTestId('linkset-card-header');
+    expect(screen.getByTestId('linkset-subtitle')).toHaveTextContent('Link Set · v0.8.0');
+    await waitFor(() => expect(mockValidate).toHaveBeenCalledWith(LINK_SET, '0.8.0'));
+  });
+});
+
+describe('Undo during an unfinished run (#988, ADR-047 update)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidate.mockImplementation(validDocument);
+  });
+
+  const source = { kind: 'url', url: 'https://r.example.org/01/1?linkType=all' } as const;
+
+  it('restarts validation when the original run finished while the card was removed', async () => {
+    let releaseFirst: (value: Awaited<ReturnType<typeof validateLinkSetSchema>>) => void = () => {};
+    mockValidate.mockReturnValueOnce(new Promise((resolve) => (releaseFirst = resolve)));
+    mockValidate.mockImplementation(validDocument);
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+
+    await screen.findByTestId('linkset-card-header');
+    expect(mockValidate).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText('Remove r.example.org/01/1'));
+    await waitFor(() => expect(screen.queryByTestId('linkset-card-header')).not.toBeInTheDocument());
+
+    // The original run completes while the slot is gone: its commit is rejected by the run guard.
+    await act(async () => releaseFirst(await validDocument()));
+
+    const action = (toast.success as jest.Mock).mock.calls[0][1].action;
+    act(() => action.onClick());
+    await screen.findByTestId('linkset-card-header');
+
+    // A fresh run, not the abandoned one, settles the restored card.
+    await waitFor(() => expect(mockValidate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-success/).length).toBeGreaterThan(0));
+    expect(screen.queryAllByTestId(/status-icon-in-progress/)).toHaveLength(0);
+  });
+
+  it('lets the new run own the slot when Undo happens before the original run finishes', async () => {
+    let releaseFirst: (value: Awaited<ReturnType<typeof validateLinkSetSchema>>) => void = () => {};
+    mockValidate.mockReturnValueOnce(new Promise((resolve) => (releaseFirst = resolve)));
+    mockValidate.mockImplementation(() =>
+      Promise.resolve({
+        kind: 'document' as const,
+        valid: false,
+        errors: [{ keyword: 'required', instancePath: '/linkset/0', params: { missingProperty: 'anchor' } }] as any,
+        version: '0.7.0',
+        schemaUrl: SCHEMA_URL,
+      }),
+    );
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+    await screen.findByTestId('linkset-card-header');
+
+    fireEvent.click(screen.getByLabelText('Remove r.example.org/01/1'));
+    await waitFor(() => expect(screen.queryByTestId('linkset-card-header')).not.toBeInTheDocument());
+    const action = (toast.success as jest.Mock).mock.calls[0][1].action;
+    act(() => action.onClick());
+    await screen.findByTestId('linkset-card-header');
+    await waitFor(() => expect(mockValidate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
+
+    // The abandoned first run reports success late; it must not overwrite the new run's result.
+    await act(async () => releaseFirst(await validDocument()));
+    expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByTestId(/status-icon-success/)).toHaveLength(0);
+  });
+
+  it('restores a settled result intact without re-running', async () => {
+    render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
+    await screen.findByTestId('linkset-card-header');
+    await waitFor(() => expect(screen.getAllByTestId(/status-icon-success/).length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByLabelText('Remove r.example.org/01/1'));
+    await waitFor(() => expect(screen.queryByTestId('linkset-card-header')).not.toBeInTheDocument());
+    const action = (toast.success as jest.Mock).mock.calls[0][1].action;
+    act(() => action.onClick());
+    await screen.findByTestId('linkset-card-header');
+    expect(screen.getAllByTestId(/status-icon-success/).length).toBeGreaterThan(0);
+    expect(mockValidate).toHaveBeenCalledTimes(1);
   });
 });

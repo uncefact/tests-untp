@@ -11,6 +11,7 @@ const stored = (decoded: Record<string, unknown>, source?: StoredLinkSet['source
   original: decoded,
   decoded,
   source,
+  validationVersion: '0.7.0',
 });
 
 describe('linkSetKey', () => {
@@ -47,8 +48,8 @@ describe('linkSetTitle', () => {
 });
 
 describe('linkSetSubtitle', () => {
-  it('is the family label', () => {
-    expect(linkSetSubtitle()).toBe('Link Set');
+  it('is the family label followed by the version the link set was validated against', () => {
+    expect(linkSetSubtitle({ validationVersion: '0.7.0' })).toBe('Link Set · v0.7.0');
   });
 });
 

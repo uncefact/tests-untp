@@ -157,3 +157,12 @@ export function buildUntpArtefactUrls(type: string, version: string): UntpArtefa
     contextUrl: `${LEGACY_BASE}/${shortCode}/${version}/context/`,
   };
 }
+
+/**
+ * The published Identity Resolver link set schema URL for a UNTP version. The schema exists from
+ * 0.7.0 under the artefacts layout only (`/idr/LinksetSchema.json`); no legacy per-type form ever
+ * existed, so this is a single layout rather than a version switch.
+ */
+export function buildLinkSetSchemaUrl(version: string): string {
+  return `${ARTEFACTS_SCHEMA_BASE}/v${version}/idr/LinksetSchema.json`;
+}
