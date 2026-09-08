@@ -8,6 +8,7 @@ import {
   commitResult,
   replacePayload,
   absorbTwin,
+  updatePayload,
 } from '@/lib/artefactCollection';
 import type { CollectionState } from '@/types/artefact';
 
@@ -278,5 +279,24 @@ describe('absorbTwin (#813 collision merge)', () => {
   it('fails open when either slot is missing', () => {
     const state = { items: [] } as any;
     expect(absorbTwin(state, 'a', 'b', 'p', 'h', [] as any, () => 'r').absorbed).toBe(false);
+  });
+});
+
+describe('updatePayload (#814)', () => {
+  it('rewrites the payload and keeps the result, run token and position; no-op for a missing instance', () => {
+    let state = emptyCollection<{ v: number }, string[]>();
+    state = upsert(state, { payload: { v: 1 }, contentHash: 'a', mintInstanceId: () => 'i1' }).state;
+    state = upsert(state, { payload: { v: 2 }, contentHash: 'b', mintInstanceId: () => 'i2' }).state;
+    const { runId } = beginRun(state, 'i1', [], () => 'r1');
+    state = beginRun(state, 'i1', [], () => 'r1').state;
+    state = commitResult(state, { instanceId: 'i1', runId: runId as string, result: ['done'] }).state;
+    const { state: next, updated } = updatePayload(state, 'i1', (p) => ({ ...p, v: 10 }));
+    expect(updated).toBe(true);
+    expect(next.items.map((i) => i.instanceId)).toEqual(['i1', 'i2']);
+    expect(next.items[0]).toMatchObject({ payload: { v: 10 }, result: ['done'], runId: 'r1' });
+    expect(next.items[1]).toBe(state.items[1]);
+    const miss = updatePayload(next, 'nope', (p) => p);
+    expect(miss.updated).toBe(false);
+    expect(miss.state).toBe(next);
   });
 });

@@ -122,11 +122,16 @@ Cypress.Commands.add(
         expect(report).to.have.property('testSuite');
         expect(report.implementation).to.deep.equal({ name: implementationName });
         expect(report.pass).to.equal(expectedPass);
+        // The three family arrays are always present (#814).
         expect(report.verifiableCredentials).to.be.an('array');
+        expect(report.conformitySchemes).to.be.an('array');
+        expect(report.linkSets).to.be.an('array');
         return report;
       });
     } else if (format === 'html') {
-      cy.readFile('cypress/downloads/untp-test-report-core-test-implementation.html').should('exist');
+      cy.readFile(
+        `cypress/downloads/untp-test-report-${implementationName.toLowerCase().replace(/\s+/g, '-')}.html`,
+      ).should('exist');
     }
   },
 );

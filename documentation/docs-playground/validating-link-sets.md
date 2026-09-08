@@ -64,3 +64,7 @@ What the step does not do:
 - An encrypted credential that has not been decrypted yet has no type to compare, so its link stays unchecked until it is decrypted.
 - A link set with no UNTP-relation credential links has nothing to check; the step succeeds and says so.
 - A fetch of a linked URL that returns nothing acceptable (the fetch fails, or the document is refused), whether from the card's Verify or from the Credentials tab's URL input, forgets the earlier result for that URL: the row goes back to Verify and the link counts as unchecked again. The credential card that was loaded earlier stays on the Credentials tab. If the same URL was fetched again successfully while the failing attempt was still in flight, that newer result is kept.
+
+## In the report
+
+A generated report records each link set with the version it was validated against, its `Schema Validation` outcome with the same explanation the card shows (minus the card's Verify hint), and its `Link Type Coverage` count and mismatches. Coverage may still be pending in a report, since it only counts the links you have verified. See [Generating reports](./generating-reports.md).

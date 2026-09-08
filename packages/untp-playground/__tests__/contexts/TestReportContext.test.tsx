@@ -1,12 +1,17 @@
 import { TestReportProvider, useTestReport } from '@/contexts/TestReportContext';
+import { downloadHtml } from '@/lib/reportDownload';
 import { generateReport } from '@/lib/reportService';
-import { downloadJson, downloadHtml } from '@/lib/utils';
-import { CredentialReportInput, DownloadReportFormat, TestReport } from '@/types';
+import { downloadJson } from '@/lib/utils';
+import { CredentialReportInput, DownloadReportFormat, LinkSetReportInput, StoredLinkSet, TestReport } from '@/types';
+import { linkSetAssessment, deriveLinkTypeCoverage, type LinkSetAssessment } from '@/lib/linkTypeCoverage';
+import { linkedCredentialRows } from '@/lib/linkSetCollection';
+import { emptyUrlBindings } from '@/lib/urlBindings';
 import { act, renderHook } from '@testing-library/react';
 import { toast } from 'sonner';
 import { TestCaseStatus, TestCaseStepId, VCDM_CONTEXT_URLS } from '../../constants';
 
 jest.mock('@/lib/reportService');
+jest.mock('@/lib/reportDownload');
 jest.mock('@/lib/utils');
 jest.mock('sonner');
 
@@ -42,10 +47,36 @@ const pendingSchemeInstance = {
   ],
 };
 
+const linkSetDoc = {
+  linkset: [
+    {
+      anchor: 'https://resolver.example.org/01/09520123456788',
+      'https://test.uncefact.org/voc/untp/dpp': [{ href: 'https://credentials.example.org/dpp-1.json', title: 'DPP' }],
+    },
+  ],
+};
+const linkSetRows = linkedCredentialRows(linkSetDoc).filter((row) => row.credential);
+const linkSetInput = (
+  schemaStatus: TestCaseStatus | undefined,
+): { linkSet: StoredLinkSet; assessment: LinkSetAssessment } => ({
+  linkSet: { original: linkSetDoc, decoded: linkSetDoc, validationVersion: '0.7.0' },
+  assessment: linkSetAssessment(
+    schemaStatus === undefined
+      ? []
+      : [{ id: TestCaseStepId.LINKSET_SCHEMA_VALIDATION, name: 'Schema Validation', status: schemaStatus }],
+    deriveLinkTypeCoverage(linkSetRows, emptyUrlBindings, []),
+  ),
+});
+const settledLinkSet = linkSetInput(TestCaseStatus.SUCCESS);
+const runningLinkSet = linkSetInput(TestCaseStatus.IN_PROGRESS);
+const unstartedLinkSet = linkSetInput(undefined);
+
 const mockReport: TestReport = {
   implementation: { name: 'Test Implementation' },
   reportName: 'UNTP',
   verifiableCredentials: [],
+  conformitySchemes: [],
+  linkSets: [],
   date: new Date().toISOString(),
   testSuite: {
     runner: 'UNTP Playground',
@@ -134,6 +165,86 @@ describe('TestReportContext', () => {
     expect(result.current.canGenerateReport).toBeFalsy();
   });
 
+  it('allows generation from a link set alone once its schema step has settled, with coverage still pending (#814)', () => {
+    expect(settledLinkSet.assessment?.coverage.step.status).toBe(TestCaseStatus.PENDING);
+    const { result } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => (
+        <TestReportProvider linkSetInstances={[settledLinkSet]}>{children}</TestReportProvider>
+      ),
+    });
+    expect(result.current.canGenerateReport).toBe(true);
+  });
+
+  it('holds generation while a link set schema step is in progress, even beside a settled credential (#814)', () => {
+    // The assessment already carries two steps here (schema + derived coverage), so a gate that
+    // counted steps instead of reading schemaRunning would wrongly allow this.
+    expect(runningLinkSet.assessment?.steps).toHaveLength(2);
+    const { result } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => (
+        <TestReportProvider credentialInstances={[terminalCredentialInstance]} linkSetInstances={[runningLinkSet]}>
+          {children}
+        </TestReportProvider>
+      ),
+    });
+    expect(result.current.canGenerateReport).toBe(false);
+  });
+
+  it('holds generation for a link set whose schema run has not started, and for one with no assessment (#814)', () => {
+    const noAssessment: LinkSetReportInput = { ...settledLinkSet, assessment: undefined };
+    for (const input of [unstartedLinkSet, noAssessment]) {
+      const { result } = renderHook(() => useTestReport(), {
+        wrapper: ({ children }) => <TestReportProvider linkSetInstances={[input]}>{children}</TestReportProvider>,
+      });
+      expect(result.current.canGenerateReport).toBe(false);
+    }
+  });
+
+  it('holds generation when one instance of a family is unfinished beside a settled one, for every family', () => {
+    const cases = [
+      { credentialInstances: [terminalCredentialInstance, pendingCredentialInstance] },
+      { schemeInstances: [terminalSchemeInstance, pendingSchemeInstance] },
+      { linkSetInstances: [settledLinkSet, runningLinkSet] },
+    ];
+    for (const props of cases) {
+      const { result } = renderHook(() => useTestReport(), {
+        wrapper: ({ children }) => <TestReportProvider {...props}>{children}</TestReportProvider>,
+      });
+      expect(result.current.canGenerateReport).toBe(false);
+    }
+  });
+
+  it('invalidates a generated report when the link set inputs change, and keeps it across an identical rerender (#814)', async () => {
+    let linkSets = [settledLinkSet];
+    const { result, rerender } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => <TestReportProvider linkSetInstances={linkSets}>{children}</TestReportProvider>,
+    });
+
+    await act(async () => {
+      await result.current.generateReport('Test Implementation');
+    });
+    expect(result.current.report).toEqual(mockReport);
+
+    rerender();
+    expect(result.current.report).toEqual(mockReport);
+
+    linkSets = [settledLinkSet];
+    rerender();
+    expect(result.current.report).toBeNull();
+    expect(result.current.canDownloadReport).toBe(false);
+  });
+
+  it('forwards the link set inputs to the report service (#814)', async () => {
+    const { result } = renderHook(() => useTestReport(), {
+      wrapper: ({ children }) => (
+        <TestReportProvider linkSetInstances={[settledLinkSet]}>{children}</TestReportProvider>
+      ),
+    });
+    await act(async () => {
+      await result.current.generateReport('Test Implementation');
+    });
+    expect(generateReport).toHaveBeenCalledWith(expect.objectContaining({ linkSetInstances: [settledLinkSet] }));
+  });
+
   it('invalidates a generated report when the last artefact is removed', async () => {
     let schemes = [terminalSchemeInstance];
     const { result, rerender } = renderHook(() => useTestReport(), {
@@ -165,6 +276,7 @@ describe('TestReportContext', () => {
       implementationName: 'Test Implementation',
       credentialInstances: [terminalCredentialInstance],
       schemeInstances: [],
+      linkSetInstances: [],
       passStatuses: [TestCaseStatus.SUCCESS, TestCaseStatus.WARNING],
     });
     expect(toast.success).toHaveBeenCalledWith('Report generated successfully');

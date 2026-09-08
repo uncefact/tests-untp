@@ -22,3 +22,5 @@ The decryption key for it is the 64-character hexadecimal string (a 256-bit AES 
 Documents recognised as encrypted in another form, a JWE (compact or JSON serialisation), an AES variant other than `aes-256-gcm`, or an envelope whose fields do not match the shape above, are shown locked with the method named, and the card does not ask for a key that could not work. To validate such a credential today, provide its decrypted form instead.
 
 If you hold credentials encrypted with a method the Playground does not support, please [raise an issue](https://github.com/uncefact/tests-untp/issues/new) naming the envelope format and where it comes from, so support can be prioritised.
+
+A credential decrypted in the browser appears in a generated report with `Decryption` as its first step; a credential that is still locked is left out of the report and does not hold the Generate Report button. See [Generating reports](./generating-reports.md).

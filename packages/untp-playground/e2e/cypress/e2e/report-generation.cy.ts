@@ -1,5 +1,11 @@
 import { TestCaseStatus } from '../../../constants';
 import { config } from '../support/config';
+import sampleDpp from '../../../public/samples/sample-digital-product-passport-v0.7.0.json';
+import sampleLinkSet from '../../../public/samples/sample-link-set.json';
+
+const openLinkSetsTab = () => cy.contains('[role="tab"]', 'Link Sets').click();
+const LINKSET_CARD_HEADER = '[data-testid="linkset-card-header"]';
+const DCC_HREF = 'https://credentials.example.org/conformity/dcc-batch-114.json';
 
 describe('Report Generation', () => {
   beforeEach(() => {
@@ -141,6 +147,91 @@ describe('Report Generation', () => {
       expect(failedUntpSchemaValidationStep.details).to.exist;
       expect(failedUntpSchemaValidationStep.details.errors).to.be.an('array');
       expect(failedUntpSchemaValidationStep.details.errors.length).to.be.greaterThan(0);
+    });
+  });
+
+  it('reports a link set on its own, with its version, both steps and pending coverage, without blocking generation (#814)', () => {
+    openLinkSetsTab();
+    cy.uploadCredential(sampleLinkSet);
+    cy.get(LINKSET_CARD_HEADER).find('[data-testid$="status-icon-success"]', { timeout: 20000 }).should('exist');
+
+    cy.generateReport('Link Set Implementation');
+    cy.downloadAndVerifyReport('Link Set Implementation', true).then((report) => {
+      expect(report.verifiableCredentials).to.deep.equal([]);
+      expect(report.conformitySchemes).to.deep.equal([]);
+      expect(report.linkSets).to.have.length(1);
+      const entry = report.linkSets[0];
+      // The bundled sample is validated against the version the selector defaulted to; the literal
+      // locks the sample to that schema rather than restating the constant.
+      expect(entry.validationVersion).to.equal('0.7.0');
+      expect(entry.title).to.equal('credential.json'); // the upload command's fixed filename
+      expect(entry.steps.map((step: any) => step.id)).to.deep.equal([
+        'linkset-schema-validation',
+        'linkset-link-type-coverage',
+      ]);
+      expect(entry.steps[0].status).to.equal(TestCaseStatus.SUCCESS);
+      expect(entry.steps[0].details.kind).to.equal('document');
+      expect(entry.steps[1].status).to.equal(TestCaseStatus.PENDING);
+      expect(entry.steps[1].details.checked).to.equal(0);
+      expect(entry.steps[1].details.total).to.equal(2);
+    });
+    cy.downloadAndVerifyReport('Link Set Implementation', true, 'html');
+  });
+
+  it('invalidates a generated report when a linked credential is verified, and the regenerated report records the mismatch (#814)', () => {
+    cy.intercept('POST', '**/api/fetch', {
+      statusCode: 200,
+      body: { ok: true, body: JSON.stringify(sampleDpp), contentType: 'application/json', finalUrl: DCC_HREF },
+    }).as('fetchLinked');
+
+    openLinkSetsTab();
+    cy.uploadCredential({
+      linkset: [
+        {
+          anchor: 'https://resolver.example.org/01/09520123456788',
+          'https://test.uncefact.org/voc/untp/dcc': [
+            {
+              href: DCC_HREF,
+              type: 'application/vc+ld+json',
+              title: 'Digital Conformity Credential',
+              hreflang: ['en'],
+            },
+          ],
+        },
+      ],
+    });
+    cy.get(LINKSET_CARD_HEADER).find('[data-testid$="status-icon-success"]', { timeout: 20000 }).should('exist');
+
+    cy.generateReport('Coverage Implementation');
+    cy.downloadAndVerifyReport('Coverage Implementation', true).then((report) => {
+      expect(report.linkSets[0].steps[1].status).to.equal(TestCaseStatus.PENDING);
+    });
+
+    cy.get(LINKSET_CARD_HEADER).click();
+    cy.get('[data-testid="linked-credential-verify"]').click();
+    cy.wait('@fetchLinked');
+    cy.get('[data-testid="linkset-link-type-coverage-status-icon-failure"]', { timeout: 60000 }).should('exist');
+
+    // The earlier report no longer describes what is on screen.
+    cy.contains('button', 'Download Report').should('be.disabled');
+    cy.get('[data-testid="generate-report-button"]').should('be.enabled');
+
+    // A new implementation name gives the regenerated report its own download filename, so the
+    // read below cannot pick up the first file.
+    cy.generateReport('Coverage Implementation Regenerated');
+    cy.downloadAndVerifyReport('Coverage Implementation Regenerated', false).then((report) => {
+      const entry = report.linkSets[0];
+      expect(entry.status).to.equal(TestCaseStatus.FAILURE);
+      expect(entry.steps[1].status).to.equal(TestCaseStatus.FAILURE);
+      expect(entry.steps[1].details.checked).to.equal(1);
+      expect(entry.steps[1].details.mismatches).to.have.length(1);
+      expect(entry.steps[1].details.mismatches[0]).to.include({ expectedType: 'dcc', href: DCC_HREF });
+      expect(entry.steps[1].details.mismatches[0].detectedType).to.equal('DigitalProductPassport');
+      // The verified credential is a real entry of the same report.
+      expect(report.verifiableCredentials).to.have.length(1);
+      expect(report.verifiableCredentials[0].core.type).to.equal('DigitalProductPassport');
+      // The verified credential names the link set it came from (the upload command's filename).
+      expect(report.verifiableCredentials[0].source).to.include({ via: 'link-set', linkSet: 'credential.json' });
     });
   });
 });

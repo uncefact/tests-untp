@@ -45,3 +45,24 @@ describe('dropUrlBinding (#1007)', () => {
     expect(dropUrlBinding(dropped, 'https://x/none')).toBe(dropped);
   });
 });
+
+describe('recordUrlBinding identity (#814)', () => {
+  it('returns the same map when every url already points at the instance, so a repeat Verify is not a change', () => {
+    const bindings = recordUrlBinding(emptyUrlBindings, ['https://x/a', 'https://x/b'], 'A' as any);
+    expect(recordUrlBinding(bindings, ['https://x/a'], 'A' as any)).toBe(bindings);
+    expect(recordUrlBinding(bindings, ['https://x/a', undefined, ''], 'A' as any)).toBe(bindings);
+    expect(recordUrlBinding(bindings, [undefined, ''], 'B' as any)).toBe(bindings);
+  });
+
+  it('returns a new map, leaving the input untouched, when a url is new or moves to another instance', () => {
+    const bindings = recordUrlBinding(emptyUrlBindings, ['https://x/a'], 'A' as any);
+    const added = recordUrlBinding(bindings, ['https://x/a', 'https://x/c'], 'A' as any);
+    expect(added).not.toBe(bindings);
+    expect(added.get('https://x/c')).toBe('A');
+    expect(bindings.has('https://x/c')).toBe(false);
+    const moved = recordUrlBinding(bindings, ['https://x/a'], 'B' as any);
+    expect(moved).not.toBe(bindings);
+    expect(moved.get('https://x/a')).toBe('B');
+    expect(bindings.get('https://x/a')).toBe('A');
+  });
+});

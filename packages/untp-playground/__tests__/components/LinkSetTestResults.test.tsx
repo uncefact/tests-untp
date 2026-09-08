@@ -392,11 +392,27 @@ describe('linked-credential Verify (#812)', () => {
     await waitFor(() => {
       expect(mockOnVerifyCredential).toHaveBeenCalledWith(
         { type: ['VerifiableCredential'] },
-        { kind: 'url', url: DPP_HREF, via: 'link-set' },
+        { kind: 'url', url: DPP_HREF, via: 'link-set', linkSet: 'https://r.example.org/01/1?linkType=all' },
       );
     });
     expect(fetchLinkedCredential).toHaveBeenCalledWith(DPP_HREF);
     expect(toast.success).toHaveBeenCalledWith('Verifying Digital Product Passport in the Credentials tab');
+  });
+
+  it('names an uploaded link set by its filename on the verified credential source (#814)', async () => {
+    (fetchLinkedCredential as jest.Mock).mockResolvedValue({
+      ok: true,
+      credential: { type: ['VerifiableCredential'] },
+    });
+    render(<Harness initial={[{ payload: storedLinkSet({ kind: 'file', filename: 'my-links.json' }) }]} />);
+    expandCard();
+    fireEvent.click(firstVerify());
+    await waitFor(() => {
+      expect(mockOnVerifyCredential).toHaveBeenCalledWith(
+        { type: ['VerifiableCredential'] },
+        { kind: 'url', url: DPP_HREF, via: 'link-set', linkSet: 'my-links.json' },
+      );
+    });
   });
 
   it('shows a visible Fetching phase while the proxy request is in flight, then returns on failure', async () => {
@@ -983,6 +999,8 @@ describe('Schema Validation outcomes (#988)', () => {
     expect(item).toHaveTextContent('not starting with "anchor", "description" or "itemDescription"');
     expect(item).toHaveTextContent('known restriction of the published schema');
     expect(item).toHaveTextContent('concerns the relation name only');
+    // The Verify hint is the card's own addition to the shared explanation (the report omits it).
+    expect(item).toHaveTextContent('Any credential links listed on this card can still be verified.');
     expect(item).not.toHaveTextContent('not a problem with the credential');
     // The failure card still offers the docs link and Verify on its credential rows.
     expect(screen.getByTestId('linkset-validation-docs')).toHaveAttribute(

@@ -9,9 +9,21 @@ export interface Credential {
 // credentials card uses it for the in-progress provenance subtitle. `requestedUrl` is the URL the
 // user asked for when it differs from the stored (post-redirect) `url`, so URL bindings can name
 // the ingestion under both forms.
-export type ArtefactSource =
+export type ArtefactSource = (
   | { kind: 'file'; filename: string }
-  | { kind: 'url'; url: string; requestedUrl?: string; via?: 'link-set' };
+  | { kind: 'url'; url: string; requestedUrl?: string }
+) & {
+  /** Set when the credential was fetched by a link set card's Verify (#812). */
+  via?: 'link-set';
+  /**
+   * When `via` is `link-set`, the link set the credential was reached through: its resolver
+   * request URL (query included) for a resolved link set, else its filename (#814). Added to the
+   * original source (file or URL) when Verify reaches an already-decrypted envelope or a decrypt
+   * lands on a twin verified from a link set, so a report can trace a credential back to the link
+   * set that listed it.
+   */
+  linkSet?: string;
+};
 
 export interface StoredCredential {
   /**
@@ -45,7 +57,7 @@ export interface StoredLinkSet {
    * subtitle read; changing the selector later never rewrites it. Re-adding the same link set
    * under another version replaces the instance with a new value here. Deliberately a plain
    * string, not `LinkSetSpecVersion`: that union describes what the selector offers now, while
-   * this records what was selected then, and the report will serialise it.
+   * this records what was selected then, and the report serialises it (#814).
    */
   validationVersion: string;
 }
