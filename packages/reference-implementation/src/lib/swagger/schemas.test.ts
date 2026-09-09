@@ -1,7 +1,7 @@
 import { ServiceType, AdapterType } from '@uncefact/untp-ri-services';
 import { generateOpenAPISchemas } from './schemas';
 import { CredentialDetailsStatus } from '@/lib/prisma/generated';
-import { collectAdditionalProperties } from './published-document';
+import { collectAdditionalProperties, collectEnums } from './published-document';
 
 /**
  * Minimal shape for navigating the generated OpenAPI JSON schema in these
@@ -554,5 +554,37 @@ describe('generateOpenAPISchemas: CredentialRecordDetail (#964)', () => {
       expect(detail.properties?.[field]?.type).toBe('string');
       expect(detail.properties?.[field]?.nullable).toBe(true);
     }
+  });
+
+  it('publishes the detail-only key warning without widening the shared warning component', () => {
+    const schemas = generateOpenAPISchemas() as Record<string, JsonSchemaObject>;
+    const detailCodes = collectEnums(schemas.CredentialRecordDetail?.properties?.warnings?.items);
+    const keylessCodes = collectEnums(schemas.CredentialRecord?.properties?.warnings?.items);
+    const namedCodes = collectEnums(schemas.CredentialRecordWarning);
+
+    // collectEnums answers an empty array for anything it cannot walk, so the
+    // two negative assertions need a member they MUST find beside them; a
+    // `warnings` property that regressed to a $ref would otherwise pass both.
+    expect(keylessCodes).toContain('DUPLICATE_CONTENT');
+    expect(namedCodes).toContain('DUPLICATE_CONTENT');
+    expect(detailCodes).toContain('DECRYPTION_KEY_UNAVAILABLE');
+    expect(keylessCodes).not.toContain('DECRYPTION_KEY_UNAVAILABLE');
+    expect(namedCodes).not.toContain('DECRYPTION_KEY_UNAVAILABLE');
+  });
+});
+
+describe('generateOpenAPISchemas: LibraryReadFailure (#1031)', () => {
+  const failure = (generateOpenAPISchemas() as Record<string, JsonSchemaObject>).LibraryReadFailure;
+
+  it('describes every field and says which route can emit NOT_FOUND', () => {
+    // An integrator reading the generated document sees only what is written
+    // here: two bare enum members would leave both codes undefined in the one
+    // place a client generator looks.
+    expect(failure.description).toContain('batch-get only');
+    for (const field of ['id', 'code', 'message']) {
+      expect(failure.properties?.[field]?.description ?? '').not.toBe('');
+    }
+    expect(failure.properties?.code?.description).toContain('RECORD_UNREADABLE');
+    expect(failure.properties?.code?.description).toContain('NOT_FOUND');
   });
 });

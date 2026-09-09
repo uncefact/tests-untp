@@ -10,10 +10,16 @@ import {
   type CheckRun,
   type LibraryRecord,
 } from '@/lib/prisma/generated';
-import { looksEnvelopeLikeButInvalid } from '@/lib/credentials/decryption-key-protection';
+import {
+  DecryptionKeyEnvelopeMalformedError,
+  DecryptionKeyUnwrapError,
+  EncryptionServiceUnavailableError,
+  looksEnvelopeLikeButInvalid,
+} from '@/lib/credentials/decryption-key-protection';
 import { CHECK_NAMES, BLOCKING_CHECKS, isNativeMasked, type LibraryCheckName as CheckName } from './check-rules';
 import type { ExternalCredentialRecord } from '@/lib/prisma/repositories/external-credential.repository';
 import { type LibraryRecordDetailView, type NativeLibraryRecordView } from './library-record-view';
+import { StructuredError } from '@uncefact/untp-utils';
 
 /**
  * The library surface's outbound shape for a credential record, as the
@@ -191,6 +197,24 @@ export const credentialRecordWarningSchema = z.discriminatedUnion('code', [
 
 export type CredentialRecordWarning = z.infer<typeof credentialRecordWarningSchema>;
 
+/**
+ * The keyless warnings plus the one code only a detail response may carry.
+ * Composed from the shared union's own members rather than restated, so a code
+ * added to the record contract reaches the detail contract with it instead of
+ * leaving two hand-kept lists to drift (ADR-057 decision 4).
+ */
+const credentialRecordDetailWarningSchema = z.discriminatedUnion('code', [
+  ...credentialRecordWarningSchema.options,
+  z
+    .object({
+      code: z.literal('DECRYPTION_KEY_UNAVAILABLE'),
+      message: z.string(),
+    })
+    .strict(),
+]);
+
+type CredentialRecordDetailWarning = z.infer<typeof credentialRecordDetailWarningSchema>;
+
 export const credentialRecordSchema = z
   .object({
     id: z.string().describe('Opaque; never parse or derive meaning from it.'),
@@ -254,6 +278,11 @@ export type CredentialRecordResponse = z.infer<typeof credentialRecordSchema>;
 
 export const credentialRecordDetailSchema = credentialRecordSchema
   .extend({
+    hasKey: z
+      .boolean()
+      .describe(
+        'Whether this service holds a key that opens its own durable copy. It remains true when the key is held but cannot be returned; that state has a null decryptionKey and exactly one DECRYPTION_KEY_UNAVAILABLE warning.',
+      ),
     storageUri: z
       .string()
       .nullable()
@@ -270,15 +299,16 @@ export const credentialRecordDetailSchema = credentialRecordSchema
       .string()
       .nullable()
       .describe(
-        "The key that opens the Reference Implementation's durable copy. Non-null exactly when hasKey is true, and null whenever hasKey is false. A non-null key always comes with a non-null storageUri.",
+        "The key that opens the Reference Implementation's durable copy. Non-null exactly when hasKey is true and the key can be returned; null with exactly one DECRYPTION_KEY_UNAVAILABLE warning when the service holds a key but cannot reveal it. A non-null key always comes with a non-null storageUri.",
       ),
+    warnings: z.array(credentialRecordDetailWarningSchema),
   })
   .superRefine((record, ctx) => {
-    if ((record.decryptionKey !== null) !== record.hasKey) {
+    if (record.decryptionKey !== null && !record.hasKey) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['decryptionKey'],
-        message: 'decryptionKey must be non-null exactly when hasKey is true',
+        message: 'decryptionKey requires hasKey',
       });
     }
     if (record.decryptionKey !== null && record.storageUri === null) {
@@ -302,6 +332,35 @@ export const credentialRecordDetailSchema = credentialRecordSchema
         message: 'native records require storageUri',
       });
     }
+    const keyUnavailableWarnings = record.warnings.filter((warning) => warning.code === 'DECRYPTION_KEY_UNAVAILABLE');
+    if (record.hasKey && record.storageUri === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['storageUri'],
+        message: 'hasKey requires storageUri',
+      });
+    }
+    if (record.hasKey && record.decryptionKey === null && keyUnavailableWarnings.length !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['warnings'],
+        message: 'hasKey with a null decryptionKey requires exactly one DECRYPTION_KEY_UNAVAILABLE warning',
+      });
+    }
+    if (!record.hasKey && keyUnavailableWarnings.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['warnings'],
+        message: 'DECRYPTION_KEY_UNAVAILABLE requires hasKey',
+      });
+    }
+    if (record.decryptionKey !== null && keyUnavailableWarnings.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['warnings'],
+        message: 'DECRYPTION_KEY_UNAVAILABLE requires a null decryptionKey',
+      });
+    }
   })
   .describe(
     'CredentialRecord plus required-nullable durable-copy coordinates and the receiver-side decryption key. The URI and digest are present together whenever a durable copy exists.',
@@ -310,10 +369,16 @@ export const credentialRecordDetailSchema = credentialRecordSchema
 export type CredentialRecordDetailResponse = z.infer<typeof credentialRecordDetailSchema>;
 
 /** A record read from the database whose rows cannot be projected: a broken invariant, never caller input. */
-export class CredentialRecordProjectionError extends Error {
+export class CredentialRecordProjectionError extends StructuredError {
+  readonly recordId: string;
+  readonly reason = 'projection' as const;
+
   constructor(recordId: string, detail: string) {
-    super(`Library record ${recordId} cannot be projected: ${detail}`);
-    this.name = 'CredentialRecordProjectionError';
+    super({
+      code: 'library.record-projection',
+      message: `Library record ${recordId} cannot be projected: ${detail}`,
+    });
+    this.recordId = recordId;
   }
 }
 
@@ -587,13 +652,69 @@ export function toCredentialRecord(
 type DetailRevealer = (stored: string) => string;
 
 /**
+ * What a caller reads on the one detail warning this projection can add.
+ * Exported so the published example is anchored to the runtime value rather
+ * than hand-copied beside it, where a reworded message would leave a wrong
+ * example in the API document with nothing to catch it.
+ */
+export const DECRYPTION_KEY_UNAVAILABLE_MESSAGE =
+  'The record is readable, but its stored decryption key could not be returned. Quote the record id and the x-correlation-id response header when contacting support.';
+
+/**
+ * Why a held key could not be returned. The values need different repairs and
+ * the caller cannot tell them apart, so they are conveyed to the route, which
+ * owns the single operator-facing event:
+ *
+ * - `malformed-envelope`: the stored value looks like an envelope and is not
+ *   one, so the revealer was never called. One row is damaged.
+ * - `key-configuration`: the revealer could not resolve the deployment's
+ *   encryption service. Every protected key in the deployment is affected.
+ * - `unwrap-failed`: the ciphertext would not open under the current wrapping
+ *   key. This row's envelope and the deployment key disagree.
+ * - `unclassified`: the revealer threw something else.
+ *
+ * The two reveal failures are recognised POSITIVELY, each by the class the
+ * revealer raises for it, and `malformed-envelope` is recognised before any
+ * reveal is attempted. A new fault on the reveal path therefore reaches the
+ * operator as an unknown cause, rather than sending them to re-check a key
+ * configuration that is not at fault. Each of the three carries a
+ * `StructuredError` class of its own, so the operator event names it by code
+ * as well as by reason; only `unclassified` can arrive without a code.
+ */
+export type KeyUnavailableReason = 'malformed-envelope' | 'key-configuration' | 'unwrap-failed' | 'unclassified';
+
+/** The classified cause handed to `onKeyUnavailable`. */
+export type KeyUnavailableCause = { reason: KeyUnavailableReason; error: unknown };
+
+/**
+ * Names a reveal failure by the class the revealer raises for it, never by
+ * message text. Both recognised classes are declared by
+ * `decryption-key-protection.ts` precisely so this classification can be
+ * positive; anything else is an unknown cause and says so.
+ */
+function classifyRevealFailure(error: unknown): KeyUnavailableReason {
+  if (error instanceof DecryptionKeyUnwrapError) return 'unwrap-failed';
+  if (error instanceof EncryptionServiceUnavailableError) return 'key-configuration';
+  return 'unclassified';
+}
+
+/**
  * Adds the durable-copy coordinates to either origin's keyless projection.
- * A malformed envelope-shaped stored key is a record failure, not legacy
- * plaintext, and is rejected before the supplied revealer is called.
+ * Any failure to reveal a held key, whatever its cause, leaves the record
+ * readable and makes its key unavailable. The detail contract keeps
+ * `hasKey: true`, clears only the returned key, keeps every warning the
+ * keyless projection already carried and adds exactly one for that state. The
+ * keyless projection remains untouched, so this warning cannot leak into list
+ * or batch responses.
+ *
+ * This function never logs. The cause is classified and handed to
+ * `onKeyUnavailable` so the caller emits one degradation event carrying it,
+ * rather than the cause being discarded here and the operator left with a
+ * misconfigured deployment that looks like a single corrupt row.
  */
 export function toCredentialRecordDetail(
   view: LibraryRecordDetailView,
-  options: { now?: Date; reveal: DetailRevealer },
+  options: { now?: Date; reveal: DetailRevealer; onKeyUnavailable?: (cause: KeyUnavailableCause) => void },
 ): CredentialRecordDetailResponse {
   const { base, storageUri, digestMultibase, storedKey } =
     view.origin === LibraryRecordOrigin.NATIVE
@@ -610,15 +731,36 @@ export function toCredentialRecordDetail(
           storedKey: view.external.decryptionKey,
         };
 
-  if (storedKey !== null && looksEnvelopeLikeButInvalid(storedKey)) {
-    throw new CredentialRecordProjectionError(view.record.id, 'has an invalid stored decryption-key envelope');
+  const warnings: CredentialRecordDetailWarning[] = [...base.warnings];
+  let decryptionKey: string | null = null;
+  if (storedKey !== null) {
+    let cause: KeyUnavailableCause | null = null;
+    if (looksEnvelopeLikeButInvalid(storedKey)) {
+      // Synthesised rather than caught: the revealer is never called for this
+      // branch. It is still one of the reveal path's own error classes, so
+      // this reason reaches the operator log with a code like the other two
+      // rather than as a bare Error the log can only name by message.
+      cause = { reason: 'malformed-envelope', error: new DecryptionKeyEnvelopeMalformedError() };
+    } else {
+      try {
+        decryptionKey = options.reveal(storedKey);
+      } catch (error) {
+        cause = { reason: classifyRevealFailure(error), error };
+      }
+    }
+    if (cause !== null) {
+      warnings.push({
+        code: 'DECRYPTION_KEY_UNAVAILABLE',
+        message: DECRYPTION_KEY_UNAVAILABLE_MESSAGE,
+      });
+      options.onKeyUnavailable?.(cause);
+    }
   }
-
-  const decryptionKey = storedKey === null ? null : options.reveal(storedKey);
   return parseProjection(credentialRecordDetailSchema, view.record.id, {
     ...base,
     storageUri,
     digestMultibase,
     decryptionKey,
+    warnings,
   });
 }

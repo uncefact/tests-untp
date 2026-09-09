@@ -126,6 +126,9 @@ import {
 import { DuplicateCredentialError } from '@/lib/prisma/repositories/external-credential.repository';
 import type { ExternalCredentialRecord } from '@/lib/prisma/repositories/external-credential.repository';
 import { LibraryRecordListError } from '@/lib/prisma/repositories/library-record.repository';
+import { libraryListResult as listResult } from '../../../../../__tests__/route-doubles/library-hydration-result';
+import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
+import { LibraryRecordSelectionError } from '@/lib/library/library-read-errors';
 import { credentialRecordSchema } from '@/lib/library/credential-record-projection';
 import type { NativeLibraryRecordView } from '@/lib/library/library-record-view';
 import {
@@ -406,7 +409,7 @@ beforeEach(() => {
   mockDefaultRegisterDependencies.mockReturnValue(DEPS_MARKER);
   mockGetExternalCredentialById.mockResolvedValue(record());
   mockStartJobQueue.mockResolvedValue({ enqueueWithin: (...args: unknown[]) => mockEnqueueWithin(...args) });
-  mockListLibraryRecords.mockResolvedValue({ data: [], total: 0 });
+  mockListLibraryRecords.mockResolvedValue(listResult([], 0));
 });
 
 // ---------------------------------------------------------------------------
@@ -884,13 +887,14 @@ describe('POST /api/v1/library logging', () => {
 
 describe('GET /api/v1/library', () => {
   it('returns the standard paginated, keyless envelope and prevents caching', async () => {
-    mockListLibraryRecords.mockResolvedValue({ data: [record()], total: 1 });
+    mockListLibraryRecords.mockResolvedValue(listResult([record()], 1));
 
     const response = await get('http://localhost/api/v1/library');
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(response.body.pagination).toEqual({ total: 1, limit: 20, offset: 0, hasMore: false });
+    expect(response.body.failures).toEqual([]);
     const listed = (response.body.data as Record<string, unknown>[])[0];
     expect(listed).toEqual(expect.objectContaining({ id: RECORD_ID, origin: 'external' }));
     expect(listed).not.toHaveProperty('decryptionKey');
@@ -900,7 +904,7 @@ describe('GET /api/v1/library', () => {
   });
 
   it('projects a native row through the handler with the keyless native envelope', async () => {
-    mockListLibraryRecords.mockResolvedValue({ data: [nativeRecord()], total: 1 });
+    mockListLibraryRecords.mockResolvedValue(listResult([nativeRecord()], 1));
 
     const response = await get('http://localhost/api/v1/library');
     const listed = (response.body.data as unknown[])[0] as Record<string, unknown>;
@@ -909,6 +913,7 @@ describe('GET /api/v1/library', () => {
     expect(listed).toEqual(expect.objectContaining({ id: RECORD_ID, origin: 'native' }));
     expect(listed).not.toHaveProperty('decryptionKey');
     expect(credentialRecordSchema.safeParse(listed).success).toBe(true);
+    expect(response.body.failures).toEqual([]);
   });
 
   it('passes repeatable type and the filters through after full validation', async () => {
@@ -966,10 +971,88 @@ describe('GET /api/v1/library', () => {
       expect(response.body).toMatchObject({
         data: [],
         pagination: { total: 0, limit: 20, offset: 0, hasMore: false },
+        failures: [],
       });
       expect(mockListLibraryRecords).not.toHaveBeenCalled();
     },
   );
+
+  it('returns readable rows and an ordered failure when one selected projection fails', async () => {
+    const brokenDate = {
+      toISOString: () => {
+        throw new Error('row-local date conversion');
+      },
+    } as unknown as Date;
+    const damaged = record({ parent: { id: 'record-damaged', createdAt: brokenDate } });
+    mockListLibraryRecords.mockResolvedValue(listResult([record(), damaged], 2));
+    const response = await get('http://localhost/api/v1/library');
+
+    expect(response.status).toBe(200);
+    expect((response.body.data as { id: string }[]).map(({ id }) => id)).toEqual([RECORD_ID]);
+    expect(response.body.failures).toEqual([
+      {
+        id: 'record-damaged',
+        code: 'RECORD_UNREADABLE',
+        message: expect.stringContaining('x-correlation-id response header'),
+      },
+    ]);
+    expect(response.body.pagination).toMatchObject({ hasMore: false });
+  });
+
+  it('still says more remain when every row on a non-final page is unreadable', async () => {
+    // The other direction of the same rule. An implementation that reported
+    // hasMore: false whenever `data` is empty passes the mixed-page case above
+    // and strands the caller here, one page into a set they cannot finish.
+    mockListLibraryRecords.mockResolvedValue(
+      listResult([], 4, [
+        { id: 'record-damaged-1', error: new LibraryRecordShapeError('record-damaged-1', 'has no run') },
+        { id: 'record-damaged-2', error: new LibraryRecordShapeError('record-damaged-2', 'has no run') },
+      ]),
+    );
+
+    const response = await get('http://localhost/api/v1/library?limit=2');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([]);
+    expect((response.body.failures as { id: string }[]).map(({ id }) => id)).toEqual([
+      'record-damaged-1',
+      'record-damaged-2',
+    ]);
+    expect(response.body.pagination).toEqual({ total: 4, limit: 2, offset: 0, hasMore: true });
+  });
+
+  it('emits one summary line carrying the counts for the request that produced them', async () => {
+    mockListLibraryRecords.mockResolvedValue(
+      listResult([record()], 2, [
+        { id: 'record-damaged', error: new LibraryRecordShapeError('record-damaged', 'no run') },
+      ]),
+    );
+
+    await get('http://localhost/api/v1/library');
+
+    const summaries = loggerCalls.info.mock.calls.filter(([, message]) => message === 'Library record read summary');
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0][0]).toMatchObject({
+      route: '/api/v1/library',
+      returned: 1,
+      unreadable: 1,
+      notFound: 0,
+    });
+  });
+
+  it('sanitises a selection-boundary failure and publishes no id from it', async () => {
+    // A row outside the page's selection cannot be attributed to any id, so
+    // the whole request fails and the offending id stays out of the body.
+    mockListLibraryRecords.mockRejectedValue(
+      new LibraryRecordSelectionError('record record-foreign was returned during hydration but was not selected'),
+    );
+
+    const response = await get('http://localhost/api/v1/library');
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(JSON.stringify(response.body)).not.toContain('record-foreign');
+  });
 
   it.each([
     ['a non-Error throw', 'internal list failure'],

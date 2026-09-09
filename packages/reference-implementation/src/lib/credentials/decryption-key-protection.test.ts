@@ -68,7 +68,7 @@ describe('isProtectedDecryptionKey', () => {
   it('returns false for a value with the right keys but null fields or an unsupported algorithm', async () => {
     const { isProtectedDecryptionKey } = await import('./decryption-key-protection');
     // Has every required key (so a presence-only check would wrongly call
-    // this "protected"), but none of the values are usable — corruption,
+    // this "protected"), but none of the values are usable: corruption,
     // not a genuine envelope.
     expect(isProtectedDecryptionKey('{"cipherText":null,"iv":null,"tag":null,"type":null}')).toBe(false);
     expect(isProtectedDecryptionKey('{"cipherText":"a","iv":"b","tag":"c","type":"des-ede3-cbc"}')).toBe(false);
@@ -77,7 +77,7 @@ describe('isProtectedDecryptionKey', () => {
   it('returns false for a genuinely well-formed-JSON envelope whose IV decodes to the wrong byte length', async () => {
     const { protectDecryptionKey, isProtectedDecryptionKey } = await import('./decryption-key-protection');
 
-    // Valid Base64, right shape, right algorithm — but the IV is 8 decoded
+    // Valid Base64, right shape, right algorithm, but the IV is 8 decoded
     // bytes, not the 12 AES-256-GCM requires. Node does not reject this
     // until decrypt's final auth check, with the same error a wrong key
     // produces, so this can only be caught structurally, before decrypt.
@@ -170,7 +170,7 @@ describe('revealDecryptionKey', () => {
 
     // Every field present (so the old, presence-only predicate treated this
     // as a genuine envelope), but the values are null. Decrypting this
-    // would throw "Unsupported algorithm: null" — a corruption problem,
+    // would throw "Unsupported algorithm: null", a corruption problem,
     // not a DATA_ENCRYPTION_KEY mismatch, so it must not surface as one.
     const corrupted = '{"cipherText":null,"iv":null,"tag":null,"type":null}';
 
@@ -234,20 +234,46 @@ describe('revealDecryptionKey', () => {
 
     jest.resetModules();
     delete process.env.DATA_ENCRYPTION_KEY;
-    const { revealDecryptionKey } = await import('./decryption-key-protection');
+    const { revealDecryptionKey, DecryptionKeyUnwrapError, EncryptionServiceUnavailableError } = await import(
+      './decryption-key-protection'
+    );
 
     expect(() => revealDecryptionKey(stored)).toThrow('Missing required DATA_ENCRYPTION_KEY');
+    // A caller separating a deployment with no key from one damaged envelope
+    // reads the class, not the message. This throw happens before any
+    // ciphertext is touched, so it must not wear the unwrap class, and it
+    // carries a class of its own: the resolver raises a bare Error, so
+    // without this wrapper the only thing left to classify on would be the
+    // message text.
+    expect(() => revealDecryptionKey(stored)).not.toThrow(DecryptionKeyUnwrapError);
+    expect(() => revealDecryptionKey(stored)).toThrow(EncryptionServiceUnavailableError);
   });
 
   it('throws a key-mismatch error and logs when the stored envelope cannot be decrypted', async () => {
-    const { protectDecryptionKey, revealDecryptionKey } = await import('./decryption-key-protection');
+    const { protectDecryptionKey, revealDecryptionKey, DecryptionKeyUnwrapError } = await import(
+      './decryption-key-protection'
+    );
 
     const stored = protectDecryptionKey(PLAINTEXT_KEY) as string;
     const tampered = JSON.parse(stored);
     tampered.cipherText = Buffer.from('tampered-cipher-text').toString('base64');
 
     expect(() => revealDecryptionKey(JSON.stringify(tampered))).toThrow('DATA_ENCRYPTION_KEY');
+    expect(() => revealDecryptionKey(JSON.stringify(tampered))).toThrow(DecryptionKeyUnwrapError);
     expect(mockError).toHaveBeenCalled();
+  });
+
+  it('throws the same key-mismatch error without logging when the caller silences the unwrap event', async () => {
+    const { protectDecryptionKey, revealDecryptionKey } = await import('./decryption-key-protection');
+
+    const stored = protectDecryptionKey(PLAINTEXT_KEY) as string;
+    const tampered = JSON.parse(stored);
+    tampered.cipherText = Buffer.from('tampered-cipher-text').toString('base64');
+
+    expect(() => revealDecryptionKey(JSON.stringify(tampered), { logUnwrapFailure: false })).toThrow(
+      'DATA_ENCRYPTION_KEY',
+    );
+    expect(mockError).not.toHaveBeenCalled();
   });
 });
 

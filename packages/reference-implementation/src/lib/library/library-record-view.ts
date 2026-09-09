@@ -5,6 +5,7 @@ import {
   type ExternalCredential,
   type LibraryRecord,
 } from '../prisma/generated';
+import { StructuredError } from '@uncefact/untp-utils';
 
 /**
  * A library record read with both of its possible children, as Prisma types
@@ -66,10 +67,16 @@ export type LibraryRecordDetailView<TRecord = LibraryRecord> =
  * back is the one it had just written, and it converts this error into its own
  * anomaly class rather than reporting stored corruption.
  */
-export class LibraryRecordShapeError extends Error {
+export class LibraryRecordShapeError extends StructuredError {
+  readonly recordId: string;
+  readonly reason = 'shape' as const;
+
   constructor(recordId: string, detail: string) {
-    super(`Library record ${recordId} ${detail}`);
-    this.name = 'LibraryRecordShapeError';
+    super({
+      code: 'library.record-shape',
+      message: `Library record ${recordId} ${detail}`,
+    });
+    this.recordId = recordId;
   }
 }
 

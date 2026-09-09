@@ -7,6 +7,7 @@ import {
   unexpectedErrorMessage,
 } from '@/lib/api/errors';
 import { apiLogger } from '@/lib/api/logger';
+import { safeError } from '@/lib/api/safe-error';
 import { parseRequestBody, definedFields, ValidationError } from '@/lib/api/validation';
 import { rethrowAsValidationFailed } from '@/lib/api/rethrow-as-validation-failed';
 import { strictIntQueryParam } from '@/lib/api/request-schemas/shared';
@@ -19,6 +20,8 @@ import {
   CredentialRecordProjectionError,
   toCredentialRecord,
   toCredentialRecordDetail,
+  type CredentialRecordDetailResponse,
+  type KeyUnavailableCause,
 } from '@/lib/library/credential-record-projection';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
 import { deleteLibraryRecordAndCopy } from '@/lib/library/delete-library-record';
@@ -32,40 +35,58 @@ import { isDatabaseError } from '@/lib/prisma/db-errors';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getRequestContext } from '@uncefact/untp-ri-services/logging';
 import { LibraryRecordOrigin } from '@/lib/prisma/generated';
+import { logDetailDegradation, logLibraryRecordFailure } from '@/lib/library/library-read-results';
+import { recordUnreadableMessage } from '@/lib/library/library-read-errors';
 
 const logger = apiLogger.child({ route: '/api/v1/library/[id]' });
 
 /**
- * A stored key could not be revealed. It carries its own class because the
- * thrown message names `DATA_ENCRYPTION_KEY`, which is the operator's
- * business and never the caller's, so the route must be able to tell this
- * failure apart from every other one and answer it with the sanitised 500.
+ * The two responses that carry tenant-owned library data: the record itself
+ * and the coded 500 that names the record's id. Shared so the header cannot
+ * be set on one and forgotten on the other. The sanitised 500 and the 404
+ * carry nothing tenant-specific and keep the platform default.
  */
-class DecryptionKeyRevealError extends Error {
-  constructor(cause: unknown) {
-    super('The stored credential decryption key could not be revealed', { cause });
-    this.name = 'DecryptionKeyRevealError';
-  }
-}
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
 
 function revealForDetail(stored: string): string {
-  try {
-    return revealDecryptionKey(stored);
-  } catch (error) {
-    throw new DecryptionKeyRevealError(error);
-  }
+  return revealDecryptionKey(stored, { logUnwrapFailure: false });
+}
+
+function recordUnreadableResponse(
+  error: unknown,
+  recordId: string,
+  tenantId: string,
+  stage: 'hydration' | 'projection' | 'detail',
+): Response {
+  logLibraryRecordFailure(logger, {
+    tenantId,
+    route: '/api/v1/library/[id]',
+    id: recordId,
+    error,
+    stage,
+  });
+  return NextResponse.json(
+    { error: recordUnreadableMessage(recordId), code: 'RECORD_UNREADABLE', id: recordId },
+    { status: 500, headers: NO_STORE_HEADERS },
+  );
 }
 
 /**
- * The 500 for every failure either operation on this route owns. The error is
- * logged with the record it happened on, under pino's `err` key so the message,
- * stack and cause chain are all rendered. No error in this chain carries key
- * material: the decrypt failure is Node's own authentication error, the
- * projection and shape failures name rows rather than values, and the
- * annotation update never reveals a stored key at all.
+ * The sanitised 500 for the failures this route still owns whole: an
+ * unclassified throw from the record read on GET, every failure PATCH owns,
+ * and a delete that failed and rolled back. A GET failure that is about the
+ * record itself takes {@link recordUnreadableResponse} instead, which is coded
+ * and names the id.
+ *
+ * The error is reduced to its name and message and logged with the record it
+ * happened on, as the shared `sanitisedServerError` does, so a cause chain
+ * cannot bring a value with it. No error that reaches here carries key
+ * material in the first place: the read and projection failures name rows
+ * rather than values, and neither the annotation update nor the delete path
+ * reveals a stored key at all.
  */
 function sanitisedServerError(error: unknown, recordId: string, detail: string): Response {
-  logger.error({ err: error, recordId }, detail);
+  logger.error({ error: safeError(error), recordId }, detail);
   return NextResponse.json({ error: unexpectedErrorMessage(getRequestContext()?.correlationId) }, { status: 500 });
 }
 
@@ -79,7 +100,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *       Returns one tenant-owned library record of either origin, including
  *       the Reference Implementation's durable-copy location, its
  *       storage-integrity digest, and the key that opens that copy when this
- *       service holds one. This is also the verification poll target.
+ *       service can return it. This is also the verification poll target.
  *       While `verification.state` is `pending`, re-poll this endpoint until
  *       it settles to `complete` or `failed`. A worker reconciliation sweep
  *       settles a pending generation that has not reported a result within
@@ -111,10 +132,12 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *       The response is never cached. A missing id and an id owned by another
  *       tenant return the same 404 response.
  *
- *       A stored key that cannot be revealed, or a stored value that resembles
- *       but is not a valid encryption envelope, returns a sanitised 500 with
- *       the request correlation id. This interim behaviour is tracked by
- *       uncefact/tests-untp#769.
+ *       When the service holds a key but cannot return it because the stored
+ *       envelope is malformed, the deployment key is unavailable, or unwrap
+ *       fails, the record still returns 200 with `hasKey: true`, a null
+ *       `decryptionKey` and one `DECRYPTION_KEY_UNAVAILABLE` warning. A
+ *       record that cannot be built returns `500 RECORD_UNREADABLE` with its
+ *       id. Database and transaction failures keep the shared sanitised 500.
  *     tags:
  *       - Library
  *     parameters:
@@ -123,13 +146,17 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *       200:
  *         description: |
  *           The library record with its durable-copy coordinates and key when
- *           available. This response always carries `Cache-Control: no-store`.
+ *           available. A held key that cannot be returned is represented by a
+ *           null `decryptionKey` and a `DECRYPTION_KEY_UNAVAILABLE` warning.
+ *           This response always carries `Cache-Control: no-store`.
  *         headers:
  *           Cache-Control:
  *             schema:
  *               type: string
  *               enum: [no-store]
  *             description: Always no-store because this response can expose key material.
+ *           x-correlation-id:
+ *             $ref: '#/components/headers/CorrelationId'
  *         content:
  *           application/json:
  *             schema:
@@ -216,6 +243,33 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   storageUri: 'https://storage.internal.example/credentials/clw0ext3rn4lprotect000003'
  *                   digestMultibase: zQmExternalStorageDigestExample
  *                   decryptionKey: 'a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f801'
+ *               externalKeyUnavailable:
+ *                 summary: External record whose held key cannot be returned
+ *                 value:
+ *                   id: clw0ext3rn4lkeyunavailable0006
+ *                   origin: external
+ *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
+ *                   annotations: { annotationVersion: 1, displayName: Recycled Content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   organisationId: null
+ *                   facilityId: null
+ *                   productId: null
+ *                   sourceUrl: 'https://supplier.example/credentials/dcc-42'
+ *                   sourceDigest: zQmSourceBytesDigestExample
+ *                   resolverUri: null
+ *                   issuedAt: '2026-08-30T10:15:00.000Z'
+ *                   encrypted: true
+ *                   hasKey: true
+ *                   verification: { generation: 1, state: complete, requestedAt: '2026-08-30T10:20:00.000Z', completedAt: '2026-08-30T10:20:04.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
+ *                   currencyStatus: current
+ *                   detailsStatus: EXTRACTED
+ *                   detailsError: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   warnings: [{ code: DECRYPTION_KEY_UNAVAILABLE, message: 'The record is readable, but its stored decryption key could not be returned. Quote the record id and the x-correlation-id response header when contacting support.' }]
+ *                   createdAt: '2026-08-30T10:20:00.000Z'
+ *                   updatedAt: '2026-08-30T10:20:04.000Z'
+ *                   storageUri: 'https://storage.internal.example/credentials/clw0ext3rn4lkeyunavailable0006'
+ *                   digestMultibase: zQmExternalStorageDigestExample
+ *                   decryptionKey: null
  *               externalUnopened:
  *                 summary: External unopened ciphertext with no receiver-side key
  *                 value:
@@ -285,17 +339,56 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                 value: { error: 'No such credential record.', code: 'NOT_FOUND' }
  *       500:
  *         description: |
- *           The record was read and could not be answered. Three causes reach
- *           this response: the stored decryption key could not be revealed,
- *           the record could not be projected onto this contract, or the
- *           stored record has a shape the write paths never produce. The body
- *           is sanitised and carries a correlation id for the operator. A
- *           database fault is answered by the shared database error responses
- *           instead, as on every other route.
+ *           One of three categories, in two body shapes.
+ *
+ *           A record that could not be read answers the coded body, which
+ *           always carries `code: RECORD_UNREADABLE` and the requested record
+ *           id, and whose message tells the caller to quote that id and the
+ *           `x-correlation-id` response header. A record can list normally and
+ *           still answer this: a record for which the service holds a key but
+ *           no durable-copy location is a readable row on the list and batch
+ *           routes and an unreadable record here, because this contract
+ *           publishes the copy location a held key belongs to. The coded body
+ *           carries `Cache-Control: no-store`, because it is the only error
+ *           body on this route that names a record id belonging to the
+ *           caller's tenant.
+ *
+ *           A database or transaction fault answers the shared sanitised body,
+ *           as on every other route, and so does an unclassified throw from
+ *           the record read. The two stages are classified differently on
+ *           purpose. The read is where a request-level fault originates, so it
+ *           is classified POSITIVELY and only a recognised record-shape
+ *           failure becomes the coded body; anything else it raises could be a
+ *           transaction fault that this contract must not report as damage to
+ *           the caller's record. Building the record is pure computation over
+ *           a view this route already holds, so that stage is classified by
+ *           exclusion and any throw from it is this record's failure, which is
+ *           the same rule the collection routes apply to a row.
+ *         headers:
+ *           x-correlation-id:
+ *             $ref: '#/components/headers/CorrelationId'
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *               oneOf:
+ *                 - type: object
+ *                   required: [error, code, id]
+ *                   properties:
+ *                     error:
+ *                       type: string
+ *                     code:
+ *                       type: string
+ *                       enum: [RECORD_UNREADABLE]
+ *                     id:
+ *                       type: string
+ *                 - $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               recordUnreadable:
+ *                 summary: The record exists and could not be read
+ *                 value: { error: 'The library record exists and belongs to this tenant but could not be read. Quote record id "clw0n4t1v3encrypted000001" and the x-correlation-id response header when contacting support.', code: RECORD_UNREADABLE, id: clw0n4t1v3encrypted000001 }
+ *               unexpected:
+ *                 summary: A database or transaction fault, or an unclassified read failure
+ *                 value: { error: 'An unexpected error has occurred. If the issue persists, please contact support and quote correlation id "7a6b5c4d-3e2f-4109-8a7b-6c5d4e3f2a1b".' }
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
@@ -306,42 +399,77 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   if (id.includes('\0')) {
     throw new NotFoundError('No such credential record.', 'NOT_FOUND');
   }
+  let view;
   try {
-    const view = await getLibraryRecordById(id, tenantId);
-    if (view === null) {
-      throw new NotFoundError('No such credential record.', 'NOT_FOUND');
-    }
-
-    const projected = toCredentialRecordDetail(view, { reveal: revealForDetail });
-    logger.info(
-      {
-        recordId: id,
-        origin: projected.origin,
-        hasKey: projected.hasKey,
-        copyPresent: projected.storageUri !== null,
-      },
-      'Library record retrieved',
-    );
-    return NextResponse.json(projected, { headers: { 'Cache-Control': 'no-store' } });
+    // The READ stage is classified POSITIVELY: only a recognised record-shape
+    // failure becomes this record's coded 500. This is where a request-level
+    // fault originates, and `isDatabaseError` is not guaranteed to recognise
+    // every one of them, so anything unrecognised takes the sanitised body
+    // rather than being published to the caller as damage to their record.
+    // The projection stage below classifies the other way round, and the
+    // reason is stated there.
+    view = await getLibraryRecordById(id, tenantId);
   } catch (error) {
-    // The shared mapper owns what it classifies: the not-found above becomes
-    // the documented 404, and a database fault takes ADR-036's mapping, whose
-    // distinct "Unhandled database error" log is how a missing repository
-    // mapping gets noticed. What is left are this route's own failures, whose
-    // messages name stored rows, envelopes and the encryption key
-    // configuration, so each is answered with the sanitised 500 here.
     if (error instanceof NotFoundError || isDatabaseError(error)) throw error;
-    if (error instanceof DecryptionKeyRevealError) {
-      return sanitisedServerError(error, id, 'The stored decryption key could not be revealed');
-    }
-    if (error instanceof CredentialRecordProjectionError) {
-      return sanitisedServerError(error, id, 'The library record could not be projected');
-    }
-    if (error instanceof LibraryRecordShapeError) {
-      return sanitisedServerError(error, id, 'The library record has a stored shape the write paths never produce');
-    }
-    return sanitisedServerError(error, id, 'Library record detail read failed');
+    if (error instanceof LibraryRecordShapeError) return recordUnreadableResponse(error, id, tenantId, 'hydration');
+    return sanitisedServerError(
+      error instanceof Error ? error : new Error(String(error)),
+      id,
+      'Library record detail read failed',
+    );
   }
+  if (view === null) {
+    throw new NotFoundError('No such credential record.', 'NOT_FOUND');
+  }
+  // Read through a holder because the projector reports it from a callback,
+  // which TypeScript's control flow cannot see assigning a plain local.
+  const keyUnavailable: { cause: KeyUnavailableCause | null } = { cause: null };
+  let projected: CredentialRecordDetailResponse;
+  // Only the call that builds the record. The logging below must not be able
+  // to answer RECORD_UNREADABLE for a record that was built successfully.
+  try {
+    projected = toCredentialRecordDetail(view, {
+      reveal: revealForDetail,
+      onKeyUnavailable: (cause) => {
+        keyUnavailable.cause = cause;
+      },
+    });
+  } catch (error) {
+    // The PROJECTION stage is classified by EXCLUSION: building the record is
+    // pure computation over a view this route already holds, so any throw from
+    // it is this record's failure and takes the coded RECORD_UNREADABLE 500
+    // naming the requested id, which is the same rule the collection routes
+    // apply to one row. A key that cannot be unlocked never reaches here: the
+    // projector turns it into a warning on a readable record.
+    //
+    // The two re-thrown classes are a structural assertion, not a reachable
+    // outcome: nothing under `toCredentialRecordDetail` touches the database
+    // or raises `NotFoundError`. They are kept so that the day it does, the
+    // 404 and ADR-036's mapping (whose distinct "Unhandled database error"
+    // log is how a missing repository mapping gets noticed) still win over
+    // this catch-all.
+    if (error instanceof NotFoundError || isDatabaseError(error)) throw error;
+    return recordUnreadableResponse(error, id, tenantId, 'projection');
+  }
+  if (keyUnavailable.cause !== null) {
+    logDetailDegradation(logger, {
+      tenantId,
+      route: '/api/v1/library/[id]',
+      id,
+      reason: keyUnavailable.cause.reason,
+      cause: keyUnavailable.cause.error,
+    });
+  }
+  logger.info(
+    {
+      recordId: id,
+      origin: projected.origin,
+      hasKey: projected.hasKey,
+      copyPresent: projected.storageUri !== null,
+    },
+    'Library record retrieved',
+  );
+  return NextResponse.json(projected, { headers: NO_STORE_HEADERS });
 });
 
 const NATIVE_DELETE_MESSAGE = 'This is a native credential record; it cannot be removed from the library.';

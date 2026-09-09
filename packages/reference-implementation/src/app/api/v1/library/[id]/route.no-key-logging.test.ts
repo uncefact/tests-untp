@@ -132,12 +132,20 @@ function view(storedKey: string | null): LibraryRecordDetailView {
   return { origin: LibraryRecordOrigin.EXTERNAL, record, external, checkRun };
 }
 
-function request(): Request {
+function request(correlationId?: string): Request {
+  const headers = new Headers({ 'x-auth-sub': 'service-sub' });
+  if (correlationId !== undefined) headers.set('x-correlation-id', correlationId);
   return {
     method: 'GET',
     url: 'http://localhost/api/v1/library/record-1',
-    headers: new Headers({ 'x-auth-sub': 'service-sub' }),
+    headers,
   } as unknown as Request;
+}
+
+function degradationLines(): Record<string, unknown>[] {
+  return mockCapturedLogLines
+    .map((captured) => JSON.parse(captured) as Record<string, unknown>)
+    .filter((entry) => entry.msg === 'Library record read degraded');
 }
 
 function wrongKeyEnvelope(): string {
@@ -172,7 +180,7 @@ describe('GET /api/v1/library/:id never logs the revealed key', () => {
     expect(mockCapturedLogLines.join('')).not.toContain(SENTINEL_KEY);
   });
 
-  it('does not log the stored envelope, the wrapping key or the revealed key on a real decrypt failure', async () => {
+  it('returns a warning and does not log the stored envelope, wrapping key or revealed key on a real decrypt failure', async () => {
     const stored = wrongKeyEnvelope();
     mockGetLibraryRecordById.mockResolvedValue(view(stored));
 
@@ -181,7 +189,17 @@ describe('GET /api/v1/library/:id never logs the revealed key', () => {
       json: () => Promise<unknown>;
     };
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      hasKey: boolean;
+      decryptionKey: string | null;
+      warnings: Array<{ code: string }>;
+    };
+    expect(body).toMatchObject({
+      hasKey: true,
+      decryptionKey: null,
+      warnings: [{ code: 'DECRYPTION_KEY_UNAVAILABLE' }],
+    });
     expect(mockCapturedLogLines.length).toBeGreaterThan(0);
     const captured = mockCapturedLogLines.join('');
     expect(captured).not.toContain(SENTINEL_KEY);
@@ -191,23 +209,115 @@ describe('GET /api/v1/library/:id never logs the revealed key', () => {
     expect(captured).not.toContain(WRONG_DATA_ENCRYPTION_KEY);
   });
 
-  it('logs the 500 against the record with the error and nothing else that failure held', async () => {
+  it('logs one safe degradation event against the record and nothing else that failure held', async () => {
     const stored = wrongKeyEnvelope();
     mockGetLibraryRecordById.mockResolvedValue(view(stored));
 
     await GET(request(), { params: Promise.resolve({ id: 'record-1' }) });
 
-    const line = mockCapturedLogLines
-      .map((captured) => JSON.parse(captured) as Record<string, unknown>)
-      .find((entry) => entry.msg === 'The stored decryption key could not be revealed');
-
-    expect(line).toBeDefined();
-    expect(line).toMatchObject({ recordId: 'record-1', err: { type: 'DecryptionKeyRevealError' } });
+    const lines = degradationLines();
+    expect(lines).toHaveLength(1);
+    const [line] = lines;
+    expect(line).toMatchObject({
+      recordId: 'record-1',
+      code: 'DECRYPTION_KEY_UNAVAILABLE',
+      readStage: 'detail',
+      reason: 'unwrap-failed',
+    });
+    expect(mockCapturedLogLines.some((captured) => captured.includes('Failed to decrypt stored credential'))).toBe(
+      false,
+    );
     const serialised = JSON.stringify(line);
     expect(serialised).not.toContain(SENTINEL_KEY);
     expect(serialised).not.toContain(JSON.parse(stored).cipherText);
     expect(serialised).not.toContain(WRAPPING_KEY);
     expect(serialised).not.toContain(WRONG_DATA_ENCRYPTION_KEY);
+  });
+
+  it.each([
+    ['unwrap-failed', () => wrongKeyEnvelope(), 'credentials.decryption-key-unwrap'],
+    [
+      'malformed-envelope',
+      () => JSON.stringify({ cipherText: 'dHJ1bmNhdGVk', type: 'aes-256-gcm' }),
+      'credentials.decryption-key-envelope-malformed',
+    ],
+  ])(
+    'names %s and carries its cause, with none of the secrets that failure held',
+    async (reason, storedKey, errorCode) => {
+      // The two causes need opposite repairs, and the caller's 200 says nothing
+      // about either, so the event's own reason and message are the operator's
+      // only account. A constant detail in their place makes them identical.
+      const stored = storedKey();
+      mockGetLibraryRecordById.mockResolvedValue(view(stored));
+
+      await GET(request(), { params: Promise.resolve({ id: 'record-1' }) });
+
+      const lines = degradationLines();
+      expect(lines).toHaveLength(1);
+      const error = lines[0].error as { name?: string; message?: string };
+      // `error.name` is a class name, which a production build minifies, so
+      // `errorCode` is what an alert can be keyed on. Every classified reason
+      // carries one.
+      expect(lines[0]).toMatchObject({ recordId: 'record-1', reason, errorCode });
+      expect(error.message).toEqual(expect.any(String));
+      expect(error.message).not.toBe('');
+
+      const serialised = JSON.stringify(lines[0]);
+      expect(serialised).not.toContain(SENTINEL_KEY);
+      expect(serialised).not.toContain(stored);
+      expect(serialised).not.toContain(WRAPPING_KEY);
+      expect(serialised).not.toContain(WRONG_DATA_ENCRYPTION_KEY);
+    },
+  );
+
+  it('names key-configuration, not a damaged row, when the deployment key cannot be resolved', async () => {
+    // One row's envelope and a whole deployment's missing key are the same 200
+    // to the caller and need opposite repairs, so the distinction lives here.
+    const stored = protectDecryptionKey(SENTINEL_KEY);
+    jest.resetModules();
+    delete process.env.DATA_ENCRYPTION_KEY;
+    try {
+      // The repository mock factory closes over this test file's own jest.fn,
+      // so the fresh module registry still reads the row set here.
+      mockGetLibraryRecordById.mockResolvedValue(view(stored));
+      const { GET: freshGet } = await import('./route');
+
+      const response = (await freshGet(request(), { params: Promise.resolve({ id: 'record-1' }) })) as unknown as {
+        status: number;
+        json: () => Promise<{ hasKey: boolean; decryptionKey: string | null }>;
+      };
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ hasKey: true, decryptionKey: null });
+
+      const lines = degradationLines();
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({
+        recordId: 'record-1',
+        reason: 'key-configuration',
+        errorCode: 'credentials.encryption-service-unavailable',
+      });
+      expect((lines[0].error as { message: string }).message).toContain('DATA_ENCRYPTION_KEY');
+      expect(JSON.stringify(lines[0])).not.toContain(SENTINEL_KEY);
+      expect(JSON.stringify(lines[0])).not.toContain(stored);
+    } finally {
+      process.env.DATA_ENCRYPTION_KEY = WRAPPING_KEY;
+      jest.resetModules();
+    }
+  });
+
+  it('stamps the served correlation id on the degradation event', async () => {
+    // The caller's message tells them to quote the x-correlation-id header, so
+    // the id the operator can search for must be the one the request context
+    // established. Nothing in the event sets it; the logger's mixin does.
+    const correlationId = '3f4a6d1e-9c2b-4f0e-8a71-5b6c7d8e9f01';
+    mockGetLibraryRecordById.mockResolvedValue(view(wrongKeyEnvelope()));
+
+    await GET(request(correlationId), { params: Promise.resolve({ id: 'record-1' }) });
+
+    const lines = degradationLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0].correlationId).toBe(correlationId);
   });
 
   it('proves the capture would catch a sentinel written through the logger the decrypt path uses', () => {

@@ -40,6 +40,7 @@ import {
   originSchema,
   verificationSummarySchema,
 } from '@/lib/library/credential-record-projection';
+import { libraryReadFailureSchema } from '@/lib/library/library-read-errors';
 import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
 import { CredentialDetailsError, CredentialDetailsStatus, CoreCredentialType } from '@/lib/prisma/generated';
 import {
@@ -583,6 +584,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     CredentialRecordDetail: credentialRecordDetailSchema,
     VerificationEnvelope: verificationEnvelopeSchema,
     CredentialRecordWarning: credentialRecordWarningSchema,
+    LibraryReadFailure: libraryReadFailureSchema,
     CredentialType: credentialTypeSchema,
     Origin: originSchema,
     VerificationSummary: verificationSummarySchema,
