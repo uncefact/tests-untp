@@ -336,6 +336,39 @@ describe('parseRequestBody', () => {
     );
   });
 
+  it('promotes a code marker from the selected first schema issue', async () => {
+    const codedSchema = z.object({ status: z.string() }).superRefine((_value, ctx) => {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['status'],
+        message: 'status is unavailable',
+        params: { code: 'STATUS_UNAVAILABLE' },
+      });
+    });
+
+    await expect(parseRequestBody(fakeRequest({ status: 'pending' }), codedSchema)).rejects.toMatchObject({
+      code: 'STATUS_UNAVAILABLE',
+      message: 'status: status is unavailable',
+    });
+  });
+
+  it('does not promote a code marker from a later schema issue', async () => {
+    const codedSchema = z.object({ status: z.string() }).superRefine((_value, ctx) => {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['status'], message: 'first issue' });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['status'],
+        message: 'later issue',
+        params: { code: 'LATER_ISSUE' },
+      });
+    });
+
+    await expect(parseRequestBody(fakeRequest({ status: 'pending' }), codedSchema)).rejects.toMatchObject({
+      message: 'status: first issue',
+    });
+    await expect(parseRequestBody(fakeRequest({ status: 'pending' }), codedSchema)).rejects.not.toHaveProperty('code');
+  });
+
   describe('capped real request', () => {
     const ORIGINAL = process.env.MAX_REQUEST_BODY_BYTES;
 
@@ -520,6 +553,27 @@ describe('parseQueryParams', () => {
     expect(error).toBeInstanceOf(ValidationError);
     expect(error).toMatchObject({ code: 'STATUS_UNAVAILABLE' });
     expect((error as Error).message).toBe('status: status is not available');
+  });
+
+  it('keeps query code precedence when a coded issue is not first', () => {
+    const schema = z.object({ status: z.string().optional() }).superRefine((_value, ctx) => {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['status'], message: 'first issue' });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['status'],
+        message: 'coded issue',
+        params: { code: 'CODED_ISSUE' },
+      });
+    });
+
+    let error: unknown;
+    try {
+      parseQueryParams(new URLSearchParams({ status: 'pending' }), schema);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toMatchObject({ code: 'CODED_ISSUE' });
+    expect((error as Error).message).toBe('status: coded issue');
   });
 
   it('leaves the code absent when a schema issue has no code marker', () => {

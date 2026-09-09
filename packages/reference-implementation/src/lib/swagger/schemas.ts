@@ -27,6 +27,7 @@ import {
 import { paginationMetaSchema } from '@/lib/api/pagination';
 import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
 import {
+  batchGetLibraryRequestSchema,
   registerExternalCredentialRequestSchema,
   updateLibraryAnnotationsRequestSchema,
 } from '@/lib/api/request-schemas/library';
@@ -577,6 +578,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     // enforced ones.
     RegisterExternalCredentialRequest: registerExternalCredentialRequestSchema,
     UpdateLibraryAnnotationsRequest: updateLibraryAnnotationsRequestSchema,
+    BatchGetLibraryRequest: batchGetLibraryRequestSchema,
     CredentialRecord: credentialRecordSchema,
     CredentialRecordDetail: credentialRecordDetailSchema,
     VerificationEnvelope: verificationEnvelopeSchema,
@@ -592,6 +594,12 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     const jsonSchema = zodToJsonSchema(schema, {
       target: 'openApi3',
       $refStrategy: 'none',
+      // The batch-get schema is a pipe whose second stage only applies the
+      // configured limit. The converter's default for a pipe publishes an
+      // allOf of both stages, a redundant second copy of the same structure,
+      // so the component is built from the input stage alone. The limit is a
+      // deployment-time bound and is never published as a static `maxItems`.
+      ...(name === 'BatchGetLibraryRequest' ? { pipeStrategy: 'input' as const } : {}),
     });
 
     // Remove the $schema property as it's not needed in OpenAPI
@@ -606,7 +614,8 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     if (
       name === 'CredentialIssueRequest' ||
       name === 'RegisterExternalCredentialRequest' ||
-      name === 'UpdateLibraryAnnotationsRequest'
+      name === 'UpdateLibraryAnnotationsRequest' ||
+      name === 'BatchGetLibraryRequest'
     ) {
       stripAdditionalPropertiesFalse(schemaObj);
     }

@@ -155,6 +155,11 @@ services:
       SYSTEM_DID: ${SYSTEM_DID:-did:web:uncefact.github.io:project-vckit:test-and-development}
       SYSTEM_DID_NAME: ${SYSTEM_DID_NAME:-System Default DID}
       SYSTEM_DID_DESCRIPTION: ${SYSTEM_DID_DESCRIPTION:-System-wide default DID for the UNTP reference implementation}
+      # API limits - see documentation/docs/reference-implementation/operations/api-pagination.md
+      # Passed through only when set, so an absent value stays absent and the
+      # default applies. A `${VAR:-}` form would inject an empty string and
+      # trigger the startup warning on every stock boot.
+      API_MAX_BATCH_GET_IDS:
       # OpenTelemetry - see docs/observability.md
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
       # Always forwarded, possibly empty; buildResource treats an empty value

@@ -12,6 +12,29 @@ export type PaginationMeta = z.infer<typeof paginationMetaSchema>;
 const BASE_DEFAULT_PAGE_LIMIT = 20;
 const DEFAULT_MAX_PAGE_LIMIT = 100;
 
+export type ConfiguredMaximum = { value: number; overrideRejected: boolean };
+
+/**
+ * Resolves a positive safe-integer maximum using the supplied fallback. An
+ * absent value uses the fallback silently. A supplied-but-unusable value,
+ * including blank, zero, negative, fractional, exponent, non-numeric and
+ * unsafe values, uses the fallback and sets `overrideRejected`.
+ */
+export function resolveConfiguredMaximum(raw: string | undefined, fallback: number): ConfiguredMaximum {
+  if (!Number.isSafeInteger(fallback) || fallback < 1) {
+    throw new Error('fallback must be a positive safe integer');
+  }
+  if (raw === undefined) {
+    return { value: fallback, overrideRejected: false };
+  }
+  const trimmed = raw.trim();
+  const parsed = Number(trimmed);
+  if (/^\d+$/.test(trimmed) && Number.isSafeInteger(parsed) && parsed >= 1) {
+    return { value: parsed, overrideRejected: false };
+  }
+  return { value: fallback, overrideRejected: true };
+}
+
 /**
  * Resolves the maximum page size a list request may ask for from the
  * `API_MAX_PAGE_LIMIT` environment variable, so an operator can raise or lower
@@ -23,16 +46,8 @@ const DEFAULT_MAX_PAGE_LIMIT = 100;
  * supplied-but-unusable rather than absent, because a config template that
  * expands an unset variable to `""` is a mistake worth surfacing.
  */
-export function resolveMaxPageLimit(raw: string | undefined): { value: number; overrideRejected: boolean } {
-  if (raw === undefined) {
-    return { value: DEFAULT_MAX_PAGE_LIMIT, overrideRejected: false };
-  }
-  const trimmed = raw.trim();
-  const parsed = Number(trimmed);
-  if (/^\d+$/.test(trimmed) && Number.isSafeInteger(parsed) && parsed >= 1) {
-    return { value: parsed, overrideRejected: false };
-  }
-  return { value: DEFAULT_MAX_PAGE_LIMIT, overrideRejected: true };
+export function resolveMaxPageLimit(raw: string | undefined): ConfiguredMaximum {
+  return resolveConfiguredMaximum(raw, DEFAULT_MAX_PAGE_LIMIT);
 }
 
 /**

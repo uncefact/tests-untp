@@ -1,3 +1,5 @@
+jest.mock('@/lib/api/batch-limits', () => ({ MAX_BATCH_GET_IDS: 2 }));
+
 import { CoreCredentialType } from '@/lib/prisma/generated';
 import { parseQueryParams, ValidationError } from '@/lib/api/validation';
 import {
@@ -8,8 +10,10 @@ import {
   registerExternalCredentialRequestSchema,
   sourceEncryptionSchema,
   listLibraryQuerySchema,
+  batchGetLibraryRequestSchema,
   updateLibraryAnnotationsRequestSchema,
 } from './library';
+import { MAX_BATCH_GET_IDS } from '@/lib/api/batch-limits';
 
 type Body = {
   sourceUrl: string;
@@ -240,6 +244,95 @@ describe('calendarDateSchema', () => {
       const body = validBody();
       body.annotations.dateReceived = value;
       expect(registerExternalCredentialRequestSchema.safeParse(body).success).toBe(false);
+    }
+  });
+});
+
+describe('batchGetLibraryRequestSchema', () => {
+  it('accepts ids and keeps whitespace and case unchanged', () => {
+    expect(batchGetLibraryRequestSchema.safeParse({ ids: [' A ', 'b'] })).toEqual({
+      success: true,
+      data: { ids: [' A ', 'b'] },
+    });
+  });
+
+  it('rejects a missing ids field and names it', () => {
+    const result = batchGetLibraryRequestSchema.safeParse({});
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]).toMatchObject({ path: ['ids'], message: 'is required' });
+  });
+
+  it('rejects null ids and a non-array ids value', () => {
+    for (const ids of [null, 'record-1', 1]) {
+      const result = batchGetLibraryRequestSchema.safeParse({ ids });
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues[0].path).toEqual(['ids']);
+    }
+  });
+
+  it('rejects an empty ids array with the minimum-item message', () => {
+    const result = batchGetLibraryRequestSchema.safeParse({ ids: [] });
+
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.issues[0]).toMatchObject({
+        path: ['ids'],
+        message: 'must contain at least one id',
+      });
+  });
+
+  it('rejects non-string and empty-string ids before the limit refinement', () => {
+    for (const ids of [[1], ['']]) {
+      const result = batchGetLibraryRequestSchema.safeParse({ ids });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].path).toEqual(['ids', 0]);
+        expect((result.error.issues[0] as { params?: unknown }).params).toBeUndefined();
+      }
+    }
+  });
+
+  it('strips unknown body keys', () => {
+    expect(batchGetLibraryRequestSchema.parse({ ids: ['record-1'], tenantId: 'other-tenant' })).toEqual({
+      ids: ['record-1'],
+    });
+  });
+
+  it('accepts exactly the configured maximum number of submitted ids', () => {
+    const result = batchGetLibraryRequestSchema.safeParse({
+      ids: Array.from({ length: MAX_BATCH_GET_IDS }, (_, index) => `record-${index}`),
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects one more submitted id with the named limit code and maximum', () => {
+    const result = batchGetLibraryRequestSchema.safeParse({
+      ids: Array.from({ length: MAX_BATCH_GET_IDS + 1 }, (_, index) => `record-${index}`),
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]).toMatchObject({
+        path: ['ids'],
+        message: `submit no more than ${MAX_BATCH_GET_IDS} ids per request`,
+        params: { code: 'BATCH_GET_LIMIT_EXCEEDED' },
+      });
+    }
+  });
+
+  it('reports element validation before the submitted-count limit', () => {
+    const result = batchGetLibraryRequestSchema.safeParse({ ids: ['', 'a', 'a'] });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['ids', 0]);
+      expect(
+        result.error.issues.some(
+          (issue) => (issue as { params?: { code?: unknown } }).params?.code === 'BATCH_GET_LIMIT_EXCEEDED',
+        ),
+      ).toBe(false);
     }
   });
 });

@@ -1,6 +1,7 @@
 import { ServiceType, AdapterType } from '@uncefact/untp-ri-services';
 import { generateOpenAPISchemas } from './schemas';
 import { CredentialDetailsStatus } from '@/lib/prisma/generated';
+import { collectAdditionalProperties } from './published-document';
 
 /**
  * Minimal shape for navigating the generated OpenAPI JSON schema in these
@@ -19,20 +20,6 @@ type JsonSchemaObject = {
   pattern?: string;
   type?: string;
 };
-
-/**
- * Every `additionalProperties` the generator emitted anywhere under `node`,
- * including inside array items, so a request component can be checked for a
- * documented rejection of unknown keys at any nesting level. A route that
- * strips unknown keys at runtime must not publish `false` at any of them.
- */
-function collectAdditionalProperties(node: JsonSchemaObject | undefined, acc: unknown[] = []): unknown[] {
-  if (!node) return acc;
-  if ('additionalProperties' in node) acc.push(node.additionalProperties);
-  Object.values(node.properties ?? {}).forEach((child) => collectAdditionalProperties(child, acc));
-  collectAdditionalProperties(node.items, acc);
-  return acc;
-}
 
 /**
  * Congruence checks for the registrar <-> scheme OpenAPI projection (#792

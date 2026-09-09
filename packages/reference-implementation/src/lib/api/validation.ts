@@ -36,6 +36,15 @@ export class ValidationError extends Error {
   }
 }
 
+function zodIssueCode(issue: z.ZodIssue): string | undefined {
+  const params = (issue as z.ZodIssue & { params?: unknown }).params;
+  if (params !== null && typeof params === 'object' && 'code' in params) {
+    const code = (params as { code?: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+  }
+  return undefined;
+}
+
 /**
  * Parse and validate a JSON request body against a Zod schema (ADR-037).
  *
@@ -50,9 +59,10 @@ export class ValidationError extends Error {
  *
  * Malformed JSON, a literal `null` body, and any shape mismatch throw
  * ValidationError with the first issue rendered as `field.path: message`,
- * which the route error mapper returns as a 400. A body over the cap throws
- * PayloadTooLargeError (413) before parsing, so an over-large malformed
- * body reports the size rather than the syntax.
+ * promoting a code marker on that selected issue when present. The route error
+ * mapper returns this as a 400. A body over the cap throws PayloadTooLargeError
+ * (413) before parsing, so an over-large malformed body reports the size rather
+ * than the syntax.
  */
 export async function parseRequestBody<Schema extends z.ZodTypeAny>(
   req: Request | { json: () => Promise<unknown> },
@@ -80,7 +90,11 @@ export async function parseRequestBody<Schema extends z.ZodTypeAny>(
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new ValidationError(`${issue.path.join('.') || 'body'}: ${issue.message}`);
+    const code = zodIssueCode(issue);
+    throw new ValidationError(
+      `${issue.path.join('.') || 'body'}: ${issue.message}`,
+      code === undefined ? undefined : { code },
+    );
   }
   return parsed.data;
 }
@@ -126,17 +140,9 @@ export function parseQueryParams<Schema extends z.ZodTypeAny>(
   }
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
-    const issueCode = (candidate: z.ZodIssue): string | undefined => {
-      const params = (candidate as z.ZodIssue & { params?: unknown }).params;
-      if (params !== null && typeof params === 'object' && 'code' in params) {
-        const code = (params as { code?: unknown }).code;
-        return typeof code === 'string' ? code : undefined;
-      }
-      return undefined;
-    };
-    const codedIssue = parsed.error.issues.find((candidate) => issueCode(candidate) !== undefined);
+    const codedIssue = parsed.error.issues.find((candidate) => zodIssueCode(candidate) !== undefined);
     const issue = codedIssue ?? parsed.error.issues[0];
-    const code = issueCode(issue);
+    const code = zodIssueCode(issue);
     throw new ValidationError(`${issue.path.join('.') || 'param'}: ${issue.message}`, code ? { code } : undefined);
   }
   return parsed.data;

@@ -59,6 +59,7 @@ export type ListLibraryRecordsOptions = {
 };
 
 type LibraryListSqlRow = { id: string | null; newestRunId: string | null; total: bigint | number };
+type LibraryRecordSelection = { id: string; newestRunId: string | null };
 
 export class LibraryRecordListError extends Error {
   constructor(detail: string) {
@@ -308,7 +309,7 @@ function totalAsNumber(total: unknown): number {
 
 async function hydrateLibraryRecords(
   tx: Prisma.TransactionClient,
-  selected: readonly { id: string; newestRunId: string | null }[],
+  selected: readonly LibraryRecordSelection[],
   tenantId: string,
 ): Promise<LibraryRecordDetailView[]> {
   if (selected.length === 0) return [];
@@ -365,7 +366,9 @@ export async function listLibraryRecords(
         if (rows.some((row) => totalAsNumber(row.total) !== total)) {
           throw new LibraryRecordListError('the anchored count changed within the page result');
         }
-        const selected = rows.flatMap((row) => (row.id === null ? [] : [{ id: row.id, newestRunId: row.newestRunId }]));
+        const selected: LibraryRecordSelection[] = rows.flatMap((row) =>
+          row.id === null ? [] : [{ id: row.id, newestRunId: row.newestRunId }],
+        );
         return { data: await hydrateLibraryRecords(tx, selected, options.tenantId), total };
       },
       // The statement is unbenchmarked and has no effective-date expression index yet.
@@ -480,6 +483,70 @@ export async function lockLibraryRecordForUpdate(
     tenantId,
   );
   return locked.length > 0;
+}
+
+/** Builds the tenant-scoped selection for an already-bounded batch-get id list. */
+export function buildLibraryBatchGetQuery(tenantId: string, ids: readonly string[]): Prisma.Sql {
+  return Prisma.sql`
+    SELECT
+      r."id" AS "id",
+      n."id" AS "newestRunId"
+    FROM "LibraryRecord" AS r
+    LEFT JOIN LATERAL (
+      SELECT n.*
+      FROM "CheckRun" AS n
+      WHERE n."recordId" = r."id" AND n."tenantId" = r."tenantId"
+      ORDER BY n."generation" DESC
+      LIMIT 1
+    ) AS n ON TRUE
+    WHERE r."tenantId" = ${tenantId}
+      AND r."id" = ANY(${ids}::text[])
+  `;
+}
+
+/**
+ * Reads the requested tenant-owned records in one repeatable-read snapshot.
+ * Exact duplicate ids are deduplicated in first-appearance order, and
+ * NUL-bearing ids are dropped before SQL. Missing and foreign ids are omitted
+ * by the tenant-scoped selection; a row selected there that cannot be hydrated
+ * remains an invariant failure.
+ */
+export async function batchGetLibraryRecords(options: {
+  tenantId: string;
+  ids: readonly string[];
+}): Promise<LibraryRecordDetailView[]> {
+  const requestedIds = [...new Set(options.ids.filter((id) => !id.includes('\0')))];
+  if (requestedIds.length === 0) return [];
+
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<LibraryRecordSelection[]>(
+          buildLibraryBatchGetQuery(options.tenantId, requestedIds),
+        );
+        const rowsById = new Map(rows.map((row) => [row.id, row]));
+        const selected: LibraryRecordSelection[] = requestedIds.flatMap((id) => {
+          const row = rowsById.get(id);
+          return row === undefined ? [] : [{ id: row.id, newestRunId: row.newestRunId }];
+        });
+        return hydrateLibraryRecords(tx, selected, options.tenantId);
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, maxWait: 2_000, timeout: 5_000 },
+    );
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'P2028'
+    ) {
+      Object.defineProperty(error, 'context', {
+        configurable: true,
+        value: { query: 'library-batch-get', tenantId: options.tenantId },
+      });
+    }
+    throw error;
+  }
 }
 
 /**
