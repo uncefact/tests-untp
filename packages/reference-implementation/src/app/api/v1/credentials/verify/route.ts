@@ -200,7 +200,7 @@ function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, max
  *                   type: string
  *                   enum: [UPSTREAM_ERROR, VC_SERVICE_ERROR]
  *       500:
- *         description: Server error (e.g. system VC service not configured)
+ *         description: Server error (e.g. system VC service not configured, or a fetch-setting conflict introduced after startup)
  *         content:
  *           application/json:
  *             schema:

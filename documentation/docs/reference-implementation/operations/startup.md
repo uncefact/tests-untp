@@ -175,6 +175,8 @@ The web process validates the shared credential-fetch settings after the request
 
 Checks stop at the first error, and warnings are emitted after all fetch settings validate. Warnings follow the normal logging level configuration. See the [v0.5 migration guide](../../migration-guides/ri-v0.5#credential-fetch-settings-have-new-names).
 
+These checks run at startup, but the readers are not cached, so a conflict introduced after startup is caught on the next read rather than at boot. Every route that reads the setting then answers `500`, including the unauthenticated verify route, and the `error` field names the two conflicting variables and no values. A running process cannot be repaired by editing its environment: set the pair to a single name and restart the process, recreating the container where one is in use.
+
 ### Redaction Path Validation
 
 The first logger constructed during startup validates any paths supplied via `LOG_REDACT_PATHS`. An invalid path fails startup with a message naming the variable and the configured paths. See [Redaction](./logging#redaction) for the path syntax and what the built-in defaults already cover.

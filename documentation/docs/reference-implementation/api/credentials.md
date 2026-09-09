@@ -401,6 +401,8 @@ The storage URI is fetched through a guarded resolver that validates the hostnam
 
 Decryption happens on the server, so a `decryptionKey` travels in the request body. Production deployments must serve this endpoint over HTTPS so the key is protected in transit.
 
+This endpoint reads the shared credential-fetch settings below on every request, and those readers are not cached. If both names of one pair become set after the process started, the next request is answered `500` with an `error` naming the two conflicting variables. That applies here even though the endpoint is unauthenticated, so an anonymous caller can see the two variable names, though never their values. The remedy is to set the pair to a single name and restart the process, recreating the container where one is in use.
+
 ### Shared credential-fetch settings
 
 The following settings are shared by verification, external registration and the supplier-source check used by re-verification. The private-address setting also controls the existing stored-address URL checks on registrar, identifier-link, data-model, service and credential publishing routes.

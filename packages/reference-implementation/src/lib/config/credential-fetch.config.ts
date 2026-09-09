@@ -146,19 +146,20 @@ export function validateFetchSettingsOnBoot(
 }
 
 /**
- * The single definition of the Cypress harness's private-address capability
- * key, so the harness and the application under test derive it from the same
- * inputs under the same presence rule.
+ * The application's answer for the private-address setting when the operator
+ * has supplied it, and `undefined` when neither name is set (blank counts as
+ * unset). It exists so a caller outside the application, such as the Cypress
+ * harness, can tell "the operator asked for this" apart from "nobody said",
+ * and apply its own default only in the second case, while still reading the
+ * value through the application's own presence, conflict and parsing rules.
  *
- * When either application name is supplied (non-blank after trimming) the
- * harness takes the application's own answer, and a both-names conflict throws
- * here just as it would at the application's boot. Only when neither is
- * supplied does the harness fall back to `CYPRESS_VERIFY_ALLOW_PRIVATE_URLS`,
- * defaulting to `true` to match `docker-compose.e2e.yml`, whose services are
- * private container addresses.
+ * A both-names conflict throws here, exactly as it would at the application's
+ * boot. When `cypress.config.ts` evaluates, that throw fails every spec's load
+ * deliberately: the application would refuse the same environment, so a run
+ * against it could only report a state the deployment cannot reach.
  */
-export function deriveHarnessAllowPrivateUrls(env: Record<string, string | undefined>): boolean {
+export function readFetchAllowPrivateUrlsIfSet(env: Record<string, string | undefined>): boolean | undefined {
   const resolved = resolveFetchSetting(env, FETCH_SETTING_PAIRS.allowPrivateUrls);
-  if (resolved.source !== 'absent') return readFetchAllowPrivateUrls(env);
-  return (env.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true') === 'true';
+  if (resolved.source === 'absent') return undefined;
+  return readFetchAllowPrivateUrls(env);
 }

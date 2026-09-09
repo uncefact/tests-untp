@@ -6,7 +6,7 @@ import path from 'path';
 import util from 'util';
 import { Client, ClientOptions } from 'minio';
 import pg from 'pg';
-import { deriveHarnessAllowPrivateUrls } from '../src/lib/config/credential-fetch.config';
+import { readFetchAllowPrivateUrlsIfSet } from '../src/lib/config/credential-fetch.config';
 const { Client: PgClient } = pg;
 
 // Load .env.e2e from this e2e workspace's root.
@@ -29,14 +29,21 @@ function parseRepositoryRootEnv(): Record<string, string | undefined> {
 // Ascending precedence: the repository-root `.env`, then `.env.e2e` and the
 // host environment, which `dotenv.config` above has already merged into
 // `process.env` with the host winning.
-// `deriveHarnessAllowPrivateUrls` is the single source of the harness rule;
-// it applies the application's presence, conflict and parsing rules and only
-// falls back to `CYPRESS_VERIFY_ALLOW_PRIVATE_URLS` when neither application
-// name is supplied.
-const harnessAllowsPrivateUrls = deriveHarnessAllowPrivateUrls({
+// `readFetchAllowPrivateUrlsIfSet` gives the application's own answer when
+// either application name is supplied, applying its presence, conflict and
+// parsing rules, and `undefined` when neither is. The fallback below and its
+// `true` default are the harness's own: they exist because
+// `docker-compose.e2e.yml` runs the stack on private container addresses, and
+// they never influence the application.
+// A both-names conflict throws while this file evaluates, which fails every
+// spec's load deliberately, because the application refuses the same
+// environment.
+const harnessEnv: Record<string, string | undefined> = {
   ...parseRepositoryRootEnv(),
   ...process.env,
-});
+};
+const harnessAllowsPrivateUrls =
+  readFetchAllowPrivateUrlsIfSet(harnessEnv) ?? (harnessEnv.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true') === 'true';
 
 const execPromise = util.promisify(exec);
 
