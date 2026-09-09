@@ -236,6 +236,47 @@ describe('registerExternalCredential', () => {
     expect(created.details).toMatchObject({ status: CredentialDetailsStatus.EXTRACTED });
   });
 
+  it.each([
+    ['an outage', () => new StorageStoreError(503, 'unavailable'), true],
+    ['a refusal', () => new StoragePayloadError(400, 'rejected'), false],
+  ])(
+    // An opened-with-key credential's message must say a re-fetch by
+    // re-verify cannot supply a key again, so this differs from the
+    // plaintext storage-failure message, which is left unchanged.
+    'names the key-bearing-route limitation when storing an opened-with-key credential fails on %s',
+    async (_label, error, retryable) => {
+      const d = deps({
+        fetchDocument: async () => ({ bytes: bytes(ENCRYPTED), contentType: 'application/json', finalUrl: 'x' }),
+      });
+      d.store.mockRejectedValueOnce(error());
+      const { created } = await persisted({ decryptionKey: SUPPLIER_KEY }, d);
+
+      expect(created.storage).toBeUndefined();
+      expect(created.checkRun).toMatchObject({
+        state: CheckRunState.FAILED,
+        checks: { retrieval: CheckResult.PASS, decryption: CheckResult.PASS },
+        failure: {
+          code: CheckRunFailureCode.STORAGE_FAILED,
+          retryable,
+          message: expect.stringContaining('a re-fetch by re-verify cannot supply one again'),
+        },
+      });
+    },
+  );
+
+  it('leaves the plaintext storage-failure message unchanged', async () => {
+    const d = deps();
+    d.store.mockRejectedValueOnce(new StorageStoreError(503, 'unavailable'));
+    const { created } = await persisted({}, d);
+
+    expect(created.checkRun).toMatchObject({
+      failure: {
+        code: CheckRunFailureCode.STORAGE_FAILED,
+        message: 'The durable copy could not be written to storage; retry via re-verify once storage recovers.',
+      },
+    });
+  });
+
   it('records a key supplied against a plaintext source as unused and still registers', async () => {
     const { created } = await persisted({ decryptionKey: SUPPLIER_KEY });
     expect(created.decryptionKeyUnused).toBe(true);
@@ -496,6 +537,89 @@ describe('registerExternalCredential', () => {
     });
   });
 
+  it.each<[string, () => { bytes: Uint8Array; decryptionKey?: string }, string]>([
+    [
+      'a no-key reading',
+      () => ({ bytes: bytes(ENCRYPTED) }),
+      'This credential is also encrypted and this service holds no key that opens it.',
+    ],
+    [
+      'a key-mismatch reading',
+      () => ({ bytes: bytes(ENCRYPTED), decryptionKey: WRONG_KEY }),
+      'The supplied decryption key also did not open this credential.',
+    ],
+    [
+      'a corrupted-envelope reading',
+      () => ({ bytes: bytes(JSON.stringify({ ...JSON.parse(ENCRYPTED), iv: 'AAAA' })), decryptionKey: SUPPLIER_KEY }),
+      'This encrypted envelope is also corrupted, so no key will open it unless the source changes.',
+    ],
+  ])(
+    // The fresh message composed for this branch must name the right key
+    // cause and the right storage cause for every one of the six
+    // combinations, not a fixed string that misdirects the caller for four
+    // of them (a refused upload, a key mismatch, or a corrupted envelope).
+    'names the right key cause for %s crossed with a storage outage',
+    async (_label, reading, keyCause) => {
+      const { bytes: body, decryptionKey } = reading();
+      const d = deps({ fetchDocument: async () => ({ bytes: body, contentType: 'application/json', finalUrl: 'x' }) });
+      d.storeBinary.mockRejectedValueOnce(new StorageStoreError(503, 'unavailable'));
+      const { created } = await persisted(decryptionKey === undefined ? {} : { decryptionKey }, d);
+
+      expect(created.checkRun).toMatchObject({
+        failure: {
+          code: CheckRunFailureCode.STORAGE_FAILED,
+          retryable: true,
+          message: expect.stringContaining('The durable copy could not be written to storage.'),
+        },
+      });
+      expect((created.checkRun as { failure: { message: string } }).failure.message).toContain(keyCause);
+      // The remedy text separates the two facts rather than saying a
+      // re-fetch cannot recover the record at all: re-verify does fetch
+      // again and, once storage succeeds, keeps the copy; opening it still
+      // needs a key #958 does not exist yet.
+      expect((created.checkRun as { failure: { message: string } }).failure.message).toContain(
+        'Re-verification will fetch again and, once storage succeeds, will keep the fetched copy; it still cannot open that copy until a key can be supplied (#958).',
+      );
+    },
+  );
+
+  it.each<[string, () => { bytes: Uint8Array; decryptionKey?: string }, string]>([
+    [
+      'a no-key reading',
+      () => ({ bytes: bytes(ENCRYPTED) }),
+      'This credential is also encrypted and this service holds no key that opens it.',
+    ],
+    [
+      'a key-mismatch reading',
+      () => ({ bytes: bytes(ENCRYPTED), decryptionKey: WRONG_KEY }),
+      'The supplied decryption key also did not open this credential.',
+    ],
+    [
+      'a corrupted-envelope reading',
+      () => ({ bytes: bytes(JSON.stringify({ ...JSON.parse(ENCRYPTED), iv: 'AAAA' })), decryptionKey: SUPPLIER_KEY }),
+      'This encrypted envelope is also corrupted, so no key will open it unless the source changes.',
+    ],
+  ])('names the right key cause for %s crossed with a storage refusal', async (_label, reading, keyCause) => {
+    const { bytes: body, decryptionKey } = reading();
+    const d = deps({ fetchDocument: async () => ({ bytes: body, contentType: 'application/json', finalUrl: 'x' }) });
+    d.storeBinary.mockRejectedValueOnce(new StoragePayloadError(400, 'rejected'));
+    const { created } = await persisted(decryptionKey === undefined ? {} : { decryptionKey }, d);
+
+    expect(created.checkRun).toMatchObject({
+      failure: {
+        code: CheckRunFailureCode.STORAGE_FAILED,
+        retryable: false,
+        message: expect.stringContaining(
+          'The storage service refused the durable copy (its upload rules do not accept this content), and an operator must allow it before any copy can be stored.',
+        ),
+      },
+    });
+    expect((created.checkRun as { failure: { message: string } }).failure.message).toContain(keyCause);
+    expect((created.checkRun as { failure: { message: string } }).failure.message).toContain(
+      'Re-verification will fetch again and, once storage succeeds, will keep the fetched copy; it still cannot open that copy until a key can be supplied (#958).',
+    );
+  });
+
   it('stores a fetched body that is not a credential as fetched, encrypted, with extraction failed and the run pending', async () => {
     const d = deps({
       fetchDocument: async () => ({
@@ -665,7 +789,11 @@ describe('settleInRequest in recover mode', () => {
     };
     const d = deps({ fetchDocument: fetchFailure(failure) });
 
-    const outcome = await settleInRequest(input(), d.deps, { mode: 'recover', currentRecordId: 'record-1' });
+    const outcome = await settleInRequest(input(), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: false,
+    });
 
     expect(outcome).toEqual({
       encrypted: null,
@@ -693,7 +821,11 @@ describe('settleInRequest in recover mode', () => {
     // again, which would leave the record as broken as it was.
     const d = deps({ findExistingExternal: async () => 'existing-record' });
 
-    const outcome = await settleInRequest(input(), d.deps, { mode: 'recover', currentRecordId: 'record-1' });
+    const outcome = await settleInRequest(input(), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: false,
+    });
 
     expect(outcome.duplicateOfRecordId).toBe('existing-record');
     expect(outcome.observedContentDigest).toBe(await signedContentDigestOf(PLAINTEXT));
@@ -711,7 +843,11 @@ describe('settleInRequest in recover mode', () => {
     const d = deps({ findExistingExternal: async () => 'existing-record' });
     d.store.mockRejectedValueOnce(new StorageStoreError(503, 'unavailable'));
 
-    const outcome = await settleInRequest(input(), d.deps, { mode: 'recover', currentRecordId: 'record-1' });
+    const outcome = await settleInRequest(input(), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: false,
+    });
 
     expect(outcome.duplicateOfRecordId).toBe('existing-record');
     expect(outcome.observedContentDigest).toBe(await signedContentDigestOf(PLAINTEXT));
@@ -727,12 +863,84 @@ describe('settleInRequest in recover mode', () => {
     const findExistingExternal = jest.fn(async () => null);
     const d = deps({ findExistingExternal });
 
-    const outcome = await settleInRequest(input(), d.deps, { mode: 'recover', currentRecordId: 'record-1' });
+    const outcome = await settleInRequest(input(), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: false,
+    });
 
     expect(findExistingExternal).toHaveBeenCalledWith('tenant-1', await signedContentDigestOf(PLAINTEXT), 'record-1');
     expect(outcome.contentDigest).toBe(await signedContentDigestOf(PLAINTEXT));
     expect(outcome.duplicateOfRecordId).toBeUndefined();
     expect(outcome.observedContentDigest).toBeUndefined();
+  });
+
+  it('skips storing a non-credential body when the reservation snapshot already holds an identity', async () => {
+    // The finaliser refuses this response regardless of what is stored (the
+    // fetched-content rule never lets a non-credential body replace an
+    // existing identity), so storing it here would only be discarded and
+    // orphan-logged. The no-identity case below shows the row still stores.
+    const d = deps({
+      fetchDocument: async () => ({
+        bytes: bytes('<html>not a credential</html>'),
+        contentType: 'text/html; charset=utf-8',
+        finalUrl: 'x',
+      }),
+    });
+
+    const outcome = await settleInRequest(input(), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: true,
+    });
+
+    expect(d.store).not.toHaveBeenCalled();
+    expect(d.storeBinary).not.toHaveBeenCalled();
+    expect(outcome.storage).toBeUndefined();
+    expect(outcome.contentKind).toBe(ExternalContentKind.OPAQUE);
+    expect(outcome.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      checks: { retrieval: CheckResult.PASS },
+    });
+  });
+
+  it('still stores a non-credential body when the reservation snapshot holds no identity', async () => {
+    const d = deps({
+      fetchDocument: async () => ({
+        bytes: bytes('<html>not a credential</html>'),
+        contentType: 'text/html; charset=utf-8',
+        finalUrl: 'x',
+      }),
+    });
+
+    const outcome = await settleInRequest(input(), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: false,
+    });
+
+    expect(d.storeBinary).toHaveBeenCalled();
+    expect(outcome.storage).toBeDefined();
+  });
+
+  it('skips storing unopened ciphertext when the reservation snapshot already holds an identity', async () => {
+    const d = deps({
+      fetchDocument: async () => ({
+        bytes: bytes(ENCRYPTED),
+        contentType: 'application/json',
+        finalUrl: 'x',
+      }),
+    });
+
+    const outcome = await settleInRequest(input(), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: true,
+    });
+
+    expect(d.storeBinary).not.toHaveBeenCalled();
+    expect(outcome.storage).toBeUndefined();
+    expect(outcome.checkRun).toMatchObject({ state: CheckRunState.FAILED });
   });
 
   it('does not let register mode pass a record id, or recover mode leave one out', async () => {

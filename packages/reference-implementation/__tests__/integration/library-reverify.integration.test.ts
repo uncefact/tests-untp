@@ -1,5 +1,20 @@
+const capturedLogLines: string[] = [];
+
+jest.mock('@uncefact/untp-ri-services/logging', () => {
+  const actual = jest.requireActual('@uncefact/untp-ri-services/logging');
+  return {
+    ...actual,
+    createLogger: (config: Record<string, unknown> = {}) =>
+      actual.createLogger({
+        ...config,
+        level: 'debug',
+        destination: { write: (line: string) => capturedLogLines.push(line) },
+      }),
+  };
+});
+
 import { createCipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
-import type { IVerifiableCredentialService } from '@uncefact/untp-ri-services';
+import type { IStorageService, IVerifiableCredentialService, StorageRecord } from '@uncefact/untp-ri-services';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import {
   CheckResult,
@@ -22,6 +37,7 @@ import {
 } from '../../src/lib/library/reconcile-pending-runs-job';
 import {
   createExternalCredential,
+  findExternalByContentDigest,
   type VerifyJobReference,
 } from '../../src/lib/prisma/repositories/external-credential.repository';
 import {
@@ -35,16 +51,48 @@ import {
   toCredentialRecordDetail,
   toNativeCredentialRecord,
 } from '../../src/lib/library/credential-record-projection';
-import { createReverificationGeneration } from '../../src/lib/prisma/repositories/check-run.repository';
+import {
+  createReverificationGeneration,
+  finaliseRecoveryGeneration,
+  recoveryFinaliseTestHooks,
+  reserveRecoveryGeneration,
+} from '../../src/lib/prisma/repositories/check-run.repository';
 import { reverifyLibraryRecord } from '../../src/lib/library/reverify-library-record';
+import {
+  defaultRegisterDependencies,
+  settleInRequest,
+  EncryptionUnavailableError,
+  type RegisterExternalCredentialDependencies,
+  type RegisterExternalCredentialInput,
+} from '../../src/lib/library/register-external-credential';
+import {
+  fetchCredentialDocument,
+  getMaxCredentialSize,
+  type FetchedDocument,
+} from '../../src/lib/credentials/fetch-credential-document';
 import {
   defaultVerifyGenerationDependencies,
   LIBRARY_VERIFY_JOB,
   VERIFY_JOB_ENQUEUE_OPTIONS,
   verifyGenerationHandler,
 } from '../../src/lib/library/verify-generation-job';
+import {
+  DecryptionRequiredError,
+  defaultReverifyLibraryRecordDependencies,
+} from '../../src/lib/library/reverify-library-record';
+import { resolveStorageService } from '../../src/lib/services/resolve-storage-service';
 
 jest.unmock('jose');
+
+// Substituted only at the real storage microservice's HTTP boundary (ADR-029:
+// mock external services at the boundary, keep internal I/O real), the same
+// way every other suite in this file stubs storage. This lets the default-dependencies test
+// below drive `reverifyLibraryRecord` through its own default dependencies
+// (its real `recoverInRequest` fallback, `defaultRegisterDependencies` and
+// `settleInRequest` in `mode: 'recover'`) with only `fetchSource` overridden,
+// rather than reconstructing that wiring in the test as `recoveryRunner` does
+// for the rest of this file's cases.
+jest.mock('../../src/lib/services/resolve-storage-service', () => ({ resolveStorageService: jest.fn() }));
 
 process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
 delete process.env.SERVICE_ENCRYPTION_KEY;
@@ -59,6 +107,33 @@ const DPP = {
   credentialSubject: { id: 'https://supplier.example/products/1', name: 'Battery pack' },
 };
 const DPP_TEXT = JSON.stringify(DPP);
+const RECOVERY_DPP = {
+  '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'],
+  type: ['VerifiableCredential', 'DigitalProductPassport'],
+  name: 'Recovered battery passport',
+  issuer: { id: 'did:web:supplier.example', name: 'Supplier Ltd' },
+  validFrom: '2026-07-22T10:00:00Z',
+  credentialSubject: {
+    product: { id: 'https://supplier.example/products/recovered', name: 'Recovered battery' },
+  },
+};
+
+function compactJwt(payload: object): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return `${header}.${body}.sig`;
+}
+
+function envelopedCredential(payload: object): Record<string, unknown> {
+  return {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: 'EnvelopedVerifiableCredential',
+    id: `data:application/vc+jwt,${compactJwt(payload)}`,
+  };
+}
+
+const RECOVERY_TEXT = JSON.stringify(envelopedCredential(RECOVERY_DPP));
+const RECOVERY_JWT = (envelopedCredential(RECOVERY_DPP).id as string).split(',')[1];
 const DETAILS = {
   name: 'Re-verification credential',
   issuerName: 'Supplier Ltd',
@@ -80,6 +155,7 @@ const COMPLETE_CHECKS = {
 
 const prisma = createRigClient();
 let fixtures: FixtureServer;
+let recoveryStorageSequence = 0;
 const senderErrors: Error[] = [];
 const sweepErrors: Error[] = [];
 const senderQueue = new PgBossJobQueue({
@@ -115,6 +191,123 @@ async function digest(bytes: Uint8Array): Promise<string> {
       base: 'base58btc',
     })
   ).toString();
+}
+
+function recoveryStorage(options: { failStore?: boolean } = {}): IStorageService {
+  const store = async (credential: Record<string, unknown>): Promise<StorageRecord> => {
+    if (options.failStore) throw new Error('storage unavailable');
+    const bytes = new TextEncoder().encode(JSON.stringify(credential));
+    const path = `/storage/recovered-${++recoveryStorageSequence}.json`;
+    fixtures.set(path, { body: encryptedBody(bytes, RECEIVER_KEY) });
+    return {
+      uri: `${fixtures.baseUrl}${path}`,
+      digestMultibase: await digest(bytes),
+      decryptionKey: RECEIVER_KEY,
+      externalId: path,
+      bucket: 'private',
+      mimeType: 'application/json',
+    };
+  };
+  const storeBinary = async (
+    content: string | Uint8Array,
+    _filename: string,
+    contentType: string,
+    encrypt = false,
+  ): Promise<StorageRecord> => {
+    if (options.failStore) throw new Error('storage unavailable');
+    const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content;
+    const path = `/storage/recovered-${++recoveryStorageSequence}.bin`;
+    fixtures.set(path, {
+      body: encrypt ? encryptedBody(Buffer.from(bytes).toString('base64'), RECEIVER_KEY) : Buffer.from(bytes),
+      contentType,
+    });
+    return {
+      uri: `${fixtures.baseUrl}${path}`,
+      digestMultibase: await digest(bytes),
+      ...(encrypt ? { decryptionKey: RECEIVER_KEY } : {}),
+      externalId: path,
+      bucket: encrypt ? 'private' : 'public',
+      mimeType: contentType,
+    };
+  };
+  return { store, storeBinary, delete: async () => undefined };
+}
+
+function sourceFetcher(): (href: string) => Promise<FetchedDocument> {
+  return (href) => fetchCredentialDocument(href, { maxBytes: getMaxCredentialSize(), timeoutMs: 10_000 });
+}
+
+function recoveryRunner(
+  storage: IStorageService,
+  fetchSource = sourceFetcher(),
+  registerOverrides: Partial<RegisterExternalCredentialDependencies> = {},
+) {
+  const registerDependencies = defaultRegisterDependencies(async () => undefined);
+  return {
+    fetchSource,
+    recoverInRequest: (input: RegisterExternalCredentialInput, currentRecordId: string, holdsIdentity: boolean) =>
+      settleInRequest(
+        input,
+        {
+          ...registerDependencies,
+          fetchDocument: fetchSource,
+          resolveStorage: async () => ({ service: storage, instanceId: 'recovery-storage' }),
+          findExistingExternal: findExternalByContentDigest,
+          ...registerOverrides,
+        },
+        { mode: 'recover', currentRecordId, holdsIdentity },
+      ),
+  };
+}
+
+async function insertNoCopyExternal(options: {
+  sourcePath: string;
+  sourceDigest?: string;
+  contentDigest?: string;
+  duplicateOfRecordId?: string;
+  failureCode?: CheckRunFailureCode;
+  /** An encrypted no-copy record, from an AES envelope whose store failed. */
+  encrypted?: boolean;
+  /** A record whose details were already extracted before the copy went missing. */
+  details?: Parameters<typeof createExternalCredential>[0]['details'];
+}): Promise<string> {
+  const failureCode = options.failureCode ?? CheckRunFailureCode.RETRIEVAL_FAILED;
+  const created = await createExternalCredential({
+    tenantId: SYSTEM_TENANT_ID,
+    sourceUrl: `${fixtures.baseUrl}${options.sourcePath}`,
+    ...(options.sourceDigest === undefined ? {} : { sourceDigest: options.sourceDigest }),
+    ...(options.contentDigest === undefined ? {} : { contentDigest: options.contentDigest }),
+    ...(options.duplicateOfRecordId === undefined ? {} : { duplicateOfRecordId: options.duplicateOfRecordId }),
+    ...(options.encrypted !== undefined
+      ? { encrypted: options.encrypted, contentKind: ExternalContentKind.CREDENTIAL }
+      : options.sourceDigest === undefined
+        ? { encrypted: null }
+        : { encrypted: false, contentKind: ExternalContentKind.CREDENTIAL }),
+    annotations: { displayName: 'Recovery fixture', declaredCredentialType: CoreCredentialType.DPP },
+    details: options.details ?? { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+    checkRun: {
+      state: CheckRunState.FAILED,
+      checks: { retrieval: failureCode === CheckRunFailureCode.RETRIEVAL_FAILED ? CheckResult.FAIL : CheckResult.PASS },
+      failure: { code: failureCode, message: 'initial durable copy was unavailable', retryable: true },
+    },
+  });
+  return created.record.id;
+}
+
+async function reverifyNoCopy(
+  recordId: string,
+  storage: IStorageService,
+  fetchSource = sourceFetcher(),
+  registerOverrides: Partial<RegisterExternalCredentialDependencies> = {},
+) {
+  const recovery = recoveryRunner(storage, fetchSource, registerOverrides);
+  return reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue, {
+    getRecord: getLibraryRecordById,
+    createGeneration: createReverificationGeneration,
+    reserveGeneration: reserveRecoveryGeneration,
+    finaliseGeneration: finaliseRecoveryGeneration,
+    ...recovery,
+  });
 }
 
 async function jobsFor(recordId: string): Promise<VerifyJobReference[]> {
@@ -222,6 +415,31 @@ async function waitFor<T>(read: () => Promise<T>, matches: (value: T) => boolean
   return value;
 }
 
+/**
+ * Polls `pg_stat_activity` for a real backend that Postgres itself reports
+ * as currently waiting on a lock while running a statement matching
+ * `queryFragment`, rather than sleeping a guessed duration and hoping a
+ * concurrent caller has reached that point by then. Used to confirm a second
+ * connection is genuinely blocked before releasing the first.
+ */
+async function waitUntilBackendBlocked(
+  client: { $queryRawUnsafe: <T>(sql: string, ...args: unknown[]) => Promise<T> },
+  queryFragment: string,
+): Promise<void> {
+  try {
+    await waitFor(
+      () =>
+        client.$queryRawUnsafe<Array<{ pid: number }>>(
+          `SELECT pid FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE $1`,
+          `%${queryFragment}%`,
+        ),
+      (rows) => rows.length > 0,
+    );
+  } catch {
+    throw new Error(`Timed out waiting for a backend blocked on a lock matching: ${queryFragment}`);
+  }
+}
+
 describe('re-verify a library record through Postgres and pg-boss', () => {
   beforeAll(async () => {
     fixtures = await startFixtureServer();
@@ -243,9 +461,15 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     fixtures.set('/storage/protected.json', { body: DPP_TEXT });
     senderErrors.splice(0);
     sweepErrors.splice(0);
+    capturedLogLines.length = 0;
   });
 
   afterEach(() => {
+    // Reset first, before either assertion below can throw: only the default-dependencies case
+    // configures this mock, and if either assertion fails without this
+    // running first, its configuration survives to leak into the next test,
+    // which is exactly the failure this reset exists to close.
+    (resolveStorageService as jest.Mock).mockReset();
     expect(senderErrors.splice(0)).toEqual([]);
     expect(sweepErrors.splice(0)).toEqual([]);
   });
@@ -320,6 +544,973 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     expect(results.filter((result) => result.outcome === 'joined')).toHaveLength(1);
     expect(await prisma.checkRun.count({ where: { recordId: native.id } })).toBe(1);
     expect(await jobsFor(native.id)).toHaveLength(1);
+  });
+
+  it('two concurrent no-copy recoveries join one reservation, so only one fetch and one store happen', async () => {
+    // Criterion 5 for the no-copy branch specifically: the reservation is
+    // the claim, so a concurrent caller must join it rather than starting a
+    // second fetch. Fails if both callers reach `settleInRequest` and store
+    // a copy each.
+    fixtures.set('/supplier/recovery-concurrent.json', { body: RECOVERY_TEXT });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-concurrent.json' });
+    let fetches = 0;
+    const countingFetch = (href: string) => {
+      fetches += 1;
+      return sourceFetcher()(href);
+    };
+    const storage = recoveryStorage();
+
+    const results = await Promise.all([
+      reverifyNoCopy(recordId, storage, countingFetch),
+      reverifyNoCopy(recordId, storage, countingFetch),
+    ]);
+
+    expect(results.filter((result) => result.outcome === 'created')).toHaveLength(1);
+    expect(results.filter((result) => result.outcome === 'joined')).toHaveLength(1);
+    expect(fetches).toBe(1);
+    expect(await prisma.checkRun.count({ where: { recordId } })).toBe(2);
+    expect(await jobsFor(recordId)).toHaveLength(1);
+  });
+
+  it('re-fetches a no-copy record, replaces custody and verifies the new copy', async () => {
+    // Fails if the ticket criterion remains on the old stub, if custody and
+    // the generation are committed separately, or if the worker cannot read
+    // the copy produced by the request-side recovery.
+    fixtures.set('/supplier/recovery-success.json', { body: RECOVERY_TEXT });
+    const sourceDigest = await digest(new TextEncoder().encode(RECOVERY_TEXT));
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-success.json' });
+    const storage = recoveryStorage();
+
+    const created = await reverifyNoCopy(recordId, storage);
+
+    expect(created).toMatchObject({ outcome: 'created', generation: 2 });
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    expect(recovered?.origin).toBe('EXTERNAL');
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({
+      sourceDigest,
+      storageUri: expect.stringContaining('/storage/recovered-'),
+      storageDigestMultibase: expect.any(String),
+      storageServiceInstanceId: 'recovery-storage',
+      storageExternalId: expect.stringContaining('/storage/recovered-'),
+      storageBucket: 'private',
+      decryptionKey: expect.any(String),
+      contentKind: ExternalContentKind.CREDENTIAL,
+      contentDigest: await digest(new TextEncoder().encode(RECOVERY_JWT)),
+      duplicateOfRecordId: null,
+    });
+    expect(recovered.record).toMatchObject({
+      detailsStatus: CredentialDetailsStatus.EXTRACTED,
+      name: 'Recovered battery passport',
+      issuerName: 'Supplier Ltd',
+      issuerDid: 'did:web:supplier.example',
+      subjectName: 'Recovered battery',
+      subjectId: 'https://supplier.example/products/recovered',
+      credentialType: 'DigitalProductPassport',
+      coreCredentialType: CoreCredentialType.DPP,
+      coreDataModelVersion: '0.6.0',
+      detailsError: null,
+    });
+    expect(recovered.checkRun).toMatchObject({ state: CheckRunState.PENDING, sourceChanged: null });
+    expect(await jobsFor(recordId)).toHaveLength(1);
+
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    await verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    })((await jobsFor(recordId))[0], context());
+
+    const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    expect(settled?.checkRun).toMatchObject({
+      state: CheckRunState.COMPLETE,
+      retrieval: CheckResult.PASS,
+      digest: CheckResult.PASS,
+      proof: CheckResult.PASS,
+    });
+    expect(verifier.verify).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-fetches a duplicate credential and writes a warning pointer to its current holder', async () => {
+    // Fails if recovery treats a duplicate as a registration conflict, writes
+    // both a pointer and a digest, or omits the consumer-visible warning.
+    fixtures.set('/supplier/recovery-duplicate.json', { body: RECOVERY_TEXT });
+    const sourceDigest = await digest(new TextEncoder().encode(RECOVERY_TEXT));
+    const contentDigest = await digest(new TextEncoder().encode(RECOVERY_JWT));
+    const winnerId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-duplicate.json',
+      sourceDigest,
+      contentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+    });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-duplicate.json' });
+
+    await reverifyNoCopy(recordId, recoveryStorage());
+
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({ contentDigest: null, duplicateOfRecordId: winnerId });
+    expect(toCredentialRecord(recovered as never).warnings).toContainEqual({
+      code: 'DUPLICATE_CONTENT',
+      message: `The credential content matches record ${winnerId}.`,
+      relatedRecordId: winnerId,
+    });
+    expect(recovered.checkRun.state).toBe(CheckRunState.PENDING);
+  });
+
+  it('settles a failed no-copy re-fetch without queueing or changing custody', async () => {
+    // Fails if a second source outage becomes a pending generation, clears
+    // the old source baseline, or claims a durable copy exists.
+    const oldSource = await digest(new TextEncoder().encode('old source bytes'));
+    fixtures.set('/supplier/recovery-unavailable.json', { body: 'unavailable', status: 503 });
+    const recordId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-unavailable.json',
+      sourceDigest: oldSource,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+    });
+
+    const result = await reverifyNoCopy(recordId, recoveryStorage());
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    expect(await jobsFor(recordId)).toHaveLength(0);
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({
+      storageUri: null,
+      storageDigestMultibase: null,
+      sourceDigest: oldSource,
+    });
+    expect(recovered.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.RETRIEVAL_FAILED,
+      failureRetryable: true,
+      sourceChanged: null,
+      lastSourceCheckAt: expect.any(Date),
+    });
+  });
+
+  it('records a storage failure after a successful no-copy fetch without queueing', async () => {
+    // Fails if storage failure is mistaken for a retrieval failure, if its
+    // observed source identity is lost, or if a job is enqueued without a copy.
+    fixtures.set('/supplier/recovery-storage-failure.json', { body: RECOVERY_TEXT });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-storage-failure.json' });
+
+    const result = await reverifyNoCopy(recordId, recoveryStorage({ failStore: true }));
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    expect(await jobsFor(recordId)).toHaveLength(0);
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({
+      storageUri: null,
+      storageDigestMultibase: null,
+      sourceDigest: await digest(new TextEncoder().encode(RECOVERY_TEXT)),
+      contentDigest: await digest(new TextEncoder().encode(RECOVERY_JWT)),
+    });
+    expect(recovered.record.detailsStatus).toBe(CredentialDetailsStatus.EXTRACTED);
+    expect(recovered.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+      failureRetryable: true,
+    });
+  });
+
+  it('rejects with EncryptionUnavailableError when a no-copy fetch opens a credential this service cannot protect, and settles the reservation FAILED with no job', async () => {
+    // The encryption preflight throws synchronously, well after the
+    // reservation exists, so the failure must not strand that reservation
+    // PENDING: it settles FAILED, custody stays untouched (no store was ever
+    // attempted), and the next verify reserves a fresh generation rather than
+    // joining a stuck one.
+    fixtures.set('/supplier/recovery-encryption-unavailable.json', { body: RECOVERY_TEXT });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-encryption-unavailable.json' });
+    const preflightCause = new Error('encryption key unavailable');
+    const assertEncryptionReady = () => {
+      throw preflightCause;
+    };
+
+    await expect(
+      reverifyNoCopy(recordId, recoveryStorage(), sourceFetcher(), { assertEncryptionReady }),
+    ).rejects.toThrow(EncryptionUnavailableError);
+
+    expect(await jobsFor(recordId)).toHaveLength(0);
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({
+      storageUri: null,
+      storageDigestMultibase: null,
+      storageExternalId: null,
+      contentDigest: null,
+    });
+    expect(recovered.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      generation: 2,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+      failureRetryable: true,
+    });
+
+    const next = await reverifyNoCopy(recordId, recoveryStorage());
+    expect(next).toMatchObject({ outcome: 'created', generation: 3 });
+  });
+
+  it('case (c): a never-opened ciphertext with no identity is stored as fetched', async () => {
+    // The synchronous 400 refusal for a no-copy encrypted record is
+    // withdrawn: this fetch runs and stores the ciphertext exactly as
+    // registration would, because the row holds no identity for a fetched
+    // ciphertext to jeopardise. A later bodyless call then meets the
+    // stored-ciphertext 400 (criterion 6), which is not this test's concern.
+    fixtures.set('/supplier/recovery-no-identity-ciphertext.json', {
+      body: encryptedBody(RECOVERY_TEXT, RECEIVER_KEY),
+    });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-no-identity-ciphertext.json' });
+
+    const result = await reverifyNoCopy(recordId, recoveryStorage());
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    expect(await jobsFor(recordId)).toHaveLength(0);
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({ storageUri: expect.any(String), decryptionKey: null, encrypted: true });
+    expect(recovered.record.detailsStatus).toBe(CredentialDetailsStatus.EXTRACTION_PENDING);
+    expect(recovered.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.DECRYPTION_REQUIRED,
+    });
+  });
+
+  it('case (b), envelope: a fetch that cannot open on an identity-holding row is refused, not replaced, and nothing is stored', async () => {
+    // The row already holds a content identity from an earlier successful
+    // recovery. Fetching unopened ciphertext this time must not release that
+    // identity or its details: it settles FAILED and preserves everything.
+    // The reservation snapshot already holds an identity, so the pipeline
+    // skips storing this response entirely: no copy is written and nothing
+    // is left for an operator to clean up, closing the sequential leak a
+    // permanently-wrong source used to create on every re-verify.
+    const heldDigest = await digest(new TextEncoder().encode('held source bytes'));
+    const heldContentDigest = await digest(new TextEncoder().encode('held-content'));
+    fixtures.set('/supplier/recovery-reject-envelope.json', { body: encryptedBody(RECOVERY_TEXT, RECEIVER_KEY) });
+    const recordId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-reject-envelope.json',
+      sourceDigest: heldDigest,
+      contentDigest: heldContentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+      details: {
+        status: CredentialDetailsStatus.EXTRACTED,
+        fields: DETAILS,
+        credentialType: 'DigitalProductPassport',
+        coreCredentialType: CoreCredentialType.DPP,
+        coreDataModelVersion: '0.6.0',
+      },
+    });
+
+    const result = await reverifyNoCopy(recordId, recoveryStorage());
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    expect(await jobsFor(recordId)).toHaveLength(0);
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({
+      storageUri: null,
+      contentDigest: heldContentDigest,
+      sourceDigest: heldDigest,
+    });
+    expect(recovered.record).toMatchObject({ detailsStatus: CredentialDetailsStatus.EXTRACTED, ...DETAILS });
+    expect(recovered.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.DECRYPTION_REQUIRED,
+    });
+    const orphan = capturedLogLines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((line) => line.msg === 'Prepared recovery copy is orphaned and needs operator cleanup');
+    expect(orphan).toBeUndefined();
+  });
+
+  it('case (b), non-credential: a fetch that returns an unrelated JSON body on an identity-holding row is refused as SOURCE_NOT_CREDENTIAL', async () => {
+    const heldDigest = await digest(new TextEncoder().encode('held source bytes 2'));
+    const heldContentDigest = await digest(new TextEncoder().encode('held-content-2'));
+    fixtures.set('/supplier/recovery-reject-html.json', { body: '<html>not a credential</html>' });
+    const recordId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-reject-html.json',
+      sourceDigest: heldDigest,
+      contentDigest: heldContentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+      details: {
+        status: CredentialDetailsStatus.EXTRACTED,
+        fields: DETAILS,
+        credentialType: 'DigitalProductPassport',
+        coreCredentialType: CoreCredentialType.DPP,
+        coreDataModelVersion: '0.6.0',
+      },
+    });
+
+    const result = await reverifyNoCopy(recordId, recoveryStorage());
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    expect(await jobsFor(recordId)).toHaveLength(0);
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({ storageUri: null, contentDigest: heldContentDigest });
+    expect(recovered.record).toMatchObject({ detailsStatus: CredentialDetailsStatus.EXTRACTED, ...DETAILS });
+    expect(recovered.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL,
+    });
+  });
+
+  it('case (a): re-opening the credential the row already holds keeps its identity and replaces custody and details', async () => {
+    // The row already holds the exact content identity a fresh fetch of the
+    // same credential produces. No holder lookup or promotion is needed;
+    // custody and details still replace from the new fetch.
+    fixtures.set('/supplier/recovery-same-credential.json', { body: RECOVERY_TEXT });
+    const sourceDigest = await digest(new TextEncoder().encode(RECOVERY_TEXT));
+    const contentDigest = await digest(new TextEncoder().encode(RECOVERY_JWT));
+    const recordId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-same-credential.json',
+      sourceDigest: await digest(new TextEncoder().encode('a different earlier source')),
+      contentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+    });
+
+    const result = await reverifyNoCopy(recordId, recoveryStorage());
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({
+      sourceDigest,
+      contentDigest,
+      duplicateOfRecordId: null,
+      storageUri: expect.stringContaining('/storage/recovered-'),
+    });
+    expect(recovered.record.detailsStatus).toBe(CredentialDetailsStatus.EXTRACTED);
+    expect(recovered.checkRun.state).toBe(CheckRunState.PENDING);
+  });
+
+  it('the 400 refusal is kept for a row that already holds unopened ciphertext (an existing durable copy)', async () => {
+    // Unlike the no-copy cases above, this row already has a durable copy:
+    // that is the case the synchronous refusal still covers.
+    const sourceDigest = await digest(new TextEncoder().encode(DPP_TEXT));
+    const recordId = await insertProtectedExternal({
+      sourcePath: '/supplier/credential.json',
+      storagePath: '/storage/protected.json',
+      sourceDigest,
+      storageDigest: sourceDigest,
+      encrypted: true,
+    });
+    await prisma.externalCredential.update({
+      where: { id_tenantId_origin: { id: recordId, tenantId: SYSTEM_TENANT_ID, origin: 'EXTERNAL' } },
+      data: { decryptionKey: null },
+    });
+
+    await expect(reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue)).rejects.toBeInstanceOf(
+      DecryptionRequiredError,
+    );
+    expect(await prisma.checkRun.count({ where: { recordId } })).toBe(1);
+  });
+
+  it('a failed re-fetch leaves previously-extracted details untouched but stamps the check time', async () => {
+    // The record already carries EXTRACTED details from an earlier
+    // successful fetch whose copy was then lost (a storage failure).
+    // Fails if a second, failed re-fetch wipes name/issuer/subject/validity
+    // back to null, or if lastSourceCheckAt is left unset despite the
+    // attempt having actually run.
+    fixtures.set('/supplier/recovery-details-kept.json', { body: 'unavailable', status: 503 });
+    const oldSourceDigest = await digest(new TextEncoder().encode('previously observed source bytes'));
+    const recordId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-details-kept.json',
+      sourceDigest: oldSourceDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+      details: {
+        status: CredentialDetailsStatus.EXTRACTED,
+        fields: DETAILS,
+        credentialType: 'DigitalProductPassport',
+        coreCredentialType: CoreCredentialType.DPP,
+        coreDataModelVersion: '0.6.0',
+      },
+    });
+
+    const result = await reverifyNoCopy(recordId, recoveryStorage());
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    expect(await jobsFor(recordId)).toHaveLength(0);
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.record).toMatchObject({
+      detailsStatus: CredentialDetailsStatus.EXTRACTED,
+      name: DETAILS.name,
+      issuerName: DETAILS.issuerName,
+      issuerDid: DETAILS.issuerDid,
+      subjectName: DETAILS.subjectName,
+      subjectId: DETAILS.subjectId,
+      credentialType: 'DigitalProductPassport',
+      coreCredentialType: CoreCredentialType.DPP,
+      coreDataModelVersion: '0.6.0',
+    });
+    expect(recovered.external.sourceDigest).toBe(oldSourceDigest);
+    expect(recovered.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.RETRIEVAL_FAILED,
+      lastSourceCheckAt: expect.any(Date),
+    });
+  });
+
+  it('a failed re-fetch on a row that already holds a content identity settles RETRIEVAL_FAILED, not SOURCE_NOT_CREDENTIAL', async () => {
+    // Unlike the previous test, this row also carries a contentDigest from
+    // an earlier successful recovery (holdsIdentity is true). A fetch that
+    // never reaches the supplier at all must still take the retrieval-failure
+    // path, not be mistaken for an observed-but-wrong-kind body: identity,
+    // custody and details all stay exactly as they were.
+    fixtures.set('/supplier/recovery-identity-unreachable.json', { body: 'unavailable', status: 503 });
+    const oldSourceDigest = await digest(new TextEncoder().encode('previously observed identity source bytes'));
+    const heldContentDigest = await digest(new TextEncoder().encode('previously observed identity content'));
+    const recordId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-identity-unreachable.json',
+      sourceDigest: oldSourceDigest,
+      contentDigest: heldContentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+      details: {
+        status: CredentialDetailsStatus.EXTRACTED,
+        fields: DETAILS,
+        credentialType: 'DigitalProductPassport',
+        coreCredentialType: CoreCredentialType.DPP,
+        coreDataModelVersion: '0.6.0',
+      },
+    });
+
+    const result = await reverifyNoCopy(recordId, recoveryStorage());
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    expect(await jobsFor(recordId)).toHaveLength(0);
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.record).toMatchObject({
+      detailsStatus: CredentialDetailsStatus.EXTRACTED,
+      name: DETAILS.name,
+      issuerName: DETAILS.issuerName,
+      issuerDid: DETAILS.issuerDid,
+      subjectName: DETAILS.subjectName,
+      subjectId: DETAILS.subjectId,
+    });
+    expect(recovered.external).toMatchObject({
+      sourceDigest: oldSourceDigest,
+      contentDigest: heldContentDigest,
+      duplicateOfRecordId: null,
+      storageUri: null,
+    });
+    expect(recovered.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.RETRIEVAL_FAILED,
+      retrieval: CheckResult.FAIL,
+      lastSourceCheckAt: expect.any(Date),
+    });
+  });
+
+  it('recovers a no-copy record through the module default dependencies, with only fetchSource stubbed', async () => {
+    // Runs the shipped wiring rather than the test's own recoveryRunner
+    // stand-in: reverifyLibraryRecord's own recoverInRequest fallback,
+    // defaultRegisterDependencies and settleInRequest in mode 'recover' all
+    // execute for real. Only the storage microservice's HTTP boundary is
+    // stubbed (ADR-029), the same boundary every other case in this file
+    // stubs, just reached through the production resolveStorage call
+    // instead of a test-supplied override.
+    fixtures.set('/supplier/recovery-default-deps.json', { body: RECOVERY_TEXT });
+    const sourceDigest = await digest(new TextEncoder().encode(RECOVERY_TEXT));
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-default-deps.json' });
+    (resolveStorageService as jest.Mock).mockResolvedValue({
+      service: recoveryStorage(),
+      instanceId: 'recovery-storage-default',
+    });
+
+    const result = await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue, {
+      ...defaultReverifyLibraryRecordDependencies(),
+      fetchSource: sourceFetcher(),
+    });
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({
+      sourceDigest,
+      storageUri: expect.stringContaining('/storage/recovered-'),
+      storageServiceInstanceId: 'recovery-storage-default',
+      contentDigest: await digest(new TextEncoder().encode(RECOVERY_JWT)),
+    });
+    expect(recovered.checkRun.state).toBe(CheckRunState.PENDING);
+    const jobs = await jobsFor(recordId);
+    expect(jobs).toHaveLength(1);
+
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    await verifyGenerationHandler({ ...defaultVerifyGenerationDependencies(), resolveVerifier: async () => verifier })(
+      jobs[0],
+      context(),
+    );
+    const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    expect(settled?.checkRun).toMatchObject({ state: CheckRunState.COMPLETE });
+  });
+
+  it('revalidates a duplicate pointer against a holder that moved before the lock', async () => {
+    // Fails if the advisory pointer is trusted after the lookup instead of
+    // being revalidated, or if the fallback holder query is not locked at
+    // commit time so a second mover could still win the race.
+    fixtures.set('/supplier/recovery-pointer.json', { body: RECOVERY_TEXT });
+    const sourceDigest = await digest(new TextEncoder().encode(RECOVERY_TEXT));
+    const contentDigest = await digest(new TextEncoder().encode(RECOVERY_JWT));
+    const originalHolder = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-pointer.json',
+      sourceDigest,
+      contentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+    });
+    const movedHolder = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-pointer.json' });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-pointer.json' });
+    const storage = recoveryStorage();
+    let moved = false;
+
+    const result = await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue, {
+      ...recoveryRunner(storage),
+      getRecord: getLibraryRecordById,
+      createGeneration: createReverificationGeneration,
+      reserveGeneration: reserveRecoveryGeneration,
+      finaliseGeneration: async (input) => {
+        if (!moved && input.prepared.duplicateOfRecordId === originalHolder) {
+          moved = true;
+          await prisma.externalCredential.update({
+            where: { id_tenantId_origin: { id: originalHolder, tenantId: SYSTEM_TENANT_ID, origin: 'EXTERNAL' } },
+            data: { contentDigest: null },
+          });
+          await prisma.externalCredential.update({
+            where: { id_tenantId_origin: { id: movedHolder, tenantId: SYSTEM_TENANT_ID, origin: 'EXTERNAL' } },
+            data: { contentDigest },
+          });
+        }
+        return finaliseRecoveryGeneration(input);
+      },
+    });
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external recovery record');
+    expect(recovered.external).toMatchObject({ contentDigest: null, duplicateOfRecordId: movedHolder });
+  });
+
+  it('promotes an advisory row when recovery replaces the current content identity, and bumps both parents', async () => {
+    // Fails if an old canonical digest is simply cleared, leaving advisories
+    // without their content identity while the recovering record takes a new
+    // one, or if the promoted advisory's parent `updatedAt` is left stale
+    // while its content identity visibly changed (ADR-053 decision 1).
+    const oldPayload = { ...RECOVERY_DPP, name: 'Old passport', id: 'https://supplier.example/credentials/old' };
+    const oldText = JSON.stringify(envelopedCredential(oldPayload));
+    const oldJwt = (JSON.parse(oldText).id as string).split(',')[1];
+    fixtures.set('/supplier/recovery-promotion.json', { body: RECOVERY_TEXT });
+    const oldDigest = await digest(new TextEncoder().encode(oldText));
+    const oldContentDigest = await digest(new TextEncoder().encode(oldJwt));
+    const canonicalId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-promotion.json',
+      sourceDigest: oldDigest,
+      contentDigest: oldContentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+    });
+    const advisoryId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-promotion.json',
+      duplicateOfRecordId: canonicalId,
+    });
+    const advisoryBefore = await getLibraryRecordById(advisoryId, SYSTEM_TENANT_ID);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const storage = recoveryStorage();
+
+    await reverifyNoCopy(canonicalId, storage);
+
+    const canonical = await getLibraryRecordById(canonicalId, SYSTEM_TENANT_ID);
+    const advisory = await getLibraryRecordById(advisoryId, SYSTEM_TENANT_ID);
+    if (canonical?.origin !== 'EXTERNAL' || advisory?.origin !== 'EXTERNAL')
+      throw new Error('expected external records');
+    expect(canonical.external).toMatchObject({
+      contentDigest: await digest(new TextEncoder().encode(RECOVERY_JWT)),
+      duplicateOfRecordId: null,
+    });
+    expect(advisory.external).toMatchObject({ contentDigest: oldContentDigest, duplicateOfRecordId: null });
+    expect(advisory.record.updatedAt.getTime()).toBeGreaterThan(advisoryBefore!.record.updatedAt.getTime());
+  });
+
+  it('repoints every other advisory of a promoted digest and bumps its parent too', async () => {
+    // The promoted row (the oldest advisory) takes the digest; every other
+    // advisory of the same former owner is repointed to it, and both moves
+    // must bump their own parent's `updatedAt`, not just the promoted one's.
+    const oldPayload = { ...RECOVERY_DPP, name: 'Old passport', id: 'https://supplier.example/credentials/old-2' };
+    const oldText = JSON.stringify(envelopedCredential(oldPayload));
+    const oldJwt = (JSON.parse(oldText).id as string).split(',')[1];
+    fixtures.set('/supplier/recovery-repoint.json', { body: RECOVERY_TEXT });
+    const oldDigest = await digest(new TextEncoder().encode(oldText));
+    const oldContentDigest = await digest(new TextEncoder().encode(oldJwt));
+    const canonicalId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-repoint.json',
+      sourceDigest: oldDigest,
+      contentDigest: oldContentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+    });
+    const promotedId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-repoint.json',
+      duplicateOfRecordId: canonicalId,
+    });
+    const otherAdvisoryId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-repoint.json',
+      duplicateOfRecordId: canonicalId,
+    });
+    const otherBefore = await getLibraryRecordById(otherAdvisoryId, SYSTEM_TENANT_ID);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    await reverifyNoCopy(canonicalId, recoveryStorage());
+
+    const promoted = await getLibraryRecordById(promotedId, SYSTEM_TENANT_ID);
+    const other = await getLibraryRecordById(otherAdvisoryId, SYSTEM_TENANT_ID);
+    if (promoted?.origin !== 'EXTERNAL' || other?.origin !== 'EXTERNAL') throw new Error('expected external records');
+    expect(promoted.external).toMatchObject({ contentDigest: oldContentDigest, duplicateOfRecordId: null });
+    expect(other.external).toMatchObject({ contentDigest: null, duplicateOfRecordId: promotedId });
+    expect(other.record.updatedAt.getTime()).toBeGreaterThan(otherBefore!.record.updatedAt.getTime());
+  });
+
+  it('recovering a digest holder concurrently with a recovery pointing at it does not deadlock', async () => {
+    // The verified deadlock: A (holds digest X, no copy) locks its own
+    // parent then waits to lock B's child while writing custody; B (no
+    // identity, fetching content that duplicates X) locks its own parent,
+    // writes its own child, then waits for a KEY SHARE on A's parent to set
+    // its FK pointer. A total lock order over every touched LibraryRecord,
+    // own included, closes this. Fails if either call times out or throws a
+    // deadlock error (Postgres 40P01) instead of both completing.
+    const sameText = JSON.stringify(envelopedCredential({ ...RECOVERY_DPP, name: 'Shared content' }));
+    const sameJwt = (JSON.parse(sameText).id as string).split(',')[1];
+    const sameContentDigest = await digest(new TextEncoder().encode(sameJwt));
+    fixtures.set('/supplier/recovery-deadlock-a.json', { body: sameText });
+    fixtures.set('/supplier/recovery-deadlock-b.json', { body: sameText });
+    const holderId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-deadlock-a.json',
+      sourceDigest: await digest(new TextEncoder().encode('a different earlier source for A')),
+      contentDigest: sameContentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+    });
+    const duplicateId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-deadlock-b.json' });
+
+    const results = await Promise.all([
+      reverifyNoCopy(holderId, recoveryStorage()),
+      reverifyNoCopy(duplicateId, recoveryStorage()),
+    ]);
+
+    expect(results.every((result) => result.outcome === 'created')).toBe(true);
+    const holder = await getLibraryRecordById(holderId, SYSTEM_TENANT_ID);
+    const duplicate = await getLibraryRecordById(duplicateId, SYSTEM_TENANT_ID);
+    if (holder?.origin !== 'EXTERNAL' || duplicate?.origin !== 'EXTERNAL') throw new Error('expected external records');
+    // Exactly one of the two now holds the shared digest as canonical, and
+    // the other points at it; both fetched the same content, so which one
+    // wins the race is not pinned, only that the identity is never split.
+    const holderIsCanonical = holder.external.contentDigest === sameContentDigest;
+    const duplicateIsCanonical = duplicate.external.contentDigest === sameContentDigest;
+    expect(holderIsCanonical !== duplicateIsCanonical).toBe(true);
+    if (holderIsCanonical) expect(duplicate.external.duplicateOfRecordId).toBe(holderId);
+    else expect(holder.external.duplicateOfRecordId).toBe(duplicateId);
+  });
+
+  it("a deterministic parent/child foreign-key choreography: B blocks on A's LibraryRecord row rather than deadlocking", async () => {
+    // A's own two-record scenario cannot deadlock under any lock order: A
+    // never needs anything of B's. The genuine cycle is parent-against-child:
+    // A holds LibraryRecord A (its own parent) and, once released, updates
+    // its own ExternalCredential A row. B has no identity and fetches content
+    // duplicating A's digest, so B's plan is {A, B}: B's own parent-lock
+    // query needs LibraryRecord A too, and blocks on it immediately (before B
+    // ever reaches its own afterParentLock hook) for as long as A holds it.
+    // Held open deterministically via the hook and released only once B is
+    // *observed* blocked (a `pg_stat_activity` poll, not a guessed sleep), so
+    // this reproduces the exact interleaving rather than hoping for it.
+    const sameText = JSON.stringify(envelopedCredential({ ...RECOVERY_DPP, name: 'FK choreography shared content' }));
+    const sameJwt = (JSON.parse(sameText).id as string).split(',')[1];
+    const sameContentDigest = await digest(new TextEncoder().encode(sameJwt));
+    fixtures.set('/supplier/recovery-fk-a.json', { body: sameText });
+    fixtures.set('/supplier/recovery-fk-b.json', { body: sameText });
+    const holderId = await insertNoCopyExternal({
+      sourcePath: '/supplier/recovery-fk-a.json',
+      sourceDigest: await digest(new TextEncoder().encode('a different earlier source for FK choreography A')),
+      contentDigest: sameContentDigest,
+      failureCode: CheckRunFailureCode.STORAGE_FAILED,
+    });
+    const duplicateId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-fk-b.json' });
+
+    const reservedA = await reserveRecoveryGeneration({
+      recordId: holderId,
+      tenantId: SYSTEM_TENANT_ID,
+      expectedGeneration: 1,
+      expectedCustody: { storageUri: null, storageDigestMultibase: null, storageExternalId: null },
+    });
+    const reservedB = await reserveRecoveryGeneration({
+      recordId: duplicateId,
+      tenantId: SYSTEM_TENANT_ID,
+      expectedGeneration: 1,
+      expectedCustody: { storageUri: null, storageDigestMultibase: null, storageExternalId: null },
+    });
+    if (reservedA.outcome !== 'reserved' || reservedB.outcome !== 'reserved') {
+      throw new Error('expected both reservations to succeed');
+    }
+
+    const registerDeps = defaultRegisterDependencies(async () => undefined);
+    const preparedA = await settleInRequest(
+      {
+        tenantId: SYSTEM_TENANT_ID,
+        sourceUrl: `${fixtures.baseUrl}/supplier/recovery-fk-a.json`,
+        annotations: { displayName: 'FK choreography A', declaredCredentialType: CoreCredentialType.DPP },
+      },
+      {
+        ...registerDeps,
+        fetchDocument: sourceFetcher(),
+        resolveStorage: async () => ({ service: recoveryStorage(), instanceId: 'fk-a-storage' }),
+        findExistingExternal: findExternalByContentDigest,
+      },
+      { mode: 'recover', currentRecordId: holderId, holdsIdentity: true },
+    );
+    const preparedB = await settleInRequest(
+      {
+        tenantId: SYSTEM_TENANT_ID,
+        sourceUrl: `${fixtures.baseUrl}/supplier/recovery-fk-b.json`,
+        annotations: { displayName: 'FK choreography B', declaredCredentialType: CoreCredentialType.DPP },
+      },
+      {
+        ...registerDeps,
+        fetchDocument: sourceFetcher(),
+        resolveStorage: async () => ({ service: recoveryStorage(), instanceId: 'fk-b-storage' }),
+        findExistingExternal: findExternalByContentDigest,
+      },
+      { mode: 'recover', currentRecordId: duplicateId, holdsIdentity: false },
+    );
+
+    let notifyALocked!: () => void;
+    const aLocked = new Promise<void>((resolve) => {
+      notifyALocked = resolve;
+    });
+    let releaseA!: () => void;
+    const aReleaseSignal = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    recoveryFinaliseTestHooks.afterParentLock = async (recordId) => {
+      if (recordId === holderId) {
+        notifyALocked();
+        // Held open until this test explicitly releases it, once B is
+        // observed blocked below (not a fixed sleep).
+        await aReleaseSignal;
+      }
+    };
+    let aPromise: ReturnType<typeof finaliseRecoveryGeneration> | undefined;
+    let bPromise: ReturnType<typeof finaliseRecoveryGeneration> | undefined;
+    try {
+      aPromise = finaliseRecoveryGeneration({
+        recordId: holderId,
+        tenantId: SYSTEM_TENANT_ID,
+        checkRunId: reservedA.checkRunId,
+        generation: reservedA.generation,
+        prepared: preparedA,
+        enqueue,
+      });
+      // Do not start B until A's own parent lock is confirmed held, but race
+      // that confirmation against A's own promise: if A rejects before ever
+      // reaching the hook, that must surface here as the actual failure
+      // rather than leave this await hanging until the outer test timeout.
+      await Promise.race([aLocked, aPromise]);
+      bPromise = finaliseRecoveryGeneration({
+        recordId: duplicateId,
+        tenantId: SYSTEM_TENANT_ID,
+        checkRunId: reservedB.checkRunId,
+        generation: reservedB.generation,
+        prepared: preparedB,
+        enqueue,
+      });
+      // B's own parent-lock statement (needing both LibraryRecord rows) is
+      // now blocked on the row A holds. Confirm that by polling for a real
+      // backend reported by Postgres itself as waiting on a lock while
+      // running that exact statement, rather than sleeping a guessed
+      // duration and hoping B reached this point by then.
+      await waitUntilBackendBlocked(prisma, 'FROM "LibraryRecord"');
+    } finally {
+      // Always releases A's held-open transaction, even when the block above
+      // threw (a timeout waiting for B to block, or A's own promise
+      // rejecting the race): leaving A's barrier unreleased would strand its
+      // transaction open and hang the whole test run rather than failing
+      // this one test cleanly.
+      releaseA();
+      recoveryFinaliseTestHooks.afterParentLock = undefined;
+    }
+
+    // Both promises settled, not raced against each other: a genuine failure
+    // in either must be reported, not swallowed by the other winning first,
+    // and both must be allowed to actually finish (successfully or not)
+    // before this test moves on to reading the rows they wrote.
+    const [settledA, settledB] = await Promise.allSettled([aPromise, bPromise]);
+    if (settledA.status === 'rejected') throw settledA.reason;
+    if (settledB.status === 'rejected') throw settledB.reason;
+    expect(settledA.value?.outcome).toBe('created');
+    expect(settledB.value?.outcome).toBe('created');
+
+    const holder = await getLibraryRecordById(holderId, SYSTEM_TENANT_ID);
+    const duplicate = await getLibraryRecordById(duplicateId, SYSTEM_TENANT_ID);
+    if (holder?.origin !== 'EXTERNAL' || duplicate?.origin !== 'EXTERNAL') throw new Error('expected external records');
+    expect(holder.external.contentDigest).toBe(sameContentDigest);
+    expect(duplicate.external.duplicateOfRecordId).toBe(holderId);
+  });
+
+  it('two concurrent no-identity recoveries of the same content converge to one canonical row and one duplicate pointer', async () => {
+    // A convergence test, not a proof of the exact interleaving: two real,
+    // independently scheduled Postgres transactions race here, so which one
+    // commits first (and therefore which one, if either, actually hits the
+    // unique index and takes the acquisition-collision retry) is not pinned
+    // by this test and can vary between runs. What every interleaving must
+    // still produce is the same outcome: exactly one row ends up canonical
+    // and the other points at it, and this never logs the "collided twice"
+    // line a genuine double failure would produce. The acquisition-collision
+    // retry path itself (the actual reconciliation under lock after a real
+    // unique-index hit) is pinned deterministically by the unit tests in
+    // `check-run.repository.test.ts` instead, which control the collision
+    // and the winner lookup directly rather than hoping for one here.
+    const sharedText = JSON.stringify(envelopedCredential({ ...RECOVERY_DPP, name: 'Collision content' }));
+    const sharedJwt = (JSON.parse(sharedText).id as string).split(',')[1];
+    const sharedContentDigest = await digest(new TextEncoder().encode(sharedJwt));
+    fixtures.set('/supplier/recovery-collision-a.json', { body: sharedText });
+    fixtures.set('/supplier/recovery-collision-b.json', { body: sharedText });
+    const recordA = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-collision-a.json' });
+    const recordB = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-collision-b.json' });
+
+    const results = await Promise.all([
+      reverifyNoCopy(recordA, recoveryStorage()),
+      reverifyNoCopy(recordB, recoveryStorage()),
+    ]);
+
+    expect(results.every((result) => result.outcome === 'created')).toBe(true);
+    const a = await getLibraryRecordById(recordA, SYSTEM_TENANT_ID);
+    const b = await getLibraryRecordById(recordB, SYSTEM_TENANT_ID);
+    if (a?.origin !== 'EXTERNAL' || b?.origin !== 'EXTERNAL') throw new Error('expected external records');
+    const aIsCanonical = a.external.contentDigest === sharedContentDigest;
+    const bIsCanonical = b.external.contentDigest === sharedContentDigest;
+    expect(aIsCanonical !== bIsCanonical).toBe(true);
+    if (aIsCanonical) expect(b.external.duplicateOfRecordId).toBe(recordA);
+    else expect(a.external.duplicateOfRecordId).toBe(recordB);
+    const collidedTwice = capturedLogLines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .some((line) => line.msg === 'Content identity collided twice and no record holds it after rollback');
+    expect(collidedTwice).toBe(false);
+  });
+
+  it('a reservation abandoned mid-fetch is settled by the sweep, and the late fetch cannot finalise it', async () => {
+    // The caller reserved and started fetching, then never returns (a crash,
+    // a killed process). The sweep settles the abandoned reservation, and a
+    // late finalisation attempt against that same reservation must be
+    // fenced out rather than attaching custody to a run the sweep has
+    // already closed.
+    fixtures.set('/supplier/recovery-abandoned.json', { body: RECOVERY_TEXT });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-abandoned.json' });
+    const reserved = await reserveRecoveryGeneration({
+      recordId,
+      tenantId: SYSTEM_TENANT_ID,
+      expectedGeneration: 1,
+      expectedCustody: { storageUri: null, storageDigestMultibase: null, storageExternalId: null },
+    });
+    if (reserved.outcome !== 'reserved') throw new Error('expected the reservation to succeed');
+    const oldMarker = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await prisma.checkRun.update({ where: { id: reserved.checkRunId }, data: { requestedAt: oldMarker } });
+
+    await sweepQueue.enqueue(LIBRARY_RECONCILE_PENDING_RUNS_JOB, {});
+    const abandoned = await waitFor(
+      () => prisma.checkRun.findUnique({ where: { id: reserved.checkRunId } }),
+      (run): run is NonNullable<typeof run> => run?.state === CheckRunState.FAILED,
+    );
+    expect(abandoned).toMatchObject({
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
+      failureRetryable: true,
+    });
+
+    // The late fetch finally resolves and tries to finalise the same
+    // reservation the sweep already closed.
+    const registerDeps = defaultRegisterDependencies(async () => undefined);
+    const prepared = await settleInRequest(
+      {
+        tenantId: SYSTEM_TENANT_ID,
+        sourceUrl: `${fixtures.baseUrl}/supplier/recovery-abandoned.json`,
+        annotations: { displayName: 'Late fetch', declaredCredentialType: CoreCredentialType.DPP },
+      },
+      {
+        ...registerDeps,
+        fetchDocument: sourceFetcher(),
+        resolveStorage: async () => ({ service: recoveryStorage(), instanceId: 'late-storage' }),
+        findExistingExternal: findExternalByContentDigest,
+      },
+      { mode: 'recover', currentRecordId: recordId, holdsIdentity: false },
+    );
+    const late = await finaliseRecoveryGeneration({
+      recordId,
+      tenantId: SYSTEM_TENANT_ID,
+      checkRunId: reserved.checkRunId,
+      generation: reserved.generation,
+      prepared,
+      enqueue,
+    });
+
+    expect(late).toEqual({ outcome: 'superseded', generation: reserved.generation });
+    const record = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (record?.origin !== 'EXTERNAL') throw new Error('expected an external record');
+    expect(record.external.storageUri).toBeNull();
+    const orphan = capturedLogLines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((line) => line.msg === 'Prepared recovery copy is orphaned and needs operator cleanup');
+    expect(orphan).toMatchObject({ recordId, reason: 'superseded' });
+  });
+
+  it('orphan-logs a prepared copy, naming its storage coordinates, when the reservation is settled before finalisation runs', async () => {
+    // The fence in `finaliseRecoveryGeneration` rejects a
+    // reservation another actor (here, simulating the sweep) has already
+    // settled. Fails if a prepared storage object is silently leaked in that
+    // case, or if the operator-facing orphan log line is missing or misses
+    // the coordinates an operator needs to find and remove the object.
+    fixtures.set('/supplier/recovery-orphan.json', { body: RECOVERY_TEXT });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/recovery-orphan.json' });
+    const storage = recoveryStorage();
+    let preparedStorageUri: string | undefined;
+    const result = await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue, {
+      ...recoveryRunner(storage),
+      getRecord: getLibraryRecordById,
+      createGeneration: createReverificationGeneration,
+      reserveGeneration: reserveRecoveryGeneration,
+      finaliseGeneration: async (input) => {
+        preparedStorageUri = input.prepared.storage?.uri;
+        // Simulate another actor (the sweep) settling this exact reservation
+        // as abandoned before this finalisation gets to write to it.
+        await prisma.checkRun.update({
+          where: { id: input.checkRunId },
+          data: {
+            state: CheckRunState.FAILED,
+            failureCode: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
+            failureRetryable: true,
+            completedAt: new Date(),
+          },
+        });
+        return finaliseRecoveryGeneration(input);
+      },
+    });
+
+    expect(preparedStorageUri).toEqual(expect.stringContaining('/storage/recovered-'));
+    expect(result).toEqual({ outcome: 'superseded', generation: 2 });
+    expect(await prisma.checkRun.count({ where: { recordId } })).toBe(2);
+    const record = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (record?.origin !== 'EXTERNAL') throw new Error('expected an external record');
+    expect(record.external.storageUri).toBeNull();
+    expect(record.external.storageDigestMultibase).toBeNull();
+
+    const orphan = capturedLogLines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((line) => line.msg === 'Prepared recovery copy is orphaned and needs operator cleanup');
+    expect(orphan).toMatchObject({
+      recordId,
+      tenantId: SYSTEM_TENANT_ID,
+      reason: 'superseded',
+      storageUri: preparedStorageUri,
+    });
   });
 
   it('records changed and not-checked supplier freshness while retaining the protected copy', async () => {

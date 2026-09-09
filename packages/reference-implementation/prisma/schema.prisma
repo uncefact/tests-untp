@@ -113,10 +113,16 @@ enum CheckResult {
 }
 
 /// Why a FAILED check run could not conclude (#955). The wire contract's
-/// closed set plus STORED_COPY_CORRUPT (#957). STORED_COPY_UNAVAILABLE is
-/// emitted when a durable copy this system believed it held cannot be read
-/// back as the document it stored; STORED_COPY_CORRUPT when it reads back but
-/// no longer matches the digest recorded when it was stored.
+/// closed set plus STORED_COPY_CORRUPT and SOURCE_NOT_CREDENTIAL (#957).
+/// STORED_COPY_UNAVAILABLE is emitted when a durable copy this system
+/// believed it held cannot be read back as the document it stored;
+/// STORED_COPY_CORRUPT when it reads back but no longer matches the digest
+/// recorded when it was stored. SOURCE_NOT_CREDENTIAL is emitted when a
+/// no-copy recovery re-fetches a source that already established a content
+/// identity, and the response is neither the held credential nor unopened
+/// ciphertext of it (an HTML page or another non-credential body): the
+/// existing identity and details are preserved rather than being treated as
+/// evidence of an unrelated credential.
 enum CheckRunFailureCode {
   RETRIEVAL_FAILED
   DECRYPTION_REQUIRED
@@ -125,6 +131,7 @@ enum CheckRunFailureCode {
   VERIFICATION_UNAVAILABLE
   STORED_COPY_UNAVAILABLE
   STORED_COPY_CORRUPT
+  SOURCE_NOT_CREDENTIAL
 }
 
 enum ServiceType {

@@ -36,6 +36,33 @@ export function isRecordNotFound(error: unknown): boolean {
 }
 
 /**
+ * P2034: Prisma's own wrapping of a write conflict or a genuine database
+ * deadlock inside an interactive transaction (on PostgreSQL, a `40P01`
+ * deadlock or a serialization failure the engine treats the same way).
+ * Distinct from the application-level lock-ordering and lock-discovery
+ * retries elsewhere in this codebase: those prevent a deadlock by locking
+ * every row a transaction will touch up front; this is the bounded retry for
+ * the rare case two transactions still deadlock despite that ordering,
+ * because Postgres itself decides which of two concurrently-blocked
+ * transactions to abort, not this code.
+ */
+export function isTransactionDeadlock(error: unknown): boolean {
+  if (hasPrismaErrorCode(error, 'P2034')) return true;
+  // The lock queries in this codebase run as `$queryRawUnsafe`, whose
+  // failures take the raw-query error path rather than the interactive
+  // transaction's own P2034 wrapping: Prisma reports these as P2010 ("Raw
+  // query failed"), with `meta.code` carrying the underlying database error
+  // code as a string (Prisma's documented shape,
+  // https://www.prisma.io/docs/orm/reference/error-reference#p2010), on
+  // PostgreSQL `'40P01'` for a genuine deadlock. Only that exact meta code
+  // is recognised: an arbitrary P2010 (a malformed raw query, a type
+  // mismatch) is a defect, not a transient condition to retry.
+  if (!hasPrismaErrorCode(error, 'P2010')) return false;
+  const meta = (error as { meta?: { code?: unknown } }).meta;
+  return meta?.code === '40P01';
+}
+
+/**
  * P2003 scoped to a specific foreign-key column, for writes that carry more
  * than one foreign key: a bare isForeignKeyViolation check on such a write
  * would attribute every violation to whichever reference the caller's message

@@ -118,9 +118,13 @@ describe('reconcilePendingRunsHandler', () => {
 
     await reconcilePendingRunsHandler(deps)({}, {} as never);
 
-    expect(deps.findAbandoned).toHaveBeenCalledWith(new Date('2026-09-06T23:30:00.000Z'));
-    expect(deps.settleAbandoned).toHaveBeenNthCalledWith(1, abandoned[0]);
-    expect(deps.settleAbandoned).toHaveBeenNthCalledWith(2, abandoned[1]);
+    const cutoff = new Date('2026-09-06T23:30:00.000Z');
+    expect(deps.findAbandoned).toHaveBeenCalledWith(cutoff);
+    // The cutoff is passed to `settleAbandoned` too, so its own conditional
+    // UPDATE can recheck the abandonment predicate
+    // rather than trusting this selection's now-stale snapshot.
+    expect(deps.settleAbandoned).toHaveBeenNthCalledWith(1, abandoned[0], cutoff);
+    expect(deps.settleAbandoned).toHaveBeenNthCalledWith(2, abandoned[1], cutoff);
   });
 
   it('propagates a selection failure so a sweep that never ran is visible to the queue', async () => {
@@ -148,7 +152,7 @@ describe('reconcilePendingRunsHandler', () => {
     await expect(reconcilePendingRunsHandler(deps)({}, {} as never)).resolves.toBeUndefined();
 
     expect(settleAbandoned).toHaveBeenCalledTimes(3);
-    expect(settleAbandoned).toHaveBeenNthCalledWith(3, abandoned[2]);
+    expect(settleAbandoned).toHaveBeenNthCalledWith(3, abandoned[2], expect.any(Date));
     // The row that could not be settled is named, so an operator can find it
     // rather than reading a tick that quietly settled fewer rows than it
     // selected.
