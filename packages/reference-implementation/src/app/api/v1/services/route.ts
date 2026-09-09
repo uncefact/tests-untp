@@ -6,6 +6,7 @@ import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { createServiceRequestSchema, listServicesQuerySchema } from '@/lib/api/request-schemas/service';
 import { createServiceInstance, listServiceInstances } from '@/lib/prisma/repositories';
 import { getEncryptionService } from '@/lib/encryption/encryption';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 import { EncryptionAlgorithm, adapterRegistry, maskInstanceConfig } from '@uncefact/untp-ri-services';
 import type { AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 
@@ -114,7 +115,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // --- SSRF protection on config URLs --------------------------------------
 
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+  if (!readFetchAllowPrivateUrls()) {
     if (typeof config.baseUrl === 'string') {
       logger.info('Validating config baseUrl is not internal');
       await assertPublicUrl(config.baseUrl, 'config.baseUrl');

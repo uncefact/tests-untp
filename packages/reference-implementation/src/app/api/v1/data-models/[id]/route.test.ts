@@ -1,3 +1,6 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
+isolateFetchAllowPrivateUrlsEnv();
+
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => {
   class MockNextResponse {
@@ -333,6 +336,20 @@ describe('PATCH /api/v1/data-models/:id', () => {
 
     expect(res.status).toBe(400);
     expect(json.error).toMatch(/schemaUrl.*private or reserved/);
+  });
+
+  it('accepts a private schema URL when FETCH_ALLOW_PRIVATE_URLS is true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
+    mockUpdateDataModel.mockResolvedValue({ id: 'dm-1', schemaUrl: 'http://127.0.0.1/schema.json' });
+
+    const req = createFakeRequest({ method: 'PATCH', body: { schemaUrl: 'http://127.0.0.1/schema.json' } });
+    const res = await PATCH(req, createContext('dm-1') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockValidatePublicUrl).not.toHaveBeenCalled();
+    expect(mockUpdateDataModel).toHaveBeenCalledWith('dm-1', 'tenant-1', {
+      schemaUrl: 'http://127.0.0.1/schema.json',
+    });
   });
 
   it('returns 400 when schemaUrl is not a valid URL', async () => {

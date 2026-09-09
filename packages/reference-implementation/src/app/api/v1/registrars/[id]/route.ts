@@ -6,6 +6,7 @@ import { updateRegistrarRequestSchema } from '@/lib/api/request-schemas/registra
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getInstanceByResolution, getRegistrarById, updateRegistrar, deleteRegistrar } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 
 const logger = apiLogger.child({ route: '/api/v1/registrars/[id]' });
 
@@ -151,7 +152,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   // registrar.url is introduced.
   if (fields.url !== undefined) {
     assertHttpUrl(fields.url, 'url');
-    if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    if (!readFetchAllowPrivateUrls()) {
       logger.info({ registrarId: id }, 'Validating registrar URL is not internal');
       await assertPublicUrl(fields.url, 'url');
     }

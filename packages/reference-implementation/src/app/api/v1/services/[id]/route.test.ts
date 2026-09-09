@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -211,7 +212,7 @@ describe('PATCH /api/v1/services/:id', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Allow private URLs by default so happy-path tests don't trigger real DNS resolution
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     // Default encryption service mock
     mockGetEncryptionService.mockReturnValue({ encrypt: mockEncrypt, decrypt: mockDecrypt });
   });
@@ -464,7 +465,7 @@ describe('PATCH /api/v1/services/:id', () => {
   });
 
   it('returns 400 when merged config.baseUrl points to a private address', async () => {
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
     mockDecrypt.mockReturnValue(JSON.stringify({ baseUrl: 'https://old.example.com', apiKey: 'key' }));
 
@@ -479,8 +480,8 @@ describe('PATCH /api/v1/services/:id', () => {
     expect(json.error).toMatch(/config\.baseUrl.*private or reserved/);
   });
 
-  it('skips SSRF validation on PATCH when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('skips SSRF validation on PATCH when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
     mockDecrypt.mockReturnValue(JSON.stringify({ baseUrl: 'https://old.example.com', apiKey: 'key' }));
     mockUpdateServiceInstance.mockResolvedValue({ ...MOCK_INSTANCE, config: 'encrypted' });
@@ -627,3 +628,4 @@ describe('DELETE /api/v1/services/:id', () => {
     expect(json.error).toBe('Service instance not found');
   });
 });
+isolateFetchAllowPrivateUrlsEnv();

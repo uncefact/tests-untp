@@ -139,8 +139,14 @@ services:
       - UNCEFACT_STORAGE_PRIVATE_BUCKET=${UNCEFACT_STORAGE_PRIVATE_BUCKET:-private-data}
       - PYX_IDR_API_URL=http://identity-resolver-service:3000
       - PYX_IDR_API_KEY=test123
-      - VERIFY_ALLOW_PRIVATE_URLS=true
+      # This e2e file is a test harness whose services use private container
+      # names. The deployment file deliberately has no default, and this file
+      # is not a deployment template.
+      - FETCH_ALLOW_PRIVATE_URLS=${FETCH_ALLOW_PRIVATE_URLS:-true}
+      - VERIFY_ALLOW_PRIVATE_URLS=${VERIFY_ALLOW_PRIVATE_URLS:-}
+      - FETCH_MAX_RESPONSE_SIZE=${FETCH_MAX_RESPONSE_SIZE:-}
       - VERIFY_MAX_CREDENTIAL_SIZE=${VERIFY_MAX_CREDENTIAL_SIZE:-}
+      - FETCH_TIMEOUT_MS=${FETCH_TIMEOUT_MS:-}
       - VERIFY_FETCH_TIMEOUT_MS=${VERIFY_FETCH_TIMEOUT_MS:-}
       # Tenant mode (default: open — override to "closed" for closed mode tests)
       - TENANT_MODE=${TENANT_MODE:-open}

@@ -35,6 +35,15 @@ import {
 
 const HREF = 'https://supplier.example/credential-a';
 const mockFetch = jest.fn();
+const FETCH_ENV_NAMES = [
+  'FETCH_ALLOW_PRIVATE_URLS',
+  'VERIFY_ALLOW_PRIVATE_URLS',
+  'FETCH_MAX_RESPONSE_SIZE',
+  'VERIFY_MAX_CREDENTIAL_SIZE',
+  'FETCH_TIMEOUT_MS',
+  'VERIFY_FETCH_TIMEOUT_MS',
+] as const;
+const originalFetchEnvironment = Object.fromEntries(FETCH_ENV_NAMES.map((name) => [name, process.env[name]]));
 
 async function failureOf(promise: Promise<unknown>) {
   try {
@@ -51,41 +60,34 @@ describe('fetchCredentialDocument', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-    delete process.env.VERIFY_MAX_CREDENTIAL_SIZE;
+    for (const name of FETCH_ENV_NAMES) delete process.env[name];
     global.fetch = mockFetch as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    for (const name of FETCH_ENV_NAMES) delete process.env[name];
   });
 
   afterAll(() => {
     global.fetch = originalFetch;
-  });
-
-  describe('getFetchTimeoutMs', () => {
-    it('returns 10 seconds when VERIFY_FETCH_TIMEOUT_MS is unset or blank', () => {
-      expect(getFetchTimeoutMs({})).toBe(10_000);
-      expect(getFetchTimeoutMs({ VERIFY_FETCH_TIMEOUT_MS: '  ' })).toBe(10_000);
-    });
-
-    it('parses a positive integer number of milliseconds', () => {
-      expect(getFetchTimeoutMs({ VERIFY_FETCH_TIMEOUT_MS: '2500' })).toBe(2_500);
-    });
-
-    it.each(['0', '-1', '1.5', '10s', 'Infinity', '120001'])('throws on %s, naming the variable', (raw) => {
-      expect(() => getFetchTimeoutMs({ VERIFY_FETCH_TIMEOUT_MS: raw })).toThrow(/VERIFY_FETCH_TIMEOUT_MS/);
-    });
+    for (const name of FETCH_ENV_NAMES) {
+      const value = originalFetchEnvironment[name];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   });
 
   describe('through the guarded resolver', () => {
-    it('uses the VERIFY_FETCH_TIMEOUT_MS budget when the caller passes no timeout', async () => {
+    it('uses the FETCH_TIMEOUT_MS budget when the caller passes no timeout', async () => {
       // Every route and job that fetches a credential URL relies on this
       // default, so an operator's override must reach the resolver from here.
       // Fails if the helper keeps a fixed budget or reads the variable elsewhere.
-      process.env.VERIFY_FETCH_TIMEOUT_MS = '3210';
+      process.env.FETCH_TIMEOUT_MS = '3210';
       mockResolveDocument.mockResolvedValue({ body: new Uint8Array(), status: 200, finalUrl: HREF });
       try {
         await fetchCredentialDocument(HREF, { maxBytes: 512 });
       } finally {
-        delete process.env.VERIFY_FETCH_TIMEOUT_MS;
+        delete process.env.FETCH_TIMEOUT_MS;
       }
       expect(mockResolveDocument).toHaveBeenCalledWith(HREF, { maxResponseBytes: 512, totalTimeoutMs: 3_210 });
     });
@@ -183,7 +185,7 @@ describe('fetchCredentialDocument', () => {
     });
   });
 
-  describe('with VERIFY_ALLOW_PRIVATE_URLS=true', () => {
+  describe('with FETCH_ALLOW_PRIVATE_URLS=true', () => {
     function response(init: {
       ok?: boolean;
       status?: number;
@@ -206,7 +208,7 @@ describe('fetchCredentialDocument', () => {
     }
 
     beforeEach(() => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     });
 
     it('uses a plain fetch with a timeout signal and never the resolver', async () => {
@@ -220,6 +222,20 @@ describe('fetchCredentialDocument', () => {
       expect(document).toMatchObject({ finalUrl: `${HREF}/moved`, contentType: 'text/plain' });
       expect(mockResolveDocument).not.toHaveBeenCalled();
       expect(mockFetch).toHaveBeenCalledWith(HREF, { signal: expect.any(AbortSignal) });
+    });
+
+    // Every RI v0.4 deployment is in this state on the day it upgrades. Fails
+    // if the local wrapper is ever pointed at the new name directly instead of
+    // going through the reader that honours the deprecated one.
+    it('takes the same bypass branch for a deployment still on the deprecated name', async () => {
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      mockFetch.mockResolvedValue(response({ body: new TextEncoder().encode('hello') }));
+
+      await fetchCredentialDocument(HREF);
+
+      expect(mockFetch).toHaveBeenCalledWith(HREF, { signal: expect.any(AbortSignal) });
+      expect(mockResolveDocument).not.toHaveBeenCalled();
     });
 
     it('classifies a timeout', async () => {
@@ -297,15 +313,18 @@ describe('fetchCredentialDocument', () => {
     });
   });
 
-  describe('getMaxCredentialSize', () => {
-    it('defaults to 10 MB and honours a positive override only', () => {
-      expect(getMaxCredentialSize()).toBe(10_485_760);
-      process.env.VERIFY_MAX_CREDENTIAL_SIZE = '2048';
+  // Both aliases have the same `(env?) => number` type, so swapping them
+  // type-checks. These two cases are what fails when a rename points an alias
+  // at the wrong reader.
+  describe('the re-exported setting readers', () => {
+    it('reads FETCH_MAX_RESPONSE_SIZE through the exported getMaxCredentialSize binding', () => {
+      process.env.FETCH_MAX_RESPONSE_SIZE = '2048';
       expect(getMaxCredentialSize()).toBe(2048);
-      process.env.VERIFY_MAX_CREDENTIAL_SIZE = '-1';
-      expect(getMaxCredentialSize()).toBe(10_485_760);
-      process.env.VERIFY_MAX_CREDENTIAL_SIZE = 'lots';
-      expect(getMaxCredentialSize()).toBe(10_485_760);
+    });
+
+    it('reads FETCH_TIMEOUT_MS through the exported getFetchTimeoutMs binding', () => {
+      process.env.FETCH_TIMEOUT_MS = '3210';
+      expect(getFetchTimeoutMs()).toBe(3210);
     });
   });
 

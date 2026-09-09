@@ -4,6 +4,7 @@ import { assertHttpUrl, assertPublicUrl, parseQueryParams, parseRequestBody } fr
 import { createDataModelRequestSchema, listDataModelsQuerySchema } from '@/lib/api/request-schemas/data-model';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createDataModel, listDataModels } from '@/lib/prisma/repositories';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 
 import { NextResponse } from 'next/server';
 
@@ -209,7 +210,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     assertHttpUrl(body.websiteUrl, 'websiteUrl');
   }
 
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+  if (!readFetchAllowPrivateUrls()) {
     logger.info('Validating URLs are not internal');
     await assertPublicUrl(body.schemaUrl, 'schemaUrl');
     await assertPublicUrl(body.contextUrl, 'contextUrl');

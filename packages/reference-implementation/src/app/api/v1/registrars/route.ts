@@ -7,6 +7,7 @@ import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { createRegistrar, getInstanceByResolution, listRegistrars } from '@/lib/prisma/repositories';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 
 const logger = apiLogger.child({ route: '/api/v1/registrars' });
 
@@ -83,12 +84,12 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // The schema's `.url()` above is WHATWG `new URL` parsing (format only, not
   // RFC 3986 validation), so it does not require http(s), reject userinfo, or
   // check the address is public. assertHttpUrl further requires an absolute
-  // http(s) scheme and rejects embedded userinfo; assertPublicUrl (unless
-  // VERIFY_ALLOW_PRIVATE_URLS relaxes it for local development) rejects a
-  // private or unresolvable address. The data-models route layers the same two
+  // http(s) scheme and rejects embedded userinfo; assertPublicUrl rejects a
+  // private or unresolvable address unless FETCH_ALLOW_PRIVATE_URLS relaxes it
+  // for local development. The data-models route layers the same two
   // checks on its own stored URL fields (ADR-037).
   assertHttpUrl(body.url, 'url');
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+  if (!readFetchAllowPrivateUrls()) {
     logger.info('Validating registrar URL is not internal');
     await assertPublicUrl(body.url, 'url');
   }

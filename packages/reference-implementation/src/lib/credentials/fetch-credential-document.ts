@@ -1,3 +1,17 @@
+/**
+ * The one fetch for a caller-supplied credential URL (#955). It runs the
+ * guarded resolver by default and a plain fetch when the development bypass is
+ * on. It returns bytes and reports failures as typed facts. Each route maps
+ * those facts to its own responses, so a route that reads a DNS failure or a
+ * 404 differently from the verify route does not need a second fetch.
+ *
+ * Its three settings live in `credential-fetch.config.ts` and are shared with
+ * external registration and the supplier-source check used by re-verification:
+ * `FETCH_ALLOW_PRIVATE_URLS`, which also relaxes the existing stored-address
+ * URL checks, `FETCH_MAX_RESPONSE_SIZE` and `FETCH_TIMEOUT_MS`. Each is read
+ * per invocation, so a change made after boot takes effect on the next fetch.
+ * That module owns the deprecated-name window and the conflict rule.
+ */
 import {
   resolveDocument,
   ResolverError,
@@ -15,58 +29,17 @@ import {
   UnsupportedSchemeError,
   UrlValidationError,
 } from '@uncefact/untp-utils/node';
+import {
+  readFetchAllowPrivateUrls,
+  readFetchMaxResponseSize as getMaxCredentialSize,
+  readFetchTimeoutMs as getFetchTimeoutMs,
+} from '@/lib/config/credential-fetch.config';
 
-/**
- * The one fetch for a caller-supplied credential URL (#955). It runs the
- * guarded resolver by default and a plain fetch when
- * `VERIFY_ALLOW_PRIVATE_URLS=true` relaxes it for local development. It
- * returns bytes and reports failures as typed facts. Each route maps those
- * facts to its own responses, so a route that reads a DNS failure or a 404
- * differently from the verify route does not need a second fetch.
- */
+export { getMaxCredentialSize, getFetchTimeoutMs };
 
-const DEFAULT_MAX_CREDENTIAL_SIZE = 10_485_760; // 10 MB
-const DEFAULT_TIMEOUT_MS = 10_000;
-/** A public route holds a request open for the whole budget, so it has a ceiling. */
-const MAX_TIMEOUT_MS = 120_000;
-
-/** The response-size cap in bytes, from `VERIFY_MAX_CREDENTIAL_SIZE` when set and positive. */
-export function getMaxCredentialSize(): number {
-  const envVal = process.env.VERIFY_MAX_CREDENTIAL_SIZE;
-  if (!envVal) return DEFAULT_MAX_CREDENTIAL_SIZE;
-  const parsed = parseInt(envVal, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_CREDENTIAL_SIZE;
-}
-
-/**
- * The whole-fetch time budget in milliseconds, from `VERIFY_FETCH_TIMEOUT_MS`
- * when set. It bounds one credential fetch end to end (connect, redirects,
- * body) on every route and job that retrieves a caller-supplied credential
- * URL. Unset or blank uses 10 seconds. A provided value that is not a
- * positive integer within the ceiling throws, surfaced at process boot
- * (instrumentation.node.ts), so a misconfigured budget fails the container
- * start instead of silently running with the default.
- */
-export function getFetchTimeoutMs(env: Record<string, string | undefined> = process.env): number {
-  const raw = env.VERIFY_FETCH_TIMEOUT_MS;
-  if (raw === undefined || raw.trim() === '') return DEFAULT_TIMEOUT_MS;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_TIMEOUT_MS) {
-    throw new Error(
-      `VERIFY_FETCH_TIMEOUT_MS must be a positive integer number of milliseconds no greater than ${MAX_TIMEOUT_MS} when set; fix or unset it (unset uses ${DEFAULT_TIMEOUT_MS}).`,
-    );
-  }
-  return parsed;
-}
-
-/** Boot-time check: parses VERIFY_FETCH_TIMEOUT_MS for its side effect only. */
-export function validateFetchTimeoutOnBoot(env: Record<string, string | undefined> = process.env): void {
-  getFetchTimeoutMs(env);
-}
-
-/** Whether the development bypass is on. When it is, every href is fetched with a plain fetch and the SSRF guard never runs. */
+/** Whether the development bypass is on for the current invocation. */
 function allowsPrivateUrls(): boolean {
-  return process.env.VERIFY_ALLOW_PRIVATE_URLS === 'true';
+  return readFetchAllowPrivateUrls();
 }
 
 export type FetchedDocument = {

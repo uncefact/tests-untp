@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../../../__tests__/env-doubles/fetch-settings-env';
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number }) => ({
@@ -420,15 +421,15 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
   });
 
   describe('private-address guard', () => {
-    const originalValue = process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    const originalValue = process.env.FETCH_ALLOW_PRIVATE_URLS;
 
     afterEach(() => {
-      if (originalValue === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-      else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalValue;
+      if (originalValue === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+      else process.env.FETCH_ALLOW_PRIVATE_URLS = originalValue;
     });
 
     it('rejects a private href with a 400 when the guard is active', async () => {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
       const req = createFakeRequest({ href: 'http://127.0.0.1/cred.json' });
 
       const res = await PATCH(req, createContext());
@@ -439,8 +440,8 @@ describe('PATCH /api/v1/identifiers/[id]/links/[linkId]', () => {
       expect(MOCK_IDR_SERVICE.updateLink).not.toHaveBeenCalled();
     });
 
-    it('updates to a private href when VERIFY_ALLOW_PRIVATE_URLS relaxes the guard', async () => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    it('updates to a private href when FETCH_ALLOW_PRIVATE_URLS relaxes the guard', async () => {
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
       const req = createFakeRequest({ href: 'http://127.0.0.1/cred.json' });
 
       const res = await PATCH(req, createContext());
@@ -523,3 +524,4 @@ describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(res.status).toBe(404);
   });
 });
+isolateFetchAllowPrivateUrlsEnv();

@@ -80,7 +80,7 @@ function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, max
  *       validates the hostname against private/reserved ranges on every
  *       redirect hop and pins the connection to the validated address, so
  *       neither a redirect nor a DNS change between check and connect can
- *       reach a private network. Set `VERIFY_ALLOW_PRIVATE_URLS=true` to
+ *       reach a private network. Set `FETCH_ALLOW_PRIVATE_URLS=true` to
  *       bypass (development only).
  *     tags:
  *       - Credentials
@@ -146,7 +146,7 @@ function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, max
  *                     message:
  *                       type: string
  *       400:
- *         description: Validation error. A malformed field is named (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format). A uri whose host is private or reserved, or whose host does not resolve, is refused with the guard's own message; with VERIFY_ALLOW_PRIVATE_URLS=true those hosts are fetched instead.
+ *         description: Validation error. A malformed field is named (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format). A uri whose host is private or reserved, or whose host does not resolve, is refused with the guard's own message; with FETCH_ALLOW_PRIVATE_URLS=true those hosts are fetched instead.
  *         content:
  *           application/json:
  *             schema:
@@ -200,7 +200,7 @@ function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, max
  *                   type: string
  *                   enum: [UPSTREAM_ERROR, VC_SERVICE_ERROR]
  *       500:
- *         description: Server error (e.g. system VC service not configured)
+ *         description: Server error (e.g. system VC service not configured, or a fetch-setting conflict introduced after startup)
  *         content:
  *           application/json:
  *             schema:
@@ -232,7 +232,7 @@ export const POST = withPublicRoute(async (req) => {
   // hostname against private/reserved ranges on every redirect hop and pins
   // the connection to the validated address, closing the redirect-following
   // and DNS-rebinding gaps a validate-then-fetch sequence leaves open.
-  // VERIFY_ALLOW_PRIVATE_URLS=true (development only) falls back to a plain
+  // FETCH_ALLOW_PRIVATE_URLS=true (development only) falls back to a plain
   // fetch so private storage hosts in local compose setups keep working.
   logger.info({ uri: credentialUri }, 'Fetching credential from storage');
 

@@ -401,10 +401,16 @@ The storage URI is fetched through a guarded resolver that validates the hostnam
 
 Decryption happens on the server, so a `decryptionKey` travels in the request body. Production deployments must serve this endpoint over HTTPS so the key is protected in transit.
 
-### Environment Variables
+This endpoint reads the shared credential-fetch settings below on every request, and those readers are not cached. If both names of one pair become set after the process started, the next request is answered `500` with an `error` naming the two conflicting variables. That applies here even though the endpoint is unauthenticated, so an anonymous caller can see the two variable names, though never their values. The remedy is to set the pair to a single name and restart the process, recreating the container where one is in use.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VERIFY_ALLOW_PRIVATE_URLS` | `false` | Set to `true` to bypass SSRF checks (development only) |
-| `VERIFY_MAX_CREDENTIAL_SIZE` | `10485760` (10 MB) | Maximum credential response size in bytes |
-| `VERIFY_FETCH_TIMEOUT_MS` | `10000` | Time budget for fetching the credential, in milliseconds, covering connect, redirects and body (maximum 120000). Also applies when registering or re-verifying an external library credential. Startup fails on a value that is not a positive integer within that ceiling. |
+### Shared credential-fetch settings
+
+The following settings are shared by verification, external registration and the supplier-source check used by re-verification. The private-address setting also controls the existing stored-address URL checks on registrar, identifier-link, data-model, service and credential publishing routes.
+
+| Variable                   | Default            | Description                                                                                                                                                                                                                                                                                    |
+| -------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FETCH_ALLOW_PRIVATE_URLS` | `false`            | Allows private addresses for caller-supplied credential retrieval and relaxes the stored-address checks for registrars, identifier links, data models, service URLs and credential publishing URLs. Use only for local development. Only exact lowercase `true` enables it, and it does not remove `http(s)` scheme or userinfo validation. |
+| `FETCH_MAX_RESPONSE_SIZE`  | `10485760` (10 MB) | Maximum response size in bytes. A value the parser cannot read as a positive number falls back to the default rather than failing startup.                                                                                                                                                      |
+| `FETCH_TIMEOUT_MS`         | `10000`            | Time budget for fetching the credential, in milliseconds, covering connect, redirects and body (maximum 120000). Startup fails when the value is not a positive integer within that ceiling.                                                                                                    |
+
+Old names remain supported during RI v0.5 and produce a startup warning when used alone. Setting both names for one setting, including equal values, fails startup. See the [startup configuration table](../operations/startup#credential-fetch-settings) and the [v0.5 migration guide](../../migration-guides/ri-v0.5#credential-fetch-settings-have-new-names) for the complete mapping and conflict rules.

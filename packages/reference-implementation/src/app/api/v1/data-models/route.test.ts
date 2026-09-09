@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../__tests__/env-doubles/fetch-settings-env';
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -877,8 +878,8 @@ describe('POST /api/v1/data-models', () => {
     expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
-  it('skips the private-address checks when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('skips the private-address checks when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     try {
       mockCreateDataModel.mockResolvedValue({ id: 'cfg-new' });
 
@@ -890,7 +891,7 @@ describe('POST /api/v1/data-models', () => {
       expect(res.status).toBe(201);
       expect(mockValidatePublicUrl).not.toHaveBeenCalled();
     } finally {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     }
   });
 
@@ -957,3 +958,4 @@ describe('POST /api/v1/data-models', () => {
     expect(mockCreateDataModel).toHaveBeenCalled();
   });
 });
+isolateFetchAllowPrivateUrlsEnv();

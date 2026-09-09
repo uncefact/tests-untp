@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../__tests__/env-doubles/fetch-settings-env';
 // Mock next/server before importing route handlers (jsdom lacks Request/Response)
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -321,7 +322,8 @@ function setupHappyPath() {
 describe('POST /api/v1/credentials', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     process.env.RI_APP_URL = 'http://localhost:3003';
     setupHappyPath();
   });
@@ -440,7 +442,7 @@ describe('POST /api/v1/credentials', () => {
 
   describe('SSRF validation', () => {
     it('calls assertPublicUrl for machineVerificationUrl when SSRF protection enabled', async () => {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
       mockAssertPublicUrl.mockResolvedValue(undefined);
 
       const req = createFakeRequest(
@@ -459,7 +461,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('calls assertPublicUrl for humanVerificationUrl when SSRF protection enabled', async () => {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
       mockAssertPublicUrl.mockResolvedValue(undefined);
 
       const req = createFakeRequest(
@@ -478,7 +480,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('returns 400 when machineVerificationUrl is a private address', async () => {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
       const { ValidationError: VE } = jest.requireActual('@/lib/api/validation');
       mockAssertPublicUrl.mockRejectedValue(
         new VE('publishingOptions.machineVerificationUrl must not point to a private or reserved network address'),
@@ -498,8 +500,8 @@ describe('POST /api/v1/credentials', () => {
       expect(json.error).toContain('private or reserved');
     });
 
-    it('skips the private-address SSRF check when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    it('skips the private-address SSRF check when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
 
       const req = createFakeRequest(
         validBody({
@@ -514,8 +516,8 @@ describe('POST /api/v1/credentials', () => {
       expect(mockAssertPublicUrl).not.toHaveBeenCalled();
     });
 
-    it('rejects a non-http(s) humanVerificationUrl even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    it('rejects a non-http(s) humanVerificationUrl even when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
 
       const req = createFakeRequest(
         validBody({ publishingOptions: { publish: true, humanVerificationUrl: 'ftp://verify.example.com/ui' } }),
@@ -531,8 +533,8 @@ describe('POST /api/v1/credentials', () => {
       expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
-    it('rejects a malformed humanVerificationUrl even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    it('rejects a malformed humanVerificationUrl even when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
 
       const req = createFakeRequest(
         validBody({ publishingOptions: { publish: true, humanVerificationUrl: 'not a url' } }),
@@ -543,8 +545,8 @@ describe('POST /api/v1/credentials', () => {
       expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
-    it('rejects a non-http(s) machineVerificationUrl even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    it('rejects a non-http(s) machineVerificationUrl even when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
 
       const req = createFakeRequest(
         validBody({ publishingOptions: { publish: true, machineVerificationUrl: 'ftp://verify.example.com/api' } }),
@@ -558,8 +560,8 @@ describe('POST /api/v1/credentials', () => {
       expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
-    it('rejects a malformed machineVerificationUrl even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    it('rejects a malformed machineVerificationUrl even when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
 
       const req = createFakeRequest(
         validBody({ publishingOptions: { publish: true, machineVerificationUrl: 'not a url' } }),
@@ -571,7 +573,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('rejects a verification URL carrying userinfo, rather than publishing the credential in the link', async () => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
 
       const human = createFakeRequest(
         validBody({
@@ -1431,7 +1433,7 @@ describe('POST /api/v1/credentials', () => {
     });
 
     it('SSRF-checks the canonical machine URL, not the raw string, when protection is enabled', async () => {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
       setupPublishingHappyPath();
       mockAssertPublicUrl.mockResolvedValue(undefined);
 
@@ -1527,7 +1529,7 @@ describe('POST /api/v1/credentials', () => {
 
       it('does not SSRF-check the derived localhost default', async () => {
         setupPublishingHappyPath();
-        delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+        delete process.env.FETCH_ALLOW_PRIVATE_URLS;
         process.env.RI_APP_URL = 'http://localhost:3003';
         mockAssertPublicUrl.mockResolvedValue(undefined);
 
@@ -2666,3 +2668,4 @@ describe('GET /api/v1/credentials', () => {
     expect(json.error).toContain('Database connection lost');
   });
 });
+isolateFetchAllowPrivateUrlsEnv();

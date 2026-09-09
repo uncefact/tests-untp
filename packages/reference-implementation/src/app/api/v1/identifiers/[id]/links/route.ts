@@ -8,6 +8,7 @@ import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { apiLogger } from '@/lib/api/logger';
 import type { Link } from '@uncefact/untp-ri-services';
 import { listLinksQuerySchema, publishLinksRequestSchema } from '@/lib/api/request-schemas/link';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links' });
 
@@ -173,13 +174,13 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   // which canonicalises for the same reason; registrars/route.ts deliberately
   // stores its URL verbatim instead, because nothing dereferences that value
   // server-side (see the comment there). The private-address check is gated on
-  // VERIFY_ALLOW_PRIVATE_URLS as it is on every sibling route, so local
+  // FETCH_ALLOW_PRIVATE_URLS as it is on every sibling route, so local
   // development can publish links to a private IDR target.
   const links = body.links.map((link, index) => ({
     ...link,
     href: assertHttpUrl(link.href, `links.${index}.href`).href,
   }));
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+  if (!readFetchAllowPrivateUrls()) {
     for (const [index, link] of links.entries()) {
       await assertPublicUrl(link.href, `links.${index}.href`);
     }

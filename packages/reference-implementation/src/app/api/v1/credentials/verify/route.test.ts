@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
 // Polyfill AbortSignal.timeout for jsdom (not available in jsdom)
 if (typeof AbortSignal.timeout !== 'function') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,23 +19,19 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withPublicRoute to mirror handleRouteError behaviour
+// The wrapper is replaced only to drop its request-context and logging setup,
+// which needs a real Request. Its error path calls the real handleRouteError,
+// so the status and body every case below asserts are the mapper's own, not a
+// mirror of it that could drift.
 jest.mock('@/lib/api/with-public-route', () => {
-  const { errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
 
   return {
     withPublicRoute: (handler: (req: unknown) => Promise<unknown>) => async (req: unknown) => {
       try {
         return await handler(req);
       } catch (e: unknown) {
-        if (e instanceof ValidationError) return jsonResponse({ error: (e as Error).message }, { status: 400 });
-        if (e instanceof ServiceRegistryError) return jsonResponse({ error: (e as Error).message }, { status: 500 });
-        return jsonResponse({ error: errorMessage(e) }, { status: 500 });
+        return handleRouteError(e);
       }
     },
   };
@@ -60,6 +57,8 @@ jest.mock('@uncefact/untp-ri-services', () => {
     isEncryptedEnvelope: (...args: unknown[]) => mockIsEncryptedEnvelope(...args),
     hasValidEnvelopeStructure: (...args: unknown[]) => mockHasValidEnvelopeStructure(...args),
     VcVerifyError: actual.VcVerifyError,
+    // The real error mapper branches on this class, so it must be the real one.
+    ServiceError: actual.ServiceError,
   };
 });
 
@@ -176,7 +175,7 @@ describe('POST /api/v1/credentials/verify', () => {
     mockMultibaseDigestVerify.mockResolvedValue(true);
     mockIsEncryptedEnvelope.mockReturnValue(false);
     mockHasValidEnvelopeStructure.mockReturnValue(true);
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.FETCH_ALLOW_PRIVATE_URLS;
   });
 
   // ── Input Validation (400s) ───────────────────────────────────────
@@ -260,8 +259,31 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('INVALID_RESPONSE');
   });
 
+  // The public counterpart of the authenticated proof in registrars/route.test.ts.
+  // withPublicRoute is a different wrapper, so that one does not transfer. Fails
+  // if the readers are ever cached at module load, which would let a pair
+  // introduced after boot go unnoticed, or if the mapper starts redacting the
+  // conflict text an operator needs.
+  it('returns the size-setting conflict as a 500 to an unauthenticated caller', async () => {
+    process.env.VERIFY_MAX_CREDENTIAL_SIZE = '2048';
+    process.env.FETCH_MAX_RESPONSE_SIZE = '2048';
+    try {
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({
+        error:
+          'VERIFY_MAX_CREDENTIAL_SIZE and FETCH_MAX_RESPONSE_SIZE are both set. VERIFY_MAX_CREDENTIAL_SIZE was renamed to FETCH_MAX_RESPONSE_SIZE in v0.5. Set FETCH_MAX_RESPONSE_SIZE to the value you intend, remove VERIFY_MAX_CREDENTIAL_SIZE, and restart.',
+      });
+      expect(mockResolveDocument).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.VERIFY_MAX_CREDENTIAL_SIZE;
+      delete process.env.FETCH_MAX_RESPONSE_SIZE;
+    }
+  });
+
   it('fetches the canonical href on the development-bypass branch too', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
     mockVcService.verify.mockResolvedValue({ verified: true });
 
@@ -336,7 +358,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('returns 502 as a network error when the bypass fetch cannot resolve the host (the guard never ran)', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockFetch.mockRejectedValue(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } }));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -376,8 +398,8 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('uses plain fetch and skips the guarded resolver when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('uses plain fetch and skips the guarded resolver when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
     mockVcService.verify.mockResolvedValue({ verified: true });
 
@@ -436,9 +458,9 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(500);
   });
 
-  describe('development bypass (VERIFY_ALLOW_PRIVATE_URLS=true) plain-fetch path', () => {
+  describe('development bypass (FETCH_ALLOW_PRIVATE_URLS=true) plain-fetch path', () => {
     beforeEach(() => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     });
 
     it('returns 502 when fetch times out', async () => {
@@ -770,3 +792,4 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.error).toBe('VCKit connection refused');
   });
 });
+isolateFetchAllowPrivateUrlsEnv();

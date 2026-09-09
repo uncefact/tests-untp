@@ -11,6 +11,7 @@ import {
   countServiceInstanceReferences,
 } from '@/lib/prisma/repositories';
 import { getEncryptionService } from '@/lib/encryption/encryption';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 import { EncryptionAlgorithm, adapterRegistry, maskInstanceConfig } from '@uncefact/untp-ri-services';
 import type { AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 
@@ -206,7 +207,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     }
 
     // SSRF protection on merged config URLs
-    if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    if (!readFetchAllowPrivateUrls()) {
       if (typeof mergedConfig.baseUrl === 'string') {
         logger.info({ serviceInstanceId: id }, 'Validating config baseUrl is not internal');
         await assertPublicUrl(mergedConfig.baseUrl, 'config.baseUrl');

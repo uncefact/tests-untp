@@ -10,6 +10,7 @@
  * packages/services/src/encryption/decrypt-credential.no-key-logging.test.ts;
  * the two suites together cover both destinations a key could leak through.
  */
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
 
 // Polyfill AbortSignal.timeout for jsdom (not available in jsdom)
 if (typeof AbortSignal.timeout !== 'function') {
@@ -111,7 +112,7 @@ describe('verify route never logs the decryption key', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedLogLines.length = 0;
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     mockResolveVcService.mockResolvedValue({
       service: { verify: jest.fn().mockResolvedValue({ verified: true }) },
       instanceId: 'inst-1',
@@ -155,3 +156,4 @@ describe('verify route never logs the decryption key', () => {
     expect(capturedLogLines.join('')).toContain(SENTINEL_KEY);
   });
 });
+isolateFetchAllowPrivateUrlsEnv();

@@ -5,6 +5,7 @@ import { updateDataModelRequestSchema } from '@/lib/api/request-schemas/data-mod
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDataModelById, updateDataModel, deleteDataModel } from '@/lib/prisma/repositories';
 import { apiLogger } from '@/lib/api/logger';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 
 const logger = apiLogger.child({ route: '/api/v1/data-models/[id]' });
 
@@ -149,7 +150,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   if (body.contextUrl !== undefined) assertHttpUrl(body.contextUrl, 'contextUrl');
   if (body.websiteUrl !== undefined) assertHttpUrl(body.websiteUrl, 'websiteUrl');
 
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+  if (!readFetchAllowPrivateUrls()) {
     logger.info({ dataModelId: id }, 'Validating URLs are not internal');
     if (body.schemaUrl !== undefined) await assertPublicUrl(body.schemaUrl, 'schemaUrl');
     if (body.contextUrl !== undefined) await assertPublicUrl(body.contextUrl, 'contextUrl');

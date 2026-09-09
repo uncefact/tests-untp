@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../__tests__/env-doubles/fetch-settings-env';
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -161,7 +162,7 @@ describe('POST /api/v1/services', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Allow private URLs by default so happy-path tests don't trigger real DNS resolution
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockCreateServiceInstance.mockResolvedValue(MOCK_RECORD);
     mockMaskInstanceConfig.mockReturnValue(MOCK_MASKED);
     mockGetEncryptionService.mockReturnValue({
@@ -394,7 +395,7 @@ describe('POST /api/v1/services', () => {
   });
 
   it('returns 400 when config.baseUrl points to a private address', async () => {
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.FETCH_ALLOW_PRIVATE_URLS;
 
     const req = createFakeRequest({
       body: { ...VALID_BODY, config: { ...VALID_BODY.config, baseUrl: 'http://127.0.0.1:3332' } },
@@ -406,8 +407,8 @@ describe('POST /api/v1/services', () => {
     expect(json.error).toMatch(/config\.baseUrl.*private or reserved/);
   });
 
-  it('skips SSRF validation when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('skips SSRF validation when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
 
     const req = createFakeRequest({
       body: { ...VALID_BODY, config: { ...VALID_BODY.config, baseUrl: 'http://127.0.0.1:3332' } },
@@ -655,3 +656,4 @@ describe('GET /api/v1/services', () => {
     expect(json.error).toContain('Database error');
   });
 });
+isolateFetchAllowPrivateUrlsEnv();
