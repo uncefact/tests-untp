@@ -18,6 +18,8 @@ const HEX_A = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 const MULTIBASE_A = `zTEST${HEX_A}`;
 const HEX_B = '9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca7';
 const MULTIBASE_B = `zTEST${HEX_B}`;
+const VALID_DECRYPTION_KEY_A = 'a'.repeat(64);
+const VALID_DECRYPTION_KEY_B = 'b'.repeat(64);
 
 // httpFetch normalises headers into a Headers instance; match by reading through it.
 const headersMatching = (pairs: Record<string, string>) => ({
@@ -198,7 +200,7 @@ describe('UncefactStorageAdapter', () => {
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/credentials/xyz-789',
           hash: HEX_B,
-          decryptionKey: 'decryption-key-abc',
+          decryptionKey: VALID_DECRYPTION_KEY_A,
         }),
       });
 
@@ -256,7 +258,7 @@ describe('UncefactStorageAdapter', () => {
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/credentials/xyz-789',
           hash: HEX_B,
-          decryptionKey: 'decryption-key-abc',
+          decryptionKey: VALID_DECRYPTION_KEY_A,
         }),
       });
 
@@ -266,12 +268,34 @@ describe('UncefactStorageAdapter', () => {
       expect(result).toEqual({
         uri: 'https://storage.example.com/credentials/xyz-789',
         digestMultibase: MULTIBASE_B,
-        decryptionKey: 'decryption-key-abc',
+        decryptionKey: VALID_DECRYPTION_KEY_A,
         encryptionAlgorithm: 'aes-256-gcm',
         externalId: MOCK_UUID,
         bucket: 'private-data',
         mimeType: 'application/json',
       });
+    });
+
+    it('should accept any non-empty URI and decryption key when encrypted', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'wat',
+          hash: HEX_A,
+          decryptionKey: 'short',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      const result = await adapter.store(mockCredential, true);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          uri: 'wat',
+          decryptionKey: 'short',
+        }),
+      );
     });
 
     it('should omit encryptionAlgorithm when storing unencrypted', async () => {
@@ -326,7 +350,7 @@ describe('UncefactStorageAdapter', () => {
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/credentials/xyz-789',
             hash: HEX_B,
-            decryptionKey: 'decryption-key-abc',
+            decryptionKey: VALID_DECRYPTION_KEY_A,
           }),
         });
 
@@ -345,7 +369,7 @@ describe('UncefactStorageAdapter', () => {
           json: jest.fn().mockResolvedValue({
             uri: 'https://storage.example.com/credentials/xyz-789',
             hash: HEX_B,
-            decryptionKey: 'decryption-key-abc',
+            decryptionKey: VALID_DECRYPTION_KEY_A,
           }),
         });
 
@@ -394,12 +418,17 @@ describe('UncefactStorageAdapter', () => {
         // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.objectContaining({
-            uri: 'https://storage.example.com/documents/abc-123',
             encrypt: false,
+            bucket: 'public-data',
             externalId: MOCK_UUID,
           }),
           'Credential stored successfully',
         );
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        const infoMock = mockLogger.info as unknown as jest.Mock;
+        const successCall = infoMock.mock.calls.find(([, message]) => message === 'Credential stored successfully');
+        expect(successCall).toBeDefined();
+        expect(successCall?.[0]).not.toHaveProperty('uri');
       });
 
       it('should call logger.error on failed storage', async () => {
@@ -419,6 +448,9 @@ describe('UncefactStorageAdapter', () => {
           expect.objectContaining({
             httpStatus: 500,
             detail: 'Internal Server Error',
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
           }),
           'Storage API request failed',
         );
@@ -437,6 +469,110 @@ describe('UncefactStorageAdapter', () => {
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
+      });
+
+      it.each([
+        [
+          'invalid digestMultibase',
+          {
+            uri: 'https://storage.example.com/documents/abc-123',
+            digestMultibase: 'invalid-digest-response-plaintext-sentinel',
+          },
+          'invalid-digest',
+          'digestMultibase',
+          'invalid-digest-response-plaintext-sentinel',
+          201,
+        ],
+        [
+          'invalid legacy hash',
+          { uri: 'https://storage.example.com/documents/abc-123', hash: 'invalid-hash-response-plaintext-sentinel' },
+          'invalid-hash',
+          'hash',
+          'invalid-hash-response-plaintext-sentinel',
+          502,
+        ],
+        [
+          'invalid uri',
+          {
+            uri: '',
+            digestMultibase: MULTIBASE_A,
+          },
+          'invalid-uri',
+          'uri',
+          '',
+          201,
+        ],
+      ])(
+        'logs the rejected response value for %s',
+        async (_name, responseBody, classification, field, value, status) => {
+          mockFetch.mockResolvedValueOnce({
+            ok: true,
+            status: 201,
+            json: jest.fn().mockResolvedValue(responseBody),
+          });
+
+          const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+          let error: unknown;
+          try {
+            await adapter.store(mockCredential);
+          } catch (caught) {
+            error = caught;
+          }
+
+          expect(error).toBeInstanceOf(StorageStoreError);
+          expect((error as Error).message).toBe(
+            `Failed to store credential: HTTP ${status}: Storage API returned invalid response (${classification}) (object ${MOCK_UUID} in bucket public-data may have been created)`,
+          );
+          expect((error as StorageStoreError).statusCode).toBe(status);
+          // eslint-disable-next-line @typescript-eslint/unbound-method
+          expect(mockLogger.error).toHaveBeenCalledWith(
+            expect.objectContaining({
+              httpStatus: 201,
+              classification,
+              [field]: value,
+              operation: 'store',
+              bucket: 'public-data',
+              externalId: MOCK_UUID,
+            }),
+            'Storage API response failed validation',
+          );
+        },
+      );
+
+      it("reports the storage service's own message and nothing else from its body", async () => {
+        const upstream = 'bucket quota exceeded for private-data';
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 422,
+          statusText: 'Unprocessable Entity',
+          json: jest.fn().mockResolvedValue({ message: upstream, code: 'UPSTREAM_VALIDATION' }),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+        let error: unknown;
+        try {
+          await adapter.store(mockCredential);
+        } catch (caught) {
+          error = caught;
+        }
+
+        expect(error).toBeInstanceOf(StoragePayloadError);
+        expect((error as Error).message).toContain(upstream);
+        // The whole logged object, not `objectContaining`: `message` is the
+        // one field of the body that is carried, and equality is what proves
+        // no other field of it (here `code`) rides along. `objectContaining`
+        // passes however many extra fields are present.
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          {
+            httpStatus: 422,
+            detail: upstream,
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
+          },
+          'Storage API rejected payload',
+        );
       });
 
       it('should include HTTP status in the error', async () => {
@@ -458,24 +594,35 @@ describe('UncefactStorageAdapter', () => {
       });
 
       it('should use response body message as detail when available', async () => {
-        mockFetch.mockResolvedValueOnce({
+        const upstream = 'data field is required';
+        mockFetch.mockResolvedValue({
           ok: false,
           status: 400,
           statusText: 'Bad Request',
-          json: jest.fn().mockResolvedValue({ message: 'data field is required' }),
+          json: jest.fn().mockResolvedValue({ message: upstream, code: 'UPSTREAM_BAD_REQUEST' }),
         });
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
-        await expect(adapter.store(mockCredential)).rejects.toThrow(
-          expect.objectContaining({
-            message: expect.stringContaining('data field is required'),
-          }),
+        await expect(adapter.store(mockCredential)).rejects.toBeInstanceOf(StoragePayloadError);
+        await expect(adapter.store(mockCredential)).rejects.toThrow(upstream);
+        // Whole-object equality again: the body's `message` is carried and
+        // its `code` is not, and only equality can show the second half.
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          {
+            httpStatus: 400,
+            detail: upstream,
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
+          },
+          'Storage API rejected payload',
         );
       });
 
       it('should fall back to statusText when response body has no message', async () => {
-        mockFetch.mockResolvedValueOnce({
+        mockFetch.mockResolvedValue({
           ok: false,
           status: 400,
           statusText: 'Bad Request',
@@ -484,15 +631,15 @@ describe('UncefactStorageAdapter', () => {
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
-        await expect(adapter.store(mockCredential)).rejects.toThrow(
-          expect.objectContaining({
-            message: expect.stringContaining('Bad Request'),
-          }),
-        );
+        // The class is pinned as well as the message: a 4xx that started
+        // throwing `StorageStoreError` (which drives retryability the other
+        // way round) would otherwise pass on the message alone.
+        await expect(adapter.store(mockCredential)).rejects.toBeInstanceOf(StoragePayloadError);
+        await expect(adapter.store(mockCredential)).rejects.toThrow('Bad Request');
       });
 
       it('should fall back to statusText when response body is not JSON', async () => {
-        mockFetch.mockResolvedValueOnce({
+        mockFetch.mockResolvedValue({
           ok: false,
           status: 400,
           statusText: 'Bad Request',
@@ -501,11 +648,8 @@ describe('UncefactStorageAdapter', () => {
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
-        await expect(adapter.store(mockCredential)).rejects.toThrow(
-          expect.objectContaining({
-            message: expect.stringContaining('Bad Request'),
-          }),
-        );
+        await expect(adapter.store(mockCredential)).rejects.toBeInstanceOf(StoragePayloadError);
+        await expect(adapter.store(mockCredential)).rejects.toThrow('Bad Request');
       });
 
       it('should use "Unknown error" when statusText is empty and body parsing fails', async () => {
@@ -518,17 +662,15 @@ describe('UncefactStorageAdapter', () => {
 
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
-        await expect(adapter.store(mockCredential)).rejects.toThrow(
-          expect.objectContaining({
-            message: expect.stringContaining('Unknown error'),
-          }),
-        );
+        await expect(adapter.store(mockCredential)).rejects.toThrow('Unknown error');
       });
 
       it('should throw StorageStoreError when response is not valid JSON', async () => {
+        const responseText = '<html>proxy error: storage unavailable</html>';
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
+          text: jest.fn().mockResolvedValue(responseText),
           json: jest.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
         });
 
@@ -539,14 +681,26 @@ describe('UncefactStorageAdapter', () => {
             message: expect.stringContaining('invalid JSON'),
           }),
         );
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            httpStatus: 200,
+            classification: 'invalid-json',
+            untrustedResponseBody: responseText,
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
+          }),
+          'Storage API response failed validation',
+        );
       });
 
       it.each([
-        ['null', null],
-        ['array', []],
-        ['string', 'not-an-object'],
-        ['number', 42],
-      ])('should throw StorageStoreError when response body is %s', async (_label, value) => {
+        ['null', null, 'null'],
+        ['array', [], '[]'],
+        ['string', 'not-an-object', 'not-an-object'],
+        ['number', 42, '42'],
+      ])('should throw StorageStoreError when response body is %s', async (_label, value, loggedValue) => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -560,6 +714,18 @@ describe('UncefactStorageAdapter', () => {
             message: expect.stringContaining('body is not an object'),
           }),
         );
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            httpStatus: 200,
+            classification: 'invalid-body',
+            responseBody: loggedValue,
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
+          }),
+          'Storage API response failed validation',
+        );
       });
 
       it('should throw StorageStoreError when response is missing "uri"', async () => {
@@ -572,6 +738,18 @@ describe('UncefactStorageAdapter', () => {
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            httpStatus: 200,
+            classification: 'invalid-uri',
+            uri: 'undefined',
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
+          }),
+          'Storage API response failed validation',
+        );
       });
 
       it('should throw StorageStoreError when response is missing both "digestMultibase" and "hash"', async () => {
@@ -584,6 +762,50 @@ describe('UncefactStorageAdapter', () => {
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            httpStatus: 200,
+            classification: 'missing-digest',
+            responseFields: '["uri"]',
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
+          }),
+          'Storage API response failed validation',
+        );
+      });
+
+      it('should classify and log an unexpected validation error', async () => {
+        const responseBody = {
+          uri: 'https://storage.example.com/documents/abc-123',
+          get hash(): string {
+            throw new Error('response hash could not be read');
+          },
+        };
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue(responseBody),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+
+        await expect(adapter.store(mockCredential)).rejects.toThrow(
+          'Storage API returned invalid response (invalid-response) (object a1b2c3d4-e5f6-7890-abcd-ef1234567890 in bucket public-data may have been created)',
+        );
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            httpStatus: 200,
+            classification: 'invalid-response',
+            validationError: 'response hash could not be read',
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
+          }),
+          'Storage API response failed validation',
+        );
       });
 
       it('should prefer "digestMultibase" over legacy "hash" when both are present', async () => {
@@ -653,8 +875,16 @@ describe('UncefactStorageAdapter', () => {
         await expect(adapter.store(mockCredential, true)).rejects.toThrow(StorageStoreError);
         // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(mockLogger.error).toHaveBeenCalledWith(
-          expect.objectContaining({ decryptionKey: undefined }),
-          expect.stringContaining('decryptionKey'),
+          expect.objectContaining({
+            httpStatus: 200,
+            classification: 'invalid-decryption-key',
+            decryptionKeyType: 'undefined',
+            decryptionKeyLength: 'null',
+            operation: 'store',
+            bucket: 'private-data',
+            externalId: MOCK_UUID,
+          }),
+          'Storage API response failed validation',
         );
       });
 
@@ -717,6 +947,9 @@ describe('UncefactStorageAdapter', () => {
           expect.objectContaining({
             httpStatus: 400,
             detail: 'Bad Request',
+            operation: 'store',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
           }),
           'Storage API rejected payload',
         );
@@ -799,7 +1032,7 @@ describe('UncefactStorageAdapter', () => {
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/documents/binary-456',
           hash: HEX_A,
-          decryptionKey: 'key-abc',
+          decryptionKey: VALID_DECRYPTION_KEY_A,
         }),
       });
 
@@ -900,7 +1133,7 @@ describe('UncefactStorageAdapter', () => {
         json: jest.fn().mockResolvedValue({
           uri: 'https://storage.example.com/documents/binary-456',
           hash: HEX_A,
-          decryptionKey: 'decrypt-key-xyz',
+          decryptionKey: VALID_DECRYPTION_KEY_B,
         }),
       });
 
@@ -910,12 +1143,34 @@ describe('UncefactStorageAdapter', () => {
       expect(result).toEqual({
         uri: 'https://storage.example.com/documents/binary-456',
         digestMultibase: MULTIBASE_A,
-        decryptionKey: 'decrypt-key-xyz',
+        decryptionKey: VALID_DECRYPTION_KEY_B,
         encryptionAlgorithm: 'aes-256-gcm',
         externalId: MOCK_UUID,
         bucket: 'priv-bucket',
         mimeType: 'text/html',
       });
+    });
+
+    it('should accept any non-empty URI and decryption key when encrypted', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          uri: 'wat',
+          hash: HEX_A,
+          decryptionKey: 'short',
+        }),
+      });
+
+      const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+      const result = await adapter.storeBinary('<html>Secret</html>', 'secret.html', 'text/html', true);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          uri: 'wat',
+          decryptionKey: 'short',
+        }),
+      );
     });
 
     it('should omit encryptionAlgorithm when uploading unencrypted', async () => {
@@ -958,6 +1213,80 @@ describe('UncefactStorageAdapter', () => {
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
         await expect(adapter.storeBinary('<html></html>', 'f.html', 'text/html')).rejects.toThrow(StoragePayloadError);
+      });
+
+      it.each([
+        [
+          'invalid digestMultibase',
+          {
+            uri: 'https://storage.example.com/documents/binary-456',
+            digestMultibase: 'invalid-digest-binary-response-plaintext-sentinel',
+          },
+          'invalid-digest',
+          201,
+        ],
+        [
+          'invalid legacy hash',
+          {
+            uri: 'https://storage.example.com/documents/binary-456',
+            hash: 'invalid-hash-binary-response-plaintext-sentinel',
+          },
+          'invalid-hash',
+          502,
+        ],
+        [
+          'object-valued uri',
+          {
+            uri: { leakedPlaintext: 'object-uri-binary-response-plaintext-sentinel' },
+            digestMultibase: MULTIBASE_A,
+          },
+          'invalid-uri',
+          201,
+        ],
+      ])('sanitises a successful response with %s', async (_name, responseBody, classification, status) => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 201,
+          json: jest.fn().mockResolvedValue(responseBody),
+        });
+
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+        let error: unknown;
+        try {
+          await adapter.storeBinary('<html></html>', 'f.html', 'text/html');
+        } catch (caught) {
+          error = caught;
+        }
+
+        expect(error).toBeInstanceOf(StorageStoreError);
+        expect(String(error)).not.toContain('binary-response-plaintext-sentinel');
+        expect((error as StorageStoreError).message).toContain(`HTTP ${status}`);
+        expect((error as StorageStoreError).statusCode).toBe(status);
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            httpStatus: 201,
+            classification,
+            operation: 'storeBinary',
+            bucket: 'public-data',
+            externalId: MOCK_UUID,
+          }),
+          'Storage API response failed validation',
+        );
+      });
+
+      it('should omit the returned uri from the successful storage log', async () => {
+        const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
+        await adapter.storeBinary('<html>Hello</html>', 'template.html', 'text/html');
+
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        const infoMock = mockLogger.info as unknown as jest.Mock;
+        const successCall = infoMock.mock.calls.find(([, message]) => message === 'Binary content stored successfully');
+        expect(successCall).toBeDefined();
+        expect(successCall?.[0]).toEqual(
+          expect.objectContaining({ encrypt: false, filename: 'template.html', bucket: 'public-data' }),
+        );
+        expect(successCall?.[0]).not.toHaveProperty('uri');
       });
 
       it('should throw StorageStoreError on 5xx response', async () => {

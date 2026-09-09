@@ -38,6 +38,7 @@ import type { EnqueueOptions, JobContext, JobHandler, JobQueue } from '@/lib/job
 import { LIBRARY_VERIFY_JOB } from '@/lib/jobs/queue-names';
 import { apiLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
+import { DECRYPTION_REQUIRED_MESSAGE } from './reverify-messages';
 
 /**
  * The asynchronous half of registration (#955, ADR-054): the verifier call
@@ -575,19 +576,19 @@ async function readStoredCopy(
     encrypted = true;
     if (storedKey === null) {
       // The copy is present and intact, so this is not an object an operator
-      // can repair. What is missing is a key, and the form that carries one
-      // is not built yet, so the caller is told that rather than sent to
-      // storage. This message describes a record that does have a durable
-      // copy: the route's own DECRYPTION_REQUIRED refusal
+      // can repair. What is missing is a key, and the caller can supply one
+      // on the key-bearing re-verification form, so the message sends them
+      // there rather than to storage. This describes a record that does have
+      // a durable copy: the route's own DECRYPTION_REQUIRED refusal
       // (`DecryptionRequiredError` in reverify-library-record.ts) covers that
       // same has-a-copy case synchronously, before this worker code ever
       // runs, not a no-copy sibling; a no-copy record is always reserved and
-      // fetched rather than refused this way. The two deliberately share
-      // this exact wording, so keep them in sync.
+      // acquired rather than refused this way. The two are the same sentence
+      // because they describe the same record in the same terms, and they
+      // read one constant so nothing has to keep two copies equal.
       throw new TerminalVerificationError({
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
-        message:
-          "This service holds no usable key for the record's durable copy. Re-verification with a caller-supplied key is not supported yet.",
+        message: DECRYPTION_REQUIRED_MESSAGE,
       });
     }
     if (!hasValidEnvelopeStructure(parsed)) throw unreadable('its encrypted envelope is corrupted');
@@ -706,7 +707,7 @@ function verifierChecks(result: VerifyResult): Pick<CheckResults, 'proof' | 'sta
  * written by our storage adapter, not supplied by a caller, and a
  * deployment's storage service legitimately lives on a private address.
  */
-async function fetchStoredCopyBytes(uri: string): Promise<Uint8Array> {
+export async function fetchStoredCopyBytes(uri: string): Promise<Uint8Array> {
   let response: Response;
   try {
     response = await fetch(uri, { signal: AbortSignal.timeout(readStoredCopyReadTimeoutMs()) });
@@ -728,23 +729,39 @@ async function fetchStoredCopyBytes(uri: string): Promise<Uint8Array> {
   }
   // Read in chunks and stop at the cap, counting bytes, so a body with no or
   // a wrong Content-Length cannot be buffered whole before it is refused.
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  if (response.body !== null) {
-    const reader = response.body.getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value === undefined) continue;
-      total += value.byteLength;
-      if (total > MAX_STORED_COPY_BYTES) {
-        await reader.cancel().catch(() => undefined);
-        throw new StoredCopyReadError('terminal', `the copy exceeds the ${MAX_STORED_COPY_BYTES}-byte read limit`);
+  //
+  // The whole streaming phase is classified, not just the request above. A
+  // read that has already received its headers can still fail: the read
+  // timeout can fire mid-body and abort the stream, the storage service can
+  // close the connection, and the assembly at the end can run out of memory
+  // on a large copy. Left unclassified, every one of those reaches a caller
+  // that reads only `kind` and is treated as terminal, which is the opposite
+  // of what they are. An unrecognised throw here is transient, the same
+  // default the worker's own reader applies to anything that is not already a
+  // terminal `StoredCopyReadError`; the cap refusal above is already
+  // classified terminal and passes through unchanged.
+  try {
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    if (response.body !== null) {
+      const reader = response.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value === undefined) continue;
+        total += value.byteLength;
+        if (total > MAX_STORED_COPY_BYTES) {
+          await reader.cancel().catch(() => undefined);
+          throw new StoredCopyReadError('terminal', `the copy exceeds the ${MAX_STORED_COPY_BYTES}-byte read limit`);
+        }
+        chunks.push(value);
       }
-      chunks.push(value);
     }
+    return new Uint8Array(Buffer.concat(chunks));
+  } catch (error) {
+    if (error instanceof StoredCopyReadError) throw error;
+    throw new StoredCopyReadError('transient', 'the copy body could not be read to completion', error);
   }
-  return new Uint8Array(Buffer.concat(chunks));
 }
 
 /**

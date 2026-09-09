@@ -19,6 +19,7 @@ import {
   settleInRequest,
   SourceRejectedError,
   StorageKeyMissingError,
+  StoreAttemptFailedError,
   type RegisterExternalCredentialDependencies,
   type RegisterExternalCredentialInput,
 } from './register-external-credential';
@@ -240,10 +241,10 @@ describe('registerExternalCredential', () => {
     ['an outage', () => new StorageStoreError(503, 'unavailable'), true],
     ['a refusal', () => new StoragePayloadError(400, 'rejected'), false],
   ])(
-    // An opened-with-key credential's message must say a re-fetch by
-    // re-verify cannot supply a key again, so this differs from the
-    // plaintext storage-failure message, which is left unchanged.
-    'names the key-bearing-route limitation when storing an opened-with-key credential fails on %s',
+    // An opened-with-key credential's message must tell the caller how to
+    // retry with the key-bearing re-verification form, so this differs from
+    // the plaintext storage-failure message, which is left unchanged.
+    'names the key-bearing retry guidance when storing an opened-with-key credential fails on %s',
     async (_label, error, retryable) => {
       const d = deps({
         fetchDocument: async () => ({ bytes: bytes(ENCRYPTED), contentType: 'application/json', finalUrl: 'x' }),
@@ -258,7 +259,9 @@ describe('registerExternalCredential', () => {
         failure: {
           code: CheckRunFailureCode.STORAGE_FAILED,
           retryable,
-          message: expect.stringContaining('a re-fetch by re-verify cannot supply one again'),
+          message: expect.stringContaining(
+            'Retry with sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify',
+          ),
         },
       });
     },
@@ -573,12 +576,13 @@ describe('registerExternalCredential', () => {
         },
       });
       expect((created.checkRun as { failure: { message: string } }).failure.message).toContain(keyCause);
-      // The remedy text separates the two facts rather than saying a
-      // re-fetch cannot recover the record at all: re-verify does fetch
-      // again and, once storage succeeds, keeps the copy; opening it still
-      // needs a key #958 does not exist yet.
+      // The remedy text names the form that can actually finish the job for
+      // this record: a bodyless re-verify would fetch and store the
+      // ciphertext again without opening it, so the message points at the
+      // key-bearing form instead. Fails if the message reverts to saying no
+      // key can be supplied.
       expect((created.checkRun as { failure: { message: string } }).failure.message).toContain(
-        'Re-verification will fetch again and, once storage succeeds, will keep the fetched copy; it still cannot open that copy until a key can be supplied (#958).',
+        'Once storage recovers, retry with sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify to fetch the source again and open it.',
       );
     },
   );
@@ -616,7 +620,7 @@ describe('registerExternalCredential', () => {
     });
     expect((created.checkRun as { failure: { message: string } }).failure.message).toContain(keyCause);
     expect((created.checkRun as { failure: { message: string } }).failure.message).toContain(
-      'Re-verification will fetch again and, once storage succeeds, will keep the fetched copy; it still cannot open that copy until a key can be supplied (#958).',
+      'Once storage recovers, retry with sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify to fetch the source again and open it.',
     );
   });
 
@@ -778,6 +782,306 @@ describe('registerExternalCredential byte fidelity and orphaned copies', () => {
 });
 
 describe('settleInRequest in recover mode', () => {
+  /**
+   * Mode B: the pipeline over bytes the caller has already read from the
+   * record's own durable copy. `storedCopy` is what a reservation hands it
+   * after the read and the integrity check have both passed.
+   */
+  function storedCopy(
+    body: string | Uint8Array,
+    overrides: { checks?: Record<string, CheckResult>; holdsIdentity?: boolean } = {},
+  ) {
+    return {
+      mode: 'recover' as const,
+      currentRecordId: 'record-1',
+      holdsIdentity: overrides.holdsIdentity ?? false,
+      acquisition: {
+        from: 'stored-copy' as const,
+        document: {
+          bytes: typeof body === 'string' ? bytes(body) : body,
+          contentType: 'application/json',
+          finalUrl: 'https://storage.example/private/copy',
+        },
+        checks: overrides.checks ?? { retrieval: CheckResult.PASS, digest: CheckResult.PASS },
+        storageUri: 'https://storage.example/private/copy',
+      },
+    };
+  }
+
+  it('opens a stored copy with the right key, storing the plaintext and never fetching the source', async () => {
+    // The whole ticket. Fails if mode B fetches the supplier, if it does not
+    // store the opened plaintext under a receiver key, or if the checks the
+    // read earned are dropped from the pending generation.
+    const fetchDocument = jest.fn(async () => {
+      throw new Error('mode B must never fetch the supplier');
+    });
+    const d = deps({ fetchDocument });
+
+    const outcome = await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, storedCopy(ENCRYPTED));
+
+    expect(fetchDocument).not.toHaveBeenCalled();
+    expect(d.store).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({
+      acquisition: { mode: 'stored-copy' },
+      encrypted: true,
+      contentKind: ExternalContentKind.CREDENTIAL,
+      decryptionKeyUnused: false,
+      checkRun: {
+        state: CheckRunState.PENDING,
+        checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS, decryption: CheckResult.PASS },
+      },
+    });
+    // No source provenance was observed, so none is claimed.
+    expect(outcome.acquisition).toEqual({ mode: 'stored-copy' });
+  });
+
+  it('names the duplicate record when a stored copy opens content another record already holds', async () => {
+    // Acceptance criterion 2. Recovery cannot reject a duplicate the way
+    // registration does, because the record already exists, so the pointer is
+    // advisory. Fails if the duplicate lookup is skipped on this path.
+    const d = deps({ findExistingExternal: jest.fn(async () => 'other-record') });
+
+    const outcome = await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, storedCopy(ENCRYPTED));
+
+    expect(outcome).toMatchObject({
+      duplicateOfRecordId: 'other-record',
+      observedContentDigest: expect.any(String),
+    });
+    expect(outcome.contentDigest).toBeUndefined();
+    expect(d.deps.findExistingExternal).toHaveBeenCalledWith('tenant-1', expect.any(String), 'record-1');
+  });
+
+  it('carries the checks the stored read earned onto a store failure', async () => {
+    // The custody-integrity result is real work this attempt did; a
+    // storage outage afterwards must not publish it as never run.
+    const d = deps();
+    d.store.mockRejectedValueOnce(new StorageStoreError(503, 'unavailable'));
+
+    const outcome = await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, storedCopy(ENCRYPTED));
+
+    expect(outcome.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS, decryption: CheckResult.PASS },
+      failure: { code: CheckRunFailureCode.STORAGE_FAILED, retryable: true },
+    });
+  });
+
+  it('carries them onto the D10 preflight failure too, on a typed carrier', async () => {
+    // The same rule through the throw path, and the carrier the settlement
+    // narrows on.
+    const d = deps({
+      assertEncryptionReady: () => {
+        throw new Error('kms unreachable');
+      },
+    });
+
+    await expect(
+      settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, storedCopy(ENCRYPTED)),
+    ).rejects.toBeInstanceOf(EncryptionUnavailableError);
+    await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, storedCopy(ENCRYPTED)).catch(
+      (error: EncryptionUnavailableError) => {
+        expect(error.checks).toEqual({
+          retrieval: CheckResult.PASS,
+          digest: CheckResult.PASS,
+          decryption: CheckResult.PASS,
+        });
+      },
+    );
+  });
+
+  it('wraps a thrown store failure in the typed carrier, keeping the original as the cause', async () => {
+    // Y-F6. The checks travel on a class the settlement narrows with
+    // `instanceof`, and the original throw stays reachable so classification
+    // by error class is unchanged.
+    const d = deps({
+      resolveStorage: async () => {
+        throw new Error('no storage instance for this tenant');
+      },
+    });
+
+    await expect(
+      settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, storedCopy(ENCRYPTED)),
+    ).rejects.toBeInstanceOf(StoreAttemptFailedError);
+    let error: StoreAttemptFailedError | undefined;
+    try {
+      await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, storedCopy(ENCRYPTED));
+    } catch (thrown) {
+      error = thrown as StoreAttemptFailedError;
+    }
+    expect(error?.checks).toMatchObject({ retrieval: CheckResult.PASS, digest: CheckResult.PASS });
+    expect((error?.cause as Error).message).toBe('no storage instance for this tenant');
+  });
+
+  it('names the record own copy, not a source, when a stored copy will not open', async () => {
+    // T-S8 and S-6. Mode B never reads the supplier, so a message telling the
+    // caller a source change would help sends them to the wrong system.
+    const d = deps();
+
+    const outcome = await settleInRequest(input({ decryptionKey: WRONG_KEY }), d.deps, storedCopy(ENCRYPTED));
+
+    const message = (outcome.checkRun as { failure: { message: string } }).failure.message;
+    expect(message).toContain("this record's durable copy");
+    // The remedy names the request field, which is the only place the word
+    // may appear: nothing here may describe a supplier fetch that did not
+    // happen, or invite the caller to change one.
+    expect(message).not.toContain('fetched');
+    expect(message).not.toMatch(/\bthe source\b/);
+    expect(message).toContain('sourceEncryption.decryptionKey');
+  });
+
+  it('says a corrupted stored envelope needs an operator, not a source change', async () => {
+    const corrupt = JSON.stringify({ ...JSON.parse(ENCRYPTED), iv: 'AAAA' });
+    const d = deps();
+
+    const outcome = await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, storedCopy(corrupt));
+
+    expect(outcome.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      failure: { code: CheckRunFailureCode.DECRYPTION_FAILED, retryable: false },
+    });
+    const message = (outcome.checkRun as { failure: { message: string } }).failure.message;
+    expect(message).toContain('operator');
+    expect(message).not.toContain('unless the source changes');
+  });
+
+  /**
+   * A corrupt envelope fetched from a source has two possible futures, and
+   * the store outcome is what decides between them. The guidance used to be
+   * chosen before the store ran, so a request whose corrupt ciphertext WAS
+   * successfully retained told the caller to go back to the supplier, when
+   * every later attempt on that record reads the retained copy and touches no
+   * supplier at all. The other two outcomes keep the source sentence: with no
+   * durable copy of these bytes, there is nothing for an operator to inspect
+   * and the supplier is genuinely the only way forward.
+   */
+  describe('corrupt-envelope guidance after a source fetch', () => {
+    const CORRUPT = JSON.stringify({ ...JSON.parse(ENCRYPTED), iv: 'AAAA' });
+    const RETAINED_COPY_MESSAGE =
+      "The encrypted envelope in this record's durable copy is corrupted and cannot be decrypted; no key will open it, and the copy needs an operator to inspect it.";
+    const SOURCE_MESSAGE =
+      'The fetched encrypted envelope is corrupted and cannot be decrypted; re-supplying the key will not help unless the source changes.';
+
+    function corruptFetch() {
+      return async () => ({ bytes: bytes(CORRUPT), contentType: 'application/json', finalUrl: 'x' });
+    }
+
+    function failureMessage(outcome: { checkRun: unknown }): string {
+      return (outcome.checkRun as { failure: { message: string } }).failure.message;
+    }
+
+    it('sends the caller to an operator once the corrupt copy is retained', async () => {
+      const d = deps({ fetchDocument: corruptFetch() });
+
+      const outcome = await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, {
+        mode: 'recover',
+        currentRecordId: 'record-1',
+        holdsIdentity: false,
+        acquisition: { from: 'source' },
+      });
+
+      expect(outcome.storage).toBeDefined();
+      expect(failureMessage(outcome)).toBe(RETAINED_COPY_MESSAGE);
+    });
+
+    it('keeps the source sentence when storing the copy failed', async () => {
+      const d = deps({ fetchDocument: corruptFetch() });
+      d.storeBinary.mockRejectedValue(new StorageStoreError(503, 'storage unavailable'));
+
+      const outcome = await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, {
+        mode: 'recover',
+        currentRecordId: 'record-1',
+        holdsIdentity: false,
+        acquisition: { from: 'source' },
+      });
+
+      expect(outcome.storage).toBeUndefined();
+      // This branch composes its own sentence from the storage and key
+      // halves rather than reading the shared one, so the assertion is on the
+      // key half it must keep naming.
+      expect(failureMessage(outcome)).toContain(
+        'This encrypted envelope is also corrupted, so no key will open it unless the source changes.',
+      );
+      expect(failureMessage(outcome)).not.toContain('needs an operator to inspect it');
+    });
+
+    it('keeps the source sentence when the store was skipped for an identity the row holds', async () => {
+      const d = deps({ fetchDocument: corruptFetch() });
+
+      const outcome = await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, {
+        mode: 'recover',
+        currentRecordId: 'record-1',
+        holdsIdentity: true,
+        acquisition: { from: 'source' },
+      });
+
+      expect(d.storeBinary).not.toHaveBeenCalled();
+      expect(outcome.storage).toBeUndefined();
+      expect(failureMessage(outcome)).toBe(SOURCE_MESSAGE);
+    });
+
+    it('keeps the source sentence on a registration, which has no copy to point at yet', async () => {
+      const d = deps({ fetchDocument: corruptFetch() });
+      d.storeBinary.mockRejectedValue(new StorageStoreError(503, 'storage unavailable'));
+
+      const outcome = await settleInRequest(input({ decryptionKey: SUPPLIER_KEY }), d.deps, { mode: 'register' });
+
+      expect(failureMessage(outcome)).toContain('unless the source changes');
+    });
+  });
+
+  it('blames the record own copy, not a re-fetched source, when it opens to a non-credential on an identity-holding row', async () => {
+    // S-6. Narrow to reach, and the caller's only account of the outcome.
+    const d = deps();
+    const plainNonCredential = JSON.stringify(
+      encryptor.encrypt(JSON.stringify({ not: 'a credential' }), EncryptionAlgorithm.AES_256_GCM),
+    );
+
+    const outcome = await settleInRequest(
+      input({ decryptionKey: SUPPLIER_KEY }),
+      d.deps,
+      storedCopy(plainNonCredential, { holdsIdentity: true }),
+    );
+
+    const message = (outcome.checkRun as { failure: { message: string } }).failure.message;
+    expect(message).toContain("record's durable copy");
+    expect(message).not.toContain('re-fetched source');
+  });
+
+  it('does not upload a stored copy when its supplied key does not open it', async () => {
+    // A stored copy is already durable, so a failed decrypt must settle the
+    // generation without creating a second ciphertext object. Fails if the
+    // stored-copy path is accidentally treated as a fresh source fetch.
+    const d = deps();
+
+    const outcome = await settleInRequest(input({ decryptionKey: WRONG_KEY }), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: false,
+      acquisition: {
+        from: 'stored-copy',
+        document: {
+          bytes: bytes(ENCRYPTED),
+          contentType: 'application/json',
+          finalUrl: 'https://storage.example/private/copy',
+        },
+        checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS },
+        storageUri: 'https://storage.example/private/copy',
+      },
+    });
+
+    expect(d.store).not.toHaveBeenCalled();
+    expect(d.storeBinary).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({
+      encrypted: true,
+      acquisition: { mode: 'stored-copy' },
+      checkRun: {
+        state: CheckRunState.FAILED,
+        checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS, decryption: CheckResult.FAIL },
+        failure: { code: CheckRunFailureCode.DECRYPTION_FAILED, retryable: true },
+      },
+    });
+  });
+
   it('returns a refused source as a failed retrieval run instead of throwing', async () => {
     // Register answers a guard refusal with a 400 and creates nothing. A
     // record already exists here, so the refusal is something to record on
@@ -793,9 +1097,14 @@ describe('settleInRequest in recover mode', () => {
       mode: 'recover',
       currentRecordId: 'record-1',
       holdsIdentity: false,
+      acquisition: { from: 'source' },
     });
 
     expect(outcome).toEqual({
+      // A source fetch that returned nothing: the supplier was reached for,
+      // and no digest exists, so the acquisition says so rather than leaving
+      // the mode to be inferred from an absent digest.
+      acquisition: { mode: 'source-failed' },
       encrypted: null,
       details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
       checkRun: {
@@ -825,6 +1134,7 @@ describe('settleInRequest in recover mode', () => {
       mode: 'recover',
       currentRecordId: 'record-1',
       holdsIdentity: false,
+      acquisition: { from: 'source' },
     });
 
     expect(outcome.duplicateOfRecordId).toBe('existing-record');
@@ -847,6 +1157,7 @@ describe('settleInRequest in recover mode', () => {
       mode: 'recover',
       currentRecordId: 'record-1',
       holdsIdentity: false,
+      acquisition: { from: 'source' },
     });
 
     expect(outcome.duplicateOfRecordId).toBe('existing-record');
@@ -867,6 +1178,7 @@ describe('settleInRequest in recover mode', () => {
       mode: 'recover',
       currentRecordId: 'record-1',
       holdsIdentity: false,
+      acquisition: { from: 'source' },
     });
 
     expect(findExistingExternal).toHaveBeenCalledWith('tenant-1', await signedContentDigestOf(PLAINTEXT), 'record-1');
@@ -892,6 +1204,7 @@ describe('settleInRequest in recover mode', () => {
       mode: 'recover',
       currentRecordId: 'record-1',
       holdsIdentity: true,
+      acquisition: { from: 'source' },
     });
 
     expect(d.store).not.toHaveBeenCalled();
@@ -917,6 +1230,7 @@ describe('settleInRequest in recover mode', () => {
       mode: 'recover',
       currentRecordId: 'record-1',
       holdsIdentity: false,
+      acquisition: { from: 'source' },
     });
 
     expect(d.storeBinary).toHaveBeenCalled();
@@ -936,6 +1250,7 @@ describe('settleInRequest in recover mode', () => {
       mode: 'recover',
       currentRecordId: 'record-1',
       holdsIdentity: true,
+      acquisition: { from: 'source' },
     });
 
     expect(d.storeBinary).not.toHaveBeenCalled();
@@ -943,15 +1258,30 @@ describe('settleInRequest in recover mode', () => {
     expect(outcome.checkRun).toMatchObject({ state: CheckRunState.FAILED });
   });
 
-  it('does not let register mode pass a record id, or recover mode leave one out', async () => {
+  it('does not let register mode pass a record id, or recover mode leave one out', () => {
     // The lookup excludes whatever id it is given, so a registration handed
     // one could be told a record is not a duplicate of the very record it
-    // matches, and a recovery without one matches itself.
+    // matches, and a recovery without one matches itself. Compile-time only:
+    // these calls are never executed, because the point is that they do not
+    // type-check.
     const d = deps();
-
-    // @ts-expect-error register mode has no record to exclude
-    await settleInRequest(input(), d.deps, { mode: 'register', currentRecordId: 'record-1' });
-    // @ts-expect-error recover mode must name the record being recovered
-    await settleInRequest(input(), d.deps, { mode: 'recover' });
+    const never = () => {
+      // @ts-expect-error register mode has no record to exclude
+      void settleInRequest(input(), d.deps, { mode: 'register', currentRecordId: 'record-1' });
+      // @ts-expect-error recover mode must name the record being recovered and its acquisition mode
+      void settleInRequest(input(), d.deps, { mode: 'recover' });
+      // @ts-expect-error a stored-copy acquisition cannot omit the checks its read earned
+      void settleInRequest(input(), d.deps, {
+        mode: 'recover',
+        currentRecordId: 'record-1',
+        holdsIdentity: false,
+        acquisition: {
+          from: 'stored-copy',
+          document: { bytes: bytes(ENCRYPTED), contentType: 'application/json', finalUrl: 'x' },
+          storageUri: 'https://storage.example/copy',
+        },
+      });
+    };
+    expect(never).toBeInstanceOf(Function);
   });
 });

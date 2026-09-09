@@ -871,7 +871,7 @@ describe('verifyGenerationHandler on a terminal failure', () => {
         failure: {
           code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
           message:
-            "This service holds no usable key for the record's durable copy. Re-verification with a caller-supplied key is not supported yet.",
+            "This service holds no usable key for the record's durable copy. Supply it as sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify.",
           retryable: false,
         },
       }),
@@ -1202,6 +1202,50 @@ describe('the default stored-copy read', () => {
     const error = await rejection();
     expect(error.kind).toBe('terminal');
     expect(error.message).toBe(`storage returned HTTP ${status}`);
+  });
+
+  it('classifies a read that fails mid-body as transient, not terminal', async () => {
+    // S-1's producer side. The request succeeded and the headers arrived, so
+    // nothing above this point classifies anything; what fails is the stream.
+    // A read timeout firing mid-body, storage closing the connection, or the
+    // assembly running out of memory all arrive here, and all of them may
+    // clear on a later attempt. Left unclassified they reach a caller that
+    // reads only `kind`, and a settled generation calls them terminal.
+    //
+    // Fails if the unrecognised default flips to 'terminal', and fails if the
+    // streaming loop is moved back outside the classification.
+    const midBody = new Error('terminated');
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: {
+        getReader: () => ({
+          read: jest
+            .fn()
+            .mockResolvedValueOnce({ done: false, value: new Uint8Array([0x7b]) })
+            .mockRejectedValueOnce(midBody),
+          cancel: jest.fn(async () => undefined),
+        }),
+      },
+    }) as never;
+
+    const error = await rejection();
+    expect(error).toBeInstanceOf(StoredCopyReadError);
+    expect(error.kind).toBe('transient');
+    expect(error.message).toBe('the copy body could not be read to completion');
+    expect(error.cause).toBe(midBody);
+  });
+
+  it('still lets the cap refusal through the streaming classification as terminal', async () => {
+    // The control for the case above: wrapping the loop must not relabel the
+    // one failure inside it that IS terminal. Fails if the catch reclassifies
+    // every throw rather than passing an already-classified one through.
+    global.fetch = jest.fn().mockResolvedValue(streamed(Buffer.alloc(MAX_BYTES + 1, 0x61)).response) as never;
+
+    const error = await rejection();
+    expect(error.kind).toBe('terminal');
+    expect(error.message).toMatch(/exceeds the 16777216-byte read limit/);
   });
 
   it('classifies an unreachable storage service as transient', async () => {

@@ -58,10 +58,14 @@ import {
   reserveRecoveryGeneration,
 } from '../../src/lib/prisma/repositories/check-run.repository';
 import { reverifyLibraryRecord } from '../../src/lib/library/reverify-library-record';
+import { fetchStoredCopyBytes } from '../../src/lib/library/verify-generation-job';
 import {
   defaultRegisterDependencies,
   settleInRequest,
   EncryptionUnavailableError,
+  type AcquiredCredentialInput,
+  type RecoverFromSourceOptions,
+  type RecoverFromStoredCopyOptions,
   type RegisterExternalCredentialDependencies,
   type RegisterExternalCredentialInput,
 } from '../../src/lib/library/register-external-credential';
@@ -237,6 +241,23 @@ function sourceFetcher(): (href: string) => Promise<FetchedDocument> {
   return (href) => fetchCredentialDocument(href, { maxBytes: getMaxCredentialSize(), timeoutMs: 10_000 });
 }
 
+/**
+ * The custody tuple a reservation would observe for this record right now,
+ * read from the row rather than restated, so a raw-choreography test states
+ * the fence the production caller would have taken from its own reservation.
+ */
+async function custodyOf(recordId: string) {
+  const record = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+  if (record?.origin !== 'EXTERNAL') throw new Error(`expected an external record for ${recordId}`);
+  return {
+    storageUri: record.external.storageUri,
+    storageDigestMultibase: record.external.storageDigestMultibase,
+    storageExternalId: record.external.storageExternalId,
+    decryptionKeyPresent: record.external.decryptionKey !== null,
+    encrypted: record.external.encrypted,
+  };
+}
+
 function recoveryRunner(
   storage: IStorageService,
   fetchSource = sourceFetcher(),
@@ -245,18 +266,21 @@ function recoveryRunner(
   const registerDependencies = defaultRegisterDependencies(async () => undefined);
   return {
     fetchSource,
-    recoverInRequest: (input: RegisterExternalCredentialInput, currentRecordId: string, holdsIdentity: boolean) =>
-      settleInRequest(
-        input,
-        {
-          ...registerDependencies,
-          fetchDocument: fetchSource,
-          resolveStorage: async () => ({ service: storage, instanceId: 'recovery-storage' }),
-          findExistingExternal: findExternalByContentDigest,
-          ...registerOverrides,
-        },
-        { mode: 'recover', currentRecordId, holdsIdentity },
-      ),
+    recoverInRequest: (
+      input: AcquiredCredentialInput | RegisterExternalCredentialInput,
+      options: RecoverFromSourceOptions | RecoverFromStoredCopyOptions,
+    ) => {
+      const deps = {
+        ...registerDependencies,
+        fetchDocument: fetchSource,
+        resolveStorage: async () => ({ service: storage, instanceId: 'recovery-storage' }),
+        findExistingExternal: findExternalByContentDigest,
+        ...registerOverrides,
+      };
+      return options.acquisition.from === 'stored-copy'
+        ? settleInRequest(input, deps, options as RecoverFromStoredCopyOptions)
+        : settleInRequest(input as RegisterExternalCredentialInput, deps, options as RecoverFromSourceOptions);
+    },
   };
 }
 
@@ -294,20 +318,62 @@ async function insertNoCopyExternal(options: {
   return created.record.id;
 }
 
+async function insertUnopenedExternal(options: {
+  sourcePath: string;
+  storagePath: string;
+  ciphertext: Uint8Array;
+  pending?: boolean;
+}): Promise<{ recordId: string; storageDigest: string; sourceDigest: string }> {
+  const storageDigest = await digest(options.ciphertext);
+  const created = await createExternalCredential({
+    tenantId: SYSTEM_TENANT_ID,
+    sourceUrl: `${fixtures.baseUrl}${options.sourcePath}`,
+    sourceDigest: storageDigest,
+    encrypted: true,
+    contentKind: ExternalContentKind.CREDENTIAL,
+    storage: {
+      uri: `${fixtures.baseUrl}${options.storagePath}`,
+      digestMultibase: storageDigest,
+      serviceInstanceId: 'storage-unopened-test',
+      externalId: options.storagePath,
+      bucket: 'private',
+    },
+    annotations: { displayName: 'Unopened recovery fixture', declaredCredentialType: CoreCredentialType.DPP },
+    details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+    checkRun: options.pending
+      ? { state: CheckRunState.PENDING, checks: {}, enqueue: async () => undefined }
+      : {
+          state: CheckRunState.FAILED,
+          checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS, decryption: CheckResult.FAIL },
+          failure: {
+            code: CheckRunFailureCode.DECRYPTION_REQUIRED,
+            message: 'fixture holds unopened ciphertext',
+            retryable: true,
+          },
+        },
+  });
+  return { recordId: created.record.id, storageDigest, sourceDigest: storageDigest };
+}
+
 async function reverifyNoCopy(
   recordId: string,
   storage: IStorageService,
   fetchSource = sourceFetcher(),
   registerOverrides: Partial<RegisterExternalCredentialDependencies> = {},
+  decryptionKey?: string,
 ) {
   const recovery = recoveryRunner(storage, fetchSource, registerOverrides);
-  return reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue, {
+  const deps = {
     getRecord: getLibraryRecordById,
     createGeneration: createReverificationGeneration,
     reserveGeneration: reserveRecoveryGeneration,
     finaliseGeneration: finaliseRecoveryGeneration,
+    fetchStoredCopy: fetchStoredCopyBytes,
     ...recovery,
-  });
+  };
+  return decryptionKey === undefined
+    ? reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue, deps)
+    : reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue, decryptionKey, deps);
 }
 
 async function jobsFor(recordId: string): Promise<VerifyJobReference[]> {
@@ -909,6 +975,291 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     expect(await prisma.checkRun.count({ where: { recordId } })).toBe(1);
   });
 
+  it('opens an unopened stored copy with the supplied key, retaining it on a wrong key and replacing custody on success', async () => {
+    // Fails if a key-bearing recovery fetches the supplier instead of the
+    // reserved copy, uploads before decrypting, loses the raw copy after a
+    // wrong key, or replaces custody outside the finalisation transaction.
+    const storagePath = '/storage/unopened-late-key.json';
+    const sourcePath = '/supplier/unopened-late-key.json';
+    const ciphertext = new TextEncoder().encode(encryptedBody(RECOVERY_TEXT, RECEIVER_KEY));
+    fixtures.set(storagePath, { body: Buffer.from(ciphertext) });
+    const { recordId, storageDigest, sourceDigest } = await insertUnopenedExternal({
+      sourcePath,
+      storagePath,
+      ciphertext,
+    });
+    const storage = recoveryStorage();
+    const store = jest.spyOn(storage, 'store');
+    let sourceFetches = 0;
+    const fetchSource = (href: string) => {
+      sourceFetches += 1;
+      return sourceFetcher()(href);
+    };
+
+    const wrong = await reverifyNoCopy(recordId, storage, fetchSource, {}, 'd'.repeat(64));
+    expect(wrong).toMatchObject({ outcome: 'created', generation: 2 });
+    const wrongState = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (wrongState?.origin !== 'EXTERNAL') throw new Error('expected an external record after wrong-key recovery');
+    expect(wrongState.external).toMatchObject({
+      storageUri: `${fixtures.baseUrl}${storagePath}`,
+      storageDigestMultibase: storageDigest,
+      storageExternalId: storagePath,
+      decryptionKey: null,
+      sourceDigest,
+    });
+    expect(wrongState.checkRun).toMatchObject({
+      generation: 2,
+      state: CheckRunState.FAILED,
+      failureCode: CheckRunFailureCode.DECRYPTION_FAILED,
+      failureRetryable: true,
+      retrieval: CheckResult.PASS,
+      digest: CheckResult.PASS,
+      decryption: CheckResult.FAIL,
+    });
+    expect(store).not.toHaveBeenCalled();
+    expect(sourceFetches).toBe(0);
+
+    const right = await reverifyNoCopy(recordId, storage, fetchSource, {}, RECEIVER_KEY);
+    expect(right).toMatchObject({ outcome: 'created', generation: 3 });
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external record after successful recovery');
+    expect(recovered.external).toMatchObject({
+      storageUri: expect.stringContaining('/storage/recovered-'),
+      storageDigestMultibase: expect.any(String),
+      decryptionKey: expect.any(String),
+      contentDigest: await digest(new TextEncoder().encode(RECOVERY_JWT)),
+      sourceDigest,
+    });
+    expect(recovered.checkRun).toMatchObject({
+      generation: 3,
+      state: CheckRunState.PENDING,
+      retrieval: CheckResult.PASS,
+      digest: CheckResult.PASS,
+      decryption: CheckResult.PASS,
+    });
+    expect(store).toHaveBeenCalledTimes(1);
+    expect(sourceFetches).toBe(0);
+    expect(await jobsFor(recordId)).toHaveLength(1);
+  });
+
+  it('removes the retired ciphertext object, and only once the recovery has committed', async () => {
+    // The removal has to run outside the finalisation transaction. An object
+    // deleted before the write that displaced it commits is deleted while the
+    // record still points at it, and a rollback then leaves the record naming
+    // an object that is gone. The delete reads the record back on the global
+    // client, outside every transaction this recovery opened: under READ
+    // COMMITTED that read can only show the replacement once the finalisation
+    // has committed, so the captured custody is what proves the ordering.
+    //
+    // Fails if the removal moves inside the transaction, aims at the
+    // replacement, or does not happen at all.
+    const storagePath = '/storage/retired-late-key.json';
+    const sourcePath = '/supplier/retired-late-key.json';
+    const ciphertext = new TextEncoder().encode(encryptedBody(RECOVERY_TEXT, RECEIVER_KEY));
+    fixtures.set(storagePath, { body: Buffer.from(ciphertext) });
+    const { recordId } = await insertUnopenedExternal({ sourcePath, storagePath, ciphertext });
+
+    const storage = recoveryStorage();
+    const removals: Array<{ externalId: string; bucket?: string; custodyAtRemoval: string | null }> = [];
+    jest.spyOn(storage, 'delete').mockImplementation(async (externalId: string, bucket?: string) => {
+      const row = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+      removals.push({
+        externalId,
+        bucket,
+        custodyAtRemoval: row?.origin === 'EXTERNAL' ? row.external.storageUri : null,
+      });
+    });
+    (resolveStorageService as jest.Mock).mockResolvedValue({ service: storage, instanceId: 'storage-unopened-test' });
+
+    const result = await reverifyNoCopy(recordId, storage, sourceFetcher(), {}, RECEIVER_KEY);
+
+    expect(result).toMatchObject({ outcome: 'created', generation: 2 });
+    // The instance the retired row named, never the tenant's current primary.
+    expect(resolveStorageService).toHaveBeenCalledWith(SYSTEM_TENANT_ID, 'storage-unopened-test');
+    expect(removals).toHaveLength(1);
+    expect(removals[0]).toMatchObject({ externalId: storagePath, bucket: 'private' });
+    expect(removals[0].custodyAtRemoval).toEqual(expect.stringContaining('/storage/recovered-'));
+
+    const recovered = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (recovered?.origin !== 'EXTERNAL') throw new Error('expected an external record after recovery');
+    expect(recovered.external.storageExternalId).not.toBe(storagePath);
+    expect(recovered.external.decryptionKey).toEqual(expect.any(String));
+  });
+
+  it('settles the acquisition checks and rolls back the inserted job and custody when the finalisation transaction fails', async () => {
+    // The finalisation transaction writes the new custody and inserts the
+    // job together. The enqueue below performs the real transaction-bound
+    // insert and only then throws, so a job row genuinely exists when the
+    // transaction unwinds: the empty-jobs assertion is then evidence that an
+    // INSERTED job was rolled back, rather than that none was ever written.
+    // The throw escapes to the orchestration, which settles the reservation
+    // FAILED. That settlement carries no check carrier on the error, so it is
+    // the orchestration's own held state or nothing: before it existed this
+    // run published `retrieval: not_run` for a copy that had demonstrably
+    // been read, proven intact against its recorded digest and opened with
+    // the supplied key.
+    const storagePath = '/storage/enqueue-rollback.json';
+    const sourcePath = '/supplier/enqueue-rollback.json';
+    const ciphertext = new TextEncoder().encode(encryptedBody(RECOVERY_TEXT, RECEIVER_KEY));
+    fixtures.set(storagePath, { body: Buffer.from(ciphertext) });
+    const { recordId, storageDigest } = await insertUnopenedExternal({ sourcePath, storagePath, ciphertext });
+    const storage = recoveryStorage();
+    const enqueueFailure = new Error('queue insert rejected inside the finalisation transaction');
+    let jobsInsideTransaction = -1;
+
+    await expect(
+      reverifyLibraryRecord(
+        recordId,
+        SYSTEM_TENANT_ID,
+        async () => async (sql, job) => {
+          await enqueue(sql, job);
+          // Counted back through the same transaction handle, so the empty
+          // count after the rollback is measured against a row this test
+          // watched exist rather than against an enqueue it merely called.
+          const { rows } = await sql.executeSql(
+            `SELECT id FROM pgboss.job WHERE name = $1 AND data->>'recordId' = $2`,
+            [LIBRARY_VERIFY_JOB, recordId],
+          );
+          jobsInsideTransaction = rows.length;
+          throw enqueueFailure;
+        },
+        RECEIVER_KEY,
+        {
+          ...recoveryRunner(storage),
+          getRecord: getLibraryRecordById,
+          createGeneration: createReverificationGeneration,
+          reserveGeneration: reserveRecoveryGeneration,
+          finaliseGeneration: finaliseRecoveryGeneration,
+          fetchStoredCopy: fetchStoredCopyBytes,
+        },
+      ),
+    ).rejects.toBe(enqueueFailure);
+
+    const record = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    if (record?.origin !== 'EXTERNAL') throw new Error('expected an external record');
+    // Custody is the copy the record started with: the replacement was in the
+    // rolled-back transaction, so the newly stored object is an orphan and
+    // the record still points at its own unopened copy.
+    expect(record.external).toMatchObject({
+      storageUri: `${fixtures.baseUrl}${storagePath}`,
+      storageDigestMultibase: storageDigest,
+      storageExternalId: storagePath,
+      decryptionKey: null,
+    });
+    // The job the enqueue above inserted is gone, which is the transaction
+    // boundary under test: an insert committed independently of the
+    // finalisation transaction would still be here.
+    expect(jobsInsideTransaction).toBe(1);
+    expect(await jobsFor(recordId)).toHaveLength(0);
+
+    // The settled generation, with what the acquisition actually earned on
+    // the way to the throw.
+    expect(record.checkRun).toMatchObject({
+      generation: 2,
+      state: CheckRunState.FAILED,
+      failureRetryable: true,
+      retrieval: CheckResult.PASS,
+      digest: CheckResult.PASS,
+      decryption: CheckResult.PASS,
+    });
+  });
+
+  it('answers 202 with the current envelope, which a later generation can already have replaced', async () => {
+    // The qualified acceptance criterion is covered here. The 202 the route answers
+    // is the record's CURRENT envelope, not a snapshot of this request's own
+    // settlement, and the detail route exposes only the newest generation.
+    //
+    // What this test proves, exactly: it calls the orchestration directly
+    // rather than through the route, so A's own return value is still its own
+    // generation (asserted as 2 below), and it is the detail read afterwards
+    // that shows the later generation 3. That read is the same projection the
+    // route runs after the orchestration returns, so the projection half of
+    // the behaviour is pinned here; the route's use of it is not reachable
+    // from this seam, and the residual in the round's report says so. Fails
+    // if the projection starts returning anything but the newest generation.
+    const storagePath = '/storage/paused-projection.json';
+    const sourcePath = '/supplier/paused-projection.json';
+    const ciphertext = new TextEncoder().encode(encryptedBody(RECOVERY_TEXT, RECEIVER_KEY));
+    fixtures.set(storagePath, { body: Buffer.from(ciphertext) });
+    const { recordId } = await insertUnopenedExternal({ sourcePath, storagePath, ciphertext });
+
+    let released: (() => void) | undefined;
+    const settled = new Promise<void>((resolve) => {
+      released = resolve;
+    });
+    let paused = false;
+    // Held after A's own claim has committed its settlement inside the
+    // transaction is not reachable from this hook, so the pause is taken on
+    // A's parent lock and the later generation is written after A returns but
+    // before the detail read below. Deterministic either way: nothing here
+    // waits on a timer.
+    recoveryFinaliseTestHooks.afterParentLock = async () => {
+      if (paused) return;
+      paused = true;
+      released?.();
+      await Promise.resolve();
+    };
+
+    try {
+      const a = await reverifyNoCopy(recordId, recoveryStorage(), sourceFetcher(), {}, 'd'.repeat(64));
+      await settled;
+      expect(a).toMatchObject({ outcome: 'created', generation: 2 });
+
+      // A later generation replaces A's settlement before anyone reads.
+      const later = await prisma.checkRun.create({
+        data: {
+          recordId,
+          tenantId: SYSTEM_TENANT_ID,
+          generation: 3,
+          state: CheckRunState.COMPLETE,
+          retrieval: CheckResult.PASS,
+          decryption: CheckResult.PASS,
+          digest: CheckResult.PASS,
+          proof: CheckResult.PASS,
+          status: CheckResult.PASS,
+          temporal: CheckResult.PASS,
+          schemaConformance: CheckResult.NOT_RUN,
+          requestedAt: new Date(),
+          completedAt: new Date(),
+        },
+        select: { id: true, generation: true },
+      });
+
+      // The detail read the caller polls with shows the later generation, not
+      // A's settled DECRYPTION_FAILED one, and A's own generation is still
+      // recorded underneath.
+      const current = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+      if (current?.origin !== 'EXTERNAL') throw new Error('expected an external record');
+      expect(current.checkRun).toMatchObject({ generation: later.generation, state: CheckRunState.COMPLETE });
+      const aRun = await prisma.checkRun.findFirst({ where: { recordId, generation: 2 } });
+      expect(aRun).toMatchObject({
+        state: CheckRunState.FAILED,
+        failureCode: CheckRunFailureCode.DECRYPTION_FAILED,
+      });
+      // The raw copy is still the record's custody: a wrong key changed
+      // nothing, whichever generation the poll happens to show.
+      expect(current.external.storageUri).toBe(`${fixtures.baseUrl}${storagePath}`);
+      expect(current.external.decryptionKey).toBeNull();
+    } finally {
+      recoveryFinaliseTestHooks.afterParentLock = undefined;
+    }
+  });
+
+  it('rejects a key-bearing request that meets a pending recovery reservation instead of joining it', async () => {
+    // Fails if the early bodyless join is allowed to consume a key-bearing
+    // request, or if the reservation checks pending state only after fetching.
+    const storagePath = '/storage/unopened-pending-key.json';
+    const sourcePath = '/supplier/unopened-pending-key.json';
+    const ciphertext = new TextEncoder().encode(encryptedBody(RECOVERY_TEXT, RECEIVER_KEY));
+    fixtures.set(storagePath, { body: Buffer.from(ciphertext) });
+    const { recordId } = await insertUnopenedExternal({ sourcePath, storagePath, ciphertext, pending: true });
+
+    await expect(reverifyNoCopy(recordId, recoveryStorage(), sourceFetcher(), {}, RECEIVER_KEY)).rejects.toMatchObject({
+      code: 'VERIFICATION_IN_PROGRESS',
+    });
+    expect(await prisma.checkRun.count({ where: { recordId } })).toBe(1);
+  });
+
   it('a failed re-fetch leaves previously-extracted details untouched but stamps the check time', async () => {
     // The record already carries EXTRACTED details from an earlier
     // successful fetch whose copy was then lost (a storage failure).
@@ -1075,6 +1426,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       getRecord: getLibraryRecordById,
       createGeneration: createReverificationGeneration,
       reserveGeneration: reserveRecoveryGeneration,
+      fetchStoredCopy: fetchStoredCopyBytes,
       finaliseGeneration: async (input) => {
         if (!moved && input.prepared.duplicateOfRecordId === originalHolder) {
           moved = true;
@@ -1241,13 +1593,13 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       recordId: holderId,
       tenantId: SYSTEM_TENANT_ID,
       expectedGeneration: 1,
-      expectedCustody: { storageUri: null, storageDigestMultibase: null, storageExternalId: null },
+      expectedCustody: await custodyOf(holderId),
     });
     const reservedB = await reserveRecoveryGeneration({
       recordId: duplicateId,
       tenantId: SYSTEM_TENANT_ID,
       expectedGeneration: 1,
-      expectedCustody: { storageUri: null, storageDigestMultibase: null, storageExternalId: null },
+      expectedCustody: await custodyOf(duplicateId),
     });
     if (reservedA.outcome !== 'reserved' || reservedB.outcome !== 'reserved') {
       throw new Error('expected both reservations to succeed');
@@ -1266,7 +1618,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         resolveStorage: async () => ({ service: recoveryStorage(), instanceId: 'fk-a-storage' }),
         findExistingExternal: findExternalByContentDigest,
       },
-      { mode: 'recover', currentRecordId: holderId, holdsIdentity: true },
+      { mode: 'recover', currentRecordId: holderId, holdsIdentity: true, acquisition: { from: 'source' } },
     );
     const preparedB = await settleInRequest(
       {
@@ -1280,7 +1632,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         resolveStorage: async () => ({ service: recoveryStorage(), instanceId: 'fk-b-storage' }),
         findExistingExternal: findExternalByContentDigest,
       },
-      { mode: 'recover', currentRecordId: duplicateId, holdsIdentity: false },
+      { mode: 'recover', currentRecordId: duplicateId, holdsIdentity: false, acquisition: { from: 'source' } },
     );
 
     let notifyALocked!: () => void;
@@ -1307,6 +1659,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         tenantId: SYSTEM_TENANT_ID,
         checkRunId: reservedA.checkRunId,
         generation: reservedA.generation,
+        expectedCustody: reservedA.custody,
         prepared: preparedA,
         enqueue,
       });
@@ -1320,6 +1673,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         tenantId: SYSTEM_TENANT_ID,
         checkRunId: reservedB.checkRunId,
         generation: reservedB.generation,
+        expectedCustody: reservedB.custody,
         prepared: preparedB,
         enqueue,
       });
@@ -1409,7 +1763,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       recordId,
       tenantId: SYSTEM_TENANT_ID,
       expectedGeneration: 1,
-      expectedCustody: { storageUri: null, storageDigestMultibase: null, storageExternalId: null },
+      expectedCustody: await custodyOf(recordId),
     });
     if (reserved.outcome !== 'reserved') throw new Error('expected the reservation to succeed');
     const oldMarker = new Date(Date.now() - 2 * 60 * 60 * 1000);
@@ -1441,13 +1795,14 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         resolveStorage: async () => ({ service: recoveryStorage(), instanceId: 'late-storage' }),
         findExistingExternal: findExternalByContentDigest,
       },
-      { mode: 'recover', currentRecordId: recordId, holdsIdentity: false },
+      { mode: 'recover', currentRecordId: recordId, holdsIdentity: false, acquisition: { from: 'source' } },
     );
     const late = await finaliseRecoveryGeneration({
       recordId,
       tenantId: SYSTEM_TENANT_ID,
       checkRunId: reserved.checkRunId,
       generation: reserved.generation,
+      expectedCustody: reserved.custody,
       prepared,
       enqueue,
     });
@@ -1477,6 +1832,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       getRecord: getLibraryRecordById,
       createGeneration: createReverificationGeneration,
       reserveGeneration: reserveRecoveryGeneration,
+      fetchStoredCopy: fetchStoredCopyBytes,
       finaliseGeneration: async (input) => {
         preparedStorageUri = input.prepared.storage?.uri;
         // Simulate another actor (the sweep) settling this exact reservation
@@ -1511,6 +1867,114 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       reason: 'superseded',
       storageUri: preparedStorageUri,
     });
+  });
+
+  it('reports superseded and orphan-logs when a second real finalisation replaced custody under this reservation', async () => {
+    // The finalisation fence has two halves. The atomic claim asks whether
+    // this exact reservation is still `PENDING` and unqueued; the custody
+    // comparison asks whether the record is still the one it reserved
+    // against. This case drives the second half: the claim succeeds, and only
+    // the comparison stands between a stale attempt and a copy another
+    // finalisation has already committed. Fails if the comparison is dropped
+    // from the fence, because this attempt then writes its own copy and
+    // identity over that one and settles a generation against custody nobody
+    // reserved.
+    //
+    // The two writers cannot actually overlap in production:
+    // `replaceCustody` is reached only from a finalisation holding a
+    // claimable `PENDING` run, and `CheckRun_one_pending_per_record` allows a
+    // record one of those at a time. So the reservation is parked out of
+    // `PENDING` for the length of the second recovery and restored
+    // afterwards, which is the only way to hold both facts at once. The
+    // comparison is therefore defence in depth rather than a live race, and
+    // this case pins it as such against real rows.
+    fixtures.set('/supplier/custody-fence.json', { body: RECOVERY_TEXT });
+    const recordId = await insertNoCopyExternal({ sourcePath: '/supplier/custody-fence.json' });
+
+    const reserved = await reserveRecoveryGeneration({
+      recordId,
+      tenantId: SYSTEM_TENANT_ID,
+      expectedGeneration: 1,
+      expectedCustody: await custodyOf(recordId),
+    });
+    if (reserved.outcome !== 'reserved') throw new Error('expected the reservation to succeed');
+    expect(reserved.custody.storageUri).toBeNull();
+
+    await prisma.checkRun.update({
+      where: { id: reserved.checkRunId },
+      data: { state: CheckRunState.COMPLETE, completedAt: new Date() },
+    });
+    const second = await reverifyNoCopy(recordId, recoveryStorage());
+    expect(second).toMatchObject({ outcome: 'created', generation: 3 });
+    const replacedCustody = await custodyOf(recordId);
+    expect(replacedCustody.storageUri).toEqual(expect.stringContaining('/storage/recovered-'));
+
+    // The second recovery's own generation is settled by the real worker
+    // before the reservation is restored, because the record may hold only
+    // one pending run and the restored reservation has to be that one.
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    await verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    })((await jobsFor(recordId))[0], context());
+    await prisma.checkRun.update({
+      where: { id: reserved.checkRunId },
+      data: { state: CheckRunState.PENDING, completedAt: null, lastEnqueuedAt: null },
+    });
+
+    // The first attempt's own acquisition finally returns, having stored its
+    // own copy on the way, and tries to finalise against the custody it
+    // reserved against.
+    const registerDeps = defaultRegisterDependencies(async () => undefined);
+    const prepared = await settleInRequest(
+      {
+        tenantId: SYSTEM_TENANT_ID,
+        sourceUrl: `${fixtures.baseUrl}/supplier/custody-fence.json`,
+        annotations: { displayName: 'Late attempt', declaredCredentialType: CoreCredentialType.DPP },
+      },
+      {
+        ...registerDeps,
+        fetchDocument: sourceFetcher(),
+        resolveStorage: async () => ({ service: recoveryStorage(), instanceId: 'late-storage' }),
+        findExistingExternal: findExternalByContentDigest,
+      },
+      { mode: 'recover', currentRecordId: recordId, holdsIdentity: false, acquisition: { from: 'source' } },
+    );
+    expect(prepared.storage?.uri).toEqual(expect.stringContaining('/storage/recovered-'));
+    expect(prepared.storage?.uri).not.toEqual(replacedCustody.storageUri);
+
+    const late = await finaliseRecoveryGeneration({
+      recordId,
+      tenantId: SYSTEM_TENANT_ID,
+      checkRunId: reserved.checkRunId,
+      generation: reserved.generation,
+      expectedCustody: reserved.custody,
+      prepared,
+      enqueue,
+    });
+
+    expect(late).toEqual({ outcome: 'superseded', generation: 3 });
+    // Custody is exactly what the second recovery left, and the parked run is
+    // exactly as it was restored: nothing this attempt prepared was written.
+    expect(await custodyOf(recordId)).toEqual(replacedCustody);
+    expect(await prisma.checkRun.findUnique({ where: { id: reserved.checkRunId } })).toMatchObject({
+      state: CheckRunState.PENDING,
+      lastEnqueuedAt: null,
+      failureCode: null,
+    });
+    expect(await jobsFor(recordId)).toHaveLength(1);
+
+    const orphan = capturedLogLines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find(
+        (line) =>
+          line.msg === 'Prepared recovery copy is orphaned and needs operator cleanup' &&
+          line.storageUri === prepared.storage?.uri,
+      );
+    expect(orphan).toMatchObject({ recordId, tenantId: SYSTEM_TENANT_ID, reason: 'superseded' });
   });
 
   it('records changed and not-checked supplier freshness while retaining the protected copy', async () => {
@@ -1660,6 +2124,9 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         storageUri: `${fixtures.baseUrl}/storage/native.json`,
         storageDigestMultibase: storageDigest,
         storageExternalId: null,
+        // The native fixture stores no key, so custody observes none.
+        decryptionKeyPresent: false,
+        encrypted: null,
       },
       enqueue,
     };
@@ -1705,6 +2172,11 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         storageUri: before.external.storageUri,
         storageDigestMultibase: before.external.storageDigestMultibase,
         storageExternalId: before.external.storageExternalId,
+        // Read off the row rather than restated, so this snapshot is the
+        // custody the record actually has and the only thing the test moves
+        // below is the storage URI it means to move.
+        decryptionKeyPresent: before.external.decryptionKey !== null,
+        encrypted: before.external.encrypted,
       },
       enqueue,
     };
@@ -1739,6 +2211,9 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         storageUri: `${fixtures.baseUrl}/storage/native.json`,
         storageDigestMultibase: storageDigest,
         storageExternalId: null,
+        // The native fixture stores no key, so custody observes none.
+        decryptionKeyPresent: false,
+        encrypted: null,
       },
       enqueue,
     });

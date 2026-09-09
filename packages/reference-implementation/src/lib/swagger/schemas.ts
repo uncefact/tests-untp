@@ -29,6 +29,7 @@ import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credenti
 import {
   batchGetLibraryRequestSchema,
   registerExternalCredentialRequestSchema,
+  verifyLibraryRecordRequestSchema,
   updateLibraryAnnotationsRequestSchema,
 } from '@/lib/api/request-schemas/library';
 import {
@@ -578,6 +579,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     // (ADR-053 decision 7), so the published shapes cannot drift from the
     // enforced ones.
     RegisterExternalCredentialRequest: registerExternalCredentialRequestSchema,
+    VerifyLibraryRecordRequest: verifyLibraryRecordRequestSchema,
     UpdateLibraryAnnotationsRequest: updateLibraryAnnotationsRequestSchema,
     BatchGetLibraryRequest: batchGetLibraryRequestSchema,
     CredentialRecord: credentialRecordSchema,
@@ -617,7 +619,8 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
       name === 'CredentialIssueRequest' ||
       name === 'RegisterExternalCredentialRequest' ||
       name === 'UpdateLibraryAnnotationsRequest' ||
-      name === 'BatchGetLibraryRequest'
+      name === 'BatchGetLibraryRequest' ||
+      name === 'VerifyLibraryRecordRequest'
     ) {
       stripAdditionalPropertiesFalse(schemaObj);
     }

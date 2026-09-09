@@ -1,7 +1,7 @@
-import { TextDecoder, TextEncoder } from 'node:util';
+import { TextDecoder } from 'node:util';
 import {
   decodeCredential,
-  decryptCredential,
+  decryptCredentialToBytes,
   getBridge,
   hasValidEnvelopeStructure,
   isEncryptedEnvelope,
@@ -89,15 +89,17 @@ export function readExternalArtefact(bytes: Uint8Array, decryptionKey: string | 
     if (!hasValidEnvelopeStructure(parsed)) {
       return { outcome: 'encrypted-key-failed', bytes, reason: 'envelope-invalid' };
     }
-    let plaintext: string;
+    let plaintext: Uint8Array;
     try {
-      plaintext = decryptCredential({
-        cipherText: parsed.cipherText,
-        key: decryptionKey,
-        iv: parsed.iv,
-        tag: parsed.tag,
-        type: parsed.type,
-      });
+      plaintext = Uint8Array.from(
+        decryptCredentialToBytes({
+          cipherText: parsed.cipherText,
+          key: decryptionKey,
+          iv: parsed.iv,
+          tag: parsed.tag,
+          type: parsed.type,
+        }),
+      );
     } catch (error) {
       // The failure's name and message are recorded, reduced by `safeError`,
       // so a wrong key can be told from a damaged ciphertext when a caller
@@ -110,7 +112,7 @@ export function readExternalArtefact(bytes: Uint8Array, decryptionKey: string | 
       outcome: 'opened',
       encrypted: true,
       keyUnused: false,
-      content: classify(new TextEncoder().encode(plaintext), parseJson(plaintext)),
+      content: classify(plaintext, parseJson(new TextDecoder().decode(plaintext))),
     };
   }
 

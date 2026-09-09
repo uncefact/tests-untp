@@ -537,6 +537,32 @@ describe('toCredentialRecord', () => {
     expect(projected.warnings[1].message).toContain('declared as DPP');
   });
 
+  it('keeps the unused-key warning on a record a later attempt did open with a key', () => {
+    // The flag is only ever set, never cleared, so the sentence has to be
+    // about a past attempt rather than the record as it stands. This record
+    // holds an opened credential, a key of its own and an extracted set of
+    // details, all from a LATER recovery than the one that supplied the
+    // unnecessary key. A present-tense wording would be asserting something
+    // no longer true of it.
+    const projected = toCredentialRecord(
+      record({
+        external: {
+          decryptionKeyUnused: true,
+          encrypted: true,
+          contentDigest: 'zOpenedDigest',
+          decryptionKey: 'protected-receiver-key',
+        },
+        parent: { detailsStatus: CredentialDetailsStatus.EXTRACTED },
+      }),
+      { now: NOW },
+    );
+
+    expect(projected.warnings).toContainEqual({
+      code: 'DECRYPTION_KEY_UNUSED',
+      message: 'A supplied decryption key was not needed on an earlier attempt.',
+    });
+  });
+
   it('projects an advisory duplicate pointer as a warning naming the record it matches', () => {
     // An advisory row carries the pointer and no digest of its own, because
     // the two are exclusive in the database. Fails if the pointer stops

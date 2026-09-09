@@ -135,7 +135,7 @@ describe('published GET /library/{id} contract (#964)', () => {
     expect(value.verification?.failure).toEqual({
       code: 'DECRYPTION_REQUIRED',
       message:
-        'The fetched credential is encrypted and this service holds no key that opens it. The copy is kept as fetched. Supplying a key later is not supported yet.',
+        'The fetched credential is encrypted and this service holds no key that opens it. The copy is kept as fetched. Retry with sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify.',
       retryable: true,
     });
   });

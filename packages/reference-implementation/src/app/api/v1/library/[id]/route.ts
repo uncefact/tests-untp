@@ -286,7 +286,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   issuedAt: null
  *                   encrypted: true
  *                   hasKey: false
- *                   verification: { generation: 1, state: failed, requestedAt: '2026-08-30T11:05:00.000Z', completedAt: '2026-08-30T11:05:02.000Z', checks: { retrieval: pass, decryption: fail, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: DECRYPTION_REQUIRED, message: 'The fetched credential is encrypted and this service holds no key that opens it. The copy is kept as fetched. Supplying a key later is not supported yet.', retryable: true } }
+ *                   verification: { generation: 1, state: failed, requestedAt: '2026-08-30T11:05:00.000Z', completedAt: '2026-08-30T11:05:02.000Z', checks: { retrieval: pass, decryption: fail, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: DECRYPTION_REQUIRED, message: 'The fetched credential is encrypted and this service holds no key that opens it. The copy is kept as fetched. Retry with sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify.', retryable: true } }
  *                   currencyStatus: unknown
  *                   detailsStatus: EXTRACTION_PENDING
  *                   detailsError: null
