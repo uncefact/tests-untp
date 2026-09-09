@@ -27,6 +27,7 @@ import {
 import {
   CredentialDocumentFetchError,
   fetchCredentialDocument,
+  getFetchTimeoutMs,
   getMaxCredentialSize,
   isRetryable,
   type DocumentFetchFailure,
@@ -223,6 +224,20 @@ describe('fetchCredentialDocument', () => {
       expect(mockFetch).toHaveBeenCalledWith(HREF, { signal: expect.any(AbortSignal) });
     });
 
+    // Every RI v0.4 deployment is in this state on the day it upgrades. Fails
+    // if the local wrapper is ever pointed at the new name directly instead of
+    // going through the reader that honours the deprecated one.
+    it('takes the same bypass branch for a deployment still on the deprecated name', async () => {
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      mockFetch.mockResolvedValue(response({ body: new TextEncoder().encode('hello') }));
+
+      await fetchCredentialDocument(HREF);
+
+      expect(mockFetch).toHaveBeenCalledWith(HREF, { signal: expect.any(AbortSignal) });
+      expect(mockResolveDocument).not.toHaveBeenCalled();
+    });
+
     it('classifies a timeout', async () => {
       const timeout = Object.assign(new Error('timed out'), { name: 'TimeoutError' });
       mockFetch.mockRejectedValueOnce(timeout);
@@ -298,10 +313,18 @@ describe('fetchCredentialDocument', () => {
     });
   });
 
-  describe('getMaxCredentialSize', () => {
-    it('uses the configured FETCH_MAX_RESPONSE_SIZE through the exported helper binding', () => {
+  // Both aliases have the same `(env?) => number` type, so swapping them
+  // type-checks. These two cases are what fails when a rename points an alias
+  // at the wrong reader.
+  describe('the re-exported setting readers', () => {
+    it('reads FETCH_MAX_RESPONSE_SIZE through the exported getMaxCredentialSize binding', () => {
       process.env.FETCH_MAX_RESPONSE_SIZE = '2048';
       expect(getMaxCredentialSize()).toBe(2048);
+    });
+
+    it('reads FETCH_TIMEOUT_MS through the exported getFetchTimeoutMs binding', () => {
+      process.env.FETCH_TIMEOUT_MS = '3210';
+      expect(getFetchTimeoutMs()).toBe(3210);
     });
   });
 

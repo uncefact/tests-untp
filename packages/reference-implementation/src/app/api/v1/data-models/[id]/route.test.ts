@@ -1,19 +1,5 @@
-const originalFetchAllowPrivateUrls = {
-  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
-  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
-};
-
-beforeEach(() => {
-  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-});
-
-afterEach(() => {
-  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
-  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
-});
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
+isolateFetchAllowPrivateUrlsEnv();
 
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => {

@@ -8,6 +8,7 @@ jest.mock('next/server', () => ({
   },
 }));
 
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../__tests__/env-doubles/fetch-settings-env';
 // Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
 jest.mock('@/lib/api/with-tenant-auth', () => {
   const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
@@ -604,19 +605,4 @@ describe('GET /api/v1/registrars', () => {
     expect(json.error).toContain('Database error');
   });
 });
-const originalFetchAllowPrivateUrls = {
-  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
-  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
-};
-
-beforeEach(() => {
-  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-});
-
-afterEach(() => {
-  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
-  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
-});
+isolateFetchAllowPrivateUrlsEnv();

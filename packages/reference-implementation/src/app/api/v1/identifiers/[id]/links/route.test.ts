@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../../__tests__/env-doubles/fetch-settings-env';
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number }) => ({
@@ -407,6 +408,9 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
       expect(MOCK_IDR_SERVICE.publishLinks).not.toHaveBeenCalled();
     });
 
+    // The deprecated name here is deliberate, not a missed rename: this is the
+    // compatibility proof that an RI v0.4 deployment's existing setting still
+    // relaxes the stored-address guard during the v0.5 window.
     it('publishes to a private target address when VERIFY_ALLOW_PRIVATE_URLS relaxes the guard', async () => {
       process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
       const req = createFakeRequest({
@@ -663,19 +667,4 @@ describe('GET /api/v1/identifiers/[id]/links', () => {
     expect(mockListLinkRegistrations).not.toHaveBeenCalled();
   });
 });
-const originalFetchAllowPrivateUrls = {
-  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
-  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
-};
-
-beforeEach(() => {
-  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-});
-
-afterEach(() => {
-  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
-  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
-});
+isolateFetchAllowPrivateUrlsEnv();

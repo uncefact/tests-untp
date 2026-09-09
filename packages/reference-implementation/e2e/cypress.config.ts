@@ -6,7 +6,7 @@ import path from 'path';
 import util from 'util';
 import { Client, ClientOptions } from 'minio';
 import pg from 'pg';
-import { readFetchAllowPrivateUrls } from '../src/lib/config/credential-fetch.config';
+import { deriveHarnessAllowPrivateUrls } from '../src/lib/config/credential-fetch.config';
 const { Client: PgClient } = pg;
 
 // Load .env.e2e from this e2e workspace's root.
@@ -15,15 +15,28 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env.e2e') });
 
-const fetchEnvironment = {
-  FETCH_ALLOW_PRIVATE_URLS: process.env.FETCH_ALLOW_PRIVATE_URLS,
-  VERIFY_ALLOW_PRIVATE_URLS: process.env.VERIFY_ALLOW_PRIVATE_URLS,
-};
-const hasFetchSetting = Object.values(fetchEnvironment).some((value) => value !== undefined && value.trim() !== '');
-// Keep the harness default aligned with docker-compose.e2e.yml when no app name is supplied.
-const harnessAllowsPrivateUrls = hasFetchSetting
-  ? readFetchAllowPrivateUrls(fetchEnvironment)
-  : (process.env.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true') === 'true';
+// The repository-root `.env` is the file Compose interpolates when it starts
+// the app container, so the harness reads it too rather than deriving its
+// capability key from a narrower view of the settings than the app under test.
+// It is parsed, never applied to `process.env`, so nothing else in this
+// process picks up a deployment value by accident.
+function parseRepositoryRootEnv(): Record<string, string | undefined> {
+  const rootEnvPath = path.resolve(__dirname, '../../../.env');
+  if (!fs.existsSync(rootEnvPath)) return {};
+  return dotenv.parse(fs.readFileSync(rootEnvPath));
+}
+
+// Ascending precedence: the repository-root `.env`, then `.env.e2e` and the
+// host environment, which `dotenv.config` above has already merged into
+// `process.env` with the host winning.
+// `deriveHarnessAllowPrivateUrls` is the single source of the harness rule;
+// it applies the application's presence, conflict and parsing rules and only
+// falls back to `CYPRESS_VERIFY_ALLOW_PRIVATE_URLS` when neither application
+// name is supplied.
+const harnessAllowsPrivateUrls = deriveHarnessAllowPrivateUrls({
+  ...parseRepositoryRootEnv(),
+  ...process.env,
+});
 
 const execPromise = util.promisify(exec);
 

@@ -10,6 +10,7 @@
  * packages/services/src/encryption/decrypt-credential.no-key-logging.test.ts;
  * the two suites together cover both destinations a key could leak through.
  */
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
 
 // Polyfill AbortSignal.timeout for jsdom (not available in jsdom)
 if (typeof AbortSignal.timeout !== 'function') {
@@ -155,19 +156,4 @@ describe('verify route never logs the decryption key', () => {
     expect(capturedLogLines.join('')).toContain(SENTINEL_KEY);
   });
 });
-const originalFetchAllowPrivateUrls = {
-  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
-  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
-};
-
-beforeEach(() => {
-  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-});
-
-afterEach(() => {
-  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
-  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
-});
+isolateFetchAllowPrivateUrlsEnv();

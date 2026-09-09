@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../../../__tests__/env-doubles/fetch-settings-env';
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number }) => ({
@@ -523,19 +524,4 @@ describe('DELETE /api/v1/identifiers/[id]/links/[linkId]', () => {
     expect(res.status).toBe(404);
   });
 });
-const originalFetchAllowPrivateUrls = {
-  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
-  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
-};
-
-beforeEach(() => {
-  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-});
-
-afterEach(() => {
-  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
-  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
-});
+isolateFetchAllowPrivateUrlsEnv();

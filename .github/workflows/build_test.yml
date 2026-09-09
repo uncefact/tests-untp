@@ -425,6 +425,10 @@ jobs:
     name: E2E RI (${{ matrix.mode }})
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # Job level, not step level: it has to reach the `Start RI stack` step, so
+    # Compose forwards it to the app container, as well as the Cypress step,
+    # which derives its own harness key from it. The stack's services are
+    # private container addresses, so the SSRF guard has to be relaxed for both.
     env:
       FETCH_ALLOW_PRIVATE_URLS: 'true'
     # `v0.7-issue-verify-matrix.cy.ts` issues through the RI and verifies

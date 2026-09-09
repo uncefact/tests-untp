@@ -2,7 +2,7 @@ import {
   readFetchAllowPrivateUrls,
   readFetchMaxResponseSize,
   readFetchTimeoutMs,
-  resolveFetchAllowPrivateUrls,
+  deriveHarnessAllowPrivateUrls,
   validateFetchSettingsOnBoot,
 } from './credential-fetch.config';
 
@@ -22,15 +22,10 @@ describe('readFetchAllowPrivateUrls', () => {
     expect(readFetchAllowPrivateUrls({ VERIFY_ALLOW_PRIVATE_URLS: 'true' })).toBe(true);
   });
 
-  it('resolves provenance without trimming the selected value', () => {
-    expect(resolveFetchAllowPrivateUrls({ VERIFY_ALLOW_PRIVATE_URLS: ' true ' })).toEqual({
-      raw: ' true ',
-      deprecatedName: 'VERIFY_ALLOW_PRIVATE_URLS',
-    });
-    expect(resolveFetchAllowPrivateUrls({ FETCH_ALLOW_PRIVATE_URLS: 'true' })).toEqual({
-      raw: 'true',
-      deprecatedName: undefined,
-    });
+  // Fails if the resolver ever trims the value it selects: a padded old-name
+  // value would then enable the bypass that the exact comparison refuses.
+  it('does not trim the value it selects from the deprecated name', () => {
+    expect(readFetchAllowPrivateUrls({ VERIFY_ALLOW_PRIVATE_URLS: ' true ' })).toBe(false);
   });
 
   it.each([
@@ -47,10 +42,7 @@ describe('readFetchAllowPrivateUrls', () => {
 
   it('treats blank deprecated input as unset', () => {
     expect(readFetchAllowPrivateUrls({ VERIFY_ALLOW_PRIVATE_URLS: ' ', FETCH_ALLOW_PRIVATE_URLS: 'true' })).toBe(true);
-    expect(resolveFetchAllowPrivateUrls({ VERIFY_ALLOW_PRIVATE_URLS: ' ' })).toEqual({
-      raw: undefined,
-      deprecatedName: undefined,
-    });
+    expect(readFetchAllowPrivateUrls({ VERIFY_ALLOW_PRIVATE_URLS: ' ' })).toBe(false);
   });
 
   it('reflects environment changes on each invocation', () => {
@@ -189,5 +181,52 @@ describe('validateFetchSettingsOnBoot', () => {
     validateFetchSettingsOnBoot(logger, env);
     validateFetchSettingsOnBoot(logger, env);
     expect(logger.warn).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('deriveHarnessAllowPrivateUrls', () => {
+  // Each case fails if the harness key stops tracking the application setting:
+  // a wrong value silently skips the SSRF specs or sends them down the wrong
+  // assertion branch, which no other check would catch.
+  it('defaults to true when neither application name is supplied', () => {
+    expect(deriveHarnessAllowPrivateUrls({})).toBe(true);
+  });
+
+  it('honours the harness-only input when neither application name is supplied', () => {
+    expect(deriveHarnessAllowPrivateUrls({ CYPRESS_VERIFY_ALLOW_PRIVATE_URLS: 'false' })).toBe(false);
+  });
+
+  it('takes the new application name over the harness-only input', () => {
+    expect(
+      deriveHarnessAllowPrivateUrls({
+        FETCH_ALLOW_PRIVATE_URLS: 'false',
+        CYPRESS_VERIFY_ALLOW_PRIVATE_URLS: 'true',
+      }),
+    ).toBe(false);
+  });
+
+  it('takes the deprecated application name when it is the only one supplied', () => {
+    expect(deriveHarnessAllowPrivateUrls({ VERIFY_ALLOW_PRIVATE_URLS: 'true' })).toBe(true);
+  });
+
+  it('applies the application parser to a padded value rather than trimming it', () => {
+    expect(deriveHarnessAllowPrivateUrls({ FETCH_ALLOW_PRIVATE_URLS: ' true ' })).toBe(false);
+  });
+
+  it('throws the application conflict when both application names are supplied', () => {
+    expect(() =>
+      deriveHarnessAllowPrivateUrls({ VERIFY_ALLOW_PRIVATE_URLS: 'true', FETCH_ALLOW_PRIVATE_URLS: 'true' }),
+    ).toThrow('VERIFY_ALLOW_PRIVATE_URLS and FETCH_ALLOW_PRIVATE_URLS are both set.');
+  });
+
+  it('counts a blank application value as absent and falls back', () => {
+    expect(deriveHarnessAllowPrivateUrls({ FETCH_ALLOW_PRIVATE_URLS: '   ' })).toBe(true);
+    expect(
+      deriveHarnessAllowPrivateUrls({ FETCH_ALLOW_PRIVATE_URLS: '   ', CYPRESS_VERIFY_ALLOW_PRIVATE_URLS: 'false' }),
+    ).toBe(false);
+  });
+
+  it('returns a boolean, never the raw string', () => {
+    expect(typeof deriveHarnessAllowPrivateUrls({ CYPRESS_VERIFY_ALLOW_PRIVATE_URLS: 'true' })).toBe('boolean');
   });
 });

@@ -1,3 +1,17 @@
+/**
+ * The one fetch for a caller-supplied credential URL (#955). It runs the
+ * guarded resolver by default and a plain fetch when the development bypass is
+ * on. It returns bytes and reports failures as typed facts. Each route maps
+ * those facts to its own responses, so a route that reads a DNS failure or a
+ * 404 differently from the verify route does not need a second fetch.
+ *
+ * Its three settings live in `credential-fetch.config.ts` and are shared with
+ * external registration and the supplier-source check used by re-verification:
+ * `FETCH_ALLOW_PRIVATE_URLS`, which also relaxes the existing stored-address
+ * URL checks, `FETCH_MAX_RESPONSE_SIZE` and `FETCH_TIMEOUT_MS`. Each is read
+ * per invocation, so a change made after boot takes effect on the next fetch.
+ * That module owns the deprecated-name window and the conflict rule.
+ */
 import {
   resolveDocument,
   ResolverError,
@@ -23,17 +37,7 @@ import {
 
 export { getMaxCredentialSize, getFetchTimeoutMs };
 
-/**
- * The shared credential-fetch settings apply to verification, external
- * registration and re-verification source checks. `FETCH_ALLOW_PRIVATE_URLS`
- * also relaxes the existing stored-address URL checks for local development.
- * The fetch returns bytes and reports failures as typed facts. Each route maps
- * those facts to its own response. If both names are introduced after boot,
- * this reader throws and the existing route wrappers return their normal 500
- * response with the conflict text.
- *
- * Whether the development bypass is on for the current invocation.
- */
+/** Whether the development bypass is on for the current invocation. */
 function allowsPrivateUrls(): boolean {
   return readFetchAllowPrivateUrls();
 }

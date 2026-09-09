@@ -43,7 +43,8 @@ export async function registerNode(): Promise<void> {
   validateBundledArtefactsFallbackOnBoot();
   validateStaleClaimOnBoot();
   validateMaxRequestBodyBytesOnBoot();
-  // Validate fetch aliases and values before encryption and queue startup.
+  // Fail the boot on a conflicting or invalid fetch setting, and warn on a
+  // deprecated name, before encryption and queue startup.
   validateFetchSettingsOnBoot(apiLogger);
   await validateEncryptionKeyOnBoot();
   await startJobQueueOnBoot();

@@ -1,3 +1,4 @@
+import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
 // Polyfill AbortSignal.timeout for jsdom (not available in jsdom)
 if (typeof AbortSignal.timeout !== 'function') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,23 +19,19 @@ jest.mock('next/server', () => ({
   },
 }));
 
-// Mock withPublicRoute to mirror handleRouteError behaviour
+// The wrapper is replaced only to drop its request-context and logging setup,
+// which needs a real Request. Its error path calls the real handleRouteError,
+// so the status and body every case below asserts are the mapper's own, not a
+// mirror of it that could drift.
 jest.mock('@/lib/api/with-public-route', () => {
-  const { errorMessage, ServiceRegistryError } = jest.requireActual('@/lib/api/errors');
-  const { ValidationError } = jest.requireActual('@/lib/api/validation');
-
-  function jsonResponse(body: unknown, init?: { status?: number }) {
-    return { status: init?.status ?? 200, json: async () => body };
-  }
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
 
   return {
     withPublicRoute: (handler: (req: unknown) => Promise<unknown>) => async (req: unknown) => {
       try {
         return await handler(req);
       } catch (e: unknown) {
-        if (e instanceof ValidationError) return jsonResponse({ error: (e as Error).message }, { status: 400 });
-        if (e instanceof ServiceRegistryError) return jsonResponse({ error: (e as Error).message }, { status: 500 });
-        return jsonResponse({ error: errorMessage(e) }, { status: 500 });
+        return handleRouteError(e);
       }
     },
   };
@@ -60,6 +57,8 @@ jest.mock('@uncefact/untp-ri-services', () => {
     isEncryptedEnvelope: (...args: unknown[]) => mockIsEncryptedEnvelope(...args),
     hasValidEnvelopeStructure: (...args: unknown[]) => mockHasValidEnvelopeStructure(...args),
     VcVerifyError: actual.VcVerifyError,
+    // The real error mapper branches on this class, so it must be the real one.
+    ServiceError: actual.ServiceError,
   };
 });
 
@@ -258,6 +257,29 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.code).toBe('INVALID_RESPONSE');
+  });
+
+  // The public counterpart of the authenticated proof in registrars/route.test.ts.
+  // withPublicRoute is a different wrapper, so that one does not transfer. Fails
+  // if the readers are ever cached at module load, which would let a pair
+  // introduced after boot go unnoticed, or if the mapper starts redacting the
+  // conflict text an operator needs.
+  it('returns the size-setting conflict as a 500 to an unauthenticated caller', async () => {
+    process.env.VERIFY_MAX_CREDENTIAL_SIZE = '2048';
+    process.env.FETCH_MAX_RESPONSE_SIZE = '2048';
+    try {
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({
+        error:
+          'VERIFY_MAX_CREDENTIAL_SIZE and FETCH_MAX_RESPONSE_SIZE are both set. VERIFY_MAX_CREDENTIAL_SIZE was renamed to FETCH_MAX_RESPONSE_SIZE in v0.5. Set FETCH_MAX_RESPONSE_SIZE to the value you intend, remove VERIFY_MAX_CREDENTIAL_SIZE, and restart.',
+      });
+      expect(mockResolveDocument).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.VERIFY_MAX_CREDENTIAL_SIZE;
+      delete process.env.FETCH_MAX_RESPONSE_SIZE;
+    }
   });
 
   it('fetches the canonical href on the development-bypass branch too', async () => {
@@ -770,19 +792,4 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.error).toBe('VCKit connection refused');
   });
 });
-const originalFetchAllowPrivateUrls = {
-  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
-  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
-};
-
-beforeEach(() => {
-  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-});
-
-afterEach(() => {
-  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
-  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
-  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
-  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
-});
+isolateFetchAllowPrivateUrlsEnv();
