@@ -29,6 +29,36 @@ function parseRepositoryRootEnv(): Record<string, string | undefined> {
 // Ascending precedence: the repository-root `.env`, then `.env.e2e` and the
 // host environment, which `dotenv.config` above has already merged into
 // `process.env` with the host winning.
+const harnessEnv: Record<string, string | undefined> = {
+  ...parseRepositoryRootEnv(),
+  ...process.env,
+};
+
+const APPLICATION_PRIVATE_URL_NAMES = ['FETCH_ALLOW_PRIVATE_URLS', 'VERIFY_ALLOW_PRIVATE_URLS'] as const;
+
+// The environment files are read with `dotenv.parse`, which returns each value
+// exactly as written. Compose, which interpolates the same root `.env` when it
+// starts the app container, does expand `${VAR:-default}` and `$VAR`. An
+// expression left in one of the two private-address names would therefore give
+// the harness a different answer from the application it is testing, so the
+// harness refuses it rather than guessing. A single-quoted expression is a
+// literal to Compose, but `dotenv.parse` strips the quotation marks, so a
+// parsed value cannot tell the two apart; the message says the form is
+// unsupported here and does not claim Compose would expand it. Only these two
+// names are inspected, and the check runs on the effective value, so a host
+// literal shadowing a root expression passes.
+function refuseExpressionsInPrivateUrlNames(env: Record<string, string | undefined>): void {
+  for (const name of APPLICATION_PRIVATE_URL_NAMES) {
+    const value = env[name];
+    if (value === undefined || !value.includes('$')) continue;
+    throw new Error(
+      `${name} contains a '$' character. The e2e harness reads the environment files literally and does not support shell or Compose expressions (\${VAR:-default}, $VAR) in FETCH_ALLOW_PRIVATE_URLS or VERIFY_ALLOW_PRIVATE_URLS. Write a literal value in the file, or export the literal ${name} in the shell that runs Cypress, which takes precedence over the files.`,
+    );
+  }
+}
+
+refuseExpressionsInPrivateUrlNames(harnessEnv);
+
 // `readFetchAllowPrivateUrlsIfSet` gives the application's own answer when
 // either application name is supplied, applying its presence, conflict and
 // parsing rules, and `undefined` when neither is. The fallback below and its
@@ -38,12 +68,32 @@ function parseRepositoryRootEnv(): Record<string, string | undefined> {
 // A both-names conflict throws while this file evaluates, which fails every
 // spec's load deliberately, because the application refuses the same
 // environment.
-const harnessEnv: Record<string, string | undefined> = {
-  ...parseRepositoryRootEnv(),
-  ...process.env,
-};
+// This derivation only seeds the initial `env.VERIFY_ALLOW_PRIVATE_URLS`.
+// Cypress then merges its own inputs over that key (`cypress.env.json`,
+// `CYPRESS_`- and `cypress_`-prefixed process variables, `--env`) before it
+// calls `setupNodeEvents`, so the callback below is the only place that sees
+// the value the specs will read, and that is where the agreement check lives.
 const harnessAllowsPrivateUrls =
   readFetchAllowPrivateUrlsIfSet(harnessEnv) ?? (harnessEnv.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true') === 'true';
+
+/**
+ * Refuses a run whose resolved capability key disagrees with the application
+ * setting the operator supplied. Agreement means the same boolean, identical
+ * in type, because the specs read the key with a plain truthiness test and a
+ * string such as `'false'` would silently pass it. When neither application
+ * name is set there is nothing to disagree with, and the operator may declare a
+ * remote instance's capability through any Cypress input, so no comparison is
+ * made. The message names the sources rather than the values, because the
+ * disagreement is about which input should be believed.
+ */
+function requireResolvedKeyToMatchApplicationSetting(resolvedValue: unknown): void {
+  const applicationSetting = readFetchAllowPrivateUrlsIfSet(harnessEnv);
+  if (applicationSetting === undefined) return;
+  if (resolvedValue === applicationSetting) return;
+  throw new Error(
+    'The harness capability key VERIFY_ALLOW_PRIVATE_URLS was overridden after the Cypress config file computed it from the application setting (FETCH_ALLOW_PRIVATE_URLS or VERIFY_ALLOW_PRIVATE_URLS). Cypress merges cypress.env.json, CYPRESS_ or cypress_ prefixed process variables and --env over the config file, and one of those supplied a different value. Remove the override, or make it the same boolean as the application setting.',
+  );
+}
 
 const execPromise = util.promisify(exec);
 
@@ -195,7 +245,9 @@ export default defineConfig({
     },
     defaultCommandTimeout: 10000,
     defaultBrowser: 'chrome',
-    setupNodeEvents(on) {
+    setupNodeEvents(on, config) {
+      requireResolvedKeyToMatchApplicationSetting(config.env.VERIFY_ALLOW_PRIVATE_URLS);
+
       // Clean up all test artefacts after all specs complete
       on('after:run', async () => {
         const client = getDbClient();
@@ -591,6 +643,8 @@ export default defineConfig({
           }
         },
       });
+
+      return config;
     },
   },
 });

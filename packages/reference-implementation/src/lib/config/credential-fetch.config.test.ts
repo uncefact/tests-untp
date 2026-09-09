@@ -176,6 +176,19 @@ describe('validateFetchSettingsOnBoot', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
+  // A validator that warned about each setting as it went would emit the
+  // deprecated-boolean warning before it ever reached the unusable timeout,
+  // advising a rename on a boot that is about to fail.
+  it('emits no warning when an earlier deprecated setting is valid and a later one is not', () => {
+    expect(() =>
+      validateFetchSettingsOnBoot(logger, {
+        VERIFY_ALLOW_PRIVATE_URLS: 'false',
+        FETCH_TIMEOUT_MS: '1.5',
+      }),
+    ).toThrow(/FETCH_TIMEOUT_MS must be a positive integer/);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
   it('warns on each independent startup invocation', () => {
     const env = { VERIFY_ALLOW_PRIVATE_URLS: 'false' };
     validateFetchSettingsOnBoot(logger, env);
