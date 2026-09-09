@@ -21,6 +21,7 @@ import {
   toCredentialRecordDetail,
 } from '@/lib/library/credential-record-projection';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
+import { deleteLibraryRecordAndCopy } from '@/lib/library/delete-library-record';
 import {
   getLibraryRecordById,
   LibraryRecordWriteAnomalyError,
@@ -341,6 +342,103 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
     }
     return sanitisedServerError(error, id, 'Library record detail read failed');
   }
+});
+
+const NATIVE_DELETE_MESSAGE = 'This is a native credential record; it cannot be removed from the library.';
+
+/**
+ * @swagger
+ * /library/{id}:
+ *   delete:
+ *     operationId: deleteLibraryRecord
+ *     summary: Delete a library record
+ *     description: |
+ *       Deletes an external library record owned by the caller's tenant. The
+ *       lookup is tenant-scoped before the native-origin check. The four
+ *       idempotent 204 cases are a record that was deleted just now, a record
+ *       already deleted by an earlier call, no record with this id at all and
+ *       a record that exists only in another tenant. A native record in the
+ *       caller's tenant is the only record-level 403; authentication can
+ *       separately refuse a principal with no tenant assignment.
+ *
+ *       A successful delete removes the record, its verification history and
+ *       its registration claim in one transaction. Durable-copy deletion is
+ *       attempted after commit using the coordinates recorded on the row. A
+ *       cleanup failure does not change the 204 response; it leaves an
+ *       operator-visible orphan warning for an operator-run sweep, which
+ *       this release does not install. When the deleted record held a content
+ *       identity that other records duplicated, the oldest duplicate becomes
+ *       its holder and the rest point at it. Deletion never revokes or
+ *       otherwise affects the credential at its source.
+ *     tags:
+ *       - Library
+ *     parameters:
+ *       - $ref: '#/components/parameters/LibraryRecordId'
+ *     responses:
+ *       204:
+ *         description: |
+ *           Idempotent success with no response body. This is returned when
+ *           the record was deleted, was already absent, does not exist, or
+ *           exists only in another tenant, whether native or external. A
+ *           durable-copy cleanup failure does not alter this response.
+ *       401:
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         description: >-
+ *           Forbidden. Either of: Forbidden - authenticated principal has no
+ *           resolvable tenant assignment; or the target is a native
+ *           credential record that cannot be removed from the library. A
+ *           foreign tenant record is a 204 case, not a 403 case.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               noTenantForUser:
+ *                 summary: The authenticated user maps to no tenant
+ *                 value: { error: 'No tenant found for user' }
+ *               nativeNotDeletable:
+ *                 value: { error: 'This is a native credential record; it cannot be removed from the library.', code: NATIVE_CREDENTIAL_NOT_DELETABLE }
+ *       500:
+ *         description: |
+ *           The transaction failed and was rolled back, or its commit outcome
+ *           is uncertain. The response is sanitised and safe to repeat. A
+ *           durable-copy cleanup failure is handled after commit and never
+ *           reaches this response.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
+  const { id } = await params;
+  if (id.includes('\0')) {
+    logger.info({ tenantId, reason: 'nul_id' }, 'Library record delete treated as missing');
+    return new NextResponse(null, { status: 204 });
+  }
+
+  let result;
+  try {
+    result = await deleteLibraryRecordAndCopy({ recordId: id, tenantId });
+  } catch (error) {
+    if (isDatabaseError(error)) {
+      logger.warn({ recordId: id, tenantId }, 'Library record delete hit a database error');
+      throw error;
+    }
+    return sanitisedServerError(error, id, 'Library record delete failed and rolled back');
+  }
+
+  if (result.outcome === 'missing') {
+    logger.info({ recordId: id, tenantId }, 'Library record delete missed');
+    return new NextResponse(null, { status: 204 });
+  }
+  if (result.outcome === 'native') {
+    throw new ForbiddenError(NATIVE_DELETE_MESSAGE, 'NATIVE_CREDENTIAL_NOT_DELETABLE');
+  }
+
+  // The module has already committed the delete and finished its best-effort
+  // durable-copy cleanup, whose outcome never changes this response.
+  return new NextResponse(null, { status: 204 });
 });
 
 const INVALID_IF_VERSION_MESSAGE = 'If-Version must be an integer between 1 and 2147483647.';

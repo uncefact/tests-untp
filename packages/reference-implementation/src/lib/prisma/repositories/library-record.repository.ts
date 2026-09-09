@@ -19,6 +19,9 @@ import {
 import { BLOCKING_CHECKS, CHECK_NAMES, isNativeMasked, type LibraryCheckName } from '@/lib/library/check-rules';
 import type { LibraryOrigin, VerificationSummary } from '@/lib/library/credential-record-projection';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { withDeadlockRetry } from './check-run.repository';
+import { apiLogger } from '@/lib/api/logger';
+import { promoteExternalCredentialDigest } from './external-credential.repository';
 
 const LIBRARY_RECORD_INCLUDE = {
   credential: true,
@@ -411,6 +414,26 @@ export class LibraryRecordWriteAnomalyError extends Error {
   }
 }
 
+const logger = apiLogger.child({ module: 'library-record.repository' });
+
+/**
+ * The delete writer's own anomaly: an advisory row attached to the record
+ * between the optimistic lock plan and the lock itself. It is the only write
+ * anomaly the delete restarts, so the restart matches this class and never a
+ * sibling reason that shares the parent class. Recovery's late-lock
+ * discovery (`RecoveryLockDiscoveryMismatchError` in `check-run.repository.ts`)
+ * carries the missing id and forces it into the next attempt's lock set;
+ * this one carries nothing and re-plans wholesale, because a delete's set is
+ * "the record and everything pointing at it", which a fresh plan read
+ * recomputes exactly.
+ */
+export class LibraryRecordDeletePlanAnomalyError extends LibraryRecordWriteAnomalyError {
+  constructor(recordId: string) {
+    super(recordId, 'gained an advisory between planning and locking its delete');
+    this.name = 'LibraryRecordDeletePlanAnomalyError';
+  }
+}
+
 export type LibraryRecordAnnotationChanges = {
   displayName?: string;
   declaredCredentialType?: CoreCredentialType;
@@ -550,6 +573,32 @@ export async function batchGetLibraryRecords(options: {
 }
 
 /**
+ * Takes tenant-scoped `FOR UPDATE` locks on the supplied library parents in
+ * one statement, ascending by id, and returns the ids that were found (an id
+ * that is absent or belongs to another tenant is simply not in the set). The
+ * caller must use an interactive transaction client and re-check any rows
+ * discovered after this statement before calling a helper that writes their
+ * parents. Recovery's finalise step in `check-run.repository.ts` calls this
+ * same helper, so the one ascending order here is the deadlock-freedom
+ * argument for every writer that locks more than one parent.
+ */
+export async function lockLibraryRecordsForUpdate(
+  tx: Prisma.TransactionClient,
+  ids: readonly string[],
+  tenantId: string,
+): Promise<Set<string>> {
+  const lockIds = [...new Set(ids)].sort();
+  if (lockIds.length === 0) return new Set();
+
+  const locked = await tx.$queryRawUnsafe<Array<{ id: string }>>(
+    'SELECT "id" FROM "LibraryRecord" WHERE "id" = ANY($1::text[]) AND "tenantId" = $2 ORDER BY "id" ASC FOR UPDATE',
+    lockIds,
+    tenantId,
+  );
+  return new Set(locked.map((row) => row.id));
+}
+
+/**
  * Reads one tenant-owned library record with the single child its origin has
  * (ADR-053 decision 1) and its newest verification run.
  *
@@ -686,4 +735,162 @@ export async function updateLibraryRecordAnnotations(input: {
       timeout: 15_000,
     },
   );
+}
+
+export type DeleteLibraryRecordStorage = Pick<
+  ExternalLibraryRecordView['external'],
+  'storageUri' | 'storageServiceInstanceId' | 'storageExternalId' | 'storageBucket'
+>;
+
+export type DeleteLibraryRecordResult =
+  | { outcome: 'missing' }
+  | { outcome: 'native' }
+  | { outcome: 'deleted'; storage: DeleteLibraryRecordStorage };
+
+/**
+ * Test-only seams: `beforeLock` pauses a delete inside its transaction before
+ * the ordered lock statement; `onAttemptError` observes every failed attempt
+ * before the retry logic sees it, so a schedule test can tell a deadlock retry
+ * from a plan restart instead of counting attempts. Both are no-ops unless a
+ * test sets them.
+ */
+export const deleteLibraryRecordTestHooks: {
+  beforeLock?: () => Promise<void>;
+  onAttemptError?: (error: unknown) => void;
+} = {};
+
+async function planLibraryRecordDeleteLockIds(recordId: string, tenantId: string): Promise<string[]> {
+  const advisories = await prisma.externalCredential.findMany({
+    where: { tenantId, duplicateOfRecordId: recordId },
+    select: { id: true },
+  });
+  return [...new Set([recordId, ...advisories.map((advisory) => advisory.id)])].sort();
+}
+
+async function deleteLibraryRecordTransaction(input: {
+  recordId: string;
+  tenantId: string;
+}): Promise<DeleteLibraryRecordResult> {
+  const plannedLockIds = await planLibraryRecordDeleteLockIds(input.recordId, input.tenantId);
+
+  return prisma.$transaction(
+    async (tx) => {
+      if (deleteLibraryRecordTestHooks.beforeLock) await deleteLibraryRecordTestHooks.beforeLock();
+
+      const lockedIds = await lockLibraryRecordsForUpdate(tx, plannedLockIds, input.tenantId);
+      if (!lockedIds.has(input.recordId)) return { outcome: 'missing' };
+
+      const view = await readLibraryRecordFromClient(tx, input.recordId, input.tenantId);
+      if (view === null) return { outcome: 'missing' };
+      if (view.origin === LibraryRecordOrigin.NATIVE) return { outcome: 'native' };
+
+      const storage: DeleteLibraryRecordStorage = {
+        storageUri: view.external.storageUri,
+        storageServiceInstanceId: view.external.storageServiceInstanceId,
+        storageExternalId: view.external.storageExternalId,
+        storageBucket: view.external.storageBucket,
+      };
+
+      // A record with no content digest has no advisories, so the re-check and
+      // the promotion are needed only on this branch. That invariant is kept
+      // elsewhere: registration attaches an advisory only to a record holding
+      // the digest it observed (`register-external-credential.ts`), promotion
+      // repoints every advisory off a record that gives its digest up
+      // (`promoteExternalCredentialDigest`), and this transaction's parent
+      // lock serialises any attach against it. Were it ever to break, the
+      // parent cascade's `ON DELETE SET NULL` would release the identity
+      // silently, which is why the lock plan above still collects advisories
+      // unconditionally.
+      if (view.external.contentDigest !== null) {
+        const advisories = await tx.externalCredential.findMany({
+          where: { tenantId: input.tenantId, duplicateOfRecordId: input.recordId },
+          select: { id: true },
+        });
+        const unlocked = advisories.find((advisory) => !lockedIds.has(advisory.id));
+        if (unlocked) {
+          throw new LibraryRecordDeletePlanAnomalyError(input.recordId);
+        }
+
+        await promoteExternalCredentialDigest(tx, {
+          recordId: input.recordId,
+          tenantId: input.tenantId,
+          contentDigest: view.external.contentDigest,
+        });
+      }
+
+      // The row was read as EXTERNAL under this lock and origin never changes,
+      // so the origin predicate guards no reachable state; it stays as defence
+      // in depth on the one statement that cascades, so that a native parent
+      // can never be the row this delete removes.
+      await tx.libraryRecord.delete({
+        where: {
+          id_tenantId_origin: {
+            id: input.recordId,
+            tenantId: input.tenantId,
+            origin: LibraryRecordOrigin.EXTERNAL,
+          },
+        },
+      });
+
+      return { outcome: 'deleted', storage };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5_000,
+      timeout: 15_000,
+    },
+  );
+}
+
+/**
+ * Deletes one tenant-owned external record. An unlocked plan read first
+ * collects the record and every advisory record pointing at it, because the
+ * promotion helper writes those parents and requires them locked; the
+ * transaction then locks that set in one ordered statement, re-checks the
+ * advisory set under the lock, promotes, and deletes. An advisory that
+ * attached between the plan and the lock restarts the whole transaction once
+ * with a fresh plan. The lock set has no ceiling: deleting the holder of a
+ * large duplicate group locks and repoints every member inside the same
+ * 15 s transaction budget as a single-parent delete, which is accepted
+ * because a group is bounded by one tenant's own registrations. The returned
+ * storage coordinates are an owned snapshot for the post-commit cleanup; no
+ * storage call is made while the transaction is open.
+ */
+export async function deleteLibraryRecord(input: {
+  recordId: string;
+  tenantId: string;
+}): Promise<DeleteLibraryRecordResult> {
+  let transactionAttempts = 0;
+  const attempt = async (): Promise<DeleteLibraryRecordResult> => {
+    transactionAttempts += 1;
+    try {
+      return await deleteLibraryRecordTransaction(input);
+    } catch (error) {
+      deleteLibraryRecordTestHooks.onAttemptError?.(error);
+      throw error;
+    }
+  };
+
+  try {
+    return await withDeadlockRetry(attempt, {
+      recordId: input.recordId,
+      tenantId: input.tenantId,
+      op: 'deleteLibraryRecord',
+    });
+  } catch (error) {
+    // One re-plan for the one anomaly the plan can suffer, and only when the
+    // deadlock retry has not already spent the second attempt. The two share
+    // one budget deliberately: the invariant is at most two transactions per
+    // call, whichever cause consumed the first, so the restarted attempt runs
+    // outside `withDeadlockRetry` and a deadlock or a second anomaly on it
+    // surfaces to the caller as a sanitised 500 that is safe to repeat.
+    if (error instanceof LibraryRecordDeletePlanAnomalyError && transactionAttempts === 1) {
+      logger.warn(
+        { recordId: input.recordId, tenantId: input.tenantId, op: 'deleteLibraryRecord' },
+        'Library record delete found an advisory attached after planning its locks; re-planning once',
+      );
+      return attempt();
+    }
+    throw error;
+  }
 }

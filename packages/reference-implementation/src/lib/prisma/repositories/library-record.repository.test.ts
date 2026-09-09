@@ -1,8 +1,13 @@
 jest.mock('../prisma', () => ({
   prisma: {
     libraryRecord: { findFirst: jest.fn(), findMany: jest.fn() },
+    externalCredential: { findMany: jest.fn() },
     $transaction: jest.fn(),
   },
+}));
+
+jest.mock('./external-credential.repository', () => ({
+  promoteExternalCredentialDigest: jest.fn(),
 }));
 
 import { CheckResult, CheckRunState, CoreCredentialType, LibraryRecordOrigin, Prisma } from '../generated';
@@ -11,18 +16,23 @@ import {
   batchGetLibraryRecords,
   buildLibraryBatchGetQuery,
   buildLibraryListQuery,
+  deleteLibraryRecord,
   getLibraryRecordById,
   LibraryRecordWriteAnomalyError,
   listLibraryRecords,
   updateLibraryRecordAnnotations,
   type LibraryRecordAnnotationChanges,
 } from './library-record.repository';
+import { promoteExternalCredentialDigest } from './external-credential.repository';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
 
 const mockGlobalFindFirst = prisma.libraryRecord.findFirst as unknown as jest.Mock;
+const mockGlobalExternalFindMany = (prisma as unknown as { externalCredential: { findMany: jest.Mock } })
+  .externalCredential.findMany;
 const mockTransaction = prisma.$transaction as unknown as jest.Mock;
 const mockUpdateMany = jest.fn();
 const mockParentUpdate = jest.fn();
+const mockParentDelete = jest.fn();
 const mockQueryRawUnsafe = jest.fn();
 
 /**
@@ -33,12 +43,18 @@ const mockQueryRawUnsafe = jest.fn();
  */
 const mockFindFirst = jest.fn();
 const mockFindMany = jest.fn();
+const mockAdvisoryFindMany = jest.fn();
 const mockCheckRunFindMany = jest.fn();
 const mockQueryRaw = jest.fn();
 const transactionClient = {
-  libraryRecord: { findFirst: mockFindFirst, findMany: mockFindMany, update: mockParentUpdate },
+  libraryRecord: {
+    findFirst: mockFindFirst,
+    findMany: mockFindMany,
+    update: mockParentUpdate,
+    delete: mockParentDelete,
+  },
   checkRun: { findMany: mockCheckRunFindMany },
-  externalCredential: { updateMany: mockUpdateMany },
+  externalCredential: { updateMany: mockUpdateMany, findMany: mockAdvisoryFindMany },
   $queryRaw: mockQueryRaw,
   $queryRawUnsafe: mockQueryRawUnsafe,
 };
@@ -93,14 +109,20 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockFindFirst.mockReset();
   mockFindMany.mockReset();
+  mockGlobalExternalFindMany.mockReset();
+  mockAdvisoryFindMany.mockReset();
   mockCheckRunFindMany.mockReset();
   mockQueryRaw.mockReset();
   mockGlobalFindFirst.mockImplementation(() => {
     throw new Error('the record was read on the global client, outside the repeatable-read transaction');
   });
   mockQueryRawUnsafe.mockResolvedValue([{ id: 'record-1' }]);
+  mockGlobalExternalFindMany.mockResolvedValue([]);
+  mockAdvisoryFindMany.mockResolvedValue([]);
   mockUpdateMany.mockResolvedValue({ count: 1 });
   mockParentUpdate.mockResolvedValue({});
+  mockParentDelete.mockResolvedValue({});
+  (promoteExternalCredentialDigest as unknown as jest.Mock).mockResolvedValue({ outcome: 'none' });
   mockTransaction.mockImplementation(async (callback: (client: unknown) => unknown) => callback(transactionClient));
 });
 
@@ -810,5 +832,251 @@ describe('buildLibraryBatchGetQuery', () => {
     expect(query.sql).toContain('n."tenantId" = r."tenantId"');
     expect(query.sql).toContain('ORDER BY n."generation" DESC');
     expect(query.sql).toContain('LIMIT 1');
+  });
+});
+
+describe('deleteLibraryRecord', () => {
+  const input = { recordId: 'record-1', tenantId: 'tenant-1' };
+
+  function externalDeleteRow(overrides: Record<string, unknown> = {}) {
+    return row({
+      externalCredential: {
+        ...row().externalCredential,
+        contentDigest: null,
+        storageUri: null,
+        storageServiceInstanceId: null,
+        storageExternalId: null,
+        storageBucket: null,
+        ...overrides,
+      },
+    });
+  }
+
+  it('locks before reading, returns a miss without writing, and uses the delete transaction options', async () => {
+    mockQueryRawUnsafe.mockResolvedValue([]);
+
+    await expect(deleteLibraryRecord(input)).resolves.toEqual({ outcome: 'missing' });
+
+    expect(mockTransaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5_000,
+      timeout: 15_000,
+    });
+    expect(mockQueryRawUnsafe.mock.invocationCallOrder[0]).toBeLessThan(
+      mockFindFirst.mock.invocationCallOrder[0] ?? Infinity,
+    );
+    expect(mockGlobalExternalFindMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', duplicateOfRecordId: 'record-1' },
+      select: { id: true },
+    });
+    expect(mockQueryRawUnsafe).toHaveBeenCalledWith(
+      'SELECT "id" FROM "LibraryRecord" WHERE "id" = ANY($1::text[]) AND "tenantId" = $2 ORDER BY "id" ASC FOR UPDATE',
+      ['record-1'],
+      'tenant-1',
+    );
+    expect(mockFindFirst).not.toHaveBeenCalled();
+    expect(mockParentDelete).not.toHaveBeenCalled();
+  });
+
+  it('locks the complete planned id set in ascending order in one statement', async () => {
+    mockGlobalExternalFindMany.mockResolvedValue([{ id: 'record-3' }, { id: 'record-2' }]);
+    mockQueryRawUnsafe.mockResolvedValue([{ id: 'record-1' }, { id: 'record-2' }, { id: 'record-3' }]);
+    mockFindFirst.mockResolvedValue(externalDeleteRow());
+
+    await expect(deleteLibraryRecord(input)).resolves.toMatchObject({ outcome: 'deleted' });
+
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(1);
+    expect(mockQueryRawUnsafe).toHaveBeenCalledWith(
+      'SELECT "id" FROM "LibraryRecord" WHERE "id" = ANY($1::text[]) AND "tenantId" = $2 ORDER BY "id" ASC FOR UPDATE',
+      ['record-1', 'record-2', 'record-3'],
+      'tenant-1',
+    );
+  });
+
+  it('returns native without writing or attempting promotion', async () => {
+    mockFindFirst.mockResolvedValue(
+      row({
+        origin: LibraryRecordOrigin.NATIVE,
+        credential: { id: 'record-1', tenantId: 'tenant-1', origin: LibraryRecordOrigin.NATIVE },
+        externalCredential: null,
+        checkRuns: [],
+      }),
+    );
+
+    await expect(deleteLibraryRecord(input)).resolves.toEqual({ outcome: 'native' });
+
+    expect(mockParentDelete).not.toHaveBeenCalled();
+    expect(promoteExternalCredentialDigest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['no advisory', { outcome: 'none' }],
+    ['promoted advisory', { outcome: 'promoted', recordId: 'record-2', repointed: 1 }],
+  ])(
+    'deletes the external parent after %s and returns exactly the four custody coordinates',
+    async (_name, promotion) => {
+      const storage = {
+        storageUri: null,
+        storageServiceInstanceId: 'storage-instance-1',
+        storageExternalId: 'object-1',
+        storageBucket: 'bucket-1',
+      };
+      mockFindFirst.mockResolvedValue(externalDeleteRow({ contentDigest: 'zDigest', ...storage }));
+      (promoteExternalCredentialDigest as unknown as jest.Mock).mockResolvedValue(promotion);
+
+      await expect(deleteLibraryRecord(input)).resolves.toEqual({ outcome: 'deleted', storage });
+
+      expect(promoteExternalCredentialDigest).toHaveBeenCalledWith(transactionClient, {
+        recordId: 'record-1',
+        tenantId: 'tenant-1',
+        contentDigest: 'zDigest',
+      });
+      expect(mockParentDelete).toHaveBeenCalledWith({
+        where: {
+          id_tenantId_origin: {
+            id: 'record-1',
+            tenantId: 'tenant-1',
+            origin: LibraryRecordOrigin.EXTERNAL,
+          },
+        },
+      });
+    },
+  );
+
+  it('promotes a no-copy holder that still holds a content identity: null coordinates never gate promotion', async () => {
+    const storage = {
+      storageUri: null,
+      storageServiceInstanceId: null,
+      storageExternalId: null,
+      storageBucket: null,
+    };
+    mockFindFirst.mockResolvedValue(externalDeleteRow({ contentDigest: 'zHolder', ...storage }));
+
+    await expect(deleteLibraryRecord(input)).resolves.toEqual({ outcome: 'deleted', storage });
+
+    expect(promoteExternalCredentialDigest).toHaveBeenCalledWith(transactionClient, {
+      recordId: 'record-1',
+      tenantId: 'tenant-1',
+      contentDigest: 'zHolder',
+    });
+    expect(mockParentDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns all-null coordinates without treating undefined fields as a digest or a storage instruction', async () => {
+    const storage = {
+      storageUri: null,
+      storageServiceInstanceId: null,
+      storageExternalId: null,
+      storageBucket: null,
+    };
+    mockFindFirst.mockResolvedValue(externalDeleteRow(storage));
+
+    await expect(deleteLibraryRecord(input)).resolves.toEqual({ outcome: 'deleted', storage });
+
+    expect(promoteExternalCredentialDigest).not.toHaveBeenCalled();
+    expect(mockParentDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['the read', () => mockFindFirst.mockRejectedValue(new Error('read failed'))],
+    ['promotion', () => mockFindFirst.mockResolvedValue(externalDeleteRow({ contentDigest: 'zDigest' }))],
+    ['parent delete', () => mockFindFirst.mockResolvedValue(externalDeleteRow())],
+  ])('propagates a failure from %s so no deleted result escapes', async (_name, configure) => {
+    configure();
+    if (_name === 'promotion') {
+      (promoteExternalCredentialDigest as unknown as jest.Mock).mockRejectedValue(new Error('promotion failed'));
+    }
+    if (_name === 'parent delete') mockParentDelete.mockRejectedValue(new Error('delete failed'));
+
+    await expect(deleteLibraryRecord(input)).rejects.toThrow();
+  });
+
+  it('propagates a transaction failure rather than manufacturing a deleted result', async () => {
+    mockTransaction.mockRejectedValueOnce(new Error('transaction failed'));
+
+    await expect(deleteLibraryRecord(input)).rejects.toThrow('transaction failed');
+  });
+
+  it('restarts once when the transaction reports a deadlock', async () => {
+    const deadlock = Object.assign(new Error('deadlock detected'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2034',
+      clientVersion: '6.19.2',
+    });
+    mockFindFirst.mockResolvedValue(externalDeleteRow());
+    mockTransaction
+      .mockRejectedValueOnce(deadlock)
+      .mockImplementationOnce(async (callback: (client: unknown) => unknown) => callback(transactionClient));
+
+    await expect(deleteLibraryRecord(input)).resolves.toMatchObject({ outcome: 'deleted' });
+
+    expect(mockTransaction).toHaveBeenCalledTimes(2);
+    expect(mockGlobalExternalFindMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('replans and restarts once when the advisory set changes before locking', async () => {
+    mockGlobalExternalFindMany
+      .mockResolvedValueOnce([{ id: 'record-2' }])
+      .mockResolvedValueOnce([{ id: 'record-2' }, { id: 'record-3' }]);
+    mockFindFirst.mockResolvedValue(externalDeleteRow({ contentDigest: 'zDigest' }));
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([{ id: 'record-1' }, { id: 'record-2' }])
+      .mockResolvedValueOnce([{ id: 'record-1' }, { id: 'record-2' }, { id: 'record-3' }]);
+    mockAdvisoryFindMany
+      .mockResolvedValueOnce([{ id: 'record-2' }, { id: 'record-3' }])
+      .mockResolvedValueOnce([{ id: 'record-2' }, { id: 'record-3' }]);
+
+    await expect(deleteLibraryRecord(input)).resolves.toMatchObject({ outcome: 'deleted' });
+
+    expect(mockTransaction).toHaveBeenCalledTimes(2);
+    expect(mockGlobalExternalFindMany).toHaveBeenCalledTimes(2);
+    expect(promoteExternalCredentialDigest).toHaveBeenCalledTimes(1);
+    expect(mockParentDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry other transaction errors', async () => {
+    mockTransaction.mockRejectedValueOnce(new Error('transaction failed'));
+
+    await expect(deleteLibraryRecord(input)).rejects.toThrow('transaction failed');
+
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockGlobalExternalFindMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('never runs a third transaction: a plan anomaly after a deadlock retry surfaces', async () => {
+    // The bound is two transactions per call. The deadlock retry spends the
+    // second, so a plan anomaly on that second attempt must propagate rather
+    // than start a third; relaxing the bound would make this pass with three.
+    const deadlock = Object.assign(new Error('deadlock detected'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2034',
+      clientVersion: '6.19.2',
+    });
+    mockGlobalExternalFindMany.mockResolvedValue([{ id: 'record-2' }]);
+    mockFindFirst.mockResolvedValue(externalDeleteRow({ contentDigest: 'zDigest' }));
+    mockQueryRawUnsafe.mockResolvedValue([{ id: 'record-1' }, { id: 'record-2' }]);
+    mockAdvisoryFindMany.mockResolvedValue([{ id: 'record-2' }, { id: 'record-3' }]);
+    mockTransaction
+      .mockRejectedValueOnce(deadlock)
+      .mockImplementationOnce(async (callback: (client: unknown) => unknown) => callback(transactionClient));
+
+    await expect(deleteLibraryRecord(input)).rejects.toThrow(LibraryRecordWriteAnomalyError);
+
+    expect(mockTransaction).toHaveBeenCalledTimes(2);
+    expect(promoteExternalCredentialDigest).not.toHaveBeenCalled();
+    expect(mockParentDelete).not.toHaveBeenCalled();
+  });
+
+  it('does not restart on a write anomaly other than the delete plan anomaly', async () => {
+    // Only the plan anomaly (an advisory attached between plan and lock) is
+    // retryable. A sibling anomaly of the same parent class raised inside the
+    // transaction must surface on the first attempt, or a future reason would
+    // be silently retried.
+    mockTransaction.mockRejectedValueOnce(new LibraryRecordWriteAnomalyError('record-1', 'some other anomaly'));
+
+    await expect(deleteLibraryRecord(input)).rejects.toThrow(/some other anomaly/);
+
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockGlobalExternalFindMany).toHaveBeenCalledTimes(1);
   });
 });

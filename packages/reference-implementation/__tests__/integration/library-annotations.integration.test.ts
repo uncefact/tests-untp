@@ -13,6 +13,7 @@ import { prisma } from '../../src/lib/prisma/prisma';
 import { updateLibraryRecordAnnotations } from '../../src/lib/prisma/repositories/library-record.repository';
 import { credentialRecordSchema, toCredentialRecord } from '../../src/lib/library/credential-record-projection';
 import { noChecksRun } from '../../src/lib/prisma/repositories/check-run.repository';
+import { holdRowForUpdate, waitForQueueBehind, type LockHolder } from './rig/locks';
 
 const OWNER_TENANT_ID = 'annotations-owner-tenant';
 const OTHER_TENANT_ID = 'annotations-other-tenant';
@@ -80,13 +81,7 @@ const deleter = createRigClient();
 /** The column is INTEGER, so this token can be matched but never advanced. */
 const MAX_ANNOTATION_VERSION = 2147483647;
 
-type LockHolder = { pid: number; release: () => void; done: Promise<void> };
-
-/**
- * Every holder opened by a test, released in afterEach. A failed wait must not
- * leave a transaction holding the parent row: the next test's truncation would
- * queue behind it and the real failure would be buried under a timeout.
- */
+/** Every holder opened by a test is released in afterEach. */
 const holders: LockHolder[] = [];
 
 /**
@@ -96,68 +91,13 @@ const holders: LockHolder[] = [];
  * is actually held.
  */
 async function holdParentLock(recordId = RECORD_ID): Promise<LockHolder> {
-  let release!: () => void;
-  const hold = new Promise<void>((resolve) => {
-    release = resolve;
+  const holder = await holdRowForUpdate(concurrent, {
+    table: 'LibraryRecord',
+    id: recordId,
+    tenantId: OWNER_TENANT_ID,
   });
-  let signalLocked!: (pid: number) => void;
-  const locked = new Promise<number>((resolve) => {
-    signalLocked = resolve;
-  });
-  const done = concurrent.$transaction(
-    async (tx) => {
-      await tx.$queryRawUnsafe(
-        'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
-        recordId,
-        OWNER_TENANT_ID,
-      );
-      const [backend] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid()::int AS pid`;
-      signalLocked(backend.pid);
-      await hold;
-    },
-    { timeout: 20_000 },
-  );
-  const holder: LockHolder = { pid: 0, release, done: done.then(() => undefined) };
   holders.push(holder);
-  holder.pid = await Promise.race([
-    locked,
-    done.then(() => {
-      throw new Error('the lock holder finished before it reported holding the lock');
-    }),
-  ]);
   return holder;
-}
-
-/**
- * Resolves once `expected` backends are queued behind the holder, read from
- * the database rather than waited out, so a schedule is observed and never
- * assumed from elapsed time. Waiting for one writer before queueing the next
- * is what puts them in the queue in a known order.
- *
- * The walk is recursive because `pg_blocking_pids` reports the process a
- * backend is directly waiting on: only the first waiter for a row waits on the
- * lock holder's transaction, and every later one waits on the tuple lock the
- * waiter ahead of it holds. Counting direct blockers alone would therefore
- * never see more than one waiter, however long it waited.
- */
-async function waitForQueueBehind(holderPid: number, expected: number): Promise<void> {
-  const deadline = Date.now() + 15_000;
-  for (;;) {
-    const [row] = await client.$queryRaw<{ count: bigint }[]>`
-      WITH RECURSIVE queued AS (
-        SELECT pid FROM pg_stat_activity WHERE ${holderPid}::int = ANY(pg_blocking_pids(pid))
-        UNION
-        SELECT waiter.pid FROM pg_stat_activity waiter
-        JOIN queued ON queued.pid = ANY(pg_blocking_pids(waiter.pid))
-      )
-      SELECT count(*)::bigint AS count FROM queued
-    `;
-    if (Number(row.count) >= expected) return;
-    if (Date.now() > deadline) {
-      throw new Error(`only ${row.count} backends are queued behind ${holderPid}, expected ${expected}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
 }
 
 async function createExternal(
@@ -546,7 +486,7 @@ describe('recipient annotation updates against Postgres', () => {
     // Both writers must be queued behind the holder before it lets go, or the
     // second could start after the first had already committed and this would
     // be two sequential updates wearing a race's name.
-    await waitForQueueBehind(holder.pid, 2);
+    await waitForQueueBehind(client, holder.pid, 2);
     holder.release();
     await holder.done;
     const results = await Promise.all([first, second]);
@@ -600,14 +540,14 @@ describe('recipient annotation updates against Postgres', () => {
         expectedVersion: 1,
         changes: { displayName: 'A' },
       });
-      await waitForQueueBehind(holder.pid, 1);
+      await waitForQueueBehind(client, holder.pid, 1);
       const secondWriter = updateLibraryRecordAnnotations({
         recordId: RECORD_ID,
         tenantId: OWNER_TENANT_ID,
         expectedVersion: 2,
         changes: { displayName: 'B' },
       });
-      await waitForQueueBehind(holder.pid, 2);
+      await waitForQueueBehind(client, holder.pid, 2);
       holder.release();
       await holder.done;
 
@@ -669,14 +609,14 @@ describe('recipient annotation updates against Postgres', () => {
       let deletion: ReturnType<typeof startDelete>;
       if (order === 'patch-first') {
         patch = startPatch();
-        await waitForQueueBehind(holder.pid, 1);
+        await waitForQueueBehind(client, holder.pid, 1);
         deletion = startDelete();
       } else {
         deletion = startDelete();
-        await waitForQueueBehind(holder.pid, 1);
+        await waitForQueueBehind(client, holder.pid, 1);
         patch = startPatch();
       }
-      await waitForQueueBehind(holder.pid, 2);
+      await waitForQueueBehind(client, holder.pid, 2);
       holder.release();
       await holder.done;
 

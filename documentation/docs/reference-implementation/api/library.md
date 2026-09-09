@@ -7,7 +7,7 @@ title: Library
 
 The library holds every credential a tenant has, whether the tenant issued it through this Reference Implementation or received it from someone else. A record for a credential the tenant issued is a **native** record. A record for a credential received from a third party is an **external** record: the tenant gives the credential's location, the Reference Implementation fetches it, checks it, and keeps its own copy, so the credential is still available if the supplier later takes it offline.
 
-This page covers listing the library, fetching several records by id, registering an external credential, retrieving one record, updating its recipient annotations and re-verifying a record. Deleting a record is a separate operation that arrives with the rest of the library epic.
+This page covers listing the library, fetching several records by id, registering an external credential, retrieving one record, updating its recipient annotations, re-verifying a record and deleting a record.
 
 :::tip[Interactive API documentation]
 The Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) carries the exact request and response schemas for the operations on this page. This page explains the behaviour, and Swagger carries the payload shapes. Every library endpoint requires authentication. See [Authentication](../authentication#obtaining-a-token) for how to obtain a Bearer token.
@@ -524,3 +524,26 @@ A no-copy recovery that opens a credential can reach the same encryption preflig
 | The record moved while the request was being prepared                                               | `202`; no new generation is created and the record's current generation is returned, settled or pending. For a no-copy reservation, this request reports that reservation as `superseded` rather than attaching to it; the run keeps whatever state actually settled it.                            |
 
 The freshness comparison is separate from verification of the pinned copy. A source outage therefore does not set the generation's `retrieval` check to `fail`. It records instead that freshness was not checked. Recovery compares a successful re-fetch with an earlier `sourceDigest` when one exists. The freshness fields appear only on a settled external generation that attempted the comparison. For a protected copy (step 7), `lastSourceCheckAt` is stamped when the source fetch starts, which happens before the generation is created, so it can precede the generation's `requestedAt` by however long that fetch took. For a no-copy recovery (step 5), the ordering is fixed rather than variable: `requestedAt` is stamped inside the reservation transaction, and `lastSourceCheckAt` is stamped afterwards, once the job queue is readied and just before the fetch itself runs, so `lastSourceCheckAt` can only follow `requestedAt`, by however long that reservation-and-queue-preparation interval took, never by the fetch's own duration.
+
+## Delete a library record
+
+```
+DELETE /api/v1/library/{id}
+```
+
+This removes an external record owned by the caller's tenant. It is allowed in any verification or custody state, including a pending verification, a record with no durable copy and a no-copy record that still holds a content identity. The record, its verification history and its registration claim are removed together. A replay of the record's original registration key after deletion registers afresh, and a replay that races the delete can return `409 IDEMPOTENCY_KEY_RECORD_DELETED`.
+
+A native record is a read-only view of a credential issued by this service. It returns `403 NATIVE_CREDENTIAL_NOT_DELETABLE` and the message `This is a native credential record; it cannot be removed from the library.` An id that is absent, was already deleted, or belongs to another tenant, whether native or external, returns the same empty `204`. Repeating a successful delete is therefore safe. The deleted record is absent from subsequent list and detail reads.
+
+Deleting a library record never revokes or otherwise affects the credential at its source. Verification already in progress is not cancelled. It may finish or be retried, but it cannot restore the deleted record. A run that settles after its record has gone is recorded as missing and nothing is recreated.
+
+The database deletion is complete once its transaction commits. The Reference Implementation then attempts to delete the durable copy, using the service instance, object id and bucket recorded on that row, and answers once that attempt has finished. The response is `204` whether or not it succeeds: a missing object, an unreachable storage service, or a row whose recorded coordinates are incomplete all leave the record deleted and the copy, if any, in place for an operator-run sweep, which this release does not install. The operator sees each such case as a warning carrying the recorded coordinates. A missing stored object cannot resurrect the database record, and the route never chooses a storage instance the row did not name.
+
+When the deleted record held a content identity and advisory records point at it, the oldest of those advisory records takes the identity and the rest are repointed at it. The promoted record gains the identity and loses its own pointer, and its last-modified time changes, as does the last-modified time of every record repointed at it. No durable copy is moved or altered by the promotion. Only the deleted holder's copy is cleaned.
+
+Responses:
+
+- `204` with no body, in four indistinguishable cases: the record was deleted by this call, was deleted earlier, never existed, or exists only in another tenant (whatever its origin there).
+- `401` when the request carries no valid token, as on every library operation.
+- `403 NATIVE_CREDENTIAL_NOT_DELETABLE` for a native record in the caller's tenant, with the message `This is a native credential record; it cannot be removed from the library.` Authentication can separately answer the shared tenant-assignment refusal.
+- Sanitised `500` when the transaction failed and rolled back, or when its commit outcome could not be confirmed. Nothing was partially deleted in the first case, and the request is safe to repeat in both. After an uncertain commit a repeat answers whatever the record's state now warrants: `204` once an external record is gone, whether that earlier attempt committed or not, or `403` for a native record. While the underlying fault persists, a repeat answers this `500` again.

@@ -30,6 +30,7 @@ const COMBINED_FORBIDDEN_OPERATIONS = new Map([
   // before the reference count so the counts never reach a non-owner.
   ['delete /services/{id}', 'system default'],
   ['patch /library/{id}', 'no recipient annotations'],
+  ['delete /library/{id}', 'cannot be removed from the library'],
 ]);
 
 // This exemption can only go stale in the safe direction: an entry for a route
