@@ -29,8 +29,9 @@ export class UnsupportedSchemeError extends UrlValidationError {
 
 /**
  * The hostname is a known private/local name (`localhost`, `*.localhost`,
- * `*.local`, `*.internal`, etc.), an IP literal in a non-public range, or
- * empty.
+ * `*.local`, `*.internal`, etc.) or an IP literal in a non-public range. An
+ * empty hostname is refused as malformed input (`InvalidUrlError`) before
+ * this check runs.
  */
 export class PrivateHostnameError extends UrlValidationError {
   constructor(hostname: string) {

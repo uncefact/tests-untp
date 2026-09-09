@@ -24,6 +24,8 @@ export interface ValidatePublicUrlOptions {
    * family the resolver prefers, `4` forces IPv4-only, `6` forces IPv6-only.
    */
   family?: 0 | 4 | 6;
+  /** Permit private, loopback and reserved hostnames and addresses. Defaults to strict rejection. */
+  allowPrivateAddresses?: boolean;
 }
 
 /**
@@ -41,12 +43,15 @@ const DEFAULT_ALLOWED_SCHEMES: readonly string[] = ['http', 'https'];
 /**
  * Validates that `url` is a parseable HTTP(S) URL whose hostname resolves
  * to publicly routable IP addresses, and returns one of those addresses
- * pinned for the caller to use as the connect target.
+ * pinned for the caller to use as the connect target. When
+ * `allowPrivateAddresses` is exactly `true`, private and reserved destinations
+ * are permitted while the other validation and pinning rules remain active.
  *
- * DNS resolution is performed with `all: true`; the URL is rejected if any
- * resolved address is in a private / loopback / link-local /
- * cloud-metadata range, so a mixed public/private DNS response cannot
- * sneak a private record through.
+ * DNS resolution is performed with `all: true`; in strict mode the URL is
+ * rejected if any resolved address is in a private / loopback / link-local /
+ * cloud-metadata range, so a mixed public/private DNS response cannot sneak a
+ * private record through. In relaxed mode the first structurally valid record
+ * is returned after every record has been checked.
  *
  * Per ADR-035, this function throws subclasses of {@link UrlValidationError}
  * on failure. The structured payload (`code`, `message`, `received`,
@@ -55,12 +60,12 @@ const DEFAULT_ALLOWED_SCHEMES: readonly string[] = ['http', 'https'];
  *
  * @see https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
  * @see ../../../docs/adrs/035-utils-throws-structured-errors.md
- * @throws {InvalidUrlError} `url` is not a parseable URL.
+ * @throws {InvalidUrlError} `url` is not a parseable URL, or has no hostname.
  * @throws {UnsupportedSchemeError} the URL's scheme is not allowed.
- * @throws {PrivateHostnameError} the hostname names a private resource.
+ * @throws {PrivateHostnameError} the hostname names a private resource in strict mode.
  * @throws {ResolutionFailedError} DNS resolution rejected, or the resolver returned an unparseable or family-contradictory record.
  * @throws {ResolutionEmptyError} DNS resolution returned no records.
- * @throws {PrivateAddressError} any resolved record is private.
+ * @throws {PrivateAddressError} any resolved record is private in strict mode.
  */
 export async function validatePublicUrl(url: string, options?: ValidatePublicUrlOptions): Promise<ResolvedAddress> {
   let parsed: URL;
@@ -71,6 +76,7 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
   }
 
   const allowedSchemes = options?.allowedSchemes ?? DEFAULT_ALLOWED_SCHEMES;
+  const allowPrivateAddresses = options?.allowPrivateAddresses === true;
   const scheme = parsed.protocol.toLowerCase().replace(/:$/, '');
   if (!allowedSchemes.some((s) => s.toLowerCase() === scheme)) {
     throw new UnsupportedSchemeError(scheme, allowedSchemes);
@@ -78,17 +84,34 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
 
   // URL.hostname wraps IPv6 literals in brackets (e.g. `[::1]`); strip them
   // so the hostname can be passed to predicates and DNS resolution. Note
-  // that `URL` already discards any `userinfo@` prefix from the hostname,
-  // so smuggling attempts like `http://evil.com@127.0.0.1/` resolve to
-  // `127.0.0.1` and are caught by isPrivateHostname below.
+  // that `URL` already discards any `userinfo@` prefix from the hostname, so
+  // a smuggling attempt like `http://evil.com@127.0.0.1/` is checked and
+  // connected as `127.0.0.1`, never as `evil.com`. In strict mode
+  // `isPrivateHostname` below then refuses it; in relaxed mode the private
+  // test does not run, and the destination is permitted as any other private
+  // destination is. Refusing the userinfo itself is not this function's job in
+  // either mode: for user-submitted URLs the RI's request schema rejects one
+  // that carries userinfo, and undici does not send credentials it was not
+  // asked for. URLs this function is given from elsewhere (did:web resolution,
+  // for instance) pass through no such schema, so that first clause covers the
+  // caller-supplied case only.
   const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
-  if (isPrivateHostname(hostname)) {
+  // A URL with no authority is malformed input, not a private destination, so
+  // it is reported as an invalid URL in both modes. Refusing it here keeps the
+  // function total: with no hostname there is nothing to resolve and nothing to
+  // pin, so returning normally would hand the caller an unpinned fetch.
+  if (!hostname) {
+    throw new InvalidUrlError(url, new Error('URL has no hostname.'));
+  }
+  if (!allowPrivateAddresses && isPrivateHostname(hostname)) {
     throw new PrivateHostnameError(hostname);
   }
 
-  // If the hostname is already an IP literal, skip DNS resolution; the
-  // literal itself is the resolved address, and the private-range check
-  // above (via isPrivateHostname) has already validated it.
+  // If the hostname is already an IP literal, skip DNS resolution: the
+  // literal itself is the resolved address, so there is nothing to look up.
+  // In strict mode `isPrivateHostname` above has already refused a private
+  // literal. In relaxed mode that test did not run, which is the point of the
+  // mode: the literal is returned and pinned without a private-range check.
   const literalFamily = isIP(hostname);
   if (literalFamily === 4 || literalFamily === 6) {
     return { address: hostname, family: literalFamily };
@@ -106,7 +129,7 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
   }
 
   const privateRecords: string[] = [];
-  let firstPublicRecord: ResolvedAddress | null = null;
+  let firstRecord: ResolvedAddress | null = null;
   for (const record of records) {
     // Derive the record's family from the address string itself rather than
     // trusting `record.family` (typed as a bare `number`, and DNS resolvers
@@ -124,22 +147,26 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
       );
     }
     const isPrivate = derivedFamily === 4 ? isPrivateIpv4(record.address) : isPrivateIpv6(record.address);
-    if (isPrivate) {
+    if (!firstRecord) firstRecord = { address: record.address, family: derivedFamily };
+    if (isPrivate && !allowPrivateAddresses) {
       privateRecords.push(record.address);
-    } else if (!firstPublicRecord) {
-      firstPublicRecord = { address: record.address, family: derivedFamily };
     }
   }
 
-  if (privateRecords.length > 0) {
+  if (!allowPrivateAddresses && privateRecords.length > 0) {
     throw new PrivateAddressError(hostname, privateRecords);
   }
 
-  // Defensive: `records.length > 0` and `privateRecords.length === 0`
-  // implies a public record was assigned in the loop. Throwing rather
-  // than `!`-asserting keeps the invariant explicit at the boundary.
-  if (!firstPublicRecord) {
-    throw new ResolutionEmptyError(hostname);
+  // Defensive: every record either throws above or becomes a candidate, and
+  // `firstRecord` holds the first structurally valid record of either kind,
+  // so `records.length > 0` implies it was assigned. That reasoning holds in
+  // both modes; the pre-relaxation version reasoned from a public record
+  // existing, which is no longer what the loop assigns. Throwing rather than
+  // `!`-asserting keeps the invariant explicit at the boundary. It throws a
+  // plain Error rather than a resolution failure so a defect in this loop can
+  // never be classified as a retryable DNS fault by a caller.
+  if (!firstRecord) {
+    throw new Error('validatePublicUrl invariant: no record selected');
   }
-  return firstPublicRecord;
+  return firstRecord;
 }

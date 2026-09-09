@@ -10,7 +10,14 @@ import { StructuredError } from '../structured-error.js';
  */
 export class ResolverError extends StructuredError {}
 
-/** The fetch call rejected before producing a response (TCP/TLS error, DNS race, etc.). */
+/**
+ * The fetch call rejected before producing a response (TCP/TLS error, DNS
+ * race, etc.), or the body read rejected after the headers arrived. Rejections
+ * that the resolver classifies as this request's timeout are reported as
+ * {@link ResolverTimedOutError} instead; every other rejection caught at those
+ * two awaits, including a non-abort-shaped one that arrives after the deadline
+ * has passed, arrives here.
+ */
 export class ResolverNetworkError extends ResolverError {
   constructor(url: string, cause: unknown) {
     super({
@@ -56,21 +63,35 @@ export class ResolverTooLargeError extends ResolverError {
   }
 }
 
-/** A redirect chain exceeded the configured maximum hop count. */
+/**
+ * A redirect chain exceeded the configured maximum hop count. `.lastHopUrl` is
+ * optional. The resolver supplies it as the hop that answered the exhausting
+ * redirect whenever a chain exhausts a finite non-negative integer
+ * `maxRedirects`, which is the supported input. It is absent otherwise: for a
+ * negative or non-integer limit, where the loop names no responder, and for a
+ * direct two-argument construction, which this constructor permits.
+ */
 export class ResolverTooManyRedirectsError extends ResolverError {
   readonly limit: number;
-  constructor(url: string, limit: number) {
+  readonly lastHopUrl?: string;
+  constructor(startUrl: string, limit: number, lastHopUrl?: string) {
     super({
       code: 'resolver.too-many-redirects',
-      message: `Exceeded ${limit} redirect hops starting from ${url}.`,
+      message: `Exceeded ${limit} redirect hops starting from ${startUrl}.`,
       received: `> ${limit} hops`,
       expected: `<= ${limit} hops`,
     });
     this.limit = limit;
+    if (lastHopUrl !== undefined) this.lastHopUrl = lastHopUrl;
   }
 }
 
-/** The fetch was aborted by the timeout signal. */
+/**
+ * The request's total deadline expired. That covers expiry while the guard was
+ * still waiting on DNS, before any fetch began, as well as a fetch or body read
+ * that rejected with an abort-shaped error once this request's signal had
+ * fired.
+ */
 export class ResolverTimedOutError extends ResolverError {
   readonly timeoutMs: number;
   constructor(url: string, timeoutMs: number, cause?: unknown) {

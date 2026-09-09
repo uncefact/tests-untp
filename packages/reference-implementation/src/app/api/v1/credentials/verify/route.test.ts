@@ -1,13 +1,4 @@
 import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
-// Polyfill AbortSignal.timeout for jsdom (not available in jsdom)
-if (typeof AbortSignal.timeout !== 'function') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (AbortSignal as any).timeout = (ms: number) => {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), ms);
-    return controller.signal;
-  };
-}
 
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => ({
@@ -84,9 +75,6 @@ jest.mock('@/lib/api/logger', () => ({
   apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
 }));
 
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
-
 import { ServiceResolutionError } from '@/lib/api/errors';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';
 import { POST } from './route';
@@ -94,11 +82,13 @@ import { POST } from './route';
 const {
   ResolverHttpError,
   ResolverNetworkError,
+  ResolverRedirectMissingLocationError,
   ResolverTimedOutError,
   ResolverTooLargeError,
   ResolverTooManyRedirectsError,
 } = jest.requireMock('@uncefact/untp-utils/resolvers');
-const { PrivateHostnameError, ResolutionFailedError } = jest.requireActual('@uncefact/untp-utils/node');
+const { PrivateHostnameError, ResolutionFailedError, UnsupportedSchemeError } =
+  jest.requireActual('@uncefact/untp-utils/node');
 
 // ── Fixtures ──────────────────────────────────────────────────────────
 
@@ -147,20 +137,11 @@ function createBadJsonRequest(): Request {
 /** Makes the guarded resolver return the given document (JSON-encoded unless a string). */
 function mockStorageDocument(body: unknown) {
   const text = typeof body === 'string' ? body : JSON.stringify(body);
-  mockResolveDocument.mockResolvedValue({ body: new TextEncoder().encode(text), status: 200 });
-}
-
-function createFetchResponse(body: unknown, opts?: { ok?: boolean; status?: number }) {
-  const ok = opts?.ok ?? true;
-  const status = opts?.status ?? (ok ? 200 : 500);
-  const text = typeof body === 'string' ? body : JSON.stringify(body);
-  return {
-    ok,
-    status,
-    url: '',
-    headers: { get: () => null },
-    arrayBuffer: async () => new TextEncoder().encode(text).buffer,
-  };
+  mockResolveDocument.mockResolvedValue({
+    body: new TextEncoder().encode(text),
+    status: 200,
+    finalUrl: VALID_URI,
+  });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
@@ -213,6 +194,23 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toBe('uri: must be a valid HTTP(S) URL');
+  });
+
+  it('keeps initial URL validation active when private URLs are enabled', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
+
+    const malformed = await POST(createFakeRequest({ uri: 'not-a-url' }));
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toEqual({ error: 'uri: must be a valid URL' });
+
+    const unsupported = await POST(createFakeRequest({ uri: 'ftp://example.com/file' }));
+    expect(unsupported.status).toBe(400);
+    expect(await unsupported.json()).toEqual({ error: 'uri: must be a valid HTTP(S) URL' });
+
+    const userinfo = await POST(createFakeRequest({ uri: 'https://user:secret@example.com/cred' }));
+    expect(userinfo.status).toBe(400);
+    expect(await userinfo.json()).toEqual({ error: 'uri: must not contain userinfo credentials' });
+    expect(mockResolveDocument).not.toHaveBeenCalled();
   });
 
   it('returns 400 for a literal null request body', async () => {
@@ -282,14 +280,17 @@ describe('POST /api/v1/credentials/verify', () => {
     }
   });
 
-  it('fetches the canonical href on the development-bypass branch too', async () => {
+  it('fetches the canonical href through the resolver when private URLs are enabled', async () => {
     process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: 'https://storage.example.com/a/../credentials/abc123' }));
     expect(res.status).toBe(200);
-    expect(mockFetch).toHaveBeenCalledWith('https://storage.example.com/credentials/abc123', expect.anything());
+    expect(mockResolveDocument).toHaveBeenCalledWith(
+      'https://storage.example.com/credentials/abc123',
+      expect.anything(),
+    );
   });
 
   it('returns 422 INVALID_RESPONSE when storage returns a JSON array', async () => {
@@ -347,6 +348,43 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.error).toBe('Hostname localhost names a private or local resource.');
   });
 
+  it('verifies a permitted private host through the resolver', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
+    const privateUri = 'http://localhost:8080/credentials/abc123';
+    mockResolveDocument.mockResolvedValue({
+      body: new TextEncoder().encode(JSON.stringify(ENVELOPED_CREDENTIAL)),
+      status: 200,
+      finalUrl: privateUri,
+    });
+    mockVcService.verify.mockResolvedValue({ verified: true });
+
+    const res = await POST(createFakeRequest({ uri: privateUri }));
+
+    expect(res.status).toBe(200);
+    expect(mockResolveDocument).toHaveBeenCalledWith(privateUri, {
+      maxResponseBytes: MAX_SIZE,
+      totalTimeoutMs: 10_000,
+      allowPrivateAddresses: true,
+    });
+  });
+
+  // A redirect hop to a non-HTTP scheme reaches the route as the guard's
+  // rejection, not as a retrieval failure. Catches a regression that routed
+  // non-hostname rejections to the 502 upstream response.
+  it.each([false, true])(
+    'returns 400 with the guard message when a redirect hop uses a forbidden scheme and private URLs are %s',
+    async (privateUrls) => {
+      if (privateUrls) process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
+      const refused = new UnsupportedSchemeError('ftp', ['http', 'https']);
+      mockResolveDocument.mockRejectedValue(refused);
+
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: refused.message });
+    },
+  );
+
   it('returns 400 with the guard message when the host does not resolve', async () => {
     const unresolved = new ResolutionFailedError('storage.example', new Error('ENOTFOUND'));
     mockResolveDocument.mockRejectedValue(unresolved);
@@ -357,22 +395,53 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.error).toBe(unresolved.message);
   });
 
-  it('returns 502 as a network error when the bypass fetch cannot resolve the host (the guard never ran)', async () => {
+  it('returns 502 as an upstream error when relaxed DNS resolution fails', async () => {
     process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
-    mockFetch.mockRejectedValue(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } }));
+    mockResolveDocument.mockRejectedValue(new ResolutionFailedError('storage.example', new Error('ENOTFOUND')));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' });
   });
 
-  it('returns 502 naming the status when the resolver hands back a 304 instead of a document', async () => {
-    mockResolveDocument.mockResolvedValue({ body: new Uint8Array(), status: 304, finalUrl: VALID_URI });
+  it.each([false, true])(
+    'returns 502 naming the status for a resolver 304 when private URLs are %s',
+    async (privateUrls) => {
+      if (privateUrls) process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
+      mockResolveDocument.mockResolvedValue({ body: new Uint8Array(), status: 304, finalUrl: VALID_URI });
+
+      const res = await POST(createFakeRequest({ uri: VALID_URI }));
+      expect(res.status).toBe(502);
+      expect(await res.json()).toEqual({
+        error: 'Failed to fetch credential: storage returned 304',
+        code: 'UPSTREAM_ERROR',
+      });
+    },
+  );
+
+  it('returns network-worded 502 for a malformed redirect Location', async () => {
+    mockResolveDocument.mockRejectedValue(new ResolverRedirectMissingLocationError(VALID_URI, 'http://['));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' });
+  });
+
+  it('returns network-worded 502 for a failed response body stream', async () => {
+    mockResolveDocument.mockRejectedValue(new ResolverNetworkError(VALID_URI, new Error('stream reset')));
+
+    const res = await POST(createFakeRequest({ uri: VALID_URI }));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' });
+  });
+
+  it('returns timeout-worded 502 for a body abort', async () => {
+    mockResolveDocument.mockRejectedValue(new ResolverTimedOutError(VALID_URI, 10_000));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({
-      error: 'Failed to fetch credential: storage returned 304',
+      error: 'Failed to fetch credential: request timed out',
       code: 'UPSTREAM_ERROR',
     });
   });
@@ -385,7 +454,7 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(await res.json()).toEqual({ error: 'Failed to fetch credential: network error', code: 'UPSTREAM_ERROR' });
   });
 
-  it('fetches via the guarded resolver with the size cap, not plain fetch', async () => {
+  it('fetches via the guarded resolver with the size cap when strict', async () => {
     mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
@@ -395,41 +464,23 @@ describe('POST /api/v1/credentials/verify', () => {
       maxResponseBytes: MAX_SIZE,
       totalTimeoutMs: 10_000,
     });
-    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('uses plain fetch and skips the guarded resolver when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+  it('uses the guarded resolver with private permission when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
     process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
-    mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
+    mockStorageDocument(ENVELOPED_CREDENTIAL);
     mockVcService.verify.mockResolvedValue({ verified: true });
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
     expect(res.status).toBe(200);
-    expect(mockResolveDocument).not.toHaveBeenCalled();
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockResolveDocument).toHaveBeenCalledWith(VALID_URI, {
+      maxResponseBytes: MAX_SIZE,
+      totalTimeoutMs: 10_000,
+      allowPrivateAddresses: true,
+    });
   });
 
   // ── Upstream Errors (502) ─────────────────────────────────────────
-
-  it('returns 502 when the guarded fetch times out', async () => {
-    mockResolveDocument.mockRejectedValue(new ResolverTimedOutError(VALID_URI, 10_000));
-
-    const res = await POST(createFakeRequest({ uri: VALID_URI }));
-    expect(res.status).toBe(502);
-    const json = await res.json();
-    expect(json.error).toBe('Failed to fetch credential: request timed out');
-    expect(json.code).toBe('UPSTREAM_ERROR');
-  });
-
-  it('returns 502 when the guarded fetch fails with a network error', async () => {
-    mockResolveDocument.mockRejectedValue(new ResolverNetworkError(VALID_URI, new Error('socket hang up')));
-
-    const res = await POST(createFakeRequest({ uri: VALID_URI }));
-    expect(res.status).toBe(502);
-    const json = await res.json();
-    expect(json.error).toBe('Failed to fetch credential: network error');
-    expect(json.code).toBe('UPSTREAM_ERROR');
-  });
 
   it('returns 502 when storage returns non-2xx', async () => {
     mockResolveDocument.mockRejectedValue(new ResolverHttpError(VALID_URI, 404));
@@ -451,77 +502,16 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(json.code).toBe('UPSTREAM_ERROR');
   });
 
-  it('rethrows unrecognised resolver failures as a 500', async () => {
-    mockResolveDocument.mockRejectedValue(new Error('unexpected'));
-
-    const res = await POST(createFakeRequest({ uri: VALID_URI }));
-    expect(res.status).toBe(500);
-  });
-
-  describe('development bypass (FETCH_ALLOW_PRIVATE_URLS=true) plain-fetch path', () => {
-    beforeEach(() => {
-      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
-    });
-
-    it('returns 502 when fetch times out', async () => {
-      const timeoutError = Object.assign(new Error('Timeout'), { name: 'TimeoutError' });
-      mockFetch.mockImplementation(() => Promise.reject(timeoutError));
+  it.each([false, true])(
+    'rethrows unrecognised resolver failures as a 500 when private URLs are %s',
+    async (privateUrls) => {
+      if (privateUrls) process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
+      mockResolveDocument.mockRejectedValue(new Error('unexpected'));
 
       const res = await POST(createFakeRequest({ uri: VALID_URI }));
-      expect(res.status).toBe(502);
-      const json = await res.json();
-      expect(json.error).toBe('Failed to fetch credential: request timed out');
-      expect(json.code).toBe('UPSTREAM_ERROR');
-    });
-
-    it('returns 502 when fetch fails with network error', async () => {
-      mockFetch.mockRejectedValue(new Error('fetch failed'));
-
-      const res = await POST(createFakeRequest({ uri: VALID_URI }));
-      expect(res.status).toBe(502);
-      const json = await res.json();
-      expect(json.error).toBe('Failed to fetch credential: network error');
-      expect(json.code).toBe('UPSTREAM_ERROR');
-    });
-
-    it('returns 502 when storage returns non-2xx', async () => {
-      mockFetch.mockResolvedValue(createFetchResponse(null, { ok: false, status: 404 }));
-
-      const res = await POST(createFakeRequest({ uri: VALID_URI }));
-      expect(res.status).toBe(502);
-      const json = await res.json();
-      expect(json.error).toBe('Failed to fetch credential: storage returned 404');
-      expect(json.code).toBe('UPSTREAM_ERROR');
-    });
-
-    it('returns 502 when response exceeds size limit', async () => {
-      mockFetch.mockResolvedValue(createFetchResponse('x'.repeat(MAX_SIZE + 1)));
-
-      const res = await POST(createFakeRequest({ uri: VALID_URI }));
-      expect(res.status).toBe(502);
-      const json = await res.json();
-      expect(json.error).toContain('exceeds maximum size');
-      expect(json.code).toBe('UPSTREAM_ERROR');
-    });
-
-    it('returns 502 when reading the response body throws', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        url: '',
-        headers: { get: () => null },
-        arrayBuffer: async () => {
-          throw new Error('stream error');
-        },
-      });
-
-      const res = await POST(createFakeRequest({ uri: VALID_URI }));
-      expect(res.status).toBe(502);
-      const json = await res.json();
-      expect(json.error).toBe('Failed to read credential response');
-      expect(json.code).toBe('UPSTREAM_ERROR');
-    });
-  });
+      expect(res.status).toBe(500);
+    },
+  );
 
   // ── Credential Processing (422) ───────────────────────────────────
 

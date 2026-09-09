@@ -31,6 +31,13 @@ describe('validatePublicUrl', () => {
       });
       expect(lookup).not.toHaveBeenCalled();
     });
+
+    it('retains parse rejection when private addresses are allowed', async () => {
+      await expect(validatePublicUrl('not a url', { allowPrivateAddresses: true })).rejects.toBeInstanceOf(
+        InvalidUrlError,
+      );
+      expect(lookup).not.toHaveBeenCalled();
+    });
   });
 
   describe('scheme', () => {
@@ -49,6 +56,13 @@ describe('validatePublicUrl', () => {
         address: '1.1.1.1',
         family: 4,
       });
+    });
+
+    it('retains scheme rejection when private addresses are allowed', async () => {
+      await expect(validatePublicUrl('ftp://example.com/path', { allowPrivateAddresses: true })).rejects.toMatchObject({
+        name: 'UnsupportedSchemeError',
+      });
+      expect(lookup).not.toHaveBeenCalled();
     });
 
     it('reports canonical scheme details on the error', async () => {
@@ -115,6 +129,53 @@ describe('validatePublicUrl', () => {
       });
       expect(lookup).not.toHaveBeenCalled();
     });
+
+    it.each([undefined, false, 'true'])(
+      'keeps private literals strict when allowPrivateAddresses is %p',
+      async (option) => {
+        await expect(
+          validatePublicUrl('http://10.0.0.1/', { allowPrivateAddresses: option as never }),
+        ).rejects.toBeInstanceOf(PrivateHostnameError);
+        expect(lookup).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejects an empty hostname as malformed input even when private addresses are allowed', async () => {
+      await expect(
+        validatePublicUrl('file:///', { allowedSchemes: ['file'], allowPrivateAddresses: true }),
+      ).rejects.toBeInstanceOf(InvalidUrlError);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it.each(['localhost', 'db.internal'])(
+      'resolves local names when private addresses are allowed',
+      async (hostname) => {
+        lookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }] as never);
+
+        await expect(validatePublicUrl(`http://${hostname}/`, { allowPrivateAddresses: true })).resolves.toEqual({
+          address: '10.0.0.5',
+          family: 4,
+        });
+        expect(lookup).toHaveBeenCalledWith(hostname, { family: 0, all: true });
+      },
+    );
+
+    it.each([
+      ['127.0.0.1', 'http://127.0.0.1/'],
+      ['169.254.169.254', 'http://169.254.169.254/'],
+      ['224.0.0.1', 'http://224.0.0.1/'],
+      ['0.0.0.0', 'http://0.0.0.0/'],
+      ['::1', 'http://[::1]/'],
+      ['fc00::1', 'http://[fc00::1]/'],
+      ['::ffff:10.0.0.1', 'http://[::ffff:10.0.0.1]/'],
+    ])('allows the non-public literal %s without DNS when opted in', async (_address, url) => {
+      const hostname = new URL(url).hostname.replace(/^\[|\]$/g, '');
+      await expect(validatePublicUrl(url, { allowPrivateAddresses: true })).resolves.toEqual({
+        address: hostname,
+        family: url.includes('[') ? 6 : 4,
+      });
+      expect(lookup).not.toHaveBeenCalled();
+    });
   });
 
   describe('DNS resolution', () => {
@@ -162,6 +223,24 @@ describe('validatePublicUrl', () => {
     it('throws ResolutionFailedError when dns returns an unsupported family', async () => {
       lookup.mockResolvedValue([{ address: 'whatever', family: 7 }] as never);
       await expect(validatePublicUrl('https://example.com/')).rejects.toBeInstanceOf(ResolutionFailedError);
+    });
+
+    it('retains DNS rejection when private addresses are allowed', async () => {
+      const dnsError = new Error('EAI_AGAIN');
+      lookup.mockRejectedValue(dnsError as never);
+
+      await expect(validatePublicUrl('https://example.com/', { allowPrivateAddresses: true })).rejects.toMatchObject({
+        name: 'ResolutionFailedError',
+        cause: dnsError,
+      });
+    });
+
+    it('retains empty resolution when private addresses are allowed', async () => {
+      lookup.mockResolvedValue([] as never);
+
+      await expect(validatePublicUrl('https://example.com/', { allowPrivateAddresses: true })).rejects.toBeInstanceOf(
+        ResolutionEmptyError,
+      );
     });
   });
 
@@ -215,6 +294,50 @@ describe('validatePublicUrl', () => {
         { address: '8.8.8.8', family: 4 },
       ] as never);
       await expect(validatePublicUrl('https://example.com/')).resolves.toEqual({ address: '1.1.1.1', family: 4 });
+    });
+
+    it('allows private and public records but pins the first record when opted in', async () => {
+      lookup.mockResolvedValue([
+        { address: '10.0.0.1', family: 4 },
+        { address: '1.1.1.1', family: 4 },
+      ] as never);
+
+      await expect(validatePublicUrl('https://mixed.example/', { allowPrivateAddresses: true })).resolves.toEqual({
+        address: '10.0.0.1',
+        family: 4,
+      });
+    });
+
+    it('pins a public first record rather than preferring a later private record when opted in', async () => {
+      lookup.mockResolvedValue([
+        { address: '1.1.1.1', family: 4 },
+        { address: '10.0.0.1', family: 4 },
+      ] as never);
+
+      await expect(validatePublicUrl('https://mixed.example/', { allowPrivateAddresses: true })).resolves.toEqual({
+        address: '1.1.1.1',
+        family: 4,
+      });
+    });
+
+    it('checks every record for contradictory metadata in relaxed mode', async () => {
+      lookup.mockResolvedValue([
+        { address: '10.0.0.1', family: 4 },
+        { address: 'not-an-ip', family: 4 },
+      ] as never);
+
+      await expect(validatePublicUrl('https://mixed.example/', { allowPrivateAddresses: true })).rejects.toBeInstanceOf(
+        ResolutionFailedError,
+      );
+    });
+
+    it('retains family validation and lookup hints in relaxed mode', async () => {
+      lookup.mockResolvedValue([{ address: '10.0.0.1', family: 6 }] as never);
+
+      await expect(
+        validatePublicUrl('https://mixed.example/', { allowPrivateAddresses: true, family: 6 }),
+      ).rejects.toBeInstanceOf(ResolutionFailedError);
+      expect(lookup).toHaveBeenCalledWith('mixed.example', { family: 6, all: true });
     });
   });
 

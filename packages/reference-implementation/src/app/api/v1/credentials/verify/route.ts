@@ -15,9 +15,9 @@ import {
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import type { EnvelopedVerifiableCredential, VerifyResult } from '@uncefact/untp-ri-services';
 import { decodeJwt } from 'jose';
-import { UrlValidationError } from '@uncefact/untp-utils/node';
 import {
   CredentialDocumentFetchError,
+  allowsPrivateUrls,
   fetchCredentialDocument,
   getMaxCredentialSize,
   type DocumentFetchFailure,
@@ -30,10 +30,15 @@ const JWT_PREFIX = 'data:application/vc+jwt,';
 /**
  * The 502 this route returns for a failure while retrieving, worded as the
  * route always has (a resolver 304 is the one newcomer, answered like any
- * other status). The caller decides which failures are the caller's 400 and
- * does not pass those here.
+ * other status). Rejected inputs are this route's 400, so the parameter admits
+ * only the failures that ran and the call site narrows to them; the type, not
+ * a sentence, is what keeps a caller's fault out of a 502.
  */
-function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, maxSize: number) {
+function upstreamFailureResponse(
+  failure: Extract<DocumentFetchFailure, { kind: 'failed' }>,
+  uri: string,
+  maxSize: number,
+) {
   const respond = (error: string) => NextResponse.json({ error, code: 'UPSTREAM_ERROR' }, { status: 502 });
   switch (failure.reason) {
     case 'timeout':
@@ -48,15 +53,25 @@ function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, max
         'Credential response exceeds maximum size',
       );
       return respond(`Credential response exceeds maximum size of ${maxSize} bytes`);
+    // Unreachable from the current helper, which reports an unreadable body as
+    // a network failure; kept because the reason remains in the union.
     case 'body-unreadable':
       logger.warn({ uri, err: failure.error }, 'Failed to read credential response body');
       return respond('Failed to read credential response');
     case 'redirects':
       logger.warn({ uri, err: failure.error }, 'Credential fetch redirect not followed');
       return respond('Failed to fetch credential: network error');
-    default:
+    case 'dns':
+    case 'network':
       logger.warn({ uri, err: failure.error }, 'Credential fetch failed');
       return respond('Failed to fetch credential: network error');
+    default: {
+      // Exhaustiveness: a new `failed` reason must choose its own answer here
+      // rather than inheriting the generic network wording by default.
+      const unhandled: never = failure;
+      logger.warn({ uri, err: (unhandled as { error?: Error }).error }, 'Credential fetch failed');
+      return respond('Failed to fetch credential: network error');
+    }
   }
 }
 
@@ -77,11 +92,19 @@ function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, max
  *       HTTPS so the key is protected in transit.
  *
  *       SSRF protection: the URI is fetched through a guarded resolver that
- *       validates the hostname against private/reserved ranges on every
- *       redirect hop and pins the connection to the validated address, so
- *       neither a redirect nor a DNS change between check and connect can
- *       reach a private network. Set `FETCH_ALLOW_PRIVATE_URLS=true` to
- *       bypass (development only).
+ *       checks each hop's host against private and reserved address ranges and
+ *       pins the connection to the address that check resolved, so neither a
+ *       redirect nor a DNS change between check and connect can reach a
+ *       private network. It also enforces the response-size limit, follows at
+ *       most three additional redirect hops on either setting, and bounds the
+ *       whole attempt (the wait for DNS, connect, redirects and body) by
+ *       `FETCH_TIMEOUT_MS`. The connection is pinned to the first
+ *       address the name resolves to, so when `localhost` resolves to `::1`
+ *       first, a same-host HTTP service listening only on IPv4 must be
+ *       addressed as `127.0.0.1` or bound on both families. Set
+ *       `FETCH_ALLOW_PRIVATE_URLS=true` for local development to permit
+ *       private or reserved destinations; the resolver's other checks remain
+ *       active.
  *     tags:
  *       - Credentials
  *     security: []
@@ -146,7 +169,7 @@ function upstreamFailureResponse(failure: DocumentFetchFailure, uri: string, max
  *                     message:
  *                       type: string
  *       400:
- *         description: Validation error. A malformed field is named (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format). A uri whose host is private or reserved, or whose host does not resolve, is refused with the guard's own message; with FETCH_ALLOW_PRIVATE_URLS=true those hosts are fetched instead.
+ *         description: Validation error. A malformed field is named (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format). Private or reserved destinations are refused unless `FETCH_ALLOW_PRIVATE_URLS=true`. A host that does not resolve is a 400 carrying the guard's message when that setting is off, and a 502 when it is on. A 400 also covers a redirect target the caller never submitted: the guard refuses that hop on its scheme or its destination; a destination refusal names the host, a scheme refusal names only the scheme.
  *         content:
  *           application/json:
  *             schema:
@@ -228,12 +251,9 @@ export const POST = withPublicRoute(async (req) => {
   const credentialUri = new URL(body.uri).href;
 
   // ── Step 2: Fetch credential from storage URI ──────────────────────
-  // The shared helper runs the guarded resolver, which validates the
-  // hostname against private/reserved ranges on every redirect hop and pins
-  // the connection to the validated address, closing the redirect-following
-  // and DNS-rebinding gaps a validate-then-fetch sequence leaves open.
-  // FETCH_ALLOW_PRIVATE_URLS=true (development only) falls back to a plain
-  // fetch so private storage hosts in local compose setups keep working.
+  // The shared helper runs the guarded resolver in both modes. The local
+  // development setting permits private destinations while retaining per-hop
+  // validation, connection pinning, redirect handling and the byte cap.
   logger.info({ uri: credentialUri }, 'Fetching credential from storage');
 
   const maxSize = getMaxCredentialSize();
@@ -243,12 +263,13 @@ export const POST = withPublicRoute(async (req) => {
     responseText = new TextDecoder().decode(document.bytes);
   } catch (e: unknown) {
     if (!(e instanceof CredentialDocumentFetchError)) throw e;
-    // Whatever the guard refused, a name it could not resolve included, has
-    // always been this route's 400 with the guard's own message. The guard
-    // reports all of those as its validation error, so that class, not the
-    // failure's reason, is the test: a DNS fault on the development bypass
-    // never met the guard and stays the upstream's 502 it always was.
-    if (e.failure.error instanceof UrlValidationError) {
+    // Rejected inputs stay caller-facing validation errors. Preserve this
+    // route's historical DNS status split while the helper reports DNS as a
+    // retrieval failure in both modes.
+    if (
+      e.failure.kind === 'rejected' ||
+      (e.failure.kind === 'failed' && e.failure.reason === 'dns' && !allowsPrivateUrls())
+    ) {
       throw new ValidationError(e.failure.error.message);
     }
     return upstreamFailureResponse(e.failure, credentialUri, maxSize);

@@ -30,8 +30,14 @@ const C = DidVerificationCheckName;
  * validates every redirect hop independently and pins each hop's connection
  * to the IP its validation resolved, closing the DNS rebinding window
  * between check and connect across the whole chain. The resolver's defaults
- * bound the resolution (1 MiB body, a 10 s timeout governing the fetch from connect onwards, 3 redirects), and
- * on the wire it sends `Accept: application/json` and a `User-Agent`
+ * bound that resolution call itself (1 MiB body, a 10 s timeout covering the
+ * resolver's own DNS wait and the fetch, 3 redirects). They do not bound this
+ * function end to end: the preliminary `validatePublicUrl(url)` below runs its
+ * own DNS lookup before that timer exists, so a stalled OS resolver can hold
+ * the pre-guard for longer than the 10 s the resolution call itself allows.
+ * Removing that duplicate pre-guard is tracked as a follow-up owned by this
+ * package, because the two failure paths word their messages differently.
+ * On the wire the resolver sends `Accept: application/json` and a `User-Agent`
  * (default or the RI_HTTP_USER_AGENT override); it adds no
  * request-correlation header, so internal request identifiers stay within
  * the operator's services when contacting the DID's own domain (#654).
@@ -40,7 +46,8 @@ const C = DidVerificationCheckName;
  * verdict on the final URL, which those two error classes carry; every
  * other failure (network, timeout, size, redirect caps, including one that
  * strikes mid-body after a response arrived) reports that HTTPS could not
- * be verified, because those error classes carry no final URL to judge.
+ * be verified, because those error classes carry no final URL to judge; a
+ * redirect-cap error carries its last responder, not the final response URL.
  *
  * @see https://w3c-ccg.github.io/did-method-web/
  * @see https://www.w3.org/TR/did-1.0/

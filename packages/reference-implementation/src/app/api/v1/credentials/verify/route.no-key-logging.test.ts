@@ -12,16 +12,6 @@
  */
 import { isolateFetchAllowPrivateUrlsEnv } from '../../../../../../__tests__/env-doubles/fetch-settings-env';
 
-// Polyfill AbortSignal.timeout for jsdom (not available in jsdom)
-if (typeof AbortSignal.timeout !== 'function') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (AbortSignal as any).timeout = (ms: number) => {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), ms);
-    return controller.signal;
-  };
-}
-
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number }) => ({
@@ -58,14 +48,8 @@ jest.mock('@/lib/services/resolve-vc-service', () => ({
 
 const mockResolveDocument = jest.fn();
 jest.mock('@uncefact/untp-utils/resolvers', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/resolvers/errors'),
   resolveDocument: (...args: unknown[]) => mockResolveDocument(...args),
-  ResolverError: class ResolverError extends Error {},
-  ResolverHttpError: class ResolverHttpError extends Error {},
-  ResolverTooLargeError: class ResolverTooLargeError extends Error {},
-  ResolverTimedOutError: class ResolverTimedOutError extends Error {},
-}));
-jest.mock('@uncefact/untp-utils/node', () => ({
-  UrlValidationError: class UrlValidationError extends Error {},
 }));
 
 import { createCipheriv, randomBytes } from 'node:crypto';
@@ -105,6 +89,8 @@ function createFakeRequest(body: Record<string, unknown>): Request {
 function mockStorageDocument(body: unknown) {
   mockResolveDocument.mockResolvedValue({
     body: new TextEncoder().encode(JSON.stringify(body)),
+    status: 200,
+    finalUrl: 'https://storage.example.com/cred',
   });
 }
 
@@ -127,6 +113,22 @@ describe('verify route never logs the decryption key', () => {
 
     const output = capturedLogLines.join('');
     expect(capturedLogLines.length).toBeGreaterThan(0); // the capture actually captured
+    expect(output).not.toContain(SENTINEL_KEY);
+  });
+
+  // The sibling cases run with the setting deleted. The relaxed setting changes
+  // which destinations the resolver will reach, not what the route logs, so the
+  // redaction guarantee must hold identically with it on. Fails if a branch
+  // taken only under the relaxed setting logs the request body or the key.
+  it('does not log the key with FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
+    mockStorageDocument(encryptEnvelope(JSON.stringify(CREDENTIAL), SENTINEL_KEY));
+
+    const res = await POST(createFakeRequest({ uri: 'http://storage.internal/cred', decryptionKey: SENTINEL_KEY }));
+    expect(res.status).toBe(200);
+
+    const output = capturedLogLines.join('');
+    expect(capturedLogLines.length).toBeGreaterThan(0);
     expect(output).not.toContain(SENTINEL_KEY);
   });
 
