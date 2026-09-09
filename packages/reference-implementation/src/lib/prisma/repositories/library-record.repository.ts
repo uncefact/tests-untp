@@ -1,10 +1,390 @@
-import { LibraryRecordOrigin, Prisma } from '../generated';
+import {
+  CheckResult,
+  CheckRunState,
+  CoreCredentialType,
+  LibraryRecordOrigin,
+  Prisma,
+  type CheckRun,
+} from '../generated';
 import { prisma } from '../prisma';
 import {
   LibraryRecordShapeError,
   narrowLibraryRecord,
+  type ExternalRecordView,
+  type NativeRecordView,
+  type LibraryRecordView,
   type LibraryRecordDetailView,
 } from '@/lib/library/library-record-view';
+import { BLOCKING_CHECKS, CHECK_NAMES, isNativeMasked, type LibraryCheckName } from '@/lib/library/check-rules';
+import type { LibraryOrigin, VerificationSummary } from '@/lib/library/credential-record-projection';
+import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+
+const LIBRARY_RECORD_INCLUDE = {
+  credential: true,
+  externalCredential: true,
+  checkRuns: {
+    orderBy: { generation: 'desc' },
+    take: 1,
+  },
+  // The run's composite foreign key already pins it to the parent's tenant,
+  // so a tenant filter here could only ever narrow the newest generation away
+  // and serve an older one as current. The list query states the same key
+  // explicitly in its raw LATERAL join.
+} as const satisfies Prisma.LibraryRecordInclude;
+
+const LIBRARY_RECORD_LIST_INCLUDE = {
+  credential: true,
+  externalCredential: true,
+} as const satisfies Prisma.LibraryRecordInclude;
+
+export const LIBRARY_LIST_SORTS = ['issuedAt:asc', 'issuedAt:desc', 'createdAt:asc', 'createdAt:desc'] as const;
+export type LibraryListSort = (typeof LIBRARY_LIST_SORTS)[number];
+
+export type ListLibraryRecordsOptions = {
+  tenantId: string;
+  type?: readonly CoreCredentialType[];
+  origin?: LibraryOrigin;
+  organisationId?: string;
+  facilityId?: string;
+  productId?: string;
+  issuer?: string;
+  encrypted?: boolean;
+  status?: VerificationSummary;
+  issuedFrom?: Date;
+  issuedTo?: Date;
+  sort?: LibraryListSort;
+  limit?: number;
+  offset?: number;
+};
+
+type LibraryListSqlRow = { id: string | null; newestRunId: string | null; total: bigint | number };
+
+export class LibraryRecordListError extends Error {
+  constructor(detail: string) {
+    super(`Library record list invariant failed: ${detail}`);
+    this.name = 'LibraryRecordListError';
+  }
+}
+
+function assertLibraryRecordCheckRun<TRecord extends { id: string }>(
+  view: NativeRecordView<TRecord>,
+  checkRun: CheckRun | null,
+): void;
+function assertLibraryRecordCheckRun<TRecord extends { id: string }>(
+  view: ExternalRecordView<TRecord>,
+  checkRun: CheckRun | null,
+): asserts checkRun is CheckRun;
+function assertLibraryRecordCheckRun<TRecord extends { id: string }>(
+  view: LibraryRecordView<TRecord>,
+  checkRun: CheckRun | null,
+): void {
+  if (view.origin === LibraryRecordOrigin.NATIVE) {
+    if (checkRun?.generation === 1) {
+      throw new LibraryRecordShapeError(view.record.id, 'is NATIVE but has a stored generation 1 check run');
+    }
+    return;
+  }
+  if (checkRun === null) {
+    throw new LibraryRecordShapeError(view.record.id, 'is EXTERNAL but has no check run');
+  }
+}
+
+const effectiveIssuedAt = Prisma.sql`COALESCE(r."validFrom", r."createdAt")`;
+
+type PrismaEnumName = 'CheckResult' | 'CheckRunState' | 'LibraryRecordOrigin';
+
+function enumValue(value: string, enumName: PrismaEnumName): Prisma.Sql {
+  // enumName is selected only from constants in this module. It is a type
+  // name, never caller input, and is therefore safe as a static SQL fragment.
+  return Prisma.sql`${value}::${Prisma.raw(`"${enumName}"`)}`;
+}
+
+function checkColumn(name: LibraryCheckName): Prisma.Sql {
+  // CHECK_NAMES is the repository's fixed seven-column vocabulary. No query
+  // parameter is ever used as an identifier here.
+  return Prisma.raw(`n."${name}"`);
+}
+
+function checkEquals(name: LibraryCheckName, result: CheckResult): Prisma.Sql {
+  return Prisma.sql`${checkColumn(name)} = ${enumValue(result, 'CheckResult')}`;
+}
+
+function checkNotEquals(name: LibraryCheckName, result: CheckResult): Prisma.Sql {
+  return Prisma.sql`${checkColumn(name)} <> ${enumValue(result, 'CheckResult')}`;
+}
+
+function summaryIsNotConformant(native: boolean): Prisma.Sql {
+  const blocking = BLOCKING_CHECKS.filter((name) => (native && isNativeMasked(name) ? false : true));
+  const ran = native ? CHECK_NAMES.filter((name) => !isNativeMasked(name)) : [...CHECK_NAMES];
+  const failedBlocking = Prisma.sql`(${Prisma.join(
+    blocking.map((name) => checkEquals(name, CheckResult.FAIL)),
+    ' OR ',
+  )})`;
+  const noChecksRan = Prisma.sql`NOT (${Prisma.join(
+    ran.map((name) => checkNotEquals(name, CheckResult.NOT_RUN)),
+    ' OR ',
+  )})`;
+  return Prisma.sql`(${failedBlocking} OR ${noChecksRan})`;
+}
+
+function summaryIsVerified(native: boolean): Prisma.Sql {
+  const blocking = BLOCKING_CHECKS.filter((name) => (native && isNativeMasked(name) ? false : true));
+  const ran = native ? CHECK_NAMES.filter((name) => !isNativeMasked(name)) : [...CHECK_NAMES];
+  const noBlockingFailure = Prisma.sql`NOT (${Prisma.join(
+    blocking.map((name) => checkEquals(name, CheckResult.FAIL)),
+    ' OR ',
+  )})`;
+  const atLeastOneCheck = Prisma.sql`(${Prisma.join(
+    ran.map((name) => checkNotEquals(name, CheckResult.NOT_RUN)),
+    ' OR ',
+  )})`;
+  return Prisma.sql`(${noBlockingFailure} AND ${atLeastOneCheck})`;
+}
+
+function statusPredicate(status: NonNullable<ListLibraryRecordsOptions['status']>): Prisma.Sql {
+  const pending = Prisma.sql`n."state" = ${enumValue(CheckRunState.PENDING, 'CheckRunState')}`;
+  const failed = Prisma.sql`n."state" = ${enumValue(CheckRunState.FAILED, 'CheckRunState')}`;
+  const complete = Prisma.sql`n."state" = ${enumValue(CheckRunState.COMPLETE, 'CheckRunState')}`;
+  const nativeSummary = (summary: Prisma.Sql, noRunIsMatch: boolean) =>
+    Prisma.sql`(r."origin" = ${enumValue(LibraryRecordOrigin.NATIVE, 'LibraryRecordOrigin')} AND (${
+      noRunIsMatch ? Prisma.sql`n."id" IS NULL OR ` : Prisma.empty
+    }(${complete} AND ${summary})))`;
+  const externalSummary = (summary: Prisma.Sql) =>
+    Prisma.sql`(r."origin" = ${enumValue(
+      LibraryRecordOrigin.EXTERNAL,
+      'LibraryRecordOrigin',
+    )} AND ${complete} AND ${summary})`;
+
+  switch (status) {
+    case 'pending':
+      return pending;
+    case 'failed':
+      return failed;
+    case 'not_conformant':
+      return Prisma.sql`(${nativeSummary(summaryIsNotConformant(true), false)} OR ${externalSummary(
+        summaryIsNotConformant(false),
+      )})`;
+    case 'verified':
+      return Prisma.sql`(${nativeSummary(summaryIsVerified(true), true)} OR ${externalSummary(
+        summaryIsVerified(false),
+      )})`;
+    default: {
+      const unhandled: never = status;
+      throw new LibraryRecordListError(`unsupported status ${String(unhandled)}`);
+    }
+  }
+}
+
+function sortExpression(sort: LibraryListSort): Prisma.Sql {
+  switch (sort) {
+    case 'issuedAt:asc':
+      return Prisma.sql`"effectiveIssuedAt" ASC`;
+    case 'issuedAt:desc':
+      return Prisma.sql`"effectiveIssuedAt" DESC`;
+    case 'createdAt:asc':
+      return Prisma.sql`"createdAt" ASC`;
+    case 'createdAt:desc':
+      return Prisma.sql`"createdAt" DESC`;
+    default: {
+      const unhandled: never = sort;
+      throw new LibraryRecordListError(`unsupported sort ${String(unhandled)}`);
+    }
+  }
+}
+
+/**
+ * Builds the bounded id-selection statement for `GET /library`.
+ *
+ * The filtered CTE is computed once and scanned twice for the page and its
+ * anchored count, so an empty or beyond-end page still returns the total.
+ * The page id selection, child hydration and newest-run hydration are at
+ * most three client operations in the same repeatable-read transaction; the
+ * run read is skipped when no selected record has a run. All caller
+ * values remain parameters; only fixed enum names, column names and sort
+ * branches are SQL fragments.
+ */
+export function buildLibraryListQuery(options: ListLibraryRecordsOptions): Prisma.Sql {
+  const filters: Prisma.Sql[] = [Prisma.sql`r."tenantId" = ${options.tenantId}`];
+  if (options.type !== undefined) {
+    if (options.type.length === 0) throw new LibraryRecordListError('type filter must not be empty');
+    const typeArray = Prisma.sql`ARRAY[${Prisma.join(options.type)}]::"CoreCredentialType"[]`;
+    filters.push(
+      Prisma.sql`((r."coreCredentialType" IS NOT NULL AND r."coreCredentialType" = ANY(${typeArray})) OR (r."coreCredentialType" IS NULL AND e."declaredCredentialType" = ANY(${typeArray})))`,
+    );
+  }
+  if (options.origin !== undefined) {
+    const origin = options.origin === 'native' ? LibraryRecordOrigin.NATIVE : LibraryRecordOrigin.EXTERNAL;
+    filters.push(Prisma.sql`r."origin" = ${enumValue(origin, 'LibraryRecordOrigin')}`);
+  }
+  if (options.organisationId !== undefined) filters.push(Prisma.sql`c."organisationId" = ${options.organisationId}`);
+  if (options.facilityId !== undefined) filters.push(Prisma.sql`c."facilityId" = ${options.facilityId}`);
+  if (options.productId !== undefined) filters.push(Prisma.sql`c."productId" = ${options.productId}`);
+  if (options.issuer !== undefined) {
+    filters.push(Prisma.sql`(LOWER(r."issuerName") = LOWER(${options.issuer}) OR r."issuerDid" = ${options.issuer})`);
+  }
+  if (options.encrypted !== undefined) {
+    filters.push(
+      Prisma.sql`((r."origin" = ${enumValue(
+        LibraryRecordOrigin.NATIVE,
+        'LibraryRecordOrigin',
+      )} AND (c."decryptionKey" IS NOT NULL) = ${options.encrypted}) OR (r."origin" = ${enumValue(
+        LibraryRecordOrigin.EXTERNAL,
+        'LibraryRecordOrigin',
+      )} AND e."encrypted" = ${options.encrypted}))`,
+    );
+  }
+  if (options.status !== undefined) filters.push(statusPredicate(options.status));
+  if (options.issuedFrom !== undefined) {
+    filters.push(Prisma.sql`${effectiveIssuedAt} >= ${options.issuedFrom.toISOString().slice(0, -1)}::timestamp(3)`);
+  }
+  if (options.issuedTo !== undefined) {
+    filters.push(Prisma.sql`${effectiveIssuedAt} <= ${options.issuedTo.toISOString().slice(0, -1)}::timestamp(3)`);
+  }
+
+  const sort = sortExpression(options.sort ?? 'issuedAt:desc');
+  const limit = options.limit ?? DEFAULT_PAGE_LIMIT;
+  const offset = options.offset ?? 0;
+
+  return Prisma.sql`
+    WITH filtered AS (
+      SELECT
+        r."id" AS "id",
+        ${effectiveIssuedAt} AS "effectiveIssuedAt",
+        r."createdAt" AS "createdAt",
+        n."id" AS "newestRunId"
+      FROM "LibraryRecord" AS r
+      LEFT JOIN "Credential" AS c
+        ON c."id" = r."id"
+       AND c."tenantId" = r."tenantId"
+       AND c."origin" = ${enumValue(LibraryRecordOrigin.NATIVE, 'LibraryRecordOrigin')}
+      LEFT JOIN "ExternalCredential" AS e
+        ON e."id" = r."id"
+       AND e."tenantId" = r."tenantId"
+       AND e."origin" = ${enumValue(LibraryRecordOrigin.EXTERNAL, 'LibraryRecordOrigin')}
+      LEFT JOIN LATERAL (
+        SELECT n.*
+        FROM "CheckRun" AS n
+        WHERE n."recordId" = r."id" AND n."tenantId" = r."tenantId"
+        ORDER BY n."generation" DESC
+        LIMIT 1
+      ) AS n ON TRUE
+      WHERE ${Prisma.join(filters, ' AND ')}
+    ),
+    page AS (
+      SELECT
+        "id",
+        "newestRunId",
+        row_number() OVER (ORDER BY ${sort}, "id" ASC) AS "ordinal"
+      FROM filtered
+      ORDER BY ${sort}, "id" ASC
+      LIMIT ${limit} OFFSET ${offset}
+    ),
+    totals AS (
+      SELECT count(*) AS "total"
+      FROM filtered
+    )
+    SELECT
+      page."id" AS "id",
+      page."newestRunId" AS "newestRunId",
+      page."ordinal" AS "ordinal",
+      totals."total" AS "total"
+    FROM totals
+    LEFT JOIN page ON TRUE
+    ORDER BY page."ordinal"
+  `;
+}
+
+function totalAsNumber(total: unknown): number {
+  if (typeof total === 'bigint') {
+    if (total < BigInt(0) || total > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new LibraryRecordListError('total is outside the safe integer range');
+    }
+    return Number(total);
+  }
+  if (typeof total === 'number' && Number.isSafeInteger(total) && total >= 0) return total;
+  throw new LibraryRecordListError('total was not a non-negative safe integer');
+}
+
+async function hydrateLibraryRecords(
+  tx: Prisma.TransactionClient,
+  selected: readonly { id: string; newestRunId: string | null }[],
+  tenantId: string,
+): Promise<LibraryRecordDetailView[]> {
+  if (selected.length === 0) return [];
+  const ids = selected.map(({ id }) => id);
+  const rows = await tx.libraryRecord.findMany({
+    where: { tenantId, id: { in: [...ids] } },
+    include: LIBRARY_RECORD_LIST_INCLUDE,
+  });
+  const newestRunIds = selected.flatMap(({ newestRunId }) => (newestRunId === null ? [] : [newestRunId]));
+  const checkRuns =
+    newestRunIds.length === 0 ? [] : await tx.checkRun.findMany({ where: { id: { in: newestRunIds }, tenantId } });
+  const runsByRecordId = new Map(checkRuns.map((checkRun) => [checkRun.recordId, checkRun]));
+  const selectedById = new Map(selected.map((selection) => [selection.id, selection]));
+  const byId = new Map<string, LibraryRecordDetailView>();
+  for (const row of rows) {
+    const selection = selectedById.get(row.id);
+    if (selection === undefined) {
+      throw new LibraryRecordShapeError(row.id, 'was returned during hydration but was not selected');
+    }
+    const view = narrowLibraryRecord(row);
+    const checkRun = selection.newestRunId === null ? null : runsByRecordId.get(row.id) ?? null;
+    if (selection.newestRunId !== null && (checkRun === null || checkRun.id !== selection.newestRunId)) {
+      throw new LibraryRecordShapeError(row.id, 'was selected with a newest check run that could not be hydrated');
+    }
+    if (view.origin === LibraryRecordOrigin.NATIVE) {
+      assertLibraryRecordCheckRun(view, checkRun);
+      byId.set(row.id, { ...view, checkRun });
+    } else {
+      assertLibraryRecordCheckRun(view, checkRun);
+      byId.set(row.id, { ...view, checkRun });
+    }
+  }
+  if (byId.size !== rows.length || byId.size !== ids.length) {
+    const missing = ids.find((id) => !byId.has(id));
+    throw new LibraryRecordShapeError(missing ?? 'unknown', 'was selected but could not be hydrated');
+  }
+  return ids.map((id) => {
+    const view = byId.get(id);
+    if (view === undefined) throw new LibraryRecordShapeError(id, 'was selected but could not be hydrated');
+    return view;
+  });
+}
+
+/** Lists one tenant's records using the id query and same-transaction hydration. */
+export async function listLibraryRecords(
+  options: ListLibraryRecordsOptions,
+): Promise<{ data: LibraryRecordDetailView[]; total: number }> {
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<LibraryListSqlRow[]>(buildLibraryListQuery(options));
+        if (rows.length === 0) throw new LibraryRecordListError('the anchored count returned no row');
+        const total = totalAsNumber(rows[0].total);
+        if (rows.some((row) => totalAsNumber(row.total) !== total)) {
+          throw new LibraryRecordListError('the anchored count changed within the page result');
+        }
+        const selected = rows.flatMap((row) => (row.id === null ? [] : [{ id: row.id, newestRunId: row.newestRunId }]));
+        return { data: await hydrateLibraryRecords(tx, selected, options.tenantId), total };
+      },
+      // The statement is unbenchmarked and has no effective-date expression index yet.
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, maxWait: 2_000, timeout: 5_000 },
+    );
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'P2028'
+    ) {
+      Object.defineProperty(error, 'context', {
+        configurable: true,
+        value: { query: 'library-list', tenantId: options.tenantId },
+      });
+    }
+    throw error;
+  }
+}
 
 /**
  * Reads one tenant-owned library record with the single child its origin has
@@ -26,33 +406,18 @@ export async function getLibraryRecordById(id: string, tenantId: string): Promis
     async (tx) => {
       const row = await tx.libraryRecord.findFirst({
         where: { id, tenantId },
-        include: {
-          credential: true,
-          externalCredential: true,
-          // The run's composite foreign key already pins it to the parent's
-          // tenant, so a tenant filter here could only ever narrow the newest
-          // generation away and serve an older one as current.
-          checkRuns: {
-            orderBy: { generation: 'desc' },
-            take: 1,
-          },
-        },
+        include: LIBRARY_RECORD_INCLUDE,
       });
       if (!row) return null;
 
       const { checkRuns, ...withChildren } = row;
       const view = narrowLibraryRecord(withChildren);
       const checkRun = checkRuns[0] ?? null;
-
       if (view.origin === LibraryRecordOrigin.NATIVE) {
-        if (checkRun?.generation === 1) {
-          throw new LibraryRecordShapeError(id, 'is NATIVE but has a stored generation 1 check run');
-        }
+        assertLibraryRecordCheckRun(view, checkRun);
         return { ...view, checkRun };
       }
-      if (checkRun === null) {
-        throw new LibraryRecordShapeError(id, 'is EXTERNAL but has no check run');
-      }
+      assertLibraryRecordCheckRun(view, checkRun);
       return { ...view, checkRun };
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },

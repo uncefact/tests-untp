@@ -136,7 +136,7 @@ export function nonEmptyArraySchema<Item extends z.ZodTypeAny>(itemSchema: Item)
  * range check) and a value above Number.MAX_SAFE_INTEGER that Number would
  * round to a different integer than the client sent.
  */
-function strictIntQueryParam(message: string, isInRange: (value: number) => boolean) {
+export function strictIntQueryParam(message: string, isInRange: (value: number) => boolean) {
   return z
     .string()
     .trim()
@@ -161,12 +161,15 @@ function strictIntQueryParam(message: string, isInRange: (value: number) => bool
  *   const resourceQuerySchema = z.object({ status: z.enum([...]) }).merge(paginationQuerySchema);
  *   const query = parseQueryParams(new URL(req.url), resourceQuerySchema);
  */
+export const paginationLimitQueryParam = strictIntQueryParam('must be a positive integer', (value) => value >= 1);
+const paginationOffsetQueryParam = strictIntQueryParam('must be a non-negative integer', (value) => value >= 0);
+
 export const paginationQuerySchema = z.object({
-  limit: strictIntQueryParam('must be a positive integer', (value) => value >= 1).refine(
+  limit: paginationLimitQueryParam.refine(
     (value) => value === undefined || value <= MAX_PAGE_LIMIT,
     `must not exceed the maximum of ${MAX_PAGE_LIMIT}`,
   ),
-  offset: strictIntQueryParam('must be a non-negative integer', (value) => value >= 0),
+  offset: paginationOffsetQueryParam,
 });
 
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;

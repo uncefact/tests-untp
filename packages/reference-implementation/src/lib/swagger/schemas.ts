@@ -32,6 +32,9 @@ import {
   credentialRecordDetailSchema,
   credentialRecordWarningSchema,
   verificationEnvelopeSchema,
+  credentialTypeSchema,
+  originSchema,
+  verificationSummarySchema,
 } from '@/lib/library/credential-record-projection';
 import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
 import { CredentialDetailsError, CredentialDetailsStatus, CoreCredentialType } from '@/lib/prisma/generated';
@@ -574,6 +577,9 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     CredentialRecordDetail: credentialRecordDetailSchema,
     VerificationEnvelope: verificationEnvelopeSchema,
     CredentialRecordWarning: credentialRecordWarningSchema,
+    CredentialType: credentialTypeSchema,
+    Origin: originSchema,
+    VerificationSummary: verificationSummarySchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};

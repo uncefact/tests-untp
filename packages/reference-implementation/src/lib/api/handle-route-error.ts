@@ -101,9 +101,11 @@ export function handleRouteError(e: unknown, options: HandleRouteErrorOptions = 
   if (isDatabaseError(e)) {
     // Database errors carry ORM internals (engine text, table and column names) in
     // their message; log the detail, return only a generic body. Unlike the final
-    // fallback below, this branch never echoes error text. The distinct log message
-    // is the signal that a repository is missing a mapping.
-    logger.error({ err: e }, 'Unhandled database error');
+    // fallback below, this branch never echoes error text. A repository may attach
+    // context to an error so the shared detector retains the operation details.
+    const context =
+      typeof e === 'object' && e !== null && 'context' in e ? (e as { context?: unknown }).context : undefined;
+    logger.error(context === undefined ? { err: e } : { err: e, context }, 'Unhandled database error');
     return NextResponse.json({ error: unexpectedErrorMessage(getRequestContext()?.correlationId) }, { status: 500 });
   }
   logger.error({ err: e }, 'Unexpected error');

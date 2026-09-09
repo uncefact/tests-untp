@@ -89,31 +89,55 @@ export async function parseRequestBody<Schema extends z.ZodTypeAny>(
  * Parse and validate URL query parameters against a Zod schema (ADR-037).
  *
  * Accepts either a URLSearchParams or the route's URL directly. Rejects a
- * query key that appears more than once (e.g. `?status=a&status=b`), since
- * a resource's query schema declares each parameter as a single scalar; a
- * multi-value/array query parameter path is deferred until a resource needs
- * one. Coerces and validates the declared parameters, throwing
+ * query key that appears more than once (e.g. `?status=a&status=b`) unless
+ * the resource opts that schema key into its repeatable array path. Coerces
+ * and validates the declared parameters, throwing
  * ValidationError with the first issue rendered as `param: message` on
  * failure so body and query 400s look identical (mirrors parseRequestBody's
  * rendering convention).
+ *
+ * `repeatable` names the keys a resource's schema declares as an array
+ * (`style: form; explode: true` in its OpenAPI parameter): those keys collect
+ * every occurrence into an array, in the order supplied, even when supplied
+ * only once (so `?type=DPP` parses to `{ type: ['DPP'] }`, not a bare
+ * string), and are exempt from the repeated-key rejection below. A key not
+ * named here still rejects a second occurrence exactly as before. A custom
+ * issue carrying `params: { code: string }` is selected ahead of the first
+ * issue and publishes that code on the ValidationError.
  */
 export function parseQueryParams<Schema extends z.ZodTypeAny>(
   source: URL | URLSearchParams,
   schema: Schema,
+  options?: { repeatable?: readonly (keyof z.input<Schema> & string)[] },
 ): z.infer<Schema> {
   const searchParams = source instanceof URL ? source.searchParams : source;
+  const repeatable = new Set(options?.repeatable ?? []);
   const seenKeys = new Set<string>();
   for (const key of searchParams.keys()) {
+    if (repeatable.has(key)) continue;
     if (seenKeys.has(key)) {
       throw new ValidationError(`${key}: repeated query parameter`);
     }
     seenKeys.add(key);
   }
-  const raw = Object.fromEntries(searchParams.entries());
+  const raw: Record<string, unknown> = {};
+  for (const key of new Set(searchParams.keys())) {
+    raw[key] = repeatable.has(key) ? searchParams.getAll(key) : searchParams.get(key);
+  }
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    throw new ValidationError(`${issue.path.join('.') || 'param'}: ${issue.message}`);
+    const issueCode = (candidate: z.ZodIssue): string | undefined => {
+      const params = (candidate as z.ZodIssue & { params?: unknown }).params;
+      if (params !== null && typeof params === 'object' && 'code' in params) {
+        const code = (params as { code?: unknown }).code;
+        return typeof code === 'string' ? code : undefined;
+      }
+      return undefined;
+    };
+    const codedIssue = parsed.error.issues.find((candidate) => issueCode(candidate) !== undefined);
+    const issue = codedIssue ?? parsed.error.issues[0];
+    const code = issueCode(issue);
+    throw new ValidationError(`${issue.path.join('.') || 'param'}: ${issue.message}`, code ? { code } : undefined);
   }
   return parsed.data;
 }

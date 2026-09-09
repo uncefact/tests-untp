@@ -11,7 +11,8 @@ import {
   UnprocessableError,
   unexpectedErrorMessage,
 } from '@/lib/api/errors';
-import { assertHttpUrl, parseRequestBody, ValidationError } from '@/lib/api/validation';
+import { assertHttpUrl, parseRequestBody, parseQueryParams, ValidationError } from '@/lib/api/validation';
+import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { readRequestBytes } from '@/lib/api/request-body';
 import {
   digestRequestBody,
@@ -22,6 +23,7 @@ import {
 } from '@/lib/api/idempotency';
 import {
   registerExternalCredentialRequestSchema,
+  listLibraryQuerySchema,
   type RegisterExternalCredentialRequest,
 } from '@/lib/api/request-schemas/library';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
@@ -40,8 +42,10 @@ import {
   type ExternalCredentialRecord,
 } from '@/lib/prisma/repositories/external-credential.repository';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
+import { isDatabaseError } from '@/lib/prisma/db-errors';
 import {
   CredentialRecordProjectionError,
+  toNativeCredentialRecord,
   toCredentialRecord,
   type CredentialRecordResponse,
 } from '@/lib/library/credential-record-projection';
@@ -55,11 +59,276 @@ import {
 import { LIBRARY_VERIFY_JOB, VERIFY_JOB_ENQUEUE_OPTIONS } from '@/lib/library/verify-generation-job';
 import { startJobQueue } from '@/lib/jobs/app-job-queue';
 import type { JobQueue } from '@/lib/jobs/types';
+import { LibraryRecordOrigin } from '@/lib/prisma/generated';
+import { listLibraryRecords } from '@/lib/prisma/repositories/library-record.repository';
 
 const logger = apiLogger.child({ route: '/api/v1/library' });
 
 const IDEMPOTENCY_KEY_REQUIRED_MESSAGE =
   'Idempotency-Key header is required: a register call creates a durable copy and cannot be retried safely without one.';
+
+const FREE_TEXT_SEARCH_DEFERRED_MESSAGE = 'Free-text search is not yet available in v1.';
+
+function hasLibraryQueryNul(query: {
+  organisationId?: string;
+  facilityId?: string;
+  productId?: string;
+  issuer?: string;
+}): boolean {
+  // PostgreSQL rejects NUL in a text parameter with SQLSTATE 22021; an empty
+  // page preserves the caller's filter without turning it into a server error.
+  return [query.organisationId, query.facilityId, query.productId, query.issuer].some(
+    (value) => value?.includes('\0') === true,
+  );
+}
+
+function listResponse(data: CredentialRecordResponse[], total: number, limit?: number, offset?: number): Response {
+  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset), {
+    headers: { 'Cache-Control': 'no-store' },
+  });
+}
+
+/**
+ * @swagger
+ * /library:
+ *   get:
+ *     operationId: listLibrary
+ *     summary: List and search the tenant's credential library
+ *     description: |
+ *       Returns native credentials issued by this tenant and external
+ *       credentials received and registered by it in one paginated view.
+ *       Every row is keyless and carries no durable-copy storage location;
+ *       use `GET /api/v1/library/{id}` for those fields. v1 has no
+ *       supersession or versioning filter, so every record is returned when
+ *       it matches the other filters.
+ *
+ *       `type` is repeatable and uses the extracted core type when present,
+ *       otherwise the external record's declared type. `issuer` compares an
+ *       issuer name case-insensitively or a DID exactly. Association filters
+ *       match native records only. The `issuedAt` sort and date bounds use
+ *       `validFrom`, falling back to `createdAt`; the response's `issuedAt`
+ *       stays `validFrom` and is null when that is null. Every sort has an
+ *       ascending id tie-breaker.
+ *     tags:
+ *       - Library
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         description: Repeatable OR filter for the credential's core type. Extracted type takes precedence over the external declaration. A native record with no recorded core type matches no value until an extraction records one; a record whose types name no core kind never matches a `type` value.
+ *         schema:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/CredentialType'
+ *         style: form
+ *         explode: true
+ *       - in: query
+ *         name: origin
+ *         description: Filter by native or external provenance.
+ *         schema:
+ *           $ref: '#/components/schemas/Origin'
+ *       - in: query
+ *         name: organisationId
+ *         description: Exact non-blank native organisation id. External records never match.
+ *         schema:
+ *           type: string
+ *           minLength: 1
+ *       - in: query
+ *         name: facilityId
+ *         description: Exact non-blank native facility id. External records never match.
+ *         schema:
+ *           type: string
+ *           minLength: 1
+ *       - in: query
+ *         name: productId
+ *         description: Exact non-blank native product id. External records never match.
+ *         schema:
+ *           type: string
+ *           minLength: 1
+ *       - in: query
+ *         name: issuer
+ *         description: Exact non-blank issuer name ignoring case, or exact issuer DID.
+ *         schema:
+ *           type: string
+ *           minLength: 1
+ *       - in: query
+ *         name: encrypted
+ *         description: Whether the record's observed body or native stored copy is encrypted. Null external observations match neither value.
+ *         schema:
+ *           type: boolean
+ *       - in: query
+ *         name: status
+ *         description: Filter by the derived verification summary.
+ *         schema:
+ *           $ref: '#/components/schemas/VerificationSummary'
+ *       - in: query
+ *         name: issuedFrom
+ *         description: Inclusive UTC lower bound on effective issuedAt, falling back to createdAt. A reversed range is a 400 validation error.
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: issuedTo
+ *         description: Inclusive UTC upper bound on effective issuedAt, falling back to createdAt. A reversed range is a 400 validation error.
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: sort
+ *         description: Sort field and direction. Ties are broken by id ascending.
+ *         schema:
+ *           type: string
+ *           enum: [issuedAt:asc, issuedAt:desc, createdAt:asc, createdAt:desc]
+ *           default: issuedAt:desc
+ *       - in: query
+ *         name: q
+ *         description: Reserved free-text search parameter. Rejected in v1 with FREE_TEXT_SEARCH_DEFERRED.
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         description: Page size. Defaults to the smaller of 20 and the configured deployment maximum. Values above the deployment maximum are rejected with PAGE_LIMIT_EXCEEDED.
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: offset
+ *         description: Number of matching records to skip.
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: A keyless page of the tenant's library.
+ *         headers:
+ *           Cache-Control:
+ *             schema:
+ *               type: string
+ *               enum: [no-store]
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [data, pagination]
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/CredentialRecord'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationMeta'
+ *             examples:
+ *               mixedPage:
+ *                 value:
+ *                   data:
+ *                     - id: cred_ext_05
+ *                       origin: external
+ *                       credential: { name: Cobalt Shipment DFR, credentialType: DFR, issuerName: Cobalt Traders Ltd, issuerDid: did:web:cobalt-traders.example, subjectName: Cobalt shipment CB-2201, subjectId: https://cobalt-traders.example/shipments/CB-2201, validFrom: '2026-07-20T10:00:00Z', validUntil: null }
+ *                       annotations: { annotationVersion: 1, displayName: Cobalt shipment DFR, declaredCredentialType: DFR, dateReceived: '2026-07-30', notes: '' }
+ *                       organisationId: null
+ *                       facilityId: null
+ *                       productId: null
+ *                       sourceUrl: https://supplier.example/credential-d
+ *                       sourceDigest: zQm-cobalt-digest
+ *                       resolverUri: null
+ *                       issuedAt: '2026-07-20T10:00:00Z'
+ *                       encrypted: false
+ *                       hasKey: true
+ *                       verification: { generation: 1, state: complete, requestedAt: '2026-07-30T09:00:00Z', completedAt: '2026-07-30T09:00:06Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
+ *                       currencyStatus: current
+ *                       detailsStatus: EXTRACTED
+ *                       detailsError: null
+ *                       capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                       warnings: []
+ *                       createdAt: '2026-07-30T09:00:00Z'
+ *                       updatedAt: '2026-07-30T09:00:06Z'
+ *                     - id: cjld2cyuq0000qzrmf1w70eq3
+ *                       origin: native
+ *                       credential: { name: Battery Pack DPP, credentialType: DPP, issuerName: Acme Battery Co, issuerDid: did:web:acme.example, subjectName: Battery Pack Model X, subjectId: https://acme.example/products/battery-x, validFrom: '2026-07-15T09:00:00Z', validUntil: '2029-07-15T09:00:00Z' }
+ *                       annotations: null
+ *                       organisationId: cjld2cyuq0001qzrmf1w70eq4
+ *                       facilityId: cjld2cyuq0002qzrmf1w70eq5
+ *                       productId: cjld2cyuq0003qzrmf1w70eq6
+ *                       sourceUrl: null
+ *                       sourceDigest: null
+ *                       resolverUri: null
+ *                       issuedAt: '2026-07-15T09:00:00Z'
+ *                       encrypted: true
+ *                       hasKey: true
+ *                       verification: { generation: 1, state: complete, requestedAt: '2026-07-15T09:00:00Z', completedAt: '2026-07-15T09:00:00Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: pass, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: verified }
+ *                       currencyStatus: current
+ *                       detailsStatus: EXTRACTED
+ *                       detailsError: null
+ *                       capabilities: { deletable: false, annotatable: false, verifiable: true }
+ *                       warnings: []
+ *                       createdAt: '2026-07-15T09:00:00Z'
+ *                       updatedAt: '2026-07-15T09:00:00Z'
+ *                   pagination: { total: 2, limit: 20, offset: 0, hasMore: false }
+ *       400:
+ *         description: Validation failure, including a reversed date range, PAGE_LIMIT_EXCEEDED, or FREE_TEXT_SEARCH_DEFERRED.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
+ *       500:
+ *         description: The selected records could not be read or projected. The body is sanitised and carries a correlation id.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+export const GET = withTenantAuth(async (req, { tenantId }) => {
+  const url = new URL(req.url);
+  if (url.searchParams.has('q')) {
+    throw new ValidationError(FREE_TEXT_SEARCH_DEFERRED_MESSAGE, { code: 'FREE_TEXT_SEARCH_DEFERRED' });
+  }
+
+  const query = parseQueryParams(url, listLibraryQuerySchema, { repeatable: ['type'] });
+  if (hasLibraryQueryNul(query)) {
+    return listResponse([], 0, query.limit, query.offset);
+  }
+
+  const issuedFrom = query.issuedFrom === undefined ? undefined : new Date(`${query.issuedFrom}T00:00:00.000Z`);
+  const issuedTo = query.issuedTo === undefined ? undefined : new Date(`${query.issuedTo}T23:59:59.999Z`);
+
+  try {
+    const { data, total } = await listLibraryRecords({
+      tenantId,
+      type: query.type,
+      origin: query.origin,
+      organisationId: query.organisationId,
+      facilityId: query.facilityId,
+      productId: query.productId,
+      issuer: query.issuer,
+      encrypted: query.encrypted,
+      status: query.status,
+      issuedFrom,
+      issuedTo,
+      sort: query.sort,
+      limit: query.limit,
+      offset: query.offset,
+    });
+    const now = new Date(Date.now());
+    const projected = data.map((view) =>
+      view.origin === LibraryRecordOrigin.NATIVE
+        ? toNativeCredentialRecord(view, { now })
+        : toCredentialRecord(view, { now }),
+    );
+    return listResponse(projected, total, query.limit, query.offset);
+  } catch (error) {
+    if (!isDatabaseError(error)) {
+      return sanitisedServerError(
+        error instanceof Error ? error : new Error(String(error)),
+        'The library records could not be listed',
+      );
+    }
+    throw error;
+  }
+});
 
 /**
  * The contract's replay is a CURRENT-RESOURCE read: the record as it is now

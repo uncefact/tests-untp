@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { LoggerService as Logger } from '@uncefact/untp-ri-services';
 import type { PrismaClient } from '../../src/lib/prisma/generated/index.js';
-import { LibraryRecordOrigin, RecordSource } from '../../src/lib/prisma/generated/index.js';
+import { CheckResult, CheckRunState, LibraryRecordOrigin, RecordSource } from '../../src/lib/prisma/generated/index.js';
 import type {
   CoreCredentialType,
   CredentialDetailsError,
@@ -192,6 +192,21 @@ export type NativeCredentialFixture = {
   coreDataModelVersion?: string | null;
   detailsStatus?: CredentialDetailsStatus;
   detailsError?: CredentialDetailsError | null;
+  organisationId?: string | null;
+  facilityId?: string | null;
+  productId?: string | null;
+  checkRun?: {
+    generation?: number;
+    state?: CheckRunState;
+    retrieval?: CheckResult;
+    decryption?: CheckResult;
+    digest?: CheckResult;
+    proof?: CheckResult;
+    status?: CheckResult;
+    temporal?: CheckResult;
+    schemaConformance?: CheckResult;
+    completedAt?: Date | null;
+  };
   details?: {
     name?: string | null;
     issuerName?: string | null;
@@ -207,7 +222,9 @@ export type NativeCredentialFixture = {
  * Inserts a native credential the way the write paths do (ADR-053 decision
  * 1): its LibraryRecord parent and its Credential child, sharing one id, in
  * one transaction. Suites that need a credential row use this rather than
- * creating a bare child, which the schema refuses.
+ * creating a bare child, which the schema refuses. The one-child-row trigger
+ * is DEFERRABLE INITIALLY DEFERRED and checks at commit, so the parent and
+ * child must be created before the same transaction commits.
  */
 export async function insertNativeCredential(
   prisma: PrismaClient,
@@ -235,8 +252,31 @@ export async function insertNativeCredential(
         storageUri: fixture.storageUri ?? `https://storage.test/${record.id}`,
         digestMultibase: fixture.digestMultibase ?? `z${record.id}`,
         decryptionKey: fixture.decryptionKey ?? null,
+        organisationId: fixture.organisationId ?? null,
+        facilityId: fixture.facilityId ?? null,
+        productId: fixture.productId ?? null,
       },
     });
+    if (fixture.checkRun !== undefined) {
+      const run = fixture.checkRun;
+      const state = run.state ?? CheckRunState.COMPLETE;
+      await tx.checkRun.create({
+        data: {
+          recordId: record.id,
+          tenantId,
+          generation: run.generation ?? 2,
+          state,
+          retrieval: run.retrieval ?? CheckResult.NOT_RUN,
+          decryption: run.decryption ?? CheckResult.NOT_RUN,
+          digest: run.digest ?? CheckResult.NOT_RUN,
+          proof: run.proof ?? CheckResult.NOT_RUN,
+          status: run.status ?? CheckResult.NOT_RUN,
+          temporal: run.temporal ?? CheckResult.NOT_RUN,
+          schemaConformance: run.schemaConformance ?? CheckResult.NOT_RUN,
+          completedAt: run.completedAt ?? (state === CheckRunState.COMPLETE ? new Date() : null),
+        },
+      });
+    }
     return { id: record.id };
   });
 }

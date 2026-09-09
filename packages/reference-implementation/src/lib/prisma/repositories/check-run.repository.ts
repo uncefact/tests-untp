@@ -13,29 +13,13 @@ import { prismaSqlExecutor } from '@/lib/jobs/prisma-sql-executor';
 import type { SqlExecutor } from '@/lib/jobs/types';
 import type { VerifyJobReference } from './external-credential.repository';
 import { apiLogger } from '@/lib/api/logger';
+import { CHECK_NAMES, type LibraryCheckName } from '@/lib/library/check-rules';
+export { CHECK_NAMES } from '@/lib/library/check-rules';
 
 const logger = apiLogger.child({ module: 'check-run.repository' });
 
-/**
- * The seven checks a generation records (the coverage listed under ADR-055
- * decision 7; the generation row itself is ADR-053 decision 3; #955). Every check is always present; NOT_RUN
- * covers both "did not apply" and "did not execute". The wire contract's
- * summary is derived from the run's state and these results, never stored.
- * The tuple is the roster; the record type and {@link noChecksRun} derive from
- * it, so an eighth check is one edit and a build error everywhere it is not
- * yet handled.
- */
-export const CHECK_NAMES = [
-  'retrieval',
-  'decryption',
-  'digest',
-  'proof',
-  'status',
-  'temporal',
-  'schemaConformance',
-] as const;
-
-export type CheckName = (typeof CHECK_NAMES)[number];
+// CHECK_NAMES is owned by check-rules.ts so the projection and list SQL share it.
+export type CheckName = LibraryCheckName;
 
 export type CheckResults = Record<CheckName, CheckResult>;
 

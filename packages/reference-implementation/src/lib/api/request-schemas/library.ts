@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import { CoreCredentialType } from '@/lib/prisma/generated';
-import { urlSchema } from './shared';
+import { originSchema, verificationSummarySchema } from '@/lib/library/credential-record-projection';
+import { LIBRARY_LIST_SORTS } from '@/lib/prisma/repositories/library-record.repository';
+import {
+  booleanQuerySchema,
+  nonBlankString,
+  paginationLimitQueryParam,
+  paginationQuerySchema,
+  urlSchema,
+} from './shared';
+import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 
 /**
  * The shared non-blank rule with a length bound applied before it, because a
@@ -30,6 +39,58 @@ const HEX_64 = /^[a-f0-9]{64}$/i;
  * arrived as; the route turns it into the `Date` the column stores.
  */
 export const calendarDateSchema = z.string().date('must be a real calendar date in YYYY-MM-DD form');
+
+const libraryListCalendarDateSchema = calendarDateSchema.refine((value) => !value.startsWith('0000-'), {
+  message: 'year must be 0001 or later',
+});
+
+const librarySortSchema = z.enum(LIBRARY_LIST_SORTS);
+
+const libraryPaginationQuerySchema = paginationQuerySchema.extend({
+  limit: paginationLimitQueryParam,
+});
+
+/**
+ * Query parameters for `GET /library`. `type` is an OpenAPI repeatable
+ * parameter and is therefore an array even when the caller supplies one
+ * value. The extracted core type is authoritative once it is present; the
+ * repository applies that distinction when it builds the SQL predicate.
+ */
+export const listLibraryQuerySchema = z
+  .object({
+    type: z.array(z.nativeEnum(CoreCredentialType)).min(1).optional(),
+    origin: originSchema.optional(),
+    organisationId: nonBlankString.optional(),
+    facilityId: nonBlankString.optional(),
+    productId: nonBlankString.optional(),
+    issuer: nonBlankString.optional(),
+    encrypted: booleanQuerySchema,
+    status: verificationSummarySchema.optional(),
+    issuedFrom: libraryListCalendarDateSchema.optional(),
+    issuedTo: libraryListCalendarDateSchema.optional(),
+    sort: librarySortSchema.default('issuedAt:desc'),
+    q: z.string().optional(),
+  })
+  .merge(libraryPaginationQuerySchema)
+  .superRefine((query, ctx) => {
+    if (query.issuedFrom !== undefined && query.issuedTo !== undefined && query.issuedFrom > query.issuedTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['issuedFrom'],
+        message: 'must be on or before issuedTo',
+      });
+    }
+    if (query.limit !== undefined && query.limit > MAX_PAGE_LIMIT) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['limit'],
+        message: `must not exceed the maximum of ${MAX_PAGE_LIMIT}`,
+        params: { code: 'PAGE_LIMIT_EXCEEDED' },
+      });
+    }
+  });
+
+export type ListLibraryQuery = z.infer<typeof listLibraryQuerySchema>;
 
 /**
  * Supplied when the caller believes the source is encrypted; the fetch is

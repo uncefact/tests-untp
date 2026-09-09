@@ -1,4 +1,5 @@
 import { CoreCredentialType } from '@/lib/prisma/generated';
+import { parseQueryParams, ValidationError } from '@/lib/api/validation';
 import {
   REGISTER_DISPLAY_NAME_MAX_LENGTH,
   REGISTER_NOTES_MAX_LENGTH,
@@ -6,6 +7,7 @@ import {
   calendarDateSchema,
   registerExternalCredentialRequestSchema,
   sourceEncryptionSchema,
+  listLibraryQuerySchema,
 } from './library';
 
 type Body = {
@@ -224,6 +226,104 @@ describe('calendarDateSchema', () => {
       const body = validBody();
       body.annotations.dateReceived = value;
       expect(registerExternalCredentialRequestSchema.safeParse(body).success).toBe(false);
+    }
+  });
+});
+
+describe('listLibraryQuerySchema', () => {
+  it('parses the repeatable type filter into an array and applies the default sort', () => {
+    expect(
+      parseQueryParams(new URL('http://localhost/api/v1/library?type=DPP'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      }),
+    ).toEqual({ type: [CoreCredentialType.DPP], sort: 'issuedAt:desc' });
+  });
+
+  it('keeps repeated type values in order while rejecting repeated scalar values', () => {
+    expect(
+      parseQueryParams(new URL('http://localhost/api/v1/library?type=DPP&type=DFR'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      }).type,
+    ).toEqual([CoreCredentialType.DPP, CoreCredentialType.DFR]);
+    expect(() =>
+      parseQueryParams(
+        new URL('http://localhost/api/v1/library?origin=native&origin=external'),
+        listLibraryQuerySchema,
+        { repeatable: ['type'] },
+      ),
+    ).toThrow('origin: repeated query parameter');
+  });
+
+  it('validates strict booleans, calendar bounds, date order, and sort choices', () => {
+    expect(
+      parseQueryParams(
+        new URL(
+          'http://localhost/api/v1/library?encrypted=false&status=verified&issuedFrom=2026-01-01&issuedTo=2026-01-31&sort=createdAt:asc&limit=3&offset=2',
+        ),
+        listLibraryQuerySchema,
+        { repeatable: ['type'] },
+      ),
+    ).toMatchObject({ encrypted: false, status: 'verified', sort: 'createdAt:asc', limit: 3, offset: 2 });
+    expect(() =>
+      parseQueryParams(new URL('http://localhost/api/v1/library?encrypted=0'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      }),
+    ).toThrow('encrypted: must be "true" or "false"');
+    expect(() =>
+      parseQueryParams(new URL('http://localhost/api/v1/library?issuedFrom=2026-02-30'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      }),
+    ).toThrow('issuedFrom: must be a real calendar date in YYYY-MM-DD form');
+    expect(() =>
+      parseQueryParams(new URL('http://localhost/api/v1/library?issuedFrom=0000-01-01'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      }),
+    ).toThrow('issuedFrom: year must be 0001 or later');
+    expect(() =>
+      parseQueryParams(new URL('http://localhost/api/v1/library?issuedTo=0000-12-31'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      }),
+    ).toThrow('issuedTo: year must be 0001 or later');
+    expect(
+      parseQueryParams(new URL('http://localhost/api/v1/library?issuedFrom=0001-01-01'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      }),
+    ).toMatchObject({ issuedFrom: '0001-01-01' });
+    expect(() =>
+      parseQueryParams(
+        new URL('http://localhost/api/v1/library?issuedFrom=2026-02-02&issuedTo=2026-02-01'),
+        listLibraryQuerySchema,
+        { repeatable: ['type'] },
+      ),
+    ).toThrow('issuedFrom: must be on or before issuedTo');
+    expect(() =>
+      parseQueryParams(new URL('http://localhost/api/v1/library?sort=name:asc'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      }),
+    ).toThrow('sort:');
+  });
+
+  it('returns a named page-limit error containing the configured maximum', () => {
+    let error: unknown;
+    try {
+      parseQueryParams(new URL('http://localhost/api/v1/library?limit=101'), listLibraryQuerySchema, {
+        repeatable: ['type'],
+      });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error).toMatchObject({ code: 'PAGE_LIMIT_EXCEEDED' });
+    expect((error as Error).message).toContain('limit: must not exceed the maximum of');
+  });
+
+  it('adds one coded issue for an over-limit value at the route schema boundary', () => {
+    const result = listLibraryQuerySchema.safeParse({ limit: '101' });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toHaveLength(1);
+      expect(result.error.issues[0]).toMatchObject({ params: { code: 'PAGE_LIMIT_EXCEEDED' } });
     }
   });
 });

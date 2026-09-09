@@ -9,7 +9,7 @@ Reads stored credentials that predate descriptive-field capture and writes the l
 
 This is an **operator-run** backfill. It ships in the image but never runs on its own, because it fetches every tenant's stored artefact. A wrong details write is not itself destructive to the stored credential, but the fetch is an external side effect, and the window during which existing rows sit at `EXTRACTION_PENDING` should stay short.
 
-Credentials issued after descriptive-field capture already carry these columns. Until this job has run, pre-existing rows remain readable and verifiable; only their stored summary is missing.
+Credentials issued after descriptive-field capture already carry these columns. Until this job has run, pre-existing rows remain readable and verifiable, and only their stored summary is missing. A row whose core credential type the migration could not resolve is also absent from every `type` filter on [the library list](../../api/library#list-and-search-the-library) until this job records one; a row whose types name no core kind stays without one after the job and never matches a `type` value.
 
 ## Before running it
 

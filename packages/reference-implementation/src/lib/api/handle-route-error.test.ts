@@ -288,6 +288,27 @@ describe('handleRouteError', () => {
     expect(mockLogger.error).toHaveBeenCalledWith({ err: dbError }, 'Unhandled database error');
   });
 
+  it('includes repository context in the generic database error log', async () => {
+    const dbError = new Error('Transaction already closed');
+    dbError.name = 'PrismaClientKnownRequestError';
+    Object.assign(dbError, {
+      code: 'P2028',
+      clientVersion: '6.0.0',
+      context: { query: 'library-list', tenantId: 'tenant-1' },
+    });
+
+    const res = handleRouteError(dbError);
+
+    expect(res.status).toBe(500);
+    expect(await (res as unknown as MockResponse).json()).toEqual({
+      error: 'An unexpected error has occurred.',
+    });
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      { err: dbError, context: { query: 'library-list', tenantId: 'tenant-1' } },
+      'Unhandled database error',
+    );
+  });
+
   it('sanitises a Prisma client validation error to a generic 500', async () => {
     const dbError = new Error('Argument `id`: Invalid value provided. Expected StringFilter or String, provided Int.');
     dbError.name = 'PrismaClientValidationError';
