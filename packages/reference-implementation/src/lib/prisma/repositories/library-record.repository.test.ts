@@ -8,6 +8,8 @@ jest.mock('../prisma', () => ({
 import { CheckResult, CheckRunState, CoreCredentialType, LibraryRecordOrigin, Prisma } from '../generated';
 import { prisma } from '../prisma';
 import {
+  batchGetLibraryRecords,
+  buildLibraryBatchGetQuery,
   buildLibraryListQuery,
   getLibraryRecordById,
   LibraryRecordWriteAnomalyError,
@@ -604,5 +606,209 @@ describe('updateLibraryRecordAnnotations', () => {
       }),
     ).rejects.toThrow(LibraryRecordWriteAnomalyError);
     expect(mockParentUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('batchGetLibraryRecords', () => {
+  it('selects the tenant ids with a bound array and hydrates in requested order', async () => {
+    const requestedIds = ['record-2', 'record-1'];
+    mockQueryRaw.mockResolvedValue([
+      { id: 'record-1', newestRunId: 'run-1' },
+      { id: 'record-2', newestRunId: 'run-2' },
+    ]);
+    mockFindMany.mockResolvedValue([row({ id: 'record-1' }), row({ id: 'record-2' })]);
+    mockCheckRunFindMany.mockResolvedValue([CHECK_RUN, CHECK_RUN_2]);
+
+    const result = await batchGetLibraryRecords({ tenantId: 'tenant-1', ids: requestedIds });
+
+    expect(mockTransaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      maxWait: 2_000,
+      timeout: 5_000,
+    });
+    expect(mockGlobalFindFirst).not.toHaveBeenCalled();
+    expect(mockQueryRaw).toHaveBeenCalledWith(expect.anything());
+    const query = mockQueryRaw.mock.calls[0][0] as { sql: string; values: unknown[] };
+    expect(query.sql).toContain('ANY');
+    expect(query.sql).toContain('text[]');
+    expect(query.sql).not.toContain('record-1');
+    expect(query.values).toContain('tenant-1');
+    expect(query.values).toEqual(['tenant-1', requestedIds]);
+    expect(mockFindMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', id: { in: requestedIds } },
+      include: { credential: true, externalCredential: true },
+    });
+    expect(result.map(({ record }) => record.id)).toEqual(requestedIds);
+  });
+
+  it('returns no rows without opening a transaction for an empty id set', async () => {
+    await expect(batchGetLibraryRecords({ tenantId: 'tenant-1', ids: [] })).resolves.toEqual([]);
+
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockQueryRaw).not.toHaveBeenCalled();
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates duplicate ids before selecting and hydrating one record', async () => {
+    const requestedIds = ['record-1', 'record-1'];
+    mockQueryRaw.mockResolvedValue([{ id: 'record-1', newestRunId: 'run-1' }]);
+    mockFindMany.mockResolvedValue([row()]);
+    mockCheckRunFindMany.mockResolvedValue([CHECK_RUN]);
+
+    await expect(batchGetLibraryRecords({ tenantId: 'tenant-1', ids: requestedIds })).resolves.toHaveLength(1);
+
+    const query = mockQueryRaw.mock.calls[0][0] as { values: unknown[] };
+    expect(query.values).toEqual(['tenant-1', ['record-1']]);
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 'tenant-1', id: { in: ['record-1'] } } }),
+    );
+  });
+
+  it('drops a NUL-bearing id before binding the SQL parameter', async () => {
+    mockQueryRaw.mockResolvedValue([{ id: 'record-1', newestRunId: 'run-1' }]);
+    mockFindMany.mockResolvedValue([row()]);
+    mockCheckRunFindMany.mockResolvedValue([CHECK_RUN]);
+
+    await expect(
+      batchGetLibraryRecords({ tenantId: 'tenant-1', ids: ['record-1\0bad', 'record-1'] }),
+    ).resolves.toHaveLength(1);
+
+    const query = mockQueryRaw.mock.calls[0][0] as { values: unknown[] };
+    expect(query.values).toEqual(['tenant-1', ['record-1']]);
+  });
+
+  it('returns no rows without opening a transaction for an all-NUL set', async () => {
+    await expect(
+      batchGetLibraryRecords({ tenantId: 'tenant-1', ids: ['record-1\0bad', 'record-1\0bad'] }),
+    ).resolves.toEqual([]);
+
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockQueryRaw).not.toHaveBeenCalled();
+  });
+
+  it('omits ids absent from the tenant-scoped selection', async () => {
+    mockQueryRaw.mockResolvedValue([{ id: 'record-2', newestRunId: 'run-2' }]);
+    mockFindMany.mockResolvedValue([row({ id: 'record-2' })]);
+    mockCheckRunFindMany.mockResolvedValue([CHECK_RUN_2]);
+
+    const result = await batchGetLibraryRecords({
+      tenantId: 'tenant-1',
+      ids: ['record-missing', 'record-2', 'record-foreign'],
+    });
+
+    expect(result.map(({ record }) => record.id)).toEqual(['record-2']);
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: { in: ['record-2'] },
+        }),
+      }),
+    );
+  });
+
+  it('keeps a native record with no run while hydrating an external run', async () => {
+    mockQueryRaw.mockResolvedValue([
+      { id: 'record-native', newestRunId: null },
+      { id: 'record-1', newestRunId: 'run-1' },
+    ]);
+    mockFindMany.mockResolvedValue([
+      row({
+        id: 'record-native',
+        origin: LibraryRecordOrigin.NATIVE,
+        credential: { id: 'record-native', tenantId: 'tenant-1', origin: LibraryRecordOrigin.NATIVE },
+        externalCredential: null,
+        checkRuns: [],
+      }),
+      row({ id: 'record-1' }),
+    ]);
+    mockCheckRunFindMany.mockResolvedValue([CHECK_RUN]);
+
+    await expect(
+      batchGetLibraryRecords({ tenantId: 'tenant-1', ids: ['record-native', 'record-1'] }),
+    ).resolves.toMatchObject({
+      0: { origin: LibraryRecordOrigin.NATIVE, checkRun: null },
+      1: { origin: LibraryRecordOrigin.EXTERNAL, checkRun: CHECK_RUN },
+    });
+  });
+
+  it('rejects a native generation 1 run selected by the batch query', async () => {
+    mockQueryRaw.mockResolvedValue([{ id: 'record-native', newestRunId: 'run-1' }]);
+    mockFindMany.mockResolvedValue([
+      row({
+        id: 'record-native',
+        origin: LibraryRecordOrigin.NATIVE,
+        credential: { id: 'record-native', tenantId: 'tenant-1', origin: LibraryRecordOrigin.NATIVE },
+        externalCredential: null,
+      }),
+    ]);
+    mockCheckRunFindMany.mockResolvedValue([{ ...CHECK_RUN, recordId: 'record-native', generation: 1 }]);
+
+    await expect(batchGetLibraryRecords({ tenantId: 'tenant-1', ids: ['record-native'] })).rejects.toThrow(
+      'is NATIVE but has a stored generation 1 check run',
+    );
+  });
+
+  it('fails when a selected external record has no loadable run', async () => {
+    mockQueryRaw.mockResolvedValue([{ id: 'record-1', newestRunId: null }]);
+    mockFindMany.mockResolvedValue([row({ id: 'record-1' })]);
+
+    await expect(batchGetLibraryRecords({ tenantId: 'tenant-1', ids: ['record-1'] })).rejects.toThrow(
+      'is EXTERNAL but has no check run',
+    );
+  });
+
+  it('fails when a selected record has a non-null run id that cannot be loaded', async () => {
+    mockQueryRaw.mockResolvedValue([{ id: 'record-1', newestRunId: 'run-missing' }]);
+    mockFindMany.mockResolvedValue([row({ id: 'record-1' })]);
+    mockCheckRunFindMany.mockResolvedValue([]);
+
+    await expect(batchGetLibraryRecords({ tenantId: 'tenant-1', ids: ['record-1'] })).rejects.toThrow(
+      'was selected with a newest check run that could not be hydrated',
+    );
+  });
+
+  it('fails when a selected record disappears before hydration', async () => {
+    mockQueryRaw.mockResolvedValue([{ id: 'record-1', newestRunId: 'run-1' }]);
+    mockFindMany.mockResolvedValue([]);
+    mockCheckRunFindMany.mockResolvedValue([CHECK_RUN]);
+
+    await expect(batchGetLibraryRecords({ tenantId: 'tenant-1', ids: ['record-1'] })).rejects.toThrow(
+      'was selected but could not be hydrated',
+    );
+  });
+
+  it('attaches batch query context when the transaction reaches Prisma timeout', async () => {
+    const timeout = Object.assign(new Error('Transaction already closed'), { code: 'P2028' });
+    mockTransaction.mockRejectedValue(timeout);
+
+    await expect(batchGetLibraryRecords({ tenantId: 'tenant-1', ids: ['record-1'] })).rejects.toBe(timeout);
+
+    expect(timeout).toHaveProperty('context', { query: 'library-batch-get', tenantId: 'tenant-1' });
+  });
+});
+
+describe('buildLibraryBatchGetQuery', () => {
+  it('binds the tenant and request id array instead of interpolating id text', () => {
+    const ids = ["record-1' OR 1=1 --", 'record-2'];
+    const query = buildLibraryBatchGetQuery('tenant-1', ids) as unknown as { sql: string; values: unknown[] };
+
+    expect(query.sql).toContain('WHERE r."tenantId" = ');
+    expect(query.sql).toContain('r."id" = ANY');
+    expect(query.sql).not.toContain(ids[0]);
+    expect(query.values).toEqual(['tenant-1', ids]);
+  });
+
+  // The lateral join is what makes one row per record carry that record's
+  // newest check run: without the ORDER BY the LIMIT would pick an arbitrary
+  // generation. The run's composite key already ties it to its record's
+  // tenant, so the join's tenant predicate is defence in depth that keeps the
+  // read explicitly tenant-keyed; the assertion pins that it stays.
+  it('selects the newest check run per record through a tenant-scoped lateral join', () => {
+    const query = buildLibraryBatchGetQuery('tenant-1', ['record-1']) as unknown as { sql: string };
+
+    expect(query.sql).toContain('LEFT JOIN LATERAL');
+    expect(query.sql).toContain('n."tenantId" = r."tenantId"');
+    expect(query.sql).toContain('ORDER BY n."generation" DESC');
+    expect(query.sql).toContain('LIMIT 1');
   });
 });

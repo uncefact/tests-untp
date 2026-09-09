@@ -11,6 +11,7 @@ import {
   urlSchema,
 } from './shared';
 import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
+import { MAX_BATCH_LIMIT } from '@/lib/api/batch-limits';
 
 /**
  * The shared non-blank rule with a length bound applied before it, because a
@@ -40,6 +41,31 @@ const HEX_64 = /^[a-f0-9]{64}$/i;
  * arrived as; the route turns it into the `Date` the column stores.
  */
 export const calendarDateSchema = z.string().date('must be a real calendar date in YYYY-MM-DD form');
+
+const batchGetStructureSchema = z.object({
+  ids: z
+    .array(z.string({ invalid_type_error: 'must be a string' }).min(1, 'must not be empty'), {
+      required_error: 'is required',
+      invalid_type_error: 'must be an array',
+    })
+    .min(1, 'must contain at least one id')
+    .describe("Bounded by the deployment's configured maximum (default 500); see the operation description"),
+});
+
+const batchGetLimitSchema = z.object({ ids: z.array(z.string()) }).superRefine((body, ctx) => {
+  if (body.ids.length > MAX_BATCH_LIMIT) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['ids'],
+      message: `submit no more than ${MAX_BATCH_LIMIT} ids per request`,
+      params: { code: 'BATCH_GET_LIMIT_EXCEEDED' },
+    });
+  }
+});
+
+export const batchGetLibraryRequestSchema = batchGetStructureSchema.pipe(batchGetLimitSchema);
+
+export type BatchGetLibraryRequest = z.infer<typeof batchGetLibraryRequestSchema>;
 
 const libraryListCalendarDateSchema = calendarDateSchema.refine((value) => !value.startsWith('0000-'), {
   message: 'year must be 0001 or later',

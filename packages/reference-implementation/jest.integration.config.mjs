@@ -18,6 +18,7 @@ const jestConfig = {
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   globalSetup: '<rootDir>/__tests__/integration/rig/global-setup.ts',
   globalTeardown: '<rootDir>/__tests__/integration/rig/global-teardown.ts',
+  setupFiles: ['<rootDir>/__tests__/integration/rig/batch-get-limit-setup.ts'],
   // Suites share one database; truncation between tests requires serial runs.
   maxWorkers: 1,
   testTimeout: 30_000,

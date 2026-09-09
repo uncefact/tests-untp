@@ -3,15 +3,25 @@ import os from 'node:os';
 import path from 'node:path';
 import type { LoggerService as Logger } from '@uncefact/untp-ri-services';
 import type { PrismaClient } from '../../src/lib/prisma/generated/index.js';
-import { CheckResult, CheckRunState, LibraryRecordOrigin, RecordSource } from '../../src/lib/prisma/generated/index.js';
-import type {
+import {
+  CheckResult,
+  CheckRunFailureCode,
+  CheckRunState,
   CoreCredentialType,
-  CredentialDetailsError,
   CredentialDetailsStatus,
+  ExternalContentKind,
+  LibraryRecordOrigin,
+  RecordSource,
 } from '../../src/lib/prisma/generated/index.js';
+import type { CredentialDetailsError } from '../../src/lib/prisma/generated/index.js';
 import { SYSTEM_TENANT_ID } from '../../src/lib/prisma/constants';
 import { runCustomSeed, type CustomSeedDependencies } from '../../prisma/custom-seed';
 import type { FixtureServer } from './rig/fixture-server';
+import {
+  createExternalCredential,
+  type ExternalStorageInput,
+} from '../../src/lib/prisma/repositories/external-credential.repository';
+import { noChecksRun } from '../../src/lib/prisma/repositories/check-run.repository';
 
 export { SYSTEM_TENANT_ID };
 
@@ -279,4 +289,105 @@ export async function insertNativeCredential(
     }
     return { id: record.id };
   });
+}
+
+export type ExternalCredentialFixtureOptions = {
+  declaredCredentialType?: CoreCredentialType;
+  coreCredentialType?: CoreCredentialType | null;
+  detailsStatus?: CredentialDetailsStatus;
+  encrypted?: boolean | null;
+  run?: 'pending' | 'complete' | 'failed' | 'notConformant' | 'nothingRan';
+  issuerName?: string;
+  issuerDid?: string;
+  validFrom?: Date | null;
+  duplicateOfRecordId?: string | null;
+  storage?: ExternalStorageInput;
+};
+
+/** Creates an external library record fixture for the supplied tenant. */
+export async function insertExternalCredential(
+  prisma: PrismaClient,
+  tenantId: string,
+  options: ExternalCredentialFixtureOptions = {},
+): Promise<string> {
+  const detailsStatus = options.detailsStatus ?? CredentialDetailsStatus.EXTRACTED;
+  const run = options.run ?? 'complete';
+  const allPass = {
+    retrieval: CheckResult.PASS,
+    decryption: CheckResult.PASS,
+    digest: CheckResult.PASS,
+    proof: CheckResult.PASS,
+    status: CheckResult.PASS,
+    temporal: CheckResult.PASS,
+    schemaConformance: CheckResult.PASS,
+  };
+  const created = await createExternalCredential({
+    tenantId,
+    sourceUrl: `https://supplier.example/${Math.random().toString(36).slice(2)}`,
+    encrypted: options.encrypted === undefined ? false : options.encrypted,
+    duplicateOfRecordId: options.duplicateOfRecordId,
+    contentKind: options.encrypted === null ? undefined : ExternalContentKind.CREDENTIAL,
+    storage: options.storage,
+    annotations: {
+      displayName: 'Library list external',
+      declaredCredentialType: options.declaredCredentialType ?? CoreCredentialType.DPP,
+    },
+    details:
+      detailsStatus === CredentialDetailsStatus.EXTRACTED
+        ? {
+            status: CredentialDetailsStatus.EXTRACTED,
+            fields: {
+              name: 'External credential',
+              issuerName: options.issuerName ?? 'Supplier Ltd',
+              issuerDid: options.issuerDid ?? 'did:web:supplier.example',
+              subjectName: 'Subject',
+              subjectId: 'https://supplier.example/subject',
+              validFrom: options.validFrom ?? new Date('2026-06-15T10:00:00.000Z'),
+              validUntil: null,
+            },
+            credentialType: 'DigitalProductPassport',
+            coreCredentialType: options.coreCredentialType ?? CoreCredentialType.DPP,
+            coreDataModelVersion: '0.7.0',
+          }
+        : { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+    checkRun:
+      run === 'failed'
+        ? {
+            state: CheckRunState.FAILED,
+            checks: { retrieval: CheckResult.FAIL },
+            failure: {
+              code: CheckRunFailureCode.RETRIEVAL_FAILED,
+              message: 'The source could not be retrieved.',
+              retryable: true,
+            },
+          }
+        : {
+            state: CheckRunState.PENDING,
+            checks:
+              run === 'notConformant'
+                ? { ...allPass, proof: CheckResult.FAIL }
+                : run === 'nothingRan'
+                  ? noChecksRun()
+                  : allPass,
+            enqueue: async () => undefined,
+          },
+  });
+  if (run === 'complete' || run === 'notConformant' || run === 'nothingRan') {
+    await prisma.checkRun.update({
+      where: { id: created.checkRun.id },
+      data: {
+        state: CheckRunState.COMPLETE,
+        ...(run === 'notConformant'
+          ? { ...allPass, proof: CheckResult.FAIL }
+          : run === 'nothingRan'
+            ? noChecksRun()
+            : allPass),
+        completedAt: new Date('2026-08-01T00:00:00.000Z'),
+        failureCode: null,
+        failureMessage: null,
+        failureRetryable: null,
+      },
+    });
+  }
+  return created.record.id;
 }

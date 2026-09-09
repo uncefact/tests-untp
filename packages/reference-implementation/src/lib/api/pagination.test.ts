@@ -3,6 +3,7 @@ import {
   paginateInMemory,
   paginationMetaSchema,
   DEFAULT_PAGE_LIMIT,
+  resolveConfiguredMaximum,
   resolveMaxPageLimit,
   warnOnRejectedMaxPageLimitOverride,
 } from './pagination';
@@ -21,6 +22,27 @@ describe('resolveMaxPageLimit', () => {
   it('rejects a supplied but unusable override and falls back to the default', () => {
     for (const raw of ['', '   ', '0', '-5', '+5', 'abc', '10.5', '1e3', '0x10', '9'.repeat(400)]) {
       expect(resolveMaxPageLimit(raw)).toEqual({ value: 100, overrideRejected: true });
+    }
+  });
+});
+
+describe('resolveConfiguredMaximum', () => {
+  it('rejects a non-positive or non-integer fallback as a programming error', () => {
+    expect(() => resolveConfiguredMaximum(undefined, 0)).toThrow('fallback must be a positive safe integer');
+    expect(() => resolveConfiguredMaximum(undefined, 1.5)).toThrow('fallback must be a positive safe integer');
+  });
+
+  it('uses the fallback for an absent variable without rejecting it', () => {
+    expect(resolveConfiguredMaximum(undefined, 500)).toEqual({ value: 500, overrideRejected: false });
+  });
+
+  it('accepts padded positive decimal integers and preserves the configured value', () => {
+    expect(resolveConfiguredMaximum(' 25 ', 500)).toEqual({ value: 25, overrideRejected: false });
+  });
+
+  it('uses the fallback and marks every unusable override', () => {
+    for (const raw of ['', '   ', '0', '-5', '+5', '10.5', '1e3', 'abc', '9'.repeat(400)]) {
+      expect(resolveConfiguredMaximum(raw, 500)).toEqual({ value: 500, overrideRejected: true });
     }
   });
 });

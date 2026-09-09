@@ -46,6 +46,10 @@ jest.mock('@/lib/credentials/validate-encryption-key-startup', () => ({
   validateEncryptionKeyAtStartup: jest.fn(),
 }));
 jest.mock('@/lib/api/pagination', () => ({ warnOnRejectedMaxPageLimitOverride: jest.fn() }));
+const mockWarnOnRejectedMaxBatchLimitOverride = jest.fn();
+jest.mock('@/lib/api/batch-limits', () => ({
+  warnOnRejectedMaxBatchLimitOverride: (...args: unknown[]) => mockWarnOnRejectedMaxBatchLimitOverride(...args),
+}));
 const mockStartJobQueue = jest.fn(async () => ({}));
 jest.mock('@/lib/jobs/app-job-queue', () => ({
   startJobQueue: () => mockStartJobQueue(),
@@ -99,6 +103,7 @@ describe('registerNode boot wiring', () => {
     expect(mockValidateStaleClaimOnBoot).toHaveBeenCalledTimes(1);
     expect(mockValidateMaxRequestBodyBytesOnBoot).toHaveBeenCalledTimes(1);
     expect(mockValidateFetchTimeoutOnBoot).toHaveBeenCalledTimes(1);
+    expect(mockWarnOnRejectedMaxBatchLimitOverride).toHaveBeenCalledTimes(1);
   });
 
   it('starts the job queue before serving', async () => {

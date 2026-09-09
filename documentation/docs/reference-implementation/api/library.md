@@ -7,7 +7,7 @@ title: Library
 
 The library holds every credential a tenant has, whether the tenant issued it through this Reference Implementation or received it from someone else. A record for a credential the tenant issued is a **native** record. A record for a credential received from a third party is an **external** record: the tenant gives the credential's location, the Reference Implementation fetches it, checks it, and keeps its own copy, so the credential is still available if the supplier later takes it offline.
 
-This page covers listing the library, registering an external credential, retrieving one record, updating its recipient annotations and re-verifying a record. Deleting a record is a separate operation that arrives with the rest of the library epic.
+This page covers listing the library, fetching several records by id, registering an external credential, retrieving one record, updating its recipient annotations and re-verifying a record. Deleting a record is a separate operation that arrives with the rest of the library epic.
 
 :::tip[Interactive API documentation]
 The Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) carries the exact request and response schemas for the operations on this page. This page explains the behaviour, and Swagger carries the payload shapes. Every library endpoint requires authentication. See [Authentication](../authentication#obtaining-a-token) for how to obtain a Bearer token.
@@ -207,6 +207,135 @@ The route accepts these filters. All supplied filters are combined with `AND`, a
 | `limit`, `offset`                           | Positive page size and non-negative skip. A `limit` above the deployment maximum returns `400 PAGE_LIMIT_EXCEEDED` naming that maximum. It is never silently clamped.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 The `q` parameter is documented for the future free-text search lane, but is deliberately not implemented in v1. Any presence of `q`, including `?q`, `?q=` or a repeated value, returns `400 FREE_TEXT_SEARCH_DEFERRED` rather than an unfiltered result. Unknown query keys are ignored according to the API's request parsing convention. `type` is the only key that may be supplied more than once, and any other repeated key returns a `400` naming it. A NUL byte in an issuer or association filter returns an empty page after validation so it cannot reach the database as invalid text.
+
+## Fetch several library records by id
+
+```
+POST /api/v1/library/batch-get
+```
+
+```json
+{
+  "ids": ["record-external-1", "record-native-1", "record-external-1"]
+}
+```
+
+Use this endpoint when a caller already knows the record ids it needs. The request must contain a non-empty `ids` array of non-empty strings. Unknown body fields are ignored. Request validation runs before the submitted-id limit, so a malformed element is reported as a validation error even when the same request also exceeds the limit.
+
+The maximum counts ids as submitted, before duplicate removal. It defaults to `500`, or the [configured maximum](../operations/api-pagination#maximum-page-size) where a deployment sets one. A request above the effective maximum returns `400 BATCH_GET_LIMIT_EXCEEDED` naming that maximum. The request is rejected rather than truncated, and duplicate ids still count towards the limit. A NUL-bearing id passes the string validation but is omitted before the database read. If every id is omitted this way, the response is an empty result.
+
+Exact duplicate ids are read once. The response has one row per matching id, in the order each id first appeared in the request. Missing ids and ids owned by another tenant are omitted without revealing which case occurred. Native and external records can be returned together.
+
+The response is always the keyless `CredentialRecord` shape. It does not include `tenantId`, `storageUri`, `digestMultibase` or `decryptionKey`. Use [Retrieve one library record](#retrieve-one-library-record) for the durable-copy location or receiver-side key. Every successful response, including an empty result, carries `Cache-Control: no-store`.
+
+```json
+{
+  "data": [
+    {
+      "id": "record-external-1",
+      "origin": "external",
+      "credential": {
+        "name": "Example credential",
+        "credentialType": "DPP",
+        "issuerName": "Example issuer",
+        "issuerDid": "did:web:issuer.example",
+        "subjectName": "Example subject",
+        "subjectId": "https://issuer.example/subject-1",
+        "validFrom": "2026-07-20T10:00:00Z",
+        "validUntil": null
+      },
+      "annotations": {
+        "annotationVersion": 1,
+        "displayName": "Example credential",
+        "declaredCredentialType": "DPP",
+        "dateReceived": "2026-07-30",
+        "notes": null
+      },
+      "organisationId": null,
+      "facilityId": null,
+      "productId": null,
+      "sourceUrl": "https://issuer.example/credentials/1",
+      "sourceDigest": "zQmExampleSourceDigest",
+      "resolverUri": null,
+      "issuedAt": "2026-07-20T10:00:00Z",
+      "encrypted": false,
+      "hasKey": true,
+      "verification": {
+        "generation": 1,
+        "state": "complete",
+        "requestedAt": "2026-07-30T09:00:00Z",
+        "completedAt": "2026-07-30T09:00:06Z",
+        "checks": {
+          "retrieval": "pass",
+          "decryption": "not_run",
+          "digest": "pass",
+          "proof": "pass",
+          "status": "pass",
+          "temporal": "pass",
+          "schemaConformance": "pass"
+        },
+        "summary": "verified"
+      },
+      "currencyStatus": "current",
+      "detailsStatus": "EXTRACTED",
+      "detailsError": null,
+      "capabilities": { "deletable": true, "annotatable": true, "verifiable": true },
+      "warnings": [],
+      "createdAt": "2026-07-30T09:00:00Z",
+      "updatedAt": "2026-07-30T09:00:06Z"
+    },
+    {
+      "id": "record-native-1",
+      "origin": "native",
+      "credential": {
+        "name": "Native example",
+        "credentialType": "DCC",
+        "issuerName": "Example issuer",
+        "issuerDid": "did:web:issuer.example",
+        "subjectName": "Native subject",
+        "subjectId": "https://issuer.example/subject-2",
+        "validFrom": "2026-07-15T09:00:00Z",
+        "validUntil": null
+      },
+      "annotations": null,
+      "organisationId": null,
+      "facilityId": null,
+      "productId": null,
+      "sourceUrl": null,
+      "sourceDigest": null,
+      "resolverUri": null,
+      "issuedAt": "2026-07-15T09:00:00Z",
+      "encrypted": false,
+      "hasKey": false,
+      "verification": {
+        "generation": 1,
+        "state": "complete",
+        "requestedAt": "2026-07-15T09:00:00Z",
+        "completedAt": "2026-07-15T09:00:00Z",
+        "checks": {
+          "retrieval": "not_run",
+          "decryption": "not_run",
+          "digest": "not_run",
+          "proof": "pass",
+          "status": "not_run",
+          "temporal": "not_run",
+          "schemaConformance": "not_run"
+        },
+        "summary": "verified"
+      },
+      "currencyStatus": "current",
+      "detailsStatus": "EXTRACTED",
+      "detailsError": null,
+      "capabilities": { "deletable": false, "annotatable": false, "verifiable": true },
+      "warnings": [],
+      "createdAt": "2026-07-15T09:00:00Z",
+      "updatedAt": "2026-07-15T09:00:00Z"
+    }
+  ]
+}
+```
+
+Malformed JSON, a missing or invalid `ids` array, and an over-limit request return `400`. An oversized body returns `413 REQUEST_BODY_TOO_LARGE`. Authentication and tenant-assignment failures keep the shared `401` and `403` responses. A database or projection failure returns a sanitised `500` with a correlation id.
 
 ## Register a credential received from a third party
 

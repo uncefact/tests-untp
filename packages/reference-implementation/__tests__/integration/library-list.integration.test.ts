@@ -4,7 +4,6 @@ import {
   CheckRunState,
   CoreCredentialType,
   CredentialDetailsStatus,
-  ExternalContentKind,
   LibraryRecordOrigin,
   ProductLevel,
 } from '../../src/lib/prisma/generated';
@@ -18,109 +17,13 @@ import {
   listLibraryRecords,
   type ListLibraryRecordsOptions,
 } from '../../src/lib/prisma/repositories/library-record.repository';
-import { createExternalCredential } from '../../src/lib/prisma/repositories/external-credential.repository';
 import { noChecksRun } from '../../src/lib/prisma/repositories/check-run.repository';
-import { insertNativeCredential } from './fixtures';
+import { insertExternalCredential, insertNativeCredential } from './fixtures';
 import { createRigClient, truncateApplicationTables } from './rig/db';
 
 const OWNER_TENANT_ID = 'library-list-owner';
 const OTHER_TENANT_ID = 'library-list-other';
 const prisma = createRigClient();
-
-const ALL_PASS = {
-  retrieval: CheckResult.PASS,
-  decryption: CheckResult.PASS,
-  digest: CheckResult.PASS,
-  proof: CheckResult.PASS,
-  status: CheckResult.PASS,
-  temporal: CheckResult.PASS,
-  schemaConformance: CheckResult.PASS,
-};
-
-async function external(
-  options: {
-    declaredCredentialType?: CoreCredentialType;
-    coreCredentialType?: CoreCredentialType | null;
-    detailsStatus?: CredentialDetailsStatus;
-    encrypted?: boolean | null;
-    run?: 'pending' | 'complete' | 'failed' | 'notConformant' | 'nothingRan';
-    issuerName?: string;
-    issuerDid?: string;
-    validFrom?: Date | null;
-    duplicateOfRecordId?: string | null;
-  } = {},
-) {
-  const detailsStatus = options.detailsStatus ?? CredentialDetailsStatus.EXTRACTED;
-  const run = options.run ?? 'complete';
-  const created = await createExternalCredential({
-    tenantId: OWNER_TENANT_ID,
-    sourceUrl: `https://supplier.example/${Math.random().toString(36).slice(2)}`,
-    encrypted: options.encrypted === undefined ? false : options.encrypted,
-    duplicateOfRecordId: options.duplicateOfRecordId,
-    contentKind: options.encrypted === null ? undefined : ExternalContentKind.CREDENTIAL,
-    annotations: {
-      displayName: 'Library list external',
-      declaredCredentialType: options.declaredCredentialType ?? CoreCredentialType.DPP,
-    },
-    details:
-      detailsStatus === CredentialDetailsStatus.EXTRACTED
-        ? {
-            status: CredentialDetailsStatus.EXTRACTED,
-            fields: {
-              name: 'External credential',
-              issuerName: options.issuerName ?? 'Supplier Ltd',
-              issuerDid: options.issuerDid ?? 'did:web:supplier.example',
-              subjectName: 'Subject',
-              subjectId: 'https://supplier.example/subject',
-              validFrom: options.validFrom ?? new Date('2026-06-15T10:00:00.000Z'),
-              validUntil: null,
-            },
-            credentialType: 'DigitalProductPassport',
-            coreCredentialType: options.coreCredentialType ?? CoreCredentialType.DPP,
-            coreDataModelVersion: '0.7.0',
-          }
-        : { status: CredentialDetailsStatus.EXTRACTION_PENDING },
-    checkRun:
-      run === 'failed'
-        ? {
-            state: CheckRunState.FAILED,
-            checks: { retrieval: CheckResult.FAIL },
-            failure: {
-              code: CheckRunFailureCode.RETRIEVAL_FAILED,
-              message: 'The source could not be retrieved.',
-              retryable: true,
-            },
-          }
-        : {
-            state: CheckRunState.PENDING,
-            checks:
-              run === 'notConformant'
-                ? { ...ALL_PASS, proof: CheckResult.FAIL }
-                : run === 'nothingRan'
-                  ? noChecksRun()
-                  : ALL_PASS,
-            enqueue: async () => undefined,
-          },
-  });
-  if (run === 'complete' || run === 'notConformant' || run === 'nothingRan') {
-    await prisma.checkRun.update({
-      where: { id: created.checkRun.id },
-      data: {
-        state: CheckRunState.COMPLETE,
-        ...(run === 'notConformant'
-          ? { ...ALL_PASS, proof: CheckResult.FAIL }
-          : run === 'nothingRan'
-            ? noChecksRun()
-            : ALL_PASS),
-        completedAt: new Date('2026-08-01T00:00:00.000Z'),
-        failureCode: null,
-        failureMessage: null,
-        failureRetryable: null,
-      },
-    });
-  }
-  return created.record.id;
-}
 
 async function appendFailedRun(recordId: string, generation: number): Promise<void> {
   await prisma.checkRun.create({
@@ -186,7 +89,7 @@ describe('GET /library repository query against migrated Postgres', () => {
         validFrom: new Date('2026-07-01T00:00:00.000Z'),
       },
     });
-    const receivedId = await external();
+    const receivedId = await insertExternalCredential(prisma, OWNER_TENANT_ID);
     await insertNativeCredential(prisma, { id: 'library-list-foreign', tenantId: OTHER_TENANT_ID });
 
     const page = await summaries({ sort: 'createdAt:asc' });
@@ -209,19 +112,19 @@ describe('GET /library repository query against migrated Postgres', () => {
   });
 
   it('applies type authority, issuer semantics, and excludes an unobserved encrypted value', async () => {
-    const extractedDppDeclaredDcc = await external({
+    const extractedDppDeclaredDcc = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
       declaredCredentialType: CoreCredentialType.DCC,
       coreCredentialType: CoreCredentialType.DPP,
       issuerName: 'Acme Supplier',
       issuerDid: 'did:web:acme.example',
     });
-    const pendingDeclaredDcc = await external({
+    const pendingDeclaredDcc = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
       declaredCredentialType: CoreCredentialType.DCC,
       coreCredentialType: null,
       detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING,
       encrypted: null,
     });
-    const other = await external({
+    const other = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
       declaredCredentialType: CoreCredentialType.DFR,
       coreCredentialType: CoreCredentialType.DFR,
     });
@@ -237,19 +140,19 @@ describe('GET /library repository query against migrated Postgres', () => {
     expect((await summaries({ issuer: 'did:web:acme.example' })).ids).toEqual([extractedDppDeclaredDcc]);
     expect((await summaries({ issuer: 'acme' })).ids).toEqual([]);
     expect((await summaries({ encrypted: false })).ids).toEqual([extractedDppDeclaredDcc, other]);
-    const encryptedExternal = await external({ encrypted: true });
+    const encryptedExternal = await insertExternalCredential(prisma, OWNER_TENANT_ID, { encrypted: true });
     expect((await summaries({ encrypted: true })).ids).toEqual([encryptedExternal]);
   });
 
   it('mirrors all four public status summaries, including the native mask', async () => {
     const nativeId = 'library-list-native-status';
     await insertNativeCredential(prisma, { id: nativeId, tenantId: OWNER_TENANT_ID });
-    const pendingId = await external({ run: 'pending' });
-    const verifiedId = await external({ run: 'complete' });
-    const notConformantId = await external({ run: 'notConformant' });
-    const nothingRanId = await external({ run: 'nothingRan' });
-    const failedId = await external({ run: 'failed' });
-    const severalGenerationsId = await external({ run: 'complete' });
+    const pendingId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'pending' });
+    const verifiedId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'complete' });
+    const notConformantId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'notConformant' });
+    const nothingRanId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'nothingRan' });
+    const failedId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'failed' });
+    const severalGenerationsId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'complete' });
     await appendFailedRun(severalGenerationsId, 2);
 
     const all = await summaries();
@@ -332,7 +235,7 @@ describe('GET /library repository query against migrated Postgres', () => {
       tenantId: OWNER_TENANT_ID,
       productId: 'product-a',
     });
-    const externalId = await external();
+    const externalId = await insertExternalCredential(prisma, OWNER_TENANT_ID);
 
     const organisationPage = await summaries({ organisationId: 'organisation-a' });
     expect(organisationPage.ids).toHaveLength(2);
@@ -375,8 +278,12 @@ describe('GET /library repository query against migrated Postgres', () => {
       where: { id_tenantId: { id: 'library-list-date-fallback', tenantId: OWNER_TENANT_ID } },
       data: { createdAt: new Date('2026-05-15T12:00:00.000Z') },
     });
-    const first = await external({ validFrom: new Date('2026-05-15T12:00:00.000Z') });
-    const second = await external({ validFrom: new Date('2026-05-15T12:00:00.000Z') });
+    const first = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-15T12:00:00.000Z'),
+    });
+    const second = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-15T12:00:00.000Z'),
+    });
 
     const page = await summaries({
       issuedFrom: new Date('2026-05-15T00:00:00.000Z'),
@@ -388,19 +295,35 @@ describe('GET /library repository query against migrated Postgres', () => {
   });
 
   it('sorts three distinct effective issued dates in ascending order', async () => {
-    const early = await external({ validFrom: new Date('2026-05-11T00:00:00.000Z') });
-    const middle = await external({ validFrom: new Date('2026-05-12T00:00:00.000Z') });
-    const late = await external({ validFrom: new Date('2026-05-13T00:00:00.000Z') });
+    const early = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-11T00:00:00.000Z'),
+    });
+    const middle = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-12T00:00:00.000Z'),
+    });
+    const late = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-13T00:00:00.000Z'),
+    });
 
     expect((await summaries({ sort: 'issuedAt:asc' })).ids).toEqual([early, middle, late]);
   });
 
   it('keeps UTC date bounds stable in a non-UTC database session', async () => {
-    const start = await external({ validFrom: new Date('2026-05-15T00:00:00.000Z') });
-    const end = await external({ validFrom: new Date('2026-05-15T23:59:59.999Z') });
-    const included = await external({ validFrom: new Date('2026-05-15T23:30:00.000Z') });
-    const before = await external({ validFrom: new Date('2026-05-14T23:59:59.999Z') });
-    const excluded = await external({ validFrom: new Date('2026-05-16T00:30:00.000Z') });
+    const start = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-15T00:00:00.000Z'),
+    });
+    const end = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-15T23:59:59.999Z'),
+    });
+    const included = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-15T23:30:00.000Z'),
+    });
+    const before = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-14T23:59:59.999Z'),
+    });
+    const excluded = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      validFrom: new Date('2026-05-16T00:30:00.000Z'),
+    });
 
     const page = await idsWithSydneySession({
       issuedFrom: new Date('2026-05-15T00:00:00.000Z'),
@@ -472,8 +395,13 @@ describe('GET /library repository query against migrated Postgres', () => {
   });
 
   it('matches issuer names without folding DIDs and returns duplicate records', async () => {
-    const issuerId = await external({ issuerName: 'Acme Supplier', issuerDid: 'did:web:Acme.example' });
-    const duplicateId = await external({ duplicateOfRecordId: issuerId });
+    const issuerId = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      issuerName: 'Acme Supplier',
+      issuerDid: 'did:web:Acme.example',
+    });
+    const duplicateId = await insertExternalCredential(prisma, OWNER_TENANT_ID, {
+      duplicateOfRecordId: issuerId,
+    });
 
     expect((await summaries({ issuer: 'ACME SUPPLIER' })).ids).toEqual([issuerId]);
     expect((await summaries({ issuer: 'did:web:acme.example' })).ids).toEqual([]);

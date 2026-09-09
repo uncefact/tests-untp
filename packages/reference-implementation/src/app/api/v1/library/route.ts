@@ -1,6 +1,5 @@
 import { TextDecoder } from 'node:util';
 import { NextResponse } from 'next/server';
-import { getRequestContext } from '@uncefact/untp-ri-services/logging';
 import { apiLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import {
@@ -9,7 +8,6 @@ import {
   PayloadTooLargeError,
   RequestBodyUnreadableError,
   UnprocessableError,
-  unexpectedErrorMessage,
 } from '@/lib/api/errors';
 import { assertHttpUrl, parseRequestBody, parseQueryParams, ValidationError } from '@/lib/api/validation';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
@@ -28,6 +26,7 @@ import {
   type RegisterExternalCredentialRequest,
 } from '@/lib/api/request-schemas/library';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
+import { sanitisedServerError } from '@/lib/api/sanitised-server-error';
 import { IdempotencyOperation } from '@/lib/prisma/generated';
 import {
   claimIdempotencyKey,
@@ -324,6 +323,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     if (!isDatabaseError(error)) {
       return sanitisedServerError(
         error instanceof Error ? error : new Error(String(error)),
+        logger,
         'The library records could not be listed',
       );
     }
@@ -360,21 +360,11 @@ function created(record: ExternalCredentialRecord): Response {
     projected = toCredentialRecord(record);
   } catch (error) {
     if (error instanceof CredentialRecordProjectionError || error instanceof LibraryRecordShapeError) {
-      return sanitisedServerError(error, 'The library record could not be projected');
+      return sanitisedServerError(error, logger, 'The library record could not be projected');
     }
     throw error;
   }
   return NextResponse.json(projected, { status: 201 });
-}
-
-/**
- * Errors this route owes a sanitised 500 for: broken invariants whose
- * messages name rows, claims and internal shapes, which the route error
- * mapper's fallback would otherwise echo.
- */
-function sanitisedServerError(error: Error, detail: string): Response {
-  logger.error({ error: safeError(error) }, detail);
-  return NextResponse.json({ error: unexpectedErrorMessage(getRequestContext()?.correlationId) }, { status: 500 });
 }
 
 /**
@@ -589,7 +579,11 @@ export const POST = withTenantAuth(async (req, context) => {
       );
       return NextResponse.json({ error: error.message, code: 'CREDENTIALS_ENCRYPTION_UNAVAILABLE' }, { status: 500 });
     }
-    return sanitisedServerError(error instanceof Error ? error : new Error(String(error)), 'Registration failed');
+    return sanitisedServerError(
+      error instanceof Error ? error : new Error(String(error)),
+      logger,
+      'Registration failed',
+    );
   }
 });
 
@@ -666,6 +660,7 @@ async function register(req: Request, tenantId: string): Promise<Response> {
   } catch (error) {
     return sanitisedServerError(
       error instanceof Error ? error : new Error(String(error)),
+      logger,
       'The job queue could not be started',
     );
   }
@@ -746,10 +741,10 @@ async function register(req: Request, tenantId: string): Promise<Response> {
       return NextResponse.json({ error: error.message, code: 'CREDENTIALS_ENCRYPTION_UNAVAILABLE' }, { status: 500 });
     }
     if (error instanceof IdempotencyClaimOperationMismatchError) {
-      return sanitisedServerError(error, 'The register claim could not be linked to its record');
+      return sanitisedServerError(error, logger, 'The register claim could not be linked to its record');
     }
     if (error instanceof StorageKeyMissingError) {
-      return sanitisedServerError(error, 'The storage service returned no key for an encrypted copy');
+      return sanitisedServerError(error, logger, 'The storage service returned no key for an encrypted copy');
     }
     throw error;
   }
