@@ -8,10 +8,11 @@ import { BODY_MUST_BE_EMPTY_MESSAGE } from '@/lib/library/reverify-messages';
  * Swagger UI fills a response's example pane from the examples the document
  * attaches. With none, it prints each property's type name instead, which is
  * why every error response on the docs page reads `{"error": "string", "code":
- * "string"}`. That placeholder also implies a `code` on responses that never
- * carry one: the route error mapper attaches `code` only for validation errors
- * constructed with one and for service-layer errors, so a forbidden,
- * not-found, conflict or unprocessable body is `error` alone.
+ * "string"}`. That placeholder also implies a `code` on responses that do not
+ * always carry one: the route error mapper emits `code` only where the error
+ * was constructed with one, and for service-layer errors. A forbidden,
+ * not-found, conflict or unprocessable body therefore carries `code` when the
+ * route names one and is `error` alone when it does not.
  *
  * Every string below is a literal the code actually produces, quoted from its
  * source rather than composed here. Message text is easy to get wrong from

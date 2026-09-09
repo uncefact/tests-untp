@@ -67,7 +67,8 @@ export function handleRouteError(e: unknown, options: HandleRouteErrorOptions = 
   }
   if (e instanceof ForbiddenError) {
     logger.warn({ err: e }, 'Forbidden');
-    return NextResponse.json({ error: e.message }, { status: 403 });
+    const body = e.code !== undefined ? { error: e.message, code: e.code } : { error: e.message };
+    return NextResponse.json(body, { status: 403 });
   }
   if (e instanceof NotFoundError) {
     logger.warn({ err: e }, 'Not found');

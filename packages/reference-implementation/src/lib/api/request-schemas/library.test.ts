@@ -8,6 +8,7 @@ import {
   registerExternalCredentialRequestSchema,
   sourceEncryptionSchema,
   listLibraryQuerySchema,
+  updateLibraryAnnotationsRequestSchema,
 } from './library';
 
 type Body = {
@@ -31,6 +32,17 @@ const validBody = (): Body => ({
     notes: 'Arrived by email.',
   },
 });
+
+/** The first issue of a failed parse, so a test can name the field it was raised on. */
+function firstIssue(result: {
+  success: boolean;
+  error?: { issues: { message: string; path: (string | number)[] }[] };
+}): { message: string; path: (string | number)[] } {
+  if (result.success || !result.error) {
+    throw new Error('expected the parse to fail');
+  }
+  return result.error.issues[0];
+}
 
 /** The first issue message for a failed parse, so a test can name the rule that rejected the value. */
 function firstMessage(result: { success: boolean; error?: { issues: { message: string }[] } }): string {
@@ -116,7 +128,8 @@ describe('registerExternalCredentialRequestSchema', () => {
     });
 
     it('rejects a missing sourceUrl', () => {
-      const { sourceUrl: _omitted, ...body } = validBody();
+      const { sourceUrl, ...body } = validBody();
+      void sourceUrl;
       expect(registerExternalCredentialRequestSchema.safeParse(body).success).toBe(false);
     });
   });
@@ -166,7 +179,8 @@ describe('registerExternalCredentialRequestSchema', () => {
 
     it('rejects a missing declaredCredentialType', () => {
       const body = validBody();
-      const { declaredCredentialType: _omitted, ...annotations } = body.annotations;
+      const { declaredCredentialType, ...annotations } = body.annotations;
+      void declaredCredentialType;
       expect(registerExternalCredentialRequestSchema.safeParse({ ...body, annotations }).success).toBe(false);
     });
   });
@@ -325,6 +339,85 @@ describe('listLibraryQuerySchema', () => {
       expect(result.error.issues).toHaveLength(1);
       expect(result.error.issues[0]).toMatchObject({ params: { code: 'PAGE_LIMIT_EXCEEDED' } });
     }
+  });
+});
+
+describe('updateLibraryAnnotationsRequestSchema', () => {
+  it('accepts every field, explicit nulls, and strips unknown keys', () => {
+    const result = updateLibraryAnnotationsRequestSchema.safeParse({
+      displayName: 'Corrected label',
+      declaredCredentialType: CoreCredentialType.DCC,
+      dateReceived: null,
+      notes: null,
+      storageUri: 'https://internal.example/secret',
+    });
+
+    expect(result).toEqual({
+      success: true,
+      data: {
+        displayName: 'Corrected label',
+        declaredCredentialType: CoreCredentialType.DCC,
+        dateReceived: null,
+        notes: null,
+      },
+    });
+  });
+
+  it('requires a recognised field, so empty and unknown-only bodies cannot become no-op updates', () => {
+    for (const body of [{}, { typo: 'ignored' }]) {
+      const result = updateLibraryAnnotationsRequestSchema.safeParse(body);
+      expect(result.success).toBe(false);
+      expect(firstMessage(result)).toBe(
+        'At least one of displayName, declaredCredentialType, dateReceived, or notes is required',
+      );
+    }
+  });
+
+  it('keeps notes empty when supplied and distinguishes it from an omitted field', () => {
+    expect(updateLibraryAnnotationsRequestSchema.safeParse({ notes: '' })).toEqual({
+      success: true,
+      data: { notes: '' },
+    });
+    expect(updateLibraryAnnotationsRequestSchema.safeParse({ displayName: 'Only label' })).toEqual({
+      success: true,
+      data: { displayName: 'Only label' },
+    });
+  });
+
+  it.each([
+    ['displayName', { displayName: 'a\0b' }],
+    ['notes', { notes: 'a\0b' }],
+  ])('rejects a NUL in %s before PostgreSQL can reject the write', (_field, body) => {
+    const result = updateLibraryAnnotationsRequestSchema.safeParse(body);
+    expect(result.success).toBe(false);
+    expect(firstMessage(result)).toBe('must not contain a NUL character');
+  });
+
+  // The three fields are derived from the register schema precisely so its
+  // bounds are not restated here, which means nothing catches a derivation that
+  // stopped deriving. These are the register bounds asserted on the PATCH
+  // schema itself: the 200-character and 2000-character maxima and the
+  // non-blank rule.
+  it.each([
+    ['displayName', { displayName: 'a'.repeat(201) }, 'String must contain at most 200 character(s)'],
+    ['displayName', { displayName: '   ' }, 'must not be only whitespace'],
+    ['notes', { notes: 'n'.repeat(2001) }, 'String must contain at most 2000 character(s)'],
+  ])('holds %s to the bounds it inherits from the register schema', (field, body, message) => {
+    const result = updateLibraryAnnotationsRequestSchema.safeParse(body);
+
+    expect(result.success).toBe(false);
+    expect(firstIssue(result).path).toEqual([field]);
+    expect(firstMessage(result)).toBe(message);
+  });
+
+  it('keeps the real-date rule, rejects null for required fields, and uses a value-free enum message', () => {
+    expect(updateLibraryAnnotationsRequestSchema.safeParse({ dateReceived: '2026-02-30' }).success).toBe(false);
+    expect(updateLibraryAnnotationsRequestSchema.safeParse({ displayName: null }).success).toBe(false);
+    expect(updateLibraryAnnotationsRequestSchema.safeParse({ declaredCredentialType: null }).success).toBe(false);
+
+    const result = updateLibraryAnnotationsRequestSchema.safeParse({ declaredCredentialType: 'sentinel-value' });
+    expect(result.success).toBe(false);
+    expect(firstMessage(result)).toBe('must be one of DFR, DCC, DPP, DTE, DIA');
   });
 });
 

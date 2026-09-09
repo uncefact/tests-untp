@@ -7,11 +7,21 @@ jest.mock('../prisma', () => ({
 
 import { CheckResult, CheckRunState, CoreCredentialType, LibraryRecordOrigin, Prisma } from '../generated';
 import { prisma } from '../prisma';
-import { buildLibraryListQuery, getLibraryRecordById, listLibraryRecords } from './library-record.repository';
+import {
+  buildLibraryListQuery,
+  getLibraryRecordById,
+  LibraryRecordWriteAnomalyError,
+  listLibraryRecords,
+  updateLibraryRecordAnnotations,
+  type LibraryRecordAnnotationChanges,
+} from './library-record.repository';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
 
 const mockGlobalFindFirst = prisma.libraryRecord.findFirst as unknown as jest.Mock;
 const mockTransaction = prisma.$transaction as unknown as jest.Mock;
+const mockUpdateMany = jest.fn();
+const mockParentUpdate = jest.fn();
+const mockQueryRawUnsafe = jest.fn();
 
 /**
  * The client the transaction hands the callback is a different object from the
@@ -24,10 +34,21 @@ const mockFindMany = jest.fn();
 const mockCheckRunFindMany = jest.fn();
 const mockQueryRaw = jest.fn();
 const transactionClient = {
-  libraryRecord: { findFirst: mockFindFirst, findMany: mockFindMany },
+  libraryRecord: { findFirst: mockFindFirst, findMany: mockFindMany, update: mockParentUpdate },
   checkRun: { findMany: mockCheckRunFindMany },
+  externalCredential: { updateMany: mockUpdateMany },
   $queryRaw: mockQueryRaw,
+  $queryRawUnsafe: mockQueryRawUnsafe,
 };
+
+// The perimeter this guards is the literal form only: excess property checking
+// fires on a fresh object literal and not on a spread, which is how the route
+// actually builds its changes, so a widened source spread into that object
+// would still compile. The assertion on the `data` keys below is what holds
+// the perimeter for the construction the route uses.
+// @ts-expect-error custody fields must never be accepted as annotation changes.
+const custodyChangeMustNotCompile: LibraryRecordAnnotationChanges = { storageUri: 'https://secret.example' };
+void custodyChangeMustNotCompile;
 
 const CHECK_RUN = {
   id: 'run-1',
@@ -75,6 +96,9 @@ beforeEach(() => {
   mockGlobalFindFirst.mockImplementation(() => {
     throw new Error('the record was read on the global client, outside the repeatable-read transaction');
   });
+  mockQueryRawUnsafe.mockResolvedValue([{ id: 'record-1' }]);
+  mockUpdateMany.mockResolvedValue({ count: 1 });
+  mockParentUpdate.mockResolvedValue({});
   mockTransaction.mockImplementation(async (callback: (client: unknown) => unknown) => callback(transactionClient));
 });
 
@@ -382,5 +406,203 @@ describe('buildLibraryListQuery', () => {
     expect(nativeBranch).not.toContain('n."retrieval"');
     expect(nativeBranch).not.toContain('n."decryption"');
     expect(nativeBranch).not.toContain('n."digest"');
+  });
+});
+
+describe('updateLibraryRecordAnnotations', () => {
+  it('locks the parent first, conditionally updates only supplied annotations, touches the parent, and returns the in-transaction view', async () => {
+    mockFindFirst
+      .mockResolvedValueOnce(row({ externalCredential: { ...row().externalCredential, annotationVersion: 1 } }))
+      .mockResolvedValueOnce(
+        row({
+          externalCredential: {
+            ...row().externalCredential,
+            annotationVersion: 2,
+            displayName: 'Corrected label',
+          },
+        }),
+      );
+
+    const changes = { displayName: 'Corrected label' };
+    const result = await updateLibraryRecordAnnotations({
+      recordId: 'record-1',
+      tenantId: 'tenant-1',
+      expectedVersion: 1,
+      changes,
+    });
+
+    expect(mockTransaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5_000,
+      timeout: 15_000,
+    });
+    expect(mockQueryRawUnsafe).toHaveBeenCalledWith(
+      'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
+      'record-1',
+      'tenant-1',
+    );
+    expect(mockUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'record-1',
+        tenantId: 'tenant-1',
+        origin: LibraryRecordOrigin.EXTERNAL,
+        annotationVersion: 1,
+      },
+      data: {
+        displayName: 'Corrected label',
+        annotationVersion: { increment: 1 },
+        updatedAt: expect.any(Date),
+      },
+    });
+    expect(mockParentUpdate).toHaveBeenCalledWith({
+      where: {
+        id_tenantId_origin: {
+          id: 'record-1',
+          tenantId: 'tenant-1',
+          origin: LibraryRecordOrigin.EXTERNAL,
+        },
+      },
+      data: { updatedAt: expect.any(Date) },
+    });
+    expect((result as { outcome: 'updated'; view: { external: { annotationVersion: number } } }).outcome).toBe(
+      'updated',
+    );
+    expect(
+      (result as { outcome: 'updated'; view: { external: { annotationVersion: number } } }).view.external
+        .annotationVersion,
+    ).toBe(2);
+    expect(mockFindFirst).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['a vanished record', [], { outcome: 'missing' }],
+    [
+      'a native record',
+      [
+        row({
+          origin: LibraryRecordOrigin.NATIVE,
+          credential: { id: 'record-1', tenantId: 'tenant-1', origin: LibraryRecordOrigin.NATIVE },
+          externalCredential: null,
+          checkRuns: [],
+        }),
+      ],
+      { outcome: 'native' },
+    ],
+  ])('does not write for %s', async (_name, lockedRows, expected) => {
+    mockQueryRawUnsafe.mockResolvedValue(lockedRows.length === 0 ? [] : [{ id: 'record-1' }]);
+    if (lockedRows.length > 0) mockFindFirst.mockResolvedValue(lockedRows[0]);
+
+    await expect(
+      updateLibraryRecordAnnotations({
+        recordId: 'record-1',
+        tenantId: 'tenant-1',
+        expectedVersion: 1,
+        changes: { notes: null },
+      }),
+    ).resolves.toEqual(expected);
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+    expect(mockParentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('returns a conflict without writing when the locked version is stale', async () => {
+    mockFindFirst.mockResolvedValue(row({ externalCredential: { ...row().externalCredential, annotationVersion: 2 } }));
+
+    await expect(
+      updateLibraryRecordAnnotations({
+        recordId: 'record-1',
+        tenantId: 'tenant-1',
+        expectedVersion: 1,
+        changes: { notes: 'must not write' },
+      }),
+    ).resolves.toEqual({ outcome: 'version_conflict', currentVersion: 2 });
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+    expect(mockParentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('treats a native post-write read as a rolled-back write anomaly rather than returning it as updated', async () => {
+    mockFindFirst
+      .mockResolvedValueOnce(row({ externalCredential: { ...row().externalCredential, annotationVersion: 1 } }))
+      .mockResolvedValueOnce(
+        row({
+          origin: LibraryRecordOrigin.NATIVE,
+          credential: { id: 'record-1', tenantId: 'tenant-1', origin: LibraryRecordOrigin.NATIVE },
+          externalCredential: null,
+          checkRuns: [],
+        }),
+      );
+
+    // The `updated` outcome is typed as an external view, so the origin is
+    // proved here rather than re-checked by every caller. A record that was
+    // updated as EXTERNAL and read back as NATIVE is a broken invariant, and
+    // the throw rolls the transaction back instead of publishing the mixture.
+    // The class and the detail are both asserted, because all three write
+    // anomalies share one class and only the message separates them.
+    const rejection = expect(
+      updateLibraryRecordAnnotations({
+        recordId: 'record-1',
+        tenantId: 'tenant-1',
+        expectedVersion: 1,
+        changes: { notes: 'written but not answerable' },
+      }),
+    ).rejects;
+    await rejection.toThrow(LibraryRecordWriteAnomalyError);
+    await rejection.toThrow(/read back as NATIVE/);
+  });
+
+  // The same broken shape either side of the write is two different findings.
+  // Before the write it is committed corruption this transaction only
+  // discovered, and the route owes the caller its "could not be read" line.
+  // After the write it is this transaction's own invariant failing on the row
+  // it has just written, so it becomes a write anomaly and rolls back.
+  it('reports a stored shape met before the write as a shape error, attempting no write', async () => {
+    mockFindFirst.mockResolvedValue(row({ checkRuns: [] }));
+
+    const rejection = expect(
+      updateLibraryRecordAnnotations({
+        recordId: 'record-1',
+        tenantId: 'tenant-1',
+        expectedVersion: 1,
+        changes: { notes: 'must not write' },
+      }),
+    ).rejects;
+    await rejection.toThrow(LibraryRecordShapeError);
+    await rejection.toThrow(/is EXTERNAL but has no check run/);
+    expect(mockUpdateMany).not.toHaveBeenCalled();
+    expect(mockParentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('converts a stored shape met by the post-write read-back into a rolled-back write anomaly', async () => {
+    mockFindFirst
+      .mockResolvedValueOnce(row({ externalCredential: { ...row().externalCredential, annotationVersion: 1 } }))
+      .mockResolvedValueOnce(row({ checkRuns: [] }));
+
+    const rejection = expect(
+      updateLibraryRecordAnnotations({
+        recordId: 'record-1',
+        tenantId: 'tenant-1',
+        expectedVersion: 1,
+        changes: { notes: 'written but not readable' },
+      }),
+    ).rejects;
+    await rejection.toThrow(LibraryRecordWriteAnomalyError);
+    // The original detail rides across, so the log still names what was wrong
+    // with the row and not merely that something was.
+    await rejection.toThrow(/is EXTERNAL but has no check run/);
+    await rejection.not.toThrow(LibraryRecordShapeError);
+  });
+
+  it('treats a zero conditional-update count as a rolled-back write anomaly', async () => {
+    mockFindFirst.mockResolvedValue(row({ externalCredential: { ...row().externalCredential, annotationVersion: 1 } }));
+    mockUpdateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      updateLibraryRecordAnnotations({
+        recordId: 'record-1',
+        tenantId: 'tenant-1',
+        expectedVersion: 1,
+        changes: { notes: 'unexpected count' },
+      }),
+    ).rejects.toThrow(LibraryRecordWriteAnomalyError);
+    expect(mockParentUpdate).not.toHaveBeenCalled();
   });
 });

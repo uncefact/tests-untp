@@ -4,21 +4,35 @@ import { CredentialDetailsStatus } from '@/lib/prisma/generated';
 
 /**
  * Minimal shape for navigating the generated OpenAPI JSON schema in these
- * structural assertions. The real output carries far more (descriptions,
- * formats, additionalProperties); only the fields these tests read are
- * declared.
+ * structural assertions. The real output carries far more (formats, examples);
+ * only the fields these tests read are declared.
  */
 type JsonSchemaObject = {
   properties?: Record<string, JsonSchemaObject>;
   format?: string;
   required?: string[];
   items?: JsonSchemaObject;
+  additionalProperties?: unknown;
   nullable?: boolean;
   enum?: string[];
   description?: string;
   pattern?: string;
   type?: string;
 };
+
+/**
+ * Every `additionalProperties` the generator emitted anywhere under `node`,
+ * including inside array items, so a request component can be checked for a
+ * documented rejection of unknown keys at any nesting level. A route that
+ * strips unknown keys at runtime must not publish `false` at any of them.
+ */
+function collectAdditionalProperties(node: JsonSchemaObject | undefined, acc: unknown[] = []): unknown[] {
+  if (!node) return acc;
+  if ('additionalProperties' in node) acc.push(node.additionalProperties);
+  Object.values(node.properties ?? {}).forEach((child) => collectAdditionalProperties(child, acc));
+  collectAdditionalProperties(node.items, acc);
+  return acc;
+}
 
 /**
  * Congruence checks for the registrar <-> scheme OpenAPI projection (#792
@@ -282,13 +296,7 @@ describe('generateOpenAPISchemas: Facility component', () => {
  * these assertions pin the published request contract to the runtime one.
  */
 describe('generateOpenAPISchemas: CredentialIssueRequest component', () => {
-  type JsonSchema = {
-    properties?: Record<string, JsonSchema>;
-    required?: string[];
-    additionalProperties?: unknown;
-    items?: JsonSchema;
-  };
-  const request = generateOpenAPISchemas().CredentialIssueRequest as JsonSchema;
+  const request = generateOpenAPISchemas().CredentialIssueRequest as JsonSchemaObject;
 
   it('requires exactly the fields the route requires', () => {
     expect(request.required).toEqual(['credentialPayload', 'credentialType', 'version']);
@@ -302,14 +310,7 @@ describe('generateOpenAPISchemas: CredentialIssueRequest component', () => {
   });
 
   it('does not document unknown keys as rejected, matching the runtime strip, at every nesting level', () => {
-    const collect = (node: JsonSchema | undefined, acc: unknown[]): unknown[] => {
-      if (!node) return acc;
-      if ('additionalProperties' in node) acc.push(node.additionalProperties);
-      Object.values(node.properties ?? {}).forEach((child) => collect(child, acc));
-      collect(node.items, acc);
-      return acc;
-    };
-    expect(collect(request, [])).not.toContain(false);
+    expect(collectAdditionalProperties(request)).not.toContain(false);
   });
 });
 
@@ -518,6 +519,42 @@ describe('generateOpenAPISchemas: RegisterExternalCredentialRequest (#955)', () 
     const decryptionKey = request.properties?.sourceEncryption?.properties?.decryptionKey;
     expect(decryptionKey?.pattern).toBe('^[a-f0-9]{64}$');
     expect(decryptionKey?.description).toContain('64 hexadecimal characters');
+  });
+});
+
+describe('generateOpenAPISchemas: UpdateLibraryAnnotationsRequest (#959)', () => {
+  const request = generateOpenAPISchemas().UpdateLibraryAnnotationsRequest as JsonSchemaObject;
+
+  it('publishes all annotation fields as optional request properties', () => {
+    expect(request.required ?? []).toEqual([]);
+    expect(Object.keys(request.properties ?? {}).sort()).toEqual(
+      ['dateReceived', 'declaredCredentialType', 'displayName', 'notes'].sort(),
+    );
+    expect(request.properties?.dateReceived?.nullable).toBe(true);
+    expect(request.properties?.notes?.nullable).toBe(true);
+  });
+
+  // Three of the four fields are wrapped in a refinement or a nullable before
+  // they reach the component, and the fourth is rebuilt from scratch for its
+  // error map. Each wrap creates a new definition whose own description is
+  // unset, so a published description is a property of how the field is built
+  // and not something the derivation guarantees.
+  it('publishes the register descriptions through the patch wrappers', () => {
+    for (const field of ['displayName', 'declaredCredentialType', 'dateReceived', 'notes']) {
+      expect(request.properties?.[field]?.description).toEqual(expect.any(String));
+      expect(request.properties?.[field]?.description).not.toBe('');
+    }
+    expect(request.properties?.displayName?.description).toContain('not only whitespace');
+    expect(request.properties?.notes?.description).toContain('Free text kept with the record');
+    // The NUL rule is a refinement, so the converter drops it: an integrator
+    // reading the component alone learns it only from the description. Both
+    // refined fields owe it (plan G9).
+    expect(request.properties?.displayName?.description).toContain('cannot contain a NUL character');
+    expect(request.properties?.notes?.description).toContain('cannot contain a NUL character');
+  });
+
+  it('does not document unknown request keys as rejected at any generated object level', () => {
+    expect(collectAdditionalProperties(request)).not.toContain(false);
   });
 });
 

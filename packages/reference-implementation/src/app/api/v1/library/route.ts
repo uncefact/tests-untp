@@ -13,6 +13,7 @@ import {
 } from '@/lib/api/errors';
 import { assertHttpUrl, parseRequestBody, parseQueryParams, ValidationError } from '@/lib/api/validation';
 import { buildPaginatedResponse } from '@/lib/api/pagination';
+import { rethrowAsValidationFailed } from '@/lib/api/rethrow-as-validation-failed';
 import { readRequestBytes } from '@/lib/api/request-body';
 import {
   digestRequestBody,
@@ -364,17 +365,6 @@ function created(record: ExternalCredentialRecord): Response {
     throw error;
   }
   return NextResponse.json(projected, { status: 201 });
-}
-
-/**
- * The contract's 400 for the body and the header, with the code it names.
- * Anything that is not a validation failure is left to the route error mapper.
- */
-function rethrowAsValidationFailed(error: unknown): never {
-  if (error instanceof ValidationError) {
-    throw new ValidationError(error.message, { code: 'VALIDATION_FAILED', cause: error });
-  }
-  throw error;
 }
 
 /**

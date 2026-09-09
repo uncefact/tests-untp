@@ -56,7 +56,15 @@ export type LibraryRecordDetailView<TRecord = LibraryRecord> =
  * missing a row its write path always creates alongside it. That is a broken
  * invariant, never an empty state, so it fails loudly with the record named.
  * A row read inside the transaction that is creating it is legitimately
- * between those states, so this is only ever raised on committed reads.
+ * between those states, so a write path never raises this on its own
+ * half-written record.
+ *
+ * It is raised on reads, including the read a write transaction takes before
+ * it writes: that read sees committed rows, so a broken shape there is
+ * corruption found before anything was attempted. A write transaction that
+ * meets one on its read-back is a different finding, because the row it read
+ * back is the one it had just written, and it converts this error into its own
+ * anomaly class rather than reporting stored corruption.
  */
 export class LibraryRecordShapeError extends Error {
   constructor(recordId: string, detail: string) {

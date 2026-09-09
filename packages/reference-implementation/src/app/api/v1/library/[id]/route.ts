@@ -1,13 +1,36 @@
 import { NextResponse } from 'next/server';
-import { NotFoundError, unexpectedErrorMessage } from '@/lib/api/errors';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  PayloadTooLargeError,
+  unexpectedErrorMessage,
+} from '@/lib/api/errors';
 import { apiLogger } from '@/lib/api/logger';
+import { parseRequestBody, definedFields, ValidationError } from '@/lib/api/validation';
+import { rethrowAsValidationFailed } from '@/lib/api/rethrow-as-validation-failed';
+import { strictIntQueryParam } from '@/lib/api/request-schemas/shared';
+import {
+  updateLibraryAnnotationsRequestSchema,
+  type UpdateLibraryAnnotationsRequest,
+} from '@/lib/api/request-schemas/library';
 import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
-import { CredentialRecordProjectionError, toCredentialRecordDetail } from '@/lib/library/credential-record-projection';
+import {
+  CredentialRecordProjectionError,
+  toCredentialRecord,
+  toCredentialRecordDetail,
+} from '@/lib/library/credential-record-projection';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
-import { getLibraryRecordById } from '@/lib/prisma/repositories/library-record.repository';
+import {
+  getLibraryRecordById,
+  LibraryRecordWriteAnomalyError,
+  updateLibraryRecordAnnotations,
+  type LibraryRecordAnnotationChanges,
+} from '@/lib/prisma/repositories/library-record.repository';
 import { isDatabaseError } from '@/lib/prisma/db-errors';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getRequestContext } from '@uncefact/untp-ri-services/logging';
+import { LibraryRecordOrigin } from '@/lib/prisma/generated';
 
 const logger = apiLogger.child({ route: '/api/v1/library/[id]' });
 
@@ -33,10 +56,12 @@ function revealForDetail(stored: string): string {
 }
 
 /**
- * The 500 for every failure this route owns. The error is logged with the
- * record it happened on; no error in this chain carries key material, because
- * the decrypt failure is Node's own authentication error and the projection
- * and shape failures name rows, not values.
+ * The 500 for every failure either operation on this route owns. The error is
+ * logged with the record it happened on, under pino's `err` key so the message,
+ * stack and cause chain are all rendered. No error in this chain carries key
+ * material: the decrypt failure is Node's own authentication error, the
+ * projection and shape failures name rows rather than values, and the
+ * annotation update never reveals a stored key at all.
  */
 function sanitisedServerError(error: unknown, recordId: string, detail: string): Response {
   logger.error({ err: error, recordId }, detail);
@@ -315,5 +340,335 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
       return sanitisedServerError(error, id, 'The library record has a stored shape the write paths never produce');
     }
     return sanitisedServerError(error, id, 'Library record detail read failed');
+  }
+});
+
+const INVALID_IF_VERSION_MESSAGE = 'If-Version must be an integer between 1 and 2147483647.';
+const MISSING_IF_VERSION_MESSAGE = 'If-Version header is required.';
+const VERSION_CONFLICT_MESSAGE = 'The supplied If-Version is stale.';
+const NATIVE_ANNOTATION_MESSAGE = 'This is a native credential record; it has no recipient annotations to update.';
+
+function parseIfVersion(req: Request): number {
+  const raw = req.headers.get('If-Version');
+  if (raw === null) {
+    throw new ValidationError(MISSING_IF_VERSION_MESSAGE, { code: 'INVALID_IF_VERSION' });
+  }
+  // The shared parser carries its own `.optional()`, which only short-circuits
+  // on an `undefined` input. The missing-header case is already answered above,
+  // so the header value reaching here is always a string and `parsed.data` is
+  // never `undefined` at run time. It is still checked, both to narrow the
+  // return type to `number` and so a future change to the shared parser cannot
+  // turn a missing version into a silent success.
+  const parsed = strictIntQueryParam(
+    INVALID_IF_VERSION_MESSAGE,
+    (value) => value >= 1 && value <= 2147483647,
+  ).safeParse(raw);
+  if (!parsed.success || parsed.data === undefined) {
+    throw new ValidationError(INVALID_IF_VERSION_MESSAGE, { code: 'INVALID_IF_VERSION' });
+  }
+  return parsed.data;
+}
+
+/**
+ * @swagger
+ * /library/{id}:
+ *   patch:
+ *     operationId: annotateLibraryRecord
+ *     summary: Update recipient annotations on a library record
+ *     description: |
+ *       Updates one or more recipient-owned annotation fields on an external
+ *       library record. The credential, its durable copy, extracted fields,
+ *       verification runs and verification queue are never changed.
+ *
+ *       Two things beyond the annotations do move. A successful update
+ *       advances the record's `updatedAt`, so a client using it as a
+ *       change-detection or cache key sees an annotation edit. And changing
+ *       `declaredCredentialType` adds or removes the `DECLARED_TYPE_MISMATCH`
+ *       warning in the record this request returns, because that warning is
+ *       derived from the declared type against the extracted one at projection
+ *       time. Neither writes anything else.
+ *
+ *       The tenant-scoped record lookup runs before the native-origin check,
+ *       `If-Version` validation and body validation. A missing or foreign id
+ *       therefore returns the same 404, while a native record returns the
+ *       named 403 even when the remaining request is invalid. A current token
+ *       advances by one; a stale token returns 409 and changes no row.
+ *
+ *       The header is validated before the body, so a request whose
+ *       `If-Version` and body are both invalid reports
+ *       `400 INVALID_IF_VERSION`.
+ *
+ *       `dateReceived` and `notes` accept `null` to clear them. Omitting a
+ *       field leaves it unchanged. At least one recognised field is required;
+ *       unknown fields are stripped. `displayName` and `notes` cannot contain
+ *       a NUL character because PostgreSQL cannot store one.
+ *
+ *       A projection failure after the transaction commits is answered as a
+ *       sanitised 500. The annotation update is already committed in that
+ *       case; re-read the record and use its new version before retrying.
+ *     tags:
+ *       - Library
+ *     parameters:
+ *       - $ref: '#/components/parameters/LibraryRecordId'
+ *       - in: header
+ *         name: If-Version
+ *         required: true
+ *         description: |
+ *           The current annotations.annotationVersion. Whitespace,
+ *           leading zeroes and a leading plus sign are accepted. An absent
+ *           header returns `400 INVALID_IF_VERSION` with the message
+ *           `If-Version header is required.`. A malformed or out-of-range
+ *           value returns `400 INVALID_IF_VERSION` with the range message; a
+ *           valid value that is stale returns `409 VERSION_CONFLICT`.
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 2147483647
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/UpdateLibraryAnnotationsRequest'
+ *             anyOf:
+ *               - required: [displayName]
+ *               - required: [declaredCredentialType]
+ *               - required: [dateReceived]
+ *               - required: [notes]
+ *     responses:
+ *       200:
+ *         description: The updated keyless credential record.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CredentialRecord'
+ *             examples:
+ *               updatedAnnotations:
+ *                 summary: A label and declared type update advances the annotation version
+ *                 value:
+ *                   id: clw0ext3rn4lannotat000001
+ *                   origin: external
+ *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
+ *                   annotations: { annotationVersion: 2, displayName: Corrected DCC, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: Received by email }
+ *                   organisationId: null
+ *                   facilityId: null
+ *                   productId: null
+ *                   sourceUrl: 'https://supplier.example/credentials/dcc-42'
+ *                   sourceDigest: zQmSourceBytesDigestExample
+ *                   resolverUri: null
+ *                   issuedAt: '2026-08-30T10:15:00.000Z'
+ *                   encrypted: false
+ *                   hasKey: true
+ *                   verification: { generation: 1, state: complete, requestedAt: '2026-08-30T10:20:00.000Z', completedAt: '2026-08-30T10:20:04.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
+ *                   currencyStatus: current
+ *                   detailsStatus: EXTRACTED
+ *                   detailsError: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   warnings: []
+ *                   createdAt: '2026-08-30T10:20:00.000Z'
+ *                   updatedAt: '2026-09-09T10:20:00.000Z'
+ *               clearedOptionalAnnotations:
+ *                 summary: The cleared date and notes as returned
+ *                 value:
+ *                   id: clw0ext3rn4lannotat000001
+ *                   origin: external
+ *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
+ *                   annotations: { annotationVersion: 3, displayName: Corrected DCC, declaredCredentialType: DCC, dateReceived: null, notes: null }
+ *                   organisationId: null
+ *                   facilityId: null
+ *                   productId: null
+ *                   sourceUrl: 'https://supplier.example/credentials/dcc-42'
+ *                   sourceDigest: zQmSourceBytesDigestExample
+ *                   resolverUri: null
+ *                   issuedAt: '2026-08-30T10:15:00.000Z'
+ *                   encrypted: false
+ *                   hasKey: true
+ *                   verification: { generation: 1, state: complete, requestedAt: '2026-08-30T10:20:00.000Z', completedAt: '2026-08-30T10:20:04.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
+ *                   currencyStatus: current
+ *                   detailsStatus: EXTRACTED
+ *                   detailsError: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   warnings: []
+ *                   createdAt: '2026-08-30T10:20:00.000Z'
+ *                   updatedAt: '2026-09-09T10:21:00.000Z'
+ *       400:
+ *         description: Invalid If-Version header or validation failure in the request body.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               missingIfVersion:
+ *                 value: { error: 'If-Version header is required.', code: INVALID_IF_VERSION }
+ *               invalidIfVersion:
+ *                 value: { error: 'If-Version must be an integer between 1 and 2147483647.', code: INVALID_IF_VERSION }
+ *               bodyValidationFailed:
+ *                 value: { error: 'body: At least one of displayName, declaredCredentialType, dateReceived, or notes is required', code: VALIDATION_FAILED }
+ *               malformedJsonBody:
+ *                 value: { error: 'Invalid JSON body', code: VALIDATION_FAILED }
+ *       401:
+ *         $ref: '#/components/responses/UnauthorisedResponse'
+ *       403:
+ *         description: >-
+ *           Forbidden. Either of: Forbidden - authenticated principal has no resolvable tenant assignment; or the target is a native credential record where no recipient annotations are permitted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               noTenantForUser:
+ *                 summary: The authenticated user maps to no tenant
+ *                 value: { error: 'No tenant found for user' }
+ *               nativeRecord:
+ *                 value: { error: 'This is a native credential record; it has no recipient annotations to update.', code: NATIVE_CREDENTIAL_NOT_ANNOTATABLE }
+ *       404:
+ *         description: No such credential record.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               notFound:
+ *                 value: { error: 'No such credential record.', code: NOT_FOUND }
+ *       409:
+ *         description: The supplied If-Version is stale.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               staleVersion:
+ *                 value: { error: 'The supplied If-Version is stale.', code: VERSION_CONFLICT }
+ *       500:
+ *         description: |
+ *           One of three cases: the record could not be read, so nothing was
+ *           attempted; the update failed and rolled back, so nothing was
+ *           committed; or the response projection failed after the update had
+ *           committed. Only the last leaves a new stored version behind, so a
+ *           retry with the old token would answer 409. Re-read the record
+ *           first and retry with the version it reports.
+ *
+ *           A record that has reached its maximum annotation version cannot be
+ *           annotated further and answers this response; contact the operator.
+ *           Under heavy contention an update can also exceed its lock wait and
+ *           answer this response; re-read the record and retry with its
+ *           current version.
+ *
+ *           The response is sanitised and carries a correlation id.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
+  const { id } = await params;
+  logger.info({ recordId: id }, 'Updating library record annotations');
+  if (id.includes('\0')) {
+    throw new NotFoundError('No such credential record.', 'NOT_FOUND');
+  }
+
+  try {
+    // Read failures are separated here rather than in the catch below, because
+    // by the time the catch sees a stored-shape error it can no longer tell a
+    // record that could not be read from one whose update committed and whose
+    // response then failed. GET keeps the same two apart.
+    let existing;
+    try {
+      existing = await getLibraryRecordById(id, tenantId);
+    } catch (error) {
+      if (error instanceof LibraryRecordShapeError) {
+        return sanitisedServerError(error, id, 'The library record could not be read for an annotation update');
+      }
+      throw error;
+    }
+    if (existing === null) {
+      throw new NotFoundError('No such credential record.', 'NOT_FOUND');
+    }
+    if (existing.origin === LibraryRecordOrigin.NATIVE) {
+      throw new ForbiddenError(NATIVE_ANNOTATION_MESSAGE, 'NATIVE_CREDENTIAL_NOT_ANNOTATABLE');
+    }
+
+    const expectedVersion = parseIfVersion(req);
+    let body: UpdateLibraryAnnotationsRequest;
+    try {
+      body = await parseRequestBody(req, updateLibraryAnnotationsRequestSchema);
+    } catch (error) {
+      rethrowAsValidationFailed(error);
+    }
+
+    const { dateReceived, ...otherFields } = definedFields(body);
+    const changes: LibraryRecordAnnotationChanges = {
+      ...otherFields,
+      ...(dateReceived !== undefined
+        ? { dateReceived: dateReceived === null ? null : new Date(`${dateReceived}T00:00:00Z`) }
+        : {}),
+    };
+    logger.info({ recordId: id, fields: Object.keys(changes) }, 'Library record annotation fields accepted');
+
+    const result = await updateLibraryRecordAnnotations({
+      recordId: id,
+      tenantId,
+      expectedVersion,
+      changes,
+    });
+    if (result.outcome === 'missing') {
+      logger.info({ recordId: id }, 'Library record disappeared before annotation update');
+      throw new NotFoundError('No such credential record.', 'NOT_FOUND');
+    }
+    if (result.outcome === 'native') {
+      throw new ForbiddenError(NATIVE_ANNOTATION_MESSAGE, 'NATIVE_CREDENTIAL_NOT_ANNOTATABLE');
+    }
+    if (result.outcome === 'version_conflict') {
+      logger.info(
+        { recordId: id, expectedVersion, currentVersion: result.currentVersion },
+        'Library record annotation version conflict',
+      );
+      throw new ConflictError(VERSION_CONFLICT_MESSAGE, 'VERSION_CONFLICT');
+    }
+
+    const projected = toCredentialRecord(result.view);
+    logger.info(
+      { recordId: id, annotationVersion: projected.annotations?.annotationVersion, fields: Object.keys(changes) },
+      'Library record annotations updated',
+    );
+    return NextResponse.json(projected);
+  } catch (error) {
+    if (
+      error instanceof ValidationError ||
+      error instanceof ForbiddenError ||
+      error instanceof NotFoundError ||
+      error instanceof ConflictError ||
+      error instanceof PayloadTooLargeError
+    ) {
+      throw error;
+    }
+    // The shared mapper owns the database fault and logs it under its own
+    // distinct message, which carries the correlation id but not the record.
+    // This line is what makes the record reachable without that join.
+    if (isDatabaseError(error)) {
+      logger.warn({ recordId: id }, 'Library record annotation update hit a database error');
+      throw error;
+    }
+    // The write transaction's own pre-write read met a stored shape the write
+    // paths never produce, so it is committed corruption found before anything
+    // was written. That is the same finding as the pre-check read above and
+    // carries the same line. A shape error met by the post-write read-back is
+    // converted to a write anomaly by the repository and never arrives here.
+    if (error instanceof LibraryRecordShapeError) {
+      return sanitisedServerError(error, id, 'The library record could not be read for an annotation update');
+    }
+    // A write anomaly is raised inside the repository's transaction and rolls
+    // it back, so nothing was committed and no version advanced.
+    if (error instanceof LibraryRecordWriteAnomalyError) {
+      return sanitisedServerError(error, id, 'Library record annotation update failed and rolled back');
+    }
+    // Only a projection failure follows a committed update. The transaction
+    // has already returned by the time the view is projected, so this is the
+    // one branch whose caller may hold a stale version.
+    if (error instanceof CredentialRecordProjectionError) {
+      return sanitisedServerError(error, id, 'The library record annotation update could not be projected');
+    }
+    return sanitisedServerError(error, id, 'Library record annotation update failed');
   }
 });
