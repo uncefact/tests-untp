@@ -93,16 +93,15 @@ function upstreamFailureResponse(
  *
  *       SSRF protection: the URI is fetched through a guarded resolver that
  *       checks each hop's host against private and reserved address ranges and
- *       pins the connection to the address that check resolved, so neither a
+ *       pins the connection to the addresses that check resolved, so neither a
  *       redirect nor a DNS change between check and connect can reach a
  *       private network. It also enforces the response-size limit, follows at
  *       most three additional redirect hops on either setting, and bounds the
  *       whole attempt (the wait for DNS, connect, redirects and body) by
- *       `FETCH_TIMEOUT_MS`. The connection is pinned to the first
- *       address the name resolves to, so when `localhost` resolves to `::1`
- *       first, a same-host HTTP service listening only on IPv4 must be
- *       addressed as `127.0.0.1` or bound on both families. Set
- *       `FETCH_ALLOW_PRIVATE_URLS=true` for local development to permit
+ *       `FETCH_TIMEOUT_MS`. The connection is pinned to the addresses the name
+ *       resolved to at validation time, tried in that order, so a `localhost`
+ *       that resolves to both `::1` and `127.0.0.1` reaches whichever listens.
+ *       Set `FETCH_ALLOW_PRIVATE_URLS=true` for local development to permit
  *       private or reserved destinations; the resolver's other checks remain
  *       active.
  *     tags:

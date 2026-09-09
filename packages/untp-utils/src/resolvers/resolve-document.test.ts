@@ -80,8 +80,13 @@ function makeResponse(opts: {
   };
 }
 
+/**
+ * The shape `validatePublicUrl` returns for a single validated address:
+ * `address` / `family` repeat the first entry of `addresses`, and the
+ * resolver hands the whole of `addresses` to the connector.
+ */
 function resolvedAddress(address = '1.1.1.1', family: 4 | 6 = 4) {
-  return { address, family };
+  return { address, family, addresses: [{ address, family }] };
 }
 
 describe('resolveDocument', () => {
@@ -511,10 +516,10 @@ describe('resolveDocument', () => {
       expect(undiciFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('pins each hop connection to the address validatePublicUrl resolved', async () => {
+    it('pins each hop connection to the addresses validatePublicUrl resolved', async () => {
       validatePublicUrl
-        .mockResolvedValueOnce({ address: '203.0.113.10', family: 4 } as never)
-        .mockResolvedValueOnce({ address: '2606:4700:4700::1111', family: 6 } as never);
+        .mockResolvedValueOnce(resolvedAddress('203.0.113.10', 4) as never)
+        .mockResolvedValueOnce(resolvedAddress('2606:4700:4700::1111', 6) as never);
       undiciFetch
         .mockResolvedValueOnce(
           makeResponse({ status: 301, headers: { location: 'https://example.com/next' }, body: null }) as never,
@@ -542,16 +547,48 @@ describe('resolveDocument', () => {
             }),
         ),
       );
-      // Each hop's lookup must return exactly the address its own
+      // Each hop's lookup must return exactly the addresses its own
       // validatePublicUrl call resolved, never a fresh DNS answer.
       expect(pins[0]).toEqual([{ address: '203.0.113.10', family: 4 }]);
       expect(pins[1]).toEqual([{ address: '2606:4700:4700::1111', family: 6 }]);
     });
 
+    // The dual-stack `localhost` case: the guard validated both addresses, so
+    // both must reach the connector, which is what lets Node's default
+    // autoSelectFamily try the second when the first refuses the connection.
+    it('hands the connector every address the guard validated for a hop', async () => {
+      validatePublicUrl.mockResolvedValueOnce({
+        address: '::1',
+        family: 6,
+        addresses: [
+          { address: '::1', family: 6 },
+          { address: '127.0.0.1', family: 4 },
+        ],
+      } as never);
+      undiciFetch.mockResolvedValueOnce(makeResponse({ body: 'final' }) as never);
+
+      await resolveDocument('http://localhost/doc', { allowPrivateAddresses: true });
+
+      expect(agentOptions).toHaveLength(1);
+      expect(undiciFetch.mock.calls[0][1]).toMatchObject({ dispatcher: agentInstances[0] });
+      const pin = await new Promise((resolve, reject) => {
+        const lookup = (
+          agentOptions[0] as {
+            connect: { lookup: (host: string, opts: object, cb: (err: unknown, addrs: unknown) => void) => void };
+          }
+        ).connect.lookup;
+        lookup('localhost', {}, (err: unknown, addresses: unknown) => (err ? reject(err) : resolve(addresses)));
+      });
+      expect(pin).toEqual([
+        { address: '::1', family: 6 },
+        { address: '127.0.0.1', family: 4 },
+      ]);
+    });
+
     it('forwards private permission and pins each redirect hop through the guard', async () => {
       validatePublicUrl
-        .mockResolvedValueOnce({ address: '10.0.0.1', family: 4 } as never)
-        .mockResolvedValueOnce({ address: '10.0.0.2', family: 4 } as never);
+        .mockResolvedValueOnce(resolvedAddress('10.0.0.1', 4) as never)
+        .mockResolvedValueOnce(resolvedAddress('10.0.0.2', 4) as never);
       undiciFetch
         .mockResolvedValueOnce(
           makeResponse({ status: 301, headers: { location: 'http://db.internal/next' }, body: null }) as never,

@@ -38,20 +38,38 @@ export interface ResolvedAddress {
   family: 4 | 6;
 }
 
+/**
+ * The validated address set for one hostname, in resolver order. Callers must
+ * connect only to these addresses, so the connection lands on IPs that
+ * validation checked.
+ *
+ * `address` and `family` repeat the first entry of `addresses`, so a caller
+ * that can use only one connect target keeps working unchanged. A caller that
+ * can offer several targets to its connector should hand it the whole of
+ * `addresses`: a name such as `localhost` resolves to both `::1` and
+ * `127.0.0.1`, and only one of them may have a listener, so pinning the first
+ * alone refuses a connection an unpinned request would have made.
+ */
+export interface ValidatedAddresses extends ResolvedAddress {
+  addresses: readonly ResolvedAddress[];
+}
+
 const DEFAULT_ALLOWED_SCHEMES: readonly string[] = ['http', 'https'];
 
 /**
  * Validates that `url` is a parseable HTTP(S) URL whose hostname resolves
- * to publicly routable IP addresses, and returns one of those addresses
- * pinned for the caller to use as the connect target. When
+ * to publicly routable IP addresses, and returns the validated address set,
+ * pinned by the resolver, for the caller to use as its connect targets. When
  * `allowPrivateAddresses` is exactly `true`, private and reserved destinations
  * are permitted while the other validation and pinning rules remain active.
  *
  * DNS resolution is performed with `all: true`; in strict mode the URL is
  * rejected if any resolved address is in a private / loopback / link-local /
  * cloud-metadata range, so a mixed public/private DNS response cannot sneak a
- * private record through. In relaxed mode the first structurally valid record
- * is returned after every record has been checked.
+ * private record through. `addresses` therefore holds every structurally valid
+ * record, in resolver order: in strict mode all of them are public, because a
+ * private one has already thrown, and in relaxed mode all of them. `address`
+ * and `family` repeat the first entry.
  *
  * Per ADR-035, this function throws subclasses of {@link UrlValidationError}
  * on failure. The structured payload (`code`, `message`, `received`,
@@ -67,7 +85,7 @@ const DEFAULT_ALLOWED_SCHEMES: readonly string[] = ['http', 'https'];
  * @throws {ResolutionEmptyError} DNS resolution returned no records.
  * @throws {PrivateAddressError} any resolved record is private in strict mode.
  */
-export async function validatePublicUrl(url: string, options?: ValidatePublicUrlOptions): Promise<ResolvedAddress> {
+export async function validatePublicUrl(url: string, options?: ValidatePublicUrlOptions): Promise<ValidatedAddresses> {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -114,7 +132,7 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
   // mode: the literal is returned and pinned without a private-range check.
   const literalFamily = isIP(hostname);
   if (literalFamily === 4 || literalFamily === 6) {
-    return { address: hostname, family: literalFamily };
+    return { address: hostname, family: literalFamily, addresses: [{ address: hostname, family: literalFamily }] };
   }
 
   let records: { address: string; family: number }[];
@@ -129,7 +147,7 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
   }
 
   const privateRecords: string[] = [];
-  let firstRecord: ResolvedAddress | null = null;
+  const validRecords: ResolvedAddress[] = [];
   for (const record of records) {
     // Derive the record's family from the address string itself rather than
     // trusting `record.family` (typed as a bare `number`, and DNS resolvers
@@ -147,7 +165,7 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
       );
     }
     const isPrivate = derivedFamily === 4 ? isPrivateIpv4(record.address) : isPrivateIpv6(record.address);
-    if (!firstRecord) firstRecord = { address: record.address, family: derivedFamily };
+    validRecords.push({ address: record.address, family: derivedFamily });
     if (isPrivate && !allowPrivateAddresses) {
       privateRecords.push(record.address);
     }
@@ -157,16 +175,16 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
     throw new PrivateAddressError(hostname, privateRecords);
   }
 
-  // Defensive: every record either throws above or becomes a candidate, and
-  // `firstRecord` holds the first structurally valid record of either kind,
-  // so `records.length > 0` implies it was assigned. That reasoning holds in
-  // both modes; the pre-relaxation version reasoned from a public record
-  // existing, which is no longer what the loop assigns. Throwing rather than
-  // `!`-asserting keeps the invariant explicit at the boundary. It throws a
-  // plain Error rather than a resolution failure so a defect in this loop can
-  // never be classified as a retryable DNS fault by a caller.
-  if (!firstRecord) {
+  // Defensive: every record either throws above or is collected, so
+  // `records.length > 0` implies `validRecords` is non-empty. That reasoning
+  // holds in both modes; the pre-relaxation version reasoned from a public
+  // record existing, which is no longer what the loop collects. Throwing
+  // rather than `!`-asserting keeps the invariant explicit at the boundary. It
+  // throws a plain Error rather than a resolution failure so a defect in this
+  // loop can never be classified as a retryable DNS fault by a caller.
+  const [first] = validRecords;
+  if (!first) {
     throw new Error('validatePublicUrl invariant: no record selected');
   }
-  return firstRecord;
+  return { address: first.address, family: first.family, addresses: validRecords };
 }

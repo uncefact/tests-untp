@@ -117,9 +117,10 @@ export interface ResolveDocumentOptions {
  * applied, returning the response body + metadata as a {@link LoadResult}.
  *
  * Each redirect hop is re-validated through
- * {@link import('../node/index.js').validatePublicUrl}, and the connection
- * to each hop is pinned to the IP that validation resolved, so an upstream
- * cannot rebind its hostname between check and connect. Private and reserved
+ * {@link import('../node/index.js').validatePublicUrl}, and the connection to
+ * each hop is pinned to the addresses its validation resolved, tried in
+ * resolver order, so an upstream cannot rebind its hostname between check and
+ * connect. Private and reserved
  * destinations remain rejected unless `allowPrivateAddresses` is exactly true.
  *
  * Only two awaits convert a foreign rejection into a resolver error: the undici
@@ -186,18 +187,26 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
         allowPrivateAddresses: options?.allowPrivateAddresses,
       });
       void guard.catch(() => undefined);
-      const { address: pinnedAddress, family: pinnedFamily } = await Promise.race([guard, abortPromise]);
+      const { addresses: pinnedAddresses } = await Promise.race([guard, abortPromise]);
 
       if (controller.signal.aborted) throw new ResolverTimedOutError(currentUrl, totalTimeoutMs);
 
       const dispatcher = new Agent({
         connect: {
           // undici resolves the connect target with `all: true` to support
-          // happy-eyeballs; the callback receives a `LookupAddress[]`.
-          // Return a single-entry array containing the IP we pinned via
-          // `validatePublicUrl`, so the connection target is exactly the
-          // address that the SSRF check validated.
-          lookup: (_hostname, _opts, cb) => cb(null, [{ address: pinnedAddress, family: pinnedFamily }]),
+          // happy-eyeballs; the callback receives a `LookupAddress[]`. Return
+          // every address `validatePublicUrl` validated, in resolver order, so
+          // the connector performs no lookup of its own and each address it
+          // may try is one the SSRF check passed. Handing it only the first
+          // would refuse a name whose other addresses hold the listener:
+          // `localhost` resolves to both `::1` and `127.0.0.1`, and Node's
+          // default `autoSelectFamily` is what tries the second when the first
+          // is refused.
+          lookup: (_hostname, _opts, cb) =>
+            cb(
+              null,
+              pinnedAddresses.map(({ address, family }) => ({ address, family })),
+            ),
         },
       });
 

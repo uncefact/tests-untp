@@ -18,6 +18,7 @@ export * from '../../../../untp-utils/build/node/index.js';
 interface ResolvedAddress {
   address: string;
   family: number;
+  addresses: readonly { address: string; family: number }[];
 }
 
 export async function validatePublicUrl(
@@ -32,5 +33,6 @@ export async function validatePublicUrl(
   }
   const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
   const family = isIP(hostname);
-  return { address: hostname, family: family === 0 ? 4 : family };
+  const resolvedFamily = family === 0 ? 4 : family;
+  return { address: hostname, family: resolvedFamily, addresses: [{ address: hostname, family: resolvedFamily }] };
 }

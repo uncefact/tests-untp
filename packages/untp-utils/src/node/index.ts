@@ -8,4 +8,9 @@ export {
   PrivateAddressError,
 } from './errors.js';
 export { isPrivateHostname, isPrivateIpv4, isPrivateIpv6 } from './is-private-ip.js';
-export { validatePublicUrl, type ValidatePublicUrlOptions, type ResolvedAddress } from './validate-public-url.js';
+export {
+  validatePublicUrl,
+  type ValidatePublicUrlOptions,
+  type ResolvedAddress,
+  type ValidatedAddresses,
+} from './validate-public-url.js';

@@ -17,6 +17,14 @@ jest.unstable_mockModule('node:dns/promises', () => ({
 
 const { validatePublicUrl } = await import('./validate-public-url.js');
 
+/**
+ * The shape `validatePublicUrl` returns for a single validated address:
+ * `address` / `family` repeat the first entry of `addresses`.
+ */
+function validated(address: string, family: 4 | 6) {
+  return { address, family, addresses: [{ address, family }] };
+}
+
 describe('validatePublicUrl', () => {
   beforeEach(() => {
     lookup.mockReset();
@@ -52,10 +60,9 @@ describe('validatePublicUrl', () => {
 
     it('accepts a caller-supplied allowedSchemes list', async () => {
       lookup.mockResolvedValue([{ address: '1.1.1.1', family: 4 }] as never);
-      await expect(validatePublicUrl('wss://example.com/ws', { allowedSchemes: ['wss', 'ws'] })).resolves.toEqual({
-        address: '1.1.1.1',
-        family: 4,
-      });
+      await expect(validatePublicUrl('wss://example.com/ws', { allowedSchemes: ['wss', 'ws'] })).resolves.toEqual(
+        validated('1.1.1.1', 4),
+      );
     });
 
     it('retains scheme rejection when private addresses are allowed', async () => {
@@ -75,10 +82,7 @@ describe('validatePublicUrl', () => {
 
     it('compares schemes case-insensitively', async () => {
       lookup.mockResolvedValue([{ address: '1.1.1.1', family: 4 }] as never);
-      await expect(validatePublicUrl('HTTPS://example.com/')).resolves.toEqual({
-        address: '1.1.1.1',
-        family: 4,
-      });
+      await expect(validatePublicUrl('HTTPS://example.com/')).resolves.toEqual(validated('1.1.1.1', 4));
     });
   });
 
@@ -104,15 +108,14 @@ describe('validatePublicUrl', () => {
     });
 
     it('returns the literal IP for a public IPv4 host without calling DNS', async () => {
-      await expect(validatePublicUrl('http://1.1.1.1/')).resolves.toEqual({ address: '1.1.1.1', family: 4 });
+      await expect(validatePublicUrl('http://1.1.1.1/')).resolves.toEqual(validated('1.1.1.1', 4));
       expect(lookup).not.toHaveBeenCalled();
     });
 
     it('returns the literal IP for a public IPv6 host without calling DNS', async () => {
-      await expect(validatePublicUrl('http://[2606:4700:4700::1111]/')).resolves.toEqual({
-        address: '2606:4700:4700::1111',
-        family: 6,
-      });
+      await expect(validatePublicUrl('http://[2606:4700:4700::1111]/')).resolves.toEqual(
+        validated('2606:4700:4700::1111', 6),
+      );
       expect(lookup).not.toHaveBeenCalled();
     });
 
@@ -152,10 +155,9 @@ describe('validatePublicUrl', () => {
       async (hostname) => {
         lookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }] as never);
 
-        await expect(validatePublicUrl(`http://${hostname}/`, { allowPrivateAddresses: true })).resolves.toEqual({
-          address: '10.0.0.5',
-          family: 4,
-        });
+        await expect(validatePublicUrl(`http://${hostname}/`, { allowPrivateAddresses: true })).resolves.toEqual(
+          validated('10.0.0.5', 4),
+        );
         expect(lookup).toHaveBeenCalledWith(hostname, { family: 0, all: true });
       },
     );
@@ -170,10 +172,9 @@ describe('validatePublicUrl', () => {
       ['::ffff:10.0.0.1', 'http://[::ffff:10.0.0.1]/'],
     ])('allows the non-public literal %s without DNS when opted in', async (_address, url) => {
       const hostname = new URL(url).hostname.replace(/^\[|\]$/g, '');
-      await expect(validatePublicUrl(url, { allowPrivateAddresses: true })).resolves.toEqual({
-        address: hostname,
-        family: url.includes('[') ? 6 : 4,
-      });
+      await expect(validatePublicUrl(url, { allowPrivateAddresses: true })).resolves.toEqual(
+        validated(hostname, url.includes('[') ? 6 : 4),
+      );
       expect(lookup).not.toHaveBeenCalled();
     });
   });
@@ -288,15 +289,22 @@ describe('validatePublicUrl', () => {
       });
     });
 
-    it('returns the first resolved IP so callers can use it as the connect target', async () => {
+    it('returns every validated public record so callers can use them all as connect targets', async () => {
       lookup.mockResolvedValue([
         { address: '1.1.1.1', family: 4 },
         { address: '8.8.8.8', family: 4 },
       ] as never);
-      await expect(validatePublicUrl('https://example.com/')).resolves.toEqual({ address: '1.1.1.1', family: 4 });
+      await expect(validatePublicUrl('https://example.com/')).resolves.toEqual({
+        address: '1.1.1.1',
+        family: 4,
+        addresses: [
+          { address: '1.1.1.1', family: 4 },
+          { address: '8.8.8.8', family: 4 },
+        ],
+      });
     });
 
-    it('allows private and public records but pins the first record when opted in', async () => {
+    it('allows private and public records and returns them all when opted in', async () => {
       lookup.mockResolvedValue([
         { address: '10.0.0.1', family: 4 },
         { address: '1.1.1.1', family: 4 },
@@ -305,10 +313,57 @@ describe('validatePublicUrl', () => {
       await expect(validatePublicUrl('https://mixed.example/', { allowPrivateAddresses: true })).resolves.toEqual({
         address: '10.0.0.1',
         family: 4,
+        addresses: [
+          { address: '10.0.0.1', family: 4 },
+          { address: '1.1.1.1', family: 4 },
+        ],
       });
     });
 
-    it('pins a public first record rather than preferring a later private record when opted in', async () => {
+    // The dual-stack `localhost` case that CI hit: only one of the two
+    // addresses has a listener, so the caller needs both to reach it.
+    it('returns both records for a dual-stack loopback name when opted in', async () => {
+      lookup.mockResolvedValue([
+        { address: '::1', family: 6 },
+        { address: '127.0.0.1', family: 4 },
+      ] as never);
+
+      await expect(validatePublicUrl('http://localhost/', { allowPrivateAddresses: true })).resolves.toEqual({
+        address: '::1',
+        family: 6,
+        addresses: [
+          { address: '::1', family: 6 },
+          { address: '127.0.0.1', family: 4 },
+        ],
+      });
+    });
+
+    it('returns every public record in strict mode', async () => {
+      lookup.mockResolvedValue([
+        { address: '1.1.1.1', family: 4 },
+        { address: '2606:4700:4700::1111', family: 6 },
+      ] as never);
+
+      await expect(validatePublicUrl('https://example.com/')).resolves.toEqual({
+        address: '1.1.1.1',
+        family: 4,
+        addresses: [
+          { address: '1.1.1.1', family: 4 },
+          { address: '2606:4700:4700::1111', family: 6 },
+        ],
+      });
+    });
+
+    it('still throws when a later record is private in strict mode', async () => {
+      lookup.mockResolvedValue([
+        { address: '1.1.1.1', family: 4 },
+        { address: '10.0.0.1', family: 4 },
+      ] as never);
+
+      await expect(validatePublicUrl('https://example.com/')).rejects.toBeInstanceOf(PrivateAddressError);
+    });
+
+    it('leads with a public first record rather than preferring a later private record when opted in', async () => {
       lookup.mockResolvedValue([
         { address: '1.1.1.1', family: 4 },
         { address: '10.0.0.1', family: 4 },
@@ -317,6 +372,10 @@ describe('validatePublicUrl', () => {
       await expect(validatePublicUrl('https://mixed.example/', { allowPrivateAddresses: true })).resolves.toEqual({
         address: '1.1.1.1',
         family: 4,
+        addresses: [
+          { address: '1.1.1.1', family: 4 },
+          { address: '10.0.0.1', family: 4 },
+        ],
       });
     });
 
