@@ -211,7 +211,7 @@ describe('PATCH /api/v1/services/:id', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Allow private URLs by default so happy-path tests don't trigger real DNS resolution
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     // Default encryption service mock
     mockGetEncryptionService.mockReturnValue({ encrypt: mockEncrypt, decrypt: mockDecrypt });
   });
@@ -464,7 +464,7 @@ describe('PATCH /api/v1/services/:id', () => {
   });
 
   it('returns 400 when merged config.baseUrl points to a private address', async () => {
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
     mockDecrypt.mockReturnValue(JSON.stringify({ baseUrl: 'https://old.example.com', apiKey: 'key' }));
 
@@ -479,8 +479,8 @@ describe('PATCH /api/v1/services/:id', () => {
     expect(json.error).toMatch(/config\.baseUrl.*private or reserved/);
   });
 
-  it('skips SSRF validation on PATCH when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('skips SSRF validation on PATCH when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
     mockDecrypt.mockReturnValue(JSON.stringify({ baseUrl: 'https://old.example.com', apiKey: 'key' }));
     mockUpdateServiceInstance.mockResolvedValue({ ...MOCK_INSTANCE, config: 'encrypted' });
@@ -626,4 +626,20 @@ describe('DELETE /api/v1/services/:id', () => {
     const json = await res.json();
     expect(json.error).toBe('Service instance not found');
   });
+});
+const originalFetchAllowPrivateUrls = {
+  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
+  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
+};
+
+beforeEach(() => {
+  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+});
+
+afterEach(() => {
+  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
+  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
 });

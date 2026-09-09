@@ -110,6 +110,22 @@ describe('POST /api/v1/registrars', () => {
     );
   });
 
+  it('returns the configuration conflict as a 500 when both names are introduced after boot', async () => {
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
+
+    const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1', url: 'https://gs1.org' } });
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(json).toEqual({
+      error:
+        'VERIFY_ALLOW_PRIVATE_URLS and FETCH_ALLOW_PRIVATE_URLS are both set. VERIFY_ALLOW_PRIVATE_URLS was renamed to FETCH_ALLOW_PRIVATE_URLS in v0.5. Set FETCH_ALLOW_PRIVATE_URLS to the value you intend, remove VERIFY_ALLOW_PRIVATE_URLS, and restart.',
+    });
+    expect(mockCreateRegistrar).not.toHaveBeenCalled();
+  });
+
   it('creates a registrar with optional fields', async () => {
     const registrar = {
       id: 'reg-1',
@@ -331,7 +347,7 @@ describe('POST /api/v1/registrars', () => {
   });
 
   it('returns 400 when url points to a private address and does not call the repository', async () => {
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     mockAssertPublicUrl.mockRejectedValueOnce(
       new ValidationError('url must not point to a private or reserved network address'),
     );
@@ -345,8 +361,8 @@ describe('POST /api/v1/registrars', () => {
     expect(mockCreateRegistrar).not.toHaveBeenCalled();
   });
 
-  it('skips the private-address check when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('skips the private-address check when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     try {
       const registrar = { id: 'reg-1', name: 'GS1', namespace: 'gs1', url: 'http://127.0.0.1/registry' };
       mockCreateRegistrar.mockResolvedValue(registrar);
@@ -357,12 +373,12 @@ describe('POST /api/v1/registrars', () => {
       expect(res.status).toBe(201);
       expect(mockAssertPublicUrl).not.toHaveBeenCalled();
     } finally {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     }
   });
 
-  it('rejects a javascript: scheme url even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('rejects a javascript: scheme url even when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     try {
       const req = createFakeRequest({ body: { name: 'GS1', namespace: 'gs1', url: 'javascript:alert(1)' } });
       const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -372,12 +388,12 @@ describe('POST /api/v1/registrars', () => {
       expect(json.error).toMatch(/http\(s\)/);
       expect(mockCreateRegistrar).not.toHaveBeenCalled();
     } finally {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     }
   });
 
-  it('rejects a url carrying userinfo even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('rejects a url carrying userinfo even when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     try {
       const req = createFakeRequest({
         body: { name: 'GS1', namespace: 'gs1', url: 'https://user:pass@gs1.org' },
@@ -389,7 +405,7 @@ describe('POST /api/v1/registrars', () => {
       expect(json.error).toMatch(/username or password/);
       expect(mockCreateRegistrar).not.toHaveBeenCalled();
     } finally {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     }
   });
 
@@ -587,4 +603,20 @@ describe('GET /api/v1/registrars', () => {
     expect(res.status).toBe(500);
     expect(json.error).toContain('Database error');
   });
+});
+const originalFetchAllowPrivateUrls = {
+  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
+  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
+};
+
+beforeEach(() => {
+  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+});
+
+afterEach(() => {
+  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
+  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
 });

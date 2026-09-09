@@ -12,6 +12,7 @@ import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { IdrLinkNotFoundError, type Link } from '@uncefact/untp-ri-services';
 import { apiLogger } from '@/lib/api/logger';
 import { updateLinkRequestSchema } from '@/lib/api/request-schemas/link';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 
 const logger = apiLogger.child({ route: '/api/v1/identifiers/[id]/links/[linkId]' });
 
@@ -278,7 +279,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   // arrived by publish (see the comment on POST /identifiers/{id}/links).
   if (body.href !== undefined) {
     body.href = assertHttpUrl(body.href, 'href').href;
-    if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+    if (!readFetchAllowPrivateUrls()) {
       await assertPublicUrl(body.href, 'href');
     }
   }

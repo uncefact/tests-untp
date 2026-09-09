@@ -312,7 +312,7 @@ describe('PATCH /api/v1/registrars/:id', () => {
   });
 
   it('returns 400 when url points to a private address and does not call the repository', async () => {
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     mockAssertPublicUrl.mockRejectedValueOnce(
       new ValidationError('url must not point to a private or reserved network address'),
     );
@@ -326,8 +326,8 @@ describe('PATCH /api/v1/registrars/:id', () => {
     expect(mockUpdateRegistrar).not.toHaveBeenCalled();
   });
 
-  it('skips the private-address check when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('skips the private-address check when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     try {
       const updated = { id: 'reg-1', name: 'GS1', url: 'http://127.0.0.1/registry' };
       mockUpdateRegistrar.mockResolvedValue(updated);
@@ -338,12 +338,12 @@ describe('PATCH /api/v1/registrars/:id', () => {
       expect(res.status).toBe(200);
       expect(mockAssertPublicUrl).not.toHaveBeenCalled();
     } finally {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     }
   });
 
-  it('rejects a javascript: scheme url even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('rejects a javascript: scheme url even when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     try {
       const req = createFakeRequest({ method: 'PATCH', body: { url: 'javascript:alert(1)' } });
       const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -353,12 +353,12 @@ describe('PATCH /api/v1/registrars/:id', () => {
       expect(json.error).toMatch(/http\(s\)/);
       expect(mockUpdateRegistrar).not.toHaveBeenCalled();
     } finally {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     }
   });
 
-  it('rejects a url carrying userinfo even when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('rejects a url carrying userinfo even when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     try {
       const req = createFakeRequest({ method: 'PATCH', body: { url: 'https://user:pass@gs1.org' } });
       const res = await PATCH(req, createContext('reg-1') as unknown as Parameters<typeof PATCH>[1]);
@@ -368,7 +368,7 @@ describe('PATCH /api/v1/registrars/:id', () => {
       expect(json.error).toMatch(/username or password/);
       expect(mockUpdateRegistrar).not.toHaveBeenCalled();
     } finally {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     }
   });
 
@@ -561,4 +561,20 @@ describe('DELETE /api/v1/registrars/:id', () => {
     expect(res.status).toBe(409);
     expect(json.error).toContain('The registrar has schemes with identifiers and cannot be deleted');
   });
+});
+const originalFetchAllowPrivateUrls = {
+  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
+  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
+};
+
+beforeEach(() => {
+  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+});
+
+afterEach(() => {
+  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
+  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
 });

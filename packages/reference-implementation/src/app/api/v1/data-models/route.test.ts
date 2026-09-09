@@ -877,8 +877,8 @@ describe('POST /api/v1/data-models', () => {
     expect(mockCreateDataModel).not.toHaveBeenCalled();
   });
 
-  it('skips the private-address checks when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('skips the private-address checks when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     try {
       mockCreateDataModel.mockResolvedValue({ id: 'cfg-new' });
 
@@ -890,7 +890,7 @@ describe('POST /api/v1/data-models', () => {
       expect(res.status).toBe(201);
       expect(mockValidatePublicUrl).not.toHaveBeenCalled();
     } finally {
-      delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
     }
   });
 
@@ -956,4 +956,20 @@ describe('POST /api/v1/data-models', () => {
     expect(json.error).toBe('A data model with this name already exists for the credential type and version');
     expect(mockCreateDataModel).toHaveBeenCalled();
   });
+});
+const originalFetchAllowPrivateUrls = {
+  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
+  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
+};
+
+beforeEach(() => {
+  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+});
+
+afterEach(() => {
+  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
+  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
 });

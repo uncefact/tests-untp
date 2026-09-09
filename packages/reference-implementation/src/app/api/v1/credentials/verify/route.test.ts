@@ -176,7 +176,7 @@ describe('POST /api/v1/credentials/verify', () => {
     mockMultibaseDigestVerify.mockResolvedValue(true);
     mockIsEncryptedEnvelope.mockReturnValue(false);
     mockHasValidEnvelopeStructure.mockReturnValue(true);
-    delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.FETCH_ALLOW_PRIVATE_URLS;
   });
 
   // ── Input Validation (400s) ───────────────────────────────────────
@@ -261,7 +261,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('fetches the canonical href on the development-bypass branch too', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
     mockVcService.verify.mockResolvedValue({ verified: true });
 
@@ -336,7 +336,7 @@ describe('POST /api/v1/credentials/verify', () => {
   });
 
   it('returns 502 as a network error when the bypass fetch cannot resolve the host (the guard never ran)', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockFetch.mockRejectedValue(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } }));
 
     const res = await POST(createFakeRequest({ uri: VALID_URI }));
@@ -376,8 +376,8 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('uses plain fetch and skips the guarded resolver when VERIFY_ALLOW_PRIVATE_URLS=true', async () => {
-    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+  it('uses plain fetch and skips the guarded resolver when FETCH_ALLOW_PRIVATE_URLS=true', async () => {
+    process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     mockFetch.mockResolvedValue(createFetchResponse(ENVELOPED_CREDENTIAL));
     mockVcService.verify.mockResolvedValue({ verified: true });
 
@@ -436,9 +436,9 @@ describe('POST /api/v1/credentials/verify', () => {
     expect(res.status).toBe(500);
   });
 
-  describe('development bypass (VERIFY_ALLOW_PRIVATE_URLS=true) plain-fetch path', () => {
+  describe('development bypass (FETCH_ALLOW_PRIVATE_URLS=true) plain-fetch path', () => {
     beforeEach(() => {
-      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     });
 
     it('returns 502 when fetch times out', async () => {
@@ -769,4 +769,20 @@ describe('POST /api/v1/credentials/verify', () => {
     const json = await res.json();
     expect(json.error).toBe('VCKit connection refused');
   });
+});
+const originalFetchAllowPrivateUrls = {
+  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
+  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
+};
+
+beforeEach(() => {
+  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+});
+
+afterEach(() => {
+  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
+  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
 });

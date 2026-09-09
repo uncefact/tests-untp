@@ -328,7 +328,7 @@ POST /api/v1/identifiers/{id}/links
 
 Publishes one or more links for an identifier to the upstream IDR service. Each link is registered on the IDR and a local audit record is stored.
 
-Each `href` must be an absolute `http` or `https` URL without embedded credentials, and it is published in its canonical form rather than exactly as sent. Unless `VERIFY_ALLOW_PRIVATE_URLS` is enabled for local development, an `href` pointing at a private or reserved address is rejected with a 400. The same rules apply to `href` on `PATCH /api/v1/identifiers/{id}/links/{linkId}`.
+Each `href` must be an absolute `http` or `https` URL without embedded credentials, and it is published in its canonical form rather than exactly as sent. Unless `FETCH_ALLOW_PRIVATE_URLS` is enabled for local development, an `href` pointing at a private or reserved address is rejected with a 400. The same rules apply to `href` on `PATCH /api/v1/identifiers/{id}/links/{linkId}`.
 
 | Required Field | Description |
 |----------------|-------------|

@@ -19,6 +19,7 @@ import { CoreCredentialType, IdempotencyOperation } from '@/lib/prisma/generated
 import { credentialIssueRequestSchema, listCredentialsQuerySchema } from '@/lib/api/request-schemas/credential';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { resolveAppUrl, buildVerifyUrl } from '@/lib/config/app-url.config';
+import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 import { apiLogger } from '@/lib/api/logger';
 import { getOrMintCorrelationId } from '@uncefact/untp-ri-services/logging';
 import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
@@ -545,14 +546,14 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // `1.1.1.1` cannot be re-read as `127.0.0.1` by a different parser once the
   // canonical `href` (`https://1.1.1.1/@127.0.0.1/`) is what leaves the route.
   // The private-address / DNS SSRF check is additionally applied unless
-  // VERIFY_ALLOW_PRIVATE_URLS relaxes it for local development.
+  // FETCH_ALLOW_PRIVATE_URLS relaxes it for local development.
   const machineVerificationUrl = publishingOptions.machineVerificationUrl
     ? assertHttpUrl(publishingOptions.machineVerificationUrl, 'publishingOptions.machineVerificationUrl').href
     : undefined;
   const humanVerificationUrl = publishingOptions.humanVerificationUrl
     ? assertHttpUrl(publishingOptions.humanVerificationUrl, 'publishingOptions.humanVerificationUrl').href
     : undefined;
-  if (process.env.VERIFY_ALLOW_PRIVATE_URLS !== 'true') {
+  if (!readFetchAllowPrivateUrls()) {
     if (machineVerificationUrl) {
       await assertPublicUrl(machineVerificationUrl, 'publishingOptions.machineVerificationUrl');
     }

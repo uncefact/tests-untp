@@ -228,7 +228,7 @@ export function parseBooleanString(raw: string | null | undefined, paramName: st
  *
  * This is the scheme and well-formedness check, independent of the SSRF
  * private-address check in {@link assertPublicUrl}. It is applied to
- * caller-supplied URLs regardless of `VERIFY_ALLOW_PRIVATE_URLS`, since that
+ * caller-supplied URLs regardless of `FETCH_ALLOW_PRIVATE_URLS`, since that
  * flag relaxes the private-network check for local development, not the
  * requirement that a published URL be a usable, safe http(s) address. Userinfo
  * (a `user:pass@` component) is rejected because such a URL may be published to

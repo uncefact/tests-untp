@@ -43,3 +43,29 @@ Migration steps:
 3. Restart the application and the background worker. Containers capture their environment when created, so recreate both containers rather than only editing `.env` (`docker compose up -d --force-recreate ri ri-worker` for compose deployments; the worker reads the same key).
 
 If you use the [encryption audit](../reference-implementation/operations/encryption-audit) as a one-off container between a rotation and the removal of the leftover old name, keep the `-e SERVICE_ENCRYPTION_KEY=` override that page shows. The audit resolves its key the same way the application does, and a leftover holding the previous key differs from the new `DATA_ENCRYPTION_KEY`.
+
+## Credential fetch settings have new names
+
+v0.5 renames the shared credential-fetch settings so their names describe the operation rather than the verify route. The old names remain supported throughout the v0.5 compatibility window and are planned for removal in RI v0.6.
+
+| Old name                     | New name                   |
+| ---------------------------- | -------------------------- |
+| `VERIFY_ALLOW_PRIVATE_URLS`  | `FETCH_ALLOW_PRIVATE_URLS` |
+| `VERIFY_MAX_CREDENTIAL_SIZE` | `FETCH_MAX_RESPONSE_SIZE`  |
+| `VERIFY_FETCH_TIMEOUT_MS`    | `FETCH_TIMEOUT_MS`         |
+
+The values do not change. For example, `VERIFY_MAX_CREDENTIAL_SIZE=2048` becomes `FETCH_MAX_RESPONSE_SIZE=2048`, and `VERIFY_FETCH_TIMEOUT_MS=3210` becomes `FETCH_TIMEOUT_MS=3210`. The boolean still enables only for exact lowercase `true`, the size still uses its existing `parseInt` fallback, and the timeout still accepts an integer from 1 through 120000 milliseconds.
+
+Before renaming, check the boolean's Compose behaviour. The bundled deployment Compose file now forwards both names independently with a blank default, while the E2E test harness defaults its new boolean name to `true` because its services use private container names. A `.env` value of `false` or any value other than exact lowercase `true` was ignored by the deployment's forced setting before the upgrade and is honoured after it. Remove `VERIFY_ALLOW_PRIVATE_URLS` from the root `.env`; if you set it deliberately, rename it to `FETCH_ALLOW_PRIVATE_URLS` without changing the value. If local storage, IDR or VCKit still needs private or loopback URLs in a deployment, set `FETCH_ALLOW_PRIVATE_URLS=true`. If strict checks were intended, keep a non-`true` value and that value is now honoured. Never set a production deployment to `true` to preserve the old Compose behaviour. The E2E stack needs no env file for its private-container default. A stale root `.env` carrying `VERIFY_ALLOW_PRIVATE_URLS` alongside the E2E default reaches the app with both names and fails startup with the conflict message.
+
+Two non-blank names for one setting fail startup, even when both values are `true` or otherwise equal. These three settings fail on equal values where the encryption-key rename warns because a boolean or a byte count carries no same-value-means-the-same-secret protection.
+
+Migration steps:
+
+1. Find existing old-name entries in the deployment environment, Compose inputs and overrides, CI variables, manifests and scripts. Decide which value is intended where both names already exist.
+2. Rename each old entry to its mapped new name, keeping the value unchanged. Remove the old entry from every input source for that process. Do not add a second active name during the transition.
+3. Upgrade custom Compose or deployment forwarding to carry both names independently during the window, as the bundled deployment Compose file does. This lets an old-only deployment upgrade before its rename is completed.
+4. Before recreating a container, ensure the intended boolean name is the only non-blank name in its environment. Recreate the web app container so its environment changes: run `docker compose up -d --force-recreate ri` for the normal stack. For the E2E stack, use its existing file and profile arguments with service `app`, and keep the closed-mode override on every command when applicable. Restart a directly run web process.
+5. Check startup logs for conflicts and deprecated-name warnings. Align Cypress capability input with the running app and normalise all deployments onto the new names before the planned v0.6 removal.
+
+These fetch settings do not require a key rotation, database migration or worker-only configuration change. The worker uses its separate durable-copy read timeout. See the [evergreen startup table](../reference-implementation/operations/startup#credential-fetch-settings) for the runtime messages and rules.

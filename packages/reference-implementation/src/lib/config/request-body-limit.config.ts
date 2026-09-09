@@ -6,7 +6,7 @@ const MINIMUM_MAX_REQUEST_BODY_BYTES = 1024;
  * `readRequestBytes` will hold (#954). `parseRequestBody` uses that reader
  * for every real request, so the cap applies to every request body the API
  * accepts. A credential payload is normally tens of kilobytes. The existing
- * `VERIFY_MAX_CREDENTIAL_SIZE` bound on a fetched credential is 10 MB. 5 MiB
+ * `FETCH_MAX_RESPONSE_SIZE` bound on a fetched credential is 10 MB. 5 MiB
  * leaves ample room for a large multi-event payload while bounding what an
  * unauthenticated-body-shaped attack can make the process hold.
  *

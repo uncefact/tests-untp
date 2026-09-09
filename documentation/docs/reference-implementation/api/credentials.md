@@ -401,10 +401,14 @@ The storage URI is fetched through a guarded resolver that validates the hostnam
 
 Decryption happens on the server, so a `decryptionKey` travels in the request body. Production deployments must serve this endpoint over HTTPS so the key is protected in transit.
 
-### Environment Variables
+### Shared credential-fetch settings
+
+The following settings are shared by verification, external registration and the supplier-source check used by re-verification. The private-address setting also controls the existing stored-address URL checks on registrar, identifier-link, data-model, service and credential publishing routes.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VERIFY_ALLOW_PRIVATE_URLS` | `false` | Set to `true` to bypass SSRF checks (development only) |
-| `VERIFY_MAX_CREDENTIAL_SIZE` | `10485760` (10 MB) | Maximum credential response size in bytes |
-| `VERIFY_FETCH_TIMEOUT_MS` | `10000` | Time budget for fetching the credential, in milliseconds, covering connect, redirects and body (maximum 120000). Also applies when registering or re-verifying an external library credential. Startup fails on a value that is not a positive integer within that ceiling. |
+| `FETCH_ALLOW_PRIVATE_URLS` | `false`            | Set to exact lowercase `true` for local development to allow private or reserved addresses. This does not remove `http(s)` scheme or userinfo validation.                                    |
+| `FETCH_MAX_RESPONSE_SIZE`  | `10485760` (10 MB) | Maximum response size in bytes. The existing lenient parsing and fallback behaviour is unchanged by the rename.                                                                              |
+| `FETCH_TIMEOUT_MS`         | `10000`            | Time budget for fetching the credential, in milliseconds, covering connect, redirects and body (maximum 120000). Startup fails when the value is not a positive integer within that ceiling. |
+
+Old names remain supported during RI v0.5 and produce a startup warning when used alone. Setting both names for one setting, including equal values, fails startup. See the [startup configuration table](../operations/startup#credential-fetch-settings) and the [v0.5 migration guide](../../migration-guides/ri-v0.5#credential-fetch-settings-have-new-names) for the complete mapping and conflict rules.

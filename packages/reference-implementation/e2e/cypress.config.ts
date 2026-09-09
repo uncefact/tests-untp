@@ -6,6 +6,7 @@ import path from 'path';
 import util from 'util';
 import { Client, ClientOptions } from 'minio';
 import pg from 'pg';
+import { readFetchAllowPrivateUrls } from '../src/lib/config/credential-fetch.config';
 const { Client: PgClient } = pg;
 
 // Load .env.e2e from this e2e workspace's root.
@@ -13,6 +14,16 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env.e2e') });
+
+const fetchEnvironment = {
+  FETCH_ALLOW_PRIVATE_URLS: process.env.FETCH_ALLOW_PRIVATE_URLS,
+  VERIFY_ALLOW_PRIVATE_URLS: process.env.VERIFY_ALLOW_PRIVATE_URLS,
+};
+const hasFetchSetting = Object.values(fetchEnvironment).some((value) => value !== undefined && value.trim() !== '');
+// Keep the harness default aligned with docker-compose.e2e.yml when no app name is supplied.
+const harnessAllowsPrivateUrls = hasFetchSetting
+  ? readFetchAllowPrivateUrls(fetchEnvironment)
+  : (process.env.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true') === 'true';
 
 const execPromise = util.promisify(exec);
 
@@ -105,8 +116,7 @@ export default defineConfig({
       accessKey: process.env.OBJECT_STORAGE_ACCESS_KEY || 'minioadmin',
       secretKey: process.env.OBJECT_STORAGE_SECRET_KEY || 'minioadmin',
     },
-    VERIFY_ALLOW_PRIVATE_URLS:
-      (process.env.VERIFY_ALLOW_PRIVATE_URLS ?? process.env.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true') === 'true',
+    VERIFY_ALLOW_PRIVATE_URLS: harnessAllowsPrivateUrls,
 
     // Identity provider
     IDP_PROVIDER: process.env.E2E_IDP_PROVIDER || 'keycloak',

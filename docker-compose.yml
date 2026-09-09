@@ -122,9 +122,13 @@ services:
       # Verification URLs
       DEFAULT_HUMAN_VERIFICATION_URL: http://localhost:3003/verify
       DEFAULT_MACHINE_VERIFICATION_URL: http://localhost:3332/agent/routeVerificationCredential
-      # Credential verification
-      VERIFY_ALLOW_PRIVATE_URLS: "true"
+      # Forward old and new names independently so the application retains its
+      # fallback and can reject conflicts. Local values come from the host.
+      FETCH_ALLOW_PRIVATE_URLS: ${FETCH_ALLOW_PRIVATE_URLS:-}
+      VERIFY_ALLOW_PRIVATE_URLS: ${VERIFY_ALLOW_PRIVATE_URLS:-}
+      FETCH_MAX_RESPONSE_SIZE: ${FETCH_MAX_RESPONSE_SIZE:-}
       VERIFY_MAX_CREDENTIAL_SIZE: ${VERIFY_MAX_CREDENTIAL_SIZE:-}
+      FETCH_TIMEOUT_MS: ${FETCH_TIMEOUT_MS:-}
       VERIFY_FETCH_TIMEOUT_MS: ${VERIFY_FETCH_TIMEOUT_MS:-}
       # System default service instances (used by seed.ts)
       SYSTEM_VC_BASE_URL: http://vckit-api:3332

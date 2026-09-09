@@ -383,14 +383,18 @@ describe('POST /api/v1/identifiers/[id]/links', () => {
 
   describe('private-address guard', () => {
     const originalValue = process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    const originalNewValue = process.env.FETCH_ALLOW_PRIVATE_URLS;
 
     afterEach(() => {
       if (originalValue === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
       else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalValue;
+      if (originalNewValue === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+      else process.env.FETCH_ALLOW_PRIVATE_URLS = originalNewValue;
     });
 
     it('rejects a private target address with a 400 when the guard is active', async () => {
       delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+      delete process.env.FETCH_ALLOW_PRIVATE_URLS;
       const req = createFakeRequest({
         links: [{ href: 'http://127.0.0.1/cred.json', rel: 'untp:dpp', type: 'application/json' }],
       });
@@ -658,4 +662,20 @@ describe('GET /api/v1/identifiers/[id]/links', () => {
     expect(body.error).toContain('limit: repeated query parameter');
     expect(mockListLinkRegistrations).not.toHaveBeenCalled();
   });
+});
+const originalFetchAllowPrivateUrls = {
+  old: process.env.VERIFY_ALLOW_PRIVATE_URLS,
+  new: process.env.FETCH_ALLOW_PRIVATE_URLS,
+};
+
+beforeEach(() => {
+  delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+});
+
+afterEach(() => {
+  if (originalFetchAllowPrivateUrls.old === undefined) delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+  else process.env.VERIFY_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.old;
+  if (originalFetchAllowPrivateUrls.new === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+  else process.env.FETCH_ALLOW_PRIVATE_URLS = originalFetchAllowPrivateUrls.new;
 });
