@@ -5,11 +5,13 @@
   "description": "Cypress E2E test suite for the untp-playground app.",
   "scripts": {
     "cypress:open": "cypress open",
-    "test:e2e": "cypress run"
+    "test:e2e": "cypress run",
+    "test:e2e:report:open": "open cypress/reports/latest.html"
   },
   "devDependencies": {
     "@types/node": "^20",
     "cypress": "^13.17.0",
+    "cypress-mochawesome-reporter": "^5.0.0",
     "typescript": "^5"
   }
 }

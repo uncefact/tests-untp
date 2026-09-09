@@ -82,6 +82,7 @@ packages/vc-test-suite/reports
 packages/*/e2e/cypress/screenshots
 packages/*/e2e/cypress/downloads
 packages/*/e2e/cypress/videos
+packages/*/e2e/cypress/reports
 
 
 # Local Claude Code files
