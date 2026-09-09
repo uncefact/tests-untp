@@ -38,7 +38,7 @@ jest.mock('@/lib/prisma/repositories/library-record.repository', () => ({
   batchGetLibraryRecords: (...args: unknown[]) => mockBatchGetLibraryRecords(...args),
 }));
 
-jest.mock('@/lib/api/batch-limits', () => ({ MAX_BATCH_GET_IDS: 3 }));
+jest.mock('@/lib/api/batch-limits', () => ({ MAX_BATCH_LIMIT: 3 }));
 
 import { CheckResult, CheckRunState, CoreCredentialType, LibraryRecordOrigin } from '@/lib/prisma/generated';
 import { UNEXPECTED_ERROR_MESSAGE } from '@/lib/api/errors';

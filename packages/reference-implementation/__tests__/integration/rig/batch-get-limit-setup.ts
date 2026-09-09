@@ -3,4 +3,4 @@
 // keeps the over-limit case small enough to seed. The maximum is read when
 // `batch-limits.ts` first loads, so a suite that needs the shipped default of
 // 500 would have to reset both this variable and the module registry.
-process.env.API_MAX_BATCH_GET_IDS = '5';
+process.env.API_MAX_BATCH_LIMIT = '5';

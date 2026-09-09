@@ -11,7 +11,7 @@ import {
   urlSchema,
 } from './shared';
 import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
-import { MAX_BATCH_GET_IDS } from '@/lib/api/batch-limits';
+import { MAX_BATCH_LIMIT } from '@/lib/api/batch-limits';
 
 /**
  * The shared non-blank rule with a length bound applied before it, because a
@@ -53,11 +53,11 @@ const batchGetStructureSchema = z.object({
 });
 
 const batchGetLimitSchema = z.object({ ids: z.array(z.string()) }).superRefine((body, ctx) => {
-  if (body.ids.length > MAX_BATCH_GET_IDS) {
+  if (body.ids.length > MAX_BATCH_LIMIT) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['ids'],
-      message: `submit no more than ${MAX_BATCH_GET_IDS} ids per request`,
+      message: `submit no more than ${MAX_BATCH_LIMIT} ids per request`,
       params: { code: 'BATCH_GET_LIMIT_EXCEEDED' },
     });
   }

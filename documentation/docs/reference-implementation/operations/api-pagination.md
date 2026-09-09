@@ -15,18 +15,18 @@ The `limit` a client may request is capped at a maximum. A request for more than
 
 The maximum defaults to `100` and is configurable per deployment through the `API_MAX_PAGE_LIMIT` environment variable.
 
-| Variable                | Description                                                                                                                                                           | Default |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `API_MAX_PAGE_LIMIT`    | Maximum number of records a list endpoint returns per page. A request whose `limit` exceeds this is rejected with a 400 naming the maximum.                           | `100`   |
-| `API_MAX_BATCH_GET_IDS` | Maximum number of ids accepted by `POST /api/v1/library/batch-get`, counted before duplicate removal. A request above this is rejected with a 400 naming the maximum. | `500`   |
+| Variable              | Description                                                                                                                                                           | Default |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `API_MAX_PAGE_LIMIT`  | Maximum number of records a list endpoint returns per page. A request whose `limit` exceeds this is rejected with a 400 naming the maximum.                           | `100`   |
+| `API_MAX_BATCH_LIMIT` | Maximum number of ids accepted by `POST /api/v1/library/batch-get`, counted before duplicate removal. A request above this is rejected with a 400 naming the maximum. | `500`   |
 
 Set either variable to any positive integer to raise or lower its bound for your deployment. A value that is not a positive integer is ignored, the default is applied, and a warning is logged at startup, so a misconfiguration is visible in the logs rather than silently taking effect.
 
 When the configured maximum is below the default page size (`20`), the default page size is lowered to the configured maximum, so a request that omits `limit` still returns no more than the configured maximum.
 
-The batch endpoint validates the request shape before checking `API_MAX_BATCH_GET_IDS` and never truncates an over-limit request.
+The batch endpoint validates the request shape before checking `API_MAX_BATCH_LIMIT` and never truncates an over-limit request.
 
-The Compose file supplied with the repository passes `API_MAX_BATCH_GET_IDS` through to the reference implementation container from the host environment or from the root `.env` file, so setting it in either reaches the running service. Leaving it unset leaves it unset in the container, and the default applies.
+The Compose file supplied with the repository passes `API_MAX_BATCH_LIMIT` through to the reference implementation container from the host environment or from the root `.env` file, so setting it in either reaches the running service. Leaving it unset leaves it unset in the container, and the default applies.
 
 ## Where the bound is enforced
 

@@ -1,4 +1,4 @@
-jest.mock('@/lib/api/batch-limits', () => ({ MAX_BATCH_GET_IDS: 2 }));
+jest.mock('@/lib/api/batch-limits', () => ({ MAX_BATCH_LIMIT: 2 }));
 
 import { CoreCredentialType } from '@/lib/prisma/generated';
 import { parseQueryParams, ValidationError } from '@/lib/api/validation';
@@ -13,7 +13,7 @@ import {
   batchGetLibraryRequestSchema,
   updateLibraryAnnotationsRequestSchema,
 } from './library';
-import { MAX_BATCH_GET_IDS } from '@/lib/api/batch-limits';
+import { MAX_BATCH_LIMIT } from '@/lib/api/batch-limits';
 
 type Body = {
   sourceUrl: string;
@@ -301,7 +301,7 @@ describe('batchGetLibraryRequestSchema', () => {
 
   it('accepts exactly the configured maximum number of submitted ids', () => {
     const result = batchGetLibraryRequestSchema.safeParse({
-      ids: Array.from({ length: MAX_BATCH_GET_IDS }, (_, index) => `record-${index}`),
+      ids: Array.from({ length: MAX_BATCH_LIMIT }, (_, index) => `record-${index}`),
     });
 
     expect(result.success).toBe(true);
@@ -309,14 +309,14 @@ describe('batchGetLibraryRequestSchema', () => {
 
   it('rejects one more submitted id with the named limit code and maximum', () => {
     const result = batchGetLibraryRequestSchema.safeParse({
-      ids: Array.from({ length: MAX_BATCH_GET_IDS + 1 }, (_, index) => `record-${index}`),
+      ids: Array.from({ length: MAX_BATCH_LIMIT + 1 }, (_, index) => `record-${index}`),
     });
 
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0]).toMatchObject({
         path: ['ids'],
-        message: `submit no more than ${MAX_BATCH_GET_IDS} ids per request`,
+        message: `submit no more than ${MAX_BATCH_LIMIT} ids per request`,
         params: { code: 'BATCH_GET_LIMIT_EXCEEDED' },
       });
     }

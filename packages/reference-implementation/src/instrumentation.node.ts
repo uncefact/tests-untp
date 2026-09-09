@@ -17,7 +17,7 @@ import { resolveServiceName } from './lib/observability/resource';
 import { startNodeSdk } from './lib/observability/start-sdk';
 import { apiLogger } from './lib/api/logger';
 import { warnOnRejectedMaxPageLimitOverride } from './lib/api/pagination';
-import { warnOnRejectedMaxBatchGetIdsOverride } from './lib/api/batch-limits';
+import { warnOnRejectedMaxBatchLimitOverride } from './lib/api/batch-limits';
 import { resolveDataEncryptionKey } from './lib/encryption/resolve-data-encryption-key';
 import { validateConfiguredEncryptionKey } from './lib/encryption/encryption-key-boot';
 import { resolveAppUrl } from './lib/config/app-url.config';
@@ -101,9 +101,9 @@ async function startJobQueueOnBoot(): Promise<void> {
 function startOpenTelemetry(): void {
   const sdk = startNodeSdk({ serviceName: resolveServiceName() });
 
-  // Surface an unusable API_MAX_PAGE_LIMIT or API_MAX_BATCH_GET_IDS to the operator once at startup.
+  // Surface an unusable API_MAX_PAGE_LIMIT or API_MAX_BATCH_LIMIT to the operator once at startup.
   warnOnRejectedMaxPageLimitOverride(apiLogger);
-  warnOnRejectedMaxBatchGetIdsOverride(apiLogger);
+  warnOnRejectedMaxBatchLimitOverride(apiLogger);
 
   const shutdown = () => {
     sdk.shutdown().catch((err: unknown) => {

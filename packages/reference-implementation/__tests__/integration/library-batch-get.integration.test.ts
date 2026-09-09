@@ -32,7 +32,7 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 const prisma = createRigClient();
 const OWNER_TENANT_ID = 'library-batch-get-owner';
 const OTHER_TENANT_ID = 'library-batch-get-other';
-const originalBatchLimit = process.env.API_MAX_BATCH_GET_IDS;
+const originalBatchLimit = process.env.API_MAX_BATCH_LIMIT;
 
 type RouteContext = { params: Promise<Record<string, string>>; tenantId: string };
 
@@ -83,8 +83,8 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await prisma.$disconnect();
-  if (originalBatchLimit === undefined) delete process.env.API_MAX_BATCH_GET_IDS;
-  else process.env.API_MAX_BATCH_GET_IDS = originalBatchLimit;
+  if (originalBatchLimit === undefined) delete process.env.API_MAX_BATCH_LIMIT;
+  else process.env.API_MAX_BATCH_LIMIT = originalBatchLimit;
 });
 
 describe('POST /library/batch-get against migrated Postgres', () => {
