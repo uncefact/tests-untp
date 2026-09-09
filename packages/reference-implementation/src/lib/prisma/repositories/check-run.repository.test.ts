@@ -24,6 +24,9 @@ jest.mock('@/lib/jobs/prisma-sql-executor', () => ({
 const mockGetLibraryRecordById = jest.fn();
 jest.mock('./library-record.repository', () => ({
   getLibraryRecordById: (...args: unknown[]) => mockGetLibraryRecordById(...args),
+  // The real helper: recovery's ordered parent lock is asserted through the
+  // transaction client's `$queryRawUnsafe`, which the helper calls.
+  lockLibraryRecordsForUpdate: jest.requireActual('./library-record.repository').lockLibraryRecordsForUpdate,
 }));
 
 import {

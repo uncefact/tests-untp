@@ -1,19 +1,6 @@
 // Mock next/server before importing route handlers
 jest.mock('next/server', () => {
-  class MockNextResponse {
-    status: number;
-    body: unknown;
-    constructor(body: unknown, init?: { status?: number }) {
-      this.body = body;
-      this.status = init?.status ?? 200;
-    }
-    async json() {
-      return this.body;
-    }
-    static json(body: unknown, init?: { status?: number }) {
-      return new MockNextResponse(body, init);
-    }
-  }
+  const { MockNextResponse } = jest.requireActual('../../../../../../__tests__/route-doubles/next-response');
   return { NextResponse: MockNextResponse };
 });
 
@@ -29,7 +16,7 @@ jest.mock('@/lib/api/logger', () => ({
   apiLogger: { child: jest.fn().mockReturnValue(mockLogger) },
 }));
 
-// Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
+// Mock withTenantAuth: skips auth but preserves error handling via handleRouteError
 jest.mock('@/lib/api/with-tenant-auth', () => {
   const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
   return {

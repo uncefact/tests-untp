@@ -1,12 +1,7 @@
-jest.mock('next/server', () => ({
-  NextResponse: {
-    json: (body: unknown, init?: { status?: number; headers?: Record<string, string> }) => ({
-      status: init?.status ?? 200,
-      headers: new Headers(init?.headers),
-      json: async () => body,
-    }),
-  },
-}));
+jest.mock('next/server', () => {
+  const { MockNextResponse } = jest.requireActual('../../../../../../__tests__/route-doubles/next-response');
+  return { NextResponse: MockNextResponse };
+});
 
 jest.mock('@/lib/api/with-tenant-auth', () => {
   const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
@@ -39,6 +34,14 @@ jest.mock('@/lib/prisma/repositories/library-record.repository', () => ({
   updateLibraryRecordAnnotations: (...args: unknown[]) => mockUpdateLibraryRecordAnnotations(...args),
 }));
 
+// The delete use case, including its post-commit durable-copy cleanup, lives in
+// the library module; `delete-library-record.test.ts` covers that behaviour and
+// these tests cover only what the route decides on top of it.
+const mockDeleteLibraryRecordAndCopy = jest.fn();
+jest.mock('@/lib/library/delete-library-record', () => ({
+  deleteLibraryRecordAndCopy: (...args: unknown[]) => mockDeleteLibraryRecordAndCopy(...args),
+}));
+
 const mockToCredentialRecordDetail = jest.fn();
 const mockToCredentialRecord = jest.fn();
 // The route classifies its failures with the real error classes, so only the
@@ -65,7 +68,7 @@ import { PayloadTooLargeError } from '@/lib/api/errors';
 import { CredentialRecordProjectionError, credentialRecordSchema } from '@/lib/library/credential-record-projection';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
 import { LibraryRecordWriteAnomalyError } from '@/lib/prisma/repositories/library-record.repository';
-import { GET, PATCH } from './route';
+import { GET, PATCH, DELETE } from './route';
 
 function request(): Request {
   return {
@@ -218,7 +221,9 @@ function renderedLogArguments(): string {
     }
     return value;
   };
-  return JSON.stringify(render([...loggerCalls.warn.mock.calls, ...loggerCalls.error.mock.calls]));
+  return JSON.stringify(
+    render([...loggerCalls.info.mock.calls, ...loggerCalls.warn.mock.calls, ...loggerCalls.error.mock.calls]),
+  );
 }
 
 async function get(
@@ -237,6 +242,16 @@ beforeEach(() => {
   mockToCredentialRecordDetail.mockReturnValue(RESPONSE);
   mockToCredentialRecord.mockReturnValue(RESPONSE);
   mockUpdateLibraryRecordAnnotations.mockResolvedValue({ outcome: 'updated', view: VIEW });
+  mockDeleteLibraryRecordAndCopy.mockResolvedValue({
+    outcome: 'deleted',
+    storage: {
+      storageUri: 'https://storage.example/A',
+      storageServiceInstanceId: 'storage-instance-A',
+      storageExternalId: 'object-A',
+      storageBucket: 'bucket-A',
+    },
+    cleanup: 'deleted',
+  });
 });
 
 describe('GET /api/v1/library/:id', () => {
@@ -686,5 +701,113 @@ describe('PATCH /api/v1/library/:id', () => {
       'Library record annotation update hit a database error',
     );
     expect(loggerCalls.error).toHaveBeenCalledWith({ err: databaseError }, 'Unhandled database error');
+  });
+});
+
+describe('DELETE /api/v1/library/:id', () => {
+  const storageA = {
+    storageUri: 'https://storage.example/A',
+    storageServiceInstanceId: 'storage-instance-A',
+    storageExternalId: 'object-A',
+    storageBucket: 'bucket-A',
+  };
+
+  function deleteRequest(id = 'record-1'): Request & { json: jest.Mock; text: jest.Mock } {
+    return {
+      method: 'DELETE',
+      url: `http://localhost/api/v1/library/${id}`,
+      headers: new Headers({ 'If-Version': 'must-not-be-read' }),
+      json: jest.fn().mockRejectedValue(new Error('DELETE must not read a body')),
+      text: jest.fn().mockRejectedValue(new Error('DELETE must not read a body')),
+    } as unknown as Request & { json: jest.Mock; text: jest.Mock };
+  }
+
+  function deleteContext(id = 'record-1') {
+    return { tenantId: 'tenant-1', params: Promise.resolve({ id }) };
+  }
+
+  it.each([
+    ['a just-deleted record', { outcome: 'deleted', storage: storageA, cleanup: 'deleted' }],
+    [
+      'a just-deleted record whose cleanup failed',
+      { outcome: 'deleted', storage: storageA, cleanup: 'storage_delete_failed' },
+    ],
+    ['a missing record', { outcome: 'missing' }],
+  ])('returns an empty 204 for %s', async (_name, result) => {
+    mockDeleteLibraryRecordAndCopy.mockResolvedValue(result);
+
+    const response = await DELETE(deleteRequest(), deleteContext());
+
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe('');
+    expect(mockDeleteLibraryRecordAndCopy).toHaveBeenCalledWith({ recordId: 'record-1', tenantId: 'tenant-1' });
+  });
+
+  it('answers a NUL id as an empty 204 without touching the database or storage', async () => {
+    const response = await DELETE(deleteRequest('record-%00'), deleteContext('record-1\0record-2'));
+
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe('');
+    expect(mockDeleteLibraryRecordAndCopy).not.toHaveBeenCalled();
+    expect(renderedLogArguments()).not.toContain('record-1\\u0000record-2');
+  });
+
+  it('returns the named native-record 403 without cleanup', async () => {
+    mockDeleteLibraryRecordAndCopy.mockResolvedValue({ outcome: 'native' });
+
+    const response = await DELETE(deleteRequest(), deleteContext());
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'This is a native credential record; it cannot be removed from the library.',
+      code: 'NATIVE_CREDENTIAL_NOT_DELETABLE',
+    });
+    expect(mockDeleteLibraryRecordAndCopy).toHaveBeenCalledWith({ recordId: 'record-1', tenantId: 'tenant-1' });
+  });
+
+  it.each([
+    ['shape', new LibraryRecordShapeError('record-1', 'has a broken shape')],
+    ['promotion', new Error('promotion failed')],
+    ['unexpected', new Error('unexpected failed')],
+  ])('returns a sanitised 500 for a %s failure before commit, with no audit line', async (_name, error) => {
+    mockDeleteLibraryRecordAndCopy.mockRejectedValue(error);
+
+    const response = await DELETE(deleteRequest(), deleteContext());
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(loggerCalls.info.mock.calls.some((call) => call[1] === 'Library record deleted from database')).toBe(false);
+  });
+
+  it('sanitises database failures and logs the record', async () => {
+    const databaseError = Object.assign(new Error('deadlock detected'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2034',
+      clientVersion: '6.19.2',
+    });
+    mockDeleteLibraryRecordAndCopy.mockRejectedValue(databaseError);
+
+    const response = await DELETE(deleteRequest(), deleteContext());
+
+    expect(response.status).toBe(500);
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      { recordId: 'record-1', tenantId: 'tenant-1' },
+      'Library record delete hit a database error',
+    );
+    expect(loggerCalls.info.mock.calls.some((call) => call[1] === 'Library record deleted from database')).toBe(false);
+  });
+
+  it('does not read a DELETE body or If-Version header', async () => {
+    const req = deleteRequest();
+    const headerRead = jest.spyOn(req.headers, 'get');
+
+    const response = await DELETE(req, deleteContext());
+
+    expect(response.status).toBe(204);
+    expect(req.json).not.toHaveBeenCalled();
+    expect(req.text).not.toHaveBeenCalled();
+    // The header is present on the request; a handler that parsed it would
+    // answer 400 and would have read it.
+    expect(headerRead.mock.calls.map(([name]) => String(name).toLowerCase())).not.toContain('if-version');
   });
 });

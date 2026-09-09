@@ -10,7 +10,7 @@ import {
 } from '../generated';
 import { prisma } from '../prisma';
 import { isTransactionDeadlock, isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
-import { getLibraryRecordById } from './library-record.repository';
+import { getLibraryRecordById, lockLibraryRecordsForUpdate } from './library-record.repository';
 import { prismaSqlExecutor } from '@/lib/jobs/prisma-sql-executor';
 import type { SqlExecutor } from '@/lib/jobs/types';
 import type { VerifyJobReference } from './external-credential.repository';
@@ -288,14 +288,16 @@ async function createReverificationGenerationOnce(
 // ---------------------------------------------------------------------------
 
 /**
- * Runs a recovery transaction once, and once more if Postgres itself reports
- * a deadlock or write conflict. The lock ordering these
- * transactions already use is what keeps a genuine deadlock rare; this is
- * the bounded fallback for the case two transactions still deadlock despite
- * that ordering, since Postgres (not this code) decides which side to
- * abort. Any other error, and a second deadlock in a row, propagates.
+ * Runs a parent-locking transaction (recovery's reserve and finalise, and the
+ * library delete) once, and once more if Postgres itself reports a deadlock
+ * or write conflict. The shared ascending lock order the multi-parent
+ * transactions use is what keeps a genuine deadlock rare; this is the bounded fallback for
+ * the case two transactions still deadlock despite that ordering, since
+ * Postgres (not this code) decides which side to abort. Any other error, and
+ * a second deadlock in a row, propagates. `context.op` names the caller in
+ * the log line's fields.
  */
-async function withDeadlockRetry<T>(
+export async function withDeadlockRetry<T>(
   attempt: () => Promise<T>,
   context: { recordId: string; tenantId: string; op: string },
 ): Promise<T> {
@@ -305,7 +307,7 @@ async function withDeadlockRetry<T>(
     if (!isTransactionDeadlock(error)) throw error;
     logger.warn(
       { recordId: context.recordId, tenantId: context.tenantId, op: context.op },
-      'Recovery transaction deadlocked; retrying once',
+      'Transaction deadlocked; retrying once',
     );
     return attempt();
   }
@@ -608,21 +610,14 @@ async function finaliseRecoveryGenerationAttempt(
         prisma.$transaction(
           async (tx): Promise<CreateReverificationGenerationResult> => {
             const lockIds = [...new Set([input.recordId, ...planned, ...forcedLockIds])].sort();
-            // The requirement is that every finalisation acquires its
-            // parents in one consistent global order, never diverging
-            // orderings across concurrent finalisations: that is what the
-            // deadlock-freedom argument for this transaction actually
-            // depends on. One statement, ascending by id, is the chosen
-            // structural guard that makes a regression a visible edit here
-            // rather than a race that only shows up under contention: a
-            // second statement, or a change to `ORDER BY`, is immediately
-            // legible as a change to this contract, not a proof by itself.
-            const lockedRows = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-              `SELECT "id" FROM "LibraryRecord" WHERE "id" = ANY($1::text[]) AND "tenantId" = $2 ORDER BY "id" ASC FOR UPDATE`,
-              lockIds,
-              input.tenantId,
-            );
-            const lockedIds = new Set(lockedRows.map((row) => row.id));
+            // The requirement is that every writer which locks more than
+            // one parent (this finalisation, the library delete) acquires
+            // them in one consistent global order: that is what the
+            // deadlock-freedom argument for these transactions depends on.
+            // The shared helper issues one statement, ascending by id, so
+            // the order lives in exactly one place and a change to it is a
+            // visible edit there rather than a race under contention.
+            const lockedIds = await lockLibraryRecordsForUpdate(tx, lockIds, input.tenantId);
             if (!lockedIds.has(input.recordId)) return { outcome: 'missing' };
 
             // Test-only seam: lets an integration test hold
