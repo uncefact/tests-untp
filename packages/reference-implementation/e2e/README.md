@@ -18,6 +18,12 @@ Open/closed mode tests validate tenant-specific behaviour: auto-provisioning, te
 
 By default (`E2E_TENANT_MODE=open`), the suite runs API tests + open mode tests. Set `E2E_TENANT_MODE=closed` to run API tests + closed mode tests instead.
 
+## API login
+
+`cy.apiLogin()` performs real Keycloak or Zitadel authentication, returns to a scriptless placeholder at `/`, and validates `/api/auth/session` before API setup starts. Cypress intercepts a single `GET /` during login, and later visits load the real application. Authentication, session and API responses are all real.
+
+Keep API-only specs on that placeholder. Application pages start browser session fetches, and protected pages also fetch DIDs. Those concurrent cookie updates are the suspected cause of the 401s seen during shared setup (#783, #522). Specs that exercise the UI should visit their target page explicitly after API setup. The `cypress/e2e/api/auth_api/api-login.cy.ts` regression runs in both tenant modes and checks real authenticated API calls without background browser requests.
+
 ## Local Testing (Docker Compose)
 
 No `.env.e2e` file is needed — all defaults in `cypress.config.ts` and `cypress/support/config.ts` point to the local Docker Compose services.
