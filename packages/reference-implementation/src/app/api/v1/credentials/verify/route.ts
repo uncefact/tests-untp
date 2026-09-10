@@ -169,7 +169,7 @@ function upstreamFailureResponse(
  *                     message:
  *                       type: string
  *       400:
- *         description: Validation error. A malformed field is named (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format). Private or reserved destinations are refused unless `FETCH_ALLOW_PRIVATE_URLS=true`. A host that does not resolve is a 400 carrying the guard's message when that setting is off, and a 502 when it is on. A 400 also covers a redirect target the caller never submitted: the guard refuses that hop on its scheme or its destination; a destination refusal names the host, a scheme refusal names only the scheme.
+ *         description: Validation error. A malformed field is named (missing or malformed uri, including one carrying userinfo credentials; invalid digestMultibase, hash, or decryptionKey format). Private or reserved destinations are refused unless `FETCH_ALLOW_PRIVATE_URLS=true`. A host that does not resolve is a 400 carrying the guard's message when that setting is off, and a 502 when it is on. A 400 also covers a redirect target the caller never submitted. The guard refuses that hop on its scheme or its destination. A destination refusal names the host, and a scheme refusal names only the scheme.
  *         content:
  *           application/json:
  *             schema:
