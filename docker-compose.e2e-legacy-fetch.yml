@@ -1,0 +1,21 @@
+# Compose override for the open-mode RI E2E run using the v0.4 fetch names.
+services:
+  app:
+    environment:
+      # These non-default values are the migration-guide example values. They
+      # keep the legacy setting fixture distinct from parser defaults.
+      VERIFY_ALLOW_PRIVATE_URLS: 'true'
+      VERIFY_MAX_CREDENTIAL_SIZE: '2048'
+      VERIFY_FETCH_TIMEOUT_MS: '3210'
+      FETCH_ALLOW_PRIVATE_URLS: ''
+      FETCH_MAX_RESPONSE_SIZE: ''
+      FETCH_TIMEOUT_MS: ''
+
+  app-worker:
+    environment:
+      VERIFY_ALLOW_PRIVATE_URLS: 'true'
+      VERIFY_MAX_CREDENTIAL_SIZE: '2048'
+      VERIFY_FETCH_TIMEOUT_MS: '3210'
+      FETCH_ALLOW_PRIVATE_URLS: ''
+      FETCH_MAX_RESPONSE_SIZE: ''
+      FETCH_TIMEOUT_MS: ''

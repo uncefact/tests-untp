@@ -1,0 +1,34 @@
+name: Artefact drift check
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artefacts-drift:
+    name: Check bundled artefacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build untp-utils
+        run: pnpm --filter @uncefact/untp-utils build
+
+      - name: Check bundled artefacts
+        run: pnpm --filter @uncefact/untp-utils artefacts:check

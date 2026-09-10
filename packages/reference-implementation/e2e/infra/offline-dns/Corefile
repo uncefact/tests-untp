@@ -1,0 +1,13 @@
+# CoreDNS template returns NXDOMAIN for every query in each publishing zone.
+# The zone list matches the source hosts in
+# packages/untp-utils/scripts/refresh-artefacts.mjs.
+# https://coredns.io/plugins/template/
+.
+{
+    errors
+    template ANY ANY untp.unece.org test.uncefact.org vocabulary.uncefact.org opensource.unicc.org w3c.github.io www.w3.org {
+        rcode NXDOMAIN
+    }
+    forward . /etc/resolv.conf
+    cache
+}
