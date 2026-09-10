@@ -167,6 +167,31 @@ describe('registerExternalCredentialRequestSchema', () => {
       expect(result.success).toBe(false);
       expect(firstMessage(result)).toMatch(/200/);
     });
+
+    it('rejects an embedded NUL and names the annotation field', () => {
+      const body = validBody();
+      body.annotations.displayName = 'a\0b';
+      const result = registerExternalCredentialRequestSchema.safeParse(body);
+
+      expect(result.success).toBe(false);
+      expect(firstIssue(result)).toMatchObject({
+        path: ['annotations', 'displayName'],
+        message: 'must not contain a NUL character',
+      });
+    });
+
+    it('keeps inner whitespace and Unicode notes with newlines', () => {
+      const body = validBody();
+      body.annotations.displayName = 'Supplier  DCC';
+      body.annotations.notes = 'Réception ✓\nSecond line';
+      const result = registerExternalCredentialRequestSchema.safeParse(body);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.annotations.displayName).toBe(body.annotations.displayName);
+        expect(result.data.annotations.notes).toBe(body.annotations.notes);
+      }
+    });
   });
 
   describe('annotations.declaredCredentialType', () => {
@@ -176,17 +201,36 @@ describe('registerExternalCredentialRequestSchema', () => {
       expect(registerExternalCredentialRequestSchema.safeParse(body).success).toBe(true);
     });
 
-    it('rejects a type outside the core credential types', () => {
+    it.each([
+      ['a string sentinel', 'DPPX'],
+      ['a number', 1],
+      ['null', null],
+      ['an object', { unexpected: true }],
+    ])('rejects %s with the permitted-values message', (_name, value) => {
       const body = validBody();
-      body.annotations.declaredCredentialType = 'DPPX' as CoreCredentialType;
-      expect(registerExternalCredentialRequestSchema.safeParse(body).success).toBe(false);
+      const result = registerExternalCredentialRequestSchema.safeParse({
+        ...body,
+        annotations: { ...body.annotations, declaredCredentialType: value },
+      });
+
+      expect(result.success).toBe(false);
+      expect(firstIssue(result)).toMatchObject({
+        path: ['annotations', 'declaredCredentialType'],
+        message: 'must be one of DFR, DCC, DPP, DTE, DIA',
+      });
     });
 
     it('rejects a missing declaredCredentialType', () => {
       const body = validBody();
       const { declaredCredentialType, ...annotations } = body.annotations;
       void declaredCredentialType;
-      expect(registerExternalCredentialRequestSchema.safeParse({ ...body, annotations }).success).toBe(false);
+      const result = registerExternalCredentialRequestSchema.safeParse({ ...body, annotations });
+
+      expect(result.success).toBe(false);
+      expect(firstIssue(result)).toMatchObject({
+        path: ['annotations', 'declaredCredentialType'],
+        message: 'must be one of DFR, DCC, DPP, DTE, DIA',
+      });
     });
   });
 
@@ -209,6 +253,18 @@ describe('registerExternalCredentialRequestSchema', () => {
       const body = validBody();
       body.annotations.notes = '';
       expect(registerExternalCredentialRequestSchema.safeParse(body).success).toBe(true);
+    });
+
+    it('rejects an embedded NUL and names the annotation field', () => {
+      const body = validBody();
+      body.annotations.notes = 'a\0b';
+      const result = registerExternalCredentialRequestSchema.safeParse(body);
+
+      expect(result.success).toBe(false);
+      expect(firstIssue(result)).toMatchObject({
+        path: ['annotations', 'notes'],
+        message: 'must not contain a NUL character',
+      });
     });
   });
 });
@@ -512,6 +568,25 @@ describe('updateLibraryAnnotationsRequestSchema', () => {
     const result = updateLibraryAnnotationsRequestSchema.safeParse({ declaredCredentialType: 'sentinel-value' });
     expect(result.success).toBe(false);
     expect(firstMessage(result)).toBe('must be one of DFR, DCC, DPP, DTE, DIA');
+  });
+
+  it.each([
+    ['a string sentinel', 'SECRET-VALUE'],
+    ['a number', 1],
+    ['null', null],
+    ['an object', { unexpected: true }],
+  ])('uses the same value-free enum message for %s as registration', (_name, value) => {
+    const body = validBody();
+    const registerResult = registerExternalCredentialRequestSchema.safeParse({
+      ...body,
+      annotations: { ...body.annotations, declaredCredentialType: value },
+    });
+    const patchResult = updateLibraryAnnotationsRequestSchema.safeParse({ declaredCredentialType: value });
+
+    expect(registerResult.success).toBe(false);
+    expect(patchResult.success).toBe(false);
+    expect(firstMessage(registerResult)).toBe('must be one of DFR, DCC, DPP, DTE, DIA');
+    expect(firstMessage(patchResult)).toBe('must be one of DFR, DCC, DPP, DTE, DIA');
   });
 });
 

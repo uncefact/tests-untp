@@ -186,6 +186,54 @@ async function persisted(
   return { created, ...d };
 }
 
+function pipelineLogger(): { info: jest.Mock; warn: jest.Mock; error: jest.Mock } {
+  return jest.requireMock('@/lib/api/logger').apiLogger as {
+    info: jest.Mock;
+    warn: jest.Mock;
+    error: jest.Mock;
+  };
+}
+
+function clearPipelineLoggerMocks(): void {
+  const logger = pipelineLogger();
+  logger.info.mockClear();
+  logger.warn.mockClear();
+  logger.error.mockClear();
+}
+
+function pipelineLoggerCalls(): unknown[][] {
+  const logger = pipelineLogger();
+  return [logger.info, logger.warn, logger.error].flatMap((method) => method.mock.calls);
+}
+
+function loggerValuesForKey(value: unknown, key: string): unknown[] {
+  if (Array.isArray(value)) return value.flatMap((item) => loggerValuesForKey(item, key));
+  if (value === null || typeof value !== 'object') return [];
+
+  return Object.entries(value).flatMap(([name, child]) => [
+    ...(name === key ? [child] : []),
+    ...loggerValuesForKey(child, key),
+  ]);
+}
+
+function assertPipelineLogsOriginOnly(): void {
+  // Mock arguments, not rendered bytes: this pins what the pipeline passes to the logger, so a redacting serialiser would not rescue a leak found here. It also sweeps every argument for the path and token, not only the source field.
+  const calls = pipelineLoggerCalls();
+  const sourceValues = calls.flatMap((call) => loggerValuesForKey(call, 'source'));
+  expect(sourceValues.length).toBeGreaterThan(0);
+  for (const source of sourceValues) expect(source).toBe('https://supplier.example');
+
+  const rendered = calls.map((call) =>
+    JSON.stringify(call, (_key, value) =>
+      value instanceof Error
+        ? { name: value.name, message: value.message, stack: value.stack, cause: value.cause }
+        : value,
+    ),
+  );
+  expect(rendered.join('\n')).not.toContain('SECRET-CAPABILITY-TOKEN');
+  expect(rendered.join('\n')).not.toContain('/credentials/abc');
+}
+
 describe('registerExternalCredential', () => {
   it('registers a plaintext credential as pending with the copy stored encrypted, the fields extracted and the job enqueued', async () => {
     const { created, store, storeBinary, enqueueVerification } = await persisted();
@@ -778,6 +826,119 @@ describe('registerExternalCredential byte fidelity and orphaned copies', () => {
       String(message).includes('the copy is orphaned'),
     );
     expect(orphanLines).toHaveLength(0);
+  });
+});
+
+describe('register pipeline source logging', () => {
+  const sourceUrl = 'https://supplier.example/credentials/abc?token=SECRET-CAPABILITY-TOKEN';
+
+  it('when re-verification refuses the stored source', async () => {
+    clearPipelineLoggerMocks();
+    const d = deps({
+      fetchDocument: fetchFailure({
+        kind: 'rejected',
+        reason: 'source-not-permitted',
+        error: new Error('Hostname resolves to a private or reserved address'),
+      }),
+    });
+
+    const outcome = await settleInRequest(input({ sourceUrl }), d.deps, {
+      mode: 'recover',
+      currentRecordId: 'record-1',
+      holdsIdentity: false,
+      acquisition: { from: 'source' },
+    });
+
+    expect(outcome.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      checks: { retrieval: CheckResult.FAIL },
+      failure: {
+        code: CheckRunFailureCode.RETRIEVAL_FAILED,
+        message: 'Hostname resolves to a private or reserved address',
+        retryable: false,
+      },
+    });
+    expect(d.store).not.toHaveBeenCalled();
+    expect(d.storeBinary).not.toHaveBeenCalled();
+    assertPipelineLogsOriginOnly();
+  });
+
+  it('when the source could not be retrieved', async () => {
+    clearPipelineLoggerMocks();
+    const d = deps({
+      fetchDocument: fetchFailure({ kind: 'failed', reason: 'network', error: new Error('network down') }),
+    });
+
+    const outcome = await settleInRequest(input({ sourceUrl }), d.deps, { mode: 'register' });
+
+    expect(outcome.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      checks: { retrieval: CheckResult.FAIL },
+      failure: {
+        code: CheckRunFailureCode.RETRIEVAL_FAILED,
+        message: 'The source could not be reached. Retry via re-verify once the source is reachable.',
+        retryable: true,
+      },
+    });
+    expect(d.store).not.toHaveBeenCalled();
+    expect(d.storeBinary).not.toHaveBeenCalled();
+    assertPipelineLogsOriginOnly();
+  });
+
+  it('when the content is already registered', async () => {
+    clearPipelineLoggerMocks();
+    const d = deps({ findExistingExternal: async () => 'existing-record' });
+
+    await expect(settleInRequest(input({ sourceUrl }), d.deps, { mode: 'register' })).rejects.toMatchObject({
+      name: 'DuplicateCredentialError',
+      existingRecordId: 'existing-record',
+    });
+    expect(d.store).not.toHaveBeenCalled();
+    expect(d.storeBinary).not.toHaveBeenCalled();
+    assertPipelineLogsOriginOnly();
+  });
+
+  it('when descriptive fields could not be extracted', async () => {
+    clearPipelineLoggerMocks();
+    const noCore = JSON.stringify(
+      envelopedCredential({ ...DPP_PAYLOAD, type: ['VerifiableCredential', 'SomethingElse'] }),
+    );
+    const d = deps({
+      fetchDocument: async () => ({ bytes: bytes(noCore), contentType: 'application/json', finalUrl: 'x' }),
+    });
+
+    const outcome = await settleInRequest(input({ sourceUrl }), d.deps, { mode: 'register' });
+
+    expect(outcome).toMatchObject({
+      contentKind: ExternalContentKind.CREDENTIAL,
+      details: {
+        status: CredentialDetailsStatus.EXTRACTION_FAILED,
+        error: CredentialDetailsError.BRIDGE_ERROR,
+      },
+      checkRun: { state: CheckRunState.PENDING },
+    });
+    expect(d.store).toHaveBeenCalledWith(JSON.parse(noCore), true);
+    assertPipelineLogsOriginOnly();
+  });
+
+  it('when the durable copy could not be stored', async () => {
+    clearPipelineLoggerMocks();
+    const d = deps();
+    d.store.mockRejectedValueOnce(new StorageStoreError(503, 'storage down'));
+
+    const outcome = await settleInRequest(input({ sourceUrl }), d.deps, { mode: 'register' });
+
+    expect(outcome.checkRun).toMatchObject({
+      state: CheckRunState.FAILED,
+      checks: { retrieval: CheckResult.PASS, decryption: CheckResult.NOT_RUN },
+      failure: {
+        code: CheckRunFailureCode.STORAGE_FAILED,
+        message: 'The durable copy could not be written to storage; retry via re-verify once storage recovers.',
+        retryable: true,
+      },
+    });
+    expect(d.store).toHaveBeenCalledTimes(1);
+    assertPipelineLogsOriginOnly();
   });
 });
 

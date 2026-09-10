@@ -1,7 +1,12 @@
 import { ServiceType, AdapterType } from '@uncefact/untp-ri-services';
 import { generateOpenAPISchemas } from './schemas';
-import { CredentialDetailsStatus } from '@/lib/prisma/generated';
+import { CoreCredentialType, CredentialDetailsStatus } from '@/lib/prisma/generated';
 import { collectAdditionalProperties, collectEnums } from './published-document';
+import {
+  REGISTER_DISPLAY_NAME_MAX_LENGTH,
+  REGISTER_NOTES_MAX_LENGTH,
+  REGISTER_SOURCE_URL_MAX_LENGTH,
+} from '@/lib/api/request-schemas/library';
 
 /**
  * Minimal shape for navigating the generated OpenAPI JSON schema in these
@@ -19,6 +24,8 @@ type JsonSchemaObject = {
   description?: string;
   pattern?: string;
   type?: string;
+  allOf?: JsonSchemaObject[];
+  maxLength?: number;
 };
 
 /**
@@ -499,6 +506,34 @@ describe('generateOpenAPISchemas: RegisterExternalCredentialRequest (#955)', () 
     expect(request.properties?.annotations?.properties?.displayName?.description).toContain('not only whitespace');
   });
 
+  it('publishes required annotation fields and credential type values', () => {
+    const annotations = request.properties?.annotations;
+
+    expect([...(annotations?.required ?? [])].sort()).toEqual(['declaredCredentialType', 'displayName']);
+    expect(annotations?.properties?.declaredCredentialType?.enum).toEqual(Object.values(CoreCredentialType));
+  });
+
+  it('publishes the NUL rule exactly once on the register fields', () => {
+    for (const field of ['displayName', 'notes']) {
+      const description = request.properties?.annotations?.properties?.[field]?.description;
+      expect(description?.split('The value cannot contain a NUL character.').length).toBe(2);
+    }
+    expect(request.properties?.annotations?.properties?.displayName?.maxLength).toBe(REGISTER_DISPLAY_NAME_MAX_LENGTH);
+    expect(request.properties?.annotations?.properties?.notes?.maxLength).toBe(REGISTER_NOTES_MAX_LENGTH);
+  });
+
+  it('publishes the source URL bound and URI format through the pipe composition', () => {
+    const sourceUrl = request.properties?.sourceUrl;
+    const alternatives = sourceUrl?.allOf ?? [];
+
+    expect(alternatives).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'string', maxLength: REGISTER_SOURCE_URL_MAX_LENGTH }),
+        expect.objectContaining({ type: 'string', format: 'uri' }),
+      ]),
+    );
+  });
+
   it('publishes the decryption key as a 64-character hexadecimal pattern, in both cases', () => {
     // The key rule is a regex, which the component can carry, so an
     // integrator reads it rather than meeting a 400. Fails if the schema
@@ -527,11 +562,8 @@ describe('generateOpenAPISchemas: UpdateLibraryAnnotationsRequest (#959)', () =>
     expect(request.properties?.notes?.nullable).toBe(true);
   });
 
-  // Three of the four fields are wrapped in a refinement or a nullable before
-  // they reach the component, and the fourth is rebuilt from scratch for its
-  // error map. Each wrap creates a new definition whose own description is
-  // unset, so a published description is a property of how the field is built
-  // and not something the derivation guarantees.
+  // Each field starts from the register definition and is then wrapped for the
+  // PATCH semantics. The descriptions must survive those wrappers.
   it('publishes the register descriptions through the patch wrappers', () => {
     for (const field of ['displayName', 'declaredCredentialType', 'dateReceived', 'notes']) {
       expect(request.properties?.[field]?.description).toEqual(expect.any(String));
@@ -544,6 +576,13 @@ describe('generateOpenAPISchemas: UpdateLibraryAnnotationsRequest (#959)', () =>
     // refined fields owe it (plan G9).
     expect(request.properties?.displayName?.description).toContain('cannot contain a NUL character');
     expect(request.properties?.notes?.description).toContain('cannot contain a NUL character');
+  });
+
+  it('publishes the NUL rule exactly once on both refined fields', () => {
+    for (const field of ['displayName', 'notes']) {
+      const description = request.properties?.[field]?.description;
+      expect(description?.split('The value cannot contain a NUL character.').length).toBe(2);
+    }
   });
 
   it('does not document unknown request keys as rejected at any generated object level', () => {
