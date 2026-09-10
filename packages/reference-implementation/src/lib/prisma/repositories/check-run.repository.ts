@@ -10,7 +10,7 @@ import {
 } from '../generated';
 import { prisma } from '../prisma';
 import { isTransactionDeadlock, isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
-import { getLibraryRecordById, lockLibraryRecordsForUpdate } from './library-record.repository';
+import { lockLibraryRecordsForUpdate } from './library-record.repository';
 import { prismaSqlExecutor } from '@/lib/jobs/prisma-sql-executor';
 import type { SqlExecutor } from '@/lib/jobs/types';
 import type { VerifyJobReference } from './external-credential.repository';
@@ -22,9 +22,19 @@ import {
   promoteExternalCredentialDigest,
   replaceCustody,
   type ExternalDetailsCapture,
+  type ExternalStorageInput,
 } from './external-credential.repository';
 import { apiLogger } from '@/lib/api/logger';
+import { safeError } from '@/lib/api/safe-error';
+import {
+  ABANDONED_CUSTODY_UNKNOWN_MESSAGE,
+  ABANDONED_RUN_MESSAGE,
+  ABANDONED_UNOPENED_COPY_MESSAGE,
+  cannotAcceptSupplierKey,
+  holdsUnopenedCopy,
+} from '@/lib/library/reverify-messages';
 import { CHECK_NAMES, type LibraryCheckName } from '@/lib/library/check-rules';
+import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
 export { CHECK_NAMES } from '@/lib/library/check-rules';
 import type { CredentialOutcome, RecoverInRequestOutcome } from '@/lib/library/register-external-credential';
 
@@ -34,6 +44,19 @@ const logger = apiLogger.child({ module: 'check-run.repository' });
 export type CheckName = LibraryCheckName;
 
 export type CheckResults = Record<CheckName, CheckResult>;
+
+/**
+ * The three checks an acquisition can earn before the shared pipeline runs:
+ * reaching the bytes, proving them intact against the digest recorded for
+ * them, and opening them. Named once over the same vocabulary every other
+ * check projection uses, so a caller carrying a partial result cannot invent
+ * a fourth name or a value outside {@link CheckResult}.
+ *
+ * A `Partial`, not a full {@link CheckResults}: an acquisition reports only
+ * the checks it actually ran, and the settlement it feeds merges them over
+ * {@link noChecksRun}.
+ */
+export type AcquisitionChecks = Partial<Pick<CheckResults, 'retrieval' | 'digest' | 'decryption'>>;
 
 export function noChecksRun(): CheckResults {
   return Object.fromEntries(CHECK_NAMES.map((name) => [name, CheckResult.NOT_RUN])) as CheckResults;
@@ -90,15 +113,48 @@ export type SettleCheckRunFailedInput = CheckRunRef & { checks: CheckResults; fa
 export type CheckRunSettleOutcome = { outcome: 'applied' } | { outcome: 'superseded' } | { outcome: 'missing' };
 
 /**
- * The custody coordinates a re-verification compares before it appends a
- * generation. The tuple is the roster: the type and {@link sameCustody}
- * both derive from it, so a coordinate added here is compared without any
- * further edit. The key envelope is deliberately absent, so a rewrap during
- * preparation does not read as a replaced copy.
+ * The coordinates {@link sameCustody} compares, and the roster the comparison
+ * iterates. A coordinate added to {@link ReverificationCustodySnapshot} and
+ * not added here fails to compile against the assertion below, so the
+ * comparison can never silently stop covering a field the type carries.
  */
-const CUSTODY_FIELDS = ['storageUri', 'storageDigestMultibase', 'storageExternalId'] as const;
+const CUSTODY_FIELDS = [
+  'storageUri',
+  'storageDigestMultibase',
+  'storageExternalId',
+  'decryptionKeyPresent',
+  'encrypted',
+] as const;
 
-export type ReverificationCustodySnapshot = Record<(typeof CUSTODY_FIELDS)[number], string | null>;
+/**
+ * The custody coordinates a re-verification compares before it appends a
+ * generation. {@link CUSTODY_FIELDS} is the roster {@link sameCustody}
+ * iterates, and the assertion below binds the two, so a coordinate added here
+ * is compared without any further edit or does not compile.
+ *
+ * The key ENVELOPE is deliberately absent, so a rewrap during preparation
+ * does not read as a replaced copy; its PRESENCE is a coordinate, because a
+ * copy acquiring a receiver key between the reservation and finalisation is
+ * exactly the custody move this fence exists to catch. Every field is
+ * required: a snapshot that never learned key presence must not compare equal
+ * to one that positively observed none.
+ */
+export type ReverificationCustodySnapshot = {
+  storageUri: string | null;
+  storageDigestMultibase: string | null;
+  storageExternalId: string | null;
+  decryptionKeyPresent: boolean;
+  encrypted: boolean | null;
+};
+
+// The roster and the type name exactly the same coordinates. A field added to
+// one and not the other makes this line the compile error.
+type UncomparedCustodyField = Exclude<keyof ReverificationCustodySnapshot, (typeof CUSTODY_FIELDS)[number]>;
+type UnknownCustodyField = Exclude<(typeof CUSTODY_FIELDS)[number], keyof ReverificationCustodySnapshot>;
+const _custodyRosterMatchesSnapshot: [UncomparedCustodyField, UnknownCustodyField] extends [never, never]
+  ? true
+  : never = true;
+void _custodyRosterMatchesSnapshot;
 
 /**
  * The result of the in-request comparison against the supplier source, and
@@ -122,8 +178,8 @@ type CreateReverificationGenerationBase = {
  * carries it: a native record has no source to compare and its projection
  * would drop the values anyway.
  *
- * The no-copy recovery branch does not use this function at all:
- * it reserves and finalises its own generation through
+ * The recovery branch does not use this function at all, in either
+ * acquisition mode: it reserves and finalises its own generation through
  * {@link reserveRecoveryGeneration} and {@link finaliseRecoveryGeneration}, so
  * this input carries no `prepared` arm any more. This function still serves
  * the native branch and the protected-copy freshness-only branch.
@@ -148,24 +204,42 @@ type ReverificationRow = {
   externalCredential: {
     storageUri: string | null;
     storageDigestMultibase: string | null;
+    storageServiceInstanceId: string | null;
     storageExternalId: string | null;
+    storageBucket: string | null;
     sourceDigest: string | null;
     contentDigest: string | null;
     duplicateOfRecordId: string | null;
+    encrypted: boolean | null;
   } | null;
   checkRuns: Array<{ id: string; generation: number; state: CheckRunState; lastEnqueuedAt: Date | null }>;
 };
 
+/**
+ * Neither child's `decryptionKey` is selected. Custody compares key
+ * PRESENCE, and that boolean is read separately as `IS NOT NULL`
+ * ({@link readKeyPresence}), so the key envelope never enters a row object
+ * the reservation and finalisation transactions hold, and cannot reach a log
+ * through one (ADR-055 decision 1).
+ *
+ * The claim is about those transactions, not about the whole module: reads
+ * elsewhere in the codebase (the record's detail view, which the projection
+ * and the route both use) do carry the envelope by design. What this include
+ * guarantees is that the locked decisions here are made without it.
+ */
 const REVERIFICATION_ROW_INCLUDE = {
   credential: { select: { storageUri: true, digestMultibase: true } },
   externalCredential: {
     select: {
       storageUri: true,
       storageDigestMultibase: true,
+      storageServiceInstanceId: true,
       storageExternalId: true,
+      storageBucket: true,
       sourceDigest: true,
       contentDigest: true,
       duplicateOfRecordId: true,
+      encrypted: true,
     },
   },
   checkRuns: {
@@ -175,6 +249,34 @@ const REVERIFICATION_ROW_INCLUDE = {
   },
 } satisfies Prisma.LibraryRecordInclude;
 
+/** Whether each custody child holds a key, without either envelope. */
+type KeyPresence = { credential: boolean; external: boolean };
+
+const NO_KEY_PRESENT: KeyPresence = { credential: false, external: false };
+
+/**
+ * The key-presence half of the custody tuple, projected in SQL rather than
+ * selected and reduced in JavaScript. Read on the same client as the row it
+ * accompanies, so inside a transaction it sees the same locked state.
+ */
+async function readKeyPresence(
+  client: Pick<Prisma.TransactionClient, '$queryRawUnsafe'>,
+  recordId: string,
+  tenantId: string,
+): Promise<KeyPresence> {
+  const rows = await client.$queryRawUnsafe<Array<{ credential: boolean; external: boolean }>>(
+    `SELECT COALESCE(c."decryptionKey" IS NOT NULL, false) AS "credential",
+            COALESCE(e."decryptionKey" IS NOT NULL, false) AS "external"
+       FROM "LibraryRecord" r
+       LEFT JOIN "Credential" c ON c."id" = r."id" AND c."tenantId" = r."tenantId"
+       LEFT JOIN "ExternalCredential" e ON e."id" = r."id" AND e."tenantId" = r."tenantId"
+      WHERE r."id" = $1 AND r."tenantId" = $2`,
+    recordId,
+    tenantId,
+  );
+  return rows[0] ?? NO_KEY_PRESENT;
+}
+
 /**
  * Locks and rechecks the parent before adding a generation. The transaction
  * deliberately uses Read Committed because each query must see the row after
@@ -183,8 +285,8 @@ const REVERIFICATION_ROW_INCLUDE = {
  * does not create a competing generation.
  *
  * Serves the native branch and the protected-copy freshness-only branch of
- * `reverifyLibraryRecord`. The no-copy recovery branch is a separate
- * reserve-then-finalise pair: it needs the fetch to happen
+ * `reverifyLibraryRecord`. The recovery branch is a separate
+ * reserve-then-finalise pair: it needs the acquisition to happen
  * outside any transaction, which this single-transaction function cannot do.
  */
 export async function createReverificationGeneration(
@@ -202,7 +304,10 @@ export async function createReverificationGeneration(
       'Re-verification insert lost a unique race; reading the winner',
     );
     const result = await resolveCheckRunRaceOutcome(input.recordId, input.tenantId);
-    return result.outcome === 'reserved' ? { outcome: 'superseded', generation: null } : result;
+    if (result.outcome === 'reserved' || result.outcome === 'conflict' || result.outcome === 'not-applicable') {
+      return { outcome: 'superseded', generation: null };
+    }
+    return result;
   }
 }
 
@@ -226,7 +331,7 @@ async function createReverificationGenerationOnce(
 
       const newest = row.checkRuns[0] ?? null;
       const currentGeneration = newest?.generation ?? (row.origin === LibraryRecordOrigin.NATIVE ? 1 : 0);
-      const currentCustody = custodyOf(row);
+      const currentCustody = custodyOf(row, await readKeyPresence(tx, input.recordId, input.tenantId));
       if (newest?.state === CheckRunState.PENDING) return { outcome: 'joined' };
       if (
         row.origin !== input.expectedOrigin ||
@@ -317,18 +422,48 @@ export type ReserveRecoveryGenerationInput = {
   recordId: string;
   tenantId: string;
   expectedGeneration: number;
-  /** Must still be the empty (no-copy) tuple; the caller only reserves for a record it read with no durable copy. */
+  /** The custody observed before the lock. Key-bearing eligible records may be rebased from the locked state. */
   expectedCustody: ReverificationCustodySnapshot;
+  keyBearing?: boolean;
 };
 
 /** The identity facts read under the reservation's own row lock, at the exact moment generation N+1 was claimed. */
 export type ReservedIdentitySnapshot = { contentDigest: string | null; duplicateOfRecordId: string | null };
 
 export type ReserveRecoveryGenerationResult =
-  | { outcome: 'reserved'; generation: number; checkRunId: string; identity: ReservedIdentitySnapshot }
+  | {
+      outcome: 'reserved';
+      generation: number;
+      checkRunId: string;
+      identity: ReservedIdentitySnapshot;
+      /**
+       * The custody this reservation observed under its own parent lock. The
+       * caller selects its acquisition mode from this and hands it back as
+       * the finalisation fence, so it is never optional: falling back to the
+       * pre-lock read is precisely the read this snapshot exists to replace.
+       */
+      custody: ReverificationCustodySnapshot;
+    }
   | { outcome: 'joined' }
+  /**
+   * A key-bearing request that cannot be carried out as sent. `reason`
+   * separates the two states behind that, because the caller's next move
+   * differs: `pending` means a generation is running right now and cannot
+   * consume this key, so wait for it; `race-lost` means this request lost the
+   * generation-index race twice and the winner had already settled by the
+   * time it was read, so nothing is running and the key, never consumed, can
+   * go again at once.
+   *
+   * `generation` is the run that caused the refusal, for the operator log
+   * line the route writes; it is not published to the caller.
+   */
+  | { outcome: 'conflict'; reason: RecoveryConflictReason; generation: number }
+  | { outcome: 'not-applicable' }
   | { outcome: 'superseded'; generation: number | null }
   | { outcome: 'missing' };
+
+/** Why a key-bearing recovery could not be carried out as sent. See {@link ReserveRecoveryGenerationResult}. */
+export type RecoveryConflictReason = 'pending' | 'race-lost';
 
 /**
  * Step 1 of recovery: claims generation N+1 as `PENDING`
@@ -347,6 +482,19 @@ export type ReserveRecoveryGenerationResult =
  */
 export async function reserveRecoveryGeneration(
   input: ReserveRecoveryGenerationInput,
+): Promise<ReserveRecoveryGenerationResult> {
+  return reserveRecoveryGenerationAttempt(input, false);
+}
+
+/**
+ * `raceRetried` is this function's own one-shot budget for re-entering the
+ * locked decision after a unique-index loss, not something a caller
+ * chooses: passing it in would let a caller disable the re-entry or unbound
+ * the recursion, so it stays a private parameter.
+ */
+async function reserveRecoveryGenerationAttempt(
+  input: ReserveRecoveryGenerationInput,
+  raceRetried: boolean,
 ): Promise<ReserveRecoveryGenerationResult> {
   try {
     return await withDeadlockRetry(
@@ -368,9 +516,40 @@ export async function reserveRecoveryGeneration(
 
             const newest = row.checkRuns[0] ?? null;
             const currentGeneration = newest?.generation ?? 0;
-            if (newest?.state === CheckRunState.PENDING) return { outcome: 'joined' };
-            const currentCustody = custodyOf(row);
-            if (currentGeneration !== input.expectedGeneration || !sameCustody(currentCustody, input.expectedCustody)) {
+            const currentCustody = custodyOf(row, await readKeyPresence(tx, input.recordId, input.tenantId));
+            // The published precedence puts rule 4 (a key against a durable
+            // copy that is already receiver-protected, 400) ahead of rule 5 (a
+            // key against a pending generation, 409), and this is the one
+            // place both can be true at once: custody became protected between
+            // the caller's entry read and this lock while a generation was
+            // also pending. Ordered the same way here, so the answer a caller
+            // gets does not depend on which of two concurrent writers happened
+            // to land first. A key that can never be applied to this record is
+            // a permanent refusal; a pending generation is a temporary one,
+            // and telling a caller to wait for something that will not help
+            // them afterwards is the worse of the two answers.
+            if (input.keyBearing === true && cannotAcceptSupplierKey(currentCustody)) {
+              return { outcome: 'not-applicable' };
+            }
+            if (newest?.state === CheckRunState.PENDING) {
+              return input.keyBearing === true
+                ? { outcome: 'conflict', reason: 'pending', generation: newest.generation }
+                : { outcome: 'joined' };
+            }
+            if (
+              currentCustody.storageUri !== null &&
+              !currentCustody.decryptionKeyPresent &&
+              currentCustody.encrypted !== true
+            ) {
+              throw new LibraryRecordShapeError(
+                input.recordId,
+                'holds a stored copy that is neither encrypted nor keyed',
+              );
+            }
+            if (
+              input.keyBearing !== true &&
+              (currentGeneration !== input.expectedGeneration || !sameCustody(currentCustody, input.expectedCustody))
+            ) {
               return { outcome: 'superseded', generation: currentGeneration };
             }
 
@@ -399,6 +578,7 @@ export async function reserveRecoveryGeneration(
                 contentDigest: row.externalCredential?.contentDigest ?? null,
                 duplicateOfRecordId: row.externalCredential?.duplicateOfRecordId ?? null,
               },
+              custody: currentCustody,
             };
           },
           { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 5_000, timeout: 15_000 },
@@ -410,13 +590,51 @@ export async function reserveRecoveryGeneration(
     // Lost the pending-index or generation-key race; another request reserved
     // (or created) first. Read the winner the same way the finalisation
     // catch does.
+    // `error` rather than `err`, reduced by `safeError`: this line is on the
+    // key-bearing path, and pino's error serialiser expands an `err` binding
+    // and walks its whole `cause` chain, which on this path has run with the
+    // supplier's key in scope (ADR-055 decision 1). The thrown value here is
+    // in practice a Prisma unique-constraint violation, which carries no key
+    // material, but the rule holds with no exceptions to remember, and the
+    // surrounding ids and message already make the failure findable.
     logger.warn(
-      { err: error, recordId: input.recordId, tenantId: input.tenantId },
+      { error: safeError(error), recordId: input.recordId, tenantId: input.tenantId },
       'Recovery reservation insert lost a unique race; reading the winner',
     );
-    return resolveCheckRunRaceOutcome(input.recordId, input.tenantId);
+    if (!raceRetried) {
+      return reserveRecoveryGenerationAttempt(input, true);
+    }
+    return resolveCheckRunRaceOutcome(input.recordId, input.tenantId, input.keyBearing === true);
   }
 }
+
+/**
+ * The durable copy a successful key-bearing recovery displaced. Returned so
+ * the caller can remove it once the replacement is committed: it is no longer
+ * named by any row, so nothing else will ever reach it. `storageUri` is a
+ * string because a recovery that replaced nothing reports no retired copy at
+ * all.
+ */
+export type RetiredRecoveryStorage = {
+  storageUri: string;
+  storageServiceInstanceId: string | null;
+  storageExternalId: string | null;
+  storageBucket: string | null;
+};
+
+/**
+ * A finalisation result, plus the retired copy when this call actually
+ * replaced one. Only a `created` outcome can carry it, because only the
+ * branch that commits a custody replacement retires anything, and saying so
+ * in the type is what stops a caller reaching for the field on an outcome
+ * that could never hold it. The property is optional, so a caller that never
+ * looks at it behaves exactly as it did before.
+ */
+export type FinaliseRecoveryGenerationResult =
+  | (Extract<CreateReverificationGenerationResult, { outcome: 'created' }> & {
+      retiredStorage?: RetiredRecoveryStorage;
+    })
+  | Exclude<CreateReverificationGenerationResult, { outcome: 'created' }>;
 
 export type FinaliseRecoveryGenerationInput = {
   recordId: string;
@@ -424,6 +642,13 @@ export type FinaliseRecoveryGenerationInput = {
   /** The exact run {@link reserveRecoveryGeneration} returned. */
   checkRunId: string;
   generation: number;
+  /**
+   * Exactly the tuple {@link reserveRecoveryGeneration} returned from under
+   * its own lock, never the caller's pre-lock read: this is the fence the
+   * finalisation compares the row against, so defaulting it would fence
+   * against a state nobody observed.
+   */
+  expectedCustody: ReverificationCustodySnapshot;
   freshness?: SourceFreshness;
   prepared: RecoverInRequestOutcome;
   enqueue: (sql: SqlExecutor, job: VerifyJobReference) => Promise<void>;
@@ -440,7 +665,14 @@ export type FinaliseRecoveryGenerationInput = {
  */
 export const recoveryFinaliseTestHooks: { afterParentLock?: (recordId: string) => Promise<void> } = {};
 
-type PreparedStorageDiscardReason = 'joined' | 'superseded' | 'missing' | 'transaction-failed' | 'rejected-replacement';
+type PreparedStorageDiscardReason =
+  | 'joined'
+  | 'superseded'
+  | 'missing'
+  | 'transaction-failed'
+  | 'rejected-replacement'
+  | 'conflict'
+  | 'not-applicable';
 
 /**
  * How many lock-discovery restarts one finalisation may spend in total,
@@ -472,9 +704,12 @@ class RecoveryLockDiscoveryMismatchError extends Error {
  * {@link MAX_LOCK_DISCOVERY_RESTARTS} of its lock-discovery restarts and a
  * further mismatch still occurs: the set of records this recovery needs to
  * lock kept changing (a holder or an advisory set moving under it) rather
- * than settling within that bound. `recoverNoCopyRecord` in
+ * than settling within that bound. `recoverExternalRecord` in
  * `reverify-library-record.ts` catches it and settles the reservation
- * `FAILED` and retryable, naming a moving identity set. When that settle
+ * `FAILED` and retryable, naming a moving identity set. This message states
+ * only what happened: the next step is appended by that caller from the
+ * reserved custody, because a record still holding an unopened copy cannot be
+ * taken forward by a plain re-verify. When that settle
  * write is confirmed the request answers 202 with the settled generation,
  * so the caller's next re-verify tries again against whatever the set looks
  * like next; an unconfirmed settle rethrows to the sanitised 500.
@@ -482,7 +717,7 @@ class RecoveryLockDiscoveryMismatchError extends Error {
 export class RecoveryLockDiscoveryExhaustedError extends Error {
   constructor() {
     super(
-      'The records this recovery needs to lock kept changing across a restart; a moving identity set prevented finalisation from acquiring a stable lock set. Re-verify to try again.',
+      'The records this recovery needs to lock kept changing across a restart; a moving identity set prevented finalisation from acquiring a stable lock set.',
     );
     this.name = 'RecoveryLockDiscoveryExhaustedError';
   }
@@ -531,20 +766,58 @@ class RecoveryReservationLostError extends Error {
 }
 
 /**
- * Every write to the claimed run's `CheckRun` row, from either branch of the
- * fetched-content rule, goes through here: an `updateMany` predicated on the
- * same pending state the claim already confirmed, so a write that somehow
- * matches no row (it should not, under the claim's lock) is reported rather
- * than silently doing nothing.
+ * Every write to the claimed run's `CheckRun` row goes through here,
+ * whichever branch made it: the terminal-acquisition settlement and the
+ * moved-identity settlement, which both return before the fetched-content
+ * rule runs at all, as well as that rule's own two branches.
+ *
+ * An `updateMany` predicated on the run's whole identity (id, record,
+ * generation and tenant) and on the same pending, unenqueued state the claim
+ * already confirmed, so a write that somehow matches no row (it should not,
+ * under the claim's lock) is reported rather than silently doing nothing.
+ * Binding the record and the generation, not the id alone, is what stops a
+ * write landing on a run belonging to another record of the same tenant or
+ * to another generation of this one.
  */
+/**
+ * The sticky `decryptionKeyUnused` flag, written from a branch that settles a
+ * failed run and deliberately changes nothing else.
+ *
+ * The flag records that a caller supplied a decryption key an attempt never
+ * needed, and it stays set so the record projection keeps saying so on every
+ * later read (ADR-055). The rejected-replacement and identity-cleared
+ * branches both settle FAILED and return before the finalisation's main
+ * external-row write, so without this call the fact is discarded and the
+ * caller who sent an unnecessary key is never told. That column only: leaving
+ * custody, identity and details exactly as they were is the whole point of
+ * those branches. In the same transaction as the failed run, so the run and
+ * the flag commit together or not at all, and a superseded finalisation (which
+ * rolls its transaction back before reaching either branch) writes neither.
+ */
+async function markDecryptionKeyUnused(
+  tx: Prisma.TransactionClient,
+  input: { recordId: string; tenantId: string },
+  prepared: RecoverInRequestOutcome,
+): Promise<void> {
+  if (prepared.decryptionKeyUnused !== true) return;
+  await tx.externalCredential.update({
+    where: {
+      id_tenantId_origin: { id: input.recordId, tenantId: input.tenantId, origin: LibraryRecordOrigin.EXTERNAL },
+    },
+    data: { decryptionKeyUnused: true },
+  });
+}
+
 async function updateClaimedRun(
   tx: Prisma.TransactionClient,
-  input: { checkRunId: string; tenantId: string },
+  input: { recordId: string; generation: number; checkRunId: string; tenantId: string },
   data: Prisma.CheckRunUpdateManyMutationInput,
 ): Promise<void> {
   const result = await tx.checkRun.updateMany({
     where: {
       id: input.checkRunId,
+      recordId: input.recordId,
+      generation: input.generation,
       tenantId: input.tenantId,
       state: CheckRunState.PENDING,
       lastEnqueuedAt: null,
@@ -555,26 +828,39 @@ async function updateClaimedRun(
 }
 
 /**
- * Step 3 of recovery. Locks the reserved run's parent (and
- * every other `LibraryRecord` the identity reconciliation touches, in id
- * order) and re-fences before writing anything: the run must still
- * be `PENDING` with `lastEnqueuedAt` null, and custody must still be empty.
- * If the fence fails (the sweep settled the reservation as abandoned, or the
- * record moved), any copy the caller's fetch stored is orphan-logged and the
- * current generation is returned rather than attached.
+ * Step 3 of recovery. Locks the reserved run's parent (and every other
+ * `LibraryRecord` the identity reconciliation touches, in id order) and
+ * re-fences before writing anything: the run must still be `PENDING` with
+ * `lastEnqueuedAt` null, and custody must still match `expectedCustody`,
+ * which is the exact tuple the reservation observed under its own lock. That
+ * is empty for a no-copy recovery and the raw copy's coordinates for a
+ * key-bearing one, so the same fence covers both without either caller
+ * stating a rule of its own. If the fence fails (the sweep settled the
+ * reservation as abandoned, or the record's custody moved), any copy this
+ * attempt stored is orphan-logged and the current generation is returned
+ * rather than attached.
  *
- * Otherwise applies the fetched-content rule: an opened
- * credential's identity and details always replace the row's (promoting a
- * relinquished digest's oldest advisory in the same transaction, which bumps
- * every promoted and repointed parent's `updatedAt`); a response that did not
- * open a credential on a row that already holds a content identity is
- * refused without touching that identity, custody or details; a response
- * that did not open a credential on a row with no identity is stored as
- * fetched, exactly as registration does.
+ * Two acquisition modes reach here. Mode A fetched the supplier source and
+ * observed provenance; mode B read the record's own durable copy and
+ * observed no supplier at all, so it writes no `sourceDigest` and no
+ * freshness pair. An acquisition that ended in its own failure (a copy that
+ * could not be read, could not be proven intact, or would not open) settles
+ * that failure's own code, message, retryability and checks and returns
+ * before any content rule applies, so a wrong key is never rewritten as
+ * `DECRYPTION_REQUIRED` and no identity, details or custody column is
+ * touched.
+ *
+ * Otherwise applies the fetched-content rule: an opened credential's identity
+ * and details always replace the row's (promoting a relinquished digest's
+ * oldest advisory in the same transaction, which bumps every promoted and
+ * repointed parent's `updatedAt`); a body that did not open a credential on a
+ * row that already holds a content identity is refused without touching that
+ * identity, custody or details; a body that did not open a credential on a
+ * row with no identity is stored as acquired, exactly as registration does.
  */
 export async function finaliseRecoveryGeneration(
   input: FinaliseRecoveryGenerationInput,
-): Promise<CreateReverificationGenerationResult> {
+): Promise<FinaliseRecoveryGenerationResult> {
   return finaliseRecoveryGenerationAttempt(input, true, [], false, 0);
 }
 
@@ -586,8 +872,12 @@ async function finaliseRecoveryGenerationAttempt(
   promotionRetried: boolean,
   /** Total lock-discovery restarts spent so far, bounded to {@link MAX_LOCK_DISCOVERY_RESTARTS} for the whole finalisation regardless of how many distinct ids triggered it. */
   discoveryRestarts: number,
-): Promise<CreateReverificationGenerationResult> {
+): Promise<FinaliseRecoveryGenerationResult> {
   const observedDigest = input.prepared.contentDigest ?? input.prepared.observedContentDigest;
+  // Set by the one branch that replaces custody, and read after the
+  // transaction commits: a copy is only retired once the write that displaced
+  // it is durable.
+  let retired: RetiredRecoveryStorage | undefined;
   try {
     // Planned with plain (unlocked) reads on the global client, before any
     // transaction opens: this is a caller with no transaction of its own, and
@@ -609,6 +899,16 @@ async function finaliseRecoveryGenerationAttempt(
       () =>
         prisma.$transaction(
           async (tx): Promise<CreateReverificationGenerationResult> => {
+            // First statement in the callback, because `withDeadlockRetry`
+            // re-runs this whole callback after a deadlock and the previous
+            // attempt's writes have been rolled back with it. Without the
+            // reset, an attempt that replaced custody and then deadlocked
+            // leaves this set; a retry that takes a different branch (a
+            // concurrent writer having given the row a content identity in
+            // between) returns 'created' without replacing anything, and the
+            // caller would otherwise receive the first attempt's retired
+            // tuple and remove the record's LIVE copy.
+            retired = undefined;
             const lockIds = [...new Set([input.recordId, ...planned, ...forcedLockIds])].sort();
             // The requirement is that every writer which locks more than
             // one parent (this finalisation, the library delete) acquires
@@ -642,9 +942,11 @@ async function finaliseRecoveryGenerationAttempt(
             // transaction commits or rolls back, and then finds nothing left
             // to match.
             const claimedRun = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-              `SELECT "id" FROM "CheckRun" WHERE "id" = $1 AND "tenantId" = $2 AND "state" = 'PENDING' AND "lastEnqueuedAt" IS NULL FOR UPDATE`,
+              `SELECT "id" FROM "CheckRun" WHERE "id" = $1 AND "recordId" = $2 AND "tenantId" = $3 AND "generation" = $4 AND "state" = 'PENDING' AND "lastEnqueuedAt" IS NULL FOR UPDATE`,
               input.checkRunId,
+              input.recordId,
               input.tenantId,
+              input.generation,
             );
 
             const row = (await tx.libraryRecord.findFirst({
@@ -660,7 +962,8 @@ async function finaliseRecoveryGenerationAttempt(
             // Anything the claim above did not confirm, or custody that
             // moved under this reservation, means the sweep or another actor
             // already settled it, or the record moved.
-            if (claimedRun.length === 0 || current.storageUri !== null) {
+            const observedCustody = custodyOf(row, await readKeyPresence(tx, input.recordId, input.tenantId));
+            if (claimedRun.length === 0 || !sameCustody(observedCustody, input.expectedCustody)) {
               return { outcome: 'superseded', generation: newest?.generation ?? null };
             }
 
@@ -679,21 +982,62 @@ async function finaliseRecoveryGenerationAttempt(
             }
 
             const prepared = input.prepared;
-            // A body was actually fetched: `contentKind` is only meaningful
-            // once this is true. An unobserved outcome (the fetch failed
-            // outright, or the guard refused the source) leaves
-            // `contentKind` undefined, which fails the `!== CREDENTIAL`
-            // check below just as surely as a fetched non-credential body
-            // would; gating on `observed` first stops a retrieval failure on
-            // an identity-holding row from being misreported as
-            // `SOURCE_NOT_CREDENTIAL` with `retrieval: PASS`. An unobserved
-            // outcome instead falls through to the generic path below,
-            // which reads its failure straight off
+            // Two different observations, deliberately split, because
+            // mode B makes one of them and never the other.
+            //
+            // `sourceObserved` means a SUPPLIER was read, which is what
+            // licenses the `sourceDigest` overwrite and the `sourceChanged` /
+            // `lastSourceCheckAt` freshness pair. Only an acquisition whose
+            // mode is `source` carries a digest, so a stored-copy attempt
+            // cannot reach those writes at all.
+            //
+            // `contentObserved` means a BODY was classified, which is what
+            // licenses the identity, `encrypted`, `contentKind` and details
+            // writes. Mode B does make this observation on a successful
+            // decrypt, so it does write those. An outcome that reached no
+            // body (a failed fetch, a failed or unprovable stored read) and
+            // one that reached a body it could not open (a wrong key, a
+            // corrupt envelope) both leave `contentKind` undefined, and both
+            // fall through to a branch that reads the failure straight off
             // `prepared.checkRun` and touches no custody, identity or detail
-            // column, exactly as library.md step 5's fourth bullet requires.
-            const observed = prepared.sourceDigest !== undefined;
-            const notOpened = observed && prepared.contentKind !== ExternalContentKind.CREDENTIAL;
+            // column. Gating on this first is what stops a retrieval failure
+            // on an identity-holding row being misreported as
+            // `SOURCE_NOT_CREDENTIAL` with `retrieval: PASS`.
+            const sourceObserved = prepared.acquisition.mode === 'source';
+            const contentObserved = prepared.contentKind !== undefined;
             const holdsIdentity = current.contentDigest !== null || current.duplicateOfRecordId !== null;
+
+            // A stored-copy read, integrity or decrypt failure is already
+            // classified by the recovery attempt. It must not be
+            // reinterpreted as a source replacement failure, and it cannot
+            // have earned any content metadata or freshness observation.
+            //
+            // Defence in depth, and deliberately not mutation-provable today:
+            // the rejected-replacement branch below already defers to
+            // `prepared.checkRun.failure` for a FAILED run, and its freshness
+            // writes are gated on `sourceObserved`, which a stored-copy
+            // acquisition can never set. Removing this branch therefore writes
+            // the same row for every input the types admit. It earns its place
+            // by making the rule explicit rather than a coincidence of two
+            // other branches, and it is the type predicate below, not a test,
+            // that enforces reading `failure` off a narrowed FAILED run.
+            if (isTerminalAcquisitionFailure(prepared)) {
+              const now = new Date(Date.now());
+              await updateClaimedRun(tx, input, {
+                state: CheckRunState.FAILED,
+                ...noChecksRun(),
+                ...prepared.checkRun.checks,
+                failureCode: prepared.checkRun.failure.code,
+                failureMessage: prepared.checkRun.failure.message,
+                failureRetryable: prepared.checkRun.failure.retryable,
+                sourceChanged: null,
+                lastSourceCheckAt: null,
+                completedAt: now,
+              });
+              return { outcome: 'created' as const, generation: input.generation, checkRunId: input.checkRunId };
+            }
+
+            const notOpened = contentObserved && prepared.contentKind !== ExternalContentKind.CREDENTIAL;
 
             // The store was skipped in-request because the reservation's own
             // snapshot already held an identity, so this prepared failure was
@@ -708,18 +1052,39 @@ async function finaliseRecoveryGenerationAttempt(
             // nothing else, so a re-verify's honest retry is what actually
             // fetches this source again.
             if (prepared.storageSkipped === 'identity-held' && !holdsIdentity) {
+              if (prepared.acquisition.mode === 'stored-copy' && prepared.checkRun.state === CheckRunState.FAILED) {
+                const now = new Date(Date.now());
+                await updateClaimedRun(tx, input, {
+                  state: CheckRunState.FAILED,
+                  ...noChecksRun(),
+                  ...prepared.checkRun.checks,
+                  failureCode: prepared.checkRun.failure.code,
+                  failureMessage: prepared.checkRun.failure.message,
+                  failureRetryable: prepared.checkRun.failure.retryable,
+                  sourceChanged: null,
+                  lastSourceCheckAt: null,
+                  completedAt: now,
+                });
+                await markDecryptionKeyUnused(tx, input, prepared);
+                return { outcome: 'created' as const, generation: input.generation, checkRunId: input.checkRunId };
+              }
               const now = new Date(Date.now());
               await updateClaimedRun(tx, input, {
                 state: CheckRunState.FAILED,
                 ...noChecksRun(),
+                ...prepared.checkRun.checks,
                 // "Nothing else written" for this branch means no custody,
-                // identity or details column, not the freshness pair: a
-                // fetch genuinely ran and was observed here, exactly as the
-                // rejected-replacement branch below, so the same pair is
-                // stamped the same way.
+                // identity or details column, not the freshness pair. This
+                // is reached only after the stored-copy sub-branch above has
+                // returned, so a supplier fetch genuinely ran and was
+                // observed, exactly as in the rejected-replacement branch
+                // below, and the same pair is stamped the same way. If that
+                // guard above is ever relaxed, this stamp stops being true
+                // and has to move behind `sourceObserved` as the
+                // rejected-replacement branch's already does.
                 sourceChanged:
                   input.freshness === undefined
-                    ? prepared.sourceDigest !== undefined && prepared.sourceDigest !== current.sourceDigest
+                    ? sourceObserved && sourceDigestOf(prepared) !== current.sourceDigest
                     : input.freshness.sourceChanged,
                 lastSourceCheckAt: input.freshness?.checkedAt ?? now,
                 failureCode: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
@@ -728,6 +1093,7 @@ async function finaliseRecoveryGenerationAttempt(
                 failureRetryable: true,
                 completedAt: now,
               });
+              await markDecryptionKeyUnused(tx, input, prepared);
               return { outcome: 'created' as const, generation: input.generation, checkRunId: input.checkRunId };
             }
 
@@ -738,22 +1104,26 @@ async function finaliseRecoveryGenerationAttempt(
               // protect either. Custody, identity and details are left exactly
               // as they were; the copy the caller may have stored is an orphan.
               const now = new Date(Date.now());
-              const failure = rejectedReplacementFailure(prepared);
+              const failure =
+                prepared.checkRun.state === CheckRunState.FAILED
+                  ? prepared.checkRun.failure
+                  : rejectedReplacementFailure(prepared);
               await updateClaimedRun(tx, input, {
                 state: CheckRunState.FAILED,
                 ...noChecksRun(),
-                retrieval: CheckResult.PASS,
-                decryption: prepared.encrypted === true ? CheckResult.FAIL : CheckResult.NOT_RUN,
-                sourceChanged:
-                  input.freshness === undefined
-                    ? prepared.sourceDigest !== undefined && prepared.sourceDigest !== current.sourceDigest
-                    : input.freshness.sourceChanged,
-                lastSourceCheckAt: input.freshness?.checkedAt ?? now,
+                ...prepared.checkRun.checks,
+                sourceChanged: sourceObserved
+                  ? input.freshness === undefined
+                    ? sourceDigestOf(prepared) !== current.sourceDigest
+                    : input.freshness.sourceChanged
+                  : null,
+                lastSourceCheckAt: sourceObserved ? input.freshness?.checkedAt ?? now : null,
                 failureCode: failure.code,
                 failureMessage: failure.message,
                 failureRetryable: failure.retryable,
                 completedAt: now,
               });
+              await markDecryptionKeyUnused(tx, input, prepared);
               // The generation itself is created successfully (outcome
               // 'created'), so the generic post-transaction orphan report below
               // (gated on a non-'created' outcome) never runs for this branch.
@@ -768,17 +1138,29 @@ async function finaliseRecoveryGenerationAttempt(
                 tenantId: input.tenantId,
                 storage: prepared.storage,
               });
+              // Captured inside the branch that actually replaced custody,
+              // never from the outcome alone: the rejected-replacement branch
+              // above also reaches a 'created' outcome with a stored copy,
+              // and there the record KEEPS its existing copy. Capturing it
+              // there would name a live copy as retired, and the caller
+              // REMOVES what this names, so it would delete the record's only
+              // copy.
+              retired = retiredCopyOf(current, prepared.storage);
             }
 
-            const identity = observed ? await reconcileIdentity(tx, input, current, prepared, lockedIds) : undefined;
+            const identity =
+              contentObserved && prepared.contentKind === ExternalContentKind.CREDENTIAL
+                ? await reconcileIdentity(tx, input, current, prepared, lockedIds)
+                : undefined;
             const externalData = {
-              ...(observed
+              ...(contentObserved
                 ? {
-                    sourceDigest: prepared.sourceDigest,
+                    ...(sourceObserved ? { sourceDigest: sourceDigestOf(prepared) } : {}),
                     encrypted: prepared.encrypted,
                     contentKind: prepared.contentKind,
                   }
                 : {}),
+              ...(prepared.decryptionKeyUnused === true ? { decryptionKeyUnused: true } : {}),
               ...(identity ?? {}),
             };
             if (Object.keys(externalData).length > 0) {
@@ -809,7 +1191,7 @@ async function finaliseRecoveryGenerationAttempt(
             // LibraryRecord row alone entirely: the failed attempt is recorded by
             // the generation row, not by touching descriptive fields or the
             // details status on a record whose source was never actually read.
-            if (observed) {
+            if (contentObserved) {
               const details = detailsColumns(prepared.details);
               await tx.libraryRecord.update({
                 where: { id_tenantId: { id: input.recordId, tenantId: input.tenantId } },
@@ -822,6 +1204,12 @@ async function finaliseRecoveryGenerationAttempt(
               state: prepared.checkRun.state,
               ...noChecksRun(),
               ...prepared.checkRun.checks,
+              // Gated on the freshness pair the caller passed, not on what
+              // the acquisition observed: a mode A fetch that returned
+              // nothing still ATTEMPTED a supplier read, and the contract
+              // records that attempt as `sourceChanged: null` with a
+              // timestamp. Mode B passes no freshness at all, so both stay
+              // null there, which is what R1 requires.
               sourceChanged: input.freshness?.sourceChanged ?? null,
               lastSourceCheckAt: input.freshness?.checkedAt ?? null,
               ...(prepared.checkRun.state === CheckRunState.FAILED
@@ -859,6 +1247,7 @@ async function finaliseRecoveryGenerationAttempt(
       { recordId: input.recordId, tenantId: input.tenantId, op: 'finalise' },
     );
     if (result.outcome !== 'created') reportPreparedStorage(input, input.prepared, result.outcome);
+    else if (retired !== undefined) return { ...result, retiredStorage: retired };
     return result;
   } catch (error) {
     if (error instanceof RecoveryReservationLostError) {
@@ -981,17 +1370,31 @@ async function finaliseRecoveryGenerationAttempt(
     // Wrapped so a throw from the post-rollback read still reports the
     // orphan before propagating.
     try {
+      // Reduced for the same reason the reservation's own race line is: this
+      // is the key-bearing path, and an unreduced `err` binding hands pino
+      // the whole cause chain to expand (ADR-055 decision 1).
       logger.warn(
-        { err: error, recordId: input.recordId, tenantId: input.tenantId },
+        { error: safeError(error), recordId: input.recordId, tenantId: input.tenantId },
         'Recovery finalisation insert lost a unique race; reading the winner',
       );
+      // Called without `keyBearing`, so a pending winner reads as `joined`
+      // even for a request that carried a key. That is deliberate and it is
+      // not a dropped key: by this point the acquisition has already run and
+      // the key has already been consumed, and this call neither reserves nor
+      // re-acquires anything. The label is a projection of what the
+      // caller should poll, not a statement that the key was refused. The
+      // reservation path is the one that must distinguish them, and it passes
+      // the flag.
       const result = await resolveCheckRunRaceOutcome(input.recordId, input.tenantId);
       reportPreparedStorage(
         input,
         input.prepared,
         result.outcome === 'reserved' ? 'transaction-failed' : result.outcome,
       );
-      return result.outcome === 'reserved' ? { outcome: 'superseded', generation: null } : result;
+      if (result.outcome === 'reserved' || result.outcome === 'conflict' || result.outcome === 'not-applicable') {
+        return { outcome: 'superseded', generation: null };
+      }
+      return result;
     } catch (readError) {
       reportPreparedStorage(input, input.prepared, 'transaction-failed');
       throw readError;
@@ -1059,6 +1462,35 @@ async function planRecoveryLockCandidates(
   }
   ids.delete(recordId);
   return [...ids];
+}
+
+/**
+ * The supplier digest this attempt observed, or null when it observed no
+ * supplier. Narrowing on the acquisition's own discriminant, so a
+ * stored-copy attempt cannot reach a digest it never computed.
+ */
+function sourceDigestOf(prepared: RecoverInRequestOutcome): string | null {
+  return prepared.acquisition.mode === 'source' ? prepared.acquisition.sourceDigest : null;
+}
+
+/**
+ * An acquisition that reached its own end without producing a body to
+ * classify: the reserved copy could not be read, could not be proven intact,
+ * or would not open. Every one of those settles the code, message,
+ * retryability and checks the attempt already decided, and nothing else.
+ *
+ * A type predicate rather than a hoisted boolean, so the settlement below
+ * reads `failure` off a narrowed `FAILED` run instead of asserting it is
+ * there three times.
+ */
+function isTerminalAcquisitionFailure(prepared: RecoverInRequestOutcome): prepared is RecoverInRequestOutcome & {
+  checkRun: { state: typeof CheckRunState.FAILED; checks: AcquisitionChecks; failure: CheckRunFailure };
+} {
+  return (
+    prepared.acquisition.mode === 'stored-copy' &&
+    prepared.contentKind === undefined &&
+    prepared.checkRun.state === CheckRunState.FAILED
+  );
 }
 
 function rejectedReplacementFailure(prepared: RecoverInRequestOutcome): CheckRunFailure {
@@ -1286,6 +1718,42 @@ function reportPreparedStorage(
 }
 
 /**
+ * The object a custody replacement displaced, or `undefined` when it
+ * displaced nothing.
+ *
+ * Read from the row this transaction locked rather than from the caller's
+ * pre-lock snapshot. The fence has already proved the two agree on the
+ * coordinates it compares, but that snapshot carries neither the bucket nor
+ * the service instance, and a removal cannot run without both.
+ *
+ * A replacement naming the object it displaced retires nothing: what the
+ * caller does with this is delete it, so returning the live copy here would
+ * destroy the record's only copy. The storage adapter mints a fresh object id
+ * for every store, so this guards against a future adapter rather than an
+ * observed case.
+ */
+function retiredCopyOf(
+  current: {
+    storageUri: string | null;
+    storageServiceInstanceId: string | null;
+    storageExternalId: string | null;
+    storageBucket: string | null;
+  },
+  replacement: ExternalStorageInput,
+): RetiredRecoveryStorage | undefined {
+  if (current.storageUri === null) return undefined;
+  if (current.storageExternalId === replacement.externalId && current.storageBucket === (replacement.bucket ?? null)) {
+    return undefined;
+  }
+  return {
+    storageUri: current.storageUri,
+    storageServiceInstanceId: current.storageServiceInstanceId,
+    storageExternalId: current.storageExternalId,
+    storageBucket: current.storageBucket,
+  };
+}
+
+/**
  * Reads the run that won a lost CheckRun-index race, and translates it to the
  * outcome a caller reports. Shared by {@link reserveRecoveryGeneration} and
  * {@link finaliseRecoveryGenerationAttempt}'s non-content-digest catch.
@@ -1296,42 +1764,122 @@ function reportPreparedStorage(
 async function resolveCheckRunRaceOutcome(
   recordId: string,
   tenantId: string,
+  keyBearing = false,
 ): Promise<
   | { outcome: 'joined' }
+  | { outcome: 'conflict'; reason: RecoveryConflictReason; generation: number }
+  | { outcome: 'not-applicable' }
   | { outcome: 'superseded'; generation: number | null }
   | { outcome: 'missing' }
-  | { outcome: 'reserved'; generation: number; checkRunId: string; identity: ReservedIdentitySnapshot }
+  | {
+      outcome: 'reserved';
+      generation: number;
+      checkRunId: string;
+      identity: ReservedIdentitySnapshot;
+      custody: ReverificationCustodySnapshot;
+    }
 > {
   const newest = await findLatestCheckRun(recordId, tenantId);
   if (newest === null) {
-    const current = await getLibraryRecordById(recordId, tenantId);
-    return current === null ? { outcome: 'missing' } : { outcome: 'superseded', generation: null };
+    return (await readRecordEligibility(recordId, tenantId)) === null
+      ? { outcome: 'missing' }
+      : { outcome: 'superseded', generation: null };
   }
-  return newest.state === CheckRunState.PENDING
-    ? { outcome: 'joined' }
-    : { outcome: 'superseded', generation: newest.generation };
+  if (!keyBearing) {
+    return newest.state === CheckRunState.PENDING
+      ? { outcome: 'joined' }
+      : { outcome: 'superseded', generation: newest.generation };
+  }
+  // Rule 4 before rule 5, matching the published precedence and the locked
+  // reservation above: a key this record can never accept is answered as such
+  // whether or not a generation also happens to be pending.
+  const eligibility = await readRecordEligibility(recordId, tenantId);
+  if (
+    eligibility !== null &&
+    eligibility.origin === LibraryRecordOrigin.EXTERNAL &&
+    // This read is a key-presence projection with no custody beside it, so
+    // it passes no `storageUri`. The predicate's docblock carries why that
+    // is safe, and names the other two sites that decide the same rule.
+    cannotAcceptSupplierKey({ decryptionKeyPresent: eligibility.keyPresent })
+  ) {
+    return { outcome: 'not-applicable' };
+  }
+  if (newest.state === CheckRunState.PENDING) {
+    return { outcome: 'conflict', reason: 'pending', generation: newest.generation };
+  }
+  // The winner has settled and the record is still eligible, so this
+  // request's key was never consumed by anything. `superseded` would be
+  // answered `202` with the winner's envelope, which a caller cannot tell
+  // apart from their own key having been applied. `conflict` says what
+  // actually happened, and `race-lost` is what makes the caller's message
+  // say the key was not used rather than telling them to wait for a
+  // settlement that has already happened.
+  return { outcome: 'conflict', reason: 'race-lost', generation: newest.generation };
 }
 
-function custodyOf(row: ReverificationRow): ReverificationCustodySnapshot {
+/**
+ * The two facts this resolver needs about the record itself: whether it still
+ * exists, and whether an external row already holds a receiver key.
+ *
+ * Read through {@link readKeyPresence} and a narrow origin select rather than
+ * through the record's detail view, which returns the full Prisma rows and so
+ * loads both key envelopes into memory. Nothing here logs them, so the detail
+ * view was a consistency gap rather than a leak; keeping every read of this
+ * predicate on the same projection is what makes
+ * {@link REVERIFICATION_ROW_INCLUDE}'s claim about this module true rather
+ * than nearly true. Two statements on the pooled client, not one transaction:
+ * this runs after a rolled-back attempt, holds no lock and decides nothing
+ * that a lock would protect.
+ */
+async function readRecordEligibility(
+  recordId: string,
+  tenantId: string,
+): Promise<{ origin: LibraryRecordOrigin; keyPresent: boolean } | null> {
+  const record = await prisma.libraryRecord.findFirst({
+    where: { id: recordId, tenantId },
+    select: { origin: true },
+  });
+  if (record === null) return null;
+  const keys = await readKeyPresence(prisma, recordId, tenantId);
+  return {
+    origin: record.origin,
+    keyPresent: record.origin === LibraryRecordOrigin.NATIVE ? keys.credential : keys.external,
+  };
+}
+
+function custodyOf(row: ReverificationRow, keys: KeyPresence): ReverificationCustodySnapshot {
   if (row.origin === LibraryRecordOrigin.NATIVE) {
-    if (row.credential === null) return { storageUri: null, storageDigestMultibase: null, storageExternalId: null };
+    if (row.credential === null) return emptyCustody();
     return {
       storageUri: row.credential.storageUri,
       storageDigestMultibase: row.credential.digestMultibase,
       storageExternalId: null,
+      decryptionKeyPresent: keys.credential,
+      encrypted: null,
     };
   }
-  if (row.externalCredential === null)
-    return { storageUri: null, storageDigestMultibase: null, storageExternalId: null };
+  if (row.externalCredential === null) return emptyCustody();
   return {
     storageUri: row.externalCredential.storageUri,
     storageDigestMultibase: row.externalCredential.storageDigestMultibase,
     storageExternalId: row.externalCredential.storageExternalId,
+    decryptionKeyPresent: keys.external,
+    encrypted: row.externalCredential.encrypted,
   };
 }
 
 function sameCustody(a: ReverificationCustodySnapshot, b: ReverificationCustodySnapshot): boolean {
   return CUSTODY_FIELDS.every((field) => a[field] === b[field]);
+}
+
+function emptyCustody(): ReverificationCustodySnapshot {
+  return {
+    storageUri: null,
+    storageDigestMultibase: null,
+    storageExternalId: null,
+    decryptionKeyPresent: false,
+    encrypted: null,
+  };
 }
 
 /**
@@ -1419,6 +1967,66 @@ export async function findAbandonedPendingCheckRuns(cutoff: Date, limit: number)
 }
 
 /**
+ * The custody facts that decide what an abandoned run's caller should do
+ * next, projected rather than selected: `decryptionKeyPresent` is the
+ * key column's IS NOT NULL, so the envelope itself never enters this row
+ * object and can never reach a log from here.
+ */
+type AbandonedRunCustody = {
+  origin: LibraryRecordOrigin;
+  storageUri: string | null;
+  encrypted: boolean | null;
+  decryptionKeyPresent: boolean;
+};
+
+/**
+ * What to tell the caller of a generation the sweep is settling. A record
+ * still holding an unopened encrypted copy cannot be taken forward by a plain
+ * re-verify (that is refused `DECRYPTION_REQUIRED` before any fetch), so it
+ * is told to send its key again. Every other record, native or already
+ * receiver-protected included, gets the generic message: a native copy's key
+ * is this service's own and a protected external copy's key is already held,
+ * so neither caller has a key to resend and asking for one would be wrong.
+ *
+ * A record whose custody cannot be read at all is settled anyway, with a
+ * third message that names both moves. The settlement must still happen: a
+ * failed read of the parent is not a reason to leave the run PENDING for
+ * ever. But the generic message would misdirect exactly the unopened-copy
+ * record this feature exists for, and the resend message would misdirect
+ * every native and receiver-protected one, so a message that covers both is
+ * the honest projection of a read that established neither.
+ */
+async function abandonedRunMessage(run: CheckRun): Promise<string> {
+  let custody: AbandonedRunCustody | undefined;
+  try {
+    const rows = await prisma.$queryRawUnsafe<AbandonedRunCustody[]>(
+      `SELECT r."origin" AS "origin",
+              e."storageUri" AS "storageUri",
+              e."encrypted" AS "encrypted",
+              (e."decryptionKey" IS NOT NULL) AS "decryptionKeyPresent"
+         FROM "LibraryRecord" r
+         LEFT JOIN "ExternalCredential" e ON e."id" = r."id" AND e."tenantId" = r."tenantId"
+        WHERE r."id" = $1 AND r."tenantId" = $2`,
+      run.recordId,
+      run.tenantId,
+    );
+    custody = rows[0];
+  } catch (error) {
+    logger.warn(
+      { error: safeError(error), recordId: run.recordId, tenantId: run.tenantId },
+      "An abandoned run's custody could not be read; settling it with resume guidance that names both moves",
+    );
+    return ABANDONED_CUSTODY_UNKNOWN_MESSAGE;
+  }
+  if (custody === undefined) return ABANDONED_CUSTODY_UNKNOWN_MESSAGE;
+  if (custody.origin !== LibraryRecordOrigin.EXTERNAL) return ABANDONED_RUN_MESSAGE;
+  // The same predicate the request path's settled failures pick their own
+  // guidance with, so the sweep and the request can never disagree about
+  // which records have to resend a key.
+  return holdsUnopenedCopy(custody) ? ABANDONED_UNOPENED_COPY_MESSAGE : ABANDONED_RUN_MESSAGE;
+}
+
+/**
  * Settles one abandoned generation with the state guard used by worker
  * results, and rechecks the abandonment predicate itself inside the UPDATE
  * (the sweep fix). Without that recheck, a reservation finalised
@@ -1426,8 +2034,17 @@ export async function findAbandonedPendingCheckRuns(cutoff: Date, limit: number)
  * refreshed by a real enqueue) would still be overwritten by a settlement
  * based on the stale selection. `cutoff` is the same value the caller
  * selected this run with.
+ *
+ * The resume guidance is chosen from the record's own custody
+ * ({@link abandonedRunMessage}) rather than being one sentence for every
+ * abandonment, because an interrupted key-bearing recovery leaves a record a
+ * plain re-verify cannot take forward. The custody read is advisory and sits
+ * outside the guarded UPDATE, whose predicate is unchanged: a reservation
+ * finalised in the meantime still wins, and this settlement then writes
+ * nothing at all.
  */
 export async function settleAbandonedCheckRun(run: CheckRun, cutoff: Date): Promise<CheckRunSettleOutcome> {
+  const failureMessage = await abandonedRunMessage(run);
   const updated = await prisma.checkRun.updateMany({
     where: {
       id: run.id,
@@ -1439,8 +2056,7 @@ export async function settleAbandonedCheckRun(run: CheckRun, cutoff: Date): Prom
       state: CheckRunState.FAILED,
       ...checksOf(run),
       failureCode: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
-      failureMessage:
-        'The verification job did not report a result within the expected window. Re-verify to run it again.',
+      failureMessage,
       failureRetryable: true,
       completedAt: new Date(Date.now()),
     },

@@ -591,9 +591,14 @@ export function toCredentialRecord(
     });
   }
   if (external.decryptionKeyUnused) {
+    // Past tense, and about a particular past attempt rather than the record
+    // as it stands. The flag is only ever set, never cleared, so a record
+    // whose source later served ciphertext that a subsequent recovery opened
+    // keeps this warning. A present-tense sentence ("the source is plaintext")
+    // would then be asserting something no longer true.
     warnings.push({
       code: 'DECRYPTION_KEY_UNUSED',
-      message: 'A decryption key was supplied but the source was plaintext, so the key was not used.',
+      message: 'A supplied decryption key was not needed on an earlier attempt.',
     });
   }
   if (parent.coreCredentialType !== null && parent.coreCredentialType !== external.declaredCredentialType) {

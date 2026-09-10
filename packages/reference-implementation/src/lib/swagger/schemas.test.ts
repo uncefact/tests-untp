@@ -499,13 +499,19 @@ describe('generateOpenAPISchemas: RegisterExternalCredentialRequest (#955)', () 
     expect(request.properties?.annotations?.properties?.displayName?.description).toContain('not only whitespace');
   });
 
-  it('publishes the decryption key as a 64-character hexadecimal pattern', () => {
+  it('publishes the decryption key as a 64-character hexadecimal pattern, in both cases', () => {
     // The key rule is a regex, which the component can carry, so an
     // integrator reads it rather than meeting a 400. Fails if the schema
     // goes back to a length-bounded free string.
+    //
+    // Both cases, because the generator drops the regex's `i` flag: a
+    // lowercase-only class published a pattern stricter than the rule the
+    // route enforces, so a generated client or a schema-validating gateway
+    // would refuse an uppercase key this endpoint accepts.
     const decryptionKey = request.properties?.sourceEncryption?.properties?.decryptionKey;
-    expect(decryptionKey?.pattern).toBe('^[a-f0-9]{64}$');
+    expect(decryptionKey?.pattern).toBe('^[a-fA-F0-9]{64}$');
     expect(decryptionKey?.description).toContain('64 hexadecimal characters');
+    expect(new RegExp(decryptionKey?.pattern as string).test('A1B2C3D4'.repeat(8))).toBe(true);
   });
 });
 

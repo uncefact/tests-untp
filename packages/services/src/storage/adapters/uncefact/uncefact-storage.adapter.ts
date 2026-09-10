@@ -10,6 +10,36 @@ import { EncryptionAlgorithm } from '../../../encryption/encryption.interface.js
 import type { UncefactStorageConfig } from './uncefact-storage.schema.js';
 import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './uncefact-storage.schema.js';
 
+/** The closed set of reasons a successful storage response can be refused. */
+type StorageResponseClassification =
+  | 'invalid-json'
+  | 'invalid-body'
+  | 'invalid-uri'
+  | 'invalid-decryption-key'
+  | 'invalid-digest'
+  | 'invalid-hash'
+  | 'missing-digest'
+  | 'invalid-response';
+
+/**
+ * A 2xx response whose body this adapter cannot use. Thrown by the digest
+ * resolution below and converted, by the caller that knows the operation and
+ * object, into the `StorageStoreError` the rest of the system sees.
+ */
+class StorageResponseValidationError extends Error {
+  readonly classification: StorageResponseClassification;
+  readonly field?: string;
+  readonly value?: unknown;
+
+  constructor(classification: StorageResponseClassification, field?: string, value?: unknown) {
+    super(`Storage response validation failed (${classification})`);
+    this.name = 'StorageResponseValidationError';
+    this.classification = classification;
+    this.field = field;
+    this.value = value;
+  }
+}
+
 /**
  * The Uncefact storage service emits `digestMultibase` in current versions
  * (v4+). Older deployments still emit a hex `sha-256` digest in the `hash`
@@ -24,27 +54,19 @@ import { uncefactStorageConfigSchema, uncefactStorageSensitiveFields } from './u
 function transcodeStorageHashToMultibase(hash: string): string {
   try {
     return MultibaseDigest.fromHex(hash, { algorithm: 'sha2-256', base: 'base58btc' }).toString();
-  } catch (err) {
-    throw new StorageStoreError(
-      502,
-      `Storage API returned hash in an unrecognised format. Expected sha-256 hex (64 chars), got "${hash}". ${
-        err instanceof Error ? err.message : ''
-      }`,
-    );
+  } catch {
+    throw new StorageResponseValidationError('invalid-hash', 'hash', hash);
   }
 }
 
-function resolveDigestMultibase(body: Record<string, unknown>, httpStatus: number): string {
+function resolveDigestMultibase(body: Record<string, unknown>): string {
   const { digestMultibase, hash } = body as { digestMultibase?: unknown; hash?: unknown };
 
   if (typeof digestMultibase === 'string' && digestMultibase.length > 0) {
     try {
       MultibaseDigest.fromString(digestMultibase);
     } catch {
-      throw new StorageStoreError(
-        httpStatus,
-        `Storage API returned "digestMultibase" that is not a valid multibase-encoded multihash: "${digestMultibase}".`,
-      );
+      throw new StorageResponseValidationError('invalid-digest', 'digestMultibase', digestMultibase);
     }
     return digestMultibase;
   }
@@ -58,10 +80,7 @@ function resolveDigestMultibase(body: Record<string, unknown>, httpStatus: numbe
     return transcodeStorageHashToMultibase(hash);
   }
 
-  throw new StorageStoreError(
-    httpStatus,
-    'Storage API returned invalid response: missing both "digestMultibase" and legacy "hash" fields',
-  );
+  throw new StorageResponseValidationError('missing-digest');
 }
 
 export const UNCEFACT_STORAGE_ADAPTER_TYPE = 'UNCEFACT_STORAGE' as const;
@@ -92,6 +111,111 @@ function apiVersionToPathSegment(version: UncefactStorageConfig['apiVersion']): 
  */
 function mayExist(externalId: string, bucket: string): string {
   return ` (object ${externalId} in bucket ${bucket} may have been created)`;
+}
+
+/**
+ * What a refusal needs to name the operation and the object it concerns. An
+ * options object keeps the context fields and the response evidence together.
+ */
+type StorageFailureContext = {
+  response: Response;
+  operation: 'store' | 'storeBinary';
+  bucket: string;
+  externalId: string;
+  logger: LoggerService;
+};
+
+const SECRET_RESPONSE_FIELD_NAMES = new Set(['apikey', 'authorization', 'decryptionkey', 'key', 'password', 'token']);
+function serialiseResponseValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  if (typeof value === 'bigint' || typeof value === 'boolean' || typeof value === 'number') return String(value);
+
+  try {
+    return (
+      JSON.stringify(value, (key, nestedValue) =>
+        SECRET_RESPONSE_FIELD_NAMES.has(key.toLowerCase()) ? '[REDACTED]' : nestedValue,
+      ) ?? Object.prototype.toString.call(value)
+    );
+  } catch {
+    return Object.prototype.toString.call(value);
+  }
+}
+
+function responseTextForValidation(response: Response): Promise<string | undefined> {
+  try {
+    const responseWithText = typeof response.clone === 'function' ? response.clone() : response;
+    if (typeof responseWithText.text !== 'function') return Promise.resolve(undefined);
+    return Promise.resolve(responseWithText.text()).catch(() => undefined);
+  } catch {
+    return Promise.resolve(undefined);
+  }
+}
+
+function decryptionKeyLength(value: unknown): number | null {
+  return typeof value === 'string' || Array.isArray(value) ? value.length : null;
+}
+
+function throwResponseValidationError(
+  context: StorageFailureContext & {
+    classification: StorageResponseClassification;
+    detail: string;
+    logFields: Record<string, unknown>;
+  },
+): never {
+  const { response, operation, bucket, externalId, logger, classification, detail, logFields } = context;
+  logger.error(
+    {
+      httpStatus: response.status,
+      classification,
+      operation,
+      bucket,
+      externalId,
+      ...Object.entries(logFields).reduce<Record<string, unknown>>(
+        (serialised, [field, value]) => Object.assign(serialised, { [field]: serialiseResponseValue(value) }),
+        {},
+      ),
+    },
+    'Storage API response failed validation',
+  );
+  const statusCode = classification === 'invalid-hash' ? 502 : response.status;
+  throw new StorageStoreError(statusCode, `${detail} (${classification})` + mayExist(externalId, bucket));
+}
+
+function responseValidationClassification(error: unknown): StorageResponseClassification {
+  return error instanceof StorageResponseValidationError ? error.classification : 'invalid-response';
+}
+
+function responseValidationLogFields(error: unknown): Record<string, unknown> {
+  if (error instanceof StorageResponseValidationError && error.field) {
+    return { [error.field]: error.value };
+  }
+  return { validationError: error instanceof Error ? error.message : String(error) };
+}
+
+/** Reports a storage service refusal with the service's own detail. */
+async function throwStoreResponseError(context: StorageFailureContext): Promise<never> {
+  const { response, operation, bucket, externalId, logger } = context;
+
+  let detail = response.statusText;
+  try {
+    const errorBody = await response.json();
+    if (errorBody?.message && typeof errorBody.message === 'string') {
+      detail = errorBody.message;
+    }
+  } catch {
+    // Response body is not valid JSON or is empty; fall back to statusText.
+  }
+  detail = detail || 'Unknown error';
+
+  const logged = { httpStatus: response.status, detail, operation, bucket, externalId };
+  if (response.status >= 400 && response.status < 500) {
+    logger.error(logged, 'Storage API rejected payload');
+    throw new StoragePayloadError(response.status, detail);
+  }
+  logger.error(logged, 'Storage API request failed');
+  throw new StorageStoreError(response.status, detail);
 }
 
 export class UncefactStorageAdapter extends BaseServiceAdapter implements IStorageService {
@@ -130,42 +254,37 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     });
 
     if (!response.ok) {
-      let detail = response.statusText;
-      try {
-        const errorBody = await response.json();
-        if (errorBody?.message && typeof errorBody.message === 'string') {
-          detail = errorBody.message;
-        }
-      } catch {
-        // Response body is not valid JSON or is empty; fall back to statusText.
-      }
-      detail = detail || 'Unknown error';
-
-      if (response.status >= 400 && response.status < 500) {
-        this.logger.error({ httpStatus: response.status, detail }, 'Storage API rejected payload');
-        throw new StoragePayloadError(response.status, detail);
-      }
-      this.logger.error({ httpStatus: response.status, detail }, 'Storage API request failed');
-      throw new StorageStoreError(response.status, detail);
+      return throwStoreResponseError({ response, operation: 'store', bucket, externalId, logger: this.logger });
     }
 
+    const responseText = responseTextForValidation(response);
     let parsed: unknown;
     try {
       parsed = await response.json();
     } catch {
-      this.logger.error({ httpStatus: response.status }, 'Storage API returned non-JSON response');
-      throw new StorageStoreError(
-        response.status,
-        'Storage API returned invalid JSON response' + mayExist(externalId, bucket),
-      );
+      return throwResponseValidationError({
+        response,
+        operation: 'store',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification: 'invalid-json',
+        detail: 'Storage API returned invalid JSON response',
+        logFields: { untrustedResponseBody: (await responseText) ?? '<unavailable>' },
+      });
     }
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      this.logger.error({ httpStatus: response.status }, 'Storage API returned non-object response body');
-      throw new StorageStoreError(
-        response.status,
-        'Storage API returned invalid response: body is not an object' + mayExist(externalId, bucket),
-      );
+      return throwResponseValidationError({
+        response,
+        operation: 'store',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification: 'invalid-body',
+        detail: 'Storage API returned invalid response: body is not an object',
+        logFields: { responseBody: parsed },
+      });
     }
 
     const body = parsed as Record<string, unknown>;
@@ -173,27 +292,55 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     const { uri, decryptionKey } = body as { uri?: unknown; decryptionKey?: unknown };
 
     if (!uri || typeof uri !== 'string') {
-      this.logger.error({ uri }, 'Storage API response missing required "uri" field');
-      throw new StorageStoreError(
-        response.status,
-        'Storage API returned invalid response: missing "uri"' + mayExist(externalId, bucket),
-      );
+      return throwResponseValidationError({
+        response,
+        operation: 'store',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification: 'invalid-uri',
+        detail: 'Storage API returned invalid response',
+        logFields: { uri },
+      });
     }
 
     if (encrypt && (!decryptionKey || typeof decryptionKey !== 'string')) {
-      this.logger.error(
-        { decryptionKey },
-        'Storage API response missing required "decryptionKey" field for encrypted storage',
-      );
-      throw new StorageStoreError(
-        response.status,
-        'Storage API returned invalid response: missing "decryptionKey"' + mayExist(externalId, bucket),
-      );
+      return throwResponseValidationError({
+        response,
+        operation: 'store',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification: 'invalid-decryption-key',
+        detail: 'Storage API returned invalid response',
+        logFields: {
+          decryptionKeyType: typeof decryptionKey,
+          decryptionKeyLength: decryptionKeyLength(decryptionKey),
+        },
+      });
     }
 
-    const digestMultibase = resolveDigestMultibase(body, response.status);
+    let digestMultibase: string;
+    try {
+      digestMultibase = resolveDigestMultibase(body);
+    } catch (error) {
+      const classification = responseValidationClassification(error);
+      return throwResponseValidationError({
+        response,
+        operation: 'store',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification,
+        detail: 'Storage API returned invalid response',
+        logFields:
+          classification === 'missing-digest'
+            ? { responseFields: Object.keys(body) }
+            : responseValidationLogFields(error),
+      });
+    }
 
-    this.logger.info({ uri, encrypt, externalId }, 'Credential stored successfully');
+    this.logger.info({ encrypt, externalId, bucket }, 'Credential stored successfully');
 
     return {
       uri,
@@ -234,7 +381,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     formData.append('id', externalId);
     formData.append('bucket', bucket);
 
-    // Build headers without Content-Type — the runtime must set
+    // Build headers without Content-Type. The runtime must set
     // multipart/form-data with the correct boundary automatically.
     const multipartHeaders: Record<string, string> = {};
     if (this.headers['X-API-Key']) {
@@ -248,42 +395,43 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     });
 
     if (!response.ok) {
-      let detail = response.statusText;
-      try {
-        const errorBody = await response.json();
-        if (errorBody?.message && typeof errorBody.message === 'string') {
-          detail = errorBody.message;
-        }
-      } catch {
-        // Response body is not valid JSON or is empty; fall back to statusText.
-      }
-      detail = detail || 'Unknown error';
-
-      if (response.status >= 400 && response.status < 500) {
-        this.logger.error({ httpStatus: response.status, detail }, 'Storage API rejected payload');
-        throw new StoragePayloadError(response.status, detail);
-      }
-      this.logger.error({ httpStatus: response.status, detail }, 'Storage API request failed');
-      throw new StorageStoreError(response.status, detail);
+      return throwStoreResponseError({
+        response,
+        operation: 'storeBinary',
+        bucket,
+        externalId,
+        logger: this.logger,
+      });
     }
 
+    const responseText = responseTextForValidation(response);
     let parsed: unknown;
     try {
       parsed = await response.json();
     } catch {
-      this.logger.error({ httpStatus: response.status }, 'Storage API returned non-JSON response');
-      throw new StorageStoreError(
-        response.status,
-        'Storage API returned invalid JSON response' + mayExist(externalId, bucket),
-      );
+      return throwResponseValidationError({
+        response,
+        operation: 'storeBinary',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification: 'invalid-json',
+        detail: 'Storage API returned invalid JSON response',
+        logFields: { untrustedResponseBody: (await responseText) ?? '<unavailable>' },
+      });
     }
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      this.logger.error({ httpStatus: response.status }, 'Storage API returned non-object response body');
-      throw new StorageStoreError(
-        response.status,
-        'Storage API returned invalid response: body is not an object' + mayExist(externalId, bucket),
-      );
+      return throwResponseValidationError({
+        response,
+        operation: 'storeBinary',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification: 'invalid-body',
+        detail: 'Storage API returned invalid response: body is not an object',
+        logFields: { responseBody: parsed },
+      });
     }
 
     const body = parsed as Record<string, unknown>;
@@ -291,27 +439,55 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     const { uri, decryptionKey } = body as { uri?: unknown; decryptionKey?: unknown };
 
     if (!uri || typeof uri !== 'string') {
-      this.logger.error({ uri }, 'Storage API response missing required "uri" field');
-      throw new StorageStoreError(
-        response.status,
-        'Storage API returned invalid response: missing "uri"' + mayExist(externalId, bucket),
-      );
+      return throwResponseValidationError({
+        response,
+        operation: 'storeBinary',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification: 'invalid-uri',
+        detail: 'Storage API returned invalid response',
+        logFields: { uri },
+      });
     }
 
     if (encrypt && (!decryptionKey || typeof decryptionKey !== 'string')) {
-      this.logger.error(
-        { decryptionKey },
-        'Storage API response missing required "decryptionKey" field for encrypted storage',
-      );
-      throw new StorageStoreError(
-        response.status,
-        'Storage API returned invalid response: missing "decryptionKey"' + mayExist(externalId, bucket),
-      );
+      return throwResponseValidationError({
+        response,
+        operation: 'storeBinary',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification: 'invalid-decryption-key',
+        detail: 'Storage API returned invalid response',
+        logFields: {
+          decryptionKeyType: typeof decryptionKey,
+          decryptionKeyLength: decryptionKeyLength(decryptionKey),
+        },
+      });
     }
 
-    const digestMultibase = resolveDigestMultibase(body, response.status);
+    let digestMultibase: string;
+    try {
+      digestMultibase = resolveDigestMultibase(body);
+    } catch (error) {
+      const classification = responseValidationClassification(error);
+      return throwResponseValidationError({
+        response,
+        operation: 'storeBinary',
+        bucket,
+        externalId,
+        logger: this.logger,
+        classification,
+        detail: 'Storage API returned invalid response',
+        logFields:
+          classification === 'missing-digest'
+            ? { responseFields: Object.keys(body) }
+            : responseValidationLogFields(error),
+      });
+    }
 
-    this.logger.info({ uri, encrypt, filename, externalId }, 'Binary content stored successfully');
+    this.logger.info({ encrypt, filename, externalId, bucket }, 'Binary content stored successfully');
 
     return {
       uri,

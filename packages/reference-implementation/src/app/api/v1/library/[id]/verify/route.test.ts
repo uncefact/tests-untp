@@ -1,8 +1,9 @@
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: (body: unknown, init?: { status?: number }) => ({
+    json: (body: unknown, init?: { status?: number; headers?: HeadersInit }) => ({
       status: init?.status ?? 200,
       json: async () => body,
+      headers: new Headers(init?.headers),
     }),
   },
 }));
@@ -85,9 +86,14 @@ import {
 import { NotFoundError } from '@/lib/api/errors';
 import { CredentialRecordProjectionError } from '@/lib/library/credential-record-projection';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
-import { DecryptionRequiredError } from '@/lib/library/reverify-library-record';
+import {
+  DecryptionRequiredError,
+  reverifyLibraryRecord,
+  SourceEncryptionNotAllowedError,
+  VerificationInProgressError,
+} from '@/lib/library/reverify-library-record';
+import { VERIFICATION_IN_PROGRESS_MESSAGE, VERIFICATION_RACE_LOST_MESSAGE } from '@/lib/library/reverify-messages';
 import { EncryptionUnavailableError } from '@/lib/library/register-external-credential';
-import { BODY_MUST_BE_EMPTY_MESSAGE } from '@/lib/library/reverify-messages';
 import { LIBRARY_VERIFY_JOB, VERIFY_JOB_ENQUEUE_OPTIONS } from '@/lib/library/verify-generation-job';
 import { POST } from './route';
 
@@ -243,8 +249,9 @@ async function post(body = '', context = AUTH_CONTEXT, options: RequestOptions =
   const response = (await POST(request(body, options), context as never)) as unknown as {
     status: number;
     json: () => Promise<unknown>;
+    headers: Headers;
   };
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: await response.json(), headers: response.headers };
 }
 
 const queue = { enqueueWithin: jest.fn() };
@@ -259,17 +266,42 @@ beforeEach(() => {
 });
 
 describe('POST /api/v1/library/:id/verify', () => {
-  it.each(['not empty', '   '])('rejects %j before reading the record', async (body) => {
-    // Fails if whitespace is parsed as an absent body or a present body is
-    // allowed to reach the key-bearing branch before that form is supported.
+  it.each([
+    ['an empty object', '{}'],
+    ['unknown fields only', '{"ignored":true}'],
+    ['the wrapper with no key', '{"sourceEncryption":{}}'],
+    // Whitespace is not bodyless. It reaches `JSON.parse`, which throws, and
+    // the route recodes that to VALIDATION_FAILED. Move that parse one line
+    // out of `parseRequestBody`'s own try and this becomes a sanitised 500
+    // with nothing else failing, which is why the case is pinned here.
+    ['whitespace', '   '],
+    ['malformed JSON', '{"sourceEncryption":{"decryptionKey":'],
+    ['a JSON null literal', 'null'],
+    ['a JSON array', '[{"sourceEncryption":{"decryptionKey":"' + 'a'.repeat(64) + '"}}]'],
+    ['a bad hex key', '{"sourceEncryption":{"decryptionKey":"not-hex"}}'],
+    ['a padded hex key', '{"sourceEncryption":{"decryptionKey":" ' + 'a'.repeat(64) + ' "}}'],
+    ['an empty-string key', '{"sourceEncryption":{"decryptionKey":""}}'],
+  ])('rejects %s before reading the record', async (_name, body) => {
+    // Fails if an invalid non-empty body is treated as bodyless and reaches
+    // the generation path without a usable key.
     const response = await post(body);
 
     expect(response.status).toBe(400);
-    expect(response.body).toEqual({
-      error: BODY_MUST_BE_EMPTY_MESSAGE,
-      code: 'VALIDATION_FAILED',
-    });
+    expect(response.body).toEqual(expect.objectContaining({ code: 'VALIDATION_FAILED' }));
     expect(mockGetLibraryRecordById).not.toHaveBeenCalled();
+  });
+
+  it('passes a valid key after the single bounded body read', async () => {
+    // Fails if the route accepts a method-only body or drops the key before
+    // the orchestration boundary. It also catches a second read of the
+    // request, but only because this fake's reader answers `{ done: true }`
+    // the second time: a double read then yields zero bytes, the request
+    // reads as bodyless, and no key reaches the assertion below. A real
+    // `Request` is what the integration layer uses; this is the unit-layer
+    // approximation of it.
+    await post(JSON.stringify({ sourceEncryption: { decryptionKey: 'a'.repeat(64) } }));
+
+    expect(mockReverifyLibraryRecord).toHaveBeenCalledWith(RECORD_ID, TENANT_ID, expect.any(Function), 'a'.repeat(64));
   });
 
   it('answers a NUL-containing id as not found without touching the database', async () => {
@@ -326,6 +358,78 @@ describe('POST /api/v1/library/:id/verify', () => {
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: new DecryptionRequiredError().message, code: 'DECRYPTION_REQUIRED' });
     expect(queue.enqueueWithin).not.toHaveBeenCalled();
+  });
+
+  it('maps an applicable key conflict to 409 with a relative Location, and logs its own warn line', async () => {
+    // Fails if a key-bearing request joins a pending generation and silently
+    // discards the only key that could open the stored copy.
+    //
+    // The warn line is the second half of the bypass this branch makes:
+    // building the response here rather than through the shared mapper is
+    // what lets it set `Location`, and it also skips the mapper's own
+    // conflict line, so this rejection has to write one. `POST
+    // /api/v1/library`'s duplicate-content 409 sets the same precedent.
+    mockReverifyLibraryRecord.mockRejectedValue(new VerificationInProgressError('pending', 3));
+
+    const response = await post(JSON.stringify({ sourceEncryption: { decryptionKey: 'b'.repeat(64) } }));
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      error: VERIFICATION_IN_PROGRESS_MESSAGE,
+      code: 'VERIFICATION_IN_PROGRESS',
+    });
+    expect(response.headers.get('Location')).toBe(`/api/v1/library/${RECORD_ID}`);
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'pending', generation: 3 }),
+      'Key-bearing re-verification refused: the record cannot take this key now',
+    );
+  });
+
+  it('answers a doubly-lost race with the same 409 and a message saying the key was not used', async () => {
+    // Nothing is in progress on this path: the winner has already
+    // settled and the record is still eligible. Fails if both reasons share
+    // one sentence again, which sends this caller to poll for a settlement
+    // that already happened.
+    mockReverifyLibraryRecord.mockRejectedValue(new VerificationInProgressError('race-lost', 4));
+
+    const response = await post(JSON.stringify({ sourceEncryption: { decryptionKey: 'b'.repeat(64) } }));
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      error: VERIFICATION_RACE_LOST_MESSAGE,
+      code: 'VERIFICATION_IN_PROGRESS',
+    });
+    expect(response.headers.get('Location')).toBe(`/api/v1/library/${RECORD_ID}`);
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'race-lost', generation: 4 }),
+      'Key-bearing re-verification refused: the record cannot take this key now',
+    );
+  });
+
+  it('rejects a key-bearing call that passes undefined where the key goes', () => {
+    // PD2. The implementation decides which form it was given by testing the
+    // fourth argument's type, so `undefined` there takes the BODYLESS arm and
+    // silently drops the `deps` in the fifth position, running the real
+    // repository, the real fetch and the real storage against a test's
+    // doubles. Narrowing the overload to `string` makes it a compile error;
+    // this line fails to compile, and the suite fails to run, if the
+    // parameter widens back to `string | undefined`.
+    // @ts-expect-error a key-bearing call must pass a key, never undefined
+    void ((): unknown => reverifyLibraryRecord('r', 't', async () => async () => undefined, undefined, {} as never));
+  });
+
+  it('maps a key on native or protected custody to SOURCE_ENCRYPTION_NOT_ALLOWED', async () => {
+    // Fails if applicability is checked after the pending join or if a key is
+    // accepted for a copy that is already protected by the receiver.
+    mockReverifyLibraryRecord.mockRejectedValue(new SourceEncryptionNotAllowedError());
+
+    const response = await post(JSON.stringify({ sourceEncryption: { decryptionKey: 'c'.repeat(64) } }));
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: new SourceEncryptionNotAllowedError().message,
+      code: 'SOURCE_ENCRYPTION_NOT_ALLOWED',
+    });
   });
 
   it('answers a record the module could not find as a 404', async () => {

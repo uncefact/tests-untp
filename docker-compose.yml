@@ -164,6 +164,10 @@ services:
       # default applies. A `${VAR:-}` form would inject an empty string and
       # trigger the startup warning on every stock boot.
       API_MAX_BATCH_LIMIT:
+      # Read by this process as well as the worker: the key-bearing recovery on
+      # POST /api/v1/library/{id}/verify reads the record's own durable copy
+      # inside the request. Same null-value form as the limit above.
+      LIBRARY_STORED_COPY_READ_TIMEOUT_MS:
       # OpenTelemetry - see docs/observability.md
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
       # Always forwarded, possibly empty; buildResource treats an empty value

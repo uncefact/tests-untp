@@ -8,6 +8,7 @@ import {
   REGISTER_SOURCE_URL_MAX_LENGTH,
   calendarDateSchema,
   registerExternalCredentialRequestSchema,
+  verifyLibraryRecordRequestSchema,
   sourceEncryptionSchema,
   listLibraryQuerySchema,
   batchGetLibraryRequestSchema,
@@ -576,5 +577,52 @@ describe('sourceEncryptionSchema', () => {
     expect(
       registerExternalCredentialRequestSchema.safeParse({ ...body, sourceEncryption: { decryptionKey: '' } }).success,
     ).toBe(false);
+  });
+});
+
+describe('verifyLibraryRecordRequestSchema', () => {
+  it('accepts only the required late decryption key and strips compatibility fields', () => {
+    const result = verifyLibraryRecordRequestSchema.safeParse({
+      sourceEncryption: { decryptionKey: 'A'.repeat(64), encryptionMethod: 'AES-256-GCM' },
+      ignored: 'field',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toEqual({ sourceEncryption: { decryptionKey: 'A'.repeat(64) } });
+  });
+
+  it.each([
+    {},
+    { sourceEncryption: {} },
+    { sourceEncryption: { decryptionKey: 'bad' } },
+    { ignored: true },
+    { sourceEncryption: { decryptionKey: null } },
+    { sourceEncryption: { decryptionKey: '' } },
+    // Padding is rejected rather than trimmed, so a key that only looks right
+    // never reaches an AES call that would fail obscurely later.
+    { sourceEncryption: { decryptionKey: ` ${'a'.repeat(64)} ` } },
+    { sourceEncryption: { decryptionKey: `${'a'.repeat(64)} ` } },
+    { sourceEncryption: { decryptionKey: 'a'.repeat(63) } },
+    { sourceEncryption: { decryptionKey: 'a'.repeat(65) } },
+  ])('rejects a body without a usable key: %j', (body) => {
+    // A schema-level assertion only: it says this body resolves no key, which
+    // is what the route branches on. Whether the route then treats such a
+    // body as bodyless is the route's own decision and is pinned there.
+    expect(verifyLibraryRecordRequestSchema.safeParse(body).success).toBe(false);
+  });
+
+  it('picks the same key validator the register schema enforces', () => {
+    // `.pick()` could be replaced by a hand-written field that happens to
+    // accept the happy case. Fails if the two ever disagree on a form one
+    // accepts and the other does not.
+    const cases = ['a'.repeat(64), 'A'.repeat(64), 'a'.repeat(63), ` ${'a'.repeat(64)}`, '', 'not-hex'];
+    for (const decryptionKey of cases) {
+      const picked = verifyLibraryRecordRequestSchema.safeParse({ sourceEncryption: { decryptionKey } }).success;
+      const registered = registerExternalCredentialRequestSchema.safeParse({
+        sourceUrl: 'https://supplier.example/a',
+        annotations: { displayName: 'x', declaredCredentialType: 'DPP' },
+        sourceEncryption: { decryptionKey },
+      }).success;
+      expect([decryptionKey, picked]).toEqual([decryptionKey, registered]);
+    }
   });
 });

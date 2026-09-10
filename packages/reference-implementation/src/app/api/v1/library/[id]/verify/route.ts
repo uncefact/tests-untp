@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { TextDecoder } from 'node:util';
 import { getRequestContext } from '@uncefact/untp-ri-services/logging';
 import { LibraryRecordOrigin } from '@/lib/prisma/generated';
 import {
@@ -9,7 +10,9 @@ import {
   UnprocessableError,
   unexpectedErrorMessage,
 } from '@/lib/api/errors';
-import { ValidationError } from '@/lib/api/validation';
+import { parseRequestBody, ValidationError } from '@/lib/api/validation';
+import { rethrowAsValidationFailed } from '@/lib/api/rethrow-as-validation-failed';
+import { verifyLibraryRecordRequestSchema, type VerifyLibraryRecordRequest } from '@/lib/api/request-schemas/library';
 import { readRequestBytes } from '@/lib/api/request-body';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { apiLogger } from '@/lib/api/logger';
@@ -23,9 +26,14 @@ import {
   type CredentialRecordResponse,
 } from '@/lib/library/credential-record-projection';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
-import { DecryptionRequiredError, reverifyLibraryRecord } from '@/lib/library/reverify-library-record';
+import {
+  DecryptionRequiredError,
+  type EnqueueVerification,
+  reverifyLibraryRecord,
+  SourceEncryptionNotAllowedError,
+  VerificationInProgressError,
+} from '@/lib/library/reverify-library-record';
 import { EncryptionUnavailableError } from '@/lib/library/register-external-credential';
-import { BODY_MUST_BE_EMPTY_MESSAGE } from '@/lib/library/reverify-messages';
 import { LIBRARY_VERIFY_JOB, VERIFY_JOB_ENQUEUE_OPTIONS } from '@/lib/library/verify-generation-job';
 import { startJobQueue } from '@/lib/jobs/app-job-queue';
 import type { JobQueue } from '@/lib/jobs/types';
@@ -78,8 +86,11 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *     summary: Re-verify one library record
  *     description: |
  *       Starts a new verification generation for a tenant-owned native or
- *       external library record. The request body must be empty. A request
- *       that arrives while a generation is pending joins that generation. A
+ *       external library record. The request body may supply the decryption
+ *       key for an unopened external copy. A bodyless request that arrives
+ *       while a generation is pending joins that generation. A key-bearing
+ *       request in the same situation is rejected with `409
+ *       VERIFICATION_IN_PROGRESS`, so its key is never discarded. A
  *       request whose record changed while it was being prepared starts no new
  *       generation and returns the record's current one, which may already be
  *       settled. The response is the current keyless record and its newest
@@ -98,12 +109,14 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *       the supplier source for freshness without replacing the copy. An
  *       external record already holding unopened ciphertext (a durable copy
  *       exists and no usable key is held) is rejected with
- *       `DECRYPTION_REQUIRED` before any fetch; the key-bearing form is
- *       tracked by [uncefact/tests-untp#958](https://github.com/uncefact/tests-untp/issues/958).
+ *       `DECRYPTION_REQUIRED` before any fetch when the request is bodyless.
+ *       The key-bearing form reads and opens that stored copy in the request.
  *
- *       An external record without a durable copy always re-fetches its
- *       stored source in the request, reserving generation N+1 as pending
- *       before the fetch runs so a concurrent request joins the same attempt.
+ *       An external record without a durable copy re-fetches its stored source
+ *       in the request, reserving generation N+1 as pending before the fetch
+ *       runs. A bodyless concurrent request joins the same attempt. A
+ *       key-bearing concurrent request is rejected, because the pending
+ *       generation cannot consume its key.
  *       What the fetch returns decides the outcome, not the record's own
  *       stale state: a response that opens the credential the record already
  *       holds, or a different one, replaces identity and details and, when
@@ -115,10 +128,13 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *       `retryable: false`, because the same request will not succeed until
  *       an operator changes the service's upload rules. A response that does not
  *       open a credential (an envelope or an unrelated body) on a record that
- *       already holds a content identity is refused with `DECRYPTION_REQUIRED`
- *       (an envelope) or `SOURCE_NOT_CREDENTIAL` (any other body), leaving
- *       that identity, its details and its custody exactly as they were, and
- *       storing nothing for that response in the first place. A response
+ *       already holds a content identity is refused, leaving that identity,
+ *       its details and its custody exactly as they were, and storing
+ *       nothing for that response in the first place. The code says how far
+ *       the bytes got: `SOURCE_NOT_CREDENTIAL` whenever they were read and
+ *       yielded no credential, including an envelope a supplied key opened
+ *       to something else, and `DECRYPTION_REQUIRED` or `DECRYPTION_FAILED`
+ *       when they could not be opened at all. A response
  *       that does not open a credential on a record with no identity to
  *       protect is stored exactly as a fresh registration would store it: an
  *       unopened envelope keeps its ciphertext, so a later bodyless call then
@@ -146,21 +162,31 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *       `202` means the generation was created, joined or superseded. It may
  *       already be failed when the response is read, for example when a worker
  *       has settled a stored-copy failure between the write and this response.
+ *       The response is the record's current envelope. A key-bearing recovery
+ *       that settles before projection can therefore return its settled
+ *       `DECRYPTION_FAILED` generation, unless a later generation has already
+ *       replaced it.
  *     tags:
  *       - Library
  *     parameters:
  *       - $ref: '#/components/parameters/LibraryRecordId'
  *     requestBody:
  *       required: false
- *       description: Omit the request body. Any body bytes are rejected until the key-bearing form is available.
+ *       description: |
+ *         Omit the request body for ordinary re-verification, or supply a key
+ *         for an unopened external copy. `sourceEncryption.decryptionKey` is
+ *         the only field this operation reads: unlike the register operation,
+ *         it does not accept `sourceEncryption.encryptionMethod`, and a body
+ *         carrying that field has it stripped rather than validated, so a
+ *         value the register operation would reject is accepted and ignored
+ *         here.
  *       content:
- *         application/octet-stream:
+ *         application/json:
  *           schema:
- *             type: string
- *             maxLength: 0
+ *             $ref: '#/components/schemas/VerifyLibraryRecordRequest'
  *     responses:
  *       202:
- *         description: A verification generation was created, an existing pending generation was joined, or the record moved while the request was being prepared.
+ *         description: A verification generation was created, an existing pending generation was joined, or the record moved while the request was being prepared. The response contains the record's current envelope, which may already be settled.
  *         content:
  *           application/json:
  *             schema:
@@ -334,13 +360,119 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
+ *               lateKeyOpenedTheStoredCopy:
+ *                 summary: A supplied key opened the record's own unopened durable copy, which was replaced with a receiver-protected copy
+ *                 value:
+ *                   id: clw0ext3rn4lrecover000007
+ *                   origin: external
+ *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
+ *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   organisationId: null
+ *                   facilityId: null
+ *                   productId: null
+ *                   sourceUrl: 'https://supplier.example/credentials/dcc-42'
+ *                   sourceDigest: zQmSourceDigestExample
+ *                   resolverUri: null
+ *                   issuedAt: '2026-08-30T10:15:00.000Z'
+ *                   encrypted: true
+ *                   hasKey: true
+ *                   verification: { generation: 3, state: pending, requestedAt: '2026-09-09T09:12:00.000Z', checks: { retrieval: pass, decryption: pass, digest: pass, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
+ *                   currencyStatus: current
+ *                   detailsStatus: EXTRACTED
+ *                   detailsError: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   warnings: []
+ *                   createdAt: '2026-08-30T10:20:00.000Z'
+ *                   updatedAt: '2026-09-09T09:12:00.000Z'
+ *               lateDecryptRevealsDuplicate:
+ *                 summary: A supplied key opened the stored copy, whose content already belongs to another record
+ *                 value:
+ *                   id: clw0ext3rn4lrecover000010
+ *                   origin: external
+ *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
+ *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   organisationId: null
+ *                   facilityId: null
+ *                   productId: null
+ *                   sourceUrl: 'https://supplier.example/credentials/dcc-42'
+ *                   sourceDigest: zQmSourceDigestExample
+ *                   resolverUri: null
+ *                   issuedAt: '2026-08-30T10:15:00.000Z'
+ *                   encrypted: true
+ *                   hasKey: true
+ *                   verification: { generation: 3, state: pending, requestedAt: '2026-09-09T09:12:00.000Z', checks: { retrieval: pass, decryption: pass, digest: pass, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
+ *                   currencyStatus: current
+ *                   detailsStatus: EXTRACTED
+ *                   detailsError: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   warnings: [{ code: DUPLICATE_CONTENT, message: 'The credential content matches record clw0ext3rn4lprotect000003.', relatedRecordId: clw0ext3rn4lprotect000003 }]
+ *                   createdAt: '2026-08-30T10:20:00.000Z'
+ *                   updatedAt: '2026-09-09T09:12:00.000Z'
+ *               lateKeyDidNotOpenTheCopy:
+ *                 summary: A supplied key did not open the stored copy, which was read and proven intact before the attempt
+ *                 value:
+ *                   id: clw0ext3rn4lrecover000008
+ *                   origin: external
+ *                   credential: { name: null, credentialType: null, issuerName: null, issuerDid: null, subjectName: null, subjectId: null, validFrom: null, validUntil: null }
+ *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   organisationId: null
+ *                   facilityId: null
+ *                   productId: null
+ *                   sourceUrl: 'https://supplier.example/credentials/dcc-42'
+ *                   sourceDigest: zQmSourceDigestExample
+ *                   resolverUri: null
+ *                   issuedAt: null
+ *                   encrypted: true
+ *                   hasKey: false
+ *                   verification: { generation: 3, state: failed, requestedAt: '2026-09-09T09:12:00.000Z', completedAt: '2026-09-09T09:12:01.000Z', checks: { retrieval: pass, decryption: fail, digest: pass, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: DECRYPTION_FAILED, message: "The supplied decryption key did not open this record's durable copy. The copy is kept exactly as it is. Retry with the correct sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify.", retryable: true } }
+ *                   currencyStatus: unknown
+ *                   detailsStatus: EXTRACTION_PENDING
+ *                   detailsError: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   warnings: []
+ *                   createdAt: '2026-08-30T10:20:00.000Z'
+ *                   updatedAt: '2026-08-30T10:20:00.000Z'
+ *               storedCopyCouldNotBeRead:
+ *                 summary: The reserved durable copy could not be read back, so no check ran at all
+ *                 value:
+ *                   id: clw0ext3rn4lrecover000009
+ *                   origin: external
+ *                   credential: { name: null, credentialType: null, issuerName: null, issuerDid: null, subjectName: null, subjectId: null, validFrom: null, validUntil: null }
+ *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   organisationId: null
+ *                   facilityId: null
+ *                   productId: null
+ *                   sourceUrl: 'https://supplier.example/credentials/dcc-42'
+ *                   sourceDigest: zQmSourceDigestExample
+ *                   resolverUri: null
+ *                   issuedAt: null
+ *                   encrypted: true
+ *                   hasKey: false
+ *                   verification: { generation: 3, state: failed, requestedAt: '2026-09-09T09:12:00.000Z', completedAt: '2026-09-09T09:12:01.000Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: STORED_COPY_UNAVAILABLE, message: 'The durable copy could not be read back from storage (storage returned HTTP 404); this needs an operator to inspect the stored object.', retryable: false } }
+ *                   currencyStatus: unknown
+ *                   detailsStatus: EXTRACTION_PENDING
+ *                   detailsError: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   warnings: []
+ *                   createdAt: '2026-08-30T10:20:00.000Z'
+ *                   updatedAt: '2026-08-30T10:20:00.000Z'
  *       400:
  *         description: |
- *           `VALIDATION_FAILED` when any request-body bytes are present, or
- *           `DECRYPTION_REQUIRED` when the record already holds a durable
- *           copy of unopened ciphertext and no usable key is held. A no-copy
+ *           `VALIDATION_FAILED` when a non-empty body does not contain a usable
+ *           decryption key, or
+ *           `SOURCE_ENCRYPTION_NOT_ALLOWED` when a key is supplied for a
+ *           native record or an external record whose durable copy is already
+ *           protected. That includes a record that was still eligible when
+ *           the caller read it and became protected before the reservation
+ *           took its lock, so a caller who checked first can still receive
+ *           this refusal; it also takes precedence over the `409` below when
+ *           both apply at once. Or
+ *           `DECRYPTION_REQUIRED` when the request is bodyless and the record
+ *           already holds a durable copy of unopened ciphertext. Bodylessness
+ *           is the deciding condition: the same record with a key on the
+ *           request opens that copy in the request instead. A no-copy
  *           record that turns out to be unopenable ciphertext is not this
- *           case: it settles as a `202` generation carrying
+ *           case either: it settles as a `202` generation carrying
  *           `DECRYPTION_REQUIRED` or `SOURCE_NOT_CREDENTIAL` instead, because
  *           the fetch had to run before that could be known. A body that
  *           cannot be read is an inherited uncoded `400`; an over-sized body
@@ -350,16 +482,21 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
- *               bodyPresent:
- *                 summary: The request carried body bytes
+ *               invalidRequestBody:
+ *                 summary: The request body did not contain a usable key
  *                 value:
- *                   error: The re-verification request body must be empty. Supplying a decryption key is not supported on this endpoint yet.
+ *                   error: 'sourceEncryption.decryptionKey: Required'
  *                   code: VALIDATION_FAILED
  *               decryptionRequired:
  *                 summary: The record already holds a durable copy of ciphertext this service cannot open
  *                 value:
- *                   error: This service holds no usable key for the record's durable copy. Re-verification with a caller-supplied key is not supported yet.
+ *                   error: This service holds no usable key for the record's durable copy. Supply it as sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify.
  *                   code: DECRYPTION_REQUIRED
+ *               sourceEncryptionNotAllowed:
+ *                 summary: The record cannot accept a supplier decryption key
+ *                 value:
+ *                   error: sourceEncryption may only be supplied for an external record with no protected durable copy yet.
+ *                   code: SOURCE_ENCRYPTION_NOT_ALLOWED
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
@@ -370,6 +507,44 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: |
+ *           A key-bearing request that could not be carried out as sent. Two
+ *           states answer it, and the message says which.
+ *
+ *           A verification generation was already in progress: the caller
+ *           waits for it to settle before supplying the key again. An
+ *           interrupted key-bearing recovery leaves its own generation
+ *           pending, so a caller whose earlier attempt died holds the record
+ *           against themselves until the reconciliation sweep settles that
+ *           run. The wait is bounded by the deployment's abandonment policy,
+ *           at least thirty minutes, and the sweep's settlement then tells
+ *           the caller to send the key again.
+ *
+ *           Or the request lost the generation-index race twice and the
+ *           winner had already settled by the time it was read: nothing is in
+ *           progress, the supplied key was never used, and it can be sent
+ *           again straight away.
+ *         headers:
+ *           Location:
+ *             description: Relative URL of the library record whose generation is in progress.
+ *             schema:
+ *               type: string
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               verificationInProgress:
+ *                 summary: The key-bearing request cannot join the pending generation
+ *                 value:
+ *                   error: Verification is already in progress for this record. Wait for it to settle before supplying a key again.
+ *                   code: VERIFICATION_IN_PROGRESS
+ *               verificationRaceLost:
+ *                 summary: The key was never used, so it can be sent again straight away
+ *                 value:
+ *                   error: Another verification generation was recorded for this record first, so the supplied key was not used. Send it again on POST /api/v1/library/{id}/verify.
+ *                   code: VERIFICATION_IN_PROGRESS
  *       413:
  *         $ref: '#/components/responses/PayloadTooLargeResponse'
  *       500:
@@ -389,14 +564,29 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *           answered instead, since a `202` would otherwise promise a
  *           settlement that never actually committed; the reconciliation
  *           sweep remains the eventual backstop for that reservation.
- *           Every other failure while fetching or finalising a no-copy
- *           recovery (including `CREDENTIALS_ENCRYPTION_UNAVAILABLE`, when
- *           this service cannot protect the storage key a durable copy of
- *           an opened credential would need, the same code and cause the
- *           register endpoint uses) settles that reservation `FAILED` too,
- *           but still answers this response rather than `202`, because the
+ *           Every other failure while acquiring or finalising a recovery,
+ *           in either acquisition mode (a no-copy recovery that fetches the
+ *           supplier source, and a key-bearing recovery that opens the
+ *           record's own durable copy), also settles that reservation
+ *           `FAILED` and retryable, but still answers this response rather
+ *           than `202`, because the
  *           caller needs the coded (or, for an unexpected fault, sanitised)
- *           reason immediately rather than only on the next poll, except a
+ *           reason immediately rather than only on the next poll. Which code
+ *           that settled generation carries depends on the class of failure,
+ *           and the settled code is what the caller reads on the next
+ *           `GET /api/v1/library/{id}`: a storage or encryption failure
+ *           (encryption unavailable, a store that returned no key, or a
+ *           storage service this tenant's configuration could not resolve,
+ *           decrypt or validate) settles `STORAGE_FAILED`; a content identity
+ *           that collided twice with a concurrent writer, and any unexpected
+ *           fault, settle `VERIFICATION_UNAVAILABLE`. That
+ *           includes `CREDENTIALS_ENCRYPTION_UNAVAILABLE`, when this service
+ *           cannot protect the storage key a durable copy of an opened
+ *           credential would need, the same code and cause the register
+ *           endpoint uses: a key-bearing recovery that opens a stored copy
+ *           reaches the same preflight before it stores the plaintext, so
+ *           this response is not confined to the no-copy branch. The one
+ *           exception is a
  *           lock-discovery exhaustion (concurrent recoveries of the same new
  *           content moving the identity set past finalisation's bounded
  *           restart), which answers `202` with that settled generation
@@ -423,8 +613,16 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
 
   try {
     const body = await readRequestBytes(req);
+    let parsedBody: VerifyLibraryRecordRequest | undefined;
     if (body.byteLength !== 0) {
-      throw new ValidationError(BODY_MUST_BE_EMPTY_MESSAGE, { code: 'VALIDATION_FAILED' });
+      try {
+        parsedBody = await parseRequestBody(
+          { json: async () => JSON.parse(new TextDecoder().decode(body)) },
+          verifyLibraryRecordRequestSchema,
+        );
+      } catch (error) {
+        rethrowAsValidationFailed(error);
+      }
     }
 
     if (id.includes('\0')) {
@@ -435,7 +633,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     // created, and still outside the transaction that will hold the record's
     // lock. A queue that will not start therefore leaves a not-found, a join
     // and a key refusal answering exactly as they would with a healthy one.
-    const result = await reverifyLibraryRecord(id, tenantId, async () => {
+    const enqueueFactory = async (): Promise<EnqueueVerification> => {
       let queue: JobQueue;
       try {
         queue = await startJobQueue();
@@ -443,7 +641,11 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
         throw new JobQueueUnavailableError(error);
       }
       return (sql, job) => queue.enqueueWithin(sql, LIBRARY_VERIFY_JOB, job, VERIFY_JOB_ENQUEUE_OPTIONS);
-    });
+    };
+    const result =
+      parsedBody === undefined
+        ? await reverifyLibraryRecord(id, tenantId, enqueueFactory)
+        : await reverifyLibraryRecord(id, tenantId, enqueueFactory, parsedBody.sourceEncryption.decryptionKey);
     const response = await currentResponse(id, tenantId);
     log.info(
       {
@@ -456,12 +658,34 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
     );
     return NextResponse.json(response, { status: 202 });
   } catch (error) {
+    if (error instanceof VerificationInProgressError) {
+      // Built here rather than through the shared mapper, which sets no
+      // headers, and this response carries `Location`. That bypasses the
+      // mapper's conflict log line too, so this rejection logs its own,
+      // exactly as the duplicate-content 409 on `POST /api/v1/library` does
+      // for the same reason. `reason` separates a refusal against a running
+      // generation from one against a race this request lost, which the two
+      // caller-facing messages also distinguish.
+      log.warn(
+        { reason: error.reason, generation: error.generation },
+        'Key-bearing re-verification refused: the record cannot take this key now',
+      );
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 409, headers: { Location: `/api/v1/library/${id}` } },
+      );
+    }
+    if (error instanceof SourceEncryptionNotAllowedError) {
+      throw new ValidationError(error.message, { code: error.code, cause: error });
+    }
     if (isMappedRouteError(error) || isDatabaseError(error)) {
       throw error;
     }
     if (error instanceof DecryptionRequiredError) {
       // Through the shared mapper as a coded validation failure, so this 400
-      // and the body-must-be-empty 400 cannot drift into two shapes.
+      // carries the same body shape as the route's other coded 400s
+      // (`SOURCE_ENCRYPTION_NOT_ALLOWED` above, and the request-schema
+      // `VALIDATION_FAILED`) rather than being assembled here.
       throw new ValidationError(error.message, { code: error.code, cause: error });
     }
     if (error instanceof EncryptionUnavailableError) {

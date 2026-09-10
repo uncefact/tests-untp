@@ -797,19 +797,28 @@ describe('POST /api/v1/library registration failures', () => {
     expect(mockRegisterExternalCredential).not.toHaveBeenCalled();
   });
 
-  it('answers a sanitised 500 without the stored URI when the store returned no key', async () => {
+  it('answers a sanitised 500 when the store returned no key', async () => {
     // Fails if StorageKeyMissingError falls through to the unmapped branch,
-    // which echoes the message and its object URI back to the caller.
-    mockRegisterExternalCredential.mockRejectedValue(
-      new StorageKeyMissingError('https://storage.example/objects/secret-object'),
-    );
+    // which echoes its message back to the caller.
+    mockRegisterExternalCredential.mockRejectedValue(new StorageKeyMissingError());
     const { status, body } = await post(registerRequest(validBody()));
 
     expect(status).toBe(500);
     expect(String(body.error)).toContain(UNEXPECTED_ERROR_MESSAGE);
-    expect(String(body.error)).not.toContain('storage.example');
-    expect(String(body.error)).not.toContain('secret-object');
     expect(mockReleaseIdempotencyKey).toHaveBeenCalledWith({ claimId: 'claim-1' });
+  });
+
+  it('carries no storage coordinates in the message a recovery would publish', () => {
+    // This message is not confined to a sanitised 500: the key-bearing
+    // recovery path copies it onto the settled generation's `failureMessage`,
+    // which the record publishes. The object's URI, external id and bucket
+    // are this deployment's own storage addresses and belong on the operator
+    // log line the raising site writes, not on a tenant's record. Fails if
+    // the class takes a URI again and interpolates it.
+    const message = new StorageKeyMissingError().message;
+
+    expect(message).not.toMatch(/https?:\/\//);
+    expect(message).toContain('needs an operator');
   });
 
   it('still answers the mapped 400 when releasing the claim itself fails', async () => {

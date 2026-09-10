@@ -10,12 +10,36 @@ jest.mock('../prisma', () => ({
       findFirst: jest.fn(),
     },
     externalCredential: { findFirst: jest.fn(), findUnique: jest.fn(), findMany: jest.fn() },
+    libraryRecord: { findFirst: jest.fn() },
   },
 }));
 
+/**
+ * The reduced capture, for asserting which line was written and with which
+ * fields. It cannot see a leak: a jest mock records the object it was handed
+ * without rendering it, so `{ err: error }`, which pino would expand cause
+ * chain and all, is indistinguishable here from a reduced `{ error }`.
+ */
 const loggerCalls: Record<string, unknown> = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+/** The same calls rendered by the real pino logger, for assertions about what a line CARRIES. */
+const renderedLogLines: string[] = [];
 loggerCalls.child = () => loggerCalls;
-jest.mock('@/lib/api/logger', () => ({ apiLogger: loggerCalls }));
+jest.mock('@/lib/api/logger', () => {
+  const { createLogger } = jest.requireActual('@uncefact/untp-ri-services/logging');
+  const rendering = createLogger({
+    level: 'debug',
+    destination: { write: (line: string) => renderedLogLines.push(line) },
+  });
+  const tee =
+    (level: 'info' | 'warn' | 'error') =>
+    (...args: unknown[]) => {
+      (loggerCalls[level] as jest.Mock)(...args);
+      (rendering as Record<string, (...a: unknown[]) => void>)[level](...args);
+    };
+  const logger: Record<string, unknown> = { info: tee('info'), warn: tee('warn'), error: tee('error') };
+  logger.child = () => logger;
+  return { apiLogger: logger };
+});
 
 jest.mock('@/lib/jobs/prisma-sql-executor', () => ({
   prismaSqlExecutor: (tx: unknown) => tx,
@@ -42,6 +66,8 @@ import {
 import { prisma } from '../prisma';
 import type { SqlExecutor } from '@/lib/jobs/types';
 import type { RecoverInRequestOutcome } from '@/lib/library/register-external-credential';
+import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
+import { ABANDONED_CUSTODY_UNKNOWN_MESSAGE, ABANDONED_RUN_MESSAGE } from '@/lib/library/reverify-messages';
 import {
   createReverificationGeneration,
   finaliseRecoveryGeneration,
@@ -51,10 +77,13 @@ import {
   RecoveryLockDiscoveryExhaustedError,
   type CreateReverificationGenerationInput,
   type FinaliseRecoveryGenerationInput,
+  type FinaliseRecoveryGenerationResult,
 } from './check-run.repository';
 
 const RECORD_ID = 'record-1';
 const TENANT_ID = 'tenant-1';
+/** A supplier key, for the rendered-line assertions. No log line here may ever carry one. */
+const KEY_SENTINEL = 'KEY-SENTINEL-3d91fa';
 const TX_LOCK = jest.fn();
 const TX_FIND = jest.fn();
 const TX_CREATE = jest.fn();
@@ -72,22 +101,44 @@ const transactionClient = {
 };
 const mockTransaction = prisma.$transaction as unknown as jest.Mock;
 
+/**
+ * Custody's key-presence half is projected by its own statement, so the key
+ * envelope never enters a row object these transactions hold. Every raw-SQL
+ * mock in this suite has to answer that statement as well as the locks, and
+ * the assertions that count lock statements have to exclude it.
+ */
+function isKeyPresenceQuery(sql: string): boolean {
+  return sql.includes('"decryptionKey" IS NOT NULL');
+}
+function isLibraryRecordLock(sql: string): boolean {
+  return sql.includes('"LibraryRecord"') && !isKeyPresenceQuery(sql);
+}
+let keyPresence: { credential: boolean; external: boolean };
+
 function row(overrides: Record<string, unknown> = {}) {
+  const { externalCredential: externalOverride, ...recordOverrides } = overrides;
+  const externalCredential =
+    externalOverride === null
+      ? null
+      : {
+          storageUri: 'https://storage.example/old',
+          storageDigestMultibase: 'zOldDigest',
+          storageExternalId: 'old-object',
+          sourceDigest: 'zOldSourceDigest',
+          contentDigest: null,
+          duplicateOfRecordId: null,
+          encrypted: false,
+          contentKind: null,
+          ...(externalOverride as Record<string, unknown> | undefined),
+        };
   return {
     id: RECORD_ID,
     tenantId: TENANT_ID,
     origin: LibraryRecordOrigin.EXTERNAL,
     credential: null,
-    externalCredential: {
-      storageUri: 'https://storage.example/old',
-      storageDigestMultibase: 'zOldDigest',
-      storageExternalId: 'old-object',
-      sourceDigest: 'zOldSourceDigest',
-      contentDigest: null,
-      duplicateOfRecordId: null,
-    },
+    externalCredential,
     checkRuns: [{ id: 'run-1', generation: 1, state: CheckRunState.COMPLETE, lastEnqueuedAt: null }],
-    ...overrides,
+    ...recordOverrides,
   };
 }
 
@@ -101,6 +152,8 @@ function input(overrides: Partial<CreateReverificationGenerationInput> = {}): Cr
       storageUri: 'https://storage.example/old',
       storageDigestMultibase: 'zOldDigest',
       storageExternalId: 'old-object',
+      decryptionKeyPresent: false,
+      encrypted: false,
     },
     enqueue: jest.fn(async () => undefined),
     ...overrides,
@@ -135,15 +188,28 @@ function abandonedRun(overrides: Partial<CheckRun> = {}): CheckRun {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  renderedLogLines.length = 0;
   mockTransaction.mockImplementation(async (callback: (tx: typeof transactionClient) => unknown) =>
     callback(transactionClient),
   );
-  TX_LOCK.mockResolvedValue([{ id: RECORD_ID }]);
+  keyPresence = { credential: false, external: false };
+  TX_LOCK.mockImplementation(async (sql: string) => (isKeyPresenceQuery(sql) ? [keyPresence] : [{ id: RECORD_ID }]));
   TX_FIND.mockResolvedValue(row());
   TX_CREATE.mockResolvedValue({ id: 'run-2', generation: 2 });
   transactionClient.checkRun.updateMany.mockResolvedValue({ count: 1 });
   mockGetLibraryRecordById.mockResolvedValue({});
   (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(null);
+  // The race resolver's own reads: a narrow origin select and the shared
+  // key-presence projection, both on the global client.
+  (prisma.libraryRecord.findFirst as unknown as jest.Mock).mockResolvedValue({
+    origin: LibraryRecordOrigin.EXTERNAL,
+  });
+  // Two statements share the global client's raw query: the sweep's custody
+  // projection and the race resolver's key-presence projection. The default
+  // answers both as "no key held"; the sweep's own tests override it.
+  (prisma.$queryRawUnsafe as unknown as jest.Mock).mockImplementation(async (sql: string) =>
+    isKeyPresenceQuery(sql) ? [{ credential: false, external: false }] : [],
+  );
 });
 
 describe('createReverificationGeneration', () => {
@@ -178,10 +244,13 @@ describe('createReverificationGeneration', () => {
           select: {
             storageUri: true,
             storageDigestMultibase: true,
+            storageServiceInstanceId: true,
             storageExternalId: true,
+            storageBucket: true,
             sourceDigest: true,
             contentDigest: true,
             duplicateOfRecordId: true,
+            encrypted: true,
           },
         },
         checkRuns: {
@@ -289,7 +358,11 @@ describe('createReverificationGeneration', () => {
       row({
         origin: LibraryRecordOrigin.NATIVE,
         externalCredential: null,
-        credential: { storageUri: 'https://storage.example/native', digestMultibase: 'zNative' },
+        credential: {
+          storageUri: 'https://storage.example/native',
+          digestMultibase: 'zNative',
+          decryptionKey: null,
+        },
         checkRuns: [],
       }),
     );
@@ -303,6 +376,8 @@ describe('createReverificationGeneration', () => {
           storageUri: 'https://storage.example/native',
           storageDigestMultibase: 'zNative',
           storageExternalId: null,
+          decryptionKeyPresent: false,
+          encrypted: null,
         },
       }),
     );
@@ -328,7 +403,7 @@ describe('createReverificationGeneration', () => {
   it('returns missing and never enqueues when the tenant-scoped lock finds no parent', async () => {
     // Fails if a record deleted during preparation can still gain a run or if
     // a foreign tenant row is accepted by an unscoped lock.
-    TX_LOCK.mockResolvedValue([]);
+    TX_LOCK.mockImplementation(async (sql: string) => (isKeyPresenceQuery(sql) ? [keyPresence] : []));
 
     await expect(createReverificationGeneration(input())).resolves.toEqual({ outcome: 'missing' });
     expect(TX_FIND).not.toHaveBeenCalled();
@@ -379,10 +454,13 @@ describe('createReverificationGeneration', () => {
     });
     mockTransaction.mockRejectedValue(unique);
     (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(null);
-    mockGetLibraryRecordById.mockResolvedValue(null);
+    (prisma.libraryRecord.findFirst as unknown as jest.Mock).mockResolvedValue(null);
 
     await expect(createReverificationGeneration(input())).resolves.toEqual({ outcome: 'missing' });
-    expect(mockGetLibraryRecordById).toHaveBeenCalledWith(RECORD_ID, TENANT_ID);
+    expect(prisma.libraryRecord.findFirst).toHaveBeenCalledWith({
+      where: { id: RECORD_ID, tenantId: TENANT_ID },
+      select: { origin: true },
+    });
   });
 });
 
@@ -393,7 +471,15 @@ describe('finaliseRecoveryGeneration', () => {
       tenantId: TENANT_ID,
       checkRunId: 'run-2',
       generation: 2,
+      expectedCustody: {
+        storageUri: null,
+        storageDigestMultibase: null,
+        storageExternalId: null,
+        decryptionKeyPresent: false,
+        encrypted: false,
+      },
       prepared: {
+        acquisition: { mode: 'source-failed' },
         encrypted: null,
         details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
         checkRun: {
@@ -434,7 +520,14 @@ describe('finaliseRecoveryGeneration', () => {
     expect(transactionClient.externalCredential.update).not.toHaveBeenCalled();
     expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
     expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
-      where: { id: 'run-2', tenantId: TENANT_ID, state: CheckRunState.PENDING, lastEnqueuedAt: null },
+      where: {
+        id: 'run-2',
+        recordId: RECORD_ID,
+        generation: 2,
+        tenantId: TENANT_ID,
+        state: CheckRunState.PENDING,
+        lastEnqueuedAt: null,
+      },
       data: expect.objectContaining({
         state: CheckRunState.FAILED,
         retrieval: CheckResult.FAIL,
@@ -471,6 +564,7 @@ describe('finaliseRecoveryGeneration', () => {
     transactionClient.externalCredential.findUnique.mockResolvedValue({ id: 'existing-holder' });
     const existingParents = new Set([RECORD_ID, 'existing-holder']);
     TX_LOCK.mockImplementation(async (sql: string, ...args: unknown[]) => {
+      if (isKeyPresenceQuery(sql)) return [keyPresence];
       if (sql.includes('"LibraryRecord"')) {
         // Accept a per-id call shape too, so a split lock statement reaches the call-count assertion.
         const ids = (Array.isArray(args[0]) ? args[0] : [args[0]]) as string[];
@@ -483,7 +577,7 @@ describe('finaliseRecoveryGeneration', () => {
     transactionClient.externalCredential.update.mockResolvedValueOnce({});
 
     const prepared = {
-      sourceDigest: 'zObservedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zObservedSourceDigest' },
       encrypted: false,
       contentKind: ExternalContentKind.CREDENTIAL,
       decryptionKeyUnused: false,
@@ -496,7 +590,7 @@ describe('finaliseRecoveryGeneration', () => {
     const result = await finaliseRecoveryGeneration(finaliseInput({ prepared }));
 
     expect(result).toEqual({ outcome: 'created', generation: 2, checkRunId: 'run-2' });
-    const libraryRecordLockCalls = TX_LOCK.mock.calls.filter(([sql]) => (sql as string).includes('"LibraryRecord"'));
+    const libraryRecordLockCalls = TX_LOCK.mock.calls.filter(([sql]) => isLibraryRecordLock(sql as string));
     expect(libraryRecordLockCalls).toHaveLength(1);
     expect(libraryRecordLockCalls[0][0]).toEqual(expect.stringContaining('= ANY('));
     expect(libraryRecordLockCalls[0][0]).toEqual(expect.stringContaining('ORDER BY "id" ASC'));
@@ -510,6 +604,7 @@ describe('finaliseRecoveryGeneration', () => {
     // rejected-replacement carries.
     TX_FIND.mockResolvedValue(identityHoldingRow());
     const prepared = {
+      acquisition: { mode: 'source-failed' },
       encrypted: null,
       details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
       checkRun: {
@@ -529,7 +624,14 @@ describe('finaliseRecoveryGeneration', () => {
     expect(transactionClient.externalCredential.update).not.toHaveBeenCalled();
     expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
     expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
-      where: { id: 'run-2', tenantId: TENANT_ID, state: CheckRunState.PENDING, lastEnqueuedAt: null },
+      where: {
+        id: 'run-2',
+        recordId: RECORD_ID,
+        generation: 2,
+        tenantId: TENANT_ID,
+        state: CheckRunState.PENDING,
+        lastEnqueuedAt: null,
+      },
       data: expect.objectContaining({
         state: CheckRunState.FAILED,
         failureCode: CheckRunFailureCode.RETRIEVAL_FAILED,
@@ -564,7 +666,7 @@ describe('finaliseRecoveryGeneration', () => {
       }),
     );
     const prepared = {
-      sourceDigest: 'zFetchedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zFetchedSourceDigest' },
       encrypted: true,
       contentKind: ExternalContentKind.OPAQUE,
       decryptionKeyUnused: false,
@@ -587,7 +689,14 @@ describe('finaliseRecoveryGeneration', () => {
     expect(transactionClient.externalCredential.update).not.toHaveBeenCalled();
     expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
     expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
-      where: { id: 'run-2', tenantId: TENANT_ID, state: CheckRunState.PENDING, lastEnqueuedAt: null },
+      where: {
+        id: 'run-2',
+        recordId: RECORD_ID,
+        generation: 2,
+        tenantId: TENANT_ID,
+        state: CheckRunState.PENDING,
+        lastEnqueuedAt: null,
+      },
       data: expect.objectContaining({
         state: CheckRunState.FAILED,
         failureCode: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
@@ -608,6 +717,69 @@ describe('finaliseRecoveryGeneration', () => {
         data: expect.objectContaining({ failureCode: CheckRunFailureCode.DECRYPTION_REQUIRED }),
       }),
     );
+  });
+
+  it('settles a corrupt envelope on an identity-holding row with its own DECRYPTION_FAILED, not the rejected-replacement default', async () => {
+    // Mode A on a row that already holds a content identity: the re-fetched
+    // source returned an AES envelope the supplied key could not open,
+    // because the envelope itself is corrupt. `settleUnopened`'s identity-held
+    // arm skipped the store and prepared DECRYPTION_FAILED with
+    // `retryable: false`, and it classified the body it did reach as OPAQUE,
+    // so this arrives at the rejected-replacement branch with a FAILED
+    // prepared run and an identity still held under this lock.
+    //
+    // That branch takes the prepared failure in preference to
+    // `rejectedReplacementFailure`, which maps `encrypted === true` to
+    // DECRYPTION_REQUIRED with `retryable: true`. Both halves are
+    // caller-visible, and the retryable flag is the one an integrator's retry
+    // loop turns on: no key opens a corrupt envelope, so advertising the
+    // attempt as retryable sends that loop round forever. Fails if the
+    // preference is dropped and `rejectedReplacementFailure(prepared)` alone
+    // decides the failure again.
+    TX_FIND.mockResolvedValue(identityHoldingRow());
+    const prepared = {
+      acquisition: { mode: 'source', sourceDigest: 'zFetchedSourceDigest' },
+      encrypted: true,
+      contentKind: ExternalContentKind.OPAQUE,
+      decryptionKeyUnused: false,
+      storageSkipped: 'identity-held',
+      details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+      checkRun: {
+        state: CheckRunState.FAILED,
+        checks: { retrieval: CheckResult.PASS, decryption: CheckResult.FAIL },
+        failure: {
+          code: CheckRunFailureCode.DECRYPTION_FAILED,
+          message:
+            'The fetched encrypted envelope is corrupted and cannot be decrypted; re-supplying the key will not help unless the source changes.',
+          retryable: false,
+        },
+      },
+    } as RecoverInRequestOutcome;
+
+    const result = await finaliseRecoveryGeneration(finaliseInput({ prepared }));
+
+    expect(result).toEqual({ outcome: 'created', generation: 2, checkRunId: 'run-2' });
+    expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'run-2',
+        recordId: RECORD_ID,
+        generation: 2,
+        tenantId: TENANT_ID,
+        state: CheckRunState.PENDING,
+        lastEnqueuedAt: null,
+      },
+      data: expect.objectContaining({
+        state: CheckRunState.FAILED,
+        failureCode: CheckRunFailureCode.DECRYPTION_FAILED,
+        failureMessage:
+          'The fetched encrypted envelope is corrupted and cannot be decrypted; re-supplying the key will not help unless the source changes.',
+        failureRetryable: false,
+      }),
+    });
+    // The branch's whole contract: the record keeps the identity, custody and
+    // details it already had.
+    expect(transactionClient.externalCredential.update).not.toHaveBeenCalled();
+    expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
   });
 
   it('reports superseded and writes nothing when the claimed run is settled by another actor before the write commits', async () => {
@@ -633,6 +805,7 @@ describe('finaliseRecoveryGeneration', () => {
     // child write is even attempted.
     TX_FIND.mockResolvedValue(identityHoldingRow());
     TX_LOCK.mockImplementation(async (sql: string) => {
+      if (isKeyPresenceQuery(sql)) return [keyPresence];
       if (sql.includes('"LibraryRecord"')) return [{ id: RECORD_ID }];
       if (sql.includes('"CheckRun"')) return []; // the claim itself finds nothing
       return [];
@@ -641,7 +814,7 @@ describe('finaliseRecoveryGeneration', () => {
       encrypted: false,
       contentKind: ExternalContentKind.OPAQUE,
       decryptionKeyUnused: false,
-      sourceDigest: 'zFetchedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zFetchedSourceDigest' },
       storage: { uri: 'https://storage.example/orphan', externalId: 'orphan-1', bucket: 'private' },
       details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
       checkRun: {
@@ -662,6 +835,57 @@ describe('finaliseRecoveryGeneration', () => {
         recordId: RECORD_ID,
         reason: 'superseded',
         storageUri: 'https://storage.example/orphan',
+      }),
+      'Prepared recovery copy is orphaned and needs operator cleanup',
+    );
+  });
+
+  it('reports superseded and writes nothing when custody moved under the reservation, orphan-logging the prepared copy', async () => {
+    // The other half of the same fence. The atomic claim above answers
+    // "is this exact reservation still mine?"; this comparison answers "is
+    // the record still the one I reserved against?". A lock-discovery
+    // restart and a deadlock retry both re-enter this transaction with the
+    // run still `PENDING` and unqueued, so the claim succeeds and only the
+    // custody comparison can catch a copy another writer replaced in the
+    // meantime. Fails if the comparison is dropped from the fence: this
+    // attempt would then settle the run and write its own copy over the one
+    // that writer committed.
+    const replaced = row({
+      externalCredential: {
+        storageUri: 'https://storage.example/replaced',
+        storageDigestMultibase: 'zReplacedDigest',
+        storageExternalId: 'replaced-object',
+      },
+      checkRuns: [{ id: 'run-2', generation: 2, state: CheckRunState.PENDING, lastEnqueuedAt: null }],
+    });
+    TX_FIND.mockResolvedValue(replaced);
+    const prepared = {
+      encrypted: false,
+      contentKind: ExternalContentKind.CREDENTIAL,
+      decryptionKeyUnused: false,
+      acquisition: { mode: 'source', sourceDigest: 'zFetchedSourceDigest' },
+      contentDigest: 'zOpenedContentDigest',
+      storage: { uri: 'https://storage.example/late-copy', externalId: 'late-1', bucket: 'private' },
+      details: { status: CredentialDetailsStatus.EXTRACTED },
+      checkRun: { state: CheckRunState.PENDING, checks: { retrieval: CheckResult.PASS } },
+    } as unknown as RecoverInRequestOutcome;
+
+    // The reservation observed a no-copy record; the row above now holds one.
+    const enqueue = jest.fn(async () => undefined);
+    const result = await finaliseRecoveryGeneration(finaliseInput({ prepared, enqueue }));
+
+    expect(result).toEqual({ outcome: 'superseded', generation: 2 });
+    expect(transactionClient.externalCredential.update).not.toHaveBeenCalled();
+    expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
+    expect(transactionClient.checkRun.updateMany).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(loggerCalls.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordId: RECORD_ID,
+        tenantId: TENANT_ID,
+        reason: 'superseded',
+        storageUri: 'https://storage.example/late-copy',
+        storageExternalId: 'late-1',
       }),
       'Prepared recovery copy is orphaned and needs operator cleanup',
     );
@@ -694,7 +918,11 @@ describe('finaliseRecoveryGeneration', () => {
     // fails the same way for a reason unrelated to this test.
     (prisma.externalCredential.findFirst as unknown as jest.Mock).mockResolvedValue({ id: 'advisory-1' });
     TX_LOCK.mockImplementation(async (sql: string) =>
-      sql.includes('"LibraryRecord"') ? [{ id: RECORD_ID }, { id: 'advisory-1' }] : [{ id: 'run-2' }],
+      isKeyPresenceQuery(sql)
+        ? [keyPresence]
+        : isLibraryRecordLock(sql)
+          ? [{ id: RECORD_ID }, { id: 'advisory-1' }]
+          : [{ id: 'run-2' }],
     );
     const promotionCollision = Object.assign(new Error('unique violation'), {
       name: 'PrismaClientKnownRequestError',
@@ -713,7 +941,7 @@ describe('finaliseRecoveryGeneration', () => {
     transactionClient.externalCredential.findFirst.mockResolvedValue({ id: 'advisory-1' });
 
     const prepared = {
-      sourceDigest: 'zNewSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zNewSourceDigest' },
       encrypted: false,
       contentKind: ExternalContentKind.CREDENTIAL,
       decryptionKeyUnused: false,
@@ -775,6 +1003,7 @@ describe('finaliseRecoveryGeneration', () => {
     let preferredHolderCalls = 0;
     const existingParents = new Set([RECORD_ID, 'new-winner']); // not 'vanished-holder'
     TX_LOCK.mockImplementation(async (sql: string, ids?: unknown) => {
+      if (isKeyPresenceQuery(sql)) return [keyPresence];
       if (sql.includes('"LibraryRecord"')) {
         return (ids as string[]).filter((id) => existingParents.has(id)).map((id) => ({ id }));
       }
@@ -812,7 +1041,7 @@ describe('finaliseRecoveryGeneration', () => {
     transactionClient.externalCredential.update.mockRejectedValueOnce(acquisitionCollision).mockResolvedValueOnce({});
 
     const prepared = {
-      sourceDigest: 'zObservedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zObservedSourceDigest' },
       encrypted: false,
       contentKind: ExternalContentKind.CREDENTIAL,
       decryptionKeyUnused: false,
@@ -854,6 +1083,7 @@ describe('finaliseRecoveryGeneration', () => {
       }),
     );
     TX_LOCK.mockImplementation(async (sql: string) => {
+      if (isKeyPresenceQuery(sql)) return [keyPresence];
       if (sql.includes('"LibraryRecord"')) return [{ id: RECORD_ID }]; // 'deleted-holder' does not exist
       if (sql.includes('"CheckRun"')) return [{ id: 'run-2' }];
       // lockedDigestHolder and lockedAnyDigestHolder: nobody holds the target digest.
@@ -866,7 +1096,7 @@ describe('finaliseRecoveryGeneration', () => {
     transactionClient.externalCredential.update.mockResolvedValueOnce({});
 
     const prepared = {
-      sourceDigest: 'zObservedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zObservedSourceDigest' },
       encrypted: false,
       contentKind: ExternalContentKind.CREDENTIAL,
       decryptionKeyUnused: false,
@@ -924,6 +1154,7 @@ describe('finaliseRecoveryGeneration', () => {
     // attempt's required-check finds its own freshly-demanded id still
     // outside `lockedIds` and mismatches again.
     TX_LOCK.mockImplementation(async (sql: string, ...args: unknown[]) => {
+      if (isKeyPresenceQuery(sql)) return [keyPresence];
       if (sql.includes('"LibraryRecord"')) {
         const ids = (Array.isArray(args[0]) ? args[0] : [args[0]]) as string[];
         return ids.filter((id) => id === RECORD_ID).map((id) => ({ id }));
@@ -933,7 +1164,7 @@ describe('finaliseRecoveryGeneration', () => {
     });
 
     const prepared = {
-      sourceDigest: 'zObservedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zObservedSourceDigest' },
       encrypted: false,
       contentKind: ExternalContentKind.CREDENTIAL,
       decryptionKeyUnused: false,
@@ -984,6 +1215,7 @@ describe('finaliseRecoveryGeneration', () => {
       .mockResolvedValueOnce(null);
     const confirmedParents = new Set([RECORD_ID, 'missing-a', 'missing-b', 'missing-c']);
     TX_LOCK.mockImplementation(async (sql: string, ...args: unknown[]) => {
+      if (isKeyPresenceQuery(sql)) return [keyPresence];
       if (sql.includes('"LibraryRecord"')) {
         const ids = (Array.isArray(args[0]) ? args[0] : [args[0]]) as string[];
         return ids.filter((id) => confirmedParents.has(id)).map((id) => ({ id }));
@@ -994,7 +1226,7 @@ describe('finaliseRecoveryGeneration', () => {
     transactionClient.externalCredential.update.mockResolvedValue({});
 
     const prepared = {
-      sourceDigest: 'zObservedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zObservedSourceDigest' },
       encrypted: false,
       contentKind: ExternalContentKind.CREDENTIAL,
       decryptionKeyUnused: false,
@@ -1038,7 +1270,7 @@ describe('finaliseRecoveryGeneration', () => {
     transactionClient.checkRun.updateMany.mockResolvedValueOnce({ count: 0 });
 
     const prepared = {
-      sourceDigest: 'zFetchedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zFetchedSourceDigest' },
       encrypted: false,
       contentKind: ExternalContentKind.OPAQUE,
       decryptionKeyUnused: false,
@@ -1100,6 +1332,7 @@ describe('finaliseRecoveryGeneration', () => {
     transactionClient.externalCredential.findFirst.mockResolvedValue(null);
     let anyDigestHolderCalls = 0;
     TX_LOCK.mockImplementation(async (sql: string) => {
+      if (isKeyPresenceQuery(sql)) return [keyPresence];
       if (sql.includes('"LibraryRecord"')) return [{ id: RECORD_ID }]; // only this attempt's own row is locked
       if (sql.includes('"CheckRun"')) return [{ id: 'run-2' }];
       if (sql.includes('FOR UPDATE')) {
@@ -1113,7 +1346,7 @@ describe('finaliseRecoveryGeneration', () => {
     });
 
     const prepared = {
-      sourceDigest: 'zObservedSourceDigest',
+      acquisition: { mode: 'source', sourceDigest: 'zObservedSourceDigest' },
       encrypted: false,
       contentKind: ExternalContentKind.CREDENTIAL,
       decryptionKeyUnused: false,
@@ -1131,6 +1364,671 @@ describe('finaliseRecoveryGeneration', () => {
 
     expect(anyDigestHolderCalls).toBe(0);
   });
+
+  describe('the reconcileIdentity gate', () => {
+    // The gate changed from "a body was observed" to "an opened credential
+    // was observed". Both directions are pinned, because the change is
+    // behaviour-preserving only for the states reachable today and nothing
+    // else records which way it should go.
+    const openedNonCredential = {
+      acquisition: { mode: 'source' as const, sourceDigest: 'zObservedSourceDigest' },
+      encrypted: false,
+      contentKind: ExternalContentKind.JSON_OBJECT,
+      decryptionKeyUnused: false,
+      details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+      checkRun: { state: CheckRunState.PENDING, checks: {}, enqueue: jest.fn(async () => undefined) },
+    } as RecoverInRequestOutcome;
+
+    it('does not reconcile identity for an observed body that is not a credential', () => {
+      // A non-credential body has no identity to reconcile. Reconciling it
+      // would relinquish the row's digest to a body that carries none.
+      TX_FIND.mockResolvedValue(
+        row({
+          externalCredential: {
+            storageUri: null,
+            storageDigestMultibase: null,
+            storageExternalId: null,
+            sourceDigest: 'zOldSourceDigest',
+            contentDigest: null,
+            duplicateOfRecordId: null,
+          },
+          checkRuns: [{ id: 'run-2', generation: 2, state: CheckRunState.PENDING, lastEnqueuedAt: null }],
+        }),
+      );
+
+      return finaliseRecoveryGeneration(finaliseInput({ prepared: openedNonCredential })).then(() => {
+        // `updateMany` on the external child is reconciliation's own
+        // relinquish write; nothing else in this branch uses it.
+        expect(transactionClient.externalCredential.updateMany).not.toHaveBeenCalled();
+      });
+    });
+
+    it('does reconcile identity for an observed credential', async () => {
+      // The other way round, so the gate cannot be inverted without a
+      // failure. This row holds a digest the opened credential replaces, so
+      // reconciliation must relinquish it.
+      TX_FIND.mockResolvedValue(
+        row({
+          externalCredential: {
+            storageUri: null,
+            storageDigestMultibase: null,
+            storageExternalId: null,
+            sourceDigest: 'zOldSourceDigest',
+            contentDigest: 'zOldContentDigest',
+            duplicateOfRecordId: null,
+          },
+          checkRuns: [{ id: 'run-2', generation: 2, state: CheckRunState.PENDING, lastEnqueuedAt: null }],
+        }),
+      );
+      transactionClient.externalCredential.updateMany.mockResolvedValue({ count: 1 });
+      transactionClient.externalCredential.findFirst.mockResolvedValue(null);
+
+      await finaliseRecoveryGeneration(
+        finaliseInput({
+          prepared: {
+            ...openedNonCredential,
+            contentKind: ExternalContentKind.CREDENTIAL,
+            contentDigest: 'zNewContentDigest',
+          } as RecoverInRequestOutcome,
+        }),
+      );
+
+      expect(transactionClient.externalCredential.updateMany).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The stored-copy acquisition modes. Every fixture here states
+   * `acquisition: { mode: 'stored-copy' }`, which is what mode B produces,
+   * and an `expectedCustody` that carries the raw copy's coordinates, which
+   * is what its reservation returned.
+   */
+  describe('a stored-copy acquisition', () => {
+    const RAW_CUSTODY = {
+      storageUri: 'https://storage.example/raw',
+      storageDigestMultibase: 'zRawDigest',
+      storageExternalId: 'raw-1',
+      decryptionKeyPresent: false,
+      encrypted: true,
+    };
+
+    /**
+     * `retiredStorage` lives on the `created` arm alone, so reading it needs
+     * the narrowing the type asks for. Each caller pins the outcome too, so
+     * an absence here can never be an absence caused by the wrong arm.
+     */
+    function retiredStorageOf(result: FinaliseRecoveryGenerationResult) {
+      return result.outcome === 'created' ? result.retiredStorage : undefined;
+    }
+
+    function rawRow(overrides: Record<string, unknown> = {}) {
+      return row({
+        externalCredential: {
+          storageUri: RAW_CUSTODY.storageUri,
+          storageDigestMultibase: RAW_CUSTODY.storageDigestMultibase,
+          storageServiceInstanceId: 'si-1',
+          storageExternalId: RAW_CUSTODY.storageExternalId,
+          storageBucket: 'private',
+          sourceDigest: 'zOldSourceDigest',
+          contentDigest: null,
+          duplicateOfRecordId: null,
+          encrypted: true,
+          ...overrides,
+        },
+        checkRuns: [{ id: 'run-2', generation: 2, state: CheckRunState.PENDING, lastEnqueuedAt: null }],
+      });
+    }
+
+    it('settles a wrong key with its own code and checks, writing no content, freshness or custody column', async () => {
+      // Without the terminal branch this outcome reaches
+      // `rejectedReplacementFailure`, which maps `encrypted === true` to
+      // DECRYPTION_REQUIRED and would rewrite a wrong key as a missing one.
+      // Fails if the branch is removed, or if it stops writing the attempt's
+      // own failure and checks.
+      TX_FIND.mockResolvedValue(rawRow({ contentDigest: 'zHeldContentDigest' }));
+      const prepared = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: true,
+        details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+        checkRun: {
+          state: CheckRunState.FAILED,
+          checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS, decryption: CheckResult.FAIL },
+          failure: {
+            code: CheckRunFailureCode.DECRYPTION_FAILED,
+            message: 'the supplied key did not open it',
+            retryable: true,
+          },
+        },
+      } as RecoverInRequestOutcome;
+
+      const result = await finaliseRecoveryGeneration(finaliseInput({ prepared, expectedCustody: RAW_CUSTODY }));
+
+      expect(result).toEqual({ outcome: 'created', generation: 2, checkRunId: 'run-2' });
+      expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({ id: 'run-2', recordId: RECORD_ID, generation: 2, tenantId: TENANT_ID }),
+        data: expect.objectContaining({
+          state: CheckRunState.FAILED,
+          retrieval: CheckResult.PASS,
+          digest: CheckResult.PASS,
+          decryption: CheckResult.FAIL,
+          failureCode: CheckRunFailureCode.DECRYPTION_FAILED,
+          failureRetryable: true,
+          sourceChanged: null,
+          lastSourceCheckAt: null,
+        }),
+      });
+      // No custody, identity or descriptive write of any kind.
+      expect(transactionClient.externalCredential.update).not.toHaveBeenCalled();
+      expect(transactionClient.externalCredential.updateMany).not.toHaveBeenCalled();
+      expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
+    });
+
+    it('settles a failed stored read the same way, with every check not run', async () => {
+      // The unobserved arm of the same branch: nothing arrived at all, so
+      // the generation states that and touches nothing else.
+      TX_FIND.mockResolvedValue(rawRow());
+      const prepared = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: null,
+        details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+        checkRun: {
+          state: CheckRunState.FAILED,
+          checks: {},
+          failure: {
+            code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+            message: 'the copy could not be read back',
+            retryable: true,
+          },
+        },
+      } as RecoverInRequestOutcome;
+
+      await finaliseRecoveryGeneration(finaliseInput({ prepared, expectedCustody: RAW_CUSTODY }));
+
+      expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
+        where: expect.anything(),
+        data: expect.objectContaining({
+          state: CheckRunState.FAILED,
+          retrieval: CheckResult.NOT_RUN,
+          digest: CheckResult.NOT_RUN,
+          decryption: CheckResult.NOT_RUN,
+          failureCode: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
+        }),
+      });
+      expect(transactionClient.externalCredential.update).not.toHaveBeenCalled();
+    });
+
+    it('takes the same terminal path from the identity-held sub-branch', async () => {
+      // The store was skipped in-request because the reservation held an
+      // identity, and that identity has since been cleared. A source-mode
+      // outcome settles the moved-identity failure there; a stored-copy one
+      // must still settle its own, because no source was ever read. Fails if
+      // the sub-branch is dropped and a wrong key is reported as an identity
+      // race with a freshness stamp.
+      TX_FIND.mockResolvedValue(rawRow());
+      const prepared = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: true,
+        details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+        storageSkipped: 'identity-held',
+        checkRun: {
+          state: CheckRunState.FAILED,
+          checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS, decryption: CheckResult.FAIL },
+          failure: {
+            code: CheckRunFailureCode.DECRYPTION_FAILED,
+            message: 'the supplied key did not open it',
+            retryable: true,
+          },
+        },
+      } as RecoverInRequestOutcome;
+
+      await finaliseRecoveryGeneration(finaliseInput({ prepared, expectedCustody: RAW_CUSTODY }));
+
+      expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
+        where: expect.anything(),
+        data: expect.objectContaining({
+          failureCode: CheckRunFailureCode.DECRYPTION_FAILED,
+          sourceChanged: null,
+          lastSourceCheckAt: null,
+        }),
+      });
+    });
+
+    it('writes content but no source provenance when the copy opens, splitting the two observations', async () => {
+      // The split is important here. `contentObserved` is true (a body was classified) while
+      // `sourceObserved` is false (no supplier was read), so identity,
+      // `encrypted` and `contentKind` are written and `sourceDigest`,
+      // `sourceChanged` and `lastSourceCheckAt` are not. Collapsing the two
+      // back together breaks one half or the other.
+      TX_FIND.mockResolvedValue(rawRow());
+      // No other record in the tenant holds this digest, so the row acquires
+      // it canonically and the write under test is the whole identity write.
+      TX_LOCK.mockImplementation(async (sql: string) => {
+        if (isKeyPresenceQuery(sql)) return [keyPresence];
+        if (isLibraryRecordLock(sql)) return [{ id: RECORD_ID }];
+        if (sql.includes('"CheckRun"')) return [{ id: 'run-2' }];
+        return [];
+      });
+      const prepared = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: true,
+        contentKind: ExternalContentKind.CREDENTIAL,
+        decryptionKeyUnused: false,
+        contentDigest: 'zOpenedDigest',
+        storage: {
+          uri: 'https://storage.example/new',
+          digestMultibase: 'zNewDigest',
+          serviceInstanceId: 'si-1',
+          externalId: 'new-1',
+          bucket: 'private',
+        },
+        details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+        checkRun: { state: CheckRunState.PENDING, checks: {}, enqueue: jest.fn(async () => undefined) },
+      } as RecoverInRequestOutcome;
+
+      await finaliseRecoveryGeneration(finaliseInput({ prepared, expectedCustody: RAW_CUSTODY }));
+
+      const externalWrite = transactionClient.externalCredential.update.mock.calls.at(-1)?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(externalWrite.data).toMatchObject({
+        encrypted: true,
+        contentKind: ExternalContentKind.CREDENTIAL,
+        contentDigest: 'zOpenedDigest',
+      });
+      expect(externalWrite.data).not.toHaveProperty('sourceDigest');
+      expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
+        where: expect.anything(),
+        data: expect.objectContaining({ sourceChanged: null, lastSourceCheckAt: null }),
+      });
+    });
+
+    it('persists a sticky decryptionKeyUnused and never writes it back to false', async () => {
+      // The flag says a key was once supplied and not needed. Fails if the
+      // finaliser starts writing the flag unconditionally, which would clear
+      // it on every later generation that did not carry one.
+      TX_FIND.mockResolvedValue(rawRow());
+      const base = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: false,
+        contentKind: ExternalContentKind.CREDENTIAL,
+        contentDigest: 'zOpenedDigest',
+        details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+        checkRun: { state: CheckRunState.PENDING, checks: {}, enqueue: jest.fn(async () => undefined) },
+      };
+
+      await finaliseRecoveryGeneration(
+        finaliseInput({
+          prepared: { ...base, decryptionKeyUnused: true } as RecoverInRequestOutcome,
+          expectedCustody: RAW_CUSTODY,
+        }),
+      );
+      expect(
+        (transactionClient.externalCredential.update.mock.calls.at(-1)?.[0] as { data: Record<string, unknown> }).data,
+      ).toMatchObject({ decryptionKeyUnused: true });
+
+      transactionClient.externalCredential.update.mockClear();
+      await finaliseRecoveryGeneration(
+        finaliseInput({
+          prepared: { ...base, decryptionKeyUnused: false } as RecoverInRequestOutcome,
+          expectedCustody: RAW_CUSTODY,
+        }),
+      );
+      expect(
+        (transactionClient.externalCredential.update.mock.calls.at(-1)?.[0] as { data: Record<string, unknown> }).data,
+      ).not.toHaveProperty('decryptionKeyUnused');
+    });
+
+    /**
+     * The sticky flag survives the two branches that settle a failure and
+     * deliberately change nothing else about the record. Both returned before
+     * the finalisation's external-row write, so the fact that this caller
+     * supplied a key nothing needed was simply discarded and the record
+     * projection never warned about it. The flag has to outlive the attempt
+     * that earned it: a later keyed opening does not make the earlier
+     * unnecessary key any less true.
+     *
+     * Each case asserts the write is that one column and nothing else,
+     * because these branches exist precisely to leave custody, identity and
+     * details alone. `credential-record-projection.test.ts` covers what the
+     * column then projects as.
+     */
+    it('writes the sticky decryptionKeyUnused, and only it, from the rejected-replacement branch', async () => {
+      TX_FIND.mockResolvedValue(rawRow({ contentDigest: 'zHeldContentDigest' }));
+      const prepared = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: false,
+        contentKind: ExternalContentKind.JSON_OBJECT,
+        decryptionKeyUnused: true,
+        details: { status: CredentialDetailsStatus.EXTRACTION_FAILED },
+        checkRun: {
+          state: CheckRunState.FAILED,
+          checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS },
+          failure: { code: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL, message: 'not a credential', retryable: true },
+        },
+      } as RecoverInRequestOutcome;
+
+      const result = await finaliseRecoveryGeneration(finaliseInput({ prepared, expectedCustody: RAW_CUSTODY }));
+
+      expect(result).toEqual({ outcome: 'created', generation: 2, checkRunId: 'run-2' });
+      expect(transactionClient.externalCredential.update).toHaveBeenCalledTimes(1);
+      expect(transactionClient.externalCredential.update).toHaveBeenCalledWith({
+        where: {
+          id_tenantId_origin: { id: RECORD_ID, tenantId: TENANT_ID, origin: LibraryRecordOrigin.EXTERNAL },
+        },
+        data: { decryptionKeyUnused: true },
+      });
+      // Custody, identity and details are the branch's whole contract.
+      expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
+      expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
+        where: expect.anything(),
+        data: expect.objectContaining({
+          state: CheckRunState.FAILED,
+          failureCode: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL,
+        }),
+      });
+    });
+
+    it('writes the sticky decryptionKeyUnused, and only it, from the identity-cleared branch', async () => {
+      // The store was skipped in-request for an identity the row no longer
+      // holds, so this settles its own moved-identity failure. The unused key
+      // is still a fact about this attempt.
+      TX_FIND.mockResolvedValue(rawRow({ contentDigest: null, duplicateOfRecordId: null }));
+      const prepared = {
+        acquisition: { mode: 'source', sourceDigest: 'zFetchedSourceDigest' },
+        encrypted: true,
+        contentKind: ExternalContentKind.OPAQUE,
+        decryptionKeyUnused: true,
+        storageSkipped: 'identity-held',
+        details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+        checkRun: {
+          state: CheckRunState.FAILED,
+          checks: { retrieval: CheckResult.PASS },
+          failure: {
+            code: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL,
+            message: 'irrelevant: never consumed',
+            retryable: true,
+          },
+        },
+      } as RecoverInRequestOutcome;
+
+      const result = await finaliseRecoveryGeneration(finaliseInput({ prepared, expectedCustody: RAW_CUSTODY }));
+
+      expect(result).toEqual({ outcome: 'created', generation: 2, checkRunId: 'run-2' });
+      expect(transactionClient.externalCredential.update).toHaveBeenCalledTimes(1);
+      expect(transactionClient.externalCredential.update).toHaveBeenCalledWith({
+        where: {
+          id_tenantId_origin: { id: RECORD_ID, tenantId: TENANT_ID, origin: LibraryRecordOrigin.EXTERNAL },
+        },
+        data: { decryptionKeyUnused: true },
+      });
+      expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
+      expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
+        where: expect.anything(),
+        data: expect.objectContaining({
+          state: CheckRunState.FAILED,
+          failureCode: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
+        }),
+      });
+    });
+
+    it('keeps the stored-copy sub-branch on its own failure code while still writing the sticky flag', async () => {
+      // Mode B opened the record's own durable copy to something that is not
+      // a credential, with a key that turned out not to be needed, and the
+      // identity the in-request skip was protecting was cleared before this
+      // lock was taken. The sibling arm settles a moved-identity failure
+      // whose message names a source being fetched; this attempt read no
+      // source at all, so it keeps the failure its own acquisition decided
+      // and stamps no freshness pair. The unused key is a fact about the
+      // attempt either way, so the same one-column write still happens.
+      TX_FIND.mockResolvedValue(rawRow({ contentDigest: null, duplicateOfRecordId: null }));
+      const prepared = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: true,
+        contentKind: ExternalContentKind.JSON_OBJECT,
+        decryptionKeyUnused: true,
+        storageSkipped: 'identity-held',
+        details: { status: CredentialDetailsStatus.EXTRACTION_FAILED },
+        checkRun: {
+          state: CheckRunState.FAILED,
+          checks: { retrieval: CheckResult.PASS, digest: CheckResult.PASS, decryption: CheckResult.PASS },
+          failure: {
+            code: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL,
+            message:
+              "The record's durable copy opened to something that is not the credential this record already holds. No source was read; the copy is unchanged.",
+            retryable: true,
+          },
+        },
+      } as RecoverInRequestOutcome;
+
+      const result = await finaliseRecoveryGeneration(finaliseInput({ prepared, expectedCustody: RAW_CUSTODY }));
+
+      expect(result).toEqual({ outcome: 'created', generation: 2, checkRunId: 'run-2' });
+      expect(transactionClient.externalCredential.update).toHaveBeenCalledTimes(1);
+      expect(transactionClient.externalCredential.update).toHaveBeenCalledWith({
+        where: {
+          id_tenantId_origin: { id: RECORD_ID, tenantId: TENANT_ID, origin: LibraryRecordOrigin.EXTERNAL },
+        },
+        data: { decryptionKeyUnused: true },
+      });
+      expect(transactionClient.libraryRecord.update).not.toHaveBeenCalled();
+      expect(transactionClient.checkRun.updateMany).toHaveBeenCalledWith({
+        where: expect.anything(),
+        data: expect.objectContaining({
+          state: CheckRunState.FAILED,
+          failureCode: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL,
+          failureRetryable: true,
+          sourceChanged: null,
+          lastSourceCheckAt: null,
+        }),
+      });
+    });
+
+    it('reports the retired copy only from the branch that actually replaced custody', async () => {
+      // The rejected-replacement branch also reaches a 'created' outcome with
+      // a prepared copy, and there the record KEEPS its raw copy. The caller
+      // DELETES whatever this reports, so naming a live copy here destroys
+      // the record's only copy.
+      TX_FIND.mockResolvedValue(rawRow());
+      const replacing = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: false,
+        contentKind: ExternalContentKind.CREDENTIAL,
+        decryptionKeyUnused: false,
+        contentDigest: 'zOpenedDigest',
+        storage: {
+          uri: 'https://storage.example/new',
+          digestMultibase: 'zNewDigest',
+          serviceInstanceId: 'si-1',
+          externalId: 'new-1',
+          bucket: 'private',
+        },
+        details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+        checkRun: { state: CheckRunState.PENDING, checks: {}, enqueue: jest.fn(async () => undefined) },
+      } as RecoverInRequestOutcome;
+
+      const replaced = await finaliseRecoveryGeneration(
+        finaliseInput({ prepared: replacing, expectedCustody: RAW_CUSTODY }),
+      );
+
+      // Every coordinate the removal needs, read from the row this
+      // transaction locked: the reservation's own snapshot carries neither
+      // the bucket nor the service instance.
+      expect(replaced.outcome).toBe('created');
+      expect(retiredStorageOf(replaced)).toEqual({
+        storageUri: RAW_CUSTODY.storageUri,
+        storageServiceInstanceId: 'si-1',
+        storageExternalId: RAW_CUSTODY.storageExternalId,
+        storageBucket: 'private',
+      });
+
+      // Now the rejected-replacement branch: a non-credential body on an
+      // identity-holding row, which stores a copy and then does not attach it.
+      (loggerCalls.info as jest.Mock).mockClear();
+      TX_FIND.mockResolvedValue(rawRow({ contentDigest: 'zHeldContentDigest' }));
+      const rejected = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: false,
+        contentKind: ExternalContentKind.JSON_OBJECT,
+        decryptionKeyUnused: false,
+        storage: {
+          uri: 'https://storage.example/rejected',
+          digestMultibase: 'zRejectedDigest',
+          serviceInstanceId: 'si-1',
+          externalId: 'rejected-1',
+          bucket: 'private',
+        },
+        details: { status: CredentialDetailsStatus.EXTRACTION_FAILED },
+        checkRun: {
+          state: CheckRunState.FAILED,
+          checks: { retrieval: CheckResult.PASS },
+          failure: { code: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL, message: 'not a credential', retryable: true },
+        },
+      } as RecoverInRequestOutcome;
+
+      const kept = await finaliseRecoveryGeneration(
+        finaliseInput({ prepared: rejected, expectedCustody: RAW_CUSTODY }),
+      );
+
+      // The outcome is pinned as well as the absence: `undefined` is also
+      // what a superseded finalisation reports, and this branch has to reach
+      // 'created' for the absence to mean what the case says.
+      expect(kept.outcome).toBe('created');
+      expect(retiredStorageOf(kept)).toBeUndefined();
+      expect(loggerCalls.error).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'rejected-replacement', storageUri: 'https://storage.example/rejected' }),
+        'Prepared recovery copy is orphaned and needs operator cleanup',
+      );
+    });
+
+    it('retires nothing when the replacement names the object it displaced', async () => {
+      // The caller DELETES what this reports, so a replacement that landed on
+      // the same object id and bucket must retire nothing: reporting it would
+      // delete the copy the row now points at. The UNCEFACT adapter mints a
+      // fresh object id per store, so this guards the contract rather than an
+      // observed case. Fails if the identity comparison is dropped.
+      TX_FIND.mockResolvedValue(rawRow());
+      const sameObject = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: false,
+        contentKind: ExternalContentKind.CREDENTIAL,
+        decryptionKeyUnused: false,
+        contentDigest: 'zOpenedDigest',
+        storage: {
+          uri: 'https://storage.example/raw-rewritten',
+          digestMultibase: 'zNewDigest',
+          serviceInstanceId: 'si-1',
+          externalId: RAW_CUSTODY.storageExternalId,
+          bucket: 'private',
+        },
+        details: { status: CredentialDetailsStatus.EXTRACTION_PENDING },
+        checkRun: { state: CheckRunState.PENDING, checks: {}, enqueue: jest.fn(async () => undefined) },
+      } as RecoverInRequestOutcome;
+
+      const result = await finaliseRecoveryGeneration(
+        finaliseInput({ prepared: sameObject, expectedCustody: RAW_CUSTODY }),
+      );
+
+      // The replacement itself still happened; only the retirement is withheld.
+      expect(result.outcome).toBe('created');
+      expect(retiredStorageOf(result)).toBeUndefined();
+    });
+
+    it('does not render the raw cause chain on the finalisation race line either', async () => {
+      // This is a second site. Reached after the acquisition has already run with
+      // the supplier's key in scope, so the same rule applies here as on the
+      // reservation's own race line. Fails if `err: error` returns.
+      const chained = Object.assign(new Error('pending index'), {
+        name: 'PrismaClientKnownRequestError',
+        code: 'P2002',
+        clientVersion: '6.19.2',
+        meta: { target: 'CheckRun_recordId_generation_key' },
+        cause: new Error(`the finalisation held ${KEY_SENTINEL}`),
+      });
+      mockTransaction.mockRejectedValue(chained);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.COMPLETE, generation: 4 }),
+      );
+
+      await finaliseRecoveryGeneration(finaliseInput({ expectedCustody: RAW_CUSTODY }));
+
+      const rendered = renderedLogLines.join('');
+      expect(rendered).toContain('Recovery finalisation insert lost a unique race');
+      expect(rendered).not.toContain(KEY_SENTINEL);
+    });
+
+    it('proves the rendered capture would show a sentinel if a line carried one', () => {
+      // Without this, both assertions above would also pass against a capture
+      // that rendered nothing at all.
+      const { createLogger } = jest.requireActual('@uncefact/untp-ri-services/logging') as {
+        createLogger: (config: Record<string, unknown>) => { warn: (...a: unknown[]) => void };
+      };
+      createLogger({
+        level: 'debug',
+        destination: { write: (line: string) => renderedLogLines.push(line) },
+      }).warn({ leakCheck: KEY_SENTINEL }, 'deliberate sentinel write');
+
+      expect(renderedLogLines.join('')).toContain(KEY_SENTINEL);
+    });
+
+    it('does not report a retired copy from a deadlock-retried attempt whose retry replaced nothing', async () => {
+      // `withDeadlockRetry` re-runs the whole transaction callback
+      // once, and the previous attempt's writes roll back with it. The first
+      // attempt here finds no content identity, replaces custody and sets the
+      // retirement; a concurrent writer then gives the row an identity, so
+      // the retry takes the rejected-replacement branch, keeps the record's
+      // LIVE copy and still returns 'created'. Without resetting the
+      // retirement inside the callback, the result names that live copy, and
+      // the caller deletes what the result names.
+      //
+      // Fails if `retired = undefined` moves back outside the callback.
+      const deadlock = Object.assign(new Error('deadlock detected'), {
+        name: 'PrismaClientKnownRequestError',
+        code: 'P2034',
+        clientVersion: '6.19.2',
+      });
+      let attempt = 0;
+      mockTransaction.mockImplementation(async (callback: (tx: typeof transactionClient) => unknown) => {
+        attempt += 1;
+        if (attempt === 1) {
+          // No identity yet: the callback runs the replacing branch, sets the
+          // retirement, and then the transaction deadlocks and rolls back.
+          TX_FIND.mockResolvedValue(rawRow());
+          await callback(transactionClient);
+          throw deadlock;
+        }
+        // A concurrent writer gave the row an identity between the attempts.
+        TX_FIND.mockResolvedValue(rawRow({ contentDigest: 'zHeldContentDigest' }));
+        return callback(transactionClient);
+      });
+      const nonCredential = {
+        acquisition: { mode: 'stored-copy' },
+        encrypted: false,
+        contentKind: ExternalContentKind.JSON_OBJECT,
+        decryptionKeyUnused: false,
+        storage: {
+          uri: 'https://storage.example/new',
+          digestMultibase: 'zNewDigest',
+          serviceInstanceId: 'si-1',
+          externalId: 'new-1',
+          bucket: 'private',
+        },
+        details: { status: CredentialDetailsStatus.EXTRACTION_FAILED },
+        checkRun: {
+          state: CheckRunState.FAILED,
+          checks: { retrieval: CheckResult.PASS },
+          failure: { code: CheckRunFailureCode.SOURCE_NOT_CREDENTIAL, message: 'not a credential', retryable: true },
+        },
+      } as RecoverInRequestOutcome;
+
+      const retried = await finaliseRecoveryGeneration(
+        finaliseInput({ prepared: nonCredential, expectedCustody: RAW_CUSTODY }),
+      );
+
+      expect(attempt).toBe(2);
+      expect(retried.outcome).toBe('created');
+      expect(retiredStorageOf(retried)).toBeUndefined();
+    });
+  });
 });
 
 describe('reserveRecoveryGeneration', () => {
@@ -1139,7 +2037,13 @@ describe('reserveRecoveryGeneration', () => {
       recordId: RECORD_ID,
       tenantId: TENANT_ID,
       expectedGeneration: 0,
-      expectedCustody: { storageUri: null, storageDigestMultibase: null, storageExternalId: null },
+      expectedCustody: {
+        storageUri: null,
+        storageDigestMultibase: null,
+        storageExternalId: null,
+        decryptionKeyPresent: false,
+        encrypted: false,
+      },
       ...overrides,
     };
   }
@@ -1169,6 +2073,13 @@ describe('reserveRecoveryGeneration', () => {
       generation: 1,
       checkRunId: 'run-2',
       identity: { contentDigest: null, duplicateOfRecordId: null },
+      custody: {
+        storageUri: null,
+        storageDigestMultibase: null,
+        storageExternalId: null,
+        decryptionKeyPresent: false,
+        encrypted: false,
+      },
     });
     expect(TX_CREATE).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -1200,6 +2111,13 @@ describe('reserveRecoveryGeneration', () => {
       generation: 1,
       checkRunId: 'run-2',
       identity: { contentDigest: null, duplicateOfRecordId: null },
+      custody: {
+        storageUri: null,
+        storageDigestMultibase: null,
+        storageExternalId: null,
+        decryptionKeyPresent: false,
+        encrypted: false,
+      },
     });
     expect(mockTransaction).toHaveBeenCalledTimes(2);
   });
@@ -1246,6 +2164,7 @@ describe('reserveRecoveryGeneration', () => {
           sourceDigest: null,
           contentDigest: null,
           duplicateOfRecordId: null,
+          encrypted: true,
         },
         checkRuns: [],
       }),
@@ -1256,9 +2175,16 @@ describe('reserveRecoveryGeneration', () => {
   });
 
   it('returns missing when the tenant-scoped lock finds no parent', async () => {
-    TX_LOCK.mockResolvedValue([]);
+    // Fails if the reservation can lock a record by id alone and then recover
+    // another tenant's row.
+    TX_LOCK.mockImplementation(async (sql: string) => (isKeyPresenceQuery(sql) ? [keyPresence] : []));
 
     await expect(reserveRecoveryGeneration(reserveInput())).resolves.toEqual({ outcome: 'missing' });
+    expect(TX_LOCK).toHaveBeenCalledWith(
+      'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
+      RECORD_ID,
+      TENANT_ID,
+    );
     expect(TX_CREATE).not.toHaveBeenCalled();
   });
 
@@ -1274,6 +2200,346 @@ describe('reserveRecoveryGeneration', () => {
     );
 
     await expect(reserveRecoveryGeneration(reserveInput())).resolves.toEqual({ outcome: 'joined' });
+  });
+
+  it('answers conflict, never joined, when a key-bearing request meets a pending generation under the lock', async () => {
+    // A joined key-bearing request would be told 202 while its key was
+    // dropped on the floor. Fails if the pending branch stops honouring
+    // keyBearing, or if the flag stops reaching the locked decision.
+    TX_FIND.mockResolvedValue(
+      row({
+        externalCredential: {
+          storageUri: 'https://storage.example/raw',
+          storageDigestMultibase: 'zRaw',
+          storageExternalId: 'raw-1',
+          sourceDigest: null,
+          contentDigest: null,
+          duplicateOfRecordId: null,
+          encrypted: true,
+        },
+        checkRuns: [{ id: 'run-9', generation: 3, state: CheckRunState.PENDING, lastEnqueuedAt: null }],
+      }),
+    );
+
+    await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).resolves.toEqual({
+      outcome: 'conflict',
+      reason: 'pending',
+      generation: 3,
+    });
+    expect(TX_CREATE).not.toHaveBeenCalled();
+  });
+
+  it('answers not-applicable, not conflict, when the copy is protected AND a generation is pending', async () => {
+    // The published precedence puts rule 4 (a key against an already
+    // protected copy, 400) ahead of rule 5 (a key against a pending
+    // generation, 409), and this is the only state where both apply. Fails if
+    // the pending test runs first, which answers 409 and sends the caller to
+    // wait for a settlement that will not make their key usable.
+    keyPresence = { credential: false, external: true };
+    TX_FIND.mockResolvedValue(
+      row({
+        externalCredential: {
+          storageUri: 'https://storage.example/protected',
+          storageDigestMultibase: 'zProtected',
+          storageExternalId: 'protected-1',
+          sourceDigest: null,
+          contentDigest: null,
+          duplicateOfRecordId: null,
+          encrypted: true,
+        },
+        checkRuns: [{ id: 'run-9', generation: 3, state: CheckRunState.PENDING, lastEnqueuedAt: null }],
+      }),
+    );
+
+    await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).resolves.toEqual({
+      outcome: 'not-applicable',
+    });
+    expect(TX_CREATE).not.toHaveBeenCalled();
+  });
+
+  it('still joins a bodyless request whose record is protected and pending', async () => {
+    // The control: reordering the two key-bearing tests must not change what
+    // a bodyless request in the same state is told.
+    keyPresence = { credential: false, external: true };
+    TX_FIND.mockResolvedValue(
+      row({
+        externalCredential: {
+          storageUri: 'https://storage.example/protected',
+          storageDigestMultibase: 'zProtected',
+          storageExternalId: 'protected-1',
+          sourceDigest: null,
+          contentDigest: null,
+          duplicateOfRecordId: null,
+          encrypted: true,
+        },
+        checkRuns: [{ id: 'run-9', generation: 3, state: CheckRunState.PENDING, lastEnqueuedAt: null }],
+      }),
+    );
+
+    await expect(reserveRecoveryGeneration(reserveInput())).resolves.toEqual({ outcome: 'joined' });
+  });
+
+  it('answers not-applicable when the copy became receiver-protected between the read and the lock', async () => {
+    // Rule 4 under the lock. Fails if applicability is judged from the
+    // caller's pre-lock read, which would let a key be spent on a record this
+    // service can already open.
+    keyPresence = { credential: false, external: true };
+    TX_FIND.mockResolvedValue(
+      row({
+        externalCredential: {
+          storageUri: 'https://storage.example/protected',
+          storageDigestMultibase: 'zProtected',
+          storageExternalId: 'protected-1',
+          sourceDigest: null,
+          contentDigest: null,
+          duplicateOfRecordId: null,
+          encrypted: true,
+        },
+        checkRuns: [],
+      }),
+    );
+
+    await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).resolves.toEqual({
+      outcome: 'not-applicable',
+    });
+    expect(TX_CREATE).not.toHaveBeenCalled();
+  });
+
+  it('reads key presence by projection rather than selecting the key envelope', async () => {
+    // The custody fence compares key PRESENCE. Fails if the envelope is put
+    // back into the row object this transaction holds, which is how it would
+    // reach a log line from here.
+    await reserveRecoveryGeneration(reserveInput());
+
+    const presenceCalls = TX_LOCK.mock.calls.filter(([sql]) => isKeyPresenceQuery(sql as string));
+    expect(presenceCalls).toHaveLength(1);
+    expect(presenceCalls[0][0]).toEqual(expect.stringContaining('IS NOT NULL'));
+    expect(presenceCalls[0].slice(1)).toEqual([RECORD_ID, TENANT_ID]);
+    const include = (TX_FIND.mock.calls[0][0] as { include: Record<string, { select: Record<string, boolean> }> })
+      .include;
+    expect(include.credential.select).not.toHaveProperty('decryptionKey');
+    expect(include.externalCredential.select).not.toHaveProperty('decryptionKey');
+  });
+
+  it('throws the shape error under the lock for a stored copy that is neither encrypted nor keyed', async () => {
+    // Re-checked under the lock, before any mode is chosen, an unkeyed
+    // plaintext copy can never be handed to the stored-copy path. Fails if
+    // the check only runs on the caller's pre-lock read.
+    TX_FIND.mockResolvedValue(
+      row({
+        externalCredential: {
+          storageUri: 'https://storage.example/plain',
+          storageDigestMultibase: 'zPlain',
+          storageExternalId: 'plain-1',
+          sourceDigest: null,
+          contentDigest: null,
+          duplicateOfRecordId: null,
+          encrypted: false,
+        },
+        checkRuns: [],
+      }),
+    );
+
+    await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).rejects.toBeInstanceOf(
+      LibraryRecordShapeError,
+    );
+    expect(TX_CREATE).not.toHaveBeenCalled();
+  });
+
+  it('reserves the next generation from the locked state when a key-bearing request finds one already advanced', async () => {
+    // Owner ruling 2. A generation that completed between the caller's read
+    // and this lock must not answer `superseded` for a key-bearing request:
+    // that would acknowledge the key without consuming it. Fails if the
+    // generation and custody comparison is applied to a key-bearing request.
+    TX_FIND.mockResolvedValue(
+      row({
+        externalCredential: {
+          storageUri: 'https://storage.example/raw',
+          storageDigestMultibase: 'zRaw',
+          storageExternalId: 'raw-1',
+          sourceDigest: null,
+          contentDigest: null,
+          duplicateOfRecordId: null,
+          encrypted: true,
+        },
+        checkRuns: [{ id: 'run-7', generation: 4, state: CheckRunState.COMPLETE, lastEnqueuedAt: null }],
+      }),
+    );
+    TX_CREATE.mockResolvedValue({ id: 'run-8', generation: 5 });
+
+    await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true, expectedGeneration: 2 }))).resolves.toEqual(
+      {
+        outcome: 'reserved',
+        generation: 5,
+        checkRunId: 'run-8',
+        identity: { contentDigest: null, duplicateOfRecordId: null },
+        custody: {
+          storageUri: 'https://storage.example/raw',
+          storageDigestMultibase: 'zRaw',
+          storageExternalId: 'raw-1',
+          decryptionKeyPresent: false,
+          encrypted: true,
+        },
+      },
+    );
+  });
+
+  describe('the unique-race fallback', () => {
+    // The three race cases are covered here. The reservation re-enters its locked decision once
+    // on a unique-index loss; a second loss falls through to the resolver,
+    // which reads the winner without a lock and must still answer a
+    // key-bearing request in terms that never drop its key.
+    const unique = Object.assign(new Error('pending index'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2002',
+      clientVersion: '6.19.2',
+    });
+
+    /** Answers the resolver's key-presence projection for this record. */
+    function resolverHoldsKey(held: boolean): void {
+      (prisma.$queryRawUnsafe as unknown as jest.Mock).mockImplementation(async (sql: string) =>
+        isKeyPresenceQuery(sql) ? [{ credential: false, external: held }] : [],
+      );
+    }
+
+    it('re-enters the locked decision exactly once before falling back to the resolver', async () => {
+      // Fails if the re-entry is removed (one transaction), or if it is
+      // unbounded (more than two).
+      mockTransaction.mockRejectedValue(unique);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.PENDING }),
+      );
+
+      await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).resolves.toEqual({
+        outcome: 'conflict',
+        reason: 'pending',
+        generation: 2,
+      });
+      expect(mockTransaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('answers conflict for a key-bearing loser whose winner is still pending', async () => {
+      mockTransaction.mockRejectedValue(unique);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.PENDING }),
+      );
+
+      await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).resolves.toEqual({
+        outcome: 'conflict',
+        reason: 'pending',
+        generation: 2,
+      });
+    });
+
+    it('answers not-applicable for a key-bearing loser whose winner protected the copy', async () => {
+      // 400, not 409: rule 4 says a key is not applicable to this record at
+      // all now, so telling the caller to wait and try again would be wrong.
+      mockTransaction.mockRejectedValue(unique);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.COMPLETE }),
+      );
+      resolverHoldsKey(true);
+
+      await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).resolves.toEqual({
+        outcome: 'not-applicable',
+      });
+    });
+
+    it('answers not-applicable, not conflict, for a key-bearing loser whose winner is pending on a protected copy', async () => {
+      // The resolver applies the same precedence as the locked reservation
+      // applies: a key that can never be used here is a permanent refusal and
+      // outranks a temporary one. Fails if the pending test runs first.
+      mockTransaction.mockRejectedValue(unique);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.PENDING }),
+      );
+      resolverHoldsKey(true);
+
+      await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).resolves.toEqual({
+        outcome: 'not-applicable',
+      });
+    });
+
+    it('answers conflict, not superseded, for a key-bearing loser whose winner settled and left the record eligible', async () => {
+      // `superseded` here is answered 202 with the winner's envelope, which a
+      // caller cannot tell apart from their own key having been applied,
+      // while the key was in fact never consumed. Fails if this arm reverts.
+      //
+      // `race-lost` rather than `pending`: nothing is running, so the caller
+      // is told their key was not used rather than to wait.
+      mockTransaction.mockRejectedValue(unique);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.COMPLETE, generation: 4 }),
+      );
+      resolverHoldsKey(false);
+
+      await expect(reserveRecoveryGeneration(reserveInput({ keyBearing: true }))).resolves.toEqual({
+        outcome: 'conflict',
+        reason: 'race-lost',
+        generation: 4,
+      });
+    });
+
+    it('reads key presence by projection in the resolver too, never through the record detail view', async () => {
+      // PD6. Every other custody read in this module projects
+      // `IS NOT NULL` in SQL so the key envelope never enters a row object it
+      // holds, and `REVERIFICATION_ROW_INCLUDE` says so. This path used to
+      // load the whole detail view. Fails if it goes back to it.
+      mockTransaction.mockRejectedValue(unique);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.COMPLETE, generation: 4 }),
+      );
+      resolverHoldsKey(false);
+
+      await reserveRecoveryGeneration(reserveInput({ keyBearing: true }));
+
+      expect(mockGetLibraryRecordById).not.toHaveBeenCalled();
+      const presenceCalls = (prisma.$queryRawUnsafe as unknown as jest.Mock).mock.calls.filter(([sql]) =>
+        isKeyPresenceQuery(sql as string),
+      );
+      expect(presenceCalls).toHaveLength(1);
+      expect(presenceCalls[0].slice(1)).toEqual([RECORD_ID, TENANT_ID]);
+      expect((prisma.libraryRecord.findFirst as unknown as jest.Mock).mock.calls[0][0]).toEqual({
+        where: { id: RECORD_ID, tenantId: TENANT_ID },
+        select: { origin: true },
+      });
+    });
+
+    it('does not render the raw cause chain on the reservation race line', async () => {
+      // This line is on the key-bearing path, and pino expands an `err`
+      // binding through its whole cause chain. Fails if `err: error` returns.
+      const chained = Object.assign(new Error('pending index'), {
+        name: 'PrismaClientKnownRequestError',
+        code: 'P2002',
+        clientVersion: '6.19.2',
+        cause: new Error(`the write held ${KEY_SENTINEL}`),
+      });
+      mockTransaction.mockRejectedValue(chained);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.COMPLETE, generation: 4 }),
+      );
+      resolverHoldsKey(false);
+
+      await reserveRecoveryGeneration(reserveInput({ keyBearing: true }));
+
+      const rendered = renderedLogLines.join('');
+      expect(rendered).toContain('Recovery reservation insert lost a unique race');
+      expect(rendered).not.toContain(KEY_SENTINEL);
+    });
+
+    it('still reports superseded for a bodyless loser whose winner settled', async () => {
+      // The bodyless side is unchanged: nothing was consumed, and a 202 with
+      // the current envelope is the truthful answer.
+      mockTransaction.mockRejectedValue(unique);
+      (prisma.checkRun.findFirst as unknown as jest.Mock).mockResolvedValue(
+        abandonedRun({ state: CheckRunState.COMPLETE, generation: 4 }),
+      );
+
+      await expect(reserveRecoveryGeneration(reserveInput())).resolves.toEqual({
+        outcome: 'superseded',
+        generation: 4,
+      });
+    });
   });
 });
 
@@ -1320,6 +2586,131 @@ describe('pending-run reconciliation repository', () => {
     const where = findMany.mock.calls[0][0].where as { OR: Array<Record<string, unknown>> };
     const nullMarkerArm = where.OR.find((arm) => arm.lastEnqueuedAt === null);
     expect(nullMarkerArm).toEqual({ lastEnqueuedAt: null, requestedAt: { lt: cutoff } });
+  });
+
+  describe('resume guidance chosen from the record custody', () => {
+    // An abandoned key-bearing recovery leaves a record a plain
+    // re-verify cannot take forward, because a bodyless request against an
+    // unopened copy is refused DECRYPTION_REQUIRED before any acquisition.
+    // Every other record has no key to resend and must get the generic
+    // message instead.
+    const cutoff = new Date('2026-09-06T23:30:00.000Z');
+
+    function custodyRow(overrides: Record<string, unknown>) {
+      return [
+        {
+          origin: LibraryRecordOrigin.EXTERNAL,
+          storageUri: null,
+          encrypted: null,
+          decryptionKeyPresent: false,
+          ...overrides,
+        },
+      ];
+    }
+
+    function settledMessage(): string {
+      const updateMany = prisma.checkRun.updateMany as unknown as jest.Mock;
+      return (updateMany.mock.calls[0][0] as { data: { failureMessage: string } }).data.failureMessage;
+    }
+
+    beforeEach(() => {
+      (prisma.checkRun.updateMany as unknown as jest.Mock).mockResolvedValue({ count: 1 });
+    });
+
+    it('tells the caller to resend the key when the record still holds an unopened encrypted copy', async () => {
+      (prisma.$queryRawUnsafe as unknown as jest.Mock).mockResolvedValue(
+        custodyRow({ storageUri: 'https://storage.example/raw', encrypted: true, decryptionKeyPresent: false }),
+      );
+
+      await expect(settleAbandonedCheckRun(abandonedRun(), cutoff)).resolves.toEqual({ outcome: 'applied' });
+
+      expect(settledMessage()).toBe(
+        'The verification job did not report a result within the expected window. This record still holds an unopened encrypted copy, so resend the key as sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify.',
+      );
+    });
+
+    it('gives an already receiver-protected external copy the generic message', async () => {
+      // This service holds the key already, so there is nothing for the
+      // caller to resend. Fails if the predicate drops the key-presence half.
+      (prisma.$queryRawUnsafe as unknown as jest.Mock).mockResolvedValue(
+        custodyRow({ storageUri: 'https://storage.example/protected', encrypted: true, decryptionKeyPresent: true }),
+      );
+
+      await settleAbandonedCheckRun(abandonedRun(), cutoff);
+
+      expect(settledMessage()).toBe(
+        'The verification job did not report a result within the expected window. Re-verify to run it again.',
+      );
+    });
+
+    it('gives a native record the generic message', async () => {
+      // A native copy was issued here and its key is this service's own.
+      // Fails if the origin is dropped from the predicate.
+      (prisma.$queryRawUnsafe as unknown as jest.Mock).mockResolvedValue([
+        {
+          origin: LibraryRecordOrigin.NATIVE,
+          storageUri: 'https://storage.example/native',
+          encrypted: null,
+          decryptionKeyPresent: false,
+        },
+      ]);
+
+      await settleAbandonedCheckRun(abandonedRun(), cutoff);
+
+      expect(settledMessage()).toBe(
+        'The verification job did not report a result within the expected window. Re-verify to run it again.',
+      );
+    });
+
+    it('gives an external record with no durable copy the generic message', async () => {
+      // A no-copy record re-fetches its source on a bodyless re-verify, so
+      // that advice is correct as it stands.
+      (prisma.$queryRawUnsafe as unknown as jest.Mock).mockResolvedValue(
+        custodyRow({ storageUri: null, encrypted: true, decryptionKeyPresent: false }),
+      );
+
+      await settleAbandonedCheckRun(abandonedRun(), cutoff);
+
+      expect(settledMessage()).toBe(
+        'The verification job did not report a result within the expected window. Re-verify to run it again.',
+      );
+    });
+
+    it('never selects the key envelope, only its IS NOT NULL projection', async () => {
+      // The whole point of reading custody here is one boolean. Fails if the
+      // key column is selected into this row object.
+      (prisma.$queryRawUnsafe as unknown as jest.Mock).mockResolvedValue(custodyRow({}));
+
+      await settleAbandonedCheckRun(abandonedRun(), cutoff);
+
+      const sql = (prisma.$queryRawUnsafe as unknown as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('"decryptionKey" IS NOT NULL');
+      expect(sql).not.toMatch(/SELECT[\s\S]*e\."decryptionKey"\s+AS/);
+    });
+
+    it('names both moves, not the generic message, when the custody read itself fails', async () => {
+      // Guidance is advice beside a settlement that has to happen, so a
+      // failed read of the parent is not a reason to leave a run PENDING for
+      // ever. What the settlement cannot do is guess: the generic message
+      // misdirects exactly the unopened-copy record this feature exists for,
+      // and the resend message misdirects every native and protected one.
+      // Fails if either specific message is used on a read that established
+      // neither.
+      (prisma.$queryRawUnsafe as unknown as jest.Mock).mockRejectedValue(new Error('connection reset'));
+
+      await expect(settleAbandonedCheckRun(abandonedRun(), cutoff)).resolves.toEqual({ outcome: 'applied' });
+
+      expect(settledMessage()).toBe(ABANDONED_CUSTODY_UNKNOWN_MESSAGE);
+      // Both moves, named: re-verify, and resend the key if the copy is still
+      // unopened.
+      expect(settledMessage()).toContain('Re-verify to run it again');
+      expect(settledMessage()).toContain('resend the key as sourceEncryption.decryptionKey');
+      expect(settledMessage()).not.toBe(ABANDONED_RUN_MESSAGE);
+      expect(loggerCalls.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ recordId: RECORD_ID, error: { name: 'Error', message: 'connection reset' } }),
+        "An abandoned run's custody could not be read; settling it with resume guidance that names both moves",
+      );
+    });
   });
 
   it('uses the state guard and preserves the run checks when settling an abandoned row', async () => {

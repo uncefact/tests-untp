@@ -32,8 +32,19 @@ export const REGISTER_SOURCE_URL_MAX_LENGTH = 2048;
 export const REGISTER_DISPLAY_NAME_MAX_LENGTH = 200;
 export const REGISTER_NOTES_MAX_LENGTH = 2000;
 
-/** The UNTP encrypted-link key: AES-256-GCM, 32 bytes as 64 hex characters, the same rule the verify route applies. */
-const HEX_64 = /^[a-f0-9]{64}$/i;
+/**
+ * The UNTP encrypted-link key: AES-256-GCM, 32 bytes as 64 hex characters,
+ * the same rule the verify route applies.
+ *
+ * The character class states both cases rather than relying on the `i` flag
+ * alone. `zod-to-json-schema` drops the flag when it emits the `pattern` for
+ * the published request components, so the document advertised
+ * `^[a-f0-9]{64}$` while the runtime accepted uppercase: a generated client
+ * or a schema-validating gateway would have refused a key this endpoint
+ * takes. The flag is kept as well, so the emitted pattern and the enforced
+ * rule now say the same thing whichever half a reader looks at.
+ */
+const HEX_64 = /^[a-fA-F0-9]{64}$/i;
 
 /**
  * A calendar date as `YYYY-MM-DD` that names a real day (zod's `date()`
@@ -137,6 +148,18 @@ export const sourceEncryptionSchema = z.object({
       'Accepted for compatibility with the contract and not currently used: the envelope names its own algorithm. Never persisted or returned.',
     ),
 });
+
+/**
+ * Request body for the late-key re-verification form. The endpoint accepts
+ * only the key, not the registration route's optional method hint. Unknown
+ * fields are stripped by the object schema after this required nested object
+ * has been validated.
+ */
+export const verifyLibraryRecordRequestSchema = z.object({
+  sourceEncryption: sourceEncryptionSchema.pick({ decryptionKey: true }),
+});
+
+export type VerifyLibraryRecordRequest = z.infer<typeof verifyLibraryRecordRequestSchema>;
 
 /**
  * Request body for `POST /library`. Mirrors `RegisterExternalCredentialRequest`

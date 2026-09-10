@@ -1,6 +1,11 @@
 import { requestBodyTooLargeMessage } from '@/lib/api/request-body';
 import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config';
-import { BODY_MUST_BE_EMPTY_MESSAGE } from '@/lib/library/reverify-messages';
+import {
+  DECRYPTION_REQUIRED_MESSAGE,
+  SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,
+  VERIFICATION_IN_PROGRESS_MESSAGE,
+  VERIFICATION_RACE_LOST_MESSAGE,
+} from '@/lib/library/reverify-messages';
 
 /**
  * Example error bodies for the published OpenAPI document.
@@ -124,11 +129,13 @@ export const SHARED_STATUS_EXAMPLES: Record<string, Record<string, ErrorExample>
 };
 
 /**
- * Messages the routes and repositories actually throw for a 404, a 409, or a
- * 422, plus the few a route composes inline. A composed message appears here
- * with a placeholder record id, so the published example shows the shape a
- * caller must parse against, and it is the only kind of entry that is not a
- * literal.
+ * Messages the routes and repositories actually throw for a coded 400, a 404,
+ * a 409, or a 422, plus the few a route composes inline. A composed message
+ * appears here with a placeholder record id, so the published example shows
+ * the shape a caller must parse against, and it is the only kind of entry
+ * that is not a literal. Entries whose wording is published in more than one
+ * place are imported from the module that owns the constant instead of being
+ * copied.
  *
  * Where an operation's documented description is exactly one of these, the
  * description is quoting the thrown message, so it can be published as that
@@ -139,8 +146,9 @@ export const SHARED_STATUS_EXAMPLES: Record<string, Record<string, ErrorExample>
  * an integrator writes code against it.
  *
  * To refresh, collect the `new NotFoundError('...')`,
- * `new ConflictError('...')`, and `new UnprocessableError('...')`
- * arguments under `src/app/api/v1`, the `notFound`, `conflict` and
+ * `new ConflictError('...')`, `new UnprocessableError('...')` and coded
+ * `new ValidationError('...')` arguments under `src/app/api/v1` and the
+ * library modules those routes raise from, the `notFound`, `conflict` and
  * `invalidReference` values handed to `mapDatabaseError` in the
  * repositories, and the error bodies built directly with
  * `NextResponse.json`.
@@ -177,8 +185,12 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'The identifier scheme has identifiers and cannot be deleted',
   'The registrar has schemes with identifiers and cannot be deleted',
   'This Idempotency-Key was already used with a different request body.',
-  BODY_MUST_BE_EMPTY_MESSAGE,
-  "This service holds no usable key for the record's durable copy. Re-verification with a caller-supplied key is not supported yet.",
+  // Read from the module that owns them rather than copied, so a reworded
+  // refusal cannot leave this allowlist quoting a sentence no code throws.
+  SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,
+  VERIFICATION_IN_PROGRESS_MESSAGE,
+  VERIFICATION_RACE_LOST_MESSAGE,
+  DECRYPTION_REQUIRED_MESSAGE,
 ]);
 
 /**

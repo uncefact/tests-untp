@@ -34,6 +34,7 @@ jest.mock('@/lib/credentials/extract-credential-details', () => {
 });
 
 import { decodeJwt } from 'jose';
+import { createCipheriv, randomBytes } from 'node:crypto';
 import { AesGcmEncryptionAdapter, EncryptionAlgorithm } from '@uncefact/untp-ri-services/encryption';
 import type { UNTPVerifiableCredential } from '@uncefact/untp-ri-services';
 import {
@@ -118,7 +119,7 @@ describe('readExternalArtefact', () => {
     expect(reading.keyUnused).toBe(false);
     expect(reading.content.kind).toBe(ExternalContentKind.CREDENTIAL);
     if (reading.content.kind !== ExternalContentKind.CREDENTIAL) return;
-    expect(reading.content.bytes).toEqual(bytes(body));
+    expect(Array.from(reading.content.bytes)).toEqual(Array.from(bytes(body)));
     expect(reading.content.credential).toEqual(body);
     expect(reading.content.decoded).toEqual(dppPayload());
   });
@@ -172,7 +173,7 @@ describe('readExternalArtefact', () => {
     expect(reading.keyUnused).toBe(false);
     expect(reading.content.kind).toBe(ExternalContentKind.CREDENTIAL);
     if (reading.content.kind !== ExternalContentKind.CREDENTIAL) return;
-    expect(reading.content.bytes).toEqual(bytes(body));
+    expect(Array.from(reading.content.bytes)).toEqual(Array.from(bytes(body)));
     expect(reading.content.decoded).toEqual(dppPayload());
   });
 
@@ -184,7 +185,44 @@ describe('readExternalArtefact', () => {
     expect(reading.outcome).toBe('opened');
     if (reading.outcome !== 'opened') return;
     expect(reading.encrypted).toBe(true);
-    expect(reading.content).toEqual({ kind: ExternalContentKind.JSON_OBJECT, bytes: bytes('{"hello":"world"}') });
+    expect(reading.content.kind).toBe(ExternalContentKind.JSON_OBJECT);
+    expect(Array.from(reading.content.bytes)).toEqual(Array.from(bytes('{"hello":"world"}')));
+  });
+
+  it('returns a decrypted binary body byte for byte, with no UTF-8 round trip', () => {
+    // The bytes-preserving reader exists for exactly this. The durable copy
+    // is the plaintext as decrypted, and a decode-then-re-encode would
+    // replace every invalid UTF-8 sequence with U+FFFD (0xEF 0xBF 0xBD) and
+    // store a body that is not the one the supplier encrypted.
+    //
+    // The envelope is built here rather than through the adapter's
+    // `encrypt(plaintext: string)`, which would UTF-8 encode the input before
+    // it was ever encrypted and so could never carry an invalid sequence in
+    // the first place. These are raw bytes: a NUL, two lone continuation
+    // bytes, a truncated two-byte sequence and a surrogate-range encoding,
+    // none of which survives a decode.
+    const binary = new Uint8Array([0x00, 0xff, 0xfe, 0x80, 0x01, 0x7f, 0xc3, 0x28, 0xed, 0xa0, 0x80]);
+    const iv = randomBytes(12);
+    const cipher = createCipheriv(EncryptionAlgorithm.AES_256_GCM, Buffer.from(KEY, 'hex'), iv);
+    const cipherText = Buffer.concat([cipher.update(Buffer.from(binary)), cipher.final()]);
+    const envelope = {
+      cipherText: cipherText.toString('base64'),
+      iv: iv.toString('base64'),
+      tag: cipher.getAuthTag().toString('base64'),
+      type: EncryptionAlgorithm.AES_256_GCM,
+    };
+
+    const reading = readExternalArtefact(bytes(JSON.stringify(envelope)), KEY);
+
+    expect(reading.outcome).toBe('opened');
+    if (reading.outcome !== 'opened') return;
+    expect(reading.encrypted).toBe(true);
+    // The JSON probe runs over a decode of these bytes, finds nothing, and
+    // classifies the body opaque. The bytes themselves are untouched.
+    expect(reading.content.kind).toBe(ExternalContentKind.OPAQUE);
+    expect(Array.from(reading.content.bytes)).toEqual(Array.from(binary));
+    // The replacement character, which is what a lossy round trip leaves.
+    expect(Buffer.from(reading.content.bytes).includes(Buffer.from([0xef, 0xbf, 0xbd]))).toBe(false);
   });
 
   it('classifies a JSON object that is not an enveloped credential', () => {
