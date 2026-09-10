@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.4.0">
 <title data-rh="true">Decryption Keys | UN Transparency Protocol</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://uncefact.github.io/tests-untp/docs/next/reference-implementation/operations/backfills/decryption-keys"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Decryption Keys | UN Transparency Protocol"><meta data-rh="true" name="description" content="Wraps credential decryption keys that are still stored in plaintext into encrypted envelopes under DATAENCRYPTIONKEY."><meta data-rh="true" property="og:description" content="Wraps credential decryption keys that are still stored in plaintext into encrypted envelopes under DATAENCRYPTIONKEY."><link data-rh="true" rel="icon" href="/tests-untp/img/favicon.ico"><link data-rh="true" rel="canonical" href="https://uncefact.github.io/tests-untp/docs/next/reference-implementation/operations/backfills/decryption-keys"><link data-rh="true" rel="alternate" href="https://uncefact.github.io/tests-untp/docs/next/reference-implementation/operations/backfills/decryption-keys" hreflang="en"><link data-rh="true" rel="alternate" href="https://uncefact.github.io/tests-untp/docs/next/reference-implementation/operations/backfills/decryption-keys" hreflang="x-default"><link rel="stylesheet" href="/tests-untp/assets/css/styles.0ca06481.css">
-<script src="/tests-untp/assets/js/runtime~main.0adf649c.js" defer="defer"></script>
+<script src="/tests-untp/assets/js/runtime~main.46a7c3b3.js" defer="defer"></script>
 <script src="/tests-untp/assets/js/main.dfae668c.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -38,7 +38,14 @@
 <li><strong>Rows deleted mid-run.</strong> A credential removed while the backfill was working is skipped and reported, which is a benign race rather than a failure.</li>
 <li><strong>An unproven key.</strong> Whenever a run completes without an envelope to verify the key against, whether it wrapped rows under <code>--force</code> or had nothing to wrap, it says so and asks you to confirm a wrapped key decrypts correctly.</li>
 </ul>
-<p>After a run, confirm a wrapped key still round-trips by retrieving a credential through the API (<code>GET /api/v1/credentials/{id}</code>) and checking its decryption key behaves as before.</p>
+<p>After a run that wrapped keys, re-run the <a href="/tests-untp/docs/next/reference-implementation/operations/encryption-audit">encryption audit</a>. A clean report is the proof that <code>DATA_ENCRYPTION_KEY</code> unwraps the values this run wrapped; any envelope the audit cannot open is a failure. If the audit reports that nothing existed to verify, the key remains unproven.</p>
+<p>As an optional per-record spot check, choose a known encrypted native record and request <code>GET /api/v1/library/{id}</code>.</p>
+<ul>
+<li>A <code>200</code> response with a non-null <code>decryptionKey</code> means the key was revealed.</li>
+<li>A <code>200</code> response with <code>hasKey: true</code>, <code>decryptionKey: null</code> and a <code>DECRYPTION_KEY_UNAVAILABLE</code> warning is a stored key the deployment key could not unwrap and is a failure.</li>
+<li><code>hasKey: false</code> is a record that holds no key.</li>
+</ul>
+<p>A row whose stored key is still legacy plaintext is returned as-is by this read and proves nothing about the deployment key, so the audit is the proof.</p>
 <p>A run that finishes its work exits 0, including one that reported deleted rows or proceeded under <code>--force</code>. It exits 1 when it skipped suspect rows, when it refused an unproven key, when the preflight could not decrypt a service instance configuration or a credential key, and when a write failed.</p>
 <h2 class="anchor anchorWithStickyNavbar_ywN1" id="re-running">Re-running<a class="hash-link" aria-label="Direct link to Re-running" title="Direct link to Re-running" href="/tests-untp/docs/next/reference-implementation/operations/backfills/decryption-keys#re-running">​</a></h2>
 <p>Re-running is safe and converges. Rows already holding an envelope are counted as already protected and left untouched. After a rolling upgrade has drained the old writers, the second run therefore only picks up what those writers added.</p>
