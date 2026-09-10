@@ -111,6 +111,7 @@ import {
   defaultReverifyLibraryRecordDependencies,
 } from '../../src/lib/library/reverify-library-record';
 import { resolveStorageService } from '../../src/lib/services/resolve-storage-service';
+import { waitFor } from './rig/wait-for';
 
 jest.unmock('jose');
 
@@ -654,17 +655,6 @@ function unopenableKeyEnvelope(): string {
   const envelope = JSON.parse(protectDecryptionKey(RECEIVER_KEY)) as { cipherText: string };
   const first = envelope.cipherText[0];
   return JSON.stringify({ ...envelope, cipherText: `${first === '0' ? '1' : '0'}${envelope.cipherText.slice(1)}` });
-}
-
-async function waitFor<T>(read: () => Promise<T>, matches: (value: T) => boolean): Promise<T> {
-  const deadline = Date.now() + 5_000;
-  let value = await read();
-  while (!matches(value) && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    value = await read();
-  }
-  if (!matches(value)) throw new Error('Timed out waiting for the integration state to settle');
-  return value;
 }
 
 /**
