@@ -1,5 +1,20 @@
 const capturedLogLines: string[] = [];
 
+jest.mock('undici', () => {
+  const actual = jest.requireActual('undici') as Record<string, unknown>;
+  return {
+    ...actual,
+    fetch: (
+      input: Parameters<typeof globalThis.fetch>[0],
+      init?: Parameters<typeof globalThis.fetch>[1],
+    ): ReturnType<typeof globalThis.fetch> => {
+      const requestInit = { ...(init ?? {}) } as Record<string, unknown>;
+      delete requestInit.dispatcher;
+      return globalThis.fetch(input, requestInit as Parameters<typeof globalThis.fetch>[1]);
+    },
+  };
+});
+
 jest.mock('@uncefact/untp-ri-services/logging', () => {
   const actual = jest.requireActual('@uncefact/untp-ri-services/logging');
   return {
@@ -13,6 +28,8 @@ jest.mock('@uncefact/untp-ri-services/logging', () => {
   };
 });
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { createCipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { IStorageService, IVerifiableCredentialService, StorageRecord } from '@uncefact/untp-ri-services';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
@@ -21,6 +38,7 @@ import {
   CheckRunFailureCode,
   CheckRunState,
   CoreCredentialType,
+  CredentialDetailsError,
   CredentialDetailsStatus,
   ExternalContentKind,
 } from '../../src/lib/prisma/generated';
@@ -112,11 +130,47 @@ const DPP = {
 };
 const DPP_TEXT = JSON.stringify(DPP);
 const DPP_070 = {
-  ...DPP,
   '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/0.7.0/context/'],
-  type: ['VerifiableCredential', 'DigitalProductPassport'],
-  name: 'Battery pack passport',
+  type: ['DigitalProductPassport', 'VerifiableCredential'],
+  id: 'https://example.org/credentials/dpp/0001',
+  issuer: {
+    type: ['CredentialIssuer'],
+    id: 'did:web:example.org',
+    name: 'Example Issuer',
+  },
+  validFrom: '2026-01-01T00:00:00Z',
+  name: 'Example Digital Product Passport',
+  credentialSubject: {
+    type: ['Product'],
+    id: 'https://example.org/product/0001',
+    name: 'Example Product',
+    idScheme: {
+      type: ['IdentifierScheme'],
+      id: 'https://example.org/identifiers/',
+      name: 'Example Identifier Scheme',
+    },
+    idGranularity: 'batch',
+    producedAtFacility: {
+      type: ['Facility'],
+      id: 'https://example.org/facility/0001',
+      name: 'Example Facility',
+    },
+    countryOfProduction: { countryCode: 'AU', countryName: 'Australia' },
+    productCategory: [
+      {
+        code: '0000',
+        name: 'Example Category',
+        schemeId: 'https://example.org/scheme/category',
+        schemeName: 'Example Category Scheme',
+      },
+    ],
+  },
 };
+const LEGACY_CONTEXT_070 = 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/context/';
+const THIRD_VALID_CONTEXT = 'https://supplier.example/contexts/third-valid.json';
+const THIRD_MALFORMED_CONTEXT = 'https://supplier.example/contexts/third-malformed.json';
+const THIRD_SCOPED_CONTEXT = 'https://supplier.example/contexts/third-scoped.json';
+const THIRD_MISSING_SCOPED_CONTEXT = 'https://supplier.example/contexts/missing-scoped.json';
 const RECOVERY_DPP = {
   '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'],
   type: ['VerifiableCredential', 'DigitalProductPassport'],
@@ -165,6 +219,9 @@ const COMPLETE_CHECKS = {
 
 const prisma = createRigClient();
 let fixtures: FixtureServer;
+let bundledFallbackFailuresRemaining = 0;
+let bundledFallbackFailuresObserved = 0;
+const realFetch = globalThis.fetch.bind(globalThis);
 let recoveryStorageSequence = 0;
 const senderErrors: Error[] = [];
 const sweepErrors: Error[] = [];
@@ -186,6 +243,90 @@ function context(overrides: Partial<JobContext> = {}): JobContext {
     ...overrides,
     expireSeconds: overrides.expireSeconds ?? 300,
   };
+}
+
+function artefactFixture(relativePath: string): string {
+  return readFileSync(path.resolve(__dirname, '../../../untp-utils/artefacts', relativePath), 'utf8');
+}
+
+function registerSchemaAndContextFixtures(): void {
+  fixtures.set('/remote/schema/untp/0.7.0/dpp.json', {
+    body: artefactFixture('schema/untp/0.7.0/dpp.json'),
+  });
+  fixtures.set('/remote/schema/untp/0.6.0/dpp.json', {
+    body: artefactFixture('schema/untp/0.6.0/dpp.json'),
+  });
+  fixtures.set('/remote/context/vcdm/2/credentials.json', {
+    body: artefactFixture('context/vcdm/2/credentials.json'),
+  });
+  fixtures.set('/remote/context/untp/0.7.0/untp.json', {
+    body: artefactFixture('context/untp/0.7.0/untp.json'),
+  });
+  fixtures.set('/remote/context/untp/0.6.0/dpp.json', {
+    body: artefactFixture('context/untp/0.6.0/dpp.json'),
+  });
+  fixtures.set('/remote/context/third-valid.json', {
+    body: JSON.stringify({ '@context': { thirdTerm: 'https://example.org/terms/thirdTerm' } }),
+  });
+  fixtures.set('/remote/context/third-malformed.json', {
+    body: JSON.stringify({ '@context': { thirdTerm: { '@id': 'https://example.org/terms/thirdTerm', '@type': 42 } } }),
+  });
+  fixtures.set('/remote/context/third-scoped.json', {
+    body: JSON.stringify({
+      '@context': {
+        scopedTerm: {
+          '@id': 'https://example.org/terms/scopedTerm',
+          '@context': THIRD_MISSING_SCOPED_CONTEXT,
+        },
+      },
+    }),
+  });
+  fixtures.set('/remote/context/missing-scoped.json', { body: 'missing', status: 404 });
+  fixtures.set('/remote/core-host-failure.json', { body: 'temporarily unavailable', status: 503 });
+}
+
+function fixtureUrlForExternalRequest(requestUrl: string): string {
+  const parsed = new URL(requestUrl);
+  if (parsed.origin === fixtures.baseUrl) return requestUrl;
+  if (parsed.href === 'https://www.w3.org/ns/credentials/v2') {
+    return `${fixtures.baseUrl}/remote/context/vcdm/2/credentials.json`;
+  }
+  if (parsed.href === 'https://vocabulary.uncefact.org/untp/0.7.0/context/') {
+    return `${fixtures.baseUrl}/remote/context/untp/0.7.0/untp.json`;
+  }
+  if (parsed.pathname === '/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json') {
+    return `${fixtures.baseUrl}/remote/schema/untp/0.6.0/dpp.json`;
+  }
+  if (parsed.pathname === '/vocabulary/untp/dpp/0.6.0/' || parsed.pathname === '/vocabulary/untp/dpp/0.6.0/context/') {
+    return `${fixtures.baseUrl}/remote/context/untp/0.6.0/dpp.json`;
+  }
+  if (parsed.href === THIRD_VALID_CONTEXT) return `${fixtures.baseUrl}/remote/context/third-valid.json`;
+  if (parsed.href === THIRD_MALFORMED_CONTEXT) return `${fixtures.baseUrl}/remote/context/third-malformed.json`;
+  if (parsed.href === THIRD_SCOPED_CONTEXT) return `${fixtures.baseUrl}/remote/context/third-scoped.json`;
+  if (parsed.href === THIRD_MISSING_SCOPED_CONTEXT) return `${fixtures.baseUrl}/remote/context/missing-scoped.json`;
+  throw new Error(`integration fixture attempted an unmapped network request: ${requestUrl}`);
+}
+
+function requestUrlOf(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
+function installFixtureFetch(): void {
+  globalThis.fetch = (async (input, init) => {
+    const requestUrl = requestUrlOf(input);
+    const isCoreArtefact =
+      requestUrl === 'https://www.w3.org/ns/credentials/v2' ||
+      requestUrl === 'https://vocabulary.uncefact.org/untp/0.7.0/context/' ||
+      requestUrl === 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json';
+    if (isCoreArtefact && bundledFallbackFailuresRemaining > 0) {
+      bundledFallbackFailuresRemaining -= 1;
+      bundledFallbackFailuresObserved += 1;
+      return realFetch(`${fixtures.baseUrl}/remote/core-host-failure.json`, init);
+    }
+    return realFetch(fixtureUrlForExternalRequest(requestUrl), init);
+  }) as typeof globalThis.fetch;
 }
 
 function enqueue(sql: Parameters<typeof senderQueue.enqueueWithin>[0], job: VerifyJobReference): Promise<void> {
@@ -517,6 +658,8 @@ async function waitUntilBackendBlocked(
 describe('re-verify a library record through Postgres and pg-boss', () => {
   beforeAll(async () => {
     fixtures = await startFixtureServer();
+    registerSchemaAndContextFixtures();
+    installFixtureFetch();
     await senderQueue.start();
     await senderQueue.declareQueue(LIBRARY_VERIFY_JOB);
     registerPendingRunReconciliation(sweepQueue, defaultReconcilePendingRunsDependencies());
@@ -536,6 +679,8 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     senderErrors.splice(0);
     sweepErrors.splice(0);
     capturedLogLines.length = 0;
+    bundledFallbackFailuresRemaining = 0;
+    bundledFallbackFailuresObserved = 0;
   });
 
   afterEach(() => {
@@ -552,6 +697,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     await sweepQueue.unschedule(LIBRARY_RECONCILE_PENDING_RUNS_JOB);
     await senderQueue.stop();
     await sweepQueue.stop();
+    globalThis.fetch = realFetch;
     await fixtures.close();
     await prisma.$disconnect();
     expect(senderErrors.splice(0)).toEqual([]);
@@ -598,6 +744,237 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     });
   });
 
+  it('falls back to the bundled schema and contexts after three core host failures', async () => {
+    // Fails if the real resolver path is bypassed, if a host-delivery failure
+    // is not replaced by the matching bundled artefact, or if fallback is
+    // attempted for fewer than the schema and two core context requests.
+    bundledFallbackFailuresRemaining = 3;
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    const handler = verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    });
+    const envelope = envelopedCredential(DPP_070);
+    const body = JSON.stringify(envelope);
+    const storagePath = '/storage/schema-conformance-bundled.json';
+    const sourcePath = '/supplier/schema-conformance-bundled.json';
+    fixtures.set(storagePath, { body });
+    fixtures.set(sourcePath, { body });
+    const copyDigest = await digest(new TextEncoder().encode(body));
+    const recordId = await insertProtectedExternal({
+      sourcePath,
+      storagePath,
+      sourceDigest: copyDigest,
+      storageDigest: copyDigest,
+      coreDataModelVersion: '0.7.0',
+    });
+
+    await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
+    await handler((await jobsFor(recordId))[0], context({ isFinalAttempt: true }));
+
+    const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    expect(settled?.checkRun).toMatchObject({ state: CheckRunState.COMPLETE, schemaConformance: CheckResult.PASS });
+    expect(bundledFallbackFailuresObserved).toBe(3);
+    const fallbackLogs = capturedLogLines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((line) => line.msg === 'Served the bundled copy of a UNTP artefact because its fetch failed');
+    expect(fallbackLogs).toHaveLength(3);
+    expect(fallbackLogs.map((line) => line.url)).toEqual(
+      expect.arrayContaining([
+        'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
+        'https://www.w3.org/ns/credentials/v2',
+        'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+      ]),
+    );
+  });
+
+  it('fails a 0.7.0 credential that declares the legacy context at the context pointer', async () => {
+    // Fails if schema conformance ignores the credential's declared context
+    // contract or reports the legacy-context mismatch as an unavailable host.
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    const handler = verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    });
+    const credential = { ...DPP_070, '@context': [DPP_070['@context'][0], LEGACY_CONTEXT_070] };
+    const envelope = envelopedCredential(credential);
+    const body = JSON.stringify(envelope);
+    const storagePath = '/storage/schema-conformance-legacy-context.json';
+    const sourcePath = '/supplier/schema-conformance-legacy-context.json';
+    fixtures.set(storagePath, { body });
+    fixtures.set(sourcePath, { body });
+    const copyDigest = await digest(new TextEncoder().encode(body));
+    const recordId = await insertProtectedExternal({
+      sourcePath,
+      storagePath,
+      sourceDigest: copyDigest,
+      storageDigest: copyDigest,
+      coreDataModelVersion: '0.7.0',
+    });
+
+    await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
+    await handler((await jobsFor(recordId))[0], context({ isFinalAttempt: true }));
+
+    const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    expect(settled?.checkRun).toMatchObject({
+      state: CheckRunState.COMPLETE,
+      schemaConformance: CheckResult.FAIL,
+      schemaConformanceMessage: expect.stringContaining('/@context/1'),
+    });
+  });
+
+  it('passes a valid remote third context and fails a malformed one as the documented classifier residual', async () => {
+    // Fails if extra remote contexts are not expanded, or if the accepted
+    // malformed-remote-context classifier residual changes its advisory arm.
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    const handler = verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    });
+    const cases = [
+      {
+        name: 'third-valid',
+        contextUrl: THIRD_VALID_CONTEXT,
+        expected: CheckResult.PASS,
+        subject: { thirdTerm: 'present' },
+      },
+      {
+        name: 'third-malformed',
+        contextUrl: THIRD_MALFORMED_CONTEXT,
+        expected: CheckResult.FAIL,
+        subject: {},
+      },
+    ];
+
+    for (const testCase of cases) {
+      const credential = {
+        ...DPP_070,
+        '@context': [...DPP_070['@context'], testCase.contextUrl],
+        credentialSubject: { ...DPP_070.credentialSubject, ...testCase.subject },
+      };
+      const envelope = envelopedCredential(credential);
+      const body = JSON.stringify(envelope);
+      const storagePath = `/storage/schema-conformance-${testCase.name}.json`;
+      const sourcePath = `/supplier/schema-conformance-${testCase.name}.json`;
+      fixtures.set(storagePath, { body });
+      fixtures.set(sourcePath, { body });
+      const copyDigest = await digest(new TextEncoder().encode(body));
+      const recordId = await insertProtectedExternal({
+        sourcePath,
+        storagePath,
+        sourceDigest: copyDigest,
+        storageDigest: copyDigest,
+        coreDataModelVersion: '0.7.0',
+      });
+
+      await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
+      await handler((await jobsFor(recordId))[0], context({ isFinalAttempt: true }));
+
+      const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+      expect(settled?.checkRun).toMatchObject({ state: CheckRunState.COMPLETE, schemaConformance: testCase.expected });
+    }
+  });
+
+  it('keeps a scoped-context fetch failure not_run and logs no URL path', async () => {
+    // Fails if a scoped context loader failure is treated as a document fail,
+    // or if its diagnostic logs the caller-controlled URL path.
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    const handler = verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    });
+    const credential = {
+      ...DPP_070,
+      '@context': [...DPP_070['@context'], THIRD_SCOPED_CONTEXT],
+      credentialSubject: { ...DPP_070.credentialSubject, scopedTerm: 'present' },
+    };
+    const envelope = envelopedCredential(credential);
+    const body = JSON.stringify(envelope);
+    const storagePath = '/storage/schema-conformance-scoped-context.json';
+    const sourcePath = '/supplier/schema-conformance-scoped-context.json';
+    fixtures.set(storagePath, { body });
+    fixtures.set(sourcePath, { body });
+    const copyDigest = await digest(new TextEncoder().encode(body));
+    const recordId = await insertProtectedExternal({
+      sourcePath,
+      storagePath,
+      sourceDigest: copyDigest,
+      storageDigest: copyDigest,
+      coreDataModelVersion: '0.7.0',
+    });
+
+    await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
+    await handler((await jobsFor(recordId))[0], context({ isFinalAttempt: true }));
+
+    const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    expect(settled?.checkRun).toMatchObject({ state: CheckRunState.COMPLETE, schemaConformance: CheckResult.NOT_RUN });
+    const contextFailure = capturedLogLines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((line) => line.msg === 'JSON-LD context could not be obtained or used for schema conformance');
+    expect(contextFailure).toMatchObject({ stage: 'JSON-LD' });
+    expect(contextFailure).not.toHaveProperty('url');
+    expect(JSON.stringify(contextFailure)).not.toContain('/contexts/missing-scoped.json');
+  });
+
+  it('runs verifier checks for a native UNREADABLE_ENVELOPE record while schema conformance is not_run', async () => {
+    // Fails if native extraction failure prevents the verifier checks from
+    // being recorded, or if schema conformance decodes a credential whose
+    // stored details explicitly say its envelope was unreadable.
+    const malformedEnvelope = { type: ['NotAVerifiableCredential'], id: 'https://example.org/malformed' };
+    const body = JSON.stringify(malformedEnvelope);
+    const storagePath = '/storage/native-unreadable-envelope.json';
+    fixtures.set(storagePath, { body });
+    const native = await insertNativeCredential(prisma, {
+      storageUri: `${fixtures.baseUrl}${storagePath}`,
+      digestMultibase: await digest(new TextEncoder().encode(body)),
+      coreCredentialType: CoreCredentialType.DPP,
+      coreDataModelVersion: '0.7.0',
+      detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED,
+      detailsError: CredentialDetailsError.UNREADABLE_ENVELOPE,
+    });
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: false, error: { type: 'integrity' } }),
+    };
+    const handler = verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    });
+
+    await reverifyLibraryRecord(native.id, SYSTEM_TENANT_ID, prepareEnqueue);
+    await handler((await jobsFor(native.id))[0], context({ isFinalAttempt: true }));
+
+    const settled = await getLibraryRecordById(native.id, SYSTEM_TENANT_ID);
+    expect(settled?.record).toMatchObject({
+      detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED,
+      detailsError: CredentialDetailsError.UNREADABLE_ENVELOPE,
+    });
+    expect(toNativeCredentialRecord(settled as never).verification).toMatchObject({
+      state: 'complete',
+      checks: {
+        retrieval: 'pass',
+        digest: 'pass',
+        proof: 'fail',
+        status: 'not_run',
+        temporal: 'not_run',
+        schemaConformance: 'not_run',
+      },
+    });
+    expect(verifier.verify).toHaveBeenCalledTimes(1);
+  });
+
   it('settles a conforming 0.7.0 DPP as pass and a missing-name DPP as an advisory fail', async () => {
     // Fails if the worker skips the core schema, checks a tenant data-model
     // row instead of the system schema, or lets the advisory result change
@@ -612,8 +989,22 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       resolveVerifier: async () => verifier,
     });
     const cases = [
-      { name: 'conforming', credential: DPP_070, expected: CheckResult.PASS },
-      { name: 'missing-name', credential: { ...DPP_070, name: undefined }, expected: CheckResult.FAIL },
+      { name: 'conforming', credential: DPP_070, expected: CheckResult.PASS, message: null },
+      {
+        name: 'missing-name',
+        credential: { ...DPP_070, name: undefined },
+        expected: CheckResult.FAIL,
+        message: "/ (must have required property 'name')",
+      },
+      {
+        name: 'nested-wrong-type',
+        credential: {
+          ...DPP_070,
+          credentialSubject: { ...DPP_070.credentialSubject, name: 42 },
+        },
+        expected: CheckResult.FAIL,
+        message: '/credentialSubject/name (must be string)',
+      },
     ];
 
     for (const testCase of cases) {
@@ -642,9 +1033,10 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       const projected = toCredentialRecord(settled as never);
       expect(projected.verification.summary).toBe('verified');
       if (testCase.expected === CheckResult.FAIL) {
-        expect(projected.warnings).toContainEqual(
-          expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY', message: expect.stringContaining('/name') }),
-        );
+        expect(projected.warnings).toContainEqual({
+          code: 'SCHEMA_CONFORMANCE_ADVISORY',
+          message: testCase.message,
+        });
       } else {
         expect(projected.warnings).not.toContainEqual(expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY' }));
       }

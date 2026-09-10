@@ -11,6 +11,8 @@ import type {
   QueueProbe,
 } from './types';
 
+export const MAX_JOB_EXPIRE_SECONDS = 24 * 60 * 60;
+
 /**
  * Options for {@link PgBossJobQueue}. The database arrives by injection;
  * this class reads no environment and owns no connection policy.
@@ -25,7 +27,10 @@ export interface PgBossJobQueueOptions {
   schema?: string;
   /** Applied where {@link EnqueueOptions.retry} is not given. */
   defaultRetry?: { limit: number; backoffSeconds?: number; backoffMaxSeconds?: number };
-  /** Applied where {@link EnqueueOptions.expireSeconds} is not given. */
+  /**
+   * Applied where {@link EnqueueOptions.expireSeconds} is not given. When it
+   * is omitted, send and schedule leave expiry to pg-boss's own default.
+   */
   defaultExpireSeconds?: number;
   /**
    * Receives queue-infrastructure errors and warnings (connection loss,
@@ -51,7 +56,7 @@ interface Registration {
 export class PgBossJobQueue implements JobQueue<SqlExecutor> {
   private readonly boss: PgBoss;
   private readonly defaultRetry?: { limit: number; backoffSeconds?: number; backoffMaxSeconds?: number };
-  private readonly defaultExpireSeconds: number;
+  private readonly defaultExpireSeconds?: number;
   private readonly onError: (error: Error) => void;
   private readonly registrations: Registration[] = [];
   /**
@@ -87,7 +92,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
       ...(options.schema !== undefined ? { schema: options.schema } : {}),
     });
     this.defaultRetry = options.defaultRetry;
-    this.defaultExpireSeconds = options.defaultExpireSeconds ?? 300;
+    this.defaultExpireSeconds = options.defaultExpireSeconds;
     const report = options.onError ?? ((error: Error) => console.error('job queue error:', error));
     // The reporter must never take the queue down with it: a throw from a
     // caller-supplied handler inside a worker callback would reject the
@@ -184,7 +189,12 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
     // deduplicating queue every unkeyed send shares one empty key, so ticks
     // would collapse into each other; ensureQueue('standard') above rejects
     // that combination before a schedule can be recorded.
-    await this.boss.schedule(name, cron, payload ?? null, { expireInSeconds: this.defaultExpireSeconds });
+    await this.boss.schedule(
+      name,
+      cron,
+      payload ?? null,
+      this.defaultExpireSeconds === undefined ? {} : { expireInSeconds: this.defaultExpireSeconds },
+    );
   }
 
   async unschedule(name: string): Promise<void> {
@@ -338,11 +348,28 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
         async (jobs: JobWithMetadata<object>[]) =>
           Promise.all(
             jobs.map(async (job) => {
+              const validExpireSeconds =
+                Number.isInteger(job.expireInSeconds) && job.expireInSeconds > 0 ? job.expireInSeconds : undefined;
+              const expireSeconds = validExpireSeconds ?? this.defaultExpireSeconds;
+              if (expireSeconds === undefined) {
+                const message = `job '${job.id}' carried an invalid expireInSeconds value and no adapter default was configured`;
+                this.onError(new Error(message));
+                throw new JobQueueError({
+                  code: 'jobs.invalid-job-expiry',
+                  message,
+                  received: job.expireInSeconds,
+                });
+              }
+              if (validExpireSeconds === undefined) {
+                this.onError(
+                  new Error(`job '${job.id}' carried an invalid expireInSeconds value; using the adapter default`),
+                );
+              }
               const context: JobContext = {
                 jobId: job.id,
                 attempt: job.retryCount + 1,
                 isFinalAttempt: job.retryCount >= job.retryLimit,
-                expireSeconds: job.expireInSeconds,
+                expireSeconds,
                 signal: job.signal,
               };
               try {
@@ -427,7 +454,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
       ...(options?.dedupeKey !== undefined ? { singletonKey: options.dedupeKey } : {}),
       ...(options?.fairnessKey !== undefined ? { group: { id: options.fairnessKey } } : {}),
       ...(options?.startAfter !== undefined ? { startAfter: options.startAfter } : {}),
-      expireInSeconds: expireSeconds,
+      ...(expireSeconds === undefined ? {} : { expireInSeconds: expireSeconds }),
       ...(retry !== undefined
         ? {
             retryLimit: retry.limit,
@@ -535,7 +562,9 @@ function validateEnqueueOptions(options: EnqueueOptions | undefined): void {
   validateRetry(options.retry, 'retry');
   if (
     options.expireSeconds !== undefined &&
-    (!Number.isInteger(options.expireSeconds) || options.expireSeconds < 1 || options.expireSeconds > 24 * 60 * 60)
+    (!Number.isInteger(options.expireSeconds) ||
+      options.expireSeconds < 1 ||
+      options.expireSeconds > MAX_JOB_EXPIRE_SECONDS)
   ) {
     throw new JobQueueError({
       code: 'jobs.invalid-enqueue-options',
@@ -553,7 +582,7 @@ function validateEnqueueOptions(options: EnqueueOptions | undefined): void {
 
 function validateExpireSeconds(value: number | undefined, label: string): void {
   if (value === undefined) return;
-  if (!Number.isInteger(value) || value < 1 || value > 24 * 60 * 60) {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_JOB_EXPIRE_SECONDS) {
     throw new JobQueueError({
       code: 'jobs.invalid-enqueue-options',
       message: `${label} must be a positive integer of at most 24 hours`,

@@ -647,6 +647,33 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     );
   });
 
+  it('carries the conformance message to a failed settlement when the verifier fails', async () => {
+    // Fails if the progress message is only carried to the successful
+    // settlement path, or if a verifier failure replaces the checks earned
+    // before it with the run row's original values.
+    verifier.verify.mockRejectedValue(new Error('vckit unreachable'));
+    const deps = dependencies({
+      checkSchemaConformance: jest.fn().mockResolvedValue({
+        result: CheckResult.FAIL,
+        message: "/ (must have required property 'name')",
+      }),
+    });
+
+    await verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true }));
+
+    expect(deps.settleFailed).toHaveBeenCalledWith({
+      id: RUN_ID,
+      tenantId: TENANT_ID,
+      schemaConformanceMessage: "/ (must have required property 'name')",
+      checks: { ...ESTABLISHED_CHECKS, schemaConformance: CheckResult.FAIL },
+      failure: {
+        code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
+        message: 'The verification service could not be reached or failed; re-verify once it is available.',
+        retryable: true,
+      },
+    });
+  });
+
   it('passes proof, status and temporal on a verified credential, keeping the checks the run already recorded', async () => {
     verifier.verify.mockResolvedValue(verified());
     const deps = dependencies();
@@ -757,7 +784,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
       jest.spyOn(Date, 'now').mockImplementation(() => now);
       const deps = dependencies({
         fetchStoredCopy: jest.fn().mockImplementation(async () => {
-          now = 297_000;
+          now = 290_000;
           return storedBytes(JSON.stringify(CREDENTIAL));
         }),
       });
@@ -766,8 +793,55 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
 
       expect(deps.checkSchemaConformance).not.toHaveBeenCalled();
       expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+      expect(loggerCalls.warn).toHaveBeenCalledWith(
+        {
+          recordId: RECORD_ID,
+          remainingMs: 0,
+          expireSeconds: 300,
+        },
+        'Schema conformance was skipped because the worker job budget was exhausted',
+      );
     } finally {
       jest.restoreAllMocks();
+    }
+  });
+
+  it('passes exact remaining budgets to the copy, schema stage and verifier', async () => {
+    // Fails if the settlement margin is dropped, if the attempt starts after
+    // findRun, or if a stage is given the raw expiry instead of the remaining
+    // allowance. At t=20 s the copy gets 270 s; after it consumes 10 s, the
+    // schema deadline is the t=290 s settlement deadline and the verifier
+    // race gets the 260 s balance.
+    jest.useFakeTimers();
+    let now = 0;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const timeoutSpy = jest.spyOn(global, 'setTimeout');
+    try {
+      verifier.verify.mockResolvedValue(verified());
+      const deps = dependencies({
+        findRun: jest.fn().mockImplementation(async () => {
+          now = 20_000;
+          return run();
+        }),
+        fetchStoredCopy: jest.fn().mockImplementation(async (_uri: string, timeoutMs: number) => {
+          expect(timeoutMs).toBe(270_000);
+          now = 30_000;
+          return storedBytes(JSON.stringify(CREDENTIAL));
+        }),
+        checkSchemaConformance: jest.fn().mockImplementation(async (input: { deadline: number }) => {
+          expect(input.deadline).toBe(290_000);
+          return { result: CheckResult.NOT_RUN, message: null };
+        }),
+      });
+
+      await verifyGenerationHandler(deps)(JOB, context({ expireSeconds: 300 }));
+
+      expect(timeoutSpy.mock.calls.map((call) => call[1])).toEqual([260_000, 260_000]);
+      expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+    } finally {
+      timeoutSpy.mockRestore();
+      nowSpy.mockRestore();
+      jest.useRealTimers();
     }
   });
 
@@ -776,12 +850,16 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     // if a slow validator can produce an unhandled error after the verifier
     // and settlement have moved on.
     jest.useFakeTimers();
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => unhandledRejections.push(reason);
+    process.on('unhandledRejection', onUnhandledRejection);
     try {
       let rejectLate: (reason?: unknown) => void = () => undefined;
       const late = new Promise<never>((_resolve, reject) => {
         rejectLate = reject;
       });
       const deps = dependencies({ checkSchemaConformance: jest.fn(() => late) });
+      verifier.verify.mockResolvedValue(verified());
       const settled = verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true, expireSeconds: 300 }));
 
       await jest.advanceTimersByTimeAsync(290_000);
@@ -790,7 +868,9 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
       await Promise.resolve();
 
       expect(deps.settleComplete).toHaveBeenCalled();
+      expect(unhandledRejections).toEqual([]);
     } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
       jest.useRealTimers();
     }
   });

@@ -475,7 +475,12 @@ describe('external credential record', () => {
   describe('reading an external credential', () => {
     it('returns the narrowed external view with the newest generation, and null under a tenant that holds its own record', async () => {
       const { record, checkRun } = await createExternalCredential(registration());
-      await settleCheckRunComplete({ id: checkRun.id, tenantId: SYSTEM_TENANT_ID, checks: noChecksRun() });
+      await settleCheckRunComplete({
+        id: checkRun.id,
+        tenantId: SYSTEM_TENANT_ID,
+        checks: noChecksRun(),
+        schemaConformanceMessage: null,
+      });
       await prisma.checkRun.create({
         data: { recordId: record.id, tenantId: SYSTEM_TENANT_ID, generation: 2, state: CheckRunState.PENDING },
       });
@@ -544,7 +549,12 @@ describe('external credential record', () => {
 
     it('reads a generation, and the newest one, of the named record under the tenant key only', async () => {
       const { record, checkRun } = await createExternalCredential(registration());
-      await settleCheckRunComplete({ id: checkRun.id, tenantId: SYSTEM_TENANT_ID, checks: noChecksRun() });
+      await settleCheckRunComplete({
+        id: checkRun.id,
+        tenantId: SYSTEM_TENANT_ID,
+        checks: noChecksRun(),
+        schemaConformanceMessage: null,
+      });
       await prisma.checkRun.create({
         data: { recordId: record.id, tenantId: SYSTEM_TENANT_ID, generation: 2, state: CheckRunState.PENDING },
       });
@@ -779,19 +789,30 @@ describe('external credential record', () => {
       const { record, checkRun } = await createExternalCredential(registration());
       const checks: CheckResults = { ...noChecksRun(), retrieval: CheckResult.PASS, proof: CheckResult.PASS };
 
-      await expect(settleCheckRunComplete({ id: checkRun.id, tenantId: SYSTEM_TENANT_ID, checks })).resolves.toEqual({
-        outcome: 'applied',
-      });
+      await expect(
+        settleCheckRunComplete({
+          id: checkRun.id,
+          tenantId: SYSTEM_TENANT_ID,
+          checks,
+          schemaConformanceMessage: null,
+        }),
+      ).resolves.toEqual({ outcome: 'applied' });
       await expect(
         settleCheckRunFailed({
           id: checkRun.id,
           tenantId: SYSTEM_TENANT_ID,
           checks: noChecksRun(),
+          schemaConformanceMessage: null,
           failure: { code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE, message: 'late', retryable: true },
         }),
       ).resolves.toEqual({ outcome: 'superseded' });
       await expect(
-        settleCheckRunComplete({ id: checkRun.id, tenantId: SYSTEM_TENANT_ID, checks: noChecksRun() }),
+        settleCheckRunComplete({
+          id: checkRun.id,
+          tenantId: SYSTEM_TENANT_ID,
+          checks: noChecksRun(),
+          schemaConformanceMessage: null,
+        }),
       ).resolves.toEqual({ outcome: 'superseded' });
 
       const stored = await prisma.checkRun.findUniqueOrThrow({ where: { id: checkRun.id } });
@@ -827,7 +848,12 @@ describe('external credential record', () => {
       });
 
       await expect(
-        settleCheckRunComplete({ id: checkRun.id, tenantId: SYSTEM_TENANT_ID, checks: noChecksRun() }),
+        settleCheckRunComplete({
+          id: checkRun.id,
+          tenantId: SYSTEM_TENANT_ID,
+          checks: noChecksRun(),
+          schemaConformanceMessage: null,
+        }),
       ).resolves.toEqual({ outcome: 'applied' });
 
       await expect(prisma.checkRun.findUniqueOrThrow({ where: { id: checkRun.id } })).resolves.toMatchObject({
@@ -854,6 +880,7 @@ describe('external credential record', () => {
           id: checkRun.id,
           tenantId: SYSTEM_TENANT_ID,
           checks: { ...noChecksRun(), retrieval: CheckResult.PASS, digest: CheckResult.PASS },
+          schemaConformanceMessage: null,
           failure: {
             code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
             message: 'The verification service could not be reached; verify again later',
@@ -862,7 +889,12 @@ describe('external credential record', () => {
         }),
       ).resolves.toEqual({ outcome: 'applied' });
       await expect(
-        settleCheckRunComplete({ id: checkRun.id, tenantId: SYSTEM_TENANT_ID, checks: noChecksRun() }),
+        settleCheckRunComplete({
+          id: checkRun.id,
+          tenantId: SYSTEM_TENANT_ID,
+          checks: noChecksRun(),
+          schemaConformanceMessage: null,
+        }),
       ).resolves.toEqual({ outcome: 'superseded' });
 
       const stored = await prisma.checkRun.findUniqueOrThrow({ where: { id: checkRun.id } });
@@ -894,7 +926,12 @@ describe('external credential record', () => {
       );
 
       await expect(
-        settleCheckRunComplete({ id: checkRun.id, tenantId: SYSTEM_TENANT_ID, checks: noChecksRun() }),
+        settleCheckRunComplete({
+          id: checkRun.id,
+          tenantId: SYSTEM_TENANT_ID,
+          checks: noChecksRun(),
+          schemaConformanceMessage: null,
+        }),
       ).resolves.toEqual({ outcome: 'superseded' });
       await expect(prisma.checkRun.findUniqueOrThrow({ where: { id: checkRun.id } })).resolves.toMatchObject({
         state: CheckRunState.FAILED,
@@ -907,7 +944,12 @@ describe('external credential record', () => {
       await prisma.tenant.create({ data: { id: OTHER_TENANT_ID, name: 'Other' } });
 
       await expect(
-        settleCheckRunComplete({ id: checkRun.id, tenantId: OTHER_TENANT_ID, checks: noChecksRun() }),
+        settleCheckRunComplete({
+          id: checkRun.id,
+          tenantId: OTHER_TENANT_ID,
+          checks: noChecksRun(),
+          schemaConformanceMessage: null,
+        }),
       ).resolves.toEqual({ outcome: 'missing' });
       await expect(prisma.checkRun.findUniqueOrThrow({ where: { id: checkRun.id } })).resolves.toMatchObject({
         state: CheckRunState.PENDING,
@@ -919,6 +961,7 @@ describe('external credential record', () => {
           id: checkRun.id,
           tenantId: SYSTEM_TENANT_ID,
           checks: noChecksRun(),
+          schemaConformanceMessage: null,
           failure: { code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE, message: 'gone', retryable: true },
         }),
       ).resolves.toEqual({ outcome: 'missing' });

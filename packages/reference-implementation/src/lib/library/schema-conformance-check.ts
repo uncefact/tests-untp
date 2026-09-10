@@ -6,7 +6,6 @@ import {
   SchemaCompilationFailedError,
   SchemaFetchFailedError,
   SchemaPayloadError,
-  SchemaValidationError,
 } from '@uncefact/untp-utils/validation';
 import {
   createJsonLdDocumentLoader,
@@ -31,7 +30,9 @@ import { apiLogger } from '@/lib/api/logger';
 const MAX_MESSAGE_LENGTH = 1_024;
 const TRUNCATION_MARKER = '...';
 
-export type SchemaConformanceResult = { result: CheckResult; message: string | null };
+export type SchemaConformanceResult =
+  | { result: typeof CheckResult.FAIL; message: string }
+  | { result: typeof CheckResult.PASS | typeof CheckResult.NOT_RUN; message: null };
 
 export type SchemaConformanceCheckInput = {
   recordId: string;
@@ -101,19 +102,21 @@ export async function checkSchemaConformance(
   const guardedSchemaLoader: SchemaLoader = {
     load: (url) => guardedLoad(() => dependencies.schemaLoader.load(url), deadline, signal),
   };
-  const guardedDocumentLoader = createJsonLdDocumentLoader({
+  const documentLoader = createJsonLdDocumentLoader({
     cache: dependencies.contextCache,
     ...dependencies.bundledArtefactsFallback,
   });
-  const guardedJsonLdDocumentLoader = (url: string) => guardedLoad(() => guardedDocumentLoader(url), deadline, signal);
+  const guardedDocumentLoader = (url: string) => guardedLoad(() => documentLoader(url), deadline, signal);
 
   try {
     await validateAgainstSchemas(payload, [schemaUrl], guardedSchemaLoader);
   } catch (error) {
-    if (hasStageTimeout(error)) return stageNotRun(log, 'schema');
+    if (hasStageTimeout(error)) return stageNotRun(log, 'schema', signal);
     if (error instanceof SchemaPayloadError) {
       const first = error.failures[0];
-      return failed(first.pointer || '/', first.message);
+      return first === undefined
+        ? failed('the schema validator reported a violation without a location')
+        : failed(first.pointer || '/', first.message);
     }
     if (error instanceof SchemaFetchFailedError || error instanceof SchemaCompilationFailedError) {
       log.warn(
@@ -122,17 +125,16 @@ export async function checkSchemaConformance(
       );
       return notRun();
     }
-    if (error instanceof SchemaValidationError) throw error;
     throw error;
   }
 
-  if (Date.now() >= deadline || signal.aborted) return stageNotRun(log, 'JSON-LD');
+  if (Date.now() >= deadline || signal.aborted) return stageNotRun(log, 'JSON-LD', signal);
 
   try {
-    await validateJsonLd(payload, { documentLoader: guardedJsonLdDocumentLoader });
+    await validateJsonLd(payload, { documentLoader: guardedDocumentLoader });
     return { result: CheckResult.PASS, message: null };
   } catch (error) {
-    if (hasStageTimeout(error)) return stageNotRun(log, 'JSON-LD');
+    if (hasStageTimeout(error)) return stageNotRun(log, 'JSON-LD', signal);
     if (error instanceof JsonLdValidationError) {
       const failure = describeJsonLdFailure(error);
       if (failure.kind === 'document') {
@@ -147,7 +149,9 @@ export async function checkSchemaConformance(
         : {
             stage: 'JSON-LD',
             ...(failure.code ? { errorCode: failure.code } : {}),
-            ...('source' in failure && failure.source ? { source: failure.source } : {}),
+            ...(failure.kind === 'context-invalid' && 'fields' in failure && failure.fields
+              ? { fields: failure.fields }
+              : {}),
           };
       log.warn({ ...diagnostic }, 'JSON-LD context could not be obtained or used for schema conformance');
       return notRun();
@@ -156,16 +160,23 @@ export async function checkSchemaConformance(
   }
 }
 
-function notRun(): SchemaConformanceResult {
+function notRun(): { result: typeof CheckResult.NOT_RUN; message: null } {
   return { result: CheckResult.NOT_RUN, message: null };
 }
 
-function failed(detail: string, code?: string): SchemaConformanceResult {
+function failed(detail: string, code?: string): { result: typeof CheckResult.FAIL; message: string } {
   return { result: CheckResult.FAIL, message: boundMessage(code ? `${detail} (${code})` : detail) };
 }
 
-function stageNotRun(logger: LoggerService, stage: string): SchemaConformanceResult {
-  logger.warn({ stage }, 'Schema conformance stage allowance was exhausted');
+function stageNotRun(
+  logger: LoggerService,
+  stage: string,
+  signal: AbortSignal,
+): { result: typeof CheckResult.NOT_RUN; message: null } {
+  logger.warn(
+    { stage, reason: signal.aborted ? 'aborted' : 'deadline' },
+    'Schema conformance stage allowance was exhausted',
+  );
   return notRun();
 }
 

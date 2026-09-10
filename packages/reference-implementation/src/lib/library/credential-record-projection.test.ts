@@ -476,9 +476,12 @@ describe('toCredentialRecord', () => {
     ).not.toContainEqual(expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY' }));
     expect(
       toCredentialRecord(
-        record({ run: { ...failed, state: CheckRunState.PENDING, schemaConformance: CheckResult.NOT_RUN } }),
+        record({ run: { ...failed, schemaConformance: CheckResult.PASS, schemaConformanceMessage: null } }),
         { now: NOW },
       ).warnings,
+    ).not.toContainEqual(expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY' }));
+    expect(
+      toCredentialRecord(record({ run: { ...failed, state: CheckRunState.PENDING } }), { now: NOW }).warnings,
     ).not.toContainEqual(expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY' }));
   });
 

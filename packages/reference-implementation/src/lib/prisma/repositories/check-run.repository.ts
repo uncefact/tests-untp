@@ -95,7 +95,7 @@ export type CheckRunRef = { id: string; tenantId: string };
 
 export type SettleCheckRunCompleteInput = CheckRunRef & {
   checks: CheckResults;
-  schemaConformanceMessage?: string | null;
+  schemaConformanceMessage: string | null;
 };
 
 /**
@@ -106,7 +106,7 @@ export type SettleCheckRunCompleteInput = CheckRunRef & {
  */
 export type SettleCheckRunFailedInput = CheckRunRef & {
   checks: CheckResults;
-  schemaConformanceMessage?: string | null;
+  schemaConformanceMessage: string | null;
   failure: CheckRunFailure;
 };
 

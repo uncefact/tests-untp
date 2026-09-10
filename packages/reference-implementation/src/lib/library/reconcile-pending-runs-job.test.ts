@@ -1,3 +1,5 @@
+jest.mock('pg-boss', () => ({ PgBoss: class PgBoss {} }));
+
 jest.mock('@/lib/api/logger', () => {
   const logger: Record<string, unknown> = {
     info: jest.fn(),
@@ -32,8 +34,17 @@ function loggerInfo(): jest.Mock {
   return apiLogger.info as unknown as jest.Mock;
 }
 
+let previousWorkerTimeout: string | undefined;
+
 beforeEach(() => {
   jest.clearAllMocks();
+  previousWorkerTimeout = process.env.WORKER_JOB_TIMEOUT_SECONDS;
+  delete process.env.WORKER_JOB_TIMEOUT_SECONDS;
+});
+
+afterEach(() => {
+  if (previousWorkerTimeout === undefined) delete process.env.WORKER_JOB_TIMEOUT_SECONDS;
+  else process.env.WORKER_JOB_TIMEOUT_SECONDS = previousWorkerTimeout;
 });
 
 function run(id: string, lastEnqueuedAt: Date | null): CheckRun {

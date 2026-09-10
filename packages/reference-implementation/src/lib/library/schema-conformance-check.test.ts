@@ -81,16 +81,34 @@ beforeEach(() => {
 });
 
 describe('checkSchemaConformance', () => {
-  it('does not decode or fetch before extracted details and both core fields exist', async () => {
+  it('does not decode or fetch when details were not extracted', async () => {
     const deps = dependencies();
     const result = await checkSchemaConformance(
-      input({ detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED, coreCredentialType: null }),
+      input({ detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED }),
       deps,
     );
 
     expect(result).toEqual({ result: CheckResult.NOT_RUN, message: null });
     expect(decodeCredential).not.toHaveBeenCalled();
     expect(validateAgainstSchemas).not.toHaveBeenCalled();
+  });
+
+  it('does not decode when extracted details have no core credential type', async () => {
+    const deps = dependencies();
+    await expect(checkSchemaConformance(input({ coreCredentialType: null }), deps)).resolves.toEqual({
+      result: CheckResult.NOT_RUN,
+      message: null,
+    });
+    expect(decodeCredential).not.toHaveBeenCalled();
+  });
+
+  it('does not decode when extracted details have no core data model version', async () => {
+    const deps = dependencies();
+    await expect(checkSchemaConformance(input({ coreDataModelVersion: null }), deps)).resolves.toEqual({
+      result: CheckResult.NOT_RUN,
+      message: null,
+    });
+    expect(decodeCredential).not.toHaveBeenCalled();
   });
 
   it('uses the system core schema URL and the shared guarded loaders', async () => {
@@ -140,6 +158,16 @@ describe('checkSchemaConformance', () => {
     expect(validateJsonLd).not.toHaveBeenCalled();
   });
 
+  it('returns a bounded failure when the schema validator reports no location', async () => {
+    const deps = dependencies();
+    validateAgainstSchemas.mockRejectedValue(new SchemaPayloadError([]));
+
+    await expect(checkSchemaConformance(input(), deps)).resolves.toEqual({
+      result: CheckResult.FAIL,
+      message: 'the schema validator reported a violation without a location',
+    });
+  });
+
   it('returns not_run and logs only the schema origin for fetch and compilation failures', async () => {
     const deps = dependencies();
     validateAgainstSchemas.mockRejectedValue(new SchemaFetchFailedError(SCHEMA_URL, new Error('private path')));
@@ -176,7 +204,10 @@ describe('checkSchemaConformance', () => {
       message: null,
     });
     expect(schemaLoader).not.toHaveBeenCalled();
-    expect(logger.warn).toHaveBeenCalledWith({ stage: 'schema' }, expect.stringContaining('allowance'));
+    expect(logger.warn).toHaveBeenCalledWith(
+      { stage: 'schema', reason: 'deadline' },
+      expect.stringContaining('allowance'),
+    );
   });
 
   it('maps a document diagnostic to fail and a context diagnostic to not_run', async () => {
@@ -202,6 +233,57 @@ describe('checkSchemaConformance', () => {
       { stage: 'JSON-LD', contextOrigin: new URL(CONTEXT_URL).origin },
       expect.any(String),
     );
+
+    describeJsonLdFailure.mockReturnValue({
+      kind: 'context-invalid',
+      detail: 'context invalid',
+      code: 'invalid-context',
+      fields: { event: 'context invalid' },
+    });
+    await expect(checkSchemaConformance(input(), deps)).resolves.toEqual({
+      result: CheckResult.NOT_RUN,
+      message: null,
+    });
+    expect(logger.warn).toHaveBeenCalledWith(
+      { stage: 'JSON-LD', errorCode: 'invalid-context', fields: { event: 'context invalid' } },
+      expect.any(String),
+    );
+  });
+
+  it('checks the deadline between schema validation and JSON-LD expansion', async () => {
+    const deps = dependencies();
+    const now = jest.spyOn(Date, 'now').mockReturnValueOnce(1_001);
+    try {
+      await expect(checkSchemaConformance(input({ deadline: 1_000 }), deps)).resolves.toEqual({
+        result: CheckResult.NOT_RUN,
+        message: null,
+      });
+      expect(validateJsonLd).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        { stage: 'JSON-LD', reason: 'deadline' },
+        expect.stringContaining('allowance'),
+      );
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('reports an aborted stage separately from a deadline', async () => {
+    const deps = dependencies();
+    const controller = new AbortController();
+    controller.abort();
+    validateAgainstSchemas.mockImplementation(async (_payload, urls, loader) => {
+      await loader.load(urls[0]);
+    });
+
+    await expect(checkSchemaConformance(input({ signal: controller.signal }), deps)).resolves.toEqual({
+      result: CheckResult.NOT_RUN,
+      message: null,
+    });
+    expect(logger.warn).toHaveBeenCalledWith(
+      { stage: 'schema', reason: 'aborted' },
+      expect.stringContaining('allowance'),
+    );
   });
 
   it('recognises a JSON-LD stage timeout through its expansion wrapper', async () => {
@@ -220,7 +302,10 @@ describe('checkSchemaConformance', () => {
       result: CheckResult.NOT_RUN,
       message: null,
     });
-    expect(logger.warn).toHaveBeenCalledWith({ stage: 'JSON-LD' }, expect.stringContaining('allowance'));
+    expect(logger.warn).toHaveBeenCalledWith(
+      { stage: 'JSON-LD', reason: 'deadline' },
+      expect.stringContaining('allowance'),
+    );
     jest.restoreAllMocks();
   });
 

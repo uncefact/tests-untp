@@ -79,7 +79,7 @@ async function scheduleReconciliation(queue: JobQueue, cron: string): Promise<vo
  * a consumer and failing on the first tick or the first job: the sweep
  * cadence, which the schedule step needs, the per-tick cap, which the sweep
  * reads on each tick, and the worker job timeout, which every queue job
- * job reads. The reader's message already names the variable and the fix,
+ * carries. The reader's message already names the variable and the fix,
  * so it is the boot error's message and no cause is attached that would
  * print it twice.
  */

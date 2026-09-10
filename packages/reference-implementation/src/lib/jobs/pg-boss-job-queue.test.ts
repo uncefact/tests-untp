@@ -30,7 +30,7 @@ jest.mock('pg-boss', () => {
 });
 
 import { JobQueueError } from './errors';
-import { PgBossJobQueue } from './pg-boss-job-queue';
+import { MAX_JOB_EXPIRE_SECONDS, PgBossJobQueue } from './pg-boss-job-queue';
 
 const { __bossMock: bossMock, __mockState: mockState } = jest.requireMock('pg-boss') as {
   __bossMock: Record<string, jest.Mock>;
@@ -45,7 +45,7 @@ const { __bossMock: bossMock, __mockState: mockState } = jest.requireMock('pg-bo
  */
 const storedQueues = new Map<string, string>();
 
-const makeQueue = (options: object = { defaultExpireSeconds: 300 }) =>
+const makeQueue = (options: object = {}) =>
   new PgBossJobQueue({ connectionString: 'postgres://example/db', ...options });
 
 /** The per-queue callback the adapter hands to boss.work, captured for direct invocation. */
@@ -165,9 +165,13 @@ describe('constructor', () => {
     expect(() => makeQueue({ defaultExpireSeconds: 0 })).toThrow(
       'defaultExpireSeconds must be a positive integer of at most 24 hours',
     );
-    expect(() => makeQueue({ defaultExpireSeconds: 86_401 })).toThrow(
+    expect(() => makeQueue({ defaultExpireSeconds: 1.5 })).toThrow(
       'defaultExpireSeconds must be a positive integer of at most 24 hours',
     );
+    expect(() => makeQueue({ defaultExpireSeconds: MAX_JOB_EXPIRE_SECONDS + 1 })).toThrow(
+      'defaultExpireSeconds must be a positive integer of at most 24 hours',
+    );
+    expect(() => makeQueue({ defaultExpireSeconds: MAX_JOB_EXPIRE_SECONDS })).not.toThrow();
   });
 
   it('falls back to console.error when no onError is supplied', () => {
@@ -218,7 +222,7 @@ describe('enqueue option mapping', () => {
   it('sends no options when none are given', async () => {
     const queue = makeQueue();
     await queue.enqueue('issue', { recordId: 'r1' });
-    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, { expireInSeconds: 300 });
+    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, {});
   });
 
   it('applies the constructed default expiry to sends and schedules', async () => {
@@ -232,7 +236,7 @@ describe('enqueue option mapping', () => {
   it('applies retry without backoff as a bare retryLimit', async () => {
     const queue = makeQueue();
     await queue.enqueue('issue', {}, { retry: { limit: 1 } });
-    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { expireInSeconds: 300, retryLimit: 1 });
+    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { retryLimit: 1 });
   });
 
   it('falls back to the constructor defaultRetry when the send names none', async () => {
@@ -242,7 +246,6 @@ describe('enqueue option mapping', () => {
       'issue',
       {},
       {
-        expireInSeconds: 300,
         retryLimit: 5,
         retryDelay: 10,
         retryBackoff: true,
@@ -253,7 +256,7 @@ describe('enqueue option mapping', () => {
   it('lets a per-send retry override the defaultRetry', async () => {
     const queue = makeQueue({ defaultRetry: { limit: 5 } });
     await queue.enqueue('issue', {}, { retry: { limit: 0 } });
-    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { expireInSeconds: 300, retryLimit: 0 });
+    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { retryLimit: 0 });
   });
 });
 
@@ -299,7 +302,7 @@ describe('transactional enqueue', () => {
     const queue = makeQueue();
     const tx = { executeSql: jest.fn(async () => ({ rows: [] })) };
     await queue.enqueueWithin(tx, 'issue', { recordId: 'r1' });
-    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, { expireInSeconds: 300, db: tx });
+    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, { db: tx });
   });
 });
 
@@ -319,7 +322,7 @@ describe('declareQueue', () => {
     const tx = { executeSql: jest.fn(async () => ({ rows: [] })) };
     await queue.enqueueWithin(tx, 'verify', { recordId: 'r1' });
     expect(bossMock.createQueue).toHaveBeenCalledTimes(1);
-    expect(bossMock.send).toHaveBeenCalledWith('verify', { recordId: 'r1' }, { expireInSeconds: 300, db: tx });
+    expect(bossMock.send).toHaveBeenCalledWith('verify', { recordId: 'r1' }, { db: tx });
   });
 
   it('rejects a send whose policy contradicts the declared queue', async () => {
@@ -728,6 +731,24 @@ describe('handler context and settlement', () => {
     ]);
   });
 
+  it('falls back to the configured expiry and warns when job metadata is invalid', async () => {
+    const onError = jest.fn();
+    const callback = await startWithHandler(
+      async (_payload, context) => {
+        expect(context).toMatchObject({ expireSeconds: 60 });
+      },
+      { defaultExpireSeconds: 60, onError },
+    );
+
+    await callback([job({ id: 'job-invalid-expiry', expireInSeconds: 0 })]);
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("job 'job-invalid-expiry' carried an invalid expireInSeconds value"),
+      }),
+    );
+  });
+
   it('treats a retry limit of zero as final on the first attempt', async () => {
     const contexts: object[] = [];
     const callback = await startWithHandler(async (_payload, context) => {
@@ -805,14 +826,7 @@ describe('scheduling', () => {
     const queue = makeQueue();
     await queue.schedule('cvc-refresh', '0 3 * * *', { source: 'cron' });
     expect(bossMock.createQueue).toHaveBeenCalledWith('cvc-refresh', { policy: 'standard', notify: true });
-    expect(bossMock.schedule).toHaveBeenCalledWith(
-      'cvc-refresh',
-      '0 3 * * *',
-      { source: 'cron' },
-      {
-        expireInSeconds: 300,
-      },
-    );
+    expect(bossMock.schedule).toHaveBeenCalledWith('cvc-refresh', '0 3 * * *', { source: 'cron' }, {});
   });
 
   it('rejects scheduling a queue declared as deduplicating', async () => {

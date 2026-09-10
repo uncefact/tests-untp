@@ -166,7 +166,7 @@ services:
       API_MAX_BATCH_LIMIT:
       # Read by this process as well as the worker. Keep the value the same
       # across both services so one background-work budget is in force.
-      WORKER_JOB_TIMEOUT_SECONDS: ${WORKER_JOB_TIMEOUT_SECONDS:-}
+      WORKER_JOB_TIMEOUT_SECONDS:
       # OpenTelemetry - see docs/observability.md
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
       # Always forwarded, possibly empty; buildResource treats an empty value
@@ -226,7 +226,7 @@ services:
       OTEL_SERVICE_NAME: ${OTEL_WORKER_SERVICE_NAME:-reference-implementation-worker}
       LIBRARY_RECONCILE_PENDING_RUNS_CRON: ${LIBRARY_RECONCILE_PENDING_RUNS_CRON:-}
       LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE: ${LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE:-}
-      WORKER_JOB_TIMEOUT_SECONDS: ${WORKER_JOB_TIMEOUT_SECONDS:-}
+      WORKER_JOB_TIMEOUT_SECONDS:
     depends_on:
       ri-db:
         condition: service_healthy

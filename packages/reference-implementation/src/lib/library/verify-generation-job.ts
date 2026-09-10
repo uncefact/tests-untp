@@ -93,10 +93,10 @@ const verifyJobReferenceSchema: z.ZodType<VerifyJobReference, z.ZodTypeDef, unkn
 /** The ids a payload must still carry for the run it names to be settled at all. */
 const settleableReferenceSchema = z.object({ tenantId: z.string().min(1), checkRunId: z.string().min(1) });
 
-/** Reads the stored copy with the remaining worker attempt budget. */
+/** The largest stored copy this worker will read back into memory. */
 const MAX_STORED_COPY_BYTES = 16 * 1024 * 1024;
 
-/** Leaves time for the two guarded settlement updates before the queue expires an attempt. */
+/** Leaves time for the guarded settlement write, and its follow-up read when that write matched nothing, before the queue expires an attempt. */
 const SETTLEMENT_MARGIN_MS = 10_000;
 
 class VerificationStageTimeout extends Error {
@@ -270,7 +270,7 @@ export function verifyGenerationHandler(deps: VerifyGenerationDependencies): Job
 
     let outcome: VerificationOutcome;
     try {
-      outcome = await verifyStoredCopy(record, run, deps, context, deadline, remaining);
+      outcome = await verifyStoredCopy(record, run, deps, context, remaining);
     } catch (error) {
       if (error instanceof TransientVerificationError && !context.isFinalAttempt) {
         log.warn(
@@ -362,12 +362,11 @@ async function verifyStoredCopy(
   run: CheckRun,
   deps: VerifyGenerationDependencies,
   context: JobContext,
-  deadline: number,
   remaining: () => number,
 ): Promise<VerificationOutcome> {
   const progress: VerificationProgress = { checks: checksOf(run), schemaConformanceMessage: null };
   try {
-    return await runStoredCopyChecks(record, deps, context, progress, deadline, remaining);
+    return await runStoredCopyChecks(record, deps, context, progress, remaining);
   } catch (error) {
     if (error instanceof VerificationError) {
       error.checks = progress.checks;
@@ -389,7 +388,6 @@ async function runStoredCopyChecks(
   deps: VerifyGenerationDependencies,
   context: JobContext,
   progress: VerificationProgress,
-  deadline: number,
   remaining: () => number,
 ): Promise<VerificationOutcome> {
   const base = progress.checks;
@@ -416,6 +414,8 @@ async function runStoredCopyChecks(
   // corrupt object must be reported as a custody failure even when the row
   // says it once held HTML or another non-credential body.
   const copyTimeoutMs = remaining();
+  // This read is bounded by the remaining allowance so it cannot consume the
+  // settlement margin reserved for the guarded write and its follow-up read.
   const stored = await readStoredCopy(
     copy.storageUri,
     copy.decryptionKey,
@@ -492,10 +492,11 @@ async function runStoredCopyChecks(
   throwIfAborted(context);
   let conformance: SchemaConformanceResult;
   const conformanceTimeoutMs = remaining();
+  const conformanceDeadline = Date.now() + conformanceTimeoutMs;
   const conformanceTimeout = new VerificationStageTimeout();
   if (conformanceTimeoutMs <= 0) {
     logger.warn(
-      { recordId: record.record.id },
+      { recordId: record.record.id, remainingMs: conformanceTimeoutMs, expireSeconds: context.expireSeconds },
       'Schema conformance was skipped because the worker job budget was exhausted',
     );
     conformance = { result: CheckResult.NOT_RUN, message: null };
@@ -508,7 +509,7 @@ async function runStoredCopyChecks(
           coreCredentialType: record.record.coreCredentialType,
           coreDataModelVersion: record.record.coreDataModelVersion,
           envelope: credential,
-          deadline,
+          deadline: conformanceDeadline,
           signal: context.signal,
         }),
         conformanceTimeoutMs,
@@ -518,7 +519,7 @@ async function runStoredCopyChecks(
     } catch (error) {
       if (error !== conformanceTimeout) throw error;
       logger.warn(
-        { recordId: record.record.id },
+        { recordId: record.record.id, remainingMs: conformanceTimeoutMs, expireSeconds: context.expireSeconds },
         'Schema conformance was skipped because the worker job budget was exhausted',
       );
       conformance = { result: CheckResult.NOT_RUN, message: null };

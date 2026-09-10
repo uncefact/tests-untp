@@ -160,6 +160,8 @@ export type ReverifyLibraryRecordDependencies = {
    * through to the real `fetch`.
    */
   fetchStoredCopy: (uri: string, timeoutMs: number) => Promise<Uint8Array>;
+  /** The request-side bound for reading a record's own durable copy. */
+  storedCopyTimeoutMs?: () => number;
 };
 
 export function defaultReverifyLibraryRecordDependencies(): ReverifyLibraryRecordDependencies {
@@ -170,6 +172,7 @@ export function defaultReverifyLibraryRecordDependencies(): ReverifyLibraryRecor
     reserveGeneration: reserveRecoveryGeneration,
     finaliseGeneration: finaliseRecoveryGeneration,
     fetchStoredCopy: fetchStoredCopyBytes,
+    storedCopyTimeoutMs: () => readWorkerJobTimeoutSeconds() * 1_000,
   };
 }
 
@@ -692,7 +695,7 @@ async function recoverExternalRecord(
         reservedCustody,
         reservedCustody.storageUri,
         deps.fetchStoredCopy,
-        readWorkerJobTimeoutSeconds() * 1_000,
+        deps.storedCopyTimeoutMs?.() ?? readWorkerJobTimeoutSeconds() * 1_000,
         earned,
       );
       prepared =
@@ -827,6 +830,7 @@ async function settleReservationOnThrow(
       id: checkRunId,
       tenantId,
       checks: { ...noChecksRun(), ...(checks ?? {}) },
+      schemaConformanceMessage: null,
       failure,
     });
     return true;

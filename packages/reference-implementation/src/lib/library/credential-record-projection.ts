@@ -52,7 +52,9 @@ export const verificationChecksSchema = z
     proof: checkResultSchema,
     status: checkResultSchema,
     temporal: checkResultSchema.describe('Recorded as evidence; never part of the blocking set.'),
-    schemaConformance: checkResultSchema.describe('Advisory only; never blocks a verified summary.'),
+    schemaConformance: checkResultSchema.describe(
+      'Advisory only; checks the system core schema for the stored type and version, then JSON-LD expansion; extension schemas are not checked.',
+    ),
   })
   .strict()
   .describe('All seven checks are always present; `not_run` covers both "did not apply" and "did not execute".');
@@ -409,7 +411,13 @@ function wireChecks(run: CheckRun, native: boolean): VerificationChecks {
 }
 
 function schemaConformanceWarnings(run: CheckRun | null): CredentialRecordWarning[] {
-  if (run?.schemaConformance !== CheckResult.FAIL || run.schemaConformanceMessage === null) return [];
+  if (
+    run?.state === CheckRunState.PENDING ||
+    run?.schemaConformance !== CheckResult.FAIL ||
+    run.schemaConformanceMessage === null
+  ) {
+    return [];
+  }
   return [{ code: 'SCHEMA_CONFORMANCE_ADVISORY', message: run.schemaConformanceMessage }];
 }
 
