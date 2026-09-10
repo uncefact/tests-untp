@@ -1,5 +1,6 @@
 import { isIP } from 'node:net';
 import { lookup as dnsLookup } from 'node:dns/promises';
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import { isPrivateHostname, isPrivateIpv4, isPrivateIpv6 } from './is-private-ip.js';
 import {
   InvalidUrlError,
@@ -26,7 +27,17 @@ export interface ValidatePublicUrlOptions {
   family?: 0 | 4 | 6;
   /** Permit private, loopback and reserved hostnames and addresses. Defaults to strict rejection. */
   allowPrivateAddresses?: boolean;
+  /**
+   * Lookup implementation used for hostname resolution. This is a test and
+   * diagnostics seam, not a policy switch: every returned address still goes
+   * through the hostname and address guard below. Omitted uses Node's default
+   * `node:dns/promises` lookup.
+   */
+  lookup?: PublicUrlLookup;
 }
+
+/** Node lookup result shape used when validating all addresses for a hostname. */
+export type PublicUrlLookup = (hostname: string, options: LookupAllOptions) => Promise<LookupAddress[]>;
 
 /**
  * The resolved address that callers must use as the connect target so the
@@ -137,7 +148,8 @@ export async function validatePublicUrl(url: string, options?: ValidatePublicUrl
 
   let records: { address: string; family: number }[];
   try {
-    records = await dnsLookup(hostname, { family: options?.family ?? 0, all: true });
+    const lookup = options?.lookup ?? dnsLookup;
+    records = await lookup(hostname, { family: options?.family ?? 0, all: true });
   } catch (cause) {
     throw new ResolutionFailedError(hostname, cause);
   }

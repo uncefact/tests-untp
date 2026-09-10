@@ -10,6 +10,7 @@ export {
 export { isPrivateHostname, isPrivateIpv4, isPrivateIpv6 } from './is-private-ip.js';
 export {
   validatePublicUrl,
+  type PublicUrlLookup,
   type ValidatePublicUrlOptions,
   type ResolvedAddress,
   type ValidatedAddresses,

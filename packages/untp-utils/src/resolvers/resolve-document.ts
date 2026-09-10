@@ -8,7 +8,7 @@ import {
   isValidHttpUserAgent,
 } from '../http-headers/index.js';
 import { MultibaseDigest, type HashAlgorithm, type MultibaseEncoding } from '../multibase-digest/index.js';
-import { validatePublicUrl } from '../node/index.js';
+import { validatePublicUrl, type PublicUrlLookup } from '../node/index.js';
 import {
   ResolverHttpError,
   ResolverNetworkError,
@@ -110,6 +110,13 @@ export interface ResolveDocumentOptions {
   allowedSchemes?: readonly string[];
   /** Permit private and reserved destinations while retaining every other guard. */
   allowPrivateAddresses?: boolean;
+  /**
+   * Optional hostname lookup for tests and diagnostics. This is not a policy
+   * switch: its answers still pass through `validatePublicUrl`'s hostname and
+   * address guard before they reach the pinned connector. When omitted, the
+   * existing `node:dns/promises` lookup is used.
+   */
+  lookup?: PublicUrlLookup;
 }
 
 /**
@@ -187,6 +194,7 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
       const guard = validatePublicUrl(currentUrl, {
         allowedSchemes: options?.allowedSchemes,
         allowPrivateAddresses: options?.allowPrivateAddresses,
+        ...(options?.lookup ? { lookup: options.lookup } : {}),
       });
       void guard.catch(() => undefined);
       const { addresses: pinnedAddresses } = await Promise.race([guard, abortPromise]);

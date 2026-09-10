@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { ReadableStream } from 'node:stream/web';
 import { MultibaseDigest } from '../multibase-digest/index.js';
-import { PrivateAddressError, ResolutionFailedError } from '../node/index.js';
+import { PrivateAddressError, ResolutionFailedError, type PublicUrlLookup } from '../node/index.js';
 import {
   ResolverHttpError,
   ResolverNetworkError,
@@ -109,6 +109,49 @@ describe('resolveDocument', () => {
   });
 
   describe('happy path', () => {
+    it('keeps the default DNS lookup path unchanged when no lookup is supplied', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: 'ok' }) as never);
+
+      await resolveDocument('https://example.com/doc');
+
+      expect(validatePublicUrl).toHaveBeenCalledWith('https://example.com/doc', {
+        allowedSchemes: undefined,
+        allowPrivateAddresses: undefined,
+      });
+    });
+
+    it('forwards a supplied lookup to validation and pins its result into the connector', async () => {
+      const lookup = jest
+        .fn<PublicUrlLookup>()
+        .mockResolvedValueOnce([{ address: '203.0.113.10', family: 4 }])
+        .mockResolvedValueOnce([{ address: '203.0.113.20', family: 4 }]);
+      validatePublicUrl.mockImplementation(async (_url, options) => {
+        const records = await (
+          options as { lookup: (hostname: string, opts: { family: 0; all: true }) => Promise<unknown[]> }
+        ).lookup('example.com', { family: 0, all: true });
+        const [first] = records as { address: string; family: 4 | 6 }[];
+        return { address: first.address, family: first.family, addresses: records } as never;
+      });
+      undiciFetch.mockResolvedValue(makeResponse({ body: 'ok' }) as never);
+
+      await resolveDocument('https://example.com/doc', { lookup });
+
+      expect(validatePublicUrl).toHaveBeenCalledWith('https://example.com/doc', expect.objectContaining({ lookup }));
+      const connectorLookup = (
+        agentOptions[0] as {
+          connect: {
+            lookup: (hostname: string, options: object, callback: (error: unknown, addresses: unknown) => void) => void;
+          };
+        }
+      ).connect.lookup;
+      const pinned = await new Promise((resolve, reject) => {
+        connectorLookup('example.com', {}, (error, addresses) => (error ? reject(error) : resolve(addresses)));
+      });
+      expect(pinned).toEqual([{ address: '203.0.113.10', family: 4 }]);
+      expect(lookup).toHaveBeenCalledTimes(1);
+    });
+
     it('returns a LoadResult with body, digest, and the allowlisted headers', async () => {
       validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
       undiciFetch.mockResolvedValue(
