@@ -4,6 +4,7 @@ import { ValidationError } from '@/lib/api/validation';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getDidById, updateDidStatus } from '@/lib/prisma/repositories';
 import { resolveDidService } from '@/lib/services/resolve-did-service';
+import { readFetchAllowPrivateUrlsIfSet } from '@/lib/config/credential-fetch.config';
 import { DidStatus } from '@uncefact/untp-ri-services';
 import { NextResponse } from 'next/server';
 
@@ -24,8 +25,8 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *
  *       Resolution of the DID document is bounded: the response body is capped at 1 MiB, the fetch is
  *       subject to a 10-second timeout from connection onwards, at most 3 redirects are followed, and every hop must resolve to a
- *       publicly routable address. A document that exceeds a bound fails the resolve check with a message
- *       naming the limit.
+ *       publicly routable address unless `FETCH_ALLOW_PRIVATE_URLS=true` is set for a trusted local deployment. A document that
+ *       exceeds a bound fails the resolve check with a message naming the limit.
  *     tags:
  *       - DIDs
  *     parameters:
@@ -90,7 +91,11 @@ export const POST = withTenantAuth(async (_req, { tenantId, params }) => {
   const { service: didService } = await resolveDidService(tenantId, did.serviceInstanceId ?? undefined);
 
   logger.info({ didId: id, did: did.did }, 'Verifying DID resolution');
-  const verification = await didService.verify(did.did);
+  const allowPrivateUrls = readFetchAllowPrivateUrlsIfSet(process.env);
+  const verification =
+    allowPrivateUrls === undefined
+      ? await didService.verify(did.did)
+      : await didService.verify(did.did, { allowPrivateUrls });
 
   const newStatus = verification.verified ? DidStatus.VERIFIED : DidStatus.VERIFICATION_FAILED;
   logger.info({ didId: id, verified: verification.verified, newStatus }, 'Updating DID status');

@@ -290,6 +290,7 @@ describe('Credential API', { testIsolation: false }, () => {
     it('GET /api/v1/library/:id: retrieves the encrypted credential', () => {
       cy.request(`/api/v1/library/${encryptedCredentialId}`).then((response) => {
         expect(response.status).to.eq(200);
+        expect(response.headers['cache-control']).to.contain('no-store');
         const cred = response.body;
         expect(cred.id).to.eq(encryptedCredentialId);
         expect(cred.storageUri).to.be.a('string');
@@ -297,6 +298,62 @@ describe('Credential API', { testIsolation: false }, () => {
         expect(cred.credential.credentialType).to.eq('DPP');
         expect(cred.decryptionKey).to.be.a('string');
       });
+    });
+  });
+
+  describe('Issuance idempotency', () => {
+    it('replays an identical request and rejects a changed body for the same key', () => {
+      const idempotencyKey = `e2e-credential-issue-${RUN_ID}`;
+      const issueBody = {
+        credentialPayload: buildCredentialPayload(defaultDidValue),
+        credentialType: 'DigitalProductPassport',
+        version: '0.6.1',
+      };
+      const changedBody = {
+        ...issueBody,
+        credentialPayload: {
+          ...issueBody.credentialPayload,
+          credentialSubject: {
+            ...issueBody.credentialPayload.credentialSubject,
+            id: `https://example.com/products/idempotency-changed-${RUN_ID}`,
+          },
+        },
+      };
+
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: issueBody,
+      })
+        .then((firstResponse) => {
+          expect(firstResponse.status).to.eq(201);
+          expect(firstResponse.body.credentialId).to.be.a('string');
+          return cy
+            .request({
+              method: 'POST',
+              url: '/api/v1/credentials',
+              headers: { 'Idempotency-Key': idempotencyKey },
+              body: issueBody,
+            })
+            .then((replayResponse) => {
+              expect(replayResponse.status).to.eq(201);
+              expect(replayResponse.body.credentialId).to.eq(firstResponse.body.credentialId);
+            });
+        })
+        .then(() =>
+          cy.request({
+            method: 'POST',
+            url: '/api/v1/credentials',
+            headers: { 'Idempotency-Key': idempotencyKey },
+            body: changedBody,
+            failOnStatusCode: false,
+          }),
+        )
+        .then((response) => {
+          expect(response.status).to.eq(422);
+          expect(response.body.code).to.eq('IDEMPOTENCY_KEY_MISMATCH');
+        });
     });
   });
 

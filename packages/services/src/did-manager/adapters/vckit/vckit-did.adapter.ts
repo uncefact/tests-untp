@@ -202,7 +202,7 @@ export class VCKitDidAdapter implements IDidService {
     }
   }
 
-  async verify(did: string): Promise<DidVerificationResult> {
+  async verify(did: string, options?: { allowPrivateUrls?: boolean }): Promise<DidVerificationResult> {
     if (!did) {
       throw new DidInputError('DID string is required for verification');
     }
@@ -232,7 +232,10 @@ export class VCKitDidAdapter implements IDidService {
       this.logger.warn({ error, did }, 'Failed to fetch provider keys, continuing with empty keys');
     }
 
-    const result = await verifyDid(did, { providerKeys });
+    const result = await verifyDid(did, {
+      providerKeys,
+      ...(options?.allowPrivateUrls === undefined ? {} : { allowPrivateUrls: options.allowPrivateUrls }),
+    });
 
     if (keyFetchFailed) {
       // Replace the vacuously-passing KEY_MATERIAL check with a failure

@@ -417,6 +417,19 @@ describe('VCKitDidAdapter', () => {
       expect(result).toEqual(mockResult);
     });
 
+    it('passes allowPrivateUrls through to verifyDid', async () => {
+      const mockResult = { verified: true, checks: [] };
+      (verifyDid as jest.Mock).mockResolvedValue(mockResult);
+      (global.fetch as jest.Mock).mockResolvedValueOnce(createMockResponse({ keys: [{ kid: 'key-1' }] }));
+
+      await service.verify('did:web:vckit.e2e.internal:dids:one', { allowPrivateUrls: true });
+
+      expect(verifyDid).toHaveBeenCalledWith('did:web:vckit.e2e.internal:dids:one', {
+        providerKeys: [{ kid: 'key-1' }],
+        allowPrivateUrls: true,
+      });
+    });
+
     it('throws DidInputError if DID string is empty', async () => {
       await expect(service.verify('')).rejects.toThrow(DidInputError);
     });
