@@ -467,7 +467,12 @@ describe('updateLibraryRecordAnnotations', () => {
       maxWait: 5_000,
       timeout: 15_000,
     });
-    expect(mockQueryRaw).toHaveBeenCalledWith(expect.any(Array), 'record-1', 'tenant-1');
+    const [templateStrings, ...boundValues] = mockQueryRaw.mock.calls[0] as [TemplateStringsArray, ...string[]];
+    const statement = Array.from(templateStrings).join('');
+    expect(statement).toContain('"LibraryRecord"');
+    expect(statement).toContain('FOR UPDATE');
+    expect(statement.indexOf('"id" =')).toBeLessThan(statement.indexOf('"tenantId" ='));
+    expect(boundValues).toEqual(['record-1', 'tenant-1']);
     expect(mockUpdateMany).toHaveBeenCalledWith({
       where: {
         id: 'record-1',

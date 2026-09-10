@@ -2088,6 +2088,8 @@ describe('reserveRecoveryGeneration', () => {
         encrypted: false,
       },
     });
+    expect(TX_SINGULAR).toHaveBeenCalledTimes(1);
+    expect(TX_SINGULAR.mock.calls[0].slice(1)).toEqual([RECORD_ID, TENANT_ID]);
     expect(TX_CREATE).toHaveBeenCalledWith({
       data: expect.objectContaining({
         recordId: RECORD_ID,

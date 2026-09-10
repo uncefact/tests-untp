@@ -638,7 +638,12 @@ export async function getExternalCredentialById(
  *
  * Takes the parent lock on the supplied interactive transaction before writing
  * the child. A caller that already holds it re-acquires it harmlessly, and a
- * caller writing more than one parent must pre-lock its ordered set.
+ * caller writing more than one parent must pre-lock its ordered set. The lock
+ * result is deliberately not inspected: an absent or foreign-tenant record is
+ * reported by the scoped child update's own P2025, so there is one answer for
+ * a missing row rather than two. Callers run this inside the transaction that
+ * writes the rest of the outcome, so custody and that outcome commit or roll
+ * back together.
  */
 export async function replaceCustody(
   tx: Prisma.TransactionClient,

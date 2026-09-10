@@ -621,9 +621,9 @@ describe('recipient annotation updates against Postgres', () => {
         await waitForQueueBehind(client, holder.pid, 1);
         patch = startPatch();
       }
-      // Neither operation is wrapped in a retry. If custody writes the child
-      // before its parent lock, this queue barrier exposes the deadlock after
-      // the PATCH takes the parent and waits for that child.
+      // Neither operation is wrapped in a retry. If the PATCH took the child
+      // before its parent, this queue barrier puts both lock acquisitions in
+      // flight together and Postgres reports the cycle as 40P01.
       await waitForQueueBehind(client, holder.pid, 2);
       holder.release();
       await holder.done;
@@ -683,26 +683,35 @@ describe('recipient annotation updates against Postgres', () => {
         await waitForQueueBehind(client, holder.pid, 1);
         patch = startPatch();
       }
-      await waitForQueueBehind(client, holder.pid, 2);
-      holder.release();
-      await holder.done;
+      try {
+        // Neither operation is wrapped in a retry. If custody writes the child
+        // before its parent lock, this queue barrier exposes the deadlock after
+        // the PATCH takes the parent and waits for that child.
+        await waitForQueueBehind(client, holder.pid, 2);
+        holder.release();
+        await holder.done;
 
-      const [patchResult, custodyResult] = await Promise.all([patch, custody]);
-      expect(patchResult.outcome).toBe('updated');
-      expect(custodyResult.id).toBe(RECORD_ID);
+        const [patchResult, custodyResult] = await Promise.all([patch, custody]);
+        expect(patchResult.outcome).toBe('updated');
+        expect(custodyResult.id).toBe(RECORD_ID);
 
-      const final = await client.externalCredential.findUniqueOrThrow({ where: { id: RECORD_ID } });
-      expect(final).toMatchObject({
-        displayName: 'patched during custody replacement',
-        annotationVersion: 2,
-        notes: 'Initial notes',
-        storageUri: replacement.uri,
-        storageDigestMultibase: replacement.digestMultibase,
-        storageServiceInstanceId: replacement.serviceInstanceId,
-        storageExternalId: replacement.externalId,
-        storageBucket: replacement.bucket,
-        decryptionKey: replacement.decryptionKey,
-      });
+        const final = await client.externalCredential.findUniqueOrThrow({ where: { id: RECORD_ID } });
+        expect(final).toMatchObject({
+          displayName: 'patched during custody replacement',
+          annotationVersion: 2,
+          notes: 'Initial notes',
+          storageUri: replacement.uri,
+          storageDigestMultibase: replacement.digestMultibase,
+          storageServiceInstanceId: replacement.serviceInstanceId,
+          storageExternalId: replacement.externalId,
+          storageBucket: replacement.bucket,
+          decryptionKey: replacement.decryptionKey,
+        });
+      } finally {
+        holder.release();
+        await holder.done.catch(() => undefined);
+        await Promise.allSettled([patch, custody]);
+      }
     },
   );
 

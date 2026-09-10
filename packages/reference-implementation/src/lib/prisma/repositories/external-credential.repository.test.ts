@@ -466,6 +466,7 @@ describe('replaceCustody', () => {
     });
     const lockQuery = jest.fn(async () => {
       await lockReleased;
+      // Consume the pre-lock clock value so a now captured before the await would carry the earlier time.
       Date.now();
       return [{ id: 'rec-1' }];
     });

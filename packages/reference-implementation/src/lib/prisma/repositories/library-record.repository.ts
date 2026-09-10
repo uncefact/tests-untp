@@ -549,8 +549,8 @@ async function readLibraryRecordFromClient(
  * admits the global client, which compiles and returns the same value, but a
  * `SELECT ... FOR UPDATE` outside a transaction runs in its own autocommit
  * transaction and releases the lock as the statement returns, so the caller
- * would hold nothing. A branded client that made that unrepresentable is
- * outside this helper's contract.
+ * would hold nothing. Pass the client Prisma hands to a `$transaction`
+ * callback, never `prisma` itself; the type cannot enforce it.
  *
  * The convention this helper carries is parent before child. Single-parent
  * callers take this lock before reading or writing their child. A caller that
