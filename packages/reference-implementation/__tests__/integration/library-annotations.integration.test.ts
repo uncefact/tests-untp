@@ -672,18 +672,27 @@ describe('recipient annotation updates against Postgres', () => {
           changes: { displayName: 'patched during custody replacement' },
         });
 
-      let patch: ReturnType<typeof startPatch>;
-      let custody: ReturnType<typeof startCustody>;
-      if (order === 'patch-first') {
-        patch = startPatch();
-        await waitForQueueBehind(client, holder.pid, 1);
-        custody = startCustody();
-      } else {
-        custody = startCustody();
-        await waitForQueueBehind(client, holder.pid, 1);
-        patch = startPatch();
-      }
+      let patch: ReturnType<typeof startPatch> | undefined;
+      let custody: ReturnType<typeof startCustody> | undefined;
       try {
+        if (order === 'patch-first') {
+          const patchHandle = startPatch();
+          patch = patchHandle;
+          void patchHandle.catch(() => undefined);
+          await waitForQueueBehind(client, holder.pid, 1);
+          const custodyHandle = startCustody();
+          custody = custodyHandle;
+          void custodyHandle.catch(() => undefined);
+        } else {
+          const custodyHandle = startCustody();
+          custody = custodyHandle;
+          void custodyHandle.catch(() => undefined);
+          await waitForQueueBehind(client, holder.pid, 1);
+          const patchHandle = startPatch();
+          patch = patchHandle;
+          void patchHandle.catch(() => undefined);
+        }
+
         // Neither operation is wrapped in a retry. If custody writes the child
         // before its parent lock, this queue barrier exposes the deadlock after
         // the PATCH takes the parent and waits for that child.
@@ -710,7 +719,7 @@ describe('recipient annotation updates against Postgres', () => {
       } finally {
         holder.release();
         await holder.done.catch(() => undefined);
-        await Promise.allSettled([patch, custody]);
+        await Promise.allSettled([patch, custody].filter((operation) => operation !== undefined));
       }
     },
   );
@@ -757,7 +766,12 @@ describe('recipient annotation updates against Postgres', () => {
 
     let waiter: Promise<unknown> | undefined;
     try {
-      await ownerReady;
+      await Promise.race([
+        ownerReady,
+        ownerDone.then(() => {
+          throw new Error('owner transaction ended before it signalled ready');
+        }),
+      ]);
       expect(ownerLocked).toBe(true);
       waiter = concurrent.$transaction(
         async (tx) => {
@@ -767,7 +781,14 @@ describe('recipient annotation updates against Postgres', () => {
       );
       await waitForQueueBehind(client, ownerPid, 1);
       allowReacquisition();
-      await expect(reacquired).resolves.toBe(true);
+      await expect(
+        Promise.race([
+          reacquired,
+          ownerDone.then(() => {
+            throw new Error('owner transaction ended before it signalled reacquired');
+          }),
+        ]),
+      ).resolves.toBe(true);
       releaseOwner();
       await ownerDone;
       await waiter;
