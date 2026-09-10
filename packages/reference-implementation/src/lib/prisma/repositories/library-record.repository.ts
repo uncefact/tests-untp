@@ -542,33 +542,31 @@ async function readLibraryRecordFromClient(
  * Takes a `FOR UPDATE` row lock on one tenant-owned `LibraryRecord` parent and
  * reports whether the row exists, so a caller can compare and write its child
  * without another writer changing the row in between.
+ * It returns false when no row matches both ids and propagates database
+ * failures.
  *
  * `tx` must be an interactive transaction client. The parameter type also
  * admits the global client, which compiles and returns the same value, but a
  * `SELECT ... FOR UPDATE` outside a transaction runs in its own autocommit
  * transaction and releases the lock as the statement returns, so the caller
- * would hold nothing. A branded client that made that unrepresentable is a
- * follow-up, tracked with the adoption below.
+ * would hold nothing. Pass the client Prisma hands to a `$transaction`
+ * callback, never `prisma` itself; the type cannot enforce it.
  *
- * The convention this helper carries is parent before child. Its callers today
- * are `updateLibraryRecordAnnotations` in this file and, as a character-for-
- * character inline copy pending adoption, `createReverificationGeneration` in
- * `check-run.repository.ts`. `replaceCustody` in
- * `external-credential.repository.ts` takes no parent lock at all, so an
- * annotation update is not serialised against a custody replacement today.
- * That divergence is a recorded follow-up, and `replaceCustody` has no
- * non-test caller yet.
+ * The convention this helper carries is parent before child. Single-parent
+ * callers take this lock before reading or writing their child. A caller that
+ * writes more than one parent must first lock the complete ordered set through
+ * `lockLibraryRecordsForUpdate`.
  */
 export async function lockLibraryRecordForUpdate(
   tx: Prisma.TransactionClient,
   id: string,
   tenantId: string,
 ): Promise<boolean> {
-  const locked = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-    'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
-    id,
-    tenantId,
-  );
+  const locked = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "LibraryRecord"
+    WHERE "id" = ${id} AND "tenantId" = ${tenantId}
+    FOR UPDATE
+  `;
   return locked.length > 0;
 }
 

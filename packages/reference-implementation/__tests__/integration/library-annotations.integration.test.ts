@@ -5,12 +5,17 @@ import {
   CoreCredentialType,
   CredentialDetailsStatus,
   LibraryRecordOrigin,
+  Prisma,
   type PrismaClient,
 } from '../../src/lib/prisma/generated/index.js';
 import { PgBossJobQueue } from '../../src/lib/jobs/pg-boss-job-queue';
 import { createRigClient, truncateApplicationTables } from './rig/db';
 import { prisma } from '../../src/lib/prisma/prisma';
-import { updateLibraryRecordAnnotations } from '../../src/lib/prisma/repositories/library-record.repository';
+import {
+  lockLibraryRecordForUpdate,
+  updateLibraryRecordAnnotations,
+} from '../../src/lib/prisma/repositories/library-record.repository';
+import { replaceCustody } from '../../src/lib/prisma/repositories/external-credential.repository';
 import { credentialRecordSchema, toCredentialRecord } from '../../src/lib/library/credential-record-projection';
 import { noChecksRun } from '../../src/lib/prisma/repositories/check-run.repository';
 import { holdRowForUpdate, waitForQueueBehind, type LockHolder } from './rig/locks';
@@ -616,6 +621,9 @@ describe('recipient annotation updates against Postgres', () => {
         await waitForQueueBehind(client, holder.pid, 1);
         patch = startPatch();
       }
+      // Neither operation is wrapped in a retry. If the PATCH took the child
+      // before its parent, this queue barrier puts both lock acquisitions in
+      // flight together and Postgres reports the cycle as 40P01.
       await waitForQueueBehind(client, holder.pid, 2);
       holder.release();
       await holder.done;
@@ -628,6 +636,178 @@ describe('recipient annotation updates against Postgres', () => {
       expect(await client.externalCredential.count({ where: { id: RECORD_ID } })).toBe(0);
     },
   );
+
+  it.each([['the PATCH', 'patch-first'] as const, ['custody replacement', 'custody-first'] as const])(
+    'lets a custody replacement and a PATCH settle without deadlocking when %s is queued first',
+    async (_first, order) => {
+      await createExternal(client);
+      const holder = await holdParentLock();
+      const replacement = {
+        uri: 'https://storage.example/replaced-copy',
+        digestMultibase: 'zReplacedCopyDigest',
+        serviceInstanceId: 'storage-service-replaced',
+        externalId: 'replaced-object',
+        bucket: 'library',
+        decryptionKey: 'replaced-key' as never,
+      };
+      const startCustody = () =>
+        prisma.$transaction(
+          (tx) =>
+            replaceCustody(tx, {
+              recordId: RECORD_ID,
+              tenantId: OWNER_TENANT_ID,
+              storage: replacement,
+            }),
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+            maxWait: 5_000,
+            timeout: 15_000,
+          },
+        );
+      const startPatch = () =>
+        updateLibraryRecordAnnotations({
+          recordId: RECORD_ID,
+          tenantId: OWNER_TENANT_ID,
+          expectedVersion: 1,
+          changes: { displayName: 'patched during custody replacement' },
+        });
+
+      let patch: ReturnType<typeof startPatch> | undefined;
+      let custody: ReturnType<typeof startCustody> | undefined;
+      try {
+        if (order === 'patch-first') {
+          const patchHandle = startPatch();
+          patch = patchHandle;
+          void patchHandle.catch(() => undefined);
+          await waitForQueueBehind(client, holder.pid, 1);
+          const custodyHandle = startCustody();
+          custody = custodyHandle;
+          void custodyHandle.catch(() => undefined);
+        } else {
+          const custodyHandle = startCustody();
+          custody = custodyHandle;
+          void custodyHandle.catch(() => undefined);
+          await waitForQueueBehind(client, holder.pid, 1);
+          const patchHandle = startPatch();
+          patch = patchHandle;
+          void patchHandle.catch(() => undefined);
+        }
+
+        // Neither operation is wrapped in a retry. If custody writes the child
+        // before its parent lock, this queue barrier exposes the deadlock after
+        // the PATCH takes the parent and waits for that child.
+        await waitForQueueBehind(client, holder.pid, 2);
+        holder.release();
+        await holder.done;
+
+        const [patchResult, custodyResult] = await Promise.all([patch, custody]);
+        expect(patchResult.outcome).toBe('updated');
+        expect(custodyResult.id).toBe(RECORD_ID);
+
+        const final = await client.externalCredential.findUniqueOrThrow({ where: { id: RECORD_ID } });
+        expect(final).toMatchObject({
+          displayName: 'patched during custody replacement',
+          annotationVersion: 2,
+          notes: 'Initial notes',
+          storageUri: replacement.uri,
+          storageDigestMultibase: replacement.digestMultibase,
+          storageServiceInstanceId: replacement.serviceInstanceId,
+          storageExternalId: replacement.externalId,
+          storageBucket: replacement.bucket,
+          decryptionKey: replacement.decryptionKey,
+        });
+      } finally {
+        holder.release();
+        await holder.done.catch(() => undefined);
+        await Promise.allSettled([patch, custody].filter((operation) => operation !== undefined));
+      }
+    },
+  );
+
+  it('binds an apostrophe-containing owned id and keeps the lock until the owning transaction ends', async () => {
+    // The owned, absent and foreign cases distinguish bound values from a
+    // quoted interpolation, while the waiter proves the lock survives the
+    // tagged statement until the interactive transaction ends.
+    const ownedId = "helper-owned-'apostrophe";
+    await createExternal(client, ownedId);
+
+    let releaseOwner!: () => void;
+    const ownerReleased = new Promise<void>((resolve) => {
+      releaseOwner = resolve;
+    });
+    let allowReacquisition!: () => void;
+    const reacquisitionAllowed = new Promise<void>((resolve) => {
+      allowReacquisition = resolve;
+    });
+    let signalOwnerReady!: () => void;
+    const ownerReady = new Promise<void>((resolve) => {
+      signalOwnerReady = resolve;
+    });
+    let signalReacquired!: (result: boolean) => void;
+    const reacquired = new Promise<boolean>((resolve) => {
+      signalReacquired = resolve;
+    });
+    let ownerPid = 0;
+    let ownerLocked = false;
+    const ownerDone = client.$transaction(
+      async (tx) => {
+        ownerLocked = await lockLibraryRecordForUpdate(tx, ownedId, OWNER_TENANT_ID);
+        const [backend] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid()::int AS pid`;
+        ownerPid = backend.pid;
+        signalOwnerReady();
+        await reacquisitionAllowed;
+        if (ownerLocked) {
+          signalReacquired(await lockLibraryRecordForUpdate(tx, ownedId, OWNER_TENANT_ID));
+        }
+        await ownerReleased;
+      },
+      { timeout: 20_000 },
+    );
+
+    let waiter: Promise<unknown> | undefined;
+    try {
+      await Promise.race([
+        ownerReady,
+        ownerDone.then(() => {
+          throw new Error('owner transaction ended before it signalled ready');
+        }),
+      ]);
+      expect(ownerLocked).toBe(true);
+      waiter = concurrent.$transaction(
+        async (tx) => {
+          expect(await lockLibraryRecordForUpdate(tx, ownedId, OWNER_TENANT_ID)).toBe(true);
+        },
+        { timeout: 20_000 },
+      );
+      const waiterHandle = waiter;
+      void waiterHandle.catch(() => undefined);
+      await waitForQueueBehind(client, ownerPid, 1);
+      allowReacquisition();
+      await expect(
+        Promise.race([
+          reacquired,
+          ownerDone.then(() => {
+            throw new Error('owner transaction ended before it signalled reacquired');
+          }),
+        ]),
+      ).resolves.toBe(true);
+      releaseOwner();
+      await ownerDone;
+      await waiter;
+
+      await expect(
+        client.$transaction(async (tx) => ({
+          absent: await lockLibraryRecordForUpdate(tx, 'helper-absent', OWNER_TENANT_ID),
+          foreign: await lockLibraryRecordForUpdate(tx, ownedId, OTHER_TENANT_ID),
+        })),
+      ).resolves.toEqual({ absent: false, foreign: false });
+    } finally {
+      allowReacquisition();
+      releaseOwner();
+      await ownerDone.catch(() => undefined);
+      await waiter?.catch(() => undefined);
+    }
+  });
 
   it('leaves the row untouched when a matching token is already at the column maximum', async () => {
     await createExternal(client);

@@ -48,8 +48,9 @@ export function isRecordNotFound(error: unknown): boolean {
  */
 export function isTransactionDeadlock(error: unknown): boolean {
   if (hasPrismaErrorCode(error, 'P2034')) return true;
-  // The lock queries in this codebase run as `$queryRawUnsafe`, whose
-  // failures take the raw-query error path rather than the interactive
+  // Multi-parent and child lock queries in this codebase run as
+  // `$queryRawUnsafe`; the singular parent lock uses a tagged `$queryRaw`.
+  // Both failures take the raw-query error path rather than the interactive
   // transaction's own P2034 wrapping: Prisma reports these as P2010 ("Raw
   // query failed"), with `meta.code` carrying the underlying database error
   // code as a string (Prisma's documented shape,

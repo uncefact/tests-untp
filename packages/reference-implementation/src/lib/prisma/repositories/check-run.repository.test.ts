@@ -1,6 +1,7 @@
 jest.mock('../prisma', () => ({
   prisma: {
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
     $queryRawUnsafe: jest.fn(),
     checkRun: {
       create: jest.fn(),
@@ -48,8 +49,9 @@ jest.mock('@/lib/jobs/prisma-sql-executor', () => ({
 const mockGetLibraryRecordById = jest.fn();
 jest.mock('./library-record.repository', () => ({
   getLibraryRecordById: (...args: unknown[]) => mockGetLibraryRecordById(...args),
-  // The real helper: recovery's ordered parent lock is asserted through the
-  // transaction client's `$queryRawUnsafe`, which the helper calls.
+  // The real helpers: the singular parent lock uses the tagged mock and the
+  // ordered parent lock keeps using the unsafe mock.
+  lockLibraryRecordForUpdate: jest.requireActual('./library-record.repository').lockLibraryRecordForUpdate,
   lockLibraryRecordsForUpdate: jest.requireActual('./library-record.repository').lockLibraryRecordsForUpdate,
 }));
 
@@ -68,6 +70,7 @@ import type { SqlExecutor } from '@/lib/jobs/types';
 import type { RecoverInRequestOutcome } from '@/lib/library/register-external-credential';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
 import { ABANDONED_CUSTODY_UNKNOWN_MESSAGE, ABANDONED_RUN_MESSAGE } from '@/lib/library/reverify-messages';
+import { prismaRawQueryError } from '../db-errors.fixtures';
 import {
   createReverificationGeneration,
   finaliseRecoveryGeneration,
@@ -84,10 +87,12 @@ const RECORD_ID = 'record-1';
 const TENANT_ID = 'tenant-1';
 /** A supplier key, for the rendered-line assertions. No log line here may ever carry one. */
 const KEY_SENTINEL = 'KEY-SENTINEL-3d91fa';
+const TX_SINGULAR = jest.fn();
 const TX_LOCK = jest.fn();
 const TX_FIND = jest.fn();
 const TX_CREATE = jest.fn();
 const transactionClient = {
+  $queryRaw: TX_SINGULAR,
   $queryRawUnsafe: TX_LOCK,
   libraryRecord: { findFirst: TX_FIND, update: jest.fn() },
   externalCredential: {
@@ -189,6 +194,8 @@ function abandonedRun(overrides: Partial<CheckRun> = {}): CheckRun {
 beforeEach(() => {
   jest.clearAllMocks();
   renderedLogLines.length = 0;
+  TX_SINGULAR.mockReset();
+  TX_SINGULAR.mockResolvedValue([{ id: RECORD_ID }]);
   mockTransaction.mockImplementation(async (callback: (tx: typeof transactionClient) => unknown) =>
     callback(transactionClient),
   );
@@ -231,11 +238,9 @@ describe('createReverificationGeneration', () => {
       maxWait: 5_000,
       timeout: 15_000,
     });
-    expect(TX_LOCK).toHaveBeenCalledWith(
-      'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
-      RECORD_ID,
-      TENANT_ID,
-    );
+    expect(TX_SINGULAR).toHaveBeenCalledTimes(1);
+    expect(TX_SINGULAR.mock.calls[0].slice(1)).toEqual([RECORD_ID, TENANT_ID]);
+    expect(TX_LOCK).not.toHaveBeenCalledWith(expect.stringContaining('FOR UPDATE'), RECORD_ID, TENANT_ID);
     expect(TX_FIND).toHaveBeenCalledWith({
       where: { id: RECORD_ID, tenantId: TENANT_ID },
       include: {
@@ -404,6 +409,7 @@ describe('createReverificationGeneration', () => {
     // Fails if a record deleted during preparation can still gain a run or if
     // a foreign tenant row is accepted by an unscoped lock.
     TX_LOCK.mockImplementation(async (sql: string) => (isKeyPresenceQuery(sql) ? [keyPresence] : []));
+    TX_SINGULAR.mockResolvedValue([]);
 
     await expect(createReverificationGeneration(input())).resolves.toEqual({ outcome: 'missing' });
     expect(TX_FIND).not.toHaveBeenCalled();
@@ -1294,6 +1300,7 @@ describe('finaliseRecoveryGeneration', () => {
     // rolled back along with everything else in this transaction) before the
     // guarded run write found no matching row and threw.
     expect(transactionClient.externalCredential.update).toHaveBeenCalled();
+    expect(TX_SINGULAR).toHaveBeenCalledWith(expect.any(Array), RECORD_ID, TENANT_ID);
     expect(result).toEqual({ outcome: 'superseded', generation: null });
     expect(loggerCalls.error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -2081,6 +2088,8 @@ describe('reserveRecoveryGeneration', () => {
         encrypted: false,
       },
     });
+    expect(TX_SINGULAR).toHaveBeenCalledTimes(1);
+    expect(TX_SINGULAR.mock.calls[0].slice(1)).toEqual([RECORD_ID, TENANT_ID]);
     expect(TX_CREATE).toHaveBeenCalledWith({
       data: expect.objectContaining({
         recordId: RECORD_ID,
@@ -2119,6 +2128,26 @@ describe('reserveRecoveryGeneration', () => {
         encrypted: false,
       },
     });
+    expect(mockTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries once when the tagged parent lock reports a raw deadlock', async () => {
+    TX_SINGULAR.mockRejectedValueOnce(prismaRawQueryError('40P01'));
+
+    await expect(reserveRecoveryGeneration(reserveInput())).resolves.toEqual({
+      outcome: 'reserved',
+      generation: 1,
+      checkRunId: 'run-2',
+      identity: { contentDigest: null, duplicateOfRecordId: null },
+      custody: {
+        storageUri: null,
+        storageDigestMultibase: null,
+        storageExternalId: null,
+        decryptionKeyPresent: false,
+        encrypted: false,
+      },
+    });
+    expect(TX_SINGULAR).toHaveBeenCalledTimes(2);
     expect(mockTransaction).toHaveBeenCalledTimes(2);
   });
 
@@ -2178,13 +2207,10 @@ describe('reserveRecoveryGeneration', () => {
     // Fails if the reservation can lock a record by id alone and then recover
     // another tenant's row.
     TX_LOCK.mockImplementation(async (sql: string) => (isKeyPresenceQuery(sql) ? [keyPresence] : []));
+    TX_SINGULAR.mockResolvedValue([]);
 
     await expect(reserveRecoveryGeneration(reserveInput())).resolves.toEqual({ outcome: 'missing' });
-    expect(TX_LOCK).toHaveBeenCalledWith(
-      'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
-      RECORD_ID,
-      TENANT_ID,
-    );
+    expect(TX_SINGULAR.mock.calls[0].slice(1)).toEqual([RECORD_ID, TENANT_ID]);
     expect(TX_CREATE).not.toHaveBeenCalled();
   });
 

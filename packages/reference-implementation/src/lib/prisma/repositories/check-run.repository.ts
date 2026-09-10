@@ -10,7 +10,7 @@ import {
 } from '../generated';
 import { prisma } from '../prisma';
 import { isTransactionDeadlock, isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
-import { lockLibraryRecordsForUpdate } from './library-record.repository';
+import { lockLibraryRecordForUpdate, lockLibraryRecordsForUpdate } from './library-record.repository';
 import { prismaSqlExecutor } from '@/lib/jobs/prisma-sql-executor';
 import type { SqlExecutor } from '@/lib/jobs/types';
 import type { VerifyJobReference } from './external-credential.repository';
@@ -316,12 +316,7 @@ async function createReverificationGenerationOnce(
 ): Promise<CreateReverificationGenerationResult> {
   return prisma.$transaction(
     async (tx): Promise<CreateReverificationGenerationResult> => {
-      const locked = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-        'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
-        input.recordId,
-        input.tenantId,
-      );
-      if (locked.length === 0) return { outcome: 'missing' };
+      if (!(await lockLibraryRecordForUpdate(tx, input.recordId, input.tenantId))) return { outcome: 'missing' };
 
       const row = (await tx.libraryRecord.findFirst({
         where: { id: input.recordId, tenantId: input.tenantId },
@@ -501,12 +496,9 @@ async function reserveRecoveryGenerationAttempt(
       () =>
         prisma.$transaction(
           async (tx): Promise<ReserveRecoveryGenerationResult> => {
-            const locked = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-              'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
-              input.recordId,
-              input.tenantId,
-            );
-            if (locked.length === 0) return { outcome: 'missing' };
+            if (!(await lockLibraryRecordForUpdate(tx, input.recordId, input.tenantId))) {
+              return { outcome: 'missing' };
+            }
 
             const row = (await tx.libraryRecord.findFirst({
               where: { id: input.recordId, tenantId: input.tenantId },

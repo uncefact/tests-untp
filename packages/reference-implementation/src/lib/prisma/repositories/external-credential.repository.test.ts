@@ -44,7 +44,9 @@ import {
   promoteExternalCredentialDigest,
   replaceCustody,
   type CreateExternalCredentialInput,
+  type ReplaceCustodyInput,
 } from './external-credential.repository';
+import { prismaRecordNotFoundError } from '../db-errors.fixtures';
 
 const mockTransaction = prisma.$transaction as unknown as jest.Mock;
 const mockExternalFindFirst = (prisma as unknown as { externalCredential: { findFirst: jest.Mock } }).externalCredential
@@ -79,6 +81,21 @@ function input(overrides: Partial<CreateExternalCredentialInput> = {}): CreateEx
     checkRun: { state: CheckRunState.PENDING, checks: {}, enqueue: jest.fn(async () => undefined) },
     ...overrides,
   } as CreateExternalCredentialInput;
+}
+
+function replacementInput(): ReplaceCustodyInput {
+  return {
+    recordId: 'rec-1',
+    tenantId: 'tenant-1',
+    storage: {
+      uri: 'https://storage.example/new',
+      digestMultibase: 'zNewDigest',
+      serviceInstanceId: 'svc-2',
+      externalId: 'new-object',
+      bucket: 'library',
+      decryptionKey: 'protected-new-key' as never,
+    },
+  };
 }
 
 beforeEach(() => {
@@ -359,6 +376,7 @@ describe('replaceCustody', () => {
     const externalUpdate = jest.fn(async () => ({ id: 'rec-1', storageUri: 'https://storage.example/new' }));
     const parentUpdate = jest.fn(async () => ({ id: 'rec-1' }));
     const transactionClient = {
+      $queryRaw: jest.fn(async () => [{ id: 'rec-1' }]),
       externalCredential: { update: externalUpdate },
       libraryRecord: { update: parentUpdate },
     };
@@ -366,18 +384,7 @@ describe('replaceCustody', () => {
       .update;
     const globalParentUpdate = (prisma as unknown as { libraryRecord: { update: jest.Mock } }).libraryRecord.update;
 
-    await replaceCustody(transactionClient as never, {
-      recordId: 'rec-1',
-      tenantId: 'tenant-1',
-      storage: {
-        uri: 'https://storage.example/new',
-        digestMultibase: 'zNewDigest',
-        serviceInstanceId: 'svc-2',
-        externalId: 'new-object',
-        bucket: 'library',
-        decryptionKey: 'protected-new-key' as never,
-      },
-    });
+    await replaceCustody(transactionClient as never, replacementInput());
 
     expect(externalUpdate).toHaveBeenCalledWith({
       where: {
@@ -403,5 +410,97 @@ describe('replaceCustody', () => {
     // Both writes go to the transaction and neither to the module's client.
     expect(globalExternalUpdate).not.toHaveBeenCalled();
     expect(globalParentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('propagates a parent lock failure before either custody write', async () => {
+    // Fails if custody starts by writing the child, which would leave a
+    // partially ordered transaction after a parent-lock failure.
+    const lockQuery = jest.fn().mockRejectedValue(new Error('lock failed'));
+    const externalUpdate = jest.fn();
+    const parentUpdate = jest.fn();
+
+    await expect(
+      replaceCustody(
+        {
+          $queryRaw: lockQuery,
+          externalCredential: { update: externalUpdate },
+          libraryRecord: { update: parentUpdate },
+        } as never,
+        replacementInput(),
+      ),
+    ).rejects.toThrow('lock failed');
+
+    expect(lockQuery).toHaveBeenCalledTimes(1);
+    expect(externalUpdate).not.toHaveBeenCalled();
+    expect(parentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('lets a false parent lock result reach the child update and its P2025 unchanged', async () => {
+    // Fails if a false lock result is treated as success, or if the parent is
+    // touched before the child reports that the scoped record is absent.
+    const lockQuery = jest.fn().mockResolvedValue([]);
+    const externalUpdate = jest.fn().mockRejectedValue(prismaRecordNotFoundError());
+    const parentUpdate = jest.fn();
+
+    await expect(
+      replaceCustody(
+        {
+          $queryRaw: lockQuery,
+          externalCredential: { update: externalUpdate },
+          libraryRecord: { update: parentUpdate },
+        } as never,
+        replacementInput(),
+      ),
+    ).rejects.toMatchObject({ code: 'P2025' });
+
+    expect(externalUpdate).toHaveBeenCalledTimes(1);
+    expect(parentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('samples the parent timestamp after the parent lock resolves', async () => {
+    // Fails if the timestamp is sampled before the lock await, which would
+    // give the parent an earlier time than the custody write's lock boundary.
+    let releaseLock!: () => void;
+    const lockReleased = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const lockQuery = jest.fn(async () => {
+      await lockReleased;
+      // Consume the pre-lock clock value so a now captured before the await would carry the earlier time.
+      Date.now();
+      return [{ id: 'rec-1' }];
+    });
+    const externalUpdate = jest.fn(async () => ({ id: 'rec-1' }));
+    const parentUpdate = jest.fn(async () => ({ id: 'rec-1' }));
+    const beforeLock = new Date('2026-09-10T10:00:00.000Z');
+    const afterLock = new Date('2026-09-10T10:00:01.000Z');
+    const now = jest
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(beforeLock.getTime())
+      .mockReturnValueOnce(afterLock.getTime());
+
+    try {
+      const replacement = replaceCustody(
+        {
+          $queryRaw: lockQuery,
+          externalCredential: { update: externalUpdate },
+          libraryRecord: { update: parentUpdate },
+        } as never,
+        replacementInput(),
+      );
+
+      expect(lockQuery).toHaveBeenCalledTimes(1);
+      expect(parentUpdate).not.toHaveBeenCalled();
+      releaseLock();
+      await replacement;
+
+      expect(parentUpdate).toHaveBeenCalledWith({
+        where: { id_tenantId: { id: 'rec-1', tenantId: 'tenant-1' } },
+        data: { updatedAt: afterLock },
+      });
+    } finally {
+      releaseLock();
+      now.mockRestore();
+    }
   });
 });
