@@ -627,7 +627,7 @@ function parseIfVersion(req: Request): number {
  *       `dateReceived` and `notes` accept `null` to clear them. Omitting a
  *       field leaves it unchanged. At least one recognised field is required;
  *       unknown fields are stripped. `displayName` and `notes` cannot contain
- *       a NUL character because PostgreSQL cannot store one.
+ *       a NUL character because the value cannot be stored.
  *
  *       A projection failure after the transaction commits is answered as a
  *       sanitised 500. The annotation update is already committed in that

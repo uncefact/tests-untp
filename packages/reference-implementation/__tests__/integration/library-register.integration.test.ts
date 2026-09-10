@@ -233,6 +233,7 @@ describe('register an external credential, end to end', () => {
     await prisma.$executeRawUnsafe(`DELETE FROM pgboss.job WHERE name = '${LIBRARY_VERIFY_JOB}'`);
     verify.mockReset();
     stored.clear();
+    lastKey = undefined;
     fixtures.set('/dpp.json', { body: DPP_TEXT });
     fixtures.set('/page.html', { body: '<html><body>not a credential</body></html>', contentType: 'text/html' });
     fixtures.set('/encrypted.json', { body: ENCRYPTED_TEXT });
@@ -385,6 +386,17 @@ describe('register an external credential, end to end', () => {
 
     expect(record.external.contentKind).toBe(ExternalContentKind.OPAQUE);
     expect(Buffer.from(lastStoredContent as Uint8Array).equals(served)).toBe(true);
+
+    // This reads the envelope written by the integration storage fake, so it
+    // fails if that fake decodes the bytes as UTF-8 before its encrypt path.
+    const storedEnvelope = stored.get(record.external.storageExternalId as string);
+    expect(storedEnvelope).toBeDefined();
+    expect(lastKey).toEqual(expect.any(String));
+    const decrypted = new AesGcmEncryptionAdapter(lastKey as string, quiet as never).decrypt(
+      JSON.parse(storedEnvelope!.toString('utf8')),
+    );
+    expect(decrypted).toBe(served.toString('base64'));
+    expect(Buffer.from(decrypted, 'base64').equals(served)).toBe(true);
   });
 
   it('fails DECRYPTION_FAILED, distinct from the no-key case, when the key does not open the source', async () => {

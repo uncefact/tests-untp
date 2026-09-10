@@ -88,14 +88,19 @@ import { EncryptionUnavailableError } from '@/lib/library/register-external-cred
 import { POST } from './route';
 
 const SENTINEL_KEY = 'deadbeefcafe0042'.repeat(4);
+const SENTINEL_ANNOTATION = 'SENTINEL-ANNOTATION-VALUE-0042';
 const SOURCE_URL = 'https://supplier.example/credentials/abc';
 const AUTH_CONTEXT = { tenantId: 'tenant-1', params: Promise.resolve({}) };
 
-function request(): Request {
+function request(annotationOverrides: Record<string, unknown> = {}): Request {
   const encoded = JSON.stringify({
     sourceUrl: SOURCE_URL,
     sourceEncryption: { decryptionKey: SENTINEL_KEY },
-    annotations: { displayName: 'Supplier DCC', declaredCredentialType: CoreCredentialType.DCC },
+    annotations: {
+      displayName: 'Supplier DCC',
+      declaredCredentialType: CoreCredentialType.DCC,
+      ...annotationOverrides,
+    },
   });
   const headers = new Map([
     ['content-type', 'application/json'],
@@ -166,12 +171,40 @@ describe('POST /api/v1/library rendered lines when the encryption preflight refu
     expect(mockCapturedLogLines.join('')).not.toContain(SENTINEL_KEY);
   });
 
-  it('proves the capture would catch the key if any of those lines carried it', async () => {
+  it('proves the capture includes an error cause if any of those lines carried it', async () => {
     // Without this the assertion above would also pass on a logger that
     // rendered nothing at all.
     const { apiLogger } = jest.requireActual('@/lib/api/logger') as { apiLogger: { warn: (...a: unknown[]) => void } };
-    apiLogger.warn({ leakCheck: SENTINEL_KEY }, 'deliberate sentinel write');
+    apiLogger.warn({ err: new Error('outer', { cause: new Error(SENTINEL_ANNOTATION) }) }, 'deliberate sentinel write');
 
-    expect(mockCapturedLogLines.join('')).toContain(SENTINEL_KEY);
+    expect(mockCapturedLogLines.join('')).toContain(SENTINEL_ANNOTATION);
+  });
+
+  it.each([
+    [
+      'displayName',
+      { displayName: `a\0${SENTINEL_ANNOTATION}` },
+      'annotations.displayName: must not contain a NUL character',
+    ],
+    ['notes', { notes: `a\0${SENTINEL_ANNOTATION}` }, 'annotations.notes: must not contain a NUL character'],
+    [
+      'declaredCredentialType',
+      { declaredCredentialType: SENTINEL_ANNOTATION },
+      'annotations.declaredCredentialType: must be one of DFR, DCC, DPP, DTE, DIA',
+    ],
+  ])('does not render the submitted sentinel when %s fails validation', async (_field, annotations, error) => {
+    const response = (await POST(request(annotations) as never, AUTH_CONTEXT as never)) as unknown as {
+      status: number;
+      json: () => Promise<Record<string, unknown>>;
+    };
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ error, code: 'VALIDATION_FAILED' });
+    expect(JSON.stringify(body)).not.toContain(SENTINEL_ANNOTATION);
+    expect(JSON.stringify(body)).not.toContain(SENTINEL_KEY);
+    expect(mockCapturedLogLines.length).toBeGreaterThan(0);
+    expect(mockCapturedLogLines.join('')).not.toContain(SENTINEL_ANNOTATION);
+    expect(mockCapturedLogLines.join('')).not.toContain(SENTINEL_KEY);
   });
 });

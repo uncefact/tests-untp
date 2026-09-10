@@ -493,8 +493,9 @@ function created(record: ExternalCredentialRecord): Response {
  *       form, as `sourceUrl`. `sourceUrl` is at most 2048 characters,
  *       `annotations.displayName` at most 200, `annotations.notes` at most
  *       2000, and `sourceEncryption.decryptionKey` is an AES-256-GCM key as 64
- *       hexadecimal characters; a value outside those bounds is a `400` naming
- *       the field.
+ *       hexadecimal characters. A value outside those bounds is a `400`
+ *       naming the field. `annotations.displayName` and `annotations.notes`
+ *       cannot contain a NUL character because the value cannot be stored.
  *     tags:
  *       - Library
  *     parameters:

@@ -129,6 +129,7 @@ import { LibraryRecordListError } from '@/lib/prisma/repositories/library-record
 import { libraryListResult as listResult } from '../../../../../__tests__/route-doubles/library-hydration-result';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
 import { LibraryRecordSelectionError } from '@/lib/library/library-read-errors';
+import { ValidationError } from '@/lib/api/validation';
 import { credentialRecordSchema } from '@/lib/library/credential-record-projection';
 import type { NativeLibraryRecordView } from '@/lib/library/library-record-view';
 import {
@@ -550,6 +551,35 @@ describe('POST /api/v1/library request validation', () => {
     expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
     expect(mockRegisterExternalCredential).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['displayName', 'a\0b'],
+    ['notes', 'a\0b'],
+  ])(
+    'rejects a NUL in annotations.%s before claiming or starting work, logging it as a validation error',
+    async (field, value) => {
+      const requestBody = validBody({
+        annotations: { ...validBody().annotations, [field]: value },
+      });
+      const { status, body } = await post(registerRequest(requestBody));
+
+      expect(status).toBe(400);
+      expect(body).toEqual({
+        error: `annotations.${field}: must not contain a NUL character`,
+        code: 'VALIDATION_FAILED',
+      });
+      expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockRegisterExternalCredential).not.toHaveBeenCalled();
+      expect(mockStartJobQueue).not.toHaveBeenCalled();
+      expect(mockDefaultRegisterDependencies).not.toHaveBeenCalled();
+
+      const validationLog = loggerCalls.warn.mock.calls.find(([, message]) => message === 'Validation error');
+      expect(validationLog).toBeDefined();
+      const loggedError = (validationLog?.[0] as { err: Error }).err;
+      expect(loggedError).toBeInstanceOf(Error);
+      expect(loggedError.cause).toBeInstanceOf(ValidationError);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

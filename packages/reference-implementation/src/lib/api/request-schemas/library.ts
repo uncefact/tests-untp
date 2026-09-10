@@ -149,6 +149,24 @@ export const sourceEncryptionSchema = z.object({
     ),
 });
 
+const annotationNulMessage = 'must not contain a NUL character';
+
+// PostgreSQL refuses a NUL byte inside a text value (SQLSTATE 22021), so the boundary rejects one rather than letting the write fail.
+function annotationContainsNoNul(value: string): boolean {
+  return !value.includes('\0');
+}
+
+const annotationCredentialTypeMessage = `must be one of ${Object.values(CoreCredentialType).join(', ')}`;
+const annotationCredentialTypeErrorMap = () => ({ message: annotationCredentialTypeMessage });
+// The NUL rule is a refinement, which the OpenAPI converter cannot express, so
+// the refined fields append it to their published descriptions, and PATCH
+// inherits the sentence with the field.
+const NUL_RULE_SENTENCE = 'The value cannot contain a NUL character.';
+
+function withNulRule(description: string): string {
+  return `${description} ${NUL_RULE_SENTENCE}`;
+}
+
 /**
  * Request body for the late-key re-verification form. The endpoint accepts
  * only the key, not the registration route's optional method hint. Unknown
@@ -177,82 +195,46 @@ export const registerExternalCredentialRequestSchema = z.object({
     .describe('Where to fetch the credential from. An absolute http(s) URL without embedded credentials.'),
   sourceEncryption: sourceEncryptionSchema.optional(),
   annotations: z.object({
-    displayName: boundedNonBlank(REGISTER_DISPLAY_NAME_MAX_LENGTH).describe(
-      "The recipient's own label for this record; not only whitespace. Never presented as part of the verified credential.",
-    ),
+    displayName: boundedNonBlank(REGISTER_DISPLAY_NAME_MAX_LENGTH)
+      .refine(annotationContainsNoNul, { message: annotationNulMessage })
+      .describe(
+        withNulRule(
+          "The recipient's own label for this record; not only whitespace. Never presented as part of the verified credential.",
+        ),
+      ),
     declaredCredentialType: z
-      .nativeEnum(CoreCredentialType)
+      .nativeEnum(CoreCredentialType, { errorMap: annotationCredentialTypeErrorMap })
       .describe(
         'The core credential type the recipient believes this is. A mismatch with the extracted type is a warning, never a failure.',
       ),
     dateReceived: calendarDateSchema
       .optional()
       .describe('When the recipient received the credential, as a calendar date.'),
-    notes: z.string().max(REGISTER_NOTES_MAX_LENGTH).optional().describe('Free text kept with the record.'),
+    notes: z
+      .string()
+      .max(REGISTER_NOTES_MAX_LENGTH)
+      .refine(annotationContainsNoNul, { message: annotationNulMessage })
+      .optional()
+      .describe(withNulRule('Free text kept with the record.')),
   }),
 });
 
 const annotationShape = registerExternalCredentialRequestSchema.shape.annotations.shape;
-const annotationNulMessage = 'must not contain a NUL character';
-const annotationCredentialTypeErrorMap = () => ({
-  message: `must be one of ${Object.values(CoreCredentialType).join(', ')}`,
-});
 
 /**
  * Recipient annotation fields accepted by PATCH /library/{id}.
  *
- * `displayName`, `dateReceived` and `notes` are the register fields, so their
- * bounds and their published descriptions are inherited rather than restated.
- * The patch semantics added on top are the two nullable wrappers: `null` clears
- * the two optional stored columns, while an omitted field is left untouched by
- * the repository.
- *
- * Two rules here are new to this route and are not shared with registration.
- * The NUL refinement on `displayName` and `notes` rejects a character
- * PostgreSQL cannot store, which the register schema still accepts and fails on
- * at the write; moving the rule onto the shared field definitions is a recorded
- * follow-up. And `declaredCredentialType` is not inherited at all: it is a
- * fresh `nativeEnum` carrying an error map that names the permitted values
- * instead of quoting the submitted one, with only the register description
- * copied across. A change to the register enum's constraints does not reach
- * this field.
+ * All four fields are the register definitions, so their bounds, their NUL
+ * rule, their value-free declared-type message and their published
+ * descriptions are inherited rather than restated. The only additions are the
+ * PATCH wrappers: `null` clears the two optional stored columns, and an omitted
+ * field is left untouched by the repository.
  */
-/**
- * The NUL rule is a refinement, and the OpenAPI converter cannot express one,
- * so the two refined fields carry it in their published descriptions instead.
- * The sentence is appended to the inherited register description; a register
- * field that lost its own description publishes the rule alone rather than a
- * fragment behind a leading space.
- */
-const NUL_RULE_SENTENCE = 'The value cannot contain a NUL character.';
-function withNulRule(description: string | undefined): string {
-  return description ? `${description} ${NUL_RULE_SENTENCE}` : NUL_RULE_SENTENCE;
-}
-
-const declaredCredentialTypeDescription = annotationShape.declaredCredentialType.description;
-const declaredCredentialTypeSchema = z
-  .nativeEnum(CoreCredentialType, { errorMap: annotationCredentialTypeErrorMap })
-  .optional();
-
 const updateAnnotationFieldsSchema = z.object({
-  displayName: annotationShape.displayName
-    .refine((value) => !value.includes('\0'), { message: annotationNulMessage })
-    .optional()
-    .describe(withNulRule(annotationShape.displayName.description)),
-  // Described only when the register field carries a description, so a register
-  // field that lost its own publishes no description here rather than an empty
-  // one.
-  declaredCredentialType: declaredCredentialTypeDescription
-    ? declaredCredentialTypeSchema.describe(declaredCredentialTypeDescription)
-    : declaredCredentialTypeSchema,
+  displayName: annotationShape.displayName.optional(),
+  declaredCredentialType: annotationShape.declaredCredentialType.optional(),
   dateReceived: annotationShape.dateReceived.nullable().optional(),
-  notes: annotationShape.notes
-    .nullable()
-    .refine((value) => value === null || value === undefined || !value.includes('\0'), {
-      message: annotationNulMessage,
-    })
-    .optional()
-    .describe(withNulRule(annotationShape.notes.description)),
+  notes: annotationShape.notes.nullable(),
 });
 
 export const updateLibraryAnnotationsRequestSchema = requireAtLeastOneField(
