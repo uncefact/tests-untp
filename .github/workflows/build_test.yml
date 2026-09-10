@@ -855,8 +855,11 @@ jobs:
 
       - name: Run legacy fetch-settings E2E spec
         if: steps.affected.outputs.result == 'true'
-        run: pnpm --filter reference-implementation-e2e test:e2e:open -- --spec cypress/e2e/api/credential_api/credential-verify.cy.ts
+        # Invoked through `exec` rather than the package script so the `--spec`
+        # filter reaches Cypress; the script form ran the whole suite.
+        run: pnpm --filter reference-implementation-e2e exec cypress run --spec cypress/e2e/api/credential_api/credential-verify.cy.ts
         env:
+          E2E_TENANT_MODE: open
           NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
           CYPRESS_PLAYGROUND_BASE_URL: 'http://localhost:4000'
 

@@ -2,11 +2,13 @@
 services:
   app:
     environment:
-      # These non-default values are the migration-guide example values. They
-      # keep the legacy setting fixture distinct from parser defaults.
+      # Non-default values that still let every credential in the suite
+      # through: the default response size is 10 MiB and the default timeout
+      # 30 s, so these are distinguishable in the app log without breaking a
+      # real encrypted envelope (several KiB) or a slow first fetch.
       VERIFY_ALLOW_PRIVATE_URLS: 'true'
-      VERIFY_MAX_CREDENTIAL_SIZE: '2048'
-      VERIFY_FETCH_TIMEOUT_MS: '3210'
+      VERIFY_MAX_CREDENTIAL_SIZE: '5242880'
+      VERIFY_FETCH_TIMEOUT_MS: '20000'
       FETCH_ALLOW_PRIVATE_URLS: ''
       FETCH_MAX_RESPONSE_SIZE: ''
       FETCH_TIMEOUT_MS: ''
@@ -14,8 +16,8 @@ services:
   app-worker:
     environment:
       VERIFY_ALLOW_PRIVATE_URLS: 'true'
-      VERIFY_MAX_CREDENTIAL_SIZE: '2048'
-      VERIFY_FETCH_TIMEOUT_MS: '3210'
+      VERIFY_MAX_CREDENTIAL_SIZE: '5242880'
+      VERIFY_FETCH_TIMEOUT_MS: '20000'
       FETCH_ALLOW_PRIVATE_URLS: ''
       FETCH_MAX_RESPONSE_SIZE: ''
       FETCH_TIMEOUT_MS: ''
