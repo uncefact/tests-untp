@@ -22,6 +22,10 @@ export const prismaForeignKeyViolationError = (message?: string): Error => prism
 export const prismaRecordNotFoundError = (message?: string): Error => prismaError('P2025', message);
 export const prismaTransactionWriteConflictError = (): Error =>
   prismaError('P2034', 'Transaction failed due to a write conflict or a deadlock');
-/** A raw-query failure (`$queryRawUnsafe`), meta carrying the underlying database error code. */
+/**
+ * A raw-query failure. Multi-parent and child locks use `$queryRawUnsafe`, and
+ * the singular parent lock uses a tagged `$queryRaw`; `meta` carries the
+ * underlying database error code.
+ */
 export const prismaRawQueryError = (dbCode: string): Error =>
   prismaError('P2010', 'Raw query failed', { code: dbCode, message: `error: ${dbCode}` });

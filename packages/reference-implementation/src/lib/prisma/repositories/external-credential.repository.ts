@@ -26,6 +26,7 @@ import {
   narrowExternalRecord,
   type ExternalLibraryRecordView,
 } from '@/lib/library/library-record-view';
+import { lockLibraryRecordForUpdate } from './library-record.repository';
 
 const logger = apiLogger.child({ module: 'external-credential.repository' });
 
@@ -635,15 +636,15 @@ export async function getExternalCredentialById(
  * exactly as it is, and the newest generation's failure is the record's
  * statement that the copy is gone (ADR-055).
  *
- * Called by `finaliseRecoveryGenerationAttempt` in `check-run.repository.ts`,
- * inside the same locked transaction that appends the re-verification
- * generation, so the custody replacement and the generation it belongs to
- * commit or roll back together.
+ * Takes the parent lock on the supplied interactive transaction before writing
+ * the child. A caller that already holds it re-acquires it harmlessly, and a
+ * caller writing more than one parent must pre-lock its ordered set.
  */
 export async function replaceCustody(
   tx: Prisma.TransactionClient,
   input: ReplaceCustodyInput,
 ): Promise<ExternalLibraryRecordView['external']> {
+  await lockLibraryRecordForUpdate(tx, input.recordId, input.tenantId);
   const now = new Date(Date.now());
   const storage = input.storage;
   const external = await tx.externalCredential.update({

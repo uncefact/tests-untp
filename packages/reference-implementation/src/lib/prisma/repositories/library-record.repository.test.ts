@@ -118,6 +118,7 @@ beforeEach(() => {
     throw new Error('the record was read on the global client, outside the repeatable-read transaction');
   });
   mockQueryRawUnsafe.mockResolvedValue([{ id: 'record-1' }]);
+  mockQueryRaw.mockResolvedValue([{ id: 'record-1' }]);
   mockGlobalExternalFindMany.mockResolvedValue([]);
   mockAdvisoryFindMany.mockResolvedValue([]);
   mockUpdateMany.mockResolvedValue({ count: 1 });
@@ -466,11 +467,7 @@ describe('updateLibraryRecordAnnotations', () => {
       maxWait: 5_000,
       timeout: 15_000,
     });
-    expect(mockQueryRawUnsafe).toHaveBeenCalledWith(
-      'SELECT "id" FROM "LibraryRecord" WHERE "id" = $1 AND "tenantId" = $2 FOR UPDATE',
-      'record-1',
-      'tenant-1',
-    );
+    expect(mockQueryRaw).toHaveBeenCalledWith(expect.any(Array), 'record-1', 'tenant-1');
     expect(mockUpdateMany).toHaveBeenCalledWith({
       where: {
         id: 'record-1',
@@ -519,7 +516,7 @@ describe('updateLibraryRecordAnnotations', () => {
       { outcome: 'native' },
     ],
   ])('does not write for %s', async (_name, lockedRows, expected) => {
-    mockQueryRawUnsafe.mockResolvedValue(lockedRows.length === 0 ? [] : [{ id: 'record-1' }]);
+    mockQueryRaw.mockResolvedValue(lockedRows.length === 0 ? [] : [{ id: 'record-1' }]);
     if (lockedRows.length > 0) mockFindFirst.mockResolvedValue(lockedRows[0]);
 
     await expect(
