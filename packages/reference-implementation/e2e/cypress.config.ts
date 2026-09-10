@@ -110,7 +110,7 @@ function getDbClient() {
   });
 }
 
-// Cannot rely on Tenant cascade deletes — manual ordered deletes needed because:
+// Cannot rely on Tenant cascade deletes. Manual ordered deletes are needed because:
 // - Credential has no FK to Tenant (legacy schema, tenantId is a plain column)
 // - Product self-reference is Restrict to prevent accidental orphaning of child products
 // - Identifier → IdentifierScheme is Restrict to prevent deleting schemes still in use
@@ -140,7 +140,7 @@ async function deleteTenantData(client: any, tenantId: string, options?: { prese
     [tenantId],
   );
 
-  // Master data entities (products have hierarchy — children first)
+  // Master data entities. Products have a hierarchy, so delete children first.
   await client.query(`DELETE FROM "Product" WHERE "tenantId" = $1 AND "parentId" IS NOT NULL`, [tenantId]);
   await client.query(`DELETE FROM "Product" WHERE "tenantId" = $1`, [tenantId]);
   await client.query(`DELETE FROM "Facility" WHERE "tenantId" = $1`, [tenantId]);
@@ -148,7 +148,7 @@ async function deleteTenantData(client: any, tenantId: string, options?: { prese
 
   // Render templates (FK to DataModel)
   await client.query(`DELETE FROM "RenderTemplate" WHERE "tenantId" = $1`, [tenantId]);
-  // Data model extensions (self-referencing — children first)
+  // Data model extensions. These are self-referencing, so delete children first.
   await client.query(`DELETE FROM "DataModel" WHERE "tenantId" = $1 AND "parentConfigId" IS NOT NULL`, [tenantId]);
   await client.query(`DELETE FROM "DataModel" WHERE "tenantId" = $1`, [tenantId]);
 
@@ -209,8 +209,9 @@ export default defineConfig({
     SA2_CLIENT_SECRET: process.env.E2E_SA2_CLIENT_SECRET || 'e2e-service-account-secret-2',
 
     // RI-internal services
-    VCKIT_BASE_URL: process.env.E2E_VCKIT_BASE_URL || 'http://vckit-api:3332',
+    VCKIT_BASE_URL: process.env.E2E_VCKIT_BASE_URL || 'https://vckit.e2e.internal',
     VCKIT_API_KEY: process.env.E2E_VCKIT_API_KEY || 'test123',
+    VCKIT_DID_WEB_RESOLVABLE: (process.env.E2E_VCKIT_DID_WEB_RESOLVABLE ?? 'true') === 'true',
     STORAGE_BASE_URL: process.env.E2E_STORAGE_BASE_URL || 'http://storage-service:3334',
     STORAGE_API_KEY: process.env.E2E_STORAGE_API_KEY || 'test123',
     STORAGE_API_VERSION: process.env.E2E_STORAGE_API_VERSION || '4.0',
@@ -251,6 +252,12 @@ export default defineConfig({
       // Clean up all test artefacts after all specs complete
       on('after:run', async () => {
         const client = getDbClient();
+        const cleanupErrors: unknown[] = [];
+        const recordCleanupFailure = (scope: string, error: unknown) => {
+          console.error(`E2E cleanup failed for ${scope}:`, error);
+          cleanupErrors.push(error);
+        };
+
         try {
           await client.connect();
 
@@ -258,18 +265,34 @@ export default defineConfig({
           const userEmail = process.env.E2E_USER_EMAIL || 'e2e-admin@test.local';
           const user2Email = process.env.E2E_USER2_EMAIL || 'e2e-user@test.local';
           for (const email of [userEmail, user2Email]) {
-            await client.query(`DELETE FROM "Account" WHERE "userId" IN (SELECT id FROM "User" WHERE email = $1)`, [
-              email,
-            ]);
-            await client.query(`DELETE FROM "User" WHERE email = $1`, [email]);
-          }
+            try {
+              await client.query(`DELETE FROM "Account" WHERE "userId" IN (SELECT id FROM "User" WHERE email = $1)`, [
+                email,
+              ]);
+            } catch (error) {
+              recordCleanupFailure(`OAuth accounts for ${email}`, error);
+            }
 
-          // Clean up orphaned Account records (Account exists but User was already deleted)
-          await client.query(`DELETE FROM "Account" WHERE "userId" NOT IN (SELECT id FROM "User")`);
-        } catch {
-          // Silently ignore — DB may not be reachable (e.g. local Docker already down)
+            try {
+              await client.query(`DELETE FROM "User" WHERE email = $1`, [email]);
+            } catch (error) {
+              recordCleanupFailure(`user ${email}`, error);
+            }
+          }
+        } catch (error) {
+          recordCleanupFailure('database connection', error);
         } finally {
-          await client.end().catch(() => {});
+          try {
+            await client.end();
+          } catch (error) {
+            recordCleanupFailure('database client close', error);
+          }
+        }
+
+        if (cleanupErrors.length > 0) {
+          const aggregateError = new AggregateError(cleanupErrors, 'E2E cleanup failed');
+          console.error('E2E cleanup failed after all cleanup attempts:', aggregateError);
+          throw aggregateError;
         }
       });
 
@@ -555,7 +578,7 @@ export default defineConfig({
           const data = await response.json();
           return { accessToken: data.access_token };
         },
-        async cleanupServiceAccountData({ sub }: { sub: string }) {
+        async cleanupServiceAccountData({ sub, preserveTenant }: { sub: string; preserveTenant?: boolean }) {
           const client = getDbClient();
           try {
             await client.connect();
@@ -572,7 +595,7 @@ export default defineConfig({
             const { id: userId, tenantId } = userResult.rows[0];
 
             if (tenantId) {
-              await deleteTenantData(client, tenantId);
+              await deleteTenantData(client, tenantId, { preserveTenant });
             }
 
             // Delete OAuth account links for this user

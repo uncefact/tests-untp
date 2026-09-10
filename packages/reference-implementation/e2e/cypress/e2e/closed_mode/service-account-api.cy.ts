@@ -10,7 +10,7 @@
  */
 import { config } from '../../support/config';
 
-describe('Closed mode — service account API', { testIsolation: false }, () => {
+describe('Closed mode: service account API', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
   let accessToken: string;
   let tokenSub: string;
@@ -28,16 +28,16 @@ describe('Closed mode — service account API', { testIsolation: false }, () => 
       tokenSub = payload.sub;
 
       // Clean up any leftover SA user from previous runs
-      cy.task('cleanupServiceAccountData', { sub: tokenSub });
+      cy.task('cleanupServiceAccountData', { sub: tokenSub, preserveTenant: true });
     });
   });
 
   after(() => {
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
-    cy.task('cleanupServiceAccountData', { sub: tokenSub });
+    cy.task('cleanupServiceAccountData', { sub: tokenSub, preserveTenant: true });
   });
 
-  it('GET /api/v1/dids — authenticates via bearer token and resolves tenant by group', () => {
+  it('GET /api/v1/dids: authenticates via bearer token and resolves tenant by group', () => {
     cy.request({
       method: 'GET',
       url: '/api/v1/dids',
@@ -49,7 +49,7 @@ describe('Closed mode — service account API', { testIsolation: false }, () => 
     });
   });
 
-  it('POST /api/v1/dids — creates a DID via service account', () => {
+  it('POST /api/v1/dids: creates a DID via service account', () => {
     const RUN_ID = Date.now();
 
     cy.request({

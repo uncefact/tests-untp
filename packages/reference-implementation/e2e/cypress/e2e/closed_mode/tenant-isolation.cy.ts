@@ -12,7 +12,7 @@
  */
 import { config } from '../../support/config';
 
-describe('Closed mode — tenant isolation', { testIsolation: false }, () => {
+describe('Closed mode: tenant isolation', { testIsolation: false }, () => {
   const SA1 = config.serviceAccounts.sa1;
   const SA2 = config.serviceAccounts.sa2;
   const GROUP_ALPHA = config.groups.alpha;
@@ -34,22 +34,22 @@ describe('Closed mode — tenant isolation', { testIsolation: false }, () => {
       token1 = result.accessToken;
       const payload = JSON.parse(Buffer.from(token1.split('.')[1], 'base64').toString());
       sub1 = payload.sub;
-      cy.task('cleanupServiceAccountData', { sub: sub1 });
+      cy.task('cleanupServiceAccountData', { sub: sub1, preserveTenant: true });
     });
 
     cy.task('getServiceAccountToken', SA2).then((result: any) => {
       token2 = result.accessToken;
       const payload = JSON.parse(Buffer.from(token2.split('.')[1], 'base64').toString());
       sub2 = payload.sub;
-      cy.task('cleanupServiceAccountData', { sub: sub2 });
+      cy.task('cleanupServiceAccountData', { sub: sub2, preserveTenant: true });
     });
   });
 
   after(() => {
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_ALPHA });
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_BETA });
-    cy.task('cleanupServiceAccountData', { sub: sub1 });
-    cy.task('cleanupServiceAccountData', { sub: sub2 });
+    cy.task('cleanupServiceAccountData', { sub: sub1, preserveTenant: true });
+    cy.task('cleanupServiceAccountData', { sub: sub2, preserveTenant: true });
   });
 
   it('SA1 (alpha) creates a DID', () => {

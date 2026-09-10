@@ -1,0 +1,4 @@
+https://vckit.e2e.internal {
+  tls /certs/leaf.crt /certs/leaf.key
+  reverse_proxy vckit-api:3332
+}

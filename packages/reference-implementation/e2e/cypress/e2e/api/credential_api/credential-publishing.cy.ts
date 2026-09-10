@@ -149,6 +149,16 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
   });
 
   after(() => {
+    // Pyx IDR v4.0 deletes one namespace via the query parameter on this
+    // endpoint: https://github.com/pyx-industries/pyx-identity-resolver/blob/v4.0.0/app/src/modules/identifier-management/identifier-management.controller.ts
+    cy.request({
+      method: 'DELETE',
+      url: `${config.services.idr.publicBaseUrl}/api/v4/identifiers`,
+      headers: idrAuthHeaders,
+      qs: { namespace: NAMESPACE },
+      failOnStatusCode: false,
+    }).then((res) => expect(res.status).to.be.oneOf([200, 204, 404]));
+
     const preserveTenant = config.tenantMode === 'closed';
     cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
   });
