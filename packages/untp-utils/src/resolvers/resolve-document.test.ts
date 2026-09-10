@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import { ReadableStream } from 'node:stream/web';
-import { PrivateAddressError } from '../node/index.js';
+import { MultibaseDigest } from '../multibase-digest/index.js';
+import { PrivateAddressError, ResolutionFailedError } from '../node/index.js';
 import {
   ResolverHttpError,
   ResolverNetworkError,
@@ -11,7 +12,14 @@ import {
 } from './errors.js';
 
 const undiciFetch = jest.fn();
+const NativeDOMException = (
+  globalThis as unknown as {
+    DOMException: new (message?: string, name?: string) => Error;
+  }
+).DOMException;
 let lastAgentClose: jest.Mock = jest.fn(() => Promise.resolve());
+let agentConstructionError: unknown;
+let agentCloseImplementation: () => Promise<unknown> = () => Promise.resolve();
 // Constructor options of every Agent created during a test, in creation
 // order. The `connect.lookup` inside is the IP pin under test.
 let agentOptions: unknown[] = [];
@@ -22,9 +30,10 @@ let agentInstances: FakeAgent[] = [];
 class FakeAgent {
   close: jest.Mock;
   constructor(options?: unknown) {
+    if (agentConstructionError !== undefined) throw agentConstructionError;
     agentOptions.push(options);
     agentInstances.push(this);
-    this.close = jest.fn(() => Promise.resolve());
+    this.close = jest.fn(() => agentCloseImplementation());
     lastAgentClose = this.close;
   }
 }
@@ -71,14 +80,21 @@ function makeResponse(opts: {
   };
 }
 
+/**
+ * The shape `validatePublicUrl` returns for a single validated address:
+ * `address` / `family` repeat the first entry of `addresses`, and the
+ * resolver hands the whole of `addresses` to the connector.
+ */
 function resolvedAddress(address = '1.1.1.1', family: 4 | 6 = 4) {
-  return { address, family };
+  return { address, family, addresses: [{ address, family }] };
 }
 
 describe('resolveDocument', () => {
   beforeEach(() => {
     agentOptions = [];
     agentInstances = [];
+    agentConstructionError = undefined;
+    agentCloseImplementation = () => Promise.resolve();
     undiciFetch.mockReset();
     validatePublicUrl.mockReset();
   });
@@ -184,15 +200,6 @@ describe('resolveDocument', () => {
       expect(error.cause).toBeInstanceOf(Error);
     });
 
-    it('throws ResolverTimedOutError when the fetch is aborted', async () => {
-      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
-      const abort = new Error('aborted');
-      abort.name = 'AbortError';
-      undiciFetch.mockRejectedValue(abort as never);
-
-      await expect(resolveDocument('https://example.com/')).rejects.toBeInstanceOf(ResolverTimedOutError);
-    });
-
     it('throws ResolverNetworkError when the response body stream rejects mid-read', async () => {
       validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
       const erroringStream = new ReadableStream<Uint8Array>({
@@ -209,6 +216,260 @@ describe('resolveDocument', () => {
 
       await expect(resolveDocument('https://example.com/')).rejects.toBeInstanceOf(ResolverNetworkError);
     });
+
+    // A foreign abort-shaped rejection, synthesised here rather than observed
+    // from undici: any abort that is not ours can arrive while our budget is
+    // still running. Classifying on the name alone would report it as "timed
+    // out after 10000ms" when our signal never fired. Fails if the deadline
+    // check is dropped.
+    it('reports an abort-named fetch rejection as a network error while our deadline has not passed', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const abort = new NativeDOMException('The operation was aborted.', 'AbortError');
+      undiciFetch.mockRejectedValue(abort as never);
+
+      const error = (await resolveDocument('https://example.com/').catch((e: unknown) => e)) as ResolverNetworkError;
+      expect(error).toBeInstanceOf(ResolverNetworkError);
+      expect(error.cause).toBe(abort);
+    });
+
+    // Same rule at the body-read await: an upstream body timeout is not our
+    // budget expiring. Fails if `readWithLimit` classifies on the name alone.
+    it('reports an abort-named body-read rejection as a network error while our deadline has not passed', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const abort = new NativeDOMException('The operation was aborted.', 'AbortError');
+      const erroringStream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          controller.error(abort);
+        },
+      });
+      undiciFetch.mockResolvedValue({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        body: erroringStream,
+      } as never);
+
+      const error = (await resolveDocument('https://example.com/').catch((e: unknown) => e)) as ResolverNetworkError;
+      expect(error).toBeInstanceOf(ResolverNetworkError);
+      expect(error.cause).toBe(abort);
+    });
+
+    it('reports an abort-named body-read rejection as a timeout once our deadline has passed', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const abort = new NativeDOMException('The operation was aborted.', 'AbortError');
+      const reader = {
+        read: jest.fn(() => new Promise((_resolve, reject) => setTimeout(() => reject(abort), 40))),
+        cancel: jest.fn(() => Promise.resolve()),
+      };
+      undiciFetch.mockResolvedValue({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        body: { getReader: () => reader },
+      } as never);
+
+      const error = (await resolveDocument('https://example.com/', { totalTimeoutMs: 10 }).catch(
+        (e: unknown) => e,
+      )) as ResolverTimedOutError;
+      expect(error).toBeInstanceOf(ResolverTimedOutError);
+      expect(error.cause).toBe(abort);
+    });
+
+    it('times out while the first-hop guard is unresolved without creating an Agent or fetching', async () => {
+      let releaseGuard!: (value: { address: string; family: 4 | 6 }) => void;
+      const guard = new Promise<{ address: string; family: 4 | 6 }>((resolve) => {
+        releaseGuard = resolve;
+      });
+      validatePublicUrl.mockReturnValue(guard as never);
+
+      const resolution = resolveDocument('https://slow-dns.example/', { totalTimeoutMs: 20 });
+      await expect(resolution).rejects.toBeInstanceOf(ResolverTimedOutError);
+      expect(agentInstances).toHaveLength(0);
+      expect(undiciFetch).not.toHaveBeenCalled();
+
+      releaseGuard(resolvedAddress());
+      await Promise.resolve();
+    });
+
+    it('does not report a late guard rejection as unhandled after timeout', async () => {
+      let rejectGuard!: (reason: Error) => void;
+      const guard = new Promise<{ address: string; family: 4 | 6 }>((_resolve, reject) => {
+        rejectGuard = reject;
+      });
+      validatePublicUrl.mockReturnValue(guard as never);
+
+      await expect(resolveDocument('https://slow-dns.example/', { totalTimeoutMs: 20 })).rejects.toBeInstanceOf(
+        ResolverTimedOutError,
+      );
+
+      const unhandledRejection = jest.fn();
+      process.on('unhandledRejection', unhandledRejection);
+      try {
+        rejectGuard(new Error('late DNS failure'));
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      } finally {
+        process.off('unhandledRejection', unhandledRejection);
+      }
+      expect(unhandledRejection).not.toHaveBeenCalled();
+    });
+
+    it('keeps the on-time DNS rejection unchanged', async () => {
+      const dnsError = new ResolutionFailedError('example.com', new Error('ENOTFOUND'));
+      validatePublicUrl.mockRejectedValue(dnsError as never);
+
+      await expect(resolveDocument('https://example.com/')).rejects.toBe(dnsError);
+      expect(undiciFetch).not.toHaveBeenCalled();
+    });
+
+    // The paired case for the fetch await: the same abort-shaped rejection is
+    // our timeout once the signal has fired.
+    it('classifies an in-flight fetch abort as a timeout', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const abort = new NativeDOMException('The operation was aborted.', 'AbortError');
+      undiciFetch.mockImplementation((_url: unknown, rawInit: unknown) => {
+        const init = rawInit as { signal: AbortSignal };
+        return new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(abort), { once: true });
+        });
+      });
+
+      const error = (await resolveDocument('https://example.com/', { totalTimeoutMs: 20 }).catch(
+        (e: unknown) => e,
+      )) as ResolverTimedOutError;
+      expect(error).toBeInstanceOf(ResolverTimedOutError);
+      expect(error.cause).toBe(abort);
+    });
+  });
+
+  describe('defect propagation', () => {
+    it('propagates a header-processing defect after a successful fetch unchanged', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const sentinel = new TypeError('header parser defect');
+      const headers = {
+        get: jest.fn(() => {
+          throw sentinel;
+        }),
+      };
+      undiciFetch.mockResolvedValue({ status: 200, ok: true, headers, body: null } as never);
+
+      await expect(resolveDocument('https://example.com/')).rejects.toBe(sentinel);
+      expect(lastAgentClose).toHaveBeenCalled();
+    });
+
+    it('propagates an Agent construction defect unchanged', async () => {
+      const sentinel = new TypeError('agent construction defect');
+      agentConstructionError = sentinel;
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+
+      await expect(resolveDocument('https://example.com/')).rejects.toBe(sentinel);
+      expect(undiciFetch).not.toHaveBeenCalled();
+    });
+
+    it('propagates a digest defect unchanged', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(makeResponse({ body: 'ok' }) as never);
+      const sentinel = new Error('digest defect');
+      const digestSpy = jest.spyOn(MultibaseDigest, 'fromData').mockRejectedValue(sentinel);
+
+      try {
+        await expect(resolveDocument('https://example.com/')).rejects.toBe(sentinel);
+      } finally {
+        digestSpy.mockRestore();
+      }
+      expect(lastAgentClose).toHaveBeenCalled();
+    });
+
+    it('propagates a request-header construction defect before dispatch unchanged', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const sentinel = new TypeError('request header defect');
+      const headers = Object.defineProperty({}, 'User-Agent', {
+        enumerable: true,
+        get: () => {
+          throw sentinel;
+        },
+      });
+
+      await expect(resolveDocument('https://example.com/', { headers })).rejects.toBe(sentinel);
+      expect(undiciFetch).not.toHaveBeenCalled();
+      // The Agent is constructed before the headers are materialised, so the
+      // defect must still leave through the dispatcher's finally. Fails if the
+      // header work moves outside that try and leaks the Agent.
+      expect(lastAgentClose).toHaveBeenCalled();
+    });
+
+    // The sibling case above supplies an explicit `User-Agent`, which takes the
+    // early-return branch of withUserAgent. This one has no caller
+    // `User-Agent`, so the implicit branch spreads the caller's object to add
+    // the generated header, and must read the throwing `Accept` getter there.
+    // Fails if that branch stops materialising the caller's headers, which
+    // would defer the defect into the transport instead of raising it here.
+    it('propagates a request-header defect from the implicit User-Agent branch unchanged', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const sentinel = new TypeError('request header defect');
+      const headers = Object.defineProperty({}, 'Accept', {
+        enumerable: true,
+        get: () => {
+          throw sentinel;
+        },
+      });
+
+      await expect(resolveDocument('https://example.com/', { headers })).rejects.toBe(sentinel);
+      expect(undiciFetch).not.toHaveBeenCalled();
+      expect(lastAgentClose).toHaveBeenCalled();
+    });
+
+    it('does not classify an abort-named processing defect as a timeout', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const sentinel = new TypeError('processing defect');
+      sentinel.name = 'AbortError';
+      const headers = {
+        get: jest.fn(() => {
+          throw sentinel;
+        }),
+      };
+      undiciFetch.mockResolvedValue({ status: 200, ok: true, headers, body: null } as never);
+
+      await expect(resolveDocument('https://example.com/')).rejects.toBe(sentinel);
+    });
+
+    it('propagates a reader acquisition defect unchanged', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const sentinel = new TypeError('reader acquisition defect');
+      undiciFetch.mockResolvedValue({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        body: {
+          getReader: () => {
+            throw sentinel;
+          },
+        },
+      } as never);
+
+      await expect(resolveDocument('https://example.com/')).rejects.toBe(sentinel);
+    });
+
+    it('propagates a chunk-processing defect unchanged', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      const sentinel = new TypeError('chunk processing defect');
+      const value = Object.defineProperty({}, 'byteLength', {
+        get: () => {
+          throw sentinel;
+        },
+      }) as unknown as Uint8Array;
+      const reader = { read: jest.fn(), cancel: jest.fn() };
+      reader.read.mockResolvedValue({ value, done: false } as never);
+      reader.cancel.mockResolvedValue(undefined as never);
+      undiciFetch.mockResolvedValue({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        body: { getReader: () => reader },
+      } as never);
+
+      await expect(resolveDocument('https://example.com/')).rejects.toBe(sentinel);
+      expect(reader.cancel).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('size limit', () => {
@@ -220,6 +481,21 @@ describe('resolveDocument', () => {
       const error = (await resolveDocument('https://example.com/big', { maxResponseBytes: 1024 }).catch(
         (e: unknown) => e,
       )) as ResolverTooLargeError;
+      expect(error).toBeInstanceOf(ResolverTooLargeError);
+      expect(error.limit).toBe(1024);
+    });
+
+    // The relaxed setting permits private destinations and nothing else. Fails
+    // if the size cap is bypassed or widened when allowPrivateAddresses is on.
+    it('applies the same size cap with allowPrivateAddresses on', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress('10.0.0.1') as never);
+      const big = new Uint8Array(2048);
+      undiciFetch.mockResolvedValue(makeResponse({ body: big }) as never);
+
+      const error = (await resolveDocument('http://db.internal/big', {
+        maxResponseBytes: 1024,
+        allowPrivateAddresses: true,
+      }).catch((e: unknown) => e)) as ResolverTooLargeError;
       expect(error).toBeInstanceOf(ResolverTooLargeError);
       expect(error.limit).toBe(1024);
     });
@@ -240,10 +516,10 @@ describe('resolveDocument', () => {
       expect(undiciFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('pins each hop connection to the address validatePublicUrl resolved', async () => {
+    it('pins each hop connection to the addresses validatePublicUrl resolved', async () => {
       validatePublicUrl
-        .mockResolvedValueOnce({ address: '203.0.113.10', family: 4 } as never)
-        .mockResolvedValueOnce({ address: '2606:4700:4700::1111', family: 6 } as never);
+        .mockResolvedValueOnce(resolvedAddress('203.0.113.10', 4) as never)
+        .mockResolvedValueOnce(resolvedAddress('2606:4700:4700::1111', 6) as never);
       undiciFetch
         .mockResolvedValueOnce(
           makeResponse({ status: 301, headers: { location: 'https://example.com/next' }, body: null }) as never,
@@ -271,10 +547,87 @@ describe('resolveDocument', () => {
             }),
         ),
       );
-      // Each hop's lookup must return exactly the address its own
+      // Each hop's lookup must return exactly the addresses its own
       // validatePublicUrl call resolved, never a fresh DNS answer.
       expect(pins[0]).toEqual([{ address: '203.0.113.10', family: 4 }]);
       expect(pins[1]).toEqual([{ address: '2606:4700:4700::1111', family: 6 }]);
+    });
+
+    // The dual-stack `localhost` case: the guard validated both addresses, so
+    // both must reach the connector, which is what lets Node's default
+    // autoSelectFamily try the second when the first refuses the connection.
+    it('hands the connector every address the guard validated for a hop', async () => {
+      validatePublicUrl.mockResolvedValueOnce({
+        address: '::1',
+        family: 6,
+        addresses: [
+          { address: '::1', family: 6 },
+          { address: '127.0.0.1', family: 4 },
+        ],
+      } as never);
+      undiciFetch.mockResolvedValueOnce(makeResponse({ body: 'final' }) as never);
+
+      await resolveDocument('http://localhost/doc', { allowPrivateAddresses: true });
+
+      expect(agentOptions).toHaveLength(1);
+      expect(undiciFetch.mock.calls[0][1]).toMatchObject({ dispatcher: agentInstances[0] });
+      const pin = await new Promise((resolve, reject) => {
+        const lookup = (
+          agentOptions[0] as {
+            connect: { lookup: (host: string, opts: object, cb: (err: unknown, addrs: unknown) => void) => void };
+          }
+        ).connect.lookup;
+        lookup('localhost', {}, (err: unknown, addresses: unknown) => (err ? reject(err) : resolve(addresses)));
+      });
+      expect(pin).toEqual([
+        { address: '::1', family: 6 },
+        { address: '127.0.0.1', family: 4 },
+      ]);
+    });
+
+    it('forwards private permission and pins each redirect hop through the guard', async () => {
+      validatePublicUrl
+        .mockResolvedValueOnce(resolvedAddress('10.0.0.1', 4) as never)
+        .mockResolvedValueOnce(resolvedAddress('10.0.0.2', 4) as never);
+      undiciFetch
+        .mockResolvedValueOnce(
+          makeResponse({ status: 301, headers: { location: 'http://db.internal/next' }, body: null }) as never,
+        )
+        .mockResolvedValueOnce(makeResponse({ body: 'final' }) as never);
+
+      await resolveDocument('http://localhost/start', { allowPrivateAddresses: true });
+
+      expect(validatePublicUrl).toHaveBeenNthCalledWith(
+        1,
+        'http://localhost/start',
+        expect.objectContaining({ allowPrivateAddresses: true }),
+      );
+      expect(validatePublicUrl).toHaveBeenNthCalledWith(
+        2,
+        'http://db.internal/next',
+        expect.objectContaining({ allowPrivateAddresses: true }),
+      );
+      // Relaxed mode must dispatch through the pinned Agents too, exactly as
+      // the strict sibling above asserts. Constructing a pinned Agent and then
+      // fetching without it would satisfy the pin assertions below alone.
+      expect(undiciFetch.mock.calls[0][1]).toMatchObject({ dispatcher: agentInstances[0] });
+      expect(undiciFetch.mock.calls[1][1]).toMatchObject({ dispatcher: agentInstances[1] });
+      const pins = await Promise.all(
+        agentOptions.map(
+          (options) =>
+            new Promise((resolve, reject) => {
+              const lookup = (
+                options as {
+                  connect: { lookup: (host: string, opts: object, cb: (err: unknown, addrs: unknown) => void) => void };
+                }
+              ).connect.lookup;
+              lookup('ignored.example', {}, (err: unknown, addresses: unknown) =>
+                err ? reject(err) : resolve(addresses),
+              );
+            }),
+        ),
+      );
+      expect(pins).toEqual([[{ address: '10.0.0.1', family: 4 }], [{ address: '10.0.0.2', family: 4 }]]);
     });
 
     it('re-validates each redirect target through validatePublicUrl', async () => {
@@ -308,15 +661,128 @@ describe('resolveDocument', () => {
 
     it('throws ResolverTooManyRedirectsError with limit attached when the chain exceeds the cap', async () => {
       validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
-      undiciFetch.mockResolvedValue(
-        makeResponse({ status: 301, headers: { location: 'https://example.com/loop' }, body: null }) as never,
-      );
+      undiciFetch
+        .mockResolvedValueOnce(
+          makeResponse({ status: 301, headers: { location: 'https://example.com/loop' }, body: null }) as never,
+        )
+        .mockResolvedValueOnce(
+          makeResponse({ status: 301, headers: { location: 'https://example.com/final' }, body: null }) as never,
+        );
 
       const error = (await resolveDocument('https://example.com/start', { maxRedirects: 1 }).catch(
         (e: unknown) => e,
       )) as ResolverTooManyRedirectsError;
       expect(error).toBeInstanceOf(ResolverTooManyRedirectsError);
       expect(error.limit).toBe(1);
+      expect(error.lastHopUrl).toBe('https://example.com/loop');
+      // The message names where the chain began and `.lastHopUrl` names who
+      // answered last. Fails if the two are transposed, which would report the hop that
+      // redirected as the start of the chain.
+      expect(error.message).toContain('starting from https://example.com/start');
+      expect(error.message).not.toContain('https://example.com/loop');
+    });
+
+    // Same cap, same responder, with the relaxed setting on. Fails if the hop
+    // cap is bypassed or overridden when allowPrivateAddresses is on.
+    it('applies the same redirect cap with allowPrivateAddresses on', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress('10.0.0.1') as never);
+      undiciFetch
+        .mockResolvedValueOnce(
+          makeResponse({ status: 301, headers: { location: 'http://db.internal/loop' }, body: null }) as never,
+        )
+        .mockResolvedValueOnce(
+          makeResponse({ status: 301, headers: { location: 'http://db.internal/final' }, body: null }) as never,
+        );
+
+      const error = (await resolveDocument('http://db.internal/start', {
+        maxRedirects: 1,
+        allowPrivateAddresses: true,
+      }).catch((e: unknown) => e)) as ResolverTooManyRedirectsError;
+      expect(error).toBeInstanceOf(ResolverTooManyRedirectsError);
+      expect(error.limit).toBe(1);
+      expect(error.lastHopUrl).toBe('http://db.internal/loop');
+      expect(undiciFetch).toHaveBeenCalledTimes(2);
+    });
+
+    // R6: the disclosed default of three additional hops, exercised rather
+    // than restated as a constant. Four consecutive redirects must exhaust it,
+    // and the error must name the hop that answered the fourth request. Fails
+    // if the default changes or the responder is transposed.
+    it('exhausts the default redirect cap of three additional hops', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      for (const location of [
+        'https://example.com/r1',
+        'https://example.com/r2',
+        'https://example.com/r3',
+        'https://example.com/r4',
+      ]) {
+        undiciFetch.mockResolvedValueOnce(makeResponse({ status: 301, headers: { location }, body: null }) as never);
+      }
+
+      const error = (await resolveDocument('https://example.com/start').catch(
+        (e: unknown) => e,
+      )) as ResolverTooManyRedirectsError;
+      expect(error).toBeInstanceOf(ResolverTooManyRedirectsError);
+      expect(error.limit).toBe(3);
+      expect(undiciFetch).toHaveBeenCalledTimes(4);
+      expect(undiciFetch.mock.calls[3][0]).toBe('https://example.com/r3');
+      expect(error.lastHopUrl).toBe('https://example.com/r3');
+    });
+
+    // The post-loop throw is reachable only when the caller supplies a
+    // negative limit, so no hop was ever validated and there is no responder
+    // to name. Fails if that path is given a default `lastHopUrl`, which would
+    // claim a response that never happened, or if the loop runs at all.
+    it('throws ResolverTooManyRedirectsError with no lastHopUrl when the caller supplies a negative limit', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+
+      const error = (await resolveDocument('https://example.com/start', { maxRedirects: -1 }).catch(
+        (e: unknown) => e,
+      )) as ResolverTooManyRedirectsError;
+      expect(error).toBeInstanceOf(ResolverTooManyRedirectsError);
+      expect(error.lastHopUrl).toBeUndefined();
+      expect(error.limit).toBe(-1);
+      expect(error.message).toContain('https://example.com/start');
+      expect(validatePublicUrl).not.toHaveBeenCalled();
+      expect(undiciFetch).not.toHaveBeenCalled();
+    });
+
+    it('does not call the second-hop guard after redirect cleanup consumes the timeout budget', async () => {
+      validatePublicUrl.mockResolvedValue(resolvedAddress() as never);
+      undiciFetch.mockResolvedValue(
+        makeResponse({ status: 301, headers: { location: 'https://example.com/next' }, body: null }) as never,
+      );
+      agentCloseImplementation = () => new Promise((resolve) => setTimeout(resolve, 30));
+
+      await expect(resolveDocument('https://example.com/start', { totalTimeoutMs: 5 })).rejects.toBeInstanceOf(
+        ResolverTimedOutError,
+      );
+      expect(validatePublicUrl).toHaveBeenCalledTimes(1);
+      expect(agentInstances).toHaveLength(1);
+      expect(undiciFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the live redirect hop when a second-hop guard remains unresolved at timeout', async () => {
+      let releaseGuard!: (value: { address: string; family: 4 | 6 }) => void;
+      const guard = new Promise<{ address: string; family: 4 | 6 }>((resolve) => {
+        releaseGuard = resolve;
+      });
+      validatePublicUrl.mockResolvedValueOnce(resolvedAddress() as never).mockReturnValueOnce(guard as never);
+      undiciFetch.mockResolvedValueOnce(
+        makeResponse({ status: 301, headers: { location: 'https://example.com/next' }, body: null }) as never,
+      );
+
+      const error = (await resolveDocument('https://example.com/start', { totalTimeoutMs: 20 }).catch(
+        (e: unknown) => e,
+      )) as ResolverTimedOutError;
+      expect(error).toBeInstanceOf(ResolverTimedOutError);
+      expect(error.message).toContain('https://example.com/next');
+      expect(validatePublicUrl).toHaveBeenCalledTimes(2);
+      expect(agentInstances).toHaveLength(1);
+      expect(undiciFetch).toHaveBeenCalledTimes(1);
+
+      releaseGuard(resolvedAddress());
+      await Promise.resolve();
     });
 
     it('throws ResolverRedirectMissingLocationError when a 3xx has no Location', async () => {

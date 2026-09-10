@@ -1,9 +1,11 @@
 /**
- * The one fetch for a caller-supplied credential URL (#955). It runs the
- * guarded resolver by default and a plain fetch when the development bypass is
- * on. It returns bytes and reports failures as typed facts. Each route maps
- * those facts to its own responses, so a route that reads a DNS failure or a
- * 404 differently from the verify route does not need a second fetch.
+ * The one fetch for a caller-supplied credential URL (#955). It always uses
+ * the guarded resolver and, when enabled for local development,
+ * `FETCH_ALLOW_PRIVATE_URLS=true` permits private destinations without
+ * removing the resolver's other checks. It returns bytes and reports failures
+ * as typed facts. Each route maps those facts to its own responses, so a route
+ * that reads a DNS failure or a 404 differently from the verify route does not
+ * need a second fetch.
  *
  * Its three settings live in `credential-fetch.config.ts` and are shared with
  * external registration and the supplier-source check used by re-verification:
@@ -37,8 +39,8 @@ import {
 
 export { getMaxCredentialSize, getFetchTimeoutMs };
 
-/** Whether the development bypass is on for the current invocation. */
-function allowsPrivateUrls(): boolean {
+/** Whether local development may fetch private or reserved destinations. */
+export function allowsPrivateUrls(): boolean {
   return readFetchAllowPrivateUrls();
 }
 
@@ -56,6 +58,15 @@ export type FetchedDocument = {
  * is malformed, or its scheme or destination is not permitted. `failed` is a
  * fault while retrieving. Whether a retry may succeed is derived by
  * {@link isRetryable}, never stored, so the rule lives in one place.
+ *
+ * Two facts in this union are unreachable through the single resolver path
+ * this module now uses. `observedBytes` is never set, because the resolver
+ * stops at the cap rather than buffering the whole body first and so knows
+ * only the limit. `body-unreadable` is never produced, because a body that
+ * will not read arrives as a resolver network failure and is classified
+ * `network`. Both stay in the union: the shape is the recorded one and
+ * consumers already switch on it. Retiring them is a follow-up, not part of
+ * this change.
  */
 export type DocumentFetchFailure =
   | { kind: 'rejected'; reason: 'invalid-url' | 'source-not-permitted'; error: Error }
@@ -63,7 +74,7 @@ export type DocumentFetchFailure =
   | {
       kind: 'failed';
       reason: 'too-large';
-      /** The bytes actually read, known only when the whole body was buffered before the cap was applied. */
+      /** The bytes actually read. Never set by the current fetch path; retained for existing consumers. */
       observedBytes?: number;
       error: Error;
     }
@@ -71,9 +82,8 @@ export type DocumentFetchFailure =
 
 /**
  * Whether the same request may plausibly succeed later. This says nothing
- * about whose fault the failure was. A DNS fault is retryable and the verify
- * route still answers it as the caller's 400, because that is what the route
- * has always done.
+ * about whose fault the failure was. A DNS fault is retryable; route status
+ * presentation is owned by each route.
  */
 export function isRetryable(failure: DocumentFetchFailure): boolean {
   if (failure.kind === 'rejected') return false;
@@ -119,11 +129,12 @@ export async function fetchCredentialDocument(
 ): Promise<FetchedDocument> {
   const maxBytes = options.maxBytes ?? getMaxCredentialSize();
   const timeoutMs = options.timeoutMs ?? getFetchTimeoutMs();
-  if (allowsPrivateUrls()) {
-    return plainFetch(href, maxBytes, timeoutMs);
-  }
   try {
-    const resolved = await resolveDocument(href, { maxResponseBytes: maxBytes, totalTimeoutMs: timeoutMs });
+    const resolved = await resolveDocument(href, {
+      maxResponseBytes: maxBytes,
+      totalTimeoutMs: timeoutMs,
+      ...(allowsPrivateUrls() ? { allowPrivateAddresses: true } : {}),
+    });
     // The resolver returns a 304 with an empty body rather than throwing,
     // for callers that sent conditional headers. This one never does, so a
     // 304 is a status the document did not come with, like any other.
@@ -198,66 +209,4 @@ const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
 function isRetryableStatus(status: number): boolean {
   return RETRYABLE_STATUSES.has(status);
-}
-
-/**
- * Reads the fault behind a plain-fetch rejection. Node's fetch rejects with
- * a TypeError whose `cause` carries the system error, so a name that did not
- * resolve and a redirect chain that ran out are told apart here, as the
- * guarded resolver tells them apart with its own classes.
- */
-function classifyPlainFetchRejection(error: Error): 'dns' | 'timeout' | 'redirects' | 'network' {
-  if (error.name === 'TimeoutError') return 'timeout';
-  const cause = error.cause as { code?: unknown; message?: unknown } | undefined;
-  const code = typeof cause?.code === 'string' ? cause.code : undefined;
-  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'dns';
-  const message = typeof cause?.message === 'string' ? cause.message : '';
-  if (/redirect/i.test(message)) return 'redirects';
-  return 'network';
-}
-
-function toError(value: unknown): Error {
-  return value instanceof Error ? value : new Error(String(value));
-}
-
-async function plainFetch(href: string, maxBytes: number, timeoutMs: number): Promise<FetchedDocument> {
-  let response: Response;
-  try {
-    response = await fetch(href, { signal: AbortSignal.timeout(timeoutMs) });
-  } catch (error) {
-    const cause = toError(error);
-    throw new CredentialDocumentFetchError({
-      kind: 'failed',
-      reason: classifyPlainFetchRejection(cause),
-      error: cause,
-    });
-  }
-
-  if (!response.ok) {
-    throw new CredentialDocumentFetchError({
-      kind: 'failed',
-      reason: 'http',
-      status: response.status,
-      error: new Error(`${href} returned status ${response.status}.`),
-    });
-  }
-
-  let bytes: Uint8Array;
-  try {
-    bytes = new Uint8Array(await response.arrayBuffer());
-  } catch (error) {
-    throw new CredentialDocumentFetchError({ kind: 'failed', reason: 'body-unreadable', error: toError(error) });
-  }
-
-  if (bytes.byteLength > maxBytes) {
-    throw new CredentialDocumentFetchError({
-      kind: 'failed',
-      reason: 'too-large',
-      observedBytes: bytes.byteLength,
-      error: new Error(`Response body for ${href} exceeds ${maxBytes}-byte limit.`),
-    });
-  }
-
-  const contentType = response.headers.get('content-type');
-  return { bytes, finalUrl: response.url || href, ...(contentType ? { contentType } : {}) };
 }

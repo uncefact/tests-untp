@@ -26,7 +26,7 @@ import {
 export const RESOLVER_DEFAULTS = {
   /** Body-size cap in bytes; exceeding throws {@link ResolverTooLargeError}. */
   maxResponseBytes: 1_048_576,
-  /** Total request timeout in milliseconds (DNS + connect + TLS + first byte + body). */
+  /** Total wait for asynchronous DNS and fetch work in milliseconds. Synchronous work cannot be interrupted, and DNS itself is not cancelled. */
   totalTimeoutMs: 10_000,
   /** Maximum additional hops after the initial request; exceeding throws {@link ResolverTooManyRedirectsError}. */
   maxRedirects: 3,
@@ -45,7 +45,9 @@ export const RESOLVER_DEFAULTS = {
 /**
  * Merges the resolved `User-Agent` into the caller's headers. A caller-supplied
  * `user-agent` (any casing) wins; otherwise the `RI_HTTP_USER_AGENT` env
- * override (blank treated as unset), then the default. The override is not
+ * override (blank treated as unset), then the default. Both branches copy the
+ * caller's headers before request conversion, so a throwing getter remains a
+ * caller defect rather than becoming a transport failure. The override is not
  * validated here: deployments validate it at boot via
  * {@link isValidHttpUserAgent} (the RI does, in instrumentation.node.ts),
  * and a value that slips through with control characters makes the fetch
@@ -53,7 +55,7 @@ export const RESOLVER_DEFAULTS = {
  */
 function withUserAgent(headers: Record<string, string> | undefined): Record<string, string> {
   const hasExplicit = Object.keys(headers ?? {}).some((key) => key.toLowerCase() === 'user-agent');
-  if (hasExplicit) return headers as Record<string, string>;
+  if (hasExplicit) return { ...(headers ?? {}) };
   const fromEnv = process.env[USER_AGENT_ENV_VAR];
   const userAgent = fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv : DEFAULT_USER_AGENT;
   return { ...headers, 'User-Agent': userAgent };
@@ -106,6 +108,8 @@ export interface ResolveDocumentOptions {
   headers?: Record<string, string>;
   /** Allowed URL schemes (forwarded to {@link import('../node/index.js').validatePublicUrl}). */
   allowedSchemes?: readonly string[];
+  /** Permit private and reserved destinations while retaining every other guard. */
+  allowPrivateAddresses?: boolean;
 }
 
 /**
@@ -113,17 +117,27 @@ export interface ResolveDocumentOptions {
  * applied, returning the response body + metadata as a {@link LoadResult}.
  *
  * Each redirect hop is re-validated through
- * {@link import('../node/index.js').validatePublicUrl}, and the connection
- * to each hop is pinned to the IP that validation resolved, so an upstream
- * cannot redirect to a private URL or rebind its hostname between check
- * and connect.
+ * {@link import('../node/index.js').validatePublicUrl}, and the connection to
+ * each hop is pinned to the set of addresses its validation resolved, so an
+ * upstream cannot rebind its hostname between check and connect. Node's
+ * address selection tries those addresses within the request budget, so a
+ * `localhost` that resolves to both `::1` and `127.0.0.1` reaches whichever
+ * listens. Private and reserved destinations remain rejected unless
+ * `allowPrivateAddresses` is exactly true.
  *
- * @throws {UrlValidationError} for URL / scheme / hostname / DNS / private-address rejections from `validatePublicUrl`.
- * @throws {ResolverNetworkError} when fetch rejects before producing a response.
+ * Only two awaits convert a foreign rejection into a resolver error: the undici
+ * fetch and the body read. Every other throw inside this function, whether a
+ * guard error or a defect in this module, propagates exactly as thrown. That
+ * is the contract #995 settled, and it is why `verify-did-web.ts:104` now
+ * surfaces a resolver defect to its caller instead of reporting it as a
+ * retryable network fault.
+ *
+ * @throws {UrlValidationError} for URL / scheme / hostname / DNS / private-address rejections from `validatePublicUrl`, propagated unwrapped.
+ * @throws {ResolverNetworkError} when the fetch rejects before producing a response, or when a mid-body read rejects, and the rejection was not classified as this request's timeout; a non-abort-shaped rejection arriving after the deadline is also reported here.
  * @throws {ResolverHttpError} on a non-2xx response status (with `.status`).
  * @throws {ResolverTooLargeError} when the body exceeds the size cap (with `.limit`).
- * @throws {ResolverTooManyRedirectsError} when the redirect chain exceeds the hop cap (with `.limit`).
- * @throws {ResolverTimedOutError} when the total timeout fires (with `.timeoutMs`).
+ * @throws {ResolverTooManyRedirectsError} when the redirect chain exceeds the hop cap (with `.limit`, and `.lastHopUrl` for the hop that answered the exhausting redirect).
+ * @throws {ResolverTimedOutError} before a hop or while the guard was waiting on DNS, once the deadline has passed; in flight or mid-body, when this request's abort is what the failing call observed (with `.timeoutMs`).
  * @throws {ResolverRedirectMissingLocationError} for a 3xx with no / unparseable Location header.
  *
  * @see https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
@@ -138,24 +152,64 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
   const totalTimeoutMs = options?.totalTimeoutMs ?? RESOLVER_DEFAULTS.totalTimeoutMs;
   const maxRedirects = options?.maxRedirects ?? RESOLVER_DEFAULTS.maxRedirects;
 
+  // The deadline protocol. `currentUrl` is hoisted above the abort promise so
+  // the promise, created once per request rather than once per hop, rejects
+  // with whichever hop was in flight when the timer fired: a timeout during
+  // DNS then names the host it was waiting on. Racing the guard against that
+  // promise bounds the wait without cancelling the lookup, because
+  // `dns.lookup` takes no signal. The bare promises are raced so that a
+  // rejection from whichever settles first still reaches the caller; the two
+  // `void ... .catch(...)` side channels exist only to keep the loser's
+  // rejection from surfacing as an unhandled rejection, and must not be moved
+  // into the race, where they would resolve the race with `undefined` and
+  // swallow a DNS failure. `signal.aborted` is checked before the guard is
+  // invoked, so a hop whose predecessor's cleanup consumed the budget makes no
+  // further guard call, and again after the race, so nothing is dispatched
+  // once the budget is spent. No `await` may be inserted between that second
+  // check and `new Agent`: any suspension there reopens the window in which
+  // the timer fires and an Agent is still constructed. Tests enforce all of
+  // this (no second-hop guard call, no Agent, fetch never called), not types.
+  let currentUrl = url;
   const controller = new AbortController();
+  let removeAbortListener: () => void = () => undefined;
+  const abortPromise = new Promise<never>((_resolve, reject) => {
+    const onAbort = () => reject(new ResolverTimedOutError(currentUrl, totalTimeoutMs));
+    controller.signal.addEventListener('abort', onAbort, { once: true });
+    removeAbortListener = () => controller.signal.removeEventListener('abort', onAbort);
+  });
+  void abortPromise.catch(() => undefined);
   const timeoutHandle = setTimeout(() => controller.abort(), totalTimeoutMs);
 
   try {
-    let currentUrl = url;
     for (let hop = 0; hop <= maxRedirects; hop += 1) {
-      const { address: pinnedAddress, family: pinnedFamily } = await validatePublicUrl(currentUrl, {
+      if (controller.signal.aborted) throw new ResolverTimedOutError(currentUrl, totalTimeoutMs);
+
+      const guard = validatePublicUrl(currentUrl, {
         allowedSchemes: options?.allowedSchemes,
+        allowPrivateAddresses: options?.allowPrivateAddresses,
       });
+      void guard.catch(() => undefined);
+      const { addresses: pinnedAddresses } = await Promise.race([guard, abortPromise]);
+
+      if (controller.signal.aborted) throw new ResolverTimedOutError(currentUrl, totalTimeoutMs);
 
       const dispatcher = new Agent({
         connect: {
-          // undici resolves the connect target with `all: true` to support
-          // happy-eyeballs; the callback receives a `LookupAddress[]`.
-          // Return a single-entry array containing the IP we pinned via
-          // `validatePublicUrl`, so the connection target is exactly the
-          // address that the SSRF check validated.
-          lookup: (_hostname, _opts, cb) => cb(null, [{ address: pinnedAddress, family: pinnedFamily }]),
+          // undici spreads this `lookup` option into `net.connect` and
+          // `tls.connect` and performs no lookup of its own. Under Node's
+          // default family autoselection it calls the callback with
+          // `all: true` and walks the returned list, so return every address
+          // `validatePublicUrl` validated (`addresses` is already in resolver
+          // order) and each address Node may try is one the SSRF check passed.
+          // Handing it only the first would refuse a name whose other
+          // addresses hold the listener: `localhost` resolves to both `::1`
+          // and `127.0.0.1`, and the walk is what reaches the second when the
+          // first is refused.
+          lookup: (_hostname, _opts, cb) =>
+            cb(
+              null,
+              pinnedAddresses.map(({ address, family }) => ({ address, family })),
+            ),
         },
       });
 
@@ -165,13 +219,28 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
       // request is "drained" only once its body has been consumed. Closing
       // before `readWithLimit` deadlocks the close on the unconsumed body.
       try {
-        const response = await undiciFetch(currentUrl, {
+        const headers = withUserAgent(options?.headers);
+        const requestOptions = {
           method: 'GET',
           redirect: 'manual',
           signal: controller.signal,
-          headers: withUserAgent(options?.headers),
+          headers,
           dispatcher,
-        });
+        } as const;
+
+        let response: Awaited<ReturnType<typeof undiciFetch>>;
+        try {
+          response = await undiciFetch(currentUrl, requestOptions);
+        } catch (cause) {
+          // This catch also sees undici's Request-construction rejections, so a
+          // redirect hop carrying userinfo or a malformed header value is
+          // wrapped as a network error rather than propagating as a defect.
+          // That is the recorded exception to #995's wording.
+          if (isOurTimeout(cause, controller.signal)) {
+            throw new ResolverTimedOutError(currentUrl, totalTimeoutMs, cause);
+          }
+          throw new ResolverNetworkError(currentUrl, cause);
+        }
 
         // 304 Not Modified: body is intentionally empty; the caller maps it
         // to `unchanged` in `resolveDocumentIfChanged`.
@@ -204,6 +273,9 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
           // Cancel the 3xx body so `dispatcher.close()` in `finally` can
           // proceed without waiting for body drain.
           if (response.body) await response.body.cancel().catch(() => undefined);
+          if (hop === maxRedirects) {
+            throw new ResolverTooManyRedirectsError(url, maxRedirects, currentUrl);
+          }
           currentUrl = nextUrl;
           continue;
         }
@@ -213,7 +285,7 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
           throw new ResolverHttpError(currentUrl, response.status);
         }
 
-        const body = await readWithLimit(response, maxBytes, currentUrl, totalTimeoutMs);
+        const body = await readWithLimit(response, maxBytes, currentUrl, totalTimeoutMs, controller.signal);
         const bodyDigest = await computeDigest(body);
         const headerView = extractHeaders(response.headers);
         return {
@@ -231,30 +303,33 @@ export async function resolveDocument(url: string, options?: ResolveDocumentOpti
     }
 
     throw new ResolverTooManyRedirectsError(url, maxRedirects);
-  } catch (cause) {
-    if (cause instanceof Error && (cause as Error & { code?: string }).code?.startsWith('resolver.')) {
-      throw cause;
-    }
-    // Re-throw UrlValidationErrors and other StructuredErrors unwrapped.
-    if (
-      cause instanceof Error &&
-      typeof (cause as Error & { code?: unknown }).code === 'string' &&
-      ((cause as Error & { code: string }).code.startsWith('url.') ||
-        (cause as Error & { code: string }).code.startsWith('resolver.'))
-    ) {
-      throw cause;
-    }
-    if (isAbortLikeError(cause)) {
-      throw new ResolverTimedOutError(url, totalTimeoutMs, cause);
-    }
-    throw new ResolverNetworkError(url, cause);
   } finally {
     clearTimeout(timeoutHandle);
+    removeAbortListener();
   }
 }
 
+/**
+ * The classification policy at the two transport catches: a rejection counts as
+ * this request's timeout only when this request's signal has fired and the
+ * error is named `AbortError` or `TimeoutError`. Everything else caught there
+ * becomes a {@link ResolverNetworkError}.
+ *
+ * The signal gate stops an abort-shaped rejection counting as this request's
+ * timeout while its signal is quiet, which would tell the operator "timed out
+ * after 10000ms" when 300 ms elapsed. The name gate keeps a non-abort-shaped
+ * rejection arriving after the deadline classified as a network fault. Neither
+ * gate proves the rejection was caused by this signal; this is the chosen
+ * policy, not a proof of cause.
+ */
+function isOurTimeout(error: unknown, signal: AbortSignal): boolean {
+  return signal.aborted && isAbortLikeError(error);
+}
+
 function isAbortLikeError(error: unknown): boolean {
-  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+  if (typeof error !== 'object' || error === null) return false;
+  const name = (error as { name?: unknown }).name;
+  return name === 'AbortError' || name === 'TimeoutError';
 }
 
 interface HeaderView {
@@ -286,6 +361,7 @@ async function readWithLimit(
   limit: number,
   url: string,
   totalTimeoutMs: number,
+  signal: AbortSignal,
 ): Promise<Uint8Array> {
   if (!response.body) return new Uint8Array(0);
 
@@ -296,22 +372,32 @@ async function readWithLimit(
   try {
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const { value, done } = await reader.read();
+      let readResult: Awaited<ReturnType<typeof reader.read>>;
+      try {
+        readResult = await reader.read();
+      } catch (error) {
+        if (isOurTimeout(error, signal)) throw new ResolverTimedOutError(url, totalTimeoutMs, error);
+        throw new ResolverNetworkError(url, error);
+      }
+
+      const { value, done } = readResult;
       if (done) break;
       if (!value) continue;
       total += value.byteLength;
       if (total > limit) {
-        await reader.cancel().catch(() => undefined);
         throw new ResolverTooLargeError(url, limit);
       }
       chunks.push(value);
     }
   } catch (error) {
-    // Release the reader so the upstream socket can be recycled.
+    // Cleanup only: release the reader so the upstream socket can be
+    // recycled, then rethrow the original value unchanged. Classification
+    // happens at the read await above, and the over-cap error is raised
+    // without cancelling inline precisely so cancellation stays here. A
+    // future edit that classified or replaced the error here would relabel
+    // both a defect and an already-classified resolver error.
     await reader.cancel().catch(() => undefined);
-    if (error instanceof ResolverTooLargeError) throw error;
-    if (isAbortLikeError(error)) throw new ResolverTimedOutError(url, totalTimeoutMs, error);
-    throw new ResolverNetworkError(url, error);
+    throw error;
   }
 
   const merged = new Uint8Array(total);

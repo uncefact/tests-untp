@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-26
 - **Status:** accepted
+- **Update (2026-09-10):** `validatePublicUrl` now returns `ValidatedAddresses`, the recorded `{ address, family }` plus `addresses` (every validated record) so the resolver can pin a multi-address name; PR #1034.
 - **Supersedes:** [ADR-034](./034-utils-error-and-warning-reporting.md)
 
 ## Context

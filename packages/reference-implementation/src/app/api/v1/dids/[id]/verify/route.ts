@@ -67,7 +67,7 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
- *         description: Server error
+ *         description: Server error, including a defect inside the document resolver (not a failed resolution, which is reported as a failed RESOLVE check)
  *         content:
  *           application/json:
  *             schema:

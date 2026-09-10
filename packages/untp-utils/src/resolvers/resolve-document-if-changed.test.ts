@@ -65,6 +65,19 @@ describe('resolveDocumentIfChanged', () => {
       expect(passedOptions.headers['if-none-match']).toBe('"abc"');
     });
 
+    it('forwards private permission alongside conditional headers', async () => {
+      resolveDocument.mockResolvedValue(loadResult({ status: 304, bodyDigest: await digestOf('') }) as never);
+
+      await resolveDocumentIfChanged('https://example.com/', { etag: '"abc"' }, { allowPrivateAddresses: true });
+
+      const passedOptions = resolveDocument.mock.calls[0][1] as {
+        allowPrivateAddresses: boolean;
+        headers: Record<string, string>;
+      };
+      expect(passedOptions.allowPrivateAddresses).toBe(true);
+      expect(passedOptions.headers['if-none-match']).toBe('"abc"');
+    });
+
     it('does not emit duplicate conditional headers when the caller supplies a differently-cased variant', async () => {
       resolveDocument.mockResolvedValue(loadResult({ status: 304, bodyDigest: await digestOf('') }) as never);
 

@@ -41,7 +41,7 @@ const jestConfig = {
     // constructs are the ones the code under test checks with `instanceof`;
     // the full resolvers module cannot load here because multiformats'
     // subpath exports do not resolve under jest.
-    '^@uncefact/untp-utils/resolvers/errors$': '<rootDir>/../untp-utils/build/resolvers/errors.js',
+    '^@uncefact/untp-utils/resolvers/errors$': '<rootDir>/../untp-utils/src/resolvers/errors.ts',
     '^@uncefact/untp-utils/common$': '<rootDir>/../untp-utils/src/common/index.ts',
     '^@uncefact/untp-utils/validation$': '<rootDir>/../untp-utils/build/validation/index.js',
     '^@uncefact/untp-utils/loaders$': '<rootDir>/../untp-utils/build/loaders/index.js',

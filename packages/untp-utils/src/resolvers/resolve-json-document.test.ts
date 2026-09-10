@@ -75,14 +75,18 @@ describe('resolveJsonDocument', () => {
     );
   });
 
-  it('forwards resolver options (allowedSchemes, size/timeout bounds) unchanged', async () => {
+  it('forwards resolver options including private permission unchanged', async () => {
     resolveDocument.mockResolvedValue({ body: encode('{}'), finalUrl: 'https://ex.test/doc' } as never);
 
-    await resolveJsonDocument('https://ex.test/doc', { allowedSchemes: ['https'], maxResponseBytes: 2048 });
+    await resolveJsonDocument('https://ex.test/doc', {
+      allowedSchemes: ['https'],
+      maxResponseBytes: 2048,
+      allowPrivateAddresses: true,
+    });
 
     expect(resolveDocument).toHaveBeenCalledWith(
       'https://ex.test/doc',
-      expect.objectContaining({ allowedSchemes: ['https'], maxResponseBytes: 2048 }),
+      expect.objectContaining({ allowedSchemes: ['https'], maxResponseBytes: 2048, allowPrivateAddresses: true }),
     );
   });
 
