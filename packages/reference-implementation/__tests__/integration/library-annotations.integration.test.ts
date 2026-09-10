@@ -779,6 +779,8 @@ describe('recipient annotation updates against Postgres', () => {
         },
         { timeout: 20_000 },
       );
+      const waiterHandle = waiter;
+      void waiterHandle.catch(() => undefined);
       await waitForQueueBehind(client, ownerPid, 1);
       allowReacquisition();
       await expect(
