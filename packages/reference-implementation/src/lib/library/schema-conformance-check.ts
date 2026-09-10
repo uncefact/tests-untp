@@ -29,6 +29,41 @@ import { apiLogger } from '@/lib/api/logger';
 
 const MAX_MESSAGE_LENGTH = 1_024;
 const TRUNCATION_MARKER = '...';
+/**
+ * Fixed explanations for the document fault codes rejected by jsonld.js safe
+ * mode. The classifier's detail is safe for display in some consumers, but
+ * its allowlisted fields can still carry values from the credential, so this
+ * persisted message uses only these fixed explanations.
+ * Unrecognised document codes, including future syntax diagnostics, use the
+ * generic message below.
+ *
+ * @see https://github.com/digitalbazaar/jsonld.js/blob/v8.3.3/lib/events.js#L103-L129
+ */
+const JSON_LD_DOCUMENT_FAILURE_MESSAGES: Readonly<Record<string, string>> = {
+  'empty object': 'Empty JSON-LD object found.',
+  'free-floating scalar': 'Free-floating JSON-LD scalar found.',
+  'invalid @language value': 'Invalid JSON-LD @language value found.',
+  'invalid property': 'Invalid JSON-LD property found.',
+  'null @id value': 'Null JSON-LD @id value found.',
+  'null @value value': 'Null JSON-LD @value found.',
+  'object with only @id': 'JSON-LD object with only @id found.',
+  'object with only @language': 'JSON-LD object with only @language found.',
+  'object with only @list': 'JSON-LD object with only @list found.',
+  'object with only @value': 'JSON-LD object with only @value found.',
+  'relative @id reference': 'Relative @id reference found.',
+  'relative @type reference': 'Relative @type reference found.',
+  'relative @vocab reference': 'Relative @vocab reference found.',
+  'reserved @id value': 'Reserved @id value found.',
+  'reserved @reverse value': 'Reserved @reverse value found.',
+  'reserved term': 'Reserved JSON-LD term found.',
+  'blank node predicate': 'Blank node predicate found.',
+  'relative graph reference': 'Relative graph reference found.',
+  'relative object reference': 'Relative object reference found.',
+  'relative predicate reference': 'Relative predicate reference found.',
+  'relative subject reference': 'Relative subject reference found.',
+  'rdfDirection not set': 'JSON-LD rdfDirection is not set.',
+};
+const GENERIC_JSON_LD_DOCUMENT_FAILURE_MESSAGE = 'The JSON-LD document could not be expanded as valid JSON-LD.';
 
 export type SchemaConformanceResult =
   | { result: typeof CheckResult.FAIL; message: string }
@@ -138,7 +173,10 @@ export async function checkSchemaConformance(
     if (error instanceof JsonLdValidationError) {
       const failure = describeJsonLdFailure(error);
       if (failure.kind === 'document') {
-        return failed(failure.detail, failure.code);
+        return failed(
+          JSON_LD_DOCUMENT_FAILURE_MESSAGES[failure.code ?? ''] ?? GENERIC_JSON_LD_DOCUMENT_FAILURE_MESSAGE,
+          failure.code,
+        );
       }
       const diagnostic = failure.url
         ? {

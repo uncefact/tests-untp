@@ -280,7 +280,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   issuedAt: '2026-08-30T10:15:00.000Z'
  *                   encrypted: false
  *                   hasKey: true
- *                   verification: { generation: 3, state: complete, requestedAt: '2026-09-07T11:04:00.000Z', completedAt: '2026-09-07T11:04:03.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: not_run }, summary: verified, sourceChanged: false, lastSourceCheckAt: '2026-09-07T11:04:00.000Z' }
+ *                   verification: { generation: 3, state: complete, requestedAt: '2026-09-07T11:04:00.000Z', completedAt: '2026-09-07T11:04:03.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified, sourceChanged: false, lastSourceCheckAt: '2026-09-07T11:04:00.000Z' }
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null

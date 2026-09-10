@@ -502,11 +502,9 @@ async function runStoredCopyChecks(
     conformance = { result: CheckResult.NOT_RUN, message: null };
   } else {
     try {
-      // The advisory check runs before the blocking verifier and shares its
-      // remaining budget. An attempt normally completes in a small fraction
-      // of the 300-second default, so it cannot starve the verifier in
-      // practice; if it does, the attempt fails transiently and retries on
-      // the ladder.
+      // Decision: the advisory check runs first and shares the attempt budget
+      // with the blocking verifier. If it exhausts that budget, the attempt
+      // fails as VERIFICATION_UNAVAILABLE and retries on the ladder.
       // The deadline guard stops new schema or context loads after the
       // budget, while this outer race also bounds work already in flight,
       // including a cache-warm expansion.

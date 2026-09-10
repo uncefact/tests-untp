@@ -79,6 +79,7 @@ import {
   settleAbandonedCheckRun,
   settleCheckRunComplete,
   settleCheckRunFailed,
+  noChecksRun,
   RecoveryLockDiscoveryExhaustedError,
   type CreateReverificationGenerationInput,
   type FinaliseRecoveryGenerationInput,
@@ -2581,7 +2582,7 @@ describe('verification settlement schema message', () => {
       settleCheckRunComplete({
         id: 'run-1',
         tenantId: TENANT_ID,
-        checks: noChecks(),
+        checks: noChecksRun(),
         schemaConformanceMessage: 'first violation',
       }),
     ).resolves.toEqual({ outcome: 'applied' });
@@ -2593,7 +2594,7 @@ describe('verification settlement schema message', () => {
       settleCheckRunFailed({
         id: 'run-1',
         tenantId: TENANT_ID,
-        checks: noChecks(),
+        checks: noChecksRun(),
         schemaConformanceMessage: null,
         failure: { code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE, message: 'failed', retryable: true },
       }),
@@ -2603,18 +2604,6 @@ describe('verification settlement schema message', () => {
     );
   });
 });
-
-function noChecks() {
-  return {
-    retrieval: CheckResult.NOT_RUN,
-    decryption: CheckResult.NOT_RUN,
-    digest: CheckResult.NOT_RUN,
-    proof: CheckResult.NOT_RUN,
-    status: CheckResult.NOT_RUN,
-    temporal: CheckResult.NOT_RUN,
-    schemaConformance: CheckResult.NOT_RUN,
-  };
-}
 
 describe('pending-run reconciliation repository', () => {
   it('selects only pending rows with no marker or an older marker', async () => {

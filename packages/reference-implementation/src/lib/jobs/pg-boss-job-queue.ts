@@ -560,18 +560,7 @@ function validateRetry(
 function validateEnqueueOptions(options: EnqueueOptions | undefined): void {
   if (options === undefined) return;
   validateRetry(options.retry, 'retry');
-  if (
-    options.expireSeconds !== undefined &&
-    (!Number.isInteger(options.expireSeconds) ||
-      options.expireSeconds < 1 ||
-      options.expireSeconds > MAX_JOB_EXPIRE_SECONDS)
-  ) {
-    throw new JobQueueError({
-      code: 'jobs.invalid-enqueue-options',
-      message: 'expireSeconds must be a positive integer of at most 24 hours',
-      received: options.expireSeconds,
-    });
-  }
+  validateExpireSeconds(options.expireSeconds, 'expireSeconds');
   if (options.fairnessKey !== undefined && options.fairnessKey.length === 0) {
     throw new JobQueueError({
       code: 'jobs.invalid-enqueue-options',

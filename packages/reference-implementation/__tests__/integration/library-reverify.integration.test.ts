@@ -179,6 +179,7 @@ const THIRD_VALID_CONTEXT = 'https://supplier.example/contexts/third-valid.json'
 const THIRD_MALFORMED_CONTEXT = 'https://supplier.example/contexts/third-malformed.json';
 const THIRD_SCOPED_CONTEXT = 'https://supplier.example/contexts/third-scoped.json';
 const THIRD_MISSING_SCOPED_CONTEXT = 'https://supplier.example/contexts/missing-scoped.json';
+const PRIVATE_REF_CONTEXT_URL = 'https://supplier.example/contexts/private-ref.json';
 const RECOVERY_DPP = {
   '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'],
   type: ['VerifiableCredential', 'DigitalProductPassport'],
@@ -282,6 +283,9 @@ function registerSchemaAndContextFixtures(): void {
   fixtures.set('/remote/context/third-valid.json', {
     body: JSON.stringify({ '@context': { thirdTerm: 'https://example.org/terms/thirdTerm' } }),
   });
+  fixtures.set('/remote/context/private-ref.json', {
+    body: JSON.stringify({ '@context': { privateRef: { '@id': 'https://example.org/terms/privateRef' } } }),
+  });
   fixtures.set('/remote/context/third-malformed.json', {
     body: JSON.stringify({ '@context': { thirdTerm: { '@id': 'https://example.org/terms/thirdTerm', '@type': 42 } } }),
   });
@@ -314,6 +318,7 @@ function registerSchemaAndContextFixtures(): void {
   externalFixtureMap.set(THIRD_MALFORMED_CONTEXT, '/remote/context/third-malformed.json');
   externalFixtureMap.set(THIRD_SCOPED_CONTEXT, '/remote/context/third-scoped.json');
   externalFixtureMap.set(THIRD_MISSING_SCOPED_CONTEXT, '/remote/context/missing-scoped.json');
+  externalFixtureMap.set(PRIVATE_REF_CONTEXT_URL, '/remote/context/private-ref.json');
 }
 
 function fixtureUrlForExternalRequest(requestUrl: string): string {
@@ -912,6 +917,57 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
       expect(settled?.checkRun).toMatchObject({ state: CheckRunState.COMPLETE, schemaConformance: testCase.expected });
     }
+  });
+
+  it('fails a valid 0.7.0 DPP with a relative private reference without persisting or logging its value', async () => {
+    // Fails if the classifier's formatted relative-id detail reaches the
+    // persisted advisory or a rendered log line.
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    const handler = verificationHandler(verifier);
+    const credential = {
+      ...DPP_070,
+      '@context': [...DPP_070['@context'], PRIVATE_REF_CONTEXT_URL],
+      credentialSubject: {
+        ...DPP_070.credentialSubject,
+        privateRef: { '@id': 'customer-private/order-secret', name: 'Example' },
+      },
+    };
+    const envelope = envelopedCredential(credential);
+    const body = JSON.stringify(envelope);
+    const storagePath = '/storage/schema-conformance-private-ref.json';
+    const sourcePath = '/supplier/schema-conformance-private-ref.json';
+    fixtures.set(storagePath, { body });
+    fixtures.set(sourcePath, { body });
+    const copyDigest = await digest(new TextEncoder().encode(body));
+    const recordId = await insertProtectedExternal({
+      sourcePath,
+      storagePath,
+      sourceDigest: copyDigest,
+      storageDigest: copyDigest,
+      coreDataModelVersion: '0.7.0',
+    });
+
+    await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
+    await handler((await jobsFor(recordId))[0], context({ isFinalAttempt: true }));
+
+    const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+    expect(settled?.checkRun).toMatchObject({
+      state: CheckRunState.COMPLETE,
+      schemaConformance: CheckResult.FAIL,
+      schemaConformanceMessage: 'Relative @id reference found. (relative @id reference)',
+    });
+    expect(settled?.checkRun?.schemaConformanceMessage).not.toContain('order-secret');
+    const advisory = toCredentialRecord(settled as never).warnings.find(
+      (warning) => warning.code === 'SCHEMA_CONFORMANCE_ADVISORY',
+    );
+    expect(advisory).toEqual({
+      code: 'SCHEMA_CONFORMANCE_ADVISORY',
+      message: 'Relative @id reference found. (relative @id reference)',
+    });
+    expect(capturedLogLines.every((line) => !line.includes('order-secret'))).toBe(true);
   });
 
   it('keeps a scoped-context fetch failure not_run and logs no URL path', async () => {

@@ -215,13 +215,25 @@ describe('checkSchemaConformance', () => {
     validateJsonLd.mockRejectedValue(new JsonLdExpansionFailedError(new Error('document failure')));
     describeJsonLdFailure.mockReturnValue({
       kind: 'document',
-      detail: 'property name is not allowed',
-      code: 'invalid',
+      detail: 'Relative @id reference found. (id: "customer-private/order-secret")',
+      code: 'relative @id reference',
     });
 
     await expect(checkSchemaConformance(input(), deps)).resolves.toEqual({
       result: CheckResult.FAIL,
-      message: 'property name is not allowed (invalid)',
+      message: 'Relative @id reference found. (relative @id reference)',
+    });
+    const documentResult = await checkSchemaConformance(input(), deps);
+    expect(documentResult.message).not.toContain('order-secret');
+
+    describeJsonLdFailure.mockReturnValue({
+      kind: 'document',
+      detail: 'future diagnostic contains customer-private/order-secret',
+      code: 'future document code',
+    });
+    await expect(checkSchemaConformance(input(), deps)).resolves.toEqual({
+      result: CheckResult.FAIL,
+      message: 'The JSON-LD document could not be expanded as valid JSON-LD. (future document code)',
     });
 
     describeJsonLdFailure.mockReturnValue({ kind: 'context-fetch', detail: 'context unavailable', url: CONTEXT_URL });
