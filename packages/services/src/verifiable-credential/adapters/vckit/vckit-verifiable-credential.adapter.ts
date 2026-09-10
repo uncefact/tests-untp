@@ -40,8 +40,27 @@ function mapErrorCode(errorCode?: string): VerificationErrorCode {
   return VerificationErrorCode.Integrity;
 }
 
+/**
+ * Accepts only a response body whose `verified` field is a real boolean.
+ *
+ * VCKit's verify endpoint reports the outcome in `verified`. A truthiness
+ * check would treat any malformed body (for example `{"verified":"false"}`)
+ * as a successful verification, so anything other than a JSON object with a
+ * boolean `verified` is rejected as a VcVerifyError.
+ */
+function parseVerifyResponse(body: unknown): IVerifyResult {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new VcVerifyError('Verification API returned a non-object response body');
+  }
+  const { verified } = body as { verified?: unknown };
+  if (typeof verified !== 'boolean') {
+    throw new VcVerifyError(`Verification API returned a non-boolean "verified" value: ${JSON.stringify(verified)}`);
+  }
+  return body as IVerifyResult;
+}
+
 function transformVerifyResult(vckitResult: IVerifyResult): VerifyResult {
-  if (vckitResult.verified) return { verified: true };
+  if (vckitResult.verified === true) return { verified: true };
   return {
     verified: false,
     error: vckitResult.error
@@ -108,7 +127,7 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
       throw new VcVerifyError(detail, response.status);
     }
 
-    const vckitResult = (await response.json()) as IVerifyResult;
+    const vckitResult = parseVerifyResponse(await response.json());
     const result = transformVerifyResult(vckitResult);
     this.logger.info({ verified: result.verified }, 'Credential verification complete');
     return result;
