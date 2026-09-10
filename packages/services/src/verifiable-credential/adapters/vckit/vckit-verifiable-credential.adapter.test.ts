@@ -322,6 +322,45 @@ describe('VCKitVerifiableCredentialService', () => {
       });
     });
 
+    it.each([
+      ['a string "false"', { verified: 'false' }],
+      ['a string "true"', { verified: 'true' }],
+      ['a number', { verified: 1 }],
+      ['an object', { verified: {} }],
+      ['a missing field', {}],
+      ['null', { verified: null }],
+    ])('should throw VcVerifyError when verified is %s instead of a boolean', async (_label, body) => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue(body),
+      });
+
+      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+
+      await expect(adapter.verify(mockEnvelopedCredential)).rejects.toThrow(VcVerifyError);
+      await expect(adapter.verify(mockEnvelopedCredential)).rejects.toThrow(
+        'Verification API returned a non-boolean "verified" value',
+      );
+    });
+
+    it.each([
+      ['null', null],
+      ['an array', [{ verified: true }]],
+      ['a string', 'verified'],
+    ])('should throw VcVerifyError when the response body is %s', async (_label, body) => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue(body),
+      });
+
+      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+
+      await expect(adapter.verify(mockEnvelopedCredential)).rejects.toThrow(VcVerifyError);
+      await expect(adapter.verify(mockEnvelopedCredential)).rejects.toThrow(
+        'Verification API returned a non-object response body',
+      );
+    });
+
     it('should throw VcVerifyError when credential is falsy', async () => {
       const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
 
