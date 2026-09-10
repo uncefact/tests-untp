@@ -72,8 +72,8 @@ try {
   if (!result.keyVerified) {
     console.warn(
       'Warning: no existing encrypted value was available to validate DATA_ENCRYPTION_KEY against; ' +
-        'verify a wrapped key decrypts correctly (for example via GET /api/v1/credentials/{id}) before ' +
-        'relying on the wrapped values.',
+        'if this run wrapped keys, re-run the encryption audit and treat a clean report as proof, with any ' +
+        'envelope it cannot open as a failure.',
     );
   }
   if (result.suspectRowIds.length > 0) {

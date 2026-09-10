@@ -1,13 +1,7 @@
-import {
-  createCredential,
-  listCredentials,
-  updateCredentialPublished,
-  getCredentialById,
-} from './credential.repository';
+import { createCredential, updateCredentialPublished } from './credential.repository';
 import { IdempotencyClaimLostError } from './idempotency-key.repository';
 import { NotFoundError } from '@/lib/api/errors';
 import { prismaError } from '../db-errors.fixtures';
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { CoreCredentialType, CredentialDetailsError, LibraryRecordOrigin, IdempotencyOperation } from '../generated';
 
 // Mock Prisma client. Use jest.fn() inside the factory to avoid hoisting issues.
@@ -16,9 +10,6 @@ jest.mock('../prisma', () => {
     libraryRecord: { create: jest.Mock; update: jest.Mock };
     credential: {
       create: jest.Mock;
-      findMany: jest.Mock;
-      findFirst: jest.Mock;
-      count: jest.Mock;
       update: jest.Mock;
     };
     idempotencyKey: { updateMany: jest.Mock; findUnique: jest.Mock };
@@ -27,9 +18,6 @@ jest.mock('../prisma', () => {
     libraryRecord: { create: jest.fn(), update: jest.fn() },
     credential: {
       create: jest.fn(),
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-      count: jest.fn(),
       update: jest.fn(),
     },
     idempotencyKey: {
@@ -48,9 +36,6 @@ import { prisma } from '../prisma';
 const mockLibraryRecord = prisma.libraryRecord as unknown as { create: jest.Mock; update: jest.Mock };
 const mockCredential = prisma.credential as unknown as {
   create: jest.Mock;
-  findMany: jest.Mock;
-  findFirst: jest.Mock;
-  count: jest.Mock;
   update: jest.Mock;
 };
 const mockIdempotencyKey = prisma.idempotencyKey as unknown as { updateMany: jest.Mock; findUnique: jest.Mock };
@@ -131,10 +116,6 @@ describe('credential.repository', () => {
     };
   }
 
-  // More than DEFAULT_PAGE_LIMIT so an unbounded query is distinguishable
-  // from a correctly-paged one.
-  const SEED_ROWS = Array.from({ length: DEFAULT_PAGE_LIMIT + 5 }, (_, i) => childWithRecord(i));
-
   const NEW_INPUT = {
     tenantId: TENANT_ID,
     storageUri: 'https://storage.example/credential-new',
@@ -146,15 +127,6 @@ describe('credential.repository', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Mirrors Prisma's own take/skip semantics (an undefined take is
-    // unbounded), so this catches the repository omitting the default
-    // limit rather than merely asserting on the call arguments.
-    mockCredential.findMany.mockImplementation(({ take, skip }: { take?: number; skip?: number } = {}) => {
-      const start = skip ?? 0;
-      const end = take !== undefined ? start + take : undefined;
-      return Promise.resolve(SEED_ROWS.slice(start, end));
-    });
-    mockCredential.count.mockResolvedValue(SEED_ROWS.length);
     mockLibraryRecord.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       ...record(99),
       id: 'cred-new',
@@ -165,53 +137,6 @@ describe('credential.repository', () => {
       record: undefined,
       ...data,
     }));
-  });
-
-  describe('listCredentials', () => {
-    it('bounds the result to DEFAULT_PAGE_LIMIT when limit is omitted and flattens the parent onto each row', async () => {
-      const result = await listCredentials({ tenantId: TENANT_ID });
-      expect(result.data).toHaveLength(DEFAULT_PAGE_LIMIT);
-      expect(result.data[0]).toEqual(flattened(0));
-      expect(result.data[0]).not.toHaveProperty('record');
-      expect(mockCredential.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: DEFAULT_PAGE_LIMIT, include: { record: true } }),
-      );
-      // Ordered by the timestamp the response carries (the parent's), id as tie-break.
-      expect(mockCredential.findMany.mock.calls[0][0].orderBy).toEqual([
-        { record: { createdAt: 'desc' } },
-        { id: 'desc' },
-      ]);
-    });
-
-    it('still pages as requested when a limit is supplied', async () => {
-      const result = await listCredentials({ tenantId: TENANT_ID, limit: 5, offset: 10 });
-      expect(result.data).toHaveLength(5);
-      expect(result.data[0].id).toBe('credential-10');
-      expect(mockCredential.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5, skip: 10 }));
-    });
-
-    it('filters by type through the parent record, where the type now lives', async () => {
-      await listCredentials({ tenantId: TENANT_ID, credentialType: 'DigitalProductPassport', isPublished: true });
-      const where = { tenantId: TENANT_ID, record: { credentialType: 'DigitalProductPassport' }, isPublished: true };
-      expect(mockCredential.findMany).toHaveBeenCalledWith(expect.objectContaining({ where }));
-      expect(mockCredential.count).toHaveBeenCalledWith({ where });
-    });
-  });
-
-  describe('getCredentialById', () => {
-    it('reads the child with its parent, scoped to the tenant, and flattens it', async () => {
-      mockCredential.findFirst.mockResolvedValue(childWithRecord(3));
-      await expect(getCredentialById('credential-3', TENANT_ID)).resolves.toEqual(flattened(3));
-      expect(mockCredential.findFirst).toHaveBeenCalledWith({
-        where: { id: 'credential-3', tenantId: TENANT_ID },
-        include: { record: true },
-      });
-    });
-
-    it('returns null when the tenant does not own the id', async () => {
-      mockCredential.findFirst.mockResolvedValue(null);
-      await expect(getCredentialById('credential-3', 'other')).resolves.toBeNull();
-    });
   });
 
   describe('createCredential', () => {

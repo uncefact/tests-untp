@@ -304,7 +304,7 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       const payload = JSON.parse(q as string).payload;
       expect(payload, 'published link must not carry a key').to.not.have.any.keys('decryptionKey', 'key');
 
-      cy.request(`/api/v1/credentials/${publishedCredentialId}`).then((credRes) => {
+      cy.request(`/api/v1/library/${publishedCredentialId}`).then((credRes) => {
         expect(payload.uri, 'storage uri in the payload').to.eq(credRes.body.storageUri);
         expect(payload.digestMultibase, 'digest in the payload').to.eq(credRes.body.digestMultibase);
 

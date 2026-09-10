@@ -115,7 +115,9 @@ describe('Verify Page', { testIsolation: false }, () => {
         expect(response.status).to.eq(201);
         const credId = response.body.credentialId;
 
-        cy.request(`/api/v1/credentials/${credId}`).then((res) => {
+        cy.request(`/api/v1/library/${credId}`).then((res) => {
+          expect(res.status).to.eq(200);
+          expect(res.body.id).to.eq(credId);
           const cred = res.body;
           unencryptedUri = cred.storageUri;
           unencryptedDigest = cred.digestMultibase;
@@ -136,7 +138,9 @@ describe('Verify Page', { testIsolation: false }, () => {
         expect(response.status).to.eq(201);
         const credId = response.body.credentialId;
 
-        cy.request(`/api/v1/credentials/${credId}`).then((res) => {
+        cy.request(`/api/v1/library/${credId}`).then((res) => {
+          expect(res.status).to.eq(200);
+          expect(res.body.id).to.eq(credId);
           const cred = res.body;
           encryptedUri = cred.storageUri;
           encryptedDigest = cred.digestMultibase;

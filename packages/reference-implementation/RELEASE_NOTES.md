@@ -1,5 +1,9 @@
 # UNTP Reference Implementation release notes
 
+## Unreleased
+
+**Breaking change: credentials read routes retired.** `GET /api/v1/credentials` and `GET /api/v1/credentials/{id}` now return `410 Gone` after authentication and tenant resolution succeed, with no deprecation window. Migrate to `/api/v1/library` and `/api/v1/library/{id}`. The replacement list contains no key material; retrieve a specific credential's key through its detail route. See the [v0.5 migration guide](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.5).
+
 ## 0.4.0 - 2026-08-17
 
 v0.3 made the Reference Implementation an API-first, multi-tenant application. v0.4 is about making it safe to run in front of real data and predictable to integrate against.

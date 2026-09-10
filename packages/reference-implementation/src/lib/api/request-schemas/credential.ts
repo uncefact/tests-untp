@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AccessRole } from '@uncefact/untp-ri-services';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
-import { bcp47TagSchema, booleanQuerySchema, idSchema, nonBlankString, paginationQuerySchema } from './shared';
+import { bcp47TagSchema, idSchema, nonBlankString } from './shared';
 
 const HEX_64 = /^[a-f0-9]{64}$/i;
 
@@ -91,19 +91,6 @@ export const credentialIssueRequestSchema = z.object({
   storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
   publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),
 });
-
-/**
- * Query parameters for GET /credentials. `credentialType` stays a plain
- * optional string (empty and whitespace values remain accepted, flowing
- * through as the exact-match filter they always were; an unknown type is a
- * 200 empty page, not an error). Merged ahead of pagination (ADR-037).
- */
-export const listCredentialsQuerySchema = z
-  .object({
-    credentialType: z.string().optional(),
-    isPublished: booleanQuerySchema,
-  })
-  .merge(paginationQuerySchema);
 
 /**
  * Request body for POST /credentials/verify, porting the route's previous

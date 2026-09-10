@@ -1,12 +1,6 @@
 import { TextDecoder } from 'node:util';
 import { NextResponse } from 'next/server';
-import {
-  ValidationError,
-  parseRequestBody,
-  parseQueryParams,
-  assertPublicUrl,
-  assertHttpUrl,
-} from '@/lib/api/validation';
+import { ValidationError, parseRequestBody, assertPublicUrl, assertHttpUrl } from '@/lib/api/validation';
 import { ConflictError } from '@/lib/api/errors';
 import {
   IDEMPOTENCY_KEY_HELD_ELSEWHERE_MESSAGE,
@@ -16,8 +10,9 @@ import {
 } from '@/lib/api/idempotency';
 import { readRequestBytes } from '@/lib/api/request-body';
 import { CoreCredentialType, IdempotencyOperation } from '@/lib/prisma/generated';
-import { credentialIssueRequestSchema, listCredentialsQuerySchema } from '@/lib/api/request-schemas/credential';
+import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
+import { retiredRoute } from '@/lib/api/retired-route';
 import { resolveAppUrl, buildVerifyUrl } from '@/lib/config/app-url.config';
 import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
 import { apiLogger } from '@/lib/api/logger';
@@ -25,12 +20,10 @@ import { getOrMintCorrelationId } from '@uncefact/untp-ri-services/logging';
 import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
 import { validateCredentialPayload } from '@/lib/credentials/validate-credential-payload';
 import { issueCredential } from '@/lib/credentials/issue-credential';
-import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 import { coreCredentialTypeOf } from '@/lib/library/core-credential-type';
 import { schemaLoader } from '@/lib/credentials/schema-loader';
 import {
   updateCredentialPublished,
-  listCredentials,
   getDidByDid,
   findConformitySchemeByCanonicalId,
   claimIdempotencyKey,
@@ -39,7 +32,6 @@ import {
   releaseIdempotencyKey,
 } from '@/lib/prisma/repositories';
 import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
-import { buildPaginatedResponse } from '@/lib/api/pagination';
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
@@ -780,105 +772,49 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   return NextResponse.json(response, { status: 201 });
 });
 
-// ---------------------------------------------------------------------------
-// GET /api/v1/credentials
-// ---------------------------------------------------------------------------
-
 /**
  * @swagger
  * /credentials:
  *   get:
- *     summary: List credentials
+ *     operationId: listCredentialsRetired
+ *     summary: 'RETIRED: use GET /api/v1/library'
+ *     deprecated: true
  *     description: |
- *       Returns a paginated, filterable list of credentials scoped to
- *       the authenticated tenant.
+ *       Retired with no deprecation window. Authentication and tenant
+ *       resolution run before retirement. Query parameters do not change
+ *       the retirement response. Use GET /api/v1/library.
+ *       See the migration guide at `/docs/migration-guides/ri-v0.5`.
  *     tags:
  *       - Credentials
- *     parameters:
- *       - in: query
- *         name: credentialType
- *         schema:
- *           type: string
- *         description: Filter by credential type (case-sensitive exact match)
- *       - in: query
- *         name: isPublished
- *         schema:
- *           type: string
- *           enum: ["true", "false"]
- *         description: Filter by published status
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           minimum: 1
- *         description: Number of credentials to return per page. Defaults to 20 unless the deployment maximum is lower. Values above the deployment maximum are rejected with a 400 naming the maximum.
- *       - in: query
- *         name: offset
- *         schema:
- *           type: integer
- *           minimum: 0
- *           default: 0
- *         description: Number of credentials to skip for pagination
  *     responses:
- *       200:
- *         description: Paginated list of credentials
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               required:
- *                 - data
- *                 - pagination
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Credential'
- *                 pagination:
- *                   $ref: '#/components/schemas/PaginationMeta'
- *       400:
- *         description: Validation error (malformed or repeated query parameter, non-integer or out-of-range pagination value, or non-boolean isPublished)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
  *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
+ *       410:
+ *         description: |
+ *           This route has been retired. Use GET /api/v1/library instead.
+ *           Returned after authentication and tenant resolution succeed.
+ *         headers:
+ *           Cache-Control:
+ *             description: Prevents caching of the retirement response.
+ *             schema:
+ *               type: string
+ *               enum: [no-store]
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               retired:
+ *                 value:
+ *                   error: This route has been retired. Use GET /api/v1/library instead.
+ *                   code: ROUTE_RETIRED
  *       500:
- *         description: Server error
+ *         description: 'The request could not be completed and the response body is sanitised.'
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const GET = withTenantAuth(async (req, { tenantId }) => {
-  const url = new URL(req.url);
-
-  logger.info('Parsing query filters');
-  const { credentialType, isPublished, limit, offset } = parseQueryParams(url, listCredentialsQuerySchema);
-
-  logger.info({ filters: { credentialType, isPublished, limit, offset } }, 'Querying credentials from database');
-  const { data, total } = await listCredentials({
-    tenantId,
-    credentialType,
-    isPublished,
-    limit,
-    offset,
-  });
-
-  logger.info({ count: data.length }, 'Credentials listed');
-  const credentials = data.map((credential) => {
-    try {
-      return { ...credential, decryptionKey: revealDecryptionKey(credential.decryptionKey) };
-    } catch (error) {
-      // The underlying message names the operator's encryption key, so it
-      // stays in the log; the caller gets the sanitised 500 every other
-      // unhandled failure returns (ADR-036).
-      logger.error({ err: error, credentialId: credential.id }, 'Failed to reveal a stored decryption key');
-      throw new Error('Failed to read a stored credential', { cause: error });
-    }
-  });
-  return NextResponse.json(buildPaginatedResponse(credentials, total, limit, offset));
-});
+export const GET = withTenantAuth(async () => retiredRoute('GET /api/v1/library'));

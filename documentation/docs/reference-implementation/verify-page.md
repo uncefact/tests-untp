@@ -96,4 +96,4 @@ The entered key is used for the current attempt only and is never persisted: it 
 
 If decryption fails, the message distinguishes what can be fixed. A key that does not match the credential can be re-entered, although a credential whose stored ciphertext has been tampered with produces the same failure, since AES-GCM cannot tell the two apart. If the stored envelope itself is corrupted, the page says so rather than asking for the key again.
 
-The issuing tenant can retrieve a credential's decryption key from `GET /api/v1/credentials/{id}` (see [Credentials API](./api/credentials)).
+The issuing tenant can retrieve a credential's decryption key from `GET /api/v1/library/{id}` (see [Library API](./api/library#retrieve-one-library-record)).

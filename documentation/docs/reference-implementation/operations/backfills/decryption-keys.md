@@ -58,7 +58,15 @@ A completed run reports how many keys it wrapped and how many were already prote
 - **Rows deleted mid-run.** A credential removed while the backfill was working is skipped and reported, which is a benign race rather than a failure.
 - **An unproven key.** Whenever a run completes without an envelope to verify the key against, whether it wrapped rows under `--force` or had nothing to wrap, it says so and asks you to confirm a wrapped key decrypts correctly.
 
-After a run, confirm a wrapped key still round-trips by retrieving a credential through the API (`GET /api/v1/credentials/{id}`) and checking its decryption key behaves as before.
+After a run that wrapped keys, re-run the [encryption audit](../encryption-audit). A clean report is the proof that `DATA_ENCRYPTION_KEY` unwraps the values this run wrapped; any envelope the audit cannot open is a failure. If the audit reports that nothing existed to verify, the key remains unproven.
+
+As an optional per-record spot check, choose a known encrypted native record and request `GET /api/v1/library/{id}`.
+
+- A `200` response with a non-null `decryptionKey` means the key was revealed.
+- A `200` response with `hasKey: true`, `decryptionKey: null` and a `DECRYPTION_KEY_UNAVAILABLE` warning is a stored key the deployment key could not unwrap and is a failure.
+- `hasKey: false` is a record that holds no key.
+
+A row whose stored key is still legacy plaintext is returned as-is by this read and proves nothing about the deployment key, so the audit is the proof.
 
 A run that finishes its work exits 0, including one that reported deleted rows or proceeded under `--force`. It exits 1 when it skipped suspect rows, when it refused an unproven key, when the preflight could not decrypt a service instance configuration or a credential key, and when a write failed.
 
