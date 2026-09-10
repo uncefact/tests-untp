@@ -60,9 +60,9 @@ export { LIBRARY_VERIFY_JOB };
  * one attempt budget comes from `WORKER_JOB_TIMEOUT_SECONDS`, which is also
  * carried by the queue job and used for every bounded stage.
  */
-export const VERIFY_JOB_ENQUEUE_OPTIONS: EnqueueOptions = {
+export const VERIFY_JOB_ENQUEUE_OPTIONS = {
   retry: { limit: 4, backoffSeconds: 30, backoffMaxSeconds: 600 },
-};
+} satisfies EnqueueOptions;
 
 const logger = apiLogger.child({ module: 'verify-generation-job' });
 
@@ -96,7 +96,7 @@ const settleableReferenceSchema = z.object({ tenantId: z.string().min(1), checkR
 /** The largest stored copy this worker will read back into memory. */
 const MAX_STORED_COPY_BYTES = 16 * 1024 * 1024;
 
-/** Leaves time for the guarded settlement write, and its follow-up read when that write matched nothing, before the queue expires an attempt. */
+/** The settlement is one guarded write; ten seconds is an order of magnitude above its measured time in the integration suites. */
 const SETTLEMENT_MARGIN_MS = 10_000;
 
 class VerificationStageTimeout extends Error {
@@ -502,6 +502,14 @@ async function runStoredCopyChecks(
     conformance = { result: CheckResult.NOT_RUN, message: null };
   } else {
     try {
+      // The advisory check runs before the blocking verifier and shares its
+      // remaining budget. An attempt normally completes in a small fraction
+      // of the 300-second default, so it cannot starve the verifier in
+      // practice; if it does, the attempt fails transiently and retries on
+      // the ladder.
+      // The deadline guard stops new schema or context loads after the
+      // budget, while this outer race also bounds work already in flight,
+      // including a cache-warm expansion.
       conformance = await withTimeout(
         deps.checkSchemaConformance({
           recordId: record.record.id,

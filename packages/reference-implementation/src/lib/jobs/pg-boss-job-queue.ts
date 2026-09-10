@@ -81,6 +81,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
 
   constructor(options: PgBossJobQueueOptions) {
     validateRetry(options.defaultRetry, 'defaultRetry');
+    // The adapter is a library boundary and validates its own inputs even when the application caller already did.
     validateExpireSeconds(options.defaultExpireSeconds, 'defaultExpireSeconds');
     this.boss = new PgBoss({
       connectionString: options.connectionString,

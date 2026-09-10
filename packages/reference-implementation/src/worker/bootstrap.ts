@@ -155,6 +155,8 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
     heartbeat = startHeartbeat({
       logger,
       probe: () => queue.probe(),
+      // The health window must outlast the longest legitimate job by the
+      // heartbeat sampling interval, with slack.
       maxJobMs: readWorkerJobTimeoutSeconds() * 1_000 + 60_000,
     });
   }
