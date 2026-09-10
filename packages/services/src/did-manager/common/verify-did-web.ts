@@ -51,36 +51,49 @@ const C = DidVerificationCheckName;
  *
  * @see https://w3c-ccg.github.io/did-method-web/
  * @see https://www.w3.org/TR/did-1.0/
+ *
+ * A trusted caller may set `allowPrivateUrls` to permit private resolution
+ * targets used by local deployments. The resolver still applies its other
+ * validation and redirect protections.
  */
-export async function verifyDidWeb(did: string): Promise<MethodVerificationResult> {
+export async function verifyDidWeb(
+  did: string,
+  options: { allowPrivateUrls?: boolean } = {},
+): Promise<MethodVerificationResult> {
   const checks: DidVerificationCheck[] = [];
   let document: DidDocument | null = null;
 
   const url = didWebToUrl(did);
+  const resolverOptions =
+    options.allowPrivateUrls === undefined ? undefined : { allowPrivateAddresses: options.allowPrivateUrls };
 
-  // The pre-fetch guard is what turns a private target into the explicit
-  // "not permitted" verification outcome below; resolveJsonDocument would
-  // also reject it, but as a generic resolution failure.
-  try {
-    await validatePublicUrl(url);
-  } catch (error) {
-    // Only the guard's own error hierarchy is a verification outcome;
-    // anything else is a programming error and must surface as one rather
-    // than masquerade as a failed check.
-    if (!(error instanceof UrlValidationError)) throw error;
-    const message =
-      error instanceof PrivateHostnameError || error instanceof PrivateAddressError
-        ? 'Private or localhost URLs are not permitted for DID resolution'
-        : `DID resolution URL rejected: ${error.message}`;
-    checks.push({ name: C.RESOLVE, passed: false, message });
-    checks.push({ name: C.HTTPS, passed: false, message: 'Could not verify HTTPS (resolution blocked)' });
-    return { document, checks };
+  // When private URLs are not allowed, this pre-fetch guard turns a private
+  // target into the explicit "not permitted" verification outcome below;
+  // resolveJsonDocument would also reject it, but as a generic resolution
+  // failure.
+  if (options.allowPrivateUrls !== true) {
+    try {
+      await validatePublicUrl(url);
+    } catch (error) {
+      // Only the guard's own error hierarchy is a verification outcome;
+      // anything else is a programming error and must surface as one rather
+      // than masquerade as a failed check.
+      if (!(error instanceof UrlValidationError)) throw error;
+      const message =
+        error instanceof PrivateHostnameError || error instanceof PrivateAddressError
+          ? 'Private or localhost URLs are not permitted for DID resolution'
+          : `DID resolution URL rejected: ${error.message}`;
+      checks.push({ name: C.RESOLVE, passed: false, message });
+      checks.push({ name: C.HTTPS, passed: false, message: 'Could not verify HTTPS (resolution blocked)' });
+      return { document, checks };
+    }
   }
 
   // Check 1: Resolve — fetch the DID document over the pinned transport.
   let finalUrl: string | null = null;
   try {
-    const result = await resolveJsonDocument(url);
+    const result =
+      resolverOptions === undefined ? await resolveJsonDocument(url) : await resolveJsonDocument(url, resolverOptions);
     finalUrl = result.finalUrl;
     document = result.json as DidDocument;
     checks.push({ name: C.RESOLVE, passed: true });

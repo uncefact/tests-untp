@@ -184,6 +184,20 @@ describe('verifyDid', () => {
     expect(keyCheck?.message).toBe('No provider keys to compare');
   });
 
+  it('passes allowPrivateUrls to the did:web method verifier', async () => {
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument, 'https://127.0.0.1/did.json'));
+
+    const result = await verifyDid('did:web:127.0.0.1', {
+      providerKeys: [],
+      allowPrivateUrls: true,
+    });
+
+    expect(result.checks.find((c) => c.name === C.RESOLVE)?.passed).toBe(true);
+    expect(mockResolveJsonDocument).toHaveBeenCalledWith('https://127.0.0.1/.well-known/did.json', {
+      allowPrivateAddresses: true,
+    });
+  });
+
   it('runs key_material check when providerKeys provided and keys match', async () => {
     mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument));
 

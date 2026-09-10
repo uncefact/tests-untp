@@ -28,6 +28,7 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 const mockResolveDidService = jest.fn();
 const mockGetDidById = jest.fn();
 const mockUpdateDidStatus = jest.fn();
+const mockReadFetchAllowPrivateUrlsIfSet = jest.fn();
 
 jest.mock('@uncefact/untp-ri-services', () => ({
   ...jest.requireActual('@uncefact/untp-ri-services'),
@@ -42,6 +43,10 @@ jest.mock('@uncefact/untp-ri-services', () => ({
 
 jest.mock('@/lib/services/resolve-did-service', () => ({
   resolveDidService: (...args: unknown[]) => mockResolveDidService(...args),
+}));
+
+jest.mock('@/lib/config/credential-fetch.config', () => ({
+  readFetchAllowPrivateUrlsIfSet: (...args: unknown[]) => mockReadFetchAllowPrivateUrlsIfSet(...args),
 }));
 
 jest.mock('@/lib/prisma/repositories', () => ({
@@ -73,6 +78,7 @@ describe('POST /api/v1/dids/:id/verify', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockResolveDidService.mockResolvedValue({ service: mockDidService, instanceId: 'inst-1' });
+    mockReadFetchAllowPrivateUrlsIfSet.mockReturnValue(undefined);
   });
 
   it('verifies a DID and updates status to VERIFIED', async () => {
@@ -134,6 +140,20 @@ describe('POST /api/v1/dids/:id/verify', () => {
     await POST(createFakeRequest(), createContext('did-1') as unknown as Parameters<typeof POST>[1]);
 
     expect(mockDidService.verify).toHaveBeenCalledWith('did:web:example.com');
+  });
+
+  it('passes the configured private-url allowance to didService.verify', async () => {
+    mockReadFetchAllowPrivateUrlsIfSet.mockReturnValue(true);
+    mockGetDidById.mockResolvedValue({ id: 'did-1', did: 'did:web:vckit.e2e.internal:dids:one' });
+    mockDidService.verify.mockResolvedValue({ verified: true, checks: [] });
+    mockUpdateDidStatus.mockResolvedValue({ id: 'did-1', status: 'VERIFIED' });
+
+    await POST(createFakeRequest(), createContext('did-1') as unknown as Parameters<typeof POST>[1]);
+
+    expect(mockReadFetchAllowPrivateUrlsIfSet).toHaveBeenCalledWith(process.env);
+    expect(mockDidService.verify).toHaveBeenCalledWith('did:web:vckit.e2e.internal:dids:one', {
+      allowPrivateUrls: true,
+    });
   });
 
   it('resolves the DID service with the stored serviceInstanceId', async () => {

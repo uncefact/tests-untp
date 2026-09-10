@@ -131,7 +131,7 @@ export interface IDidService {
   /** Get the full DID Document */
   getDocument(did: string): Promise<DidDocument>;
   /** Verify a DID and its document against a series of checks */
-  verify(did: string): Promise<DidVerificationResult>;
+  verify(did: string, options?: { allowPrivateUrls?: boolean }): Promise<DidVerificationResult>;
   /** DID types this adapter supports */
   getSupportedTypes(): DidType[];
   /** DID methods this adapter supports */

@@ -267,6 +267,7 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       expect(machineLink.linkType).to.eq('gs1:verificationService');
       expect(machineLink.mimeType).to.eq('text/plain');
       expect(machineLink.accessRole ?? []).to.have.length(0);
+      expect(machineLink).to.not.have.property('encryptionMethod');
 
       const credentialLink = links.find((l: any) => l.mimeType === 'application/json');
       expect(credentialLink, 'credential link').to.exist;
@@ -274,12 +275,14 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       expect(credentialLink.linkType).to.eq('untp:dpp');
       expect(credentialLink.targetUrl).to.be.a('string').and.not.eq(MACHINE_VERIFICATION_URL);
       expect(credentialLink.accessRole).to.have.members(ACCESS_ROLES);
+      expect(credentialLink.encryptionMethod).to.eq('AES-256');
 
       const humanLink = links.find((l: any) => l.mimeType === 'text/html');
       expect(humanLink, 'human verification link').to.exist;
       expect(humanLink.linkType).to.eq('untp:dpp');
       expect(humanLink.targetUrl).to.include('/verify');
       expect(humanLink.accessRole).to.have.members(ACCESS_ROLES);
+      expect(humanLink).to.not.have.property('encryptionMethod');
     });
   });
 

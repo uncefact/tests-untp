@@ -245,6 +245,20 @@ describe('verifyDidWeb', () => {
     expect(result.checks.map((c) => c.name)).toEqual([C.RESOLVE, C.HTTPS]);
   });
 
+  it('resolves a private target when allowPrivateUrls is enabled', async () => {
+    mockResolveJsonDocument.mockResolvedValueOnce(resolvedDoc(validDidDocument, 'https://127.0.0.1/did.json'));
+
+    const result = await verifyDidWeb('did:web:127.0.0.1', { allowPrivateUrls: true });
+
+    expect(result.document).toEqual(validDidDocument);
+    expect(result.checks.find((c) => c.name === C.RESOLVE)?.passed).toBe(true);
+    expect(result.checks.find((c) => c.name === C.HTTPS)?.passed).toBe(true);
+    expect(mockValidatePublicUrl).not.toHaveBeenCalled();
+    expect(mockResolveJsonDocument).toHaveBeenCalledWith('https://127.0.0.1/.well-known/did.json', {
+      allowPrivateAddresses: true,
+    });
+  });
+
   describe('SSRF protection', () => {
     it('blocks localhost URLs', async () => {
       useRealGuardOnce();

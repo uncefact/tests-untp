@@ -181,6 +181,10 @@ describe('DID API', { testIsolation: false }, () => {
         expect(response.body).to.not.have.property('ok');
         expect(response.body.verification).to.exist;
         expect(response.body.verification.checks).to.be.an('array');
+        expect(response.body.verification.verified).to.eq(true);
+        const httpsCheck = response.body.verification.checks.find((check: any) => check.name === 'https');
+        expect(httpsCheck).to.exist;
+        expect(httpsCheck.passed).to.eq(true);
         expect(response.body.did).to.exist;
         expect(response.body.did.id).to.eq(createdDidId);
       });

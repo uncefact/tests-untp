@@ -12,11 +12,16 @@ import { DidInputError } from '../errors.js';
 export interface VerifyDidOptions {
   /** Keys from the DID provider, used for the key_material check. */
   providerKeys: Array<{ kid: string }>;
+  /** Permit private or reserved did:web resolution targets for trusted local deployments. */
+  allowPrivateUrls?: boolean;
 }
 
 // ── Method verifier registry ────────────────────────────────────────────────
 
-type MethodVerifier = (did: string) => Promise<MethodVerificationResult>;
+type MethodVerifier = (
+  did: string,
+  options?: Pick<VerifyDidOptions, 'allowPrivateUrls'>,
+) => Promise<MethodVerificationResult>;
 
 const methodVerifiers: Record<string, MethodVerifier> = {
   web: verifyDidWeb,
@@ -49,7 +54,7 @@ export async function verifyDid(did: string, options: VerifyDidOptions): Promise
   let document: DidDocument | null = null;
   const checks: DidVerificationCheck[] = [];
 
-  const methodResult = await verifier(did);
+  const methodResult = await verifier(did, { allowPrivateUrls: options.allowPrivateUrls });
   document = methodResult.document;
   checks.push(...methodResult.checks);
 
