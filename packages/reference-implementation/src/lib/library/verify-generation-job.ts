@@ -96,7 +96,7 @@ const settleableReferenceSchema = z.object({ tenantId: z.string().min(1), checkR
 /** The largest stored copy this worker will read back into memory. */
 const MAX_STORED_COPY_BYTES = 16 * 1024 * 1024;
 
-/** The settlement is one guarded write; ten seconds is an order of magnitude above its measured time in the integration suites. */
+/** Leaves time for the guarded settlement write, and its follow-up read when that write matched nothing, before the queue expires an attempt. The settlement is one guarded write; ten seconds is an order of magnitude above its measured time in the integration suites. */
 const SETTLEMENT_MARGIN_MS = 10_000;
 
 class VerificationStageTimeout extends Error {
