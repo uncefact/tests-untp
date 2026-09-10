@@ -26,7 +26,7 @@ Keep API-only specs on that placeholder. Application pages start browser session
 
 ## Local Testing (Docker Compose)
 
-No `.env.e2e` file is needed — all defaults in `cypress.config.ts` and `cypress/support/config.ts` point to the local Docker Compose services.
+No `.env.e2e` file is needed. All defaults in `cypress.config.ts` and `cypress/support/config.ts` point to the local Docker Compose services.
 
 Ensure you have completed the [prerequisites](../../../README.md#prerequisites) in the root README before running.
 
@@ -87,7 +87,7 @@ To run E2E tests against deployed instances of the RI and Playground (e.g. stagi
    - The RI's OIDC redirect URI must be registered in the IDP client configuration (e.g. `https://your-ri.example.com/api/auth/callback/zitadel`).
    - **Two test users** with passwords (for multi-user tenant tests).
    - **Two service accounts** with client credentials (for API auth tests).
-   - All test users and service accounts must be in a **dedicated test group** (e.g. `org-e2e`) — not a group containing real data. Tests clean up all resource data within the test tenant.
+   - All test users and service accounts must be in a **dedicated test group** (e.g. `org-e2e`), not a group containing real data. Tests clean up all resource data within the test tenant.
    - For closed mode tenant isolation tests, a second group is needed (e.g. `org-e2e-beta`) with one SA assigned to each group.
    - For **Zitadel**: set `E2E_IDP_AUDIENCE` to the project ID so service account tokens include the `groups` claim.
 
@@ -115,7 +115,7 @@ Tests are designed to be safe to run against deployed instances, including produ
 
 #### What tests clean up
 
-- **Per-spec cleanup** (`before`/`after` hooks): Each spec deletes all resource data (credentials, DIDs, services, products, facilities, etc.) from the test tenant via direct DB operations. In closed mode, the tenant record itself is preserved — only the data within it is deleted.
+- **Per-spec cleanup** (`before`/`after` hooks): Each spec deletes all resource data (credentials, DIDs, services, products, facilities, etc.) from the test tenant via direct DB operations. In closed mode, the tenant record itself is preserved. Only the data within it is deleted.
 - **User cleanup** (`before` hooks): Test user and OAuth Account records are deleted before each spec to prevent `OAuthAccountNotLinked` errors from stale sessions.
 - **Service account cleanup**: The service account test specs clean up their own auto-provisioned SA users and associated tenants via the `cleanupServiceAccountData` task.
 - **Global cleanup** (`after:run`): After all specs complete, Cypress runs a final cleanup that removes:
@@ -139,6 +139,8 @@ All variables and their defaults are set in [`cypress.config.ts`](./cypress.conf
 | Variable                            | Purpose                                                                                                                                                            | Default                                                                     |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
 | `CYPRESS_BASE_URL`                  | RI application URL                                                                                                                                                 | `http://localhost:3003`                                                     |
+| `E2E_VCKIT_BASE_URL`                | VCKit base URL stored in e2e service instances                                                                                                                     | `https://vckit.e2e.internal`                                                |
+| `E2E_VCKIT_DID_WEB_RESOLVABLE`      | Declares whether the configured VCKit instance can resolve `did:web` documents over HTTPS during signing                                                           | `true`                                                                      |
 | `E2E_IDP_PROVIDER`                  | `keycloak` or `zitadel`                                                                                                                                            | `keycloak`                                                                  |
 | `E2E_IDP_BASE_URL`                  | Identity provider URL                                                                                                                                              | `http://localhost:8081`                                                     |
 | `E2E_IDP_AUDIENCE`                  | Zitadel project ID (Zitadel only)                                                                                                                                  | (none)                                                                      |
@@ -156,6 +158,8 @@ Eight spec cases still call `Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')`. This is 
 
 ### did:web and HTTPS
 
-Some credential issuance tests (issuing with a tenant-created DID, issuing with a DID on a non-primary VC service instance) require VCKit to resolve `did:web` DID documents during signing. The `did:web` specification requires HTTPS, so these tests are **automatically skipped** when the VCKit base URL is not HTTPS (i.e. in the local Docker Compose environment where VCKit runs on `http://vckit-api:3332`).
+The RI e2e Compose stack places VCKit behind the `vckit-tls` Caddy service. It serves `https://vckit.e2e.internal`, trusts the committed test CA inside VCKit, the RI app, the worker, and the Playground, and proxies every path to `vckit-api:3332`.
 
-These tests run when VCKit is deployed with a publicly resolvable HTTPS domain (e.g. `https://vckit.example.com`). The remaining DID ownership enforcement tests (system default DID issuance, cross-tenant rejection, fabricated DID rejection) run in all environments.
+The `services.vckit.didWebResolvable` capability controls the two issuance tests that need VCKit to resolve a tenant-owned `did:web` document during signing. The Compose default is `true`. Set `CYPRESS_VCKIT_DID_WEB_RESOLVABLE=false` to skip both tests for an instance that cannot provide this capability. Cypress parses the `CYPRESS_` value as JSON, so use a boolean value rather than the string `"false"`.
+
+The remaining DID ownership enforcement tests, including system default issuance, cross-tenant rejection, and fabricated DID rejection, run in all environments.

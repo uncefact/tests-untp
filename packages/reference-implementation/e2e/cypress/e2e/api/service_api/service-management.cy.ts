@@ -33,7 +33,7 @@ describe('Service API', { testIsolation: false }, () => {
   });
 
   describe('CRUD operations', () => {
-    it('POST /api/v1/services — creates a service instance', () => {
+    it('POST /api/v1/services: creates a service instance', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/services',
@@ -58,7 +58,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/services — lists service instances including the created one', () => {
+    it('GET /api/v1/services: lists service instances including the created one', () => {
       cy.request('/api/v1/services').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -72,7 +72,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/services/:id — retrieves a specific service instance', () => {
+    it('GET /api/v1/services/:id: retrieves a specific service instance', () => {
       cy.request(`/api/v1/services/${createdServiceId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(createdServiceId);
@@ -83,7 +83,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/services/:id — masks sensitive config fields', () => {
+    it('GET /api/v1/services/:id: masks sensitive config fields', () => {
       cy.request(`/api/v1/services/${createdServiceId}`).then((response) => {
         const serviceConfig = response.body.config;
         expect(serviceConfig).to.be.an('object');
@@ -92,7 +92,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/services/:id — updates service name', () => {
+    it('PATCH /api/v1/services/:id: updates service name', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/services/${createdServiceId}`,
@@ -103,7 +103,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/services/:id — updates description', () => {
+    it('PATCH /api/v1/services/:id: updates description', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/services/${createdServiceId}`,
@@ -114,7 +114,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/services/:id — merges config preserving existing fields', () => {
+    it('PATCH /api/v1/services/:id: merges config preserving existing fields', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/services/${createdServiceId}`,
@@ -132,7 +132,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/services/:id — confirms all updates persisted', () => {
+    it('GET /api/v1/services/:id: confirms all updates persisted', () => {
       cy.request(`/api/v1/services/${createdServiceId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`Updated E2E VC Service ${RUN_ID}`);
@@ -141,7 +141,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/services/:id — deletes the service instance', () => {
+    it('DELETE /api/v1/services/:id: deletes the service instance', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/services/${createdServiceId}`,
@@ -150,7 +150,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/services/:id — returns 409 when instance has references', () => {
+    it('DELETE /api/v1/services/:id: returns 409 when instance has references', () => {
       // Create a service instance that will be referenced by a DID
       cy.request({
         method: 'POST',
@@ -180,7 +180,7 @@ describe('Service API', { testIsolation: false }, () => {
         }).then((didRes) => {
           const didId = didRes.body.id;
 
-          // Attempt to delete without force — should get 409
+          // Attempt to delete without force. It should get 409.
           cy.request({
             method: 'DELETE',
             url: `/api/v1/services/${refServiceId}`,
@@ -191,7 +191,7 @@ describe('Service API', { testIsolation: false }, () => {
             expect(deleteRes.body.error).to.include('DID(s)');
           });
 
-          // Delete with force=true — should succeed
+          // Delete with force=true. It should succeed.
           cy.request({
             method: 'DELETE',
             url: `/api/v1/services/${refServiceId}?force=true`,
@@ -210,7 +210,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/services/:id — returns 404 after deletion', () => {
+    it('GET /api/v1/services/:id: returns 404 after deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/services/${createdServiceId}`,
@@ -251,7 +251,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('creates a second primary — first should be demoted', () => {
+    it('creates a second primary: first should be demoted', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/services',
@@ -313,7 +313,7 @@ describe('Service API', { testIsolation: false }, () => {
       cy.request('/api/v1/services?serviceType=VC').then((response) => {
         expect(response.status).to.eq(200);
         const systemVc = response.body.data.find((s: ServiceInstance) => s.id === SYSTEM_VC_SERVICE_ID);
-        // No tenant primary exists yet — system default should be primary
+        // No tenant primary exists yet. The system default should be primary.
         expect(systemVc).to.exist;
         expect(systemVc.isPrimary).to.be.true;
       });
@@ -355,7 +355,7 @@ describe('Service API', { testIsolation: false }, () => {
       cy.request('/api/v1/services?serviceType=STORAGE').then((response) => {
         expect(response.status).to.eq(200);
         const systemStorage = response.body.data.find((s: ServiceInstance) => s.id === SYSTEM_STORAGE_SERVICE_ID);
-        // Tenant has no STORAGE primary — system default stays primary
+        // Tenant has no STORAGE primary. The system default stays primary.
         expect(systemStorage).to.exist;
         expect(systemStorage.isPrimary).to.be.true;
       });
@@ -457,29 +457,50 @@ describe('Service API', { testIsolation: false }, () => {
     });
 
     it('supports pagination with limit and offset', () => {
-      cy.request('/api/v1/services?limit=1&offset=0').then((firstPage) => {
-        expect(firstPage.status).to.eq(200);
-        expect(firstPage.body.data.length).to.be.at.most(1);
-        expect(firstPage.body.pagination.offset).to.eq(0);
+      const paginationService = (name: string) => ({
+        serviceType: 'VC',
+        adapterType: 'VCKIT',
+        name,
+        config: {
+          baseUrl: config.services.vckit.baseUrl,
+          apiKey: config.services.vckit.apiKey,
+        },
+      });
 
-        if (firstPage.body.data.length === 1) {
-          const firstId = firstPage.body.data[0].id;
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/services',
+        body: paginationService(`E2E Pagination First ${RUN_ID}`),
+      }).then((firstCreate) => {
+        expect(firstCreate.status).to.eq(201);
 
-          cy.request('/api/v1/services?limit=1&offset=1').then((secondPage) => {
-            expect(secondPage.status).to.eq(200);
-            expect(secondPage.body.pagination.offset).to.eq(1);
-            if (secondPage.body.data.length === 1) {
-              expect(secondPage.body.data[0].id).to.not.eq(firstId);
-            }
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/services',
+          body: paginationService(`E2E Pagination Second ${RUN_ID}`),
+        }).then((secondCreate) => {
+          expect(secondCreate.status).to.eq(201);
+
+          cy.request('/api/v1/services?limit=1&offset=0').then((firstPage) => {
+            expect(firstPage.status).to.eq(200);
+            expect(firstPage.body.data).to.have.length(1);
+            expect(firstPage.body.pagination.offset).to.eq(0);
+
+            cy.request('/api/v1/services?limit=1&offset=1').then((secondPage) => {
+              expect(secondPage.status).to.eq(200);
+              expect(secondPage.body.data).to.have.length(1);
+              expect(secondPage.body.pagination.offset).to.eq(1);
+              expect(secondPage.body.data[0].id).to.not.eq(firstPage.body.data[0].id);
+            });
           });
-        }
+        });
       });
     });
 
     it('includes system default service instances', () => {
       cy.request('/api/v1/services').then((response) => {
         expect(response.status).to.eq(200);
-        // System defaults are seeded at startup — at least one should exist
+        // System defaults are seeded at startup. At least one should exist.
         expect(response.body.data.length).to.be.greaterThan(0);
         expect(response.body.pagination.total).to.be.greaterThan(0);
       });
@@ -656,7 +677,7 @@ describe('Service API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/services/:id — returns 400 when config.baseUrl points to a private address', function () {
+    it('PATCH /api/v1/services/:id: returns 400 when config.baseUrl points to a private address', function () {
       if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
 
       // Create a temporary service to test PATCH SSRF validation

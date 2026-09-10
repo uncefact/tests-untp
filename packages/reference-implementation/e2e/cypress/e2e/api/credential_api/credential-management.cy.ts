@@ -101,9 +101,9 @@ describe('Credential API', { testIsolation: false }, () => {
         defaultDidValue = defaultDid.did;
       });
 
-      // Create a tenant-owned MANAGED DID (only when VCKit has an HTTPS
-      // endpoint — did:web resolution requires HTTPS for signing)
-      if (config.services.vckit.baseUrl.startsWith('https://')) {
+      // Create a tenant-owned MANAGED DID when the configured instance can
+      // resolve did:web documents over HTTPS during signing.
+      if (config.services.vckit.didWebResolvable) {
         cy.request({
           method: 'POST',
           url: '/api/v1/dids',
@@ -145,11 +145,9 @@ describe('Credential API', { testIsolation: false }, () => {
     });
 
     // Signing with a tenant-created managed DID requires VCKit to resolve
-    // the did:web document over HTTPS. In Docker CI the VCKit domain is an
-    // internal hostname over HTTP, so did:web resolution fails. Skip when
-    // VCKit is not on an HTTPS endpoint.
+    // the did:web document over HTTPS during signing.
     it('issues a credential using a tenant-owned DID', function () {
-      if (!config.services.vckit.baseUrl.startsWith('https://')) this.skip();
+      if (!config.services.vckit.didWebResolvable) this.skip();
 
       cy.request({
         method: 'POST',
@@ -159,10 +157,29 @@ describe('Credential API', { testIsolation: false }, () => {
           credentialType: 'DigitalProductPassport',
           version: '0.6.1',
         },
-      }).then((response) => {
-        expect(response.status).to.eq(201);
-        expect(response.body.credentialId).to.be.a('string');
-      });
+      })
+        .then((response) => {
+          expect(response.status).to.eq(201);
+          const credentialId = response.body.credentialId;
+          expect(credentialId).to.be.a('string');
+          return cy.request(`/api/v1/library/${credentialId}`);
+        })
+        .then((libraryResponse) => {
+          expect(libraryResponse.status).to.eq(200);
+          return cy.request({
+            method: 'POST',
+            url: '/api/v1/credentials/verify',
+            body: {
+              uri: libraryResponse.body.storageUri,
+              digestMultibase: libraryResponse.body.digestMultibase,
+              decryptionKey: libraryResponse.body.decryptionKey,
+            },
+          });
+        })
+        .then((verifyResponse) => {
+          expect(verifyResponse.status).to.eq(200);
+          expect(verifyResponse.body.verified).to.be.true;
+        });
     });
 
     it('rejects issuance with a DID belonging to another tenant', () => {
@@ -197,9 +214,9 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
-    // Same did:web HTTPS constraint as the tenant-owned DID test above.
+    // The secondary service uses the same declared did:web capability.
     it('issues a credential using a DID on a non-primary VC service instance', function () {
-      if (!config.services.vckit.baseUrl.startsWith('https://')) this.skip();
+      if (!config.services.vckit.didWebResolvable) this.skip();
       cy.request({
         method: 'POST',
         url: '/api/v1/services',
@@ -254,7 +271,7 @@ describe('Credential API', { testIsolation: false }, () => {
   // Issue and retrieve
   // -----------------------------------------------------------------------
   describe('Issue and retrieve credentials', () => {
-    it('POST /api/v1/credentials — issues an encrypted credential', () => {
+    it('POST /api/v1/credentials: issues an encrypted credential', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',
@@ -287,7 +304,7 @@ describe('Credential API', { testIsolation: false }, () => {
   // Issuance options
   // -----------------------------------------------------------------------
   describe('Issuance options', () => {
-    it('POST /api/v1/credentials — storageOptions.encrypt=false stores without encryption', () => {
+    it('POST /api/v1/credentials: storageOptions.encrypt=false stores without encryption', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',
@@ -310,7 +327,7 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/credentials — publishingOptions.publish=true issues and publishes', () => {
+    it('POST /api/v1/credentials: publishingOptions.publish=true issues and publishes', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',
@@ -339,7 +356,7 @@ describe('Credential API', { testIsolation: false }, () => {
   // v0.6.0 credential issuance
   // -----------------------------------------------------------------------
   describe('v0.6.0 credential issuance', () => {
-    it('POST /api/v1/credentials — issues a v0.6.0 DPP credential', () => {
+    it('POST /api/v1/credentials: issues a v0.6.0 DPP credential', () => {
       const payload = {
         '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'],
         id: `urn:uuid:e2e-v060-dpp-${RUN_ID}`,
@@ -369,7 +386,7 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/credentials — issues a v0.6.0 DCC credential', () => {
+    it('POST /api/v1/credentials: issues a v0.6.0 DCC credential', () => {
       const uniqueSuffix = `${RUN_ID}-${Math.random().toString(36).slice(2, 8)}`;
       const payload = {
         '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/'],

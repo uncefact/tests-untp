@@ -3,7 +3,7 @@
  *
  * Reads values from Cypress.env() which are populated by the env block
  * in cypress.config.ts. Do NOT import this file from cypress.config.ts
- * or any Node.js task — those should read from config.env.* directly.
+ * or any Node.js task. Those should read from config.env.* directly.
  */
 export const config = {
   idp: {
@@ -36,6 +36,7 @@ export const config = {
     vckit: {
       baseUrl: Cypress.env('VCKIT_BASE_URL') as string,
       apiKey: Cypress.env('VCKIT_API_KEY') as string,
+      didWebResolvable: Cypress.env('VCKIT_DID_WEB_RESOLVABLE') as boolean,
     },
     storage: {
       baseUrl: Cypress.env('STORAGE_BASE_URL') as string,

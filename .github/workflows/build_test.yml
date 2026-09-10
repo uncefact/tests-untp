@@ -12,7 +12,7 @@ on:
   # only caches written from the base branch are shared across PRs
   # targeting it.
   # All other jobs (qa matrix, e2e image builds, e2e runs) are PR-only
-  # via job-level `if:` guards below — re-running them post-merge adds
+  # via job-level `if:` guards below. Re-running them post-merge adds
   # no signal because the PR already validated the same code.
   push:
     branches:
@@ -587,19 +587,37 @@ jobs:
         run: |
           echo "--- Waiting up to 180s for app on http://localhost:3003 and playground on http://localhost:4000 ---"
           deadline=$(($(date +%s) + 180))
+          worker_health=""
           while [ $(date +%s) -lt $deadline ]; do
             app_ok=0
             pg_ok=0
             curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null && app_ok=1
             curl -sS -o /dev/null -m 2 http://localhost:4000 2>/dev/null && pg_ok=1
-            if [ "$app_ok" = 1 ] && [ "$pg_ok" = 1 ]; then
-              echo "--- Both services responding ---"
+            worker_container=$(docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground ps -q app-worker)
+            if [ -n "$worker_container" ]; then
+              worker_health=$(docker inspect --format '{{.State.Health.Status}}' "$worker_container" 2>/dev/null || true)
+            else
+              worker_health="not-found"
+            fi
+            if [ "$app_ok" = 1 ] && [ "$pg_ok" = 1 ] && [ "$worker_health" = "healthy" ]; then
+              echo "--- App, playground and app-worker are ready ---"
               break
             fi
             sleep 2
           done
           echo "--- Container status ---"
           docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground ps
+          worker_container=$(docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground ps -q app-worker)
+          if [ -n "$worker_container" ]; then
+            worker_health=$(docker inspect --format '{{.State.Health.Status}}' "$worker_container" 2>/dev/null || true)
+          else
+            worker_health="not-found"
+          fi
+          if [ "$worker_health" != "healthy" ]; then
+            echo "::error::app-worker did not become healthy within 180s (${{ matrix.mode }} mode, status: ${worker_health:-unknown})"
+            docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app-worker
+            exit 1
+          fi
           if ! curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
             echo "::error::App did not respond on :3003 within 180s (${{ matrix.mode }} mode)"
             docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app
@@ -620,7 +638,7 @@ jobs:
 
       - name: Dump RI and Playground container logs on failure
         if: failure() && steps.affected.outputs.result == 'true'
-        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app untp-playground
+        run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app untp-playground app-worker vckit-api vckit-tls
 
       - name: Upload Cypress artifacts on failure
         if: failure() && steps.affected.outputs.result == 'true'
@@ -635,7 +653,7 @@ jobs:
           retention-days: 7
 
       - name: Stop RI stack
-        if: steps.affected.outputs.result == 'true'
+        if: always() && steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground down -v
 
   e2e-playground:

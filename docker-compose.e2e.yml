@@ -14,18 +14,44 @@ services:
     volumes:
       - ./packages/untp-playground:/untp-playground
       - /untp-playground/node_modules
+      - ./packages/reference-implementation/e2e/tls/ca.crt:/certs/ca.crt:ro
     environment:
       - NODE_ENV=development
-      - VERIFICATION_SERVICE_URL=http://vckit-api:3332/agent/routeVerificationCredential
+      - NODE_EXTRA_CA_CERTS=/certs/ca.crt
+      - VERIFICATION_SERVICE_URL=https://vckit.e2e.internal/agent/routeVerificationCredential
       - VERIFICATION_SERVICE_TOKEN=test123
+    depends_on:
+      vckit-tls:
+        condition: service_started
+
+  vckit-tls:
+    image: caddy:2.8-alpine@sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17
+    profiles: ['ri', 'playground']
+    depends_on:
+      vckit-api:
+        condition: service_healthy
+    volumes:
+      - ./packages/reference-implementation/e2e/tls/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./packages/reference-implementation/e2e/tls/leaf.crt:/certs/leaf.crt:ro
+      - ./packages/reference-implementation/e2e/tls/leaf.key:/certs/leaf.key:ro
+    networks:
+      default:
+        aliases:
+          - vckit.e2e.internal
 
   vckit-api:
     image: ghcr.io/uncefact/project-vckit:sha-325b7e3@sha256:3623cd45cdb971ba16c6016a1e3ba153fe6920c2053275cd430e76ab75d5a563
     profiles: ['ri', 'playground']
     env_file:
       - local.env
+    environment:
+      - PROTOCOL=https
+      - API_DOMAIN=vckit.e2e.internal
+      - NODE_EXTRA_CA_CERTS=/certs/ca.crt
     ports:
       - 3332:3332
+    volumes:
+      - ./packages/reference-implementation/e2e/tls/ca.crt:/certs/ca.crt:ro
     depends_on:
       - db
     healthcheck:
@@ -121,9 +147,10 @@ services:
       - RI_DATABASE_URL=postgresql://ri-postgres:ri-postgres@e2e-ri-db:5432/ri?schema=public
       - RI_APP_URL=http://localhost:3003
       - DEFAULT_HUMAN_VERIFICATION_URL=http://localhost:3003/verify
-      - DEFAULT_MACHINE_VERIFICATION_URL=http://vckit-api:3332/agent/routeVerificationCredential
-      - VCKIT_API_URL=http://vckit-api:3332/v2
+      - DEFAULT_MACHINE_VERIFICATION_URL=https://vckit.e2e.internal/agent/routeVerificationCredential
+      - VCKIT_API_URL=https://vckit.e2e.internal/v2
       - VCKIT_API_KEY=test123
+      - NODE_EXTRA_CA_CERTS=/certs/ca.crt
       - DATA_ENCRYPTION_KEY=dd1b7430915155b51c503806031f31f901e85563035f65421d707f042c75f44b
       - AUTH_SECRET=e2e-super-secret-key-for-testing
       - AUTH_TRUST_HOST=true
@@ -151,12 +178,12 @@ services:
       # Read by this process as well as app-worker. Keep the value the same
       # across both services so one background-work budget is in force.
       - WORKER_JOB_TIMEOUT_SECONDS
-      # Tenant mode (default: open — override to "closed" for closed mode tests)
+      # Tenant mode (default: open; override to "closed" for closed mode tests)
       - TENANT_MODE=${TENANT_MODE:-open}
       - TENANT_CLAIM_NAME=${TENANT_CLAIM_NAME:-groups}
       - TENANT_CLAIM_FORMAT=${TENANT_CLAIM_FORMAT:-array_first}
       # System default service instances (used by seed.ts)
-      - SYSTEM_VC_BASE_URL=http://vckit-api:3332
+      - SYSTEM_VC_BASE_URL=https://vckit.e2e.internal
       - SYSTEM_VC_API_KEY=test123
       - SYSTEM_VC_ADAPTER_TYPE=VCKIT
       - SYSTEM_VC_API_VERSION=1.0.0
@@ -180,11 +207,14 @@ services:
       - SYSTEM_DID_DESCRIPTION=System-wide default DID for E2E testing
     volumes:
       - ./examples/seed:/app/seed/custom:ro
+      - ./packages/reference-implementation/e2e/tls/ca.crt:/certs/ca.crt:ro
     extra_hosts:
       - 'localhost:host-gateway'
     depends_on:
       vckit-api:
         condition: service_healthy
+      vckit-tls:
+        condition: service_started
       storage-service:
         condition: service_started
       e2e-keycloak:
@@ -210,15 +240,20 @@ services:
     environment:
       - RI_DATABASE_URL=postgresql://ri-postgres:ri-postgres@e2e-ri-db:5432/ri?schema=public
       - DATA_ENCRYPTION_KEY=dd1b7430915155b51c503806031f31f901e85563035f65421d707f042c75f44b
+      - NODE_EXTRA_CA_CERTS=/certs/ca.crt
       - OTEL_SERVICE_NAME=reference-implementation-worker
       - LIBRARY_RECONCILE_PENDING_RUNS_CRON=${LIBRARY_RECONCILE_PENDING_RUNS_CRON:-}
       - LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE=${LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE:-}
       - WORKER_JOB_TIMEOUT_SECONDS
     extra_hosts:
       - 'localhost:host-gateway'
+    volumes:
+      - ./packages/reference-implementation/e2e/tls/ca.crt:/certs/ca.crt:ro
     depends_on:
       vckit-api:
         condition: service_healthy
+      vckit-tls:
+        condition: service_started
       e2e-ri-db:
         condition: service_healthy
 

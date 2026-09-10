@@ -19,9 +19,8 @@ describe('Data Model API', { testIsolation: false }, () => {
     // Find a core data model to use as parent for extension tests
     cy.request('/api/v1/data-models').then((response) => {
       const core = response.body.data.find((dm: any) => !dm.isExtension);
-      if (core) {
-        parentConfigId = core.id;
-      }
+      expect(core, 'a seeded core data model').to.exist;
+      parentConfigId = core.id;
     });
   });
 
@@ -31,7 +30,7 @@ describe('Data Model API', { testIsolation: false }, () => {
   });
 
   describe('Listing core data models', () => {
-    it('GET /api/v1/data-models — lists data models including system defaults', () => {
+    it('GET /api/v1/data-models: lists data models including system defaults', () => {
       cy.request('/api/v1/data-models').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -41,7 +40,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models — filters by credentialType', () => {
+    it('GET /api/v1/data-models: filters by credentialType', () => {
       cy.request('/api/v1/data-models?credentialType=DigitalProductPassport').then((response) => {
         expect(response.status).to.eq(200);
         response.body.data.forEach((dm: any) => {
@@ -50,7 +49,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models — list items do not include extensions, renderTemplates, or parentConfig', () => {
+    it('GET /api/v1/data-models: list items do not include extensions, renderTemplates, or parentConfig', () => {
       cy.request('/api/v1/data-models').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array').that.is.not.empty;
@@ -62,9 +61,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models/:id — detail response includes parentConfig, extensions, and renderTemplates', function () {
-      if (!parentConfigId) this.skip();
-
+    it('GET /api/v1/data-models/:id: detail response includes parentConfig, extensions, and renderTemplates', function () {
       cy.request(`/api/v1/data-models/${parentConfigId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.have.property('parentConfig');
@@ -73,7 +70,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models — filters by version', () => {
+    it('GET /api/v1/data-models: filters by version', () => {
       cy.request('/api/v1/data-models?version=0.6.0').then((response) => {
         expect(response.status).to.eq(200);
         response.body.data.forEach((dm: any) => {
@@ -82,7 +79,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models — filters by isExtension=false', () => {
+    it('GET /api/v1/data-models: filters by isExtension=false', () => {
       cy.request('/api/v1/data-models?isExtension=false').then((response) => {
         expect(response.status).to.eq(200);
         response.body.data.forEach((dm: any) => {
@@ -93,9 +90,7 @@ describe('Data Model API', { testIsolation: false }, () => {
   });
 
   describe('CRUD operations on extensions', () => {
-    it('POST /api/v1/data-models — creates a data model extension', function () {
-      if (!parentConfigId) this.skip();
-
+    it('POST /api/v1/data-models: creates a data model extension', function () {
       cy.request({
         method: 'POST',
         url: '/api/v1/data-models',
@@ -118,9 +113,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/data-models — includes optional websiteUrl', function () {
-      if (!parentConfigId) this.skip();
-
+    it('POST /api/v1/data-models: includes optional websiteUrl', function () {
       cy.request({
         method: 'POST',
         url: '/api/v1/data-models',
@@ -137,12 +130,12 @@ describe('Data Model API', { testIsolation: false }, () => {
         expect(response.status).to.eq(201);
         expect(response.body.websiteUrl).to.eq(`https://example.com/e2e-dcc-${RUN_ID}`);
 
-        // Clean up — only keep the first extension for remaining tests
+        // Clean up. Only keep the first extension for remaining tests.
         cy.request({ method: 'DELETE', url: `/api/v1/data-models/${response.body.id}` });
       });
     });
 
-    it('GET /api/v1/data-models — includes newly created extension', function () {
+    it('GET /api/v1/data-models: includes newly created extension', function () {
       if (!createdDataModelId) this.skip();
 
       cy.request('/api/v1/data-models').then((response) => {
@@ -152,7 +145,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models — filters by isExtension=true', () => {
+    it('GET /api/v1/data-models: filters by isExtension=true', () => {
       cy.request('/api/v1/data-models?isExtension=true').then((response) => {
         expect(response.status).to.eq(200);
         response.body.data.forEach((dm: any) => {
@@ -161,7 +154,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models/:id — retrieves a specific data model', function () {
+    it('GET /api/v1/data-models/:id: retrieves a specific data model', function () {
       if (!createdDataModelId) this.skip();
 
       cy.request(`/api/v1/data-models/${createdDataModelId}`).then((response) => {
@@ -171,7 +164,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/data-models/:id — updates name', function () {
+    it('PATCH /api/v1/data-models/:id: updates name', function () {
       if (!createdDataModelId) this.skip();
 
       cy.request({
@@ -184,7 +177,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/data-models/:id — updates schemaUrl and contextUrl', function () {
+    it('PATCH /api/v1/data-models/:id: updates schemaUrl and contextUrl', function () {
       if (!createdDataModelId) this.skip();
 
       cy.request({
@@ -201,7 +194,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models/:id — confirms updates persisted', function () {
+    it('GET /api/v1/data-models/:id: confirms updates persisted', function () {
       if (!createdDataModelId) this.skip();
 
       cy.request(`/api/v1/data-models/${createdDataModelId}`).then((response) => {
@@ -211,7 +204,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models/:id/form-config — returns form configuration', function () {
+    it('GET /api/v1/data-models/:id/form-config: returns form configuration', function () {
       if (!createdDataModelId) this.skip();
 
       cy.request(`/api/v1/data-models/${createdDataModelId}/form-config`).then((response) => {
@@ -224,9 +217,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/data-models — accepts a custom credentialType for extensions', function () {
-      if (!parentConfigId) this.skip();
-
+    it('POST /api/v1/data-models: accepts a custom credentialType for extensions', function () {
       cy.request({
         method: 'POST',
         url: '/api/v1/data-models',
@@ -250,7 +241,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/data-models/:id — deletes the data model extension', function () {
+    it('DELETE /api/v1/data-models/:id: deletes the data model extension', function () {
       if (!createdDataModelId) this.skip();
 
       cy.request({
@@ -261,7 +252,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/data-models/:id — returns 404 after deletion', function () {
+    it('GET /api/v1/data-models/:id: returns 404 after deletion', function () {
       if (!createdDataModelId) this.skip();
 
       cy.request({
@@ -390,9 +381,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/data-models — created data model is always an extension regardless of isExtension in body', function () {
-      if (!parentConfigId) this.skip();
-
+    it('POST /api/v1/data-models: created data model is always an extension regardless of isExtension in body', function () {
       cy.request({
         method: 'POST',
         url: '/api/v1/data-models',
@@ -445,8 +434,6 @@ describe('Data Model API', { testIsolation: false }, () => {
     });
 
     it('returns 400 when PATCH body is empty', function () {
-      if (!parentConfigId) this.skip();
-
       // Create a temporary extension to test PATCH validation
       cy.request({
         method: 'POST',
@@ -496,8 +483,8 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/data-models — returns 400 when schemaUrl points to a private address', function () {
-      if (!parentConfigId || Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
+    it('POST /api/v1/data-models: returns 400 when schemaUrl points to a private address', function () {
+      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
 
       cy.request({
         method: 'POST',
@@ -517,8 +504,8 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/data-models — returns 400 when contextUrl points to a private address', function () {
-      if (!parentConfigId || Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
+    it('POST /api/v1/data-models: returns 400 when contextUrl points to a private address', function () {
+      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
 
       cy.request({
         method: 'POST',
@@ -538,8 +525,8 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/data-models/:id — returns 400 when schemaUrl points to a private address', function () {
-      if (!parentConfigId || Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
+    it('PATCH /api/v1/data-models/:id: returns 400 when schemaUrl points to a private address', function () {
+      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
 
       // Create a temporary extension to test PATCH validation
       cy.request({
@@ -571,8 +558,8 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/data-models/:id — returns 400 when contextUrl points to a private address', function () {
-      if (!parentConfigId || Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
+    it('PATCH /api/v1/data-models/:id: returns 400 when contextUrl points to a private address', function () {
+      if (Cypress.env('VERIFY_ALLOW_PRIVATE_URLS')) this.skip();
 
       cy.request({
         method: 'POST',
@@ -603,7 +590,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/data-models — returns 400 for invalid JSON body', () => {
+    it('POST /api/v1/data-models: returns 400 for invalid JSON body', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/data-models',
@@ -616,7 +603,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/data-models — returns 404 for nonexistent parentConfigId', () => {
+    it('POST /api/v1/data-models: returns 404 for nonexistent parentConfigId', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/data-models',
@@ -634,7 +621,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/data-models/:id — returns 404 for nonexistent data model', () => {
+    it('PATCH /api/v1/data-models/:id: returns 404 for nonexistent data model', () => {
       cy.request({
         method: 'PATCH',
         url: '/api/v1/data-models/nonexistent-id',
@@ -645,7 +632,7 @@ describe('Data Model API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/data-models/:id — returns 404 for nonexistent data model', () => {
+    it('DELETE /api/v1/data-models/:id: returns 404 for nonexistent data model', () => {
       cy.request({
         method: 'DELETE',
         url: '/api/v1/data-models/nonexistent-id',
