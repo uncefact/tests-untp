@@ -111,13 +111,16 @@ describe('published POST /library/{id}/verify contract', () => {
     });
   });
 
-  it('describes the superseded outcome and the unobservable unwrap failure', () => {
+  it('describes the superseded outcome and how the detail poll reports an unlockable key', () => {
     // Both are states a caller reaches and cannot otherwise account for: a
-    // request that did no work, and a settled generation the detail poll
-    // answers with a server error.
+    // request that did no work, and a settled generation whose held key cannot
+    // be returned, which the detail poll now names on the record itself rather
+    // than answering with a server error.
     const description = oneLine(operation.description);
     expect(description).toContain('changed while it was being prepared');
-    expect(description).toContain('uncefact/tests-untp/issues/769');
+    expect(description).toContain('DECRYPTION_KEY_UNAVAILABLE');
+    expect(description).not.toContain('sanitised `500`');
+    expect(description).not.toContain('issues/769');
   });
 
   it('carries the freshness pair into the published record component', () => {

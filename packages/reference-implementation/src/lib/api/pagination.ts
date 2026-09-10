@@ -104,21 +104,43 @@ export interface PaginatedResponse<T> {
   pagination: PaginationMeta;
 }
 
+/**
+ * Wraps a page of rows with its pagination meta.
+ *
+ * `options.consumedCount` is how many rows the page CONSUMED from `total`,
+ * including any the route left out of `data`. It defaults to `data.length`,
+ * which is correct for every route that returns each row it selected. A route
+ * that reports some selected rows outside `data`, as the library reads do
+ * through their `failures` array, MUST pass `data.length + failures.length`
+ * (ADR-057 decision 6). Omitting it there under-counts what the page consumed,
+ * so an exhausted final page reports `hasMore: true` and the client asks for
+ * one more page that comes back empty. The error only ever runs that way: an
+ * under-count can never report `hasMore: false` prematurely, so no record is
+ * silently dropped from a paged walk.
+ *
+ * It is taken as an option rather than as a fifth number beside `limit` and
+ * `offset` so that a call which omits `offset` cannot place it there instead:
+ * three consecutive optional numbers make that transposition compile, and the
+ * page it produces reports a wrong `offset` and the very `hasMore` this
+ * argument exists to correct.
+ */
 export function buildPaginatedResponse<T>(
   data: T[],
   total: number,
   limit?: number,
   offset?: number,
+  options?: { consumedCount?: number },
 ): PaginatedResponse<T> {
   const effectiveLimit = limit ?? DEFAULT_PAGE_LIMIT;
   const effectiveOffset = offset ?? 0;
+  const consumedCount = options?.consumedCount ?? data.length;
   return {
     data,
     pagination: {
       total,
       limit: effectiveLimit,
       offset: effectiveOffset,
-      hasMore: effectiveOffset + data.length < total,
+      hasMore: effectiveOffset + consumedCount < total,
     },
   };
 }

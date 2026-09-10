@@ -199,6 +199,13 @@ describe('buildPaginatedResponse', () => {
       },
     });
   });
+
+  it('uses the consumed page count when failures make data shorter than the page', () => {
+    expect(buildPaginatedResponse([{ id: 'readable' }], 20, 20, 0, { consumedCount: 20 }).pagination.hasMore).toBe(
+      false,
+    );
+    expect(buildPaginatedResponse([], 40, 20, 0, { consumedCount: 20 }).pagination.hasMore).toBe(true);
+  });
 });
 
 describe('paginateInMemory', () => {

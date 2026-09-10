@@ -37,6 +37,18 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
             schema: { type: 'string' },
           },
         },
+        // Declared once and referenced by the operations whose published
+        // messages tell a caller to quote it. The middleware sets the header
+        // on every /api/v1 response; an operation that instructs a caller to
+        // read a header must also document that the header exists, or a
+        // client generated from this document has nowhere to read it from.
+        headers: {
+          CorrelationId: {
+            description:
+              'The correlation id used for this request and stamped on the per-record degradation log events. An `x-correlation-id` request header is kept only when it passes the validation the logging operations page describes; otherwise it is replaced, by a valid load balancer trace root when one is available and by a generated id when it is not. Quote this response header when reporting a failure, because it is the value an operator searches on.',
+            schema: { type: 'string' },
+          },
+        },
         // Shared responses. Auth 401/403 are referenced from each JSDoc
         // block. 413 is declared here and attached to every operation that
         // accepts a request body (see attachPayloadTooLargeResponses).

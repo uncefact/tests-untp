@@ -54,6 +54,14 @@ async function postAsOwner(body: unknown): Promise<{ response: Response; body: R
   return { response, body: (await response.json()) as Record<string, unknown> };
 }
 
+async function postAsOwnerText(body: unknown): Promise<{ status: number; text: string }> {
+  const response = await post(request(body), {
+    params: Promise.resolve({}),
+    tenantId: OWNER_TENANT_ID,
+  });
+  return { status: response.status, text: await response.text() };
+}
+
 async function appendFailedGeneration(recordId: string, generation: number): Promise<void> {
   await prisma.checkRun.create({
     data: {
@@ -88,7 +96,7 @@ afterAll(async () => {
 });
 
 describe('POST /library/batch-get against migrated Postgres', () => {
-  it('returns both origins in [b, missing, a, b, foreign] order while omitting duplicates, missing and foreign ids', async () => {
+  it('returns both origins and accounts for missing and foreign ids in first-appearance order', async () => {
     const nativeId = (
       await insertNativeCredential(prisma, {
         id: 'library-batch-native',
@@ -107,19 +115,80 @@ describe('POST /library/batch-get against migrated Postgres', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect((body.data as { id: string }[]).map(({ id }) => id)).toEqual([externalId, nativeId]);
+    expect(body.failures).toEqual([
+      { id: 'library-batch-missing', code: 'NOT_FOUND', message: 'No such credential record.' },
+      { id: foreignId, code: 'NOT_FOUND', message: 'No such credential record.' },
+    ]);
   });
 
-  it('omits a foreign id indistinguishably from a missing id and returns an all-missing empty array', async () => {
+  it('reports a foreign id indistinguishably from a missing id and returns an all-missing failure list', async () => {
     await insertNativeCredential(prisma, { id: 'library-batch-foreign', tenantId: OTHER_TENANT_ID });
 
     const mixed = await postAsOwner({ ids: ['library-batch-foreign', 'library-batch-missing'] });
     expect(mixed.response.status).toBe(200);
-    expect(mixed.body).toEqual({ data: [] });
+    expect(mixed.body).toEqual({
+      data: [],
+      failures: [
+        { id: 'library-batch-foreign', code: 'NOT_FOUND', message: 'No such credential record.' },
+        { id: 'library-batch-missing', code: 'NOT_FOUND', message: 'No such credential record.' },
+      ],
+    });
     expect(mixed.response.headers.get('cache-control')).toBe('no-store');
 
     const empty = await postAsOwner({ ids: ['library-batch-missing-a', 'library-batch-missing-b'] });
     expect(empty.response.status).toBe(200);
-    expect(empty.body).toEqual({ data: [] });
+    expect(empty.body).toEqual({
+      data: [],
+      failures: [
+        { id: 'library-batch-missing-a', code: 'NOT_FOUND', message: 'No such credential record.' },
+        { id: 'library-batch-missing-b', code: 'NOT_FOUND', message: 'No such credential record.' },
+      ],
+    });
+  });
+
+  it('answers a foreign id with the same bytes as an id that does not exist', async () => {
+    // The two responses must be indistinguishable to the caller, so the
+    // witness compares the raw response text for one id before and after the
+    // record exists under another tenant. Comparing parsed objects would let
+    // a difference in field order pass as equal while a caller diffing the
+    // bodies could still probe for existence.
+    const probedId = 'library-batch-existence-probe';
+
+    const absent = await postAsOwnerText({ ids: [probedId] });
+    await insertNativeCredential(prisma, { id: probedId, tenantId: OTHER_TENANT_ID });
+    const foreign = await postAsOwnerText({ ids: [probedId] });
+
+    expect(absent.status).toBe(200);
+    expect(foreign.status).toBe(absent.status);
+    expect(foreign.text).toBe(absent.text);
+  });
+
+  it('returns a stored row it cannot represent as RECORD_UNREADABLE beside the rows it can', async () => {
+    // Against real rows rather than a repository double: a native record with
+    // a stored generation 1 breaks the read model's own invariant, and only
+    // the database can put the code in that state.
+    const readable = await insertExternalCredential(prisma, OWNER_TENANT_ID);
+    const damaged = (
+      await insertNativeCredential(prisma, {
+        id: 'library-batch-damaged',
+        tenantId: OWNER_TENANT_ID,
+        checkRun: { generation: 1 },
+      })
+    ).id;
+
+    const { response, body } = await postAsOwner({ ids: [readable, damaged, 'library-batch-missing'] });
+
+    expect(response.status).toBe(200);
+    expect((body.data as { id: string }[]).map(({ id }) => id)).toEqual([readable]);
+    expect(body.failures).toEqual([
+      {
+        id: damaged,
+        code: 'RECORD_UNREADABLE',
+        message: expect.stringContaining('x-correlation-id response header'),
+      },
+      { id: 'library-batch-missing', code: 'NOT_FOUND', message: 'No such credential record.' },
+    ]);
+    expect(JSON.stringify(body.data)).not.toContain('decryptionKey');
   });
 
   it('returns the newest failed generation after an older verified generation', async () => {
@@ -214,7 +283,7 @@ describe('POST /library/batch-get against migrated Postgres', () => {
     }
   });
 
-  it('drops a NUL-bearing id while returning a valid id', async () => {
+  it('reports a NUL-bearing id as NOT_FOUND while returning a valid id', async () => {
     const id = await insertNativeCredential(prisma, {
       id: 'library-batch-nul-valid',
       tenantId: OWNER_TENANT_ID,
@@ -224,6 +293,9 @@ describe('POST /library/batch-get against migrated Postgres', () => {
 
     expect(response.status).toBe(200);
     expect((body.data as { id: string }[]).map(({ id: returnedId }) => returnedId)).toEqual([id.id]);
+    expect(body.failures).toEqual([
+      { id: 'library-batch-bad\0id', code: 'NOT_FOUND', message: 'No such credential record.' },
+    ]);
   });
 
   it('returns all five ids in request order at the maximum and rejects six duplicate submissions before deduplication', async () => {

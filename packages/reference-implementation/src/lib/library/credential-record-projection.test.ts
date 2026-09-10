@@ -12,6 +12,11 @@ import {
   type ExternalCredential,
   type LibraryRecord,
 } from '@/lib/prisma/generated';
+import {
+  DecryptionKeyEnvelopeMalformedError,
+  DecryptionKeyUnwrapError,
+  EncryptionServiceUnavailableError,
+} from '@/lib/credentials/decryption-key-protection';
 import type { ExternalCredentialRecord } from '@/lib/prisma/repositories/external-credential.repository';
 import type { NativeLibraryRecordView } from './library-record-view';
 import {
@@ -25,8 +30,10 @@ import {
   toNativeCredentialRecord,
   toCredentialRecord,
   verificationEnvelopeSchema,
+  type KeyUnavailableCause,
   type VerificationChecks,
 } from './credential-record-projection';
+import { StructuredError } from '@uncefact/untp-utils';
 
 const NOW = new Date('2026-09-03T12:00:00.000Z');
 
@@ -924,19 +931,53 @@ describe('credentialRecordDetailSchema and toCredentialRecordDetail', () => {
   });
 
   it.each([
-    ['at the start of the value', '{"cipherText":"broken"}'],
-    // JSON parsing accepts whitespace before the brace, so a padded corrupt
-    // envelope is corrupt too and must not reach the revealer as plaintext.
-    ['after leading whitespace', '\n  {"cipherText":"broken"}'],
-  ])('checks an envelope-shaped stored key %s before calling the revealer', (_name, storedKey) => {
-    const reveal = jest.fn((): string => 'should-not-return');
-    expect(() =>
-      toCredentialRecordDetail(nativeRecord({ credential: { decryptionKey: storedKey } }), {
-        now: NOW,
-        reveal,
+    ['native', nativeRecord({ credential: { decryptionKey: '{"cipherText":"broken"}' } })],
+    [
+      'external',
+      record({
+        external: {
+          storageUri: 'https://storage.example/external/credential-a',
+          decryptionKey: '{"cipherText":"broken"}',
+        },
       }),
-    ).toThrow(CredentialRecordProjectionError);
+    ],
+  ])('returns a warning for a malformed envelope on a %s record without calling the revealer', (_name, view) => {
+    const reveal = jest.fn((): string => 'should-not-return');
+    const projected = toCredentialRecordDetail(view, { now: NOW, reveal });
+
+    expect(projected).toMatchObject({
+      hasKey: true,
+      decryptionKey: null,
+      warnings: [
+        {
+          code: 'DECRYPTION_KEY_UNAVAILABLE',
+          message: expect.stringContaining('x-correlation-id response header'),
+        },
+      ],
+    });
     expect(reveal).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing deployment key configuration', new Error('Missing required DATA_ENCRYPTION_KEY environment variable.')],
+    ['a failed unwrap', new Error('Failed to decrypt the stored credential decryption key.')],
+  ])('returns a warning for %s on both record origins', (_name, failure) => {
+    for (const view of [
+      nativeRecord({ credential: { decryptionKey: 'stored-envelope' } }),
+      record({
+        external: { storageUri: 'https://storage.example/external/credential-a', decryptionKey: 'stored-envelope' },
+      }),
+    ]) {
+      const reveal = jest.fn(() => {
+        throw failure;
+      });
+      const projected = toCredentialRecordDetail(view, { now: NOW, reveal });
+
+      expect(projected.hasKey).toBe(true);
+      expect(projected.decryptionKey).toBeNull();
+      expect(projected.warnings.filter(({ code }) => code === 'DECRYPTION_KEY_UNAVAILABLE')).toHaveLength(1);
+      expect(reveal).toHaveBeenCalledWith('stored-envelope');
+    }
   });
 
   it.each([
@@ -950,6 +991,193 @@ describe('credentialRecordDetailSchema and toCredentialRecordDetail', () => {
   ])('rejects the illegal detail combination %s', (_name, custody) => {
     const base = toCredentialRecord(record(), { now: NOW });
     expect(credentialRecordDetailSchema.safeParse({ ...base, ...custody }).success).toBe(false);
+  });
+
+  it.each([
+    [
+      'a held key with no copy location, even carrying the warning',
+      { decryptionKey: null, hasKey: true, storageUri: null, digestMultibase: null },
+    ],
+    [
+      'the warning on a record that holds no key',
+      { decryptionKey: null, hasKey: false, storageUri: 'https://storage.example/copy', digestMultibase: 'zStorage' },
+    ],
+    [
+      'the warning beside a key that was returned',
+      { decryptionKey: 'key', hasKey: true, storageUri: 'https://storage.example/copy', digestMultibase: 'zStorage' },
+    ],
+  ])('rejects %s', (_name, custody) => {
+    // Each is a custody claim the caller could not falsify: a key with nowhere
+    // to use it, a warning about a key the record says it does not hold, and a
+    // warning contradicting the key beside it (ADR-057 decision 4, rules b, d
+    // and e). Deleting any of those three superRefine clauses fails here.
+    const base = toCredentialRecord(record(), { now: NOW });
+    const warning = {
+      code: 'DECRYPTION_KEY_UNAVAILABLE' as const,
+      message: 'The stored key could not be returned.',
+    };
+
+    expect(credentialRecordDetailSchema.safeParse({ ...base, ...custody, warnings: [warning] }).success).toBe(false);
+  });
+
+  it('keeps the warnings the keyless projection already carried beside the key warning', () => {
+    // DUPLICATE_CONTENT holds the only pointer a caller has to the record this
+    // one matches, and an unavailable key is exactly when a caller reads the
+    // detail route. Building the detail warnings as only the key warning
+    // passes every other test in this file.
+    const view = record({
+      external: {
+        duplicateOfRecordId: 'canonical-record',
+        storageUri: 'https://storage.example/external/credential-a',
+        storageDigestMultibase: 'zStorage',
+        decryptionKey: '{"cipherText":"broken"}',
+      },
+    });
+
+    const projected = toCredentialRecordDetail(view, {
+      now: NOW,
+      reveal: () => {
+        throw new Error('the revealer must not be called for a malformed envelope');
+      },
+    });
+
+    expect(projected).toMatchObject({ hasKey: true, decryptionKey: null });
+    expect(projected.warnings).toContainEqual({
+      code: 'DUPLICATE_CONTENT',
+      message: 'The credential content matches record canonical-record.',
+      relatedRecordId: 'canonical-record',
+    });
+    expect(projected.warnings.filter(({ code }) => code === 'DECRYPTION_KEY_UNAVAILABLE')).toHaveLength(1);
+  });
+
+  it.each([
+    ['malformed-envelope', '{"cipherText":"broken"}', null, 'credentials.decryption-key-envelope-malformed'],
+    [
+      'unwrap-failed',
+      'stored-envelope',
+      new DecryptionKeyUnwrapError(new Error('auth tag mismatch')),
+      'credentials.decryption-key-unwrap',
+    ],
+    [
+      'key-configuration',
+      'stored-envelope',
+      new EncryptionServiceUnavailableError(new Error('Missing required DATA_ENCRYPTION_KEY environment variable.')),
+      'credentials.encryption-service-unavailable',
+    ],
+    // Classification is positive, so a fault the revealer has never raised
+    // before must not be reported as the deployment's key configuration and
+    // send an operator to re-check a variable that is not at fault. A bare
+    // Error carrying the very sentence the resolver uses is the discriminating
+    // case: text alone would have named this key-configuration.
+    ['unclassified', 'stored-envelope', new Error('Missing required DATA_ENCRYPTION_KEY environment variable.'), null],
+  ])('reports %s to its caller rather than swallowing the cause', (reason, stored, failure, errorCode) => {
+    // A deployment whose wrapping key is gone and a single damaged row give
+    // the caller the same 200, so the route's one event is where the operator
+    // separates them. Discarding the cause here makes that impossible.
+    const causes: unknown[] = [];
+    const view = record({
+      external: {
+        storageUri: 'https://storage.example/external/credential-a',
+        storageDigestMultibase: 'zStorage',
+        decryptionKey: stored,
+      },
+    });
+
+    const projected = toCredentialRecordDetail(view, {
+      now: NOW,
+      reveal: () => {
+        if (failure === null) throw new Error('the revealer must not be called for a malformed envelope');
+        throw failure;
+      },
+      onKeyUnavailable: (cause) => causes.push(cause),
+    });
+
+    expect(projected).toMatchObject({ hasKey: true, decryptionKey: null });
+    expect(causes).toHaveLength(1);
+    expect(causes[0]).toMatchObject({ reason });
+    expect((causes[0] as { error: Error }).error.message).not.toBe('');
+    if (failure !== null) expect((causes[0] as { error: unknown }).error).toBe(failure);
+    // Every classified reason hands the route an error carrying its own code,
+    // so the operator event can be alerted on by code and not by message text.
+    // `unclassified` is the only reason that may arrive without one.
+    const carried = (causes[0] as { error: unknown }).error;
+    expect(carried instanceof StructuredError ? carried.code : null).toBe(errorCode);
+  });
+
+  it('synthesises the malformed-envelope cause as its own error class', () => {
+    // The route reads `errorCode` off the class, so a plain Error here would
+    // silently drop the code from that one reason's event.
+    const causes: KeyUnavailableCause[] = [];
+    const view = record({
+      external: {
+        storageUri: 'https://storage.example/external/credential-a',
+        storageDigestMultibase: 'zStorage',
+        decryptionKey: '{"cipherText":"broken"}',
+      },
+    });
+
+    toCredentialRecordDetail(view, {
+      now: NOW,
+      reveal: () => {
+        throw new Error('the revealer must not be called for a malformed envelope');
+      },
+      onKeyUnavailable: (cause) => causes.push(cause),
+    });
+
+    expect(causes[0].error).toBeInstanceOf(DecryptionKeyEnvelopeMalformedError);
+  });
+
+  it('does not call back when the held key is returned', () => {
+    const onKeyUnavailable = jest.fn();
+    const view = record({
+      external: {
+        storageUri: 'https://storage.example/external/credential-a',
+        storageDigestMultibase: 'zStorage',
+        decryptionKey: 'stored-envelope',
+      },
+    });
+
+    const projected = toCredentialRecordDetail(view, {
+      now: NOW,
+      reveal: () => 'revealed-key',
+      onKeyUnavailable,
+    });
+
+    expect(projected.decryptionKey).toBe('revealed-key');
+    expect(projected.warnings.filter(({ code }) => code === 'DECRYPTION_KEY_UNAVAILABLE')).toHaveLength(0);
+    expect(onKeyUnavailable).not.toHaveBeenCalled();
+  });
+
+  it('rejects two DECRYPTION_KEY_UNAVAILABLE warnings instead of checking only their presence', () => {
+    const base = toCredentialRecord(
+      record({ external: { storageUri: 'https://storage.example/external/credential-a' } }),
+      { now: NOW },
+    );
+    const warning = {
+      code: 'DECRYPTION_KEY_UNAVAILABLE' as const,
+      message: 'The stored key could not be returned.',
+    };
+
+    expect(
+      credentialRecordDetailSchema.safeParse({
+        ...base,
+        hasKey: true,
+        storageUri: 'https://storage.example/external/credential-a',
+        digestMultibase: 'zStorage',
+        decryptionKey: null,
+        warnings: [warning, warning],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects the detail-only warning on the keyless record schema', () => {
+    const keyless = toCredentialRecord(record(), { now: NOW });
+    expect(
+      credentialRecordSchema.safeParse({
+        ...keyless,
+        warnings: [{ code: 'DECRYPTION_KEY_UNAVAILABLE', message: 'The stored key could not be returned.' }],
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects a native detail without storageUri', () => {

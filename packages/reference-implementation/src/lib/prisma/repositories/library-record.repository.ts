@@ -22,6 +22,8 @@ import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { withDeadlockRetry } from './check-run.repository';
 import { apiLogger } from '@/lib/api/logger';
 import { promoteExternalCredentialDigest } from './external-credential.repository';
+import { LibraryRecordSelectionError } from '@/lib/library/library-read-errors';
+import { StructuredError } from '@uncefact/untp-utils';
 
 const LIBRARY_RECORD_INCLUDE = {
   credential: true,
@@ -64,10 +66,37 @@ export type ListLibraryRecordsOptions = {
 type LibraryListSqlRow = { id: string | null; newestRunId: string | null; total: bigint | number };
 type LibraryRecordSelection = { id: string; newestRunId: string | null };
 
-export class LibraryRecordListError extends Error {
+export type LibraryRecordHydrationFailure = { id: string; error: unknown };
+export type LibraryRecordHydrationResult = {
+  data: LibraryRecordDetailView[];
+  failures: LibraryRecordHydrationFailure[];
+  /**
+   * The ids this read selected, in selection order. It looks redundant against
+   * the union of the data and failure ids, and it is not: once outcomes split
+   * across two arrays there is nothing else that carries the order a page or a
+   * caller asked for (ADR-057 decision 9). Do not remove it as a cleanup.
+   */
+  selectedIds: string[];
+};
+
+/**
+ * A list query's own invariant failed: an unsupported sort, an anchored total
+ * that moved between rows or fell outside the safe integer range. Distinct
+ * from `LibraryRecordSelectionError`, declared in
+ * `src/lib/library/library-read-errors.ts` because both this repository and
+ * the read-results helper raise it, which is about the rows that came back not
+ * matching the ids that were selected. This one stays here because only the
+ * repository raises it. Both end at the same sanitised 500, because neither
+ * can be attributed to a single record.
+ */
+export class LibraryRecordListError extends StructuredError {
+  readonly reason = 'selection' as const;
+
   constructor(detail: string) {
-    super(`Library record list invariant failed: ${detail}`);
-    this.name = 'LibraryRecordListError';
+    super({
+      code: 'library.list-selection',
+      message: `Library record list invariant failed: ${detail}`,
+    });
   }
 }
 
@@ -314,8 +343,12 @@ async function hydrateLibraryRecords(
   tx: Prisma.TransactionClient,
   selected: readonly LibraryRecordSelection[],
   tenantId: string,
-): Promise<LibraryRecordDetailView[]> {
-  if (selected.length === 0) return [];
+): Promise<LibraryRecordHydrationResult> {
+  const selectedIds = selected.map(({ id }) => id);
+  if (new Set(selectedIds).size !== selectedIds.length) {
+    throw new LibraryRecordSelectionError('the selected ids contain a duplicate');
+  }
+  if (selected.length === 0) return { data: [], failures: [], selectedIds: [] };
   const ids = selected.map(({ id }) => id);
   const rows = await tx.libraryRecord.findMany({
     where: { tenantId, id: { in: [...ids] } },
@@ -324,42 +357,73 @@ async function hydrateLibraryRecords(
   const newestRunIds = selected.flatMap(({ newestRunId }) => (newestRunId === null ? [] : [newestRunId]));
   const checkRuns =
     newestRunIds.length === 0 ? [] : await tx.checkRun.findMany({ where: { id: { in: newestRunIds }, tenantId } });
+  const selectedIdSet = new Set(ids);
+  for (const checkRun of checkRuns) {
+    if (!selectedIdSet.has(checkRun.recordId)) {
+      throw new LibraryRecordSelectionError(
+        `check-run ${checkRun.id} belongs to unselected record ${checkRun.recordId}`,
+      );
+    }
+  }
   const runsByRecordId = new Map(checkRuns.map((checkRun) => [checkRun.recordId, checkRun]));
   const selectedById = new Map(selected.map((selection) => [selection.id, selection]));
   const byId = new Map<string, LibraryRecordDetailView>();
+  const failuresById = new Map<string, LibraryRecordHydrationFailure>();
   for (const row of rows) {
     const selection = selectedById.get(row.id);
     if (selection === undefined) {
-      throw new LibraryRecordShapeError(row.id, 'was returned during hydration but was not selected');
+      throw new LibraryRecordSelectionError(`record ${row.id} was returned during hydration but was not selected`);
     }
-    const view = narrowLibraryRecord(row);
-    const checkRun = selection.newestRunId === null ? null : runsByRecordId.get(row.id) ?? null;
-    if (selection.newestRunId !== null && (checkRun === null || checkRun.id !== selection.newestRunId)) {
-      throw new LibraryRecordShapeError(row.id, 'was selected with a newest check run that could not be hydrated');
+    if (byId.has(row.id) || failuresById.has(row.id)) {
+      throw new LibraryRecordSelectionError(`record ${row.id} was returned more than once during hydration`);
     }
-    if (view.origin === LibraryRecordOrigin.NATIVE) {
-      assertLibraryRecordCheckRun(view, checkRun);
-      byId.set(row.id, { ...view, checkRun });
-    } else {
-      assertLibraryRecordCheckRun(view, checkRun);
-      byId.set(row.id, { ...view, checkRun });
+    try {
+      const view = narrowLibraryRecord(row);
+      const checkRun = selection.newestRunId === null ? null : runsByRecordId.get(row.id) ?? null;
+      if (selection.newestRunId !== null && (checkRun === null || checkRun.id !== selection.newestRunId)) {
+        throw new LibraryRecordShapeError(row.id, 'was selected with a newest check run that could not be hydrated');
+      }
+      if (view.origin === LibraryRecordOrigin.NATIVE) {
+        assertLibraryRecordCheckRun(view, checkRun);
+        byId.set(row.id, { ...view, checkRun });
+      } else {
+        assertLibraryRecordCheckRun(view, checkRun);
+        byId.set(row.id, { ...view, checkRun });
+      }
+    } catch (error) {
+      failuresById.set(row.id, { id: row.id, error });
     }
   }
-  if (byId.size !== rows.length || byId.size !== ids.length) {
-    const missing = ids.find((id) => !byId.has(id));
-    throw new LibraryRecordShapeError(missing ?? 'unknown', 'was selected but could not be hydrated');
+  const missingIds = ids.filter((id) => !byId.has(id) && !failuresById.has(id));
+  // Unreachable by construction: the duplicate check above throws first, and
+  // each iteration of the loop writes exactly one of the two maps. Kept as a
+  // structural assertion, not a reachable outcome.
+  if (byId.size + failuresById.size !== rows.length) {
+    throw new LibraryRecordSelectionError('hydration cardinality could not be attributed to a selected id');
   }
-  return ids.map((id) => {
-    const view = byId.get(id);
-    if (view === undefined) throw new LibraryRecordShapeError(id, 'was selected but could not be hydrated');
-    return view;
-  });
+  for (const id of missingIds) {
+    failuresById.set(id, {
+      id,
+      error: new LibraryRecordShapeError(id, 'was selected but could not be hydrated'),
+    });
+  }
+  return {
+    data: ids.flatMap((id) => {
+      const view = byId.get(id);
+      return view === undefined ? [] : [view];
+    }),
+    failures: ids.flatMap((id) => {
+      const failure = failuresById.get(id);
+      return failure === undefined ? [] : [failure];
+    }),
+    selectedIds: ids,
+  };
 }
 
 /** Lists one tenant's records using the id query and same-transaction hydration. */
 export async function listLibraryRecords(
   options: ListLibraryRecordsOptions,
-): Promise<{ data: LibraryRecordDetailView[]; total: number }> {
+): Promise<LibraryRecordHydrationResult & { total: number }> {
   try {
     return await prisma.$transaction(
       async (tx) => {
@@ -372,7 +436,7 @@ export async function listLibraryRecords(
         const selected: LibraryRecordSelection[] = rows.flatMap((row) =>
           row.id === null ? [] : [{ id: row.id, newestRunId: row.newestRunId }],
         );
-        return { data: await hydrateLibraryRecords(tx, selected, options.tenantId), total };
+        return { ...(await hydrateLibraryRecords(tx, selected, options.tenantId)), total };
       },
       // The statement is unbenchmarked and has no effective-date expression index yet.
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, maxWait: 2_000, timeout: 5_000 },
@@ -530,16 +594,16 @@ export function buildLibraryBatchGetQuery(tenantId: string, ids: readonly string
 /**
  * Reads the requested tenant-owned records in one repeatable-read snapshot.
  * Exact duplicate ids are deduplicated in first-appearance order, and
- * NUL-bearing ids are dropped before SQL. Missing and foreign ids are omitted
- * by the tenant-scoped selection; a row selected there that cannot be hydrated
- * remains an invariant failure.
+ * NUL-bearing ids are dropped before SQL. Missing and foreign ids are absent
+ * from the tenant-scoped selection for the route to report as NOT_FOUND; a row
+ * selected there that cannot be hydrated is returned as a row-local failure.
  */
 export async function batchGetLibraryRecords(options: {
   tenantId: string;
   ids: readonly string[];
-}): Promise<LibraryRecordDetailView[]> {
+}): Promise<LibraryRecordHydrationResult> {
   const requestedIds = [...new Set(options.ids.filter((id) => !id.includes('\0')))];
-  if (requestedIds.length === 0) return [];
+  if (requestedIds.length === 0) return { data: [], failures: [], selectedIds: [] };
 
   try {
     return await prisma.$transaction(
@@ -547,6 +611,10 @@ export async function batchGetLibraryRecords(options: {
         const rows = await tx.$queryRaw<LibraryRecordSelection[]>(
           buildLibraryBatchGetQuery(options.tenantId, requestedIds),
         );
+        const returnedIds = rows.map(({ id }) => id);
+        if (new Set(returnedIds).size !== returnedIds.length || returnedIds.some((id) => !requestedIds.includes(id))) {
+          throw new LibraryRecordSelectionError('the batch selection returned a duplicate or unrequested id');
+        }
         const rowsById = new Map(rows.map((row) => [row.id, row]));
         const selected: LibraryRecordSelection[] = requestedIds.flatMap((id) => {
           const row = rowsById.get(id);

@@ -1748,12 +1748,11 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     expect(await jobsFor(native.id)).toHaveLength(0);
   });
 
-  it('settles a stored key that will not unwrap as retryable, and the detail projection then refuses the record', async () => {
-    // The interim mapping shared with #769. The caller is told to re-verify
-    // once access is restored, and cannot read that settled generation off the
-    // detail route until an operator restores the key. Fails if the unwrap
-    // failure is settled as proven loss, or if the detail projection quietly
-    // publishes a record whose key it could not open.
+  it('settles a stored key that will not unwrap as retryable, and the detail projection keeps the record readable', async () => {
+    // The worker still reports the copy as unavailable and retryable, while
+    // the detail route keeps the verification result readable and explains
+    // that the held key could not be returned. Fails if the unwrap failure is
+    // settled as proven loss, or if the detail projection drops the record.
     const storagePath = '/storage/encrypted.json';
     fixtures.set(storagePath, { body: encryptedBody(DPP_TEXT, RECEIVER_KEY) });
     const sourceDigest = await digest(new TextEncoder().encode(DPP_TEXT));
@@ -1781,13 +1780,14 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       failureRetryable: true,
     });
     expect(verifier.verify).not.toHaveBeenCalled();
-    // The keyless projection still answers, so the record is readable through
-    // every surface that does not open the key. The detail route's own reveal
-    // is what fails, and it answers the sanitised 500 that #769 tracks.
+    // The keyless projection still answers, and detail now degrades only the
+    // key field rather than losing the record that carries the run result.
     expect(() => toCredentialRecord(settled as never)).not.toThrow();
-    expect(() => toCredentialRecordDetail(settled as never, { reveal: revealDecryptionKey })).toThrow(
-      /Failed to decrypt the stored credential decryption key/,
-    );
+    expect(toCredentialRecordDetail(settled as never, { reveal: revealDecryptionKey })).toMatchObject({
+      hasKey: true,
+      decryptionKey: null,
+      warnings: [{ code: 'DECRYPTION_KEY_UNAVAILABLE' }],
+    });
   });
 
   it.each([

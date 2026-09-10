@@ -12,6 +12,11 @@ import {
 import { LibraryRecordOrigin } from '@/lib/prisma/generated';
 import { isDatabaseError } from '@/lib/prisma/db-errors';
 import { batchGetLibraryRecords } from '@/lib/prisma/repositories/library-record.repository';
+import {
+  projectCollectionRead,
+  logLibraryReadSummary,
+  type LibraryReadCollectionBody,
+} from '@/lib/library/library-read-results';
 
 const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
 
@@ -25,7 +30,12 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *       Returns the matching native and external credential records owned by
  *       the authenticated tenant. The response contains at most one row per
  *       id, in the order each id first appears in the request body. Missing,
- *       foreign-tenant and NUL-bearing ids are silently omitted.
+ *       foreign-tenant and NUL-bearing ids are returned in `failures` as
+ *       `NOT_FOUND`; owned rows that cannot be read are returned there as
+ *       `RECORD_UNREADABLE`. Every distinct submitted id is accounted for
+ *       exactly once across the two arrays, and `failures` keeps the same
+ *       first-appearance order as `data`, so a caller can pair its request
+ *       list against either array by walking it once.
  *
  *       Request validation runs before the id maximum is checked. The maximum
  *       counts ids as submitted, before duplicate removal, and is configurable
@@ -56,18 +66,25 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *               type: string
  *               enum: [no-store]
  *             description: Always no-store because library records are tenant-scoped data.
+ *           x-correlation-id:
+ *             $ref: '#/components/headers/CorrelationId'
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               required: [data]
+ *               required: [data, failures]
  *               properties:
  *                 data:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/CredentialRecord'
+ *                 failures:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/LibraryReadFailure'
  *             examples:
- *               mixedRecords:
+ *               mixedOutcome:
+ *                 summary: Both origins returned beside one owned row that could not be read
  *                 value:
  *                   data:
  *                     - id: record-external-1
@@ -112,6 +129,15 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *                       warnings: []
  *                       createdAt: '2026-07-15T09:00:00Z'
  *                       updatedAt: '2026-07-15T09:00:00Z'
+ *                   failures:
+ *                     - { id: record-damaged-1, code: RECORD_UNREADABLE, message: 'The library record exists and belongs to this tenant but could not be read. Quote record id "record-damaged-1" and the x-correlation-id response header when contacting support.' }
+ *               allFailed:
+ *                 summary: Every requested id is unreadable or not found
+ *                 value:
+ *                   data: []
+ *                   failures:
+ *                     - { id: damaged-record-1, code: RECORD_UNREADABLE, message: 'The library record exists and belongs to this tenant but could not be read. Quote record id "damaged-record-1" and the x-correlation-id response header when contacting support.' }
+ *                     - { id: missing-record-1, code: NOT_FOUND, message: 'No such credential record.' }
  *       400:
  *         description: A validation failure, or more ids than the deployment's configured maximum, counted as submitted before duplicate removal (`BATCH_GET_LIMIT_EXCEEDED`). Validation is checked before the limit and the request is never truncated.
  *         content:
@@ -123,7 +149,10 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *       403:
  *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       500:
- *         description: The selected records could not be read or projected. The body is sanitised and carries a correlation id.
+ *         description: A database, transaction or selection-boundary failure prevented a truthful per-id outcome. The body is sanitised and carries a correlation id. Row-local failures are returned in `failures`.
+ *         headers:
+ *           x-correlation-id:
+ *             $ref: '#/components/headers/CorrelationId'
  *         content:
  *           application/json:
  *             schema:
@@ -131,23 +160,37 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
   const { ids } = await parseRequestBody(req, batchGetLibraryRequestSchema);
-  // Exact duplicates keep first appearance. Postgres rejects NUL in text with
-  // SQLSTATE 22021, so NUL-bearing ids cannot match a stored id and mirror the
-  // detail route by being dropped before the database query.
-  const selectedIds = [...new Set(ids.filter((id) => !id.includes('\0')))];
-  if (selectedIds.length === 0) {
-    return NextResponse.json({ data: [] }, { headers: { 'Cache-Control': 'no-store' } });
-  }
+  // Exact duplicates keep first appearance. NUL-bearing ids are retained in
+  // this accounting list but excluded from the database selection because
+  // PostgreSQL rejects NUL in a text parameter.
+  const requestedIds = [...new Set(ids)];
+  const selectedIds = requestedIds.filter((id) => !id.includes('\0'));
 
   try {
-    const records = await batchGetLibraryRecords({ tenantId, ids: selectedIds });
+    const records =
+      selectedIds.length === 0
+        ? { data: [], failures: [], selectedIds: [] }
+        : await batchGetLibraryRecords({ tenantId, ids: selectedIds });
     const now = new Date(Date.now());
-    const data: CredentialRecordResponse[] = records.map((view) =>
-      view.origin === LibraryRecordOrigin.NATIVE
-        ? toNativeCredentialRecord(view, { now })
-        : toCredentialRecord(view, { now }),
+    const projected = projectCollectionRead(
+      records,
+      {
+        orderedIds: requestedIds,
+        tenantId,
+        route: '/api/v1/library/batch-get',
+        project: (view) =>
+          view.origin === LibraryRecordOrigin.NATIVE
+            ? toNativeCredentialRecord(view, { now })
+            : toCredentialRecord(view, { now }),
+      },
+      logger,
     );
-    return NextResponse.json({ data }, { headers: { 'Cache-Control': 'no-store' } });
+    logLibraryReadSummary(logger, { tenantId, route: '/api/v1/library/batch-get', result: projected });
+    const body: LibraryReadCollectionBody<CredentialRecordResponse> = {
+      data: projected.data,
+      failures: projected.failures,
+    };
+    return NextResponse.json(body, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     if (isDatabaseError(error)) throw error;
     return sanitisedServerError(

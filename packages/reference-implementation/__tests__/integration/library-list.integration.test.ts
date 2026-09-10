@@ -17,6 +17,7 @@ import {
   listLibraryRecords,
   type ListLibraryRecordsOptions,
 } from '../../src/lib/prisma/repositories/library-record.repository';
+import { projectCollectionRead } from '../../src/lib/library/library-read-results';
 import { noChecksRun } from '../../src/lib/prisma/repositories/check-run.repository';
 import { insertExternalCredential, insertNativeCredential } from './fixtures';
 import { createRigClient, truncateApplicationTables } from './rig/db';
@@ -47,6 +48,7 @@ async function summaries(options: Omit<ListLibraryRecordsOptions, 'tenantId'> = 
   return {
     total: result.total,
     ids: result.data.map((view) => view.record.id),
+    failures: result.failures.map(({ id }) => id),
     projected: result.data.map((view) =>
       view.origin === LibraryRecordOrigin.NATIVE ? toNativeCredentialRecord(view) : toCredentialRecord(view),
     ),
@@ -109,6 +111,83 @@ describe('GET /library repository query against migrated Postgres', () => {
 
     await expect(summaries({ offset: 2 })).resolves.toMatchObject({ total: 2, ids: [], projected: [] });
     await expect(summaries({ offset: 3 })).resolves.toMatchObject({ total: 2, ids: [], projected: [] });
+  });
+
+  it('keeps a readable row when a selected neighbour has a broken read-model shape', async () => {
+    const readable = await insertNativeCredential(prisma, {
+      id: 'library-list-readable-neighbour',
+      tenantId: OWNER_TENANT_ID,
+    });
+    const unreadable = await insertNativeCredential(prisma, {
+      id: 'library-list-broken-neighbour',
+      tenantId: OWNER_TENANT_ID,
+      checkRun: { generation: 1 },
+    });
+
+    const page = await summaries({ sort: 'createdAt:asc' });
+
+    expect(page.total).toBe(2);
+    expect(page.ids).toEqual([readable.id]);
+    expect(page.failures).toEqual([unreadable.id]);
+  });
+
+  it('reports an external record with no check run at all as a row-local failure', async () => {
+    // Every run has to go, not only the newest: the newest-run LATERAL join
+    // falls back to whatever generation is left, so deleting one run leaves a
+    // row that reads perfectly well and proves nothing.
+    const readable = await insertExternalCredential(prisma, OWNER_TENANT_ID);
+    const runless = await insertExternalCredential(prisma, OWNER_TENANT_ID);
+    await appendFailedRun(runless, 2);
+    await prisma.$executeRaw`DELETE FROM "CheckRun" WHERE "recordId" = ${runless}`;
+
+    expect(await prisma.checkRun.count({ where: { recordId: runless } })).toBe(0);
+
+    const page = await summaries({ sort: 'createdAt:asc' });
+
+    expect(page.total).toBe(2);
+    expect(page.ids).toEqual([readable]);
+    expect(page.failures).toEqual([runless]);
+  });
+
+  it('reports a settled failed run whose failure columns are null as an unreadable row', async () => {
+    // A state the database genuinely permits: FAILED with no failure code,
+    // message or retryable flag. The row hydrates, so the read model accepts
+    // it, and the projection is where it stops being representable.
+    const readable = await insertExternalCredential(prisma, OWNER_TENANT_ID);
+    const damaged = await insertExternalCredential(prisma, OWNER_TENANT_ID);
+    await prisma.checkRun.create({
+      data: {
+        recordId: damaged,
+        tenantId: OWNER_TENANT_ID,
+        generation: 2,
+        state: CheckRunState.FAILED,
+        ...noChecksRun(),
+        retrieval: CheckResult.FAIL,
+        failureCode: null,
+        failureMessage: null,
+        failureRetryable: null,
+        completedAt: new Date('2026-08-02T00:00:00.000Z'),
+      },
+    });
+
+    const read = await listLibraryRecords({ tenantId: OWNER_TENANT_ID, limit: 100, sort: 'createdAt:asc' });
+    const projected = projectCollectionRead(
+      read,
+      {
+        orderedIds: read.selectedIds,
+        tenantId: OWNER_TENANT_ID,
+        route: '/api/v1/library',
+        project: (view) =>
+          view.origin === LibraryRecordOrigin.NATIVE ? toNativeCredentialRecord(view) : toCredentialRecord(view),
+      },
+      { error: jest.fn(), info: jest.fn() },
+    );
+
+    expect(read.failures).toEqual([]);
+    expect(projected.data.map(({ id }) => id)).toEqual([readable]);
+    expect(projected.failures).toEqual([
+      { id: damaged, code: 'RECORD_UNREADABLE', message: expect.stringContaining('x-correlation-id') },
+    ]);
   });
 
   it('applies type authority, issuer semantics, and excludes an unobserved encrypted value', async () => {

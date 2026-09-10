@@ -61,6 +61,12 @@ import { startJobQueue } from '@/lib/jobs/app-job-queue';
 import type { JobQueue } from '@/lib/jobs/types';
 import { LibraryRecordOrigin } from '@/lib/prisma/generated';
 import { listLibraryRecords } from '@/lib/prisma/repositories/library-record.repository';
+import {
+  projectCollectionRead,
+  logLibraryReadSummary,
+  type CollectionReadResult,
+  type PaginatedLibraryReadBody,
+} from '@/lib/library/library-read-results';
 
 const logger = apiLogger.child({ route: '/api/v1/library' });
 
@@ -82,8 +88,24 @@ function hasLibraryQueryNul(query: {
   );
 }
 
-function listResponse(data: CredentialRecordResponse[], total: number, limit?: number, offset?: number): Response {
-  return NextResponse.json(buildPaginatedResponse(data, total, limit, offset), {
+/**
+ * The list body: the paginated rows plus the required `failures` sibling. The
+ * page consumed every row it selected, readable or not, so `hasMore` is
+ * computed from both arrays rather than from `data` alone (ADR-057 decision 6).
+ */
+function listResponse(
+  result: CollectionReadResult<CredentialRecordResponse>,
+  total: number,
+  limit?: number,
+  offset?: number,
+): Response {
+  const body: PaginatedLibraryReadBody<CredentialRecordResponse> = {
+    ...buildPaginatedResponse(result.data, total, limit, offset, {
+      consumedCount: result.data.length + result.failures.length,
+    }),
+    failures: result.failures,
+  };
+  return NextResponse.json(body, {
     headers: { 'Cache-Control': 'no-store' },
   });
 }
@@ -100,7 +122,10 @@ function listResponse(data: CredentialRecordResponse[], total: number, limit?: n
  *       Every row is keyless and carries no durable-copy storage location;
  *       use `GET /api/v1/library/{id}` for those fields. v1 has no
  *       supersession or versioning filter, so every record is returned when
- *       it matches the other filters.
+ *       it matches the other filters. Readable rows are returned in `data`;
+ *       a row that cannot be represented is named in `failures` with
+ *       `RECORD_UNREADABLE`. A failure does not remove other rows from the
+ *       page, and `pagination.total` includes unreadable selected rows.
  *
  *       `type` is repeatable and uses the extracted core type when present,
  *       otherwise the external record's declared type. `issuer` compares an
@@ -199,17 +224,25 @@ function listResponse(data: CredentialRecordResponse[], total: number, limit?: n
  *           default: 0
  *     responses:
  *       200:
- *         description: A keyless page of the tenant's library.
+ *         description: |
+ *           A keyless page of the tenant's library. `pagination.hasMore`
+ *           counts the rows this page consumed, which is `data` and
+ *           `failures` together, so a page whose rows all failed still
+ *           reports that more remain. Advance by `limit`, never by
+ *           `data.length`: a client that advances by the rows it received
+ *           re-requests an all-failed page for ever.
  *         headers:
  *           Cache-Control:
  *             schema:
  *               type: string
  *               enum: [no-store]
+ *           x-correlation-id:
+ *             $ref: '#/components/headers/CorrelationId'
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               required: [data, pagination]
+ *               required: [data, pagination, failures]
  *               properties:
  *                 data:
  *                   type: array
@@ -217,8 +250,13 @@ function listResponse(data: CredentialRecordResponse[], total: number, limit?: n
  *                     $ref: '#/components/schemas/CredentialRecord'
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationMeta'
+ *                 failures:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/LibraryReadFailure'
  *             examples:
- *               mixedPage:
+ *               mixedOutcomePage:
+ *                 summary: A final page carrying both origins and one unreadable row
  *                 value:
  *                   data:
  *                     - id: cred_ext_05
@@ -263,7 +301,16 @@ function listResponse(data: CredentialRecordResponse[], total: number, limit?: n
  *                       warnings: []
  *                       createdAt: '2026-07-15T09:00:00Z'
  *                       updatedAt: '2026-07-15T09:00:00Z'
- *                   pagination: { total: 2, limit: 20, offset: 0, hasMore: false }
+ *                   pagination: { total: 3, limit: 20, offset: 0, hasMore: false }
+ *                   failures:
+ *                     - { id: damaged-record-2, code: RECORD_UNREADABLE, message: 'The library record exists and belongs to this tenant but could not be read. Quote record id "damaged-record-2" and the x-correlation-id response header when contacting support.' }
+ *               allFailedPage:
+ *                 summary: A page where every selected row is unreadable
+ *                 value:
+ *                   data: []
+ *                   pagination: { total: 3, limit: 1, offset: 0, hasMore: true }
+ *                   failures:
+ *                     - { id: damaged-record-1, code: RECORD_UNREADABLE, message: 'The library record exists and belongs to this tenant but could not be read. Quote record id "damaged-record-1" and the x-correlation-id response header when contacting support.' }
  *       400:
  *         description: Validation failure, including a reversed date range, PAGE_LIMIT_EXCEEDED, or FREE_TEXT_SEARCH_DEFERRED.
  *         content:
@@ -275,7 +322,10 @@ function listResponse(data: CredentialRecordResponse[], total: number, limit?: n
  *       403:
  *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
  *       500:
- *         description: The selected records could not be read or projected. The body is sanitised and carries a correlation id.
+ *         description: A database, transaction or selection-boundary failure prevented a truthful per-record outcome. The body is sanitised and carries a correlation id. Row-local failures are returned in `failures` with `RECORD_UNREADABLE`.
+ *         headers:
+ *           x-correlation-id:
+ *             $ref: '#/components/headers/CorrelationId'
  *         content:
  *           application/json:
  *             schema:
@@ -289,14 +339,17 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
 
   const query = parseQueryParams(url, listLibraryQuerySchema, { repeatable: ['type'] });
   if (hasLibraryQueryNul(query)) {
-    return listResponse([], 0, query.limit, query.offset);
+    const empty: CollectionReadResult<CredentialRecordResponse> = { data: [], failures: [] };
+    const response = listResponse(empty, 0, query.limit, query.offset);
+    logLibraryReadSummary(logger, { tenantId, route: '/api/v1/library', result: empty });
+    return response;
   }
 
   const issuedFrom = query.issuedFrom === undefined ? undefined : new Date(`${query.issuedFrom}T00:00:00.000Z`);
   const issuedTo = query.issuedTo === undefined ? undefined : new Date(`${query.issuedTo}T23:59:59.999Z`);
 
   try {
-    const { data, total } = await listLibraryRecords({
+    const read = await listLibraryRecords({
       tenantId,
       type: query.type,
       origin: query.origin,
@@ -313,12 +366,21 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
       offset: query.offset,
     });
     const now = new Date(Date.now());
-    const projected = data.map((view) =>
-      view.origin === LibraryRecordOrigin.NATIVE
-        ? toNativeCredentialRecord(view, { now })
-        : toCredentialRecord(view, { now }),
+    const projected = projectCollectionRead(
+      read,
+      {
+        orderedIds: read.selectedIds,
+        tenantId,
+        route: '/api/v1/library',
+        project: (view) =>
+          view.origin === LibraryRecordOrigin.NATIVE
+            ? toNativeCredentialRecord(view, { now })
+            : toCredentialRecord(view, { now }),
+      },
+      logger,
     );
-    return listResponse(projected, total, query.limit, query.offset);
+    logLibraryReadSummary(logger, { tenantId, route: '/api/v1/library', result: projected });
+    return listResponse(projected, read.total, query.limit, query.offset);
   } catch (error) {
     if (!isDatabaseError(error)) {
       return sanitisedServerError(

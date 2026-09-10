@@ -86,12 +86,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *       verification envelope. Re-poll `GET /api/v1/library/{id}` to see the
  *       generation settle.
  *
- *       One case is not observable on that poll. When the service cannot
- *       unlock the key it holds for the durable copy, the generation settles
- *       as `STORED_COPY_UNAVAILABLE` with `retryable: true`, and the detail
- *       route returns a sanitised `500` until an operator restores access to
- *       the encryption key. That gap is tracked by
- *       [uncefact/tests-untp#769](https://github.com/uncefact/tests-untp/issues/769).
+ *       When the service cannot unlock the key it holds for the durable copy,
+ *       the generation settles as `STORED_COPY_UNAVAILABLE` with
+ *       `retryable: true`, and the detail poll reports that state on the
+ *       record: `200` with `hasKey: true`, a null `decryptionKey` and one
+ *       `DECRYPTION_KEY_UNAVAILABLE` warning, until an operator restores
+ *       access to the encryption key.
  *
  *       Native records read their stored artefact on the worker. An external
  *       record with a protected copy re-verifies that pinned copy and checks

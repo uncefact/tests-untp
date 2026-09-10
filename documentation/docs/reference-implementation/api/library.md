@@ -186,11 +186,16 @@ This returns both native and external records in the standard paginated envelope
       "updatedAt": "2026-07-15T09:00:00Z"
     }
   ],
-  "pagination": { "total": 2, "limit": 20, "offset": 0, "hasMore": false }
+  "pagination": { "total": 2, "limit": 20, "offset": 0, "hasMore": false },
+  "failures": []
 }
 ```
 
 List rows are keyless for both origins. They also omit `storageUri` and `digestMultibase`. Use [Retrieve one library record](#retrieve-one-library-record) when a durable-copy location or receiver-side key is required. The response is sent with `Cache-Control: no-store`.
+
+The response always includes `failures`. A row whose stored state cannot be represented is left out of `data` and named there as `{ "id": "<selected id>", "code": "RECORD_UNREADABLE", "message": "..." }`; all other rows still return. The message says the record exists and belongs to this tenant, which is what separates the code from `NOT_FOUND`, and tells the caller to quote the record id and the `x-correlation-id` response header when contacting support. Stored state this contract cannot represent is the usual cause, but the code covers any fault local to that one record, so it is not by itself proof that the stored record is damaged. Database, transaction and selection-boundary failures remain whole-response `500` errors. `pagination.total` includes unreadable rows, and `pagination.hasMore` counts the page as consumed by `data.length + failures.length`, not by `data.length`. Advance to the next request by `limit`, even when every row on the current page is in `failures`.
+
+For example, a first page with twenty unreadable rows out of forty has `data: []`, twenty `RECORD_UNREADABLE` failures and `hasMore: true`. The next page can contain nineteen readable rows and one failure with `hasMore: false`; no extra readable rows are pulled forward to fill either page.
 
 The route accepts these filters. All supplied filters are combined with `AND`, and a value that matches no record returns an empty page rather than an error.
 
@@ -222,9 +227,9 @@ POST /api/v1/library/batch-get
 
 Use this endpoint when a caller already knows the record ids it needs. The request must contain a non-empty `ids` array of non-empty strings. Unknown body fields are ignored. Request validation runs before the submitted-id limit, so a malformed element is reported as a validation error even when the same request also exceeds the limit.
 
-The maximum counts ids as submitted, before duplicate removal. It defaults to `500`, or the [configured maximum](../operations/api-pagination#maximum-page-size) where a deployment sets one. A request above the effective maximum returns `400 BATCH_GET_LIMIT_EXCEEDED` naming that maximum. The request is rejected rather than truncated, and duplicate ids still count towards the limit. A NUL-bearing id passes the string validation but is omitted before the database read. If every id is omitted this way, the response is an empty result.
+The maximum counts ids as submitted, before duplicate removal. It defaults to `500`, or the [configured maximum](../operations/api-pagination#maximum-page-size) where a deployment sets one. A request above the effective maximum returns `400 BATCH_GET_LIMIT_EXCEEDED` naming that maximum. The request is rejected rather than truncated, and duplicate ids still count towards the limit. A NUL-bearing id passes the string validation but is reported as `NOT_FOUND` without reaching the database. If every id is NUL-bearing, the response is `200` with an empty `data` array and one `NOT_FOUND` failure per distinct submitted id.
 
-Exact duplicate ids are read once. The response has one row per matching id, in the order each id first appeared in the request. Missing ids and ids owned by another tenant are omitted without revealing which case occurred. Native and external records can be returned together.
+Exact duplicate ids are read once. The response has one row per readable matching id, in the order each id first appeared in the request. `failures` keeps that same first-appearance order, so a caller can pair its request list against either array by walking it once. Every distinct submitted id appears exactly once across `data` and the required `failures` array. Missing ids, ids owned by another tenant and NUL-bearing ids have the same `{ "id": "<submitted id>", "code": "NOT_FOUND", "message": "No such credential record." }` outcome, so the response does not reveal which case occurred. A selected row that cannot be represented has `RECORD_UNREADABLE` instead. Native and external records can be returned together.
 
 The response is always the keyless `CredentialRecord` shape. It does not include `tenantId`, `storageUri`, `digestMultibase` or `decryptionKey`. Use [Retrieve one library record](#retrieve-one-library-record) for the durable-copy location or receiver-side key. Every successful response, including an empty result, carries `Cache-Control: no-store`.
 
@@ -331,11 +336,12 @@ The response is always the keyless `CredentialRecord` shape. It does not include
       "createdAt": "2026-07-15T09:00:00Z",
       "updatedAt": "2026-07-15T09:00:00Z"
     }
-  ]
+  ],
+  "failures": []
 }
 ```
 
-Malformed JSON, a missing or invalid `ids` array, and an over-limit request return `400`. An oversized body returns `413 REQUEST_BODY_TOO_LARGE`. Authentication and tenant-assignment failures keep the shared `401` and `403` responses. A database or projection failure returns a sanitised `500` with a correlation id.
+Malformed JSON, a missing or invalid `ids` array, and an over-limit request return `400`. An oversized body returns `413 REQUEST_BODY_TOO_LARGE`. Authentication and tenant-assignment failures keep the shared `401` and `403` responses. A database, transaction or selection-boundary failure returns a sanitised `500` with a correlation id; a row-local read or projection failure is a `RECORD_UNREADABLE` entry in `failures`.
 
 ## Register a credential received from a third party
 
@@ -365,7 +371,7 @@ Duplicate detection compares the signed JWT content of an opened credential with
 
 A record that holds a credential's content identity keeps it whatever state the record is in. A record whose durable copy failed to store, or whose credential could not be read, therefore still blocks a fresh registration of that credential. Re-verifying that record repairs it. A repeat registration of the same credential is answered with the `409` naming that record for as long as it holds the identity.
 
-The record contract also publishes a `DUPLICATE_CONTENT` warning. It is raised when a re-verification re-reads a source whose signed content identity belongs to another external record in the tenant. The recovered record keeps its new durable copy and points at the record that already holds the identity.
+The record contract also publishes a `DUPLICATE_CONTENT` warning, on every route that returns a record. It is raised when a re-verification re-reads a source whose signed content identity belongs to another external record in the tenant. The recovered record keeps its new durable copy and points at the record that already holds the identity.
 
 Responses:
 
@@ -402,19 +408,20 @@ The route is also the verification polling target. A record with `verification.s
 
 The custody fields describe the copy held by this Reference Implementation. For an external record, `sourceUrl` is the supplier's fetch location and `sourceDigest` is the digest of the raw bytes as fetched. `storageUri` is the location of the Reference Implementation's durable copy and `digestMultibase` is the storage service's content digest for that copy. Do not substitute `sourceUrl` for `storageUri`.
 
-| Record state                               | `storageUri` | `digestMultibase` | `decryptionKey`               |
-| ------------------------------------------ | ------------ | ----------------- | ----------------------------- |
-| Native credential, encrypted copy          | set          | set               | the native storage key        |
-| Native credential, unencrypted copy        | set          | set               | `null`                        |
-| External credential, protected copy        | set          | set               | the receiver-side storage key |
-| External credential, unopened ciphertext   | set          | set               | `null`                        |
-| External credential without a durable copy | `null`       | `null`            | `null`                        |
+| Record state                                               | `storageUri` | `digestMultibase` | `decryptionKey`                                   |
+| ---------------------------------------------------------- | ------------ | ----------------- | ------------------------------------------------- |
+| Native credential, encrypted copy                          | set          | set               | the native storage key                            |
+| Native credential, unencrypted copy                        | set          | set               | `null`                                            |
+| External credential, protected copy                        | set          | set               | the receiver-side storage key                     |
+| External credential, unopened ciphertext                   | set          | set               | `null`                                            |
+| External credential without a durable copy                 | `null`       | `null`            | `null`                                            |
+| Native or external record with a held key it cannot return | set          | set               | `null`, with `DECRYPTION_KEY_UNAVAILABLE` warning |
 
 What `digestMultibase` covers depends on the copy. For a copy the storage service encrypted, meaning a native encrypted credential or an external protected copy, it covers the content before encryption. For an unencrypted copy, and for unopened ciphertext stored exactly as fetched, it covers the stored bytes. A caller fetching an encrypted copy must decrypt it before comparing the digest.
 
 What that decryption yields depends on the kind of copy. An encrypted credential decrypts to the credential JSON, and its digest covers the compact form of that JSON. Every other encrypted copy, meaning an HTML page, a JSON body that is not a credential, or opaque bytes, decrypts to the base64 text of the stored bytes, and its digest covers those bytes. So a caller comparing the digest of a non-credential copy base64-decodes the decrypted text first.
 
-`storageUri` and `digestMultibase` travel together: both are set whenever a durable copy exists, and the digest is `null` whenever the URI is `null`. `decryptionKey` is non-null exactly when `hasKey` is `true`, and a key is only ever returned alongside a `storageUri`. A native record always has a durable copy, so its URI and digest are never `null`.
+`storageUri` and `digestMultibase` travel together: both are set whenever a durable copy exists, and the digest is `null` whenever the URI is `null`. `decryptionKey` is non-null exactly when `hasKey` is `true` and the held key can be returned. When the service holds a key but cannot return it, whatever the record's origin, `hasKey` remains `true`, `decryptionKey` is `null`, and the detail response carries exactly one `DECRYPTION_KEY_UNAVAILABLE` warning. That warning code appears on the detail response only: the list and batch rows carry no key, and their schema forbids it, so a client's warning handler will never meet it there. A non-null key is only ever returned alongside a `storageUri`. A native record always has a durable copy, so its URI and digest are never `null`.
 
 `hasKey` and `decryptionKey` report the stored custody columns as they are. A re-verification that proves the durable copy lost leaves them unchanged, and the record's newest verification generation carries that state instead. So a key can still be returned for a copy that no longer answers, and the record's `verification` envelope is where that loss is reported, as `STORED_COPY_UNAVAILABLE` or `STORED_COPY_CORRUPT` with `retryable: false`.
 
@@ -438,7 +445,7 @@ The example below shows the custody fields alongside the record id and origin. E
 
 An unknown id and an id belonging to another tenant both return `404 NOT_FOUND` with the same body. The detail route does not distinguish those cases.
 
-If a stored key cannot be revealed, or a stored value resembles an encryption envelope but is invalid, the route returns a sanitised `500` with the request correlation id. The settled response for that case is tracked by [uncefact/tests-untp#769](https://github.com/uncefact/tests-untp/issues/769).
+If a stored key cannot be revealed, or a stored value resembles an encryption envelope but is invalid, the route still returns the complete detail record with `200`, `hasKey: true`, `decryptionKey: null` and exactly one `DECRYPTION_KEY_UNAVAILABLE` warning. If the record itself cannot be built, the route returns `500 RECORD_UNREADABLE` with the requested id; the message tells the caller to quote that id and the `x-correlation-id` response header. That coded response carries `Cache-Control: no-store`, because it is the only error on this route that names one of the tenant's record ids. Database and transaction failures keep the shared sanitised `500`.
 
 ## Update recipient annotations
 
@@ -500,7 +507,7 @@ The route applies these checks in order.
 
 Every accepted request returns `202` with the current keyless record. It may already show `complete` or `failed` when the worker settles the generation before the response is read. Re-poll the detail route to observe the final state. A stored-copy loss is discovered by the worker and settles as `STORED_COPY_UNAVAILABLE` when the copy cannot be read back as the document that was stored, or `STORED_COPY_CORRUPT` when it reads back but fails its digest check. The generation carries `retryable: false`, while the record's custody coordinates and `hasKey` remain unchanged.
 
-One case is not observable on that poll. When the service cannot unlock the key it holds for the durable copy, the generation settles as `STORED_COPY_UNAVAILABLE` with `retryable: true`, and the detail route returns the sanitised `500` described above until an operator restores access to the encryption key. That gap is tracked by [uncefact/tests-untp#769](https://github.com/uncefact/tests-untp/issues/769).
+When the service cannot unlock the key it holds for the durable copy, the generation settles as `STORED_COPY_UNAVAILABLE` with `retryable: true`, and the detail poll reports that state on the record: `200`, `hasKey: true`, `decryptionKey: null` and one `DECRYPTION_KEY_UNAVAILABLE` warning, until an operator restores access to the encryption key.
 
 A no-copy recovery that opens a credential can reach the same encryption preflight the register endpoint runs. If this service cannot protect the storage key a durable copy of that opened credential would need, the request answers `500 CREDENTIALS_ENCRYPTION_UNAVAILABLE`, the same code and cause the [register endpoint](#register-a-credential-received-from-a-third-party) uses. Unlike the register endpoint, a generation _is_ created here: the reservation this recovery already made is settled `FAILED STORAGE_FAILED` (retryable) before the coded 500 is answered. Any other unexpected failure while fetching or finalising a no-copy recovery also settles the reservation before answering, as a retryable `VERIFICATION_UNAVAILABLE` rather than as `STORAGE_FAILED`, and answers a sanitised `500`, except the queue-unavailable-after-reservation case and the lock-discovery exhaustion case in step 5, both of which answer `202` with the settled generation instead, once their own settle write commits. Either way the reservation itself is settled, not left `PENDING`, so a later re-verify reserves a fresh generation rather than joining a stuck one.
 

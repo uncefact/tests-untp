@@ -103,6 +103,7 @@ const RESPONSE = {
   storageUri: 'https://storage.example/record-1',
   digestMultibase: 'zDigest',
   decryptionKey: 'plain-key',
+  warnings: [],
 };
 
 /**
@@ -266,7 +267,10 @@ describe('GET /api/v1/library/:id', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(await response.json()).toEqual(RESPONSE);
     expect(mockGetLibraryRecordById).toHaveBeenCalledWith('record-1', 'tenant-1');
-    expect(mockToCredentialRecordDetail).toHaveBeenCalledWith(VIEW, { reveal: expect.any(Function) });
+    expect(mockToCredentialRecordDetail).toHaveBeenCalledWith(VIEW, {
+      reveal: expect.any(Function),
+      onKeyUnavailable: expect.any(Function),
+    });
   });
 
   it('logs the lookup on entry and the retrieval on completion, with the custody state but no key', async () => {
@@ -327,50 +331,137 @@ describe('GET /api/v1/library/:id', () => {
     expect(await response.json()).toEqual({ error: 'No such credential record.', code: 'NOT_FOUND' });
   });
 
-  it.each([
-    [
-      'a failed key reveal',
-      () =>
-        mockToCredentialRecordDetail.mockImplementation((_view: unknown, options: { reveal: (s: string) => string }) =>
-          options.reveal('stored-envelope'),
-        ),
-      'The stored decryption key could not be revealed',
-    ],
-    [
-      'a projection failure',
-      () =>
-        mockToCredentialRecordDetail.mockImplementation(() => {
-          throw new CredentialRecordProjectionError('record-1', 'has an invalid stored decryption-key envelope');
-        }),
-      'The library record could not be projected',
-    ],
-    [
-      'a stored shape the write paths never produce',
-      () =>
-        mockGetLibraryRecordById.mockRejectedValue(
-          new LibraryRecordShapeError('record-1', 'is EXTERNAL but has no check run'),
-        ),
-      'The library record has a stored shape the write paths never produce',
-    ],
-    [
-      'any other failure',
-      () => mockGetLibraryRecordById.mockRejectedValue(new Error('row contains a secret-key-value')),
-      'Library record detail read failed',
-    ],
-  ])('answers a sanitised 500 for %s and logs the error against the record', async (_name, arrange, message) => {
-    mockRevealDecryptionKey.mockImplementation(() => {
-      throw new Error('DATA_ENCRYPTION_KEY is missing');
+  it('returns RECORD_UNREADABLE for a projection failure and logs only its safe classification', async () => {
+    mockToCredentialRecordDetail.mockImplementation(() => {
+      throw new CredentialRecordProjectionError('record-1', 'has an invalid stored state');
     });
-    arrange();
+    const response = await get();
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({
+      error: expect.stringContaining('x-correlation-id response header'),
+      code: 'RECORD_UNREADABLE',
+      id: 'record-1',
+    });
+    expect(loggerCalls.error).toHaveBeenCalledTimes(1);
+    expect(loggerCalls.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordId: 'record-1',
+        code: 'RECORD_UNREADABLE',
+        readStage: 'projection',
+        reason: 'projection',
+        errorCode: 'library.record-projection',
+        // The caller's body says only that the record could not be read, so
+        // this is the operator's only account of which invariant broke. The
+        // class builds its message from a record id and schema-constraint
+        // text, so it can hold no stored value.
+        error: {
+          name: 'CredentialRecordProjectionError',
+          message: 'Library record record-1 cannot be projected: has an invalid stored state',
+        },
+      }),
+      'Library record read degraded',
+    );
+  });
+
+  it('returns RECORD_UNREADABLE for an unclassified throw while building the record', async () => {
+    // The same rule the collections apply to a row-local throw they cannot
+    // classify: the record is what could not be built, so the caller gets the
+    // coded body naming their own id, and the operator gets the cause.
+    mockToCredentialRecordDetail.mockImplementation(() => {
+      throw new RangeError('Invalid time value');
+    });
 
     const response = await get();
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(await response.json()).toEqual({
+      error: expect.stringContaining('record id "record-1"'),
+      code: 'RECORD_UNREADABLE',
+      id: 'record-1',
+    });
+    expect(loggerCalls.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordId: 'record-1',
+        readStage: 'projection',
+        reason: 'unclassified',
+        error: { name: 'RangeError', message: 'Invalid time value' },
+      }),
+      'Library record read degraded',
+    );
+  });
+
+  it('reports a key the projector could not return, with the cause that separates the repairs', async () => {
+    mockToCredentialRecordDetail.mockImplementation((_view: unknown, options: unknown) => {
+      (options as { onKeyUnavailable: (cause: unknown) => void }).onKeyUnavailable({
+        reason: 'key-configuration',
+        error: new Error('Missing required DATA_ENCRYPTION_KEY environment variable.'),
+      });
+      return {
+        ...RESPONSE,
+        decryptionKey: null,
+        warnings: [{ code: 'DECRYPTION_KEY_UNAVAILABLE', message: 'The stored key could not be returned.' }],
+      };
+    });
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ hasKey: true, decryptionKey: null });
     expect(loggerCalls.error).toHaveBeenCalledTimes(1);
-    expect(loggerCalls.error).toHaveBeenCalledWith({ err: expect.any(Error), recordId: 'record-1' }, message);
+    expect(loggerCalls.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordId: 'record-1',
+        code: 'DECRYPTION_KEY_UNAVAILABLE',
+        readStage: 'detail',
+        reason: 'key-configuration',
+        error: {
+          name: 'Error',
+          message: 'Missing required DATA_ENCRYPTION_KEY environment variable.',
+        },
+      }),
+      'Library record read degraded',
+    );
+  });
+
+  it('returns RECORD_UNREADABLE for a stored shape failure with the URL id', async () => {
+    mockGetLibraryRecordById.mockRejectedValue(
+      new LibraryRecordShapeError('record-1', 'is EXTERNAL but has no check run'),
+    );
+
+    const response = await get();
+
+    expect(response.status).toBe(500);
+    // This body names a record id belonging to the caller's tenant, so a
+    // shared cache must not keep it, as with the 200.
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({
+      error: expect.stringContaining('record id "record-1"'),
+      code: 'RECORD_UNREADABLE',
+      id: 'record-1',
+    });
+    expect(loggerCalls.error).toHaveBeenCalledWith(
+      expect.objectContaining({ recordId: 'record-1', code: 'RECORD_UNREADABLE', readStage: 'hydration' }),
+      'Library record read degraded',
+    );
+  });
+
+  it('keeps an unexpected repository failure as a sanitised whole-request error', async () => {
+    mockGetLibraryRecordById.mockRejectedValue(new Error('row contains a secret-key-value'));
+
+    const response = await get();
+
+    expect(response.status).toBe(500);
+    // The sanitised body names nothing tenant-specific, so it does not take
+    // the header the coded body needs.
+    expect(response.headers.get('Cache-Control')).toBeNull();
+    expect(await response.json()).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(loggerCalls.error).toHaveBeenCalledWith(
+      { error: { name: expect.any(String), message: expect.any(String) }, recordId: 'record-1' },
+      'Library record detail read failed',
+    );
     expect(JSON.stringify(await response.json())).not.toContain('secret-key-value');
-    expect(JSON.stringify(await response.json())).not.toContain('DATA_ENCRYPTION_KEY');
   });
 
   it('leaves a database fault to the shared mapper, which owns its distinct log', async () => {
@@ -669,7 +760,13 @@ describe('PATCH /api/v1/library/:id', () => {
     expect(JSON.stringify(await response.json())).not.toContain('secret-key-value');
     expect(JSON.stringify(await response.json())).not.toContain('invalid stored annotation row');
     expect(loggerCalls.error).toHaveBeenCalledTimes(1);
-    expect(loggerCalls.error).toHaveBeenCalledWith({ err: expect.any(Error), recordId: 'record-1' }, message);
+    // Name and message only. Logging the error object itself would render its
+    // whole cause chain, which is the one place a stored value could reach a
+    // log line from a path that never intended to publish one.
+    expect(loggerCalls.error).toHaveBeenCalledWith(
+      { error: { name: expect.any(String), message: expect.any(String) }, recordId: 'record-1' },
+      message,
+    );
   });
 
   it('answers the named refusal when the repository reports a native record it could not annotate', async () => {

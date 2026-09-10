@@ -23,11 +23,12 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 });
 
 const mockError = jest.fn();
+const mockInfo = jest.fn();
 jest.mock('@/lib/api/logger', () => {
   const logger: Record<string, unknown> = {
     error: (...args: unknown[]) => mockError(...args),
     warn: jest.fn(),
-    info: jest.fn(),
+    info: (...args: unknown[]) => mockInfo(...args),
   };
   logger.child = () => logger;
   return { apiLogger: logger };
@@ -43,6 +44,9 @@ jest.mock('@/lib/api/batch-limits', () => ({ MAX_BATCH_LIMIT: 3 }));
 import { CheckResult, CheckRunState, CoreCredentialType, LibraryRecordOrigin } from '@/lib/prisma/generated';
 import { UNEXPECTED_ERROR_MESSAGE } from '@/lib/api/errors';
 import { credentialRecordSchema } from '@/lib/library/credential-record-projection';
+import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
+import { LibraryRecordSelectionError } from '@/lib/library/library-read-errors';
+import { libraryHydrationResult as hydrated } from '../../../../../../__tests__/route-doubles/library-hydration-result';
 import { POST } from './route';
 
 const AUTH_CONTEXT = { tenantId: 'tenant-owner', params: Promise.resolve({}) };
@@ -166,7 +170,7 @@ function nativeView(id: string) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockBatchGetLibraryRecords.mockResolvedValue([]);
+  mockBatchGetLibraryRecords.mockResolvedValue(hydrated([]));
 });
 
 describe('POST /library/batch-get validation', () => {
@@ -238,7 +242,7 @@ describe('POST /library/batch-get validation', () => {
 
 describe('POST /library/batch-get selection and projection', () => {
   it('deduplicates exact ids, passes the tenant boundary, and preserves first-appearance order', async () => {
-    mockBatchGetLibraryRecords.mockResolvedValue([externalView('record-b'), nativeView('record-a')]);
+    mockBatchGetLibraryRecords.mockResolvedValue(hydrated([externalView('record-b'), nativeView('record-a')]));
 
     const { status, body, headers } = await post({ ids: ['record-b', 'record-a', 'record-b'] });
 
@@ -251,36 +255,48 @@ describe('POST /library/batch-get selection and projection', () => {
     expect(headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('drops NUL-bearing ids after validation while returning valid records', async () => {
-    mockBatchGetLibraryRecords.mockResolvedValue([nativeView('record-a')]);
+  it('reports NUL-bearing ids while returning valid records', async () => {
+    mockBatchGetLibraryRecords.mockResolvedValue(hydrated([nativeView('record-a')]));
 
     const { status, body, headers } = await post({ ids: ['record-a', 'bad\0id'] });
 
     expect(status).toBe(200);
     expect(mockBatchGetLibraryRecords).toHaveBeenCalledWith({ tenantId: 'tenant-owner', ids: ['record-a'] });
     expect((body.data as { id: string }[]).map(({ id }) => id)).toEqual(['record-a']);
+    expect(body.failures).toEqual([{ id: 'bad\0id', code: 'NOT_FOUND', message: 'No such credential record.' }]);
     expect(headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('returns an empty no-store response without reading the repository for an all-NUL request', async () => {
+  it('accounts for every distinct all-NUL id without reading the repository', async () => {
     const { status, body, headers } = await post({ ids: ['bad\0id', 'another\0id'] });
 
     expect(status).toBe(200);
-    expect(body).toEqual({ data: [] });
+    expect(body).toEqual({
+      data: [],
+      failures: [
+        { id: 'bad\0id', code: 'NOT_FOUND', message: 'No such credential record.' },
+        { id: 'another\0id', code: 'NOT_FOUND', message: 'No such credential record.' },
+      ],
+    });
     expect(headers.get('Cache-Control')).toBe('no-store');
     expect(mockBatchGetLibraryRecords).not.toHaveBeenCalled();
   });
 
-  it('returns an empty keyless response with no-store when no requested record is found', async () => {
+  it('returns a NOT_FOUND failure with no-store when no requested record is found', async () => {
     const { status, body, headers } = await post({ ids: ['missing'] });
 
     expect(status).toBe(200);
-    expect(body).toEqual({ data: [] });
+    expect(body).toEqual({
+      data: [],
+      failures: [{ id: 'missing', code: 'NOT_FOUND', message: 'No such credential record.' }],
+    });
     expect(headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('projects mixed origins in request order against the strict keyless schema', async () => {
-    mockBatchGetLibraryRecords.mockResolvedValue([externalView('record-external'), nativeView('record-native')]);
+    mockBatchGetLibraryRecords.mockResolvedValue(
+      hydrated([externalView('record-external'), nativeView('record-native')]),
+    );
 
     const { body } = await post({ ids: ['record-external', 'record-native'] });
 
@@ -292,24 +308,101 @@ describe('POST /library/batch-get selection and projection', () => {
       expect(row).not.toHaveProperty('digestMultibase');
       expect(row).not.toHaveProperty('tenantId');
     }
+    expect(body.failures).toEqual([]);
   });
 
-  it('returns a sanitised 500 when a selected record cannot be projected', async () => {
+  it('returns a RECORD_UNREADABLE failure when a selected record cannot be projected', async () => {
     const invalid = {
       ...externalView('record-invalid'),
-      checkRun: { ...externalView('record-invalid').checkRun, completedAt: null },
+      checkRun: { ...externalView('record-invalid').checkRun, state: CheckRunState.COMPLETE, completedAt: null },
     };
-    mockBatchGetLibraryRecords.mockResolvedValue([invalid]);
+    mockBatchGetLibraryRecords.mockResolvedValue(hydrated([invalid]));
 
     const { status, body } = await post({ ids: ['record-invalid'] });
 
+    expect(status).toBe(200);
+    expect(body.data).toEqual([]);
+    expect(body.failures).toEqual([
+      {
+        id: 'record-invalid',
+        code: 'RECORD_UNREADABLE',
+        message: expect.stringContaining('x-correlation-id response header'),
+      },
+    ]);
+    expect(mockError).toHaveBeenCalledWith(
+      expect.objectContaining({ recordId: 'record-invalid', code: 'RECORD_UNREADABLE', readStage: 'projection' }),
+      'Library record read degraded',
+    );
+  });
+
+  it('returns a RECORD_UNREADABLE failure when the repository reports a row it could not hydrate', async () => {
+    // The repository's own failure branch, which the projection case above
+    // does not reach: a selected row that never became a view at all.
+    mockBatchGetLibraryRecords.mockResolvedValue(
+      hydrated(
+        [nativeView('record-a')],
+        [{ id: 'record-damaged', error: new LibraryRecordShapeError('record-damaged', 'is EXTERNAL but has no run') }],
+      ),
+    );
+
+    const { status, body } = await post({ ids: ['record-a', 'record-damaged'] });
+
+    expect(status).toBe(200);
+    expect((body.data as { id: string }[]).map(({ id }) => id)).toEqual(['record-a']);
+    expect(body.failures).toEqual([
+      {
+        id: 'record-damaged',
+        code: 'RECORD_UNREADABLE',
+        message: expect.stringContaining('x-correlation-id response header'),
+      },
+    ]);
+    expect(mockError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordId: 'record-damaged',
+        code: 'RECORD_UNREADABLE',
+        readStage: 'hydration',
+        reason: 'shape',
+        errorCode: 'library.record-shape',
+        error: expect.objectContaining({ name: 'LibraryRecordShapeError' }),
+      }),
+      'Library record read degraded',
+    );
+  });
+
+  it('sanitises a selection-boundary failure and publishes no id from it', async () => {
+    // A row outside the caller's selection cannot be attributed to any id, so
+    // the whole request fails, and neither the offending id nor the caller's
+    // own id may appear in the body.
+    mockBatchGetLibraryRecords.mockRejectedValue(
+      new LibraryRecordSelectionError('record record-foreign was returned during hydration but was not selected'),
+    );
+
+    const { status, body } = await post({ ids: ['record-a'] });
+
     expect(status).toBe(500);
     expect(String(body.error)).toContain(UNEXPECTED_ERROR_MESSAGE);
-    expect(String(body.error)).not.toContain('record-invalid');
-    expect(mockError).toHaveBeenCalledWith(
-      { error: expect.anything() },
-      'The library records could not be fetched in a batch',
+    expect(JSON.stringify(body)).not.toContain('record-foreign');
+    expect(JSON.stringify(body)).not.toContain('record-a');
+  });
+
+  it('emits one summary line carrying the counts for the request that produced them', async () => {
+    mockBatchGetLibraryRecords.mockResolvedValue(
+      hydrated(
+        [nativeView('record-a')],
+        [{ id: 'record-damaged', error: new LibraryRecordShapeError('record-damaged', 'is EXTERNAL but has no run') }],
+      ),
     );
+
+    await post({ ids: ['record-a', 'record-damaged', 'record-missing'] });
+
+    const summaries = mockInfo.mock.calls.filter(([, message]) => message === 'Library record read summary');
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0][0]).toMatchObject({
+      route: '/api/v1/library/batch-get',
+      returned: 1,
+      unreadable: 1,
+      notFound: 1,
+    });
   });
 
   it('keeps a database failure on the shared sanitised error mapping', async () => {
