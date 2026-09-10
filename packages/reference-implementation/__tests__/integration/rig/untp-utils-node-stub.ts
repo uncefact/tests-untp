@@ -13,18 +13,14 @@
 
 import { isIP } from 'node:net';
 
-export * from '../../../../untp-utils/build/node/index.js';
+import type { ValidatedAddresses } from '../../../../untp-utils/build/node/index.js';
 
-interface ResolvedAddress {
-  address: string;
-  family: number;
-  addresses: readonly { address: string; family: number }[];
-}
+export * from '../../../../untp-utils/build/node/index.js';
 
 export async function validatePublicUrl(
   url: string,
   options?: { allowedSchemes?: readonly string[] },
-): Promise<ResolvedAddress> {
+): Promise<ValidatedAddresses> {
   const parsed = new URL(url);
   const scheme = parsed.protocol.toLowerCase().replace(/:$/, '');
   const allowed = options?.allowedSchemes ?? ['http', 'https'];
@@ -33,6 +29,6 @@ export async function validatePublicUrl(
   }
   const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
   const family = isIP(hostname);
-  const resolvedFamily = family === 0 ? 4 : family;
+  const resolvedFamily: 4 | 6 = family === 6 ? 6 : 4;
   return { address: hostname, family: resolvedFamily, addresses: [{ address: hostname, family: resolvedFamily }] };
 }

@@ -28,7 +28,7 @@ const C = DidVerificationCheckName;
  * for the rejection classes. The fetch itself goes through
  * `resolveJsonDocument` from `@uncefact/untp-utils/resolvers`, which
  * validates every redirect hop independently and pins each hop's connection
- * to the IP its validation resolved, closing the DNS rebinding window
+ * to the addresses its validation resolved, closing the DNS rebinding window
  * between check and connect across the whole chain. The resolver's defaults
  * bound that resolution call itself (1 MiB body, a 10 s timeout covering the
  * resolver's own DNS wait and the fetch, 3 redirects). They do not bound this

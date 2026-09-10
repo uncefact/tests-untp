@@ -123,6 +123,23 @@ describe('fetchCredentialDocument', () => {
       },
     );
 
+    it('honours the deprecated VERIFY_ALLOW_PRIVATE_URLS name on its own', async () => {
+      // The deprecated name is still read throughout RI v0.5, and only the
+      // shared reader knows that. A helper that read FETCH_ALLOW_PRIVATE_URLS
+      // from the environment directly instead of calling the shared reader
+      // would drop allowPrivateAddresses here and fail this case.
+      process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+      mockResolveDocument.mockResolvedValue({ body: new Uint8Array(), status: 200, finalUrl: HREF });
+
+      await fetchCredentialDocument(HREF, { maxBytes: 512, timeoutMs: 2_000 });
+
+      expect(mockResolveDocument).toHaveBeenCalledWith(HREF, {
+        maxResponseBytes: 512,
+        totalTimeoutMs: 2_000,
+        allowPrivateAddresses: true,
+      });
+    });
+
     it('omits the content type when the server sent none', async () => {
       mockResolveDocument.mockResolvedValue({ body: new Uint8Array(), status: 200, finalUrl: HREF });
       await expect(fetchCredentialDocument(HREF)).resolves.toEqual({ bytes: new Uint8Array(), finalUrl: HREF });

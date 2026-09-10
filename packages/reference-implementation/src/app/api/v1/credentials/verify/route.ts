@@ -98,9 +98,10 @@ function upstreamFailureResponse(
  *       private network. It also enforces the response-size limit, follows at
  *       most three additional redirect hops on either setting, and bounds the
  *       whole attempt (the wait for DNS, connect, redirects and body) by
- *       `FETCH_TIMEOUT_MS`. The connection is pinned to the addresses the name
- *       resolved to at validation time, tried in that order, so a `localhost`
- *       that resolves to both `::1` and `127.0.0.1` reaches whichever listens.
+ *       `FETCH_TIMEOUT_MS`. The connection is pinned to the set of addresses
+ *       the name resolved to at validation time. Node's address selection
+ *       tries those addresses within the request budget, so a `localhost` that
+ *       resolves to both `::1` and `127.0.0.1` reaches whichever listens.
  *       Set `FETCH_ALLOW_PRIVATE_URLS=true` for local development to permit
  *       private or reserved destinations; the resolver's other checks remain
  *       active.

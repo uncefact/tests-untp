@@ -99,8 +99,8 @@ export function readFetchMaxResponseSize(env: Record<string, string | undefined>
 }
 
 /**
- * The whole-fetch time budget in milliseconds, covering connect, redirects and
- * body. Unlike the size, an unusable value throws: a public route holds a
+ * The whole-fetch time budget in milliseconds, covering the wait for DNS,
+ * connect, redirects and body. Unlike the size, an unusable value throws: a public route holds a
  * request open for the whole budget, so silently running on the default when
  * the operator asked for something else is a difference they need to be told
  * about. The throw is surfaced at process boot (instrumentation.node.ts), and
