@@ -1,5 +1,7 @@
 const logLines: Array<{ level: 'info' | 'warn' | 'error'; message: string }> = [];
 
+jest.mock('pg-boss', () => ({ PgBoss: class PgBoss {} }));
+
 /**
  * The same calls again, rendered by the REAL pino logger into a captured
  * destination. The reduced `{ level, message }` capture above is convenient
@@ -199,6 +201,7 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     completedAt: new Date('2026-09-03T11:01:00.000Z'),
     lastEnqueuedAt: new Date('2026-09-03T11:00:00.000Z'),
     ...overrides,
+    schemaConformanceMessage: overrides.schemaConformanceMessage ?? null,
   };
 }
 
@@ -311,6 +314,7 @@ function dependencies(overrides: Partial<ReverifyLibraryRecordDependencies> = {}
     // real `fetch` against a storage URI.
     fetchStoredCopy:
       typedMock<ReverifyLibraryRecordDependencies['fetchStoredCopy']>().mockResolvedValue(STORED_CIPHERTEXT),
+    storedCopyTimeoutMs: () => 300_000,
     ...overrides,
   };
 }
@@ -1582,6 +1586,7 @@ describe('reverifyLibraryRecord with a supplied decryption key', () => {
         custody,
       }),
       fetchStoredCopy,
+      storedCopyTimeoutMs: () => 12_345,
       recoverInRequest,
     });
 
@@ -1591,7 +1596,7 @@ describe('reverifyLibraryRecord with a supplied decryption key', () => {
       checkRunId: 'run-2',
     });
 
-    expect(fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+    expect(fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI, 12_345);
     expect(deps.fetchSource).not.toHaveBeenCalled();
     const [input, options] = recoverInRequest.mock.calls[0];
     expect(input).not.toHaveProperty('sourceUrl');
@@ -1650,7 +1655,7 @@ describe('reverifyLibraryRecord with a supplied decryption key', () => {
 
     await reverifyLibraryRecord(RECORD_ID, TENANT_ID, prepareEnqueue, SUPPLIED_KEY, deps);
 
-    expect(fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+    expect(fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI, 300_000);
     expect(deps.fetchSource).not.toHaveBeenCalled();
   });
 

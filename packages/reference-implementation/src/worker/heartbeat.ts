@@ -16,14 +16,6 @@ export const HEARTBEAT_PROBE_TIMEOUT_MS = 5_000;
  * budget, not by this.
  */
 export const HEARTBEAT_STALE_FETCH_MS = 30_000;
-/**
- * How long a consumer may report a job in hand before that stops counting
- * as work. An attempt expires at 120 s (VERIFY_JOB_ENQUEUE_OPTIONS), and
- * pg-boss keeps a consumer's job count when a settlement throws, so a count
- * older than this is a retained count after a failure, not a running job.
- */
-export const HEARTBEAT_MAX_JOB_MS = 180_000;
-
 export interface HeartbeatOptions {
   /** Proves the queue can still work; rejects when it cannot. */
   probe: () => Promise<QueueProbe>;
@@ -32,7 +24,8 @@ export interface HeartbeatOptions {
   intervalMs?: number;
   probeTimeoutMs?: number;
   staleFetchMs?: number;
-  maxJobMs?: number;
+  /** How long a consumer may report a job in hand before it is considered stale. */
+  maxJobMs: number;
   /** Injected for tests; the real clock otherwise. */
   now?: () => number;
 }
@@ -71,7 +64,7 @@ export function startHeartbeat(options: HeartbeatOptions): Heartbeat {
   const intervalMs = options.intervalMs ?? HEARTBEAT_INTERVAL_MS;
   const probeTimeoutMs = options.probeTimeoutMs ?? HEARTBEAT_PROBE_TIMEOUT_MS;
   const staleFetchMs = options.staleFetchMs ?? HEARTBEAT_STALE_FETCH_MS;
-  const maxJobMs = options.maxJobMs ?? HEARTBEAT_MAX_JOB_MS;
+  const maxJobMs = options.maxJobMs;
   const now = options.now ?? (() => Date.now());
   const startedAt = now();
   let stopped = false;

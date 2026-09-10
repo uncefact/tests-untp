@@ -97,6 +97,7 @@ function jobContext(overrides: Partial<JobContext> = {}): JobContext {
     isFinalAttempt: true,
     signal: new AbortController().signal,
     ...overrides,
+    expireSeconds: overrides.expireSeconds ?? 300,
   };
 }
 
@@ -824,6 +825,7 @@ describe('DELETE /library/{id} database behaviour', () => {
           id: 'delete-settlement-run-1',
           tenantId: OWNER_TENANT_ID,
           checks: COMPLETE_CHECKS,
+          schemaConformanceMessage: null,
         });
         await waitForQueueBehind(observer, holder.pid, 1);
         deletion = deleteLibraryRecord({ recordId: 'delete-settlement', tenantId: OWNER_TENANT_ID });
@@ -835,6 +837,7 @@ describe('DELETE /library/{id} database behaviour', () => {
           id: 'delete-settlement-run-1',
           tenantId: OWNER_TENANT_ID,
           checks: COMPLETE_CHECKS,
+          schemaConformanceMessage: null,
         });
         await waitForQueueBehind(observer, holder.pid, 2);
       }
@@ -858,6 +861,7 @@ describe('DELETE /library/{id} database behaviour', () => {
       id: 'delete-failed-settlement-run-1',
       tenantId: OWNER_TENANT_ID,
       checks: noChecksRun(),
+      schemaConformanceMessage: null,
       failure: {
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
         message: 'The copy is absent.',

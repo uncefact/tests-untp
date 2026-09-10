@@ -30,6 +30,7 @@ jest.mock('pg-boss', () => {
 });
 
 import { JobQueueError } from './errors';
+import { MAX_JOB_EXPIRE_SECONDS } from './job-expiry';
 import { PgBossJobQueue } from './pg-boss-job-queue';
 
 const { __bossMock: bossMock, __mockState: mockState } = jest.requireMock('pg-boss') as {
@@ -60,6 +61,7 @@ const job = (overrides: object = {}) => ({
   data: { recordId: 'r1' },
   retryCount: 0,
   retryLimit: 2,
+  expireInSeconds: 300,
   signal: new AbortController().signal,
   ...overrides,
 });
@@ -160,6 +162,19 @@ describe('constructor', () => {
     );
   });
 
+  it('rejects an invalid default expiry', () => {
+    expect(() => makeQueue({ defaultExpireSeconds: 0 })).toThrow(
+      'defaultExpireSeconds must be a positive integer of at most 24 hours',
+    );
+    expect(() => makeQueue({ defaultExpireSeconds: 1.5 })).toThrow(
+      'defaultExpireSeconds must be a positive integer of at most 24 hours',
+    );
+    expect(() => makeQueue({ defaultExpireSeconds: MAX_JOB_EXPIRE_SECONDS + 1 })).toThrow(
+      'defaultExpireSeconds must be a positive integer of at most 24 hours',
+    );
+    expect(() => makeQueue({ defaultExpireSeconds: MAX_JOB_EXPIRE_SECONDS })).not.toThrow();
+  });
+
   it('falls back to console.error when no onError is supplied', () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
@@ -185,7 +200,7 @@ describe('enqueue option mapping', () => {
         dedupeKey: 'issue:r1',
         fairnessKey: 'tenant-a',
         startAfter,
-        expireSeconds: 120,
+        expireSeconds: 60,
         retry: { limit: 3, backoffSeconds: 30, backoffMaxSeconds: 600 },
       },
     );
@@ -196,7 +211,7 @@ describe('enqueue option mapping', () => {
         singletonKey: 'issue:r1',
         group: { id: 'tenant-a' },
         startAfter,
-        expireInSeconds: 120,
+        expireInSeconds: 60,
         retryLimit: 3,
         retryDelay: 30,
         retryBackoff: true,
@@ -211,6 +226,14 @@ describe('enqueue option mapping', () => {
     expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, {});
   });
 
+  it('applies the constructed default expiry to sends and schedules', async () => {
+    const queue = makeQueue({ defaultExpireSeconds: 60 });
+    await queue.enqueue('issue', {});
+    await queue.schedule('issue', '0 * * * *');
+    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { expireInSeconds: 60 });
+    expect(bossMock.schedule).toHaveBeenCalledWith('issue', '0 * * * *', null, { expireInSeconds: 60 });
+  });
+
   it('applies retry without backoff as a bare retryLimit', async () => {
     const queue = makeQueue();
     await queue.enqueue('issue', {}, { retry: { limit: 1 } });
@@ -220,7 +243,15 @@ describe('enqueue option mapping', () => {
   it('falls back to the constructor defaultRetry when the send names none', async () => {
     const queue = makeQueue({ defaultRetry: { limit: 5, backoffSeconds: 10 } });
     await queue.enqueue('issue', {});
-    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { retryLimit: 5, retryDelay: 10, retryBackoff: true });
+    expect(bossMock.send).toHaveBeenCalledWith(
+      'issue',
+      {},
+      {
+        retryLimit: 5,
+        retryDelay: 10,
+        retryBackoff: true,
+      },
+    );
   });
 
   it('lets a per-send retry override the defaultRetry', async () => {
@@ -695,10 +726,28 @@ describe('handler context and settlement', () => {
     await callback([job({ retryCount: 1, retryLimit: 2 })]);
     await callback([job({ retryCount: 2, retryLimit: 2 })]);
     expect(contexts).toMatchObject([
-      { attempt: 1, isFinalAttempt: false },
-      { attempt: 2, isFinalAttempt: false },
-      { attempt: 3, isFinalAttempt: true },
+      { attempt: 1, isFinalAttempt: false, expireSeconds: 300 },
+      { attempt: 2, isFinalAttempt: false, expireSeconds: 300 },
+      { attempt: 3, isFinalAttempt: true, expireSeconds: 300 },
     ]);
+  });
+
+  it('falls back to the configured expiry and warns when job metadata is invalid', async () => {
+    const onError = jest.fn();
+    const callback = await startWithHandler(
+      async (_payload, context) => {
+        expect(context).toMatchObject({ expireSeconds: 60 });
+      },
+      { defaultExpireSeconds: 60, onError },
+    );
+
+    await callback([job({ id: 'job-invalid-expiry', expireInSeconds: 0 })]);
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("job 'job-invalid-expiry' carried an invalid expireInSeconds value"),
+      }),
+    );
   });
 
   it('treats a retry limit of zero as final on the first attempt', async () => {

@@ -100,7 +100,7 @@ services:
       AUTH_OIDC_AUTHORIZATION_URL: http://localhost:${KEYCLOAK_PORT:-8080}/realms/${KEYCLOAK_REALM:-ri-local}/protocol/openid-connect/auth
       AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE: ${AUTH_OIDC_SERVICE_ACCOUNT_AUDIENCE:-ri-api}
       AUTH_SECRET: ${AUTH_SECRET:-change-me-in-production}
-      AUTH_TRUST_HOST: "true"
+      AUTH_TRUST_HOST: 'true'
       RI_APP_URL: http://localhost:3003
       # Tenant mode
       TENANT_MODE: ${TENANT_MODE:-open}
@@ -164,10 +164,9 @@ services:
       # default applies. A `${VAR:-}` form would inject an empty string and
       # trigger the startup warning on every stock boot.
       API_MAX_BATCH_LIMIT:
-      # Read by this process as well as the worker: the key-bearing recovery on
-      # POST /api/v1/library/{id}/verify reads the record's own durable copy
-      # inside the request. Same null-value form as the limit above.
-      LIBRARY_STORED_COPY_READ_TIMEOUT_MS:
+      # Read by this process as well as the worker. Keep the value the same
+      # across both services so one background-work budget is in force.
+      WORKER_JOB_TIMEOUT_SECONDS:
       # OpenTelemetry - see docs/observability.md
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
       # Always forwarded, possibly empty; buildResource treats an empty value
@@ -227,7 +226,7 @@ services:
       OTEL_SERVICE_NAME: ${OTEL_WORKER_SERVICE_NAME:-reference-implementation-worker}
       LIBRARY_RECONCILE_PENDING_RUNS_CRON: ${LIBRARY_RECONCILE_PENDING_RUNS_CRON:-}
       LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE: ${LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE:-}
-      LIBRARY_STORED_COPY_READ_TIMEOUT_MS: ${LIBRARY_STORED_COPY_READ_TIMEOUT_MS:-}
+      WORKER_JOB_TIMEOUT_SECONDS:
     depends_on:
       ri-db:
         condition: service_healthy

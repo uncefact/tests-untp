@@ -52,7 +52,9 @@ export const verificationChecksSchema = z
     proof: checkResultSchema,
     status: checkResultSchema,
     temporal: checkResultSchema.describe('Recorded as evidence; never part of the blocking set.'),
-    schemaConformance: checkResultSchema.describe('Advisory only; never blocks a verified summary.'),
+    schemaConformance: checkResultSchema.describe(
+      'Advisory only; checks the system core schema for the stored type and version, then JSON-LD expansion; extension schemas are not checked.',
+    ),
   })
   .strict()
   .describe('All seven checks are always present; `not_run` covers both "did not apply" and "did not execute".');
@@ -408,6 +410,17 @@ function wireChecks(run: CheckRun, native: boolean): VerificationChecks {
   ) as VerificationChecks;
 }
 
+function schemaConformanceWarnings(run: CheckRun | null): CredentialRecordWarning[] {
+  if (
+    run?.state === CheckRunState.PENDING ||
+    run?.schemaConformance !== CheckResult.FAIL ||
+    run.schemaConformanceMessage === null
+  ) {
+    return [];
+  }
+  return [{ code: 'SCHEMA_CONFORMANCE_ADVISORY', message: run.schemaConformanceMessage }];
+}
+
 function freshnessOf(
   run: CheckRun,
 ): { sourceChanged: boolean | null; lastSourceCheckAt: string } | Record<string, never> {
@@ -557,7 +570,7 @@ export function toNativeCredentialRecord(
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,
     capabilities: { deletable: false, annotatable: false, verifiable: true },
-    warnings: [],
+    warnings: schemaConformanceWarnings(checkRun),
     createdAt: parent.createdAt.toISOString(),
     updatedAt: parent.updatedAt.toISOString(),
   };
@@ -578,7 +591,7 @@ export function toCredentialRecord(
 ): CredentialRecordResponse {
   const now = options.now ?? new Date(Date.now());
   const { record: parent, external, checkRun } = record;
-  const warnings: CredentialRecordWarning[] = [];
+  const warnings: CredentialRecordWarning[] = schemaConformanceWarnings(checkRun);
   // The pointer is written by recovery (#957, this release) and by
   // promotion (#960, not yet landed), so this warning is currently reachable
   // only through a re-verification that recovers a record onto content

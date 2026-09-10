@@ -4,13 +4,15 @@ import {
   type CheckRunSettleOutcome,
 } from '@/lib/prisma/repositories/check-run.repository';
 import type { CheckRun } from '@/lib/prisma/generated';
-import type { JobHandler, JobQueue } from '@/lib/jobs/types';
+import type { EnqueueOptions, JobHandler, JobQueue } from '@/lib/jobs/types';
 import { LIBRARY_RECONCILE_PENDING_RUNS_JOB } from '@/lib/jobs/queue-names';
 import { readReconcilePendingRunsBatchSize } from '@/lib/config/reconcile-pending-runs.config';
+import { readWorkerJobTimeoutSeconds } from '@/lib/config/worker-job-timeout.config';
 import { VERIFY_JOB_ENQUEUE_OPTIONS } from './verify-generation-job';
 import { apiLogger } from '@/lib/api/logger';
 
 const RECONCILIATION_BOUND_SECONDS = 30 * 60;
+type RetryLadder = NonNullable<EnqueueOptions['retry']>;
 const logger = apiLogger.child({ module: 'reconcile-pending-runs-job' });
 
 export type ReconcilePendingRunsDependencies = {
@@ -47,17 +49,16 @@ export function defaultReconcilePendingRunsDependencies(): ReconcilePendingRunsD
  */
 export function verificationAbandonmentCutoff(
   now: Date = new Date(Date.now()),
-  options = VERIFY_JOB_ENQUEUE_OPTIONS,
+  retry: RetryLadder = VERIFY_JOB_ENQUEUE_OPTIONS.retry,
+  attemptSeconds = readWorkerJobTimeoutSeconds(),
 ): Date {
-  const retry = options.retry;
-  const retryLimit = retry?.limit ?? 0;
-  const backoffSeconds = retry?.backoffSeconds ?? 0;
-  const backoffMaxSeconds = retry?.backoffMaxSeconds ?? Number.POSITIVE_INFINITY;
+  const retryLimit = retry.limit;
+  const backoffSeconds = retry.backoffSeconds ?? 0;
+  const backoffMaxSeconds = retry.backoffMaxSeconds ?? Number.POSITIVE_INFINITY;
   let retrySeconds = 0;
-  for (let retry = 1; retry <= retryLimit; retry += 1) {
-    retrySeconds += Math.min(backoffSeconds * 2 ** retry, backoffMaxSeconds);
+  for (let retryNumber = 1; retryNumber <= retryLimit; retryNumber += 1) {
+    retrySeconds += Math.min(backoffSeconds * 2 ** retryNumber, backoffMaxSeconds);
   }
-  const attemptSeconds = options.expireSeconds ?? 0;
   const elapsedSeconds = attemptSeconds * (retryLimit + 1) + retrySeconds;
   const roundedSeconds = Math.max(
     RECONCILIATION_BOUND_SECONDS,

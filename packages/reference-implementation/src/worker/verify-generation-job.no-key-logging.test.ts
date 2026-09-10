@@ -66,6 +66,7 @@ function run(): CheckRun {
     requestedAt: new Date('2026-09-07T00:00:00.000Z'),
     completedAt: null,
     lastEnqueuedAt: new Date('2026-09-07T00:00:00.000Z'),
+    schemaConformanceMessage: null,
   };
 }
 
@@ -130,7 +131,14 @@ function encryptedCopy(): Uint8Array {
 const JOB = { tenantId: TENANT_ID, recordId: RECORD_ID, generation: 2, checkRunId: RUN_ID };
 
 function jobContext(overrides: Partial<JobContext> = {}): JobContext {
-  return { jobId: 'job-1', attempt: 1, isFinalAttempt: true, signal: new AbortController().signal, ...overrides };
+  return {
+    jobId: 'job-1',
+    attempt: 1,
+    isFinalAttempt: true,
+    expireSeconds: 300,
+    signal: new AbortController().signal,
+    ...overrides,
+  };
 }
 
 function dependencies(overrides: Partial<VerifyGenerationDependencies> = {}): VerifyGenerationDependencies {
@@ -141,6 +149,7 @@ function dependencies(overrides: Partial<VerifyGenerationDependencies> = {}): Ve
     revealStoredKey: jest.fn().mockReturnValue(SENTINEL_KEY),
     verifyDigest: jest.fn().mockResolvedValue(true),
     resolveVerifier: jest.fn().mockResolvedValue({ verify: jest.fn().mockResolvedValue({ verified: true }) }),
+    checkSchemaConformance: jest.fn().mockResolvedValue({ result: CheckResult.NOT_RUN, message: null }),
     settleComplete: jest.fn().mockResolvedValue({ outcome: 'applied' }),
     settleFailed: jest.fn().mockResolvedValue({ outcome: 'applied' }),
     ...overrides,
@@ -176,6 +185,7 @@ describe('worker verification log output', () => {
       resolveVerifier: jest.fn().mockResolvedValue({
         verify: jest.fn().mockRejectedValue(verifierFailure),
       }),
+      checkSchemaConformance: jest.fn().mockResolvedValue({ result: CheckResult.NOT_RUN, message: null }),
       settleComplete: jest.fn(),
       settleFailed: jest.fn().mockResolvedValue({ outcome: 'applied' }),
     };
@@ -186,6 +196,7 @@ describe('worker verification log output', () => {
         jobId: 'job-1',
         attempt: 1,
         isFinalAttempt: true,
+        expireSeconds: 300,
         signal: new AbortController().signal,
       },
     );

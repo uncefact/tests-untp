@@ -77,6 +77,9 @@ import {
   findAbandonedPendingCheckRuns,
   reserveRecoveryGeneration,
   settleAbandonedCheckRun,
+  settleCheckRunComplete,
+  settleCheckRunFailed,
+  noChecksRun,
   RecoveryLockDiscoveryExhaustedError,
   type CreateReverificationGenerationInput,
   type FinaliseRecoveryGenerationInput,
@@ -184,6 +187,7 @@ function abandonedRun(overrides: Partial<CheckRun> = {}): CheckRun {
     failureRetryable: null,
     sourceChanged: null,
     lastSourceCheckAt: null,
+    schemaConformanceMessage: null,
     requestedAt: new Date('2026-09-06T00:00:00.000Z'),
     completedAt: null,
     lastEnqueuedAt: null,
@@ -2566,6 +2570,38 @@ describe('reserveRecoveryGeneration', () => {
         generation: 4,
       });
     });
+  });
+});
+
+describe('verification settlement schema message', () => {
+  it('writes the nullable message on both complete and failed settlements', async () => {
+    const updateMany = prisma.checkRun.updateMany as unknown as jest.Mock;
+    updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      settleCheckRunComplete({
+        id: 'run-1',
+        tenantId: TENANT_ID,
+        checks: noChecksRun(),
+        schemaConformanceMessage: 'first violation',
+      }),
+    ).resolves.toEqual({ outcome: 'applied' });
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ schemaConformanceMessage: 'first violation' }) }),
+    );
+
+    await expect(
+      settleCheckRunFailed({
+        id: 'run-1',
+        tenantId: TENANT_ID,
+        checks: noChecksRun(),
+        schemaConformanceMessage: null,
+        failure: { code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE, message: 'failed', retryable: true },
+      }),
+    ).resolves.toEqual({ outcome: 'applied' });
+    expect(updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ schemaConformanceMessage: null }) }),
+    );
   });
 });
 

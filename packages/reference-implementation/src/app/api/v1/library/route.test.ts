@@ -333,6 +333,7 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     sourceChanged: null,
     lastSourceCheckAt: null,
     ...overrides,
+    schemaConformanceMessage: overrides.schemaConformanceMessage ?? null,
   };
 }
 

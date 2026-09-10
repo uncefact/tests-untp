@@ -17,16 +17,25 @@ Every UNTP release from 0.6.0 onwards (0.6.0, 0.6.1 and 0.7.0 today):
 - The 0.7.0 Conformity Scheme schema and the 0.7.0 Identity Resolver link set schema.
 - The W3C Verifiable Credentials Data Model v2 context (`https://www.w3.org/ns/credentials/v2`), which every credential declares, and its JSON Schema.
 
-Extension schemas and contexts hosted elsewhere (for example a sector's own credential type) are not bundled. A fetch failure for one of those still fails the request as before.
+Extension schemas and contexts hosted elsewhere (for example a sector's own credential type) are not bundled. On the issuance route, a fetch failure for one of those still fails the request as before. On the worker path, a failure to fetch an extension context settles `schemaConformance: not_run` and verification continues; extension schemas are never checked there at all.
 
 ## What happens during an outage
 
-When the host cannot deliver a bundled artefact (its name does not resolve, it cannot be reached, it times out, it answers an error status, it returns a body that is not JSON, or it exceeds the fetch's size or redirect bounds), the bundled copy is used instead and the request continues. Two failures are deliberately not covered, so they still fail the request as before: a URL the guard refused (a private address or hostname, an unsupported scheme, an unparseable URL), because a UNTP host resolving to a private address is something an operator must see, and an unexpected error inside the fetch itself. The copy is cached for the same period as a fetched one, so the host is retried once the cache entry expires.
+When the host cannot deliver a bundled artefact (its name does not resolve, it cannot be reached, it times out, it answers an error status, it returns a body that is not JSON, or it exceeds the fetch's size or redirect bounds), the bundled copy is used instead and the request continues. The worker's schema-conformance check is also a consumer of this fallback when it validates a stored copy. On the issuance route, a failure the fallback does not cover still fails the request as before. On the worker path, that failure settles `schemaConformance: not_run` and verification continues. This includes a URL the guard refused (a private address or hostname, an unsupported scheme, or an unparseable URL) and an unexpected error inside the fetch itself. The copy is cached for the same period as a fetched one, so the host is retried once the cache entry expires.
 
 Each time this happens the service logs a warning so the outage is visible (abridged; the real line also carries the usual `time`, `pid` and `hostname` fields and the error's stack):
 
 ```json
-{"level":40,"module":"schema-loader","url":"https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json","err":{"type":"ResolverHttpError","message":"https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json returned status 403."},"msg":"Served the bundled copy of a UNTP artefact because its fetch failed (snapshot listed in @uncefact/untp-utils artefacts/manifest.json; BUNDLED_ARTEFACTS_FALLBACK=false disables this)"}
+{
+  "level": 40,
+  "module": "schema-loader",
+  "url": "https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json",
+  "err": {
+    "type": "ResolverHttpError",
+    "message": "https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json returned status 403."
+  },
+  "msg": "Served the bundled copy of a UNTP artefact because its fetch failed (snapshot listed in @uncefact/untp-utils artefacts/manifest.json; BUNDLED_ARTEFACTS_FALLBACK=false disables this)"
+}
 ```
 
 `url` is the artefact that could not be fetched and `err` is the fetch's own failure, so the line tells an unreachable host apart from a host answering an error. The line is logged under `module: "schema-loader"` for a `@context` fallback as well as a schema one; the `url` says which.

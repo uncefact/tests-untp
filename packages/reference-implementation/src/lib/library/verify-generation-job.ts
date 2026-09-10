@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { readStoredCopyReadTimeoutMs } from '@/lib/config/stored-copy-read-timeout.config';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import {
   decryptCredentialToBytes,
@@ -39,6 +38,11 @@ import { LIBRARY_VERIFY_JOB } from '@/lib/jobs/queue-names';
 import { apiLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import { DECRYPTION_REQUIRED_MESSAGE } from './reverify-messages';
+import {
+  checkSchemaConformance,
+  type SchemaConformanceCheckInput,
+  type SchemaConformanceResult,
+} from './schema-conformance-check';
 
 /**
  * The asynchronous half of registration (#955, ADR-054): the verifier call
@@ -52,17 +56,13 @@ export { LIBRARY_VERIFY_JOB };
 
 /**
  * A transient failure (storage or the verifier unreachable) is retried on
- * this ladder; the last attempt settles the run FAILED instead. The ladder
- * is minutes long so a short outage settles as a real outcome rather than
- * as a job that outlives the caller's patience; a longer one is what
- * re-verify (#957, #958) exists for. `expireSeconds` bounds one attempt at
- * more than the copy read (10 s) and the verifier call (60 s, raced in the
- * handler because the verifier takes no signal of its own) together.
+ * this ladder; the last attempt settles the run FAILED instead. The worker's
+ * one attempt budget comes from `WORKER_JOB_TIMEOUT_SECONDS`, which is also
+ * carried by the queue job and used for every bounded stage.
  */
-export const VERIFY_JOB_ENQUEUE_OPTIONS: EnqueueOptions = {
+export const VERIFY_JOB_ENQUEUE_OPTIONS = {
   retry: { limit: 4, backoffSeconds: 30, backoffMaxSeconds: 600 },
-  expireSeconds: 120,
-};
+} satisfies EnqueueOptions;
 
 const logger = apiLogger.child({ module: 'verify-generation-job' });
 
@@ -93,11 +93,18 @@ const verifyJobReferenceSchema: z.ZodType<VerifyJobReference, z.ZodTypeDef, unkn
 /** The ids a payload must still carry for the run it names to be settled at all. */
 const settleableReferenceSchema = z.object({ tenantId: z.string().min(1), checkRunId: z.string().min(1) });
 
-/** Reading the stored copy back is bounded like the details backfill's read of the same store. */
+/** The largest stored copy this worker will read back into memory. */
 const MAX_STORED_COPY_BYTES = 16 * 1024 * 1024;
 
-/** Inside the attempt's expiry (VERIFY_JOB_ENQUEUE_OPTIONS.expireSeconds) with room for the copy read before it. */
-const VERIFIER_CALL_TIMEOUT_MS = 60_000;
+/** Leaves time for the guarded settlement write, and its follow-up read when that write matched nothing, before the queue expires an attempt. The settlement is one guarded write; ten seconds is an order of magnitude above its measured time in the integration suites. */
+const SETTLEMENT_MARGIN_MS = 10_000;
+
+class VerificationStageTimeout extends Error {
+  constructor() {
+    super('schema conformance did not finish within the remaining job budget');
+    this.name = 'VerificationStageTimeout';
+  }
+}
 
 /**
  * How reading the stored copy back failed. `transient`: storage could not be
@@ -126,10 +133,11 @@ export type VerifyGenerationDependencies = {
    * bytes: a UTF-8 decode and re-encode would change any body that is not
    * valid UTF-8 and report an intact copy as corrupt.
    */
-  fetchStoredCopy: (uri: string) => Promise<Uint8Array>;
+  fetchStoredCopy: (uri: string, timeoutMs: number) => Promise<Uint8Array>;
   revealStoredKey: (stored: string) => string | null;
   verifyDigest: (expected: string, data: Uint8Array) => Promise<boolean>;
   resolveVerifier: (tenantId: string) => Promise<IVerifiableCredentialService>;
+  checkSchemaConformance: (input: SchemaConformanceCheckInput) => Promise<SchemaConformanceResult>;
   settleComplete: (input: SettleCheckRunCompleteInput) => Promise<CheckRunSettleOutcome>;
   settleFailed: (input: SettleCheckRunFailedInput) => Promise<CheckRunSettleOutcome>;
 };
@@ -142,6 +150,7 @@ export function defaultVerifyGenerationDependencies(): VerifyGenerationDependenc
     revealStoredKey: revealDecryptionKey,
     verifyDigest: async (expected, data) => MultibaseDigest.fromString(expected).verify(data),
     resolveVerifier: async (tenantId) => (await resolveVcService(tenantId)).service,
+    checkSchemaConformance,
     settleComplete: settleCheckRunComplete,
     settleFailed: settleCheckRunFailed,
   };
@@ -165,6 +174,7 @@ type OperatorSignal = { classification: string; message: string };
 abstract class VerificationError extends Error {
   readonly failure: CheckRunFailure;
   readonly operator?: OperatorSignal;
+  schemaConformanceMessage: string | null = null;
   /**
    * What the worker had established when this was thrown: the copy was
    * retrieved, decrypted, and its digest checked. A failed settlement records
@@ -204,6 +214,9 @@ class TerminalVerificationError extends VerificationError {
 
 export function verifyGenerationHandler(deps: VerifyGenerationDependencies): JobHandler<VerifyJobReference> {
   return async (payload, context) => {
+    const attemptStartedAt = Date.now();
+    const deadline = attemptStartedAt + context.expireSeconds * 1_000 - SETTLEMENT_MARGIN_MS;
+    const remaining = (): number => Math.max(0, Math.floor(deadline - Date.now()));
     const parsed = verifyJobReferenceSchema.safeParse(payload);
     if (!parsed.success) {
       // A payload this process cannot read will not read better on a retry.
@@ -219,6 +232,7 @@ export function verifyGenerationHandler(deps: VerifyGenerationDependencies): Job
             id: ids.data.checkRunId,
             tenantId: ids.data.tenantId,
             checks: noChecksRun(),
+            schemaConformanceMessage: null,
             failure: {
               code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
               message: 'Verification could not be scheduled for this generation; re-verify to run it again.',
@@ -254,9 +268,9 @@ export function verifyGenerationHandler(deps: VerifyGenerationDependencies): Job
       return;
     }
 
-    let checks: CheckResults;
+    let outcome: VerificationOutcome;
     try {
-      checks = await verifyStoredCopy(record, run, deps, context);
+      outcome = await verifyStoredCopy(record, run, deps, context, remaining);
     } catch (error) {
       if (error instanceof TransientVerificationError && !context.isFinalAttempt) {
         log.warn(
@@ -291,6 +305,7 @@ export function verifyGenerationHandler(deps: VerifyGenerationDependencies): Job
             id: run.id,
             tenantId: job.tenantId,
             checks: error.checks ?? checksOf(run),
+            schemaConformanceMessage: error.schemaConformanceMessage,
             failure: error.failure,
           }),
         );
@@ -298,7 +313,15 @@ export function verifyGenerationHandler(deps: VerifyGenerationDependencies): Job
       }
       throw error;
     }
-    report(log, await deps.settleComplete({ id: run.id, tenantId: job.tenantId, checks }));
+    report(
+      log,
+      await deps.settleComplete({
+        id: run.id,
+        tenantId: job.tenantId,
+        checks: outcome.checks,
+        schemaConformanceMessage: outcome.schemaConformanceMessage,
+      }),
+    );
   };
 }
 
@@ -339,22 +362,34 @@ async function verifyStoredCopy(
   run: CheckRun,
   deps: VerifyGenerationDependencies,
   context: JobContext,
-): Promise<CheckResults> {
-  const progress: { checks: CheckResults } = { checks: checksOf(run) };
+  remaining: () => number,
+): Promise<VerificationOutcome> {
+  const progress: VerificationProgress = { checks: checksOf(run), schemaConformanceMessage: null };
   try {
-    return await runStoredCopyChecks(record, deps, context, progress);
+    return await runStoredCopyChecks(record, deps, context, progress, remaining);
   } catch (error) {
-    if (error instanceof VerificationError) error.checks = progress.checks;
+    if (error instanceof VerificationError) {
+      error.checks = progress.checks;
+      error.schemaConformanceMessage = progress.schemaConformanceMessage;
+    }
     throw error;
   }
 }
+
+type VerificationOutcome = { checks: CheckResults; schemaConformanceMessage: string | null };
+
+type VerificationProgress = {
+  checks: CheckResults;
+  schemaConformanceMessage: string | null;
+};
 
 async function runStoredCopyChecks(
   record: LibraryRecordDetailView,
   deps: VerifyGenerationDependencies,
   context: JobContext,
-  progress: { checks: CheckResults },
-): Promise<CheckResults> {
+  progress: VerificationProgress,
+  remaining: () => number,
+): Promise<VerificationOutcome> {
   const base = progress.checks;
   const copy = copyOf(record);
 
@@ -378,12 +413,16 @@ async function runStoredCopyChecks(
   // Read the object before using the recorded content kind. A missing or
   // corrupt object must be reported as a custody failure even when the row
   // says it once held HTML or another non-credential body.
+  const copyTimeoutMs = remaining();
+  // This read is bounded by the remaining allowance so it cannot consume the
+  // settlement margin reserved for the guarded write and its follow-up read.
   const stored = await readStoredCopy(
     copy.storageUri,
     copy.decryptionKey,
     copy.contentKind === ExternalContentKind.CREDENTIAL,
     deps,
     context,
+    copyTimeoutMs,
   );
   const checks = {
     ...base,
@@ -442,7 +481,7 @@ async function runStoredCopyChecks(
   if (copy.contentKind !== ExternalContentKind.CREDENTIAL) {
     // The body was fetched and stored but is not an enveloped credential. The
     // proof check fails by definition; the verifier is not asked to sign off.
-    return { ...checked, proof: CheckResult.FAIL };
+    return { checks: { ...checked, proof: CheckResult.FAIL }, schemaConformanceMessage: null };
   }
   // readStoredCopy throws `unreadable` for a CREDENTIAL copy whose content is
   // not a JSON object, so a copy that reaches this line always carries one.
@@ -450,7 +489,55 @@ async function runStoredCopyChecks(
   // intact copy that is not one settles COMPLETE with the proof check failed.
   const credential = stored.credential as EnvelopedVerifiableCredential;
 
+  throwIfAborted(context);
+  let conformance: SchemaConformanceResult;
+  const conformanceTimeoutMs = remaining();
+  const conformanceDeadline = Date.now() + conformanceTimeoutMs;
+  const conformanceTimeout = new VerificationStageTimeout();
+  if (conformanceTimeoutMs <= 0) {
+    logger.warn(
+      { recordId: record.record.id, remainingMs: conformanceTimeoutMs, expireSeconds: context.expireSeconds },
+      'Schema conformance was skipped because the worker job budget was exhausted',
+    );
+    conformance = { result: CheckResult.NOT_RUN, message: null };
+  } else {
+    try {
+      // Decision: the advisory check runs first and shares the attempt budget
+      // with the blocking verifier. If it exhausts that budget, the attempt
+      // fails as VERIFICATION_UNAVAILABLE and retries on the ladder.
+      // The deadline guard stops new schema or context loads after the
+      // budget, while this outer race also bounds work already in flight,
+      // including a cache-warm expansion.
+      conformance = await withTimeout(
+        deps.checkSchemaConformance({
+          recordId: record.record.id,
+          detailsStatus: record.record.detailsStatus,
+          coreCredentialType: record.record.coreCredentialType,
+          coreDataModelVersion: record.record.coreDataModelVersion,
+          envelope: credential,
+          deadline: conformanceDeadline,
+          signal: context.signal,
+        }),
+        conformanceTimeoutMs,
+        'schema conformance',
+        conformanceTimeout,
+      );
+    } catch (error) {
+      if (error !== conformanceTimeout) throw error;
+      logger.warn(
+        { recordId: record.record.id, remainingMs: conformanceTimeoutMs, expireSeconds: context.expireSeconds },
+        'Schema conformance was skipped because the worker job budget was exhausted',
+      );
+      conformance = { result: CheckResult.NOT_RUN, message: null };
+    }
+  }
+  throwIfAborted(context);
+  const conformanceChecks = { ...checked, schemaConformance: conformance.result };
+  progress.checks = conformanceChecks;
+  progress.schemaConformanceMessage = conformance.message;
+
   let result: VerifyResult;
+  const verifierTimeoutMs = remaining();
   try {
     // Resolving the tenant's verifier and calling it are one unavailability
     // for the caller: neither ran a check. The call has no signal of its own,
@@ -458,7 +545,7 @@ async function runStoredCopyChecks(
     // the attempt's expiry or keep the final attempt from settling.
     result = await withTimeout(
       deps.resolveVerifier(record.record.tenantId).then((verifier) => verifier.verify(credential)),
-      VERIFIER_CALL_TIMEOUT_MS,
+      verifierTimeoutMs,
       'the verifier call',
     );
   } catch (error) {
@@ -474,7 +561,7 @@ async function runStoredCopyChecks(
   // caught here, after the call, rather than settling a result the queue
   // already counts as failed.
   throwIfAborted(context);
-  return { ...checked, ...verifierChecks(result) };
+  return { checks: { ...conformanceChecks, ...verifierChecks(result) }, schemaConformanceMessage: conformance.message };
 }
 
 type StoredCopy = {
@@ -513,10 +600,11 @@ async function readStoredCopy(
   expectsCredential: boolean,
   deps: VerifyGenerationDependencies,
   context: JobContext,
+  timeoutMs: number,
 ): Promise<StoredCopy> {
   let bytes: Uint8Array;
   try {
-    bytes = await deps.fetchStoredCopy(uri);
+    bytes = await deps.fetchStoredCopy(uri, timeoutMs);
   } catch (error) {
     if (error instanceof StoredCopyReadError && error.kind === 'terminal') {
       throw new TerminalVerificationError(
@@ -707,10 +795,10 @@ function verifierChecks(result: VerifyResult): Pick<CheckResults, 'proof' | 'sta
  * written by our storage adapter, not supplied by a caller, and a
  * deployment's storage service legitimately lives on a private address.
  */
-export async function fetchStoredCopyBytes(uri: string): Promise<Uint8Array> {
+export async function fetchStoredCopyBytes(uri: string, timeoutMs: number): Promise<Uint8Array> {
   let response: Response;
   try {
-    response = await fetch(uri, { signal: AbortSignal.timeout(readStoredCopyReadTimeoutMs()) });
+    response = await fetch(uri, { signal: AbortSignal.timeout(timeoutMs) });
   } catch (error) {
     throw new StoredCopyReadError('transient', 'storage could not be reached', error);
   }
@@ -787,10 +875,15 @@ function decodeBase64(text: string): Uint8Array | null {
   return Buffer.from(bytes).toString('base64') === encoded ? bytes : null;
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  what: string,
+  timeoutError: Error = new Error(`${what} did not answer within ${ms} ms`),
+): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${what} did not answer within ${ms} ms`)), ms);
+    timer = setTimeout(() => reject(timeoutError), Math.max(0, Math.floor(ms)));
   });
   try {
     return await Promise.race([promise, timeout]);

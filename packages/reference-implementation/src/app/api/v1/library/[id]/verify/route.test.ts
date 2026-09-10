@@ -181,6 +181,7 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     completedAt: new Date('2026-09-03T11:01:00.000Z'),
     lastEnqueuedAt: new Date('2026-09-03T11:00:00.000Z'),
     ...overrides,
+    schemaConformanceMessage: overrides.schemaConformanceMessage ?? null,
   };
 }
 

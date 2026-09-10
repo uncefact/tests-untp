@@ -17,6 +17,8 @@
  */
 const mockCapturedLogLines: string[] = [];
 
+jest.mock('pg-boss', () => ({ PgBoss: class PgBoss {} }));
+
 jest.mock('@uncefact/untp-ri-services/logging', () => {
   const actual = jest.requireActual('@uncefact/untp-ri-services/logging');
   return {
@@ -410,9 +412,10 @@ describe('POST /api/v1/library/{id}/verify rendered lines never carry the suppli
         temporal: CheckResult.NOT_RUN,
         schemaConformance: CheckResult.NOT_RUN,
       },
+      schemaConformanceMessage: null,
       failure: { code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE, message: 'settled', retryable: true },
     };
 
-    expect(Object.keys(settleInput)).toEqual(['id', 'tenantId', 'checks', 'failure']);
+    expect(Object.keys(settleInput)).toEqual(['id', 'tenantId', 'checks', 'schemaConformanceMessage', 'failure']);
   });
 });

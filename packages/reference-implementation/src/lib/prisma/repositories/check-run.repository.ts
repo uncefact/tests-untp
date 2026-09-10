@@ -93,7 +93,10 @@ export type CheckRunFailure = {
  */
 export type CheckRunRef = { id: string; tenantId: string };
 
-export type SettleCheckRunCompleteInput = CheckRunRef & { checks: CheckResults };
+export type SettleCheckRunCompleteInput = CheckRunRef & {
+  checks: CheckResults;
+  schemaConformanceMessage: string | null;
+};
 
 /**
  * Every check is stated on failure too, so an omitted check can never keep a
@@ -101,7 +104,11 @@ export type SettleCheckRunCompleteInput = CheckRunRef & { checks: CheckResults }
  * it is not left PASS, is the caller's rule: the caller has the run in hand
  * (it read it under the tenant to get here) and passes the merged set.
  */
-export type SettleCheckRunFailedInput = CheckRunRef & { checks: CheckResults; failure: CheckRunFailure };
+export type SettleCheckRunFailedInput = CheckRunRef & {
+  checks: CheckResults;
+  schemaConformanceMessage: string | null;
+  failure: CheckRunFailure;
+};
 
 /**
  * `applied`: this call settled the run. `superseded`: the run was no longer
@@ -1896,6 +1903,7 @@ export async function settleCheckRunComplete(input: SettleCheckRunCompleteInput)
   return settle(input, {
     state: CheckRunState.COMPLETE,
     ...input.checks,
+    schemaConformanceMessage: input.schemaConformanceMessage ?? null,
     failureCode: null,
     failureMessage: null,
     failureRetryable: null,
@@ -1908,6 +1916,7 @@ export async function settleCheckRunFailed(input: SettleCheckRunFailedInput): Pr
   return settle(input, {
     state: CheckRunState.FAILED,
     ...input.checks,
+    schemaConformanceMessage: input.schemaConformanceMessage ?? null,
     failureCode: input.failure.code,
     failureMessage: input.failure.message,
     failureRetryable: input.failure.retryable,

@@ -148,11 +148,9 @@ services:
       - VERIFY_MAX_CREDENTIAL_SIZE=${VERIFY_MAX_CREDENTIAL_SIZE:-}
       - FETCH_TIMEOUT_MS=${FETCH_TIMEOUT_MS:-}
       - VERIFY_FETCH_TIMEOUT_MS=${VERIFY_FETCH_TIMEOUT_MS:-}
-      # Read by this process as well as app-worker: the key-bearing recovery on
-      # POST /api/v1/library/{id}/verify reads the record's own durable copy
-      # inside the request. Passed through only when set, so an absent value
-      # stays absent and the default applies.
-      - LIBRARY_STORED_COPY_READ_TIMEOUT_MS
+      # Read by this process as well as app-worker. Keep the value the same
+      # across both services so one background-work budget is in force.
+      - WORKER_JOB_TIMEOUT_SECONDS
       # Tenant mode (default: open — override to "closed" for closed mode tests)
       - TENANT_MODE=${TENANT_MODE:-open}
       - TENANT_CLAIM_NAME=${TENANT_CLAIM_NAME:-groups}
@@ -215,7 +213,7 @@ services:
       - OTEL_SERVICE_NAME=reference-implementation-worker
       - LIBRARY_RECONCILE_PENDING_RUNS_CRON=${LIBRARY_RECONCILE_PENDING_RUNS_CRON:-}
       - LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE=${LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE:-}
-      - LIBRARY_STORED_COPY_READ_TIMEOUT_MS=${LIBRARY_STORED_COPY_READ_TIMEOUT_MS:-}
+      - WORKER_JOB_TIMEOUT_SECONDS
     extra_hosts:
       - 'localhost:host-gateway'
     depends_on:
