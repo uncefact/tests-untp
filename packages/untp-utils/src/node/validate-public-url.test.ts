@@ -7,6 +7,7 @@ import {
   ResolutionFailedError,
   UrlValidationError,
 } from './errors.js';
+import type { PublicUrlLookup } from './validate-public-url.js';
 
 const lookup = jest.fn();
 
@@ -180,6 +181,15 @@ describe('validatePublicUrl', () => {
   });
 
   describe('DNS resolution', () => {
+    it('uses a supplied lookup callback while still validating its addresses', async () => {
+      const suppliedLookup = jest.fn<PublicUrlLookup>().mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+
+      await expect(validatePublicUrl('https://example.com/', { lookup: suppliedLookup })).rejects.toBeInstanceOf(
+        PrivateAddressError,
+      );
+      expect(suppliedLookup).toHaveBeenCalledWith('example.com', { family: 0, all: true });
+    });
+
     it('throws ResolutionFailedError when dns.lookup rejects', async () => {
       lookup.mockRejectedValue(new Error('ENOTFOUND example.com') as never);
       await expect(validatePublicUrl('https://example.com/')).rejects.toMatchObject({

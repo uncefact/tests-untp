@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { ResolverHttpError, ResolverInvalidJsonError } from './errors.js';
+import type { PublicUrlLookup } from '../node/validate-public-url.js';
 
 const resolveDocument = jest.fn();
 
@@ -88,6 +89,23 @@ describe('resolveJsonDocument', () => {
       'https://ex.test/doc',
       expect.objectContaining({ allowedSchemes: ['https'], maxResponseBytes: 2048, allowPrivateAddresses: true }),
     );
+  });
+
+  it('leaves the default resolver lookup path unchanged when no lookup is supplied', async () => {
+    resolveDocument.mockResolvedValue({ body: encode('{}'), finalUrl: 'https://ex.test/doc' } as never);
+
+    await resolveJsonDocument('https://ex.test/doc');
+
+    expect(resolveDocument.mock.calls[0][1]).not.toHaveProperty('lookup');
+  });
+
+  it('forwards the optional lookup callback to the guarded resolver', async () => {
+    const lookup = jest.fn<PublicUrlLookup>();
+    resolveDocument.mockResolvedValue({ body: encode('{}'), finalUrl: 'https://ex.test/doc' } as never);
+
+    await resolveJsonDocument('https://ex.test/doc', { lookup });
+
+    expect(resolveDocument).toHaveBeenCalledWith('https://ex.test/doc', expect.objectContaining({ lookup }));
   });
 
   it('throws ResolverInvalidJsonError when the body is not valid JSON', async () => {

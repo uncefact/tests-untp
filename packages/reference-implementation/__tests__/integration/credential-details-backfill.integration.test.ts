@@ -1,18 +1,17 @@
-// Jest cannot load jose's ESM build in this suite. decodeJwt here only
-// splits a compact JWT; production decodeCredential uses the real library.
-jest.mock('jose', () => ({
-  decodeJwt: (jwt: string) => {
-    const { 1: payload, length } = jwt.split('.');
-    if (length !== 3 || !payload) {
-      throw new Error('Invalid JWT');
-    }
-    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-  },
-}));
+// The production decoder must parse the real compact JWT in this integration
+// suite. The unit Jest mock is not evidence for that dependency boundary.
+jest.unmock('jose');
 
+import { AesGcmEncryptionAdapter, EncryptionAlgorithm } from '@uncefact/untp-ri-services/encryption';
 import { createRigClient, truncateApplicationTables } from './rig/db';
+import { startFixtureServer, type FixtureServer } from './rig/fixture-server';
 import { insertNativeCredential, seedSystemTenant } from './fixtures';
-import { CoreCredentialType, CredentialDetailsStatus } from '../../src/lib/prisma/generated/index.js';
+import {
+  CoreCredentialType,
+  CredentialDetailsError,
+  CredentialDetailsStatus,
+} from '../../src/lib/prisma/generated/index.js';
+import { protectDecryptionKey } from '../../src/lib/credentials/decryption-key-protection';
 
 /**
  * Integration coverage for the credential-details backfill (#953), against
@@ -24,35 +23,77 @@ import { CoreCredentialType, CredentialDetailsStatus } from '../../src/lib/prism
  * idempotent second run do not hold against a real table.
  */
 
+const DEPLOYMENT_KEY = 'a'.repeat(64);
+const CREDENTIAL_KEY = 'b'.repeat(64);
+const originalDataEncryptionKey = process.env.DATA_ENCRYPTION_KEY;
+const originalServiceEncryptionKey = process.env.SERVICE_ENCRYPTION_KEY;
+
+process.env.DATA_ENCRYPTION_KEY = DEPLOYMENT_KEY;
+delete process.env.SERVICE_ENCRYPTION_KEY;
+
 const client = createRigClient();
+const observer = createRigClient();
+let fixtures!: FixtureServer;
+
+const quietLogger = {
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+  child: () => quietLogger,
+};
+
+const DEFAULT_CREDENTIAL = {
+  name: 'Wool Passport',
+  issuerName: 'Example Issuer',
+  issuerDid: 'did:web:issuer.example',
+  subjectName: 'Merino batch',
+  subjectId: 'https://example.com/product/1',
+};
+
+const BACKFILL_IDS = ['cred-backfill-bad', 'cred-backfill-encrypted', 'cred-backfill-plain'] as const;
 
 beforeEach(async () => {
+  fixtures = await startFixtureServer();
   await truncateApplicationTables(client);
   await seedSystemTenant(client);
 });
 
+afterEach(async () => {
+  await fixtures.close();
+});
+
 afterAll(async () => {
   await client.$disconnect();
+  await observer.$disconnect();
+  if (originalDataEncryptionKey === undefined) delete process.env.DATA_ENCRYPTION_KEY;
+  else process.env.DATA_ENCRYPTION_KEY = originalDataEncryptionKey;
+  if (originalServiceEncryptionKey === undefined) delete process.env.SERVICE_ENCRYPTION_KEY;
+  else process.env.SERVICE_ENCRYPTION_KEY = originalServiceEncryptionKey;
 });
 
 function compactJwt(payload: Record<string, unknown>): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+  const header = Buffer.from(JSON.stringify({ alg: 'ES256', typ: 'vc+jwt' })).toString('base64url');
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
   return `${header}.${body}.sig`;
 }
 
-function envelopedCredential() {
-  const payload = {
+function credentialPayload(fields: typeof DEFAULT_CREDENTIAL): Record<string, unknown> {
+  return {
     '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
     type: ['VerifiableCredential', 'DigitalProductPassport'],
-    name: 'Wool Passport',
-    issuer: { id: 'did:web:issuer.example', name: 'Example Issuer' },
+    name: fields.name,
+    issuer: { id: fields.issuerDid, name: fields.issuerName },
     credentialSubject: {
-      product: { id: 'https://example.com/product/1', name: 'Merino batch' },
+      product: { id: fields.subjectId, name: fields.subjectName },
     },
     validFrom: '2024-01-15T00:00:00.000Z',
     validUntil: '2025-01-15T00:00:00.000Z',
   };
+}
+
+function envelopedCredential(fields: typeof DEFAULT_CREDENTIAL = DEFAULT_CREDENTIAL): Record<string, unknown> {
+  const payload = credentialPayload(fields);
   return {
     '@context': ['https://www.w3.org/ns/credentials/v2'],
     id: `data:application/vc+jwt,${compactJwt(payload)}`,
@@ -60,14 +101,32 @@ function envelopedCredential() {
   };
 }
 
+function credentialArtifact(fields: typeof DEFAULT_CREDENTIAL = DEFAULT_CREDENTIAL): string {
+  return JSON.stringify(envelopedCredential(fields));
+}
+
+function encryptedCredentialArtifact(fields: typeof DEFAULT_CREDENTIAL = DEFAULT_CREDENTIAL): string {
+  const adapter = new AesGcmEncryptionAdapter(CREDENTIAL_KEY, quietLogger as never);
+  return JSON.stringify(adapter.encrypt(credentialArtifact(fields), EncryptionAlgorithm.AES_256_GCM));
+}
+
+async function readBackfillRows() {
+  return observer.libraryRecord.findMany({
+    where: { id: { in: [...BACKFILL_IDS] } },
+    orderBy: { id: 'asc' },
+  });
+}
+
 describe('credential-details backfill against Postgres', () => {
   it('fills in only the core kind of an extracted record that has none, and leaves a record with a known kind alone', async () => {
+    fixtures.set('/backfill/core-kind', { body: credentialArtifact() });
     await insertNativeCredential(client, {
       id: 'cred-nokind',
       credentialType: 'DigitalLivestockPassport',
       coreCredentialType: null,
       detailsStatus: CredentialDetailsStatus.EXTRACTED,
       details: { name: 'Kept' },
+      storageUri: `${fixtures.baseUrl}/backfill/core-kind`,
     });
     await insertNativeCredential(client, {
       id: 'cred-known',
@@ -75,9 +134,7 @@ describe('credential-details backfill against Postgres', () => {
       detailsStatus: CredentialDetailsStatus.EXTRACTED,
     });
     const { backfillCredentialDetails } = await import('../../src/lib/credentials/backfill-credential-details');
-    const fetchArtifact = async () => JSON.stringify(envelopedCredential());
-
-    const result = await backfillCredentialDetails(client, { fetchArtifact });
+    const result = await backfillCredentialDetails(client);
 
     expect(result.failures).toEqual([]);
     expect(result).toMatchObject({ scanned: 1, updated: 0, coreKindsResolved: 1, failed: 0 });
@@ -87,42 +144,122 @@ describe('credential-details backfill against Postgres', () => {
     expect(filled.name).toBe('Kept');
   });
 
-  it('fills a pre-capture row, then reports zero changes on a second run', async () => {
+  it('leaves three pre-capture rows unchanged in dry-run, persists each apply outcome, and converges on a second apply', async () => {
+    const encryptedFields = {
+      name: 'Encrypted Wool Passport',
+      issuerName: 'Encrypted Example Issuer',
+      issuerDid: 'did:web:encrypted.issuer.example',
+      subjectName: 'Encrypted Merino batch',
+      subjectId: 'https://example.com/product/encrypted',
+    };
+    const plaintextFields = {
+      name: 'Plain Wool Passport',
+      issuerName: 'Plain Example Issuer',
+      issuerDid: 'did:web:plain.issuer.example',
+      subjectName: 'Plain Merino batch',
+      subjectId: 'https://example.com/product/plain',
+    };
+    fixtures.set('/backfill/unreadable', { body: '{not-json' });
+    fixtures.set('/backfill/encrypted', { body: encryptedCredentialArtifact(encryptedFields) });
+    fixtures.set('/backfill/plain', { body: credentialArtifact(plaintextFields) });
+
     await insertNativeCredential(client, {
-      id: 'c-pending',
-      storageUri: 'https://storage.test/c-pending',
-      digestMultibase: 'zQmPending',
+      id: 'cred-backfill-bad',
+      storageUri: `${fixtures.baseUrl}/backfill/unreadable`,
+      digestMultibase: 'zQmBackfillBad',
+      coreCredentialType: CoreCredentialType.DPP,
+      detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING,
+    });
+    await insertNativeCredential(client, {
+      id: 'cred-backfill-encrypted',
+      storageUri: `${fixtures.baseUrl}/backfill/encrypted`,
+      digestMultibase: 'zQmBackfillEncrypted',
+      coreCredentialType: CoreCredentialType.DPP,
+      detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING,
+      decryptionKey: protectDecryptionKey(CREDENTIAL_KEY),
+    });
+    await insertNativeCredential(client, {
+      id: 'cred-backfill-plain',
+      storageUri: `${fixtures.baseUrl}/backfill/plain`,
+      digestMultibase: 'zQmBackfillPlain',
+      coreCredentialType: CoreCredentialType.DPP,
+      detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING,
     });
 
     const { backfillCredentialDetails } = await import('../../src/lib/credentials/backfill-credential-details');
-    const fetchArtifact = async () => JSON.stringify(envelopedCredential());
+    const beforeDryRun = await readBackfillRows();
 
-    const first = await backfillCredentialDetails(client, { fetchArtifact });
-    expect(first.failures).toEqual([]);
-    expect(first.scanned).toBe(1);
-    expect(first.updated).toBe(1);
-    expect(first.failed).toBe(0);
+    const dryRun = await backfillCredentialDetails(client, { dryRun: true });
 
-    const afterFirst = await client.libraryRecord.findUniqueOrThrow({ where: { id: 'c-pending' } });
-    expect(afterFirst.detailsStatus).toBe(CredentialDetailsStatus.EXTRACTED);
-    expect(afterFirst.coreDataModelVersion).toBe('0.6.1');
-    expect(afterFirst.name).toBe('Wool Passport');
-    expect(afterFirst.issuerName).toBe('Example Issuer');
-    expect(afterFirst.issuerDid).toBe('did:web:issuer.example');
-    expect(afterFirst.subjectName).toBe('Merino batch');
-    expect(afterFirst.subjectId).toBe('https://example.com/product/1');
-    expect(afterFirst.validFrom).toEqual(new Date('2024-01-15T00:00:00.000Z'));
-    expect(afterFirst.validUntil).toEqual(new Date('2025-01-15T00:00:00.000Z'));
-    expect(afterFirst.detailsError).toBeNull();
+    expect(dryRun).toMatchObject({ dryRun: true, scanned: 3, updated: 2, failed: 1 });
+    expect(dryRun.failures).toEqual([
+      {
+        id: 'cred-backfill-bad',
+        errorClass: CredentialDetailsError.UNREADABLE_ENVELOPE,
+        message: 'Response from storage URI is not valid JSON',
+      },
+    ]);
+    expect(await readBackfillRows()).toEqual(beforeDryRun);
 
-    const second = await backfillCredentialDetails(client, { fetchArtifact });
-    expect(second.scanned).toBe(0);
-    expect(second.updated).toBe(0);
-    expect(second.failed).toBe(0);
+    const applied = await backfillCredentialDetails(client);
 
-    const afterSecond = await client.libraryRecord.findUniqueOrThrow({ where: { id: 'c-pending' } });
-    expect(afterSecond.updatedAt).toEqual(afterFirst.updatedAt);
-    expect(afterSecond.name).toBe(afterFirst.name);
-    expect(afterSecond.coreDataModelVersion).toBe(afterFirst.coreDataModelVersion);
+    expect(applied).toMatchObject({ dryRun: false, scanned: 3, updated: 2, failed: 1 });
+    expect(applied.failures).toEqual([
+      {
+        id: 'cred-backfill-bad',
+        errorClass: CredentialDetailsError.UNREADABLE_ENVELOPE,
+        message: 'Response from storage URI is not valid JSON',
+      },
+    ]);
+
+    const afterApply = await readBackfillRows();
+    expect(afterApply).toEqual([
+      expect.objectContaining({
+        id: 'cred-backfill-bad',
+        detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED,
+        detailsError: CredentialDetailsError.UNREADABLE_ENVELOPE,
+        coreCredentialType: CoreCredentialType.DPP,
+      }),
+      expect.objectContaining({
+        id: 'cred-backfill-encrypted',
+        detailsStatus: CredentialDetailsStatus.EXTRACTED,
+        detailsError: null,
+        coreCredentialType: CoreCredentialType.DPP,
+        coreDataModelVersion: '0.6.1',
+        name: encryptedFields.name,
+        issuerName: encryptedFields.issuerName,
+        issuerDid: encryptedFields.issuerDid,
+        subjectName: encryptedFields.subjectName,
+        subjectId: encryptedFields.subjectId,
+        validFrom: new Date('2024-01-15T00:00:00.000Z'),
+        validUntil: new Date('2025-01-15T00:00:00.000Z'),
+      }),
+      expect.objectContaining({
+        id: 'cred-backfill-plain',
+        detailsStatus: CredentialDetailsStatus.EXTRACTED,
+        detailsError: null,
+        coreCredentialType: CoreCredentialType.DPP,
+        coreDataModelVersion: '0.6.1',
+        name: plaintextFields.name,
+        issuerName: plaintextFields.issuerName,
+        issuerDid: plaintextFields.issuerDid,
+        subjectName: plaintextFields.subjectName,
+        subjectId: plaintextFields.subjectId,
+        validFrom: new Date('2024-01-15T00:00:00.000Z'),
+        validUntil: new Date('2025-01-15T00:00:00.000Z'),
+      }),
+    ]);
+
+    const secondApply = await backfillCredentialDetails(client);
+
+    expect(secondApply).toEqual({
+      dryRun: false,
+      scanned: 0,
+      updated: 0,
+      coreKindsResolved: 0,
+      failed: 0,
+      failures: [],
+    });
+    expect(await readBackfillRows()).toEqual(afterApply);
   });
 });
