@@ -262,6 +262,24 @@ describe('checkSchemaConformance', () => {
     );
   });
 
+  it('maps the invalid document shape code to its fixed advisory', async () => {
+    const deps = dependencies();
+    validateJsonLd.mockRejectedValue(new JsonLdExpansionFailedError(new Error('document failure')));
+    describeJsonLdFailure.mockReturnValue({
+      kind: 'document',
+      detail: 'JSON-LD document must be a non-null object.',
+      code: 'invalid document shape',
+    });
+
+    const result = await checkSchemaConformance(input(), deps);
+
+    expect(result).toEqual({
+      result: CheckResult.FAIL,
+      message: 'The credential is not a JSON-LD object. (invalid document shape)',
+    });
+    expect(result.message).not.toContain('JSON-LD document must be a non-null object.');
+  });
+
   it('checks the deadline between schema validation and JSON-LD expansion', async () => {
     const deps = dependencies();
     const now = jest.spyOn(Date, 'now').mockReturnValueOnce(1_001);

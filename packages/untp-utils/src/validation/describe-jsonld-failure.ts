@@ -46,7 +46,7 @@ export interface JsonLdContextFailure extends JsonLdFailureDescriptionBase {
 /** The contexts are fine and the document itself fails against them. */
 export interface JsonLdDocumentFailure extends JsonLdFailureDescriptionBase {
   kind: 'document';
-  /** The jsonld.js syntax-error or safe-mode event code, when one was recognised. */
+  /** The jsonld.js syntax-error or safe-mode event code, or this module's own `invalid document shape` code. */
   code?: string;
   /**
    * Whether jsonld.js rejected the context definitions themselves
@@ -153,7 +153,7 @@ export function describeJsonLdFailure(error: JsonLdValidationError): JsonLdFailu
   // Our own pre-expansion diagnostic: safe, typed, and more precise than
   // the generic fallback (expansion never ran).
   if (error instanceof JsonLdInvalidShapeError) {
-    return { kind: 'document', detail: error.message };
+    return { kind: 'document', detail: error.message, code: 'invalid document shape' };
   }
 
   // The failing @context URL, when jsonld.js recorded one on its wrapper: a

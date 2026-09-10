@@ -261,6 +261,7 @@ describe('describeJsonLdFailure', () => {
 
       expect(failure.kind).toBe('document');
       expect(failure.detail).toContain('non-null object');
+      expect(failure.code).toBe('invalid document shape');
     });
   });
 

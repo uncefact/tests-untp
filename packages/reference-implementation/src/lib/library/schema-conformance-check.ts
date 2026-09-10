@@ -37,7 +37,7 @@ const TRUNCATION_MARKER = '...';
  * Unrecognised document codes, including future syntax diagnostics, use the
  * generic message below.
  *
- * @see https://github.com/digitalbazaar/jsonld.js/blob/v8.3.3/lib/events.js#L103-L129
+ * @see https://github.com/digitalbazaar/jsonld.js/blob/v8.3.3/lib/events.js#L103-L129. The last entry is this repository's own code.
  */
 const JSON_LD_DOCUMENT_FAILURE_MESSAGES: Readonly<Record<string, string>> = {
   'empty object': 'Empty JSON-LD object found.',
@@ -62,6 +62,7 @@ const JSON_LD_DOCUMENT_FAILURE_MESSAGES: Readonly<Record<string, string>> = {
   'relative predicate reference': 'Relative predicate reference found.',
   'relative subject reference': 'Relative subject reference found.',
   'rdfDirection not set': 'JSON-LD rdfDirection is not set.',
+  'invalid document shape': 'The credential is not a JSON-LD object.',
 };
 const GENERIC_JSON_LD_DOCUMENT_FAILURE_MESSAGE = 'The JSON-LD document could not be expanded as valid JSON-LD.';
 
