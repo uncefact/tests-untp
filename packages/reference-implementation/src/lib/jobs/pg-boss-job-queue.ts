@@ -25,6 +25,8 @@ export interface PgBossJobQueueOptions {
   schema?: string;
   /** Applied where {@link EnqueueOptions.retry} is not given. */
   defaultRetry?: { limit: number; backoffSeconds?: number; backoffMaxSeconds?: number };
+  /** Applied where {@link EnqueueOptions.expireSeconds} is not given. */
+  defaultExpireSeconds?: number;
   /**
    * Receives queue-infrastructure errors and warnings (connection loss,
    * maintenance failures, a LISTEN/NOTIFY setup that fell back to polling)
@@ -49,6 +51,7 @@ interface Registration {
 export class PgBossJobQueue implements JobQueue<SqlExecutor> {
   private readonly boss: PgBoss;
   private readonly defaultRetry?: { limit: number; backoffSeconds?: number; backoffMaxSeconds?: number };
+  private readonly defaultExpireSeconds: number;
   private readonly onError: (error: Error) => void;
   private readonly registrations: Registration[] = [];
   /**
@@ -74,6 +77,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
 
   constructor(options: PgBossJobQueueOptions) {
     validateRetry(options.defaultRetry, 'defaultRetry');
+    validateExpireSeconds(options.defaultExpireSeconds, 'defaultExpireSeconds');
     this.boss = new PgBoss({
       connectionString: options.connectionString,
       // Workers are woken by LISTEN/NOTIFY the moment a job lands; polling
@@ -83,6 +87,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
       ...(options.schema !== undefined ? { schema: options.schema } : {}),
     });
     this.defaultRetry = options.defaultRetry;
+    this.defaultExpireSeconds = options.defaultExpireSeconds ?? 300;
     const report = options.onError ?? ((error: Error) => console.error('job queue error:', error));
     // The reporter must never take the queue down with it: a throw from a
     // caller-supplied handler inside a worker callback would reject the
@@ -179,7 +184,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
     // deduplicating queue every unkeyed send shares one empty key, so ticks
     // would collapse into each other; ensureQueue('standard') above rejects
     // that combination before a schedule can be recorded.
-    await this.boss.schedule(name, cron, payload ?? null, {});
+    await this.boss.schedule(name, cron, payload ?? null, { expireInSeconds: this.defaultExpireSeconds });
   }
 
   async unschedule(name: string): Promise<void> {
@@ -337,6 +342,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
                 jobId: job.id,
                 attempt: job.retryCount + 1,
                 isFinalAttempt: job.retryCount >= job.retryLimit,
+                expireSeconds: job.expireInSeconds,
                 signal: job.signal,
               };
               try {
@@ -416,11 +422,12 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
 
   private sendOptions(options?: EnqueueOptions): SendOptions {
     const retry = options?.retry ?? this.defaultRetry;
+    const expireSeconds = options?.expireSeconds ?? this.defaultExpireSeconds;
     return {
       ...(options?.dedupeKey !== undefined ? { singletonKey: options.dedupeKey } : {}),
       ...(options?.fairnessKey !== undefined ? { group: { id: options.fairnessKey } } : {}),
       ...(options?.startAfter !== undefined ? { startAfter: options.startAfter } : {}),
-      ...(options?.expireSeconds !== undefined ? { expireInSeconds: options.expireSeconds } : {}),
+      expireInSeconds: expireSeconds,
       ...(retry !== undefined
         ? {
             retryLimit: retry.limit,
@@ -540,6 +547,17 @@ function validateEnqueueOptions(options: EnqueueOptions | undefined): void {
     throw new JobQueueError({
       code: 'jobs.invalid-enqueue-options',
       message: 'fairnessKey must be a non-empty string',
+    });
+  }
+}
+
+function validateExpireSeconds(value: number | undefined, label: string): void {
+  if (value === undefined) return;
+  if (!Number.isInteger(value) || value < 1 || value > 24 * 60 * 60) {
+    throw new JobQueueError({
+      code: 'jobs.invalid-enqueue-options',
+      message: `${label} must be a positive integer of at most 24 hours`,
+      received: value,
     });
   }
 }

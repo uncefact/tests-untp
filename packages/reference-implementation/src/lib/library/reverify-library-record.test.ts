@@ -199,6 +199,7 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     completedAt: new Date('2026-09-03T11:01:00.000Z'),
     lastEnqueuedAt: new Date('2026-09-03T11:00:00.000Z'),
     ...overrides,
+    schemaConformanceMessage: overrides.schemaConformanceMessage ?? null,
   };
 }
 
@@ -1591,7 +1592,7 @@ describe('reverifyLibraryRecord with a supplied decryption key', () => {
       checkRunId: 'run-2',
     });
 
-    expect(fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+    expect(fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI, 300_000);
     expect(deps.fetchSource).not.toHaveBeenCalled();
     const [input, options] = recoverInRequest.mock.calls[0];
     expect(input).not.toHaveProperty('sourceUrl');
@@ -1650,7 +1651,7 @@ describe('reverifyLibraryRecord with a supplied decryption key', () => {
 
     await reverifyLibraryRecord(RECORD_ID, TENANT_ID, prepareEnqueue, SUPPLIED_KEY, deps);
 
-    expect(fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+    expect(fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI, 300_000);
     expect(deps.fetchSource).not.toHaveBeenCalled();
   });
 

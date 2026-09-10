@@ -5,6 +5,7 @@ import { JobQueueError } from './errors';
 import { PgBossJobQueue } from './pg-boss-job-queue';
 import type { JobQueue } from './types';
 import { SENDING_QUEUES } from './queue-names';
+import { readWorkerJobTimeoutSeconds } from '../config/worker-job-timeout.config';
 
 /**
  * The one job queue of this process (ADR-054 decision 3), built on the same
@@ -46,6 +47,7 @@ export function resolveQueueConnectionString(): string {
 export function createJobQueue(): PgBossJobQueue {
   return new PgBossJobQueue({
     connectionString: resolveQueueConnectionString(),
+    defaultExpireSeconds: readWorkerJobTimeoutSeconds(),
     onError: reportQueueError,
   });
 }

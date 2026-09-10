@@ -111,6 +111,7 @@ function run(): CheckRun {
     requestedAt: new Date('2026-09-07T00:00:00.000Z'),
     completedAt: null,
     lastEnqueuedAt: new Date('2026-09-07T00:00:00.000Z'),
+    schemaConformanceMessage: null,
   };
 }
 
@@ -160,13 +161,20 @@ function dependencies(storedText: string): VerifyGenerationDependencies {
     revealStoredKey: jest.fn(),
     verifyDigest: jest.fn(verifyAgainstService),
     resolveVerifier: jest.fn().mockResolvedValue({ verify: jest.fn().mockResolvedValue({ verified: true }) }),
+    checkSchemaConformance: jest.fn().mockResolvedValue({ result: CheckResult.PASS, message: null }),
     settleComplete: jest.fn().mockResolvedValue({ outcome: 'applied' }),
     settleFailed: jest.fn().mockResolvedValue({ outcome: 'applied' }),
   };
 }
 
 const JOB = { tenantId: TENANT_ID, recordId: RECORD_ID, generation: 2, checkRunId: RUN_ID };
-const CONTEXT = { jobId: 'job-1', attempt: 1, isFinalAttempt: true, signal: new AbortController().signal };
+const CONTEXT = {
+  jobId: 'job-1',
+  attempt: 1,
+  isFinalAttempt: true,
+  expireSeconds: 300,
+  signal: new AbortController().signal,
+};
 
 describe('the credential copy digest preimage', () => {
   it('is the compact JSON.stringify of the credential, as the storage service reported it', () => {

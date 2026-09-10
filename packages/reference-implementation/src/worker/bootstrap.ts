@@ -23,7 +23,7 @@ import {
   readReconcilePendingRunsBatchSize,
   readReconcilePendingRunsCron,
 } from '../lib/config/reconcile-pending-runs.config';
-import { readStoredCopyReadTimeoutMs } from '../lib/config/stored-copy-read-timeout.config';
+import { readWorkerJobTimeoutSeconds } from '../lib/config/worker-job-timeout.config';
 import { registerPendingRunReconciliation } from '../lib/library/reconcile-pending-runs-job';
 import { registerLibraryJobs } from '../lib/library/verify-generation-job';
 import { prisma } from '../lib/prisma/prisma';
@@ -78,7 +78,7 @@ async function scheduleReconciliation(queue: JobQueue, cron: string): Promise<vo
  * malformed value fails the boot with the variable named instead of starting
  * a consumer and failing on the first tick or the first job: the sweep
  * cadence, which the schedule step needs, the per-tick cap, which the sweep
- * reads on each tick, and the stored-copy read budget, which every verify
+ * reads on each tick, and the worker job timeout, which every queue job
  * job reads. The reader's message already names the variable and the fix,
  * so it is the boot error's message and no cause is attached that would
  * print it twice.
@@ -87,7 +87,7 @@ function resolveWorkerConfiguration(): { reconciliationCron: string } {
   try {
     const reconciliationCron = readReconcilePendingRunsCron();
     readReconcilePendingRunsBatchSize();
-    readStoredCopyReadTimeoutMs();
+    readWorkerJobTimeoutSeconds();
     return { reconciliationCron };
   } catch (error) {
     throw new WorkerBootError('worker.configuration-invalid', error instanceof Error ? error.message : String(error));
@@ -152,7 +152,11 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
     await scheduleReconciliation(queue, reconciliationCron);
   }
   if (!shuttingDown) {
-    heartbeat = startHeartbeat({ logger, probe: () => queue.probe() });
+    heartbeat = startHeartbeat({
+      logger,
+      probe: () => queue.probe(),
+      maxJobMs: readWorkerJobTimeoutSeconds() * 1_000 + 60_000,
+    });
   }
 
   logger.info(

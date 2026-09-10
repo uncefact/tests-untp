@@ -55,6 +55,7 @@ function run(id: string, lastEnqueuedAt: Date | null): CheckRun {
     failureRetryable: null,
     sourceChanged: null,
     lastSourceCheckAt: null,
+    schemaConformanceMessage: null,
     requestedAt: NOW,
     completedAt: null,
     lastEnqueuedAt,
@@ -71,21 +72,21 @@ function dependencies(overrides: Partial<ReconcilePendingRunsDependencies> = {})
 }
 
 describe('verificationAbandonmentCutoff', () => {
-  it('rounds the complete retry ladder up to a 30-minute policy bound', () => {
+  it('rounds the complete retry ladder up to the one-hour default policy bound', () => {
     // Fails if the cutoff is computed from an unrounded ladder or drops the
-    // 30-minute floor.
+    // configured default attempt expiry.
     const cutoff = verificationAbandonmentCutoff(NOW);
 
-    expect(cutoff).toEqual(new Date('2026-09-06T23:30:00.000Z'));
+    expect(cutoff).toEqual(new Date('2026-09-06T23:00:00.000Z'));
   });
 
   it('bounds each retry by its jittered maximum, not by the unjittered doubling', () => {
     // pg-boss jitters the backoff up to twice the plain doubling, so a bound
     // computed from the unjittered ladder can expire while the job is still
     // waiting for its next attempt. Fails if the exponent starts at 0.
-    const options = { retry: { limit: 4, backoffSeconds: 60, backoffMaxSeconds: 600 }, expireSeconds: 120 };
+    const retry = { limit: 4, backoffSeconds: 60, backoffMaxSeconds: 600 };
 
-    const cutoff = verificationAbandonmentCutoff(NOW, options);
+    const cutoff = verificationAbandonmentCutoff(NOW, retry, 120);
 
     // Five attempts of 120 s plus jittered backoffs of 120, 240, 480 and 600
     // is 2040 seconds, which rounds up to 60 minutes. The unjittered ladder
@@ -98,9 +99,9 @@ describe('verificationAbandonmentCutoff', () => {
     // Every attempt may run to its expiry. Fails if the expiry is added once,
     // which stays inside the 30-minute floor at today's values and drops below
     // the real ladder as soon as either the limit or the expiry grows.
-    const options = { retry: { limit: 4, backoffSeconds: 300, backoffMaxSeconds: 600 }, expireSeconds: 600 };
+    const retry = { limit: 4, backoffSeconds: 300, backoffMaxSeconds: 600 };
 
-    const cutoff = verificationAbandonmentCutoff(NOW, options);
+    const cutoff = verificationAbandonmentCutoff(NOW, retry, 600);
 
     // Five attempts of 600 s, plus backoffs capped at 600 each, is 5400
     // seconds, which rounds up to 90 minutes. Adding the expiry once would
@@ -118,7 +119,7 @@ describe('reconcilePendingRunsHandler', () => {
 
     await reconcilePendingRunsHandler(deps)({}, {} as never);
 
-    const cutoff = new Date('2026-09-06T23:30:00.000Z');
+    const cutoff = new Date('2026-09-06T23:00:00.000Z');
     expect(deps.findAbandoned).toHaveBeenCalledWith(cutoff);
     // The cutoff is passed to `settleAbandoned` too, so its own conditional
     // UPDATE can recheck the abandonment predicate

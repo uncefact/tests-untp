@@ -97,6 +97,7 @@ function jobContext(overrides: Partial<JobContext> = {}): JobContext {
     isFinalAttempt: true,
     signal: new AbortController().signal,
     ...overrides,
+    expireSeconds: overrides.expireSeconds ?? 300,
   };
 }
 

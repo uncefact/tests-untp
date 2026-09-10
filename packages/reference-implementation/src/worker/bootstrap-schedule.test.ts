@@ -60,7 +60,7 @@ beforeEach(() => {
   process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
   delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_CRON;
   delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE;
-  delete process.env.LIBRARY_STORED_COPY_READ_TIMEOUT_MS;
+  delete process.env.WORKER_JOB_TIMEOUT_SECONDS;
   fakeQueue.start.mockImplementation(async () => undefined);
   fakeQueue.schedule.mockImplementation(async () => undefined);
 });
@@ -70,7 +70,16 @@ describe('the reconciliation schedule at worker boot', () => {
     return runWorker(OPTIONS).then(() => {
       expect(fakeQueue.schedule).toHaveBeenCalledWith(LIBRARY_RECONCILE_PENDING_RUNS_JOB, '*/10 * * * *');
       expect(startHeartbeat).toHaveBeenCalledTimes(1);
+      expect(startHeartbeat).toHaveBeenCalledWith(expect.objectContaining({ maxJobMs: 360_000 }));
     });
+  });
+
+  it('moves the heartbeat active-job window with the configured worker timeout', async () => {
+    process.env.WORKER_JOB_TIMEOUT_SECONDS = '600';
+
+    await runWorker(OPTIONS);
+
+    expect(startHeartbeat).toHaveBeenCalledWith(expect.objectContaining({ maxJobMs: 660_000 }));
   });
 
   it('is recorded on the cadence LIBRARY_RECONCILE_PENDING_RUNS_CRON sets', async () => {
@@ -110,12 +119,12 @@ describe('the reconciliation schedule at worker boot', () => {
     expect(fakeQueue.start).not.toHaveBeenCalled();
   });
 
-  it('fails the boot, naming the variable, when the stored-copy read budget is malformed', async () => {
-    process.env.LIBRARY_STORED_COPY_READ_TIMEOUT_MS = '10s';
+  it('fails the boot, naming the variable, when the worker job timeout is malformed', async () => {
+    process.env.WORKER_JOB_TIMEOUT_SECONDS = '10s';
 
     await expect(runWorker(OPTIONS)).rejects.toMatchObject({
       code: 'worker.configuration-invalid',
-      message: expect.stringContaining('LIBRARY_STORED_COPY_READ_TIMEOUT_MS'),
+      message: expect.stringContaining('WORKER_JOB_TIMEOUT_SECONDS'),
     });
 
     expect(fakeQueue.start).not.toHaveBeenCalled();

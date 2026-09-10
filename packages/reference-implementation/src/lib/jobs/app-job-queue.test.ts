@@ -1,7 +1,7 @@
 export {};
 
 type Constructed = {
-  options: { connectionString: string; onError?: (error: Error) => void };
+  options: { connectionString: string; defaultExpireSeconds?: number; onError?: (error: Error) => void };
   start: jest.Mock;
   stop: jest.Mock;
   declareQueue: jest.Mock;
@@ -54,6 +54,7 @@ const DATABASE_ENV_KEYS = [
   'RI_POSTGRES_DB',
   'RI_POSTGRES_HOST',
   'RI_POSTGRES_PORT',
+  'WORKER_JOB_TIMEOUT_SECONDS',
 ] as const;
 
 const savedEnv: Record<string, string | undefined> = {};
@@ -96,8 +97,19 @@ describe('startJobQueue', () => {
 
     expect(constructed).toHaveLength(1);
     expect(constructed[0].options.connectionString).toBe('postgresql://ri:secret@db.test:5432/ri?schema=public');
+    expect(constructed[0].options.defaultExpireSeconds).toBe(300);
     expect(constructed[0].start).toHaveBeenCalledTimes(1);
     expect(queue).toBe((constructed[0].start as jest.Mock).mock.instances[0]);
+  });
+
+  it('passes the configured worker timeout to the queue constructor', async () => {
+    process.env.RI_DATABASE_URL = 'postgresql://ri:secret@db.test:5432/ri?schema=public';
+    process.env.WORKER_JOB_TIMEOUT_SECONDS = '60';
+    const { startJobQueue } = loadModule();
+
+    await startJobQueue();
+
+    expect(constructed[0].options.defaultExpireSeconds).toBe(60);
   });
 
   it('starts once when two callers race, and both receive the same queue', async () => {

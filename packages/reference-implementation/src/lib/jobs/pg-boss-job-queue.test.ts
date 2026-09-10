@@ -45,7 +45,7 @@ const { __bossMock: bossMock, __mockState: mockState } = jest.requireMock('pg-bo
  */
 const storedQueues = new Map<string, string>();
 
-const makeQueue = (options: object = {}) =>
+const makeQueue = (options: object = { defaultExpireSeconds: 300 }) =>
   new PgBossJobQueue({ connectionString: 'postgres://example/db', ...options });
 
 /** The per-queue callback the adapter hands to boss.work, captured for direct invocation. */
@@ -60,6 +60,7 @@ const job = (overrides: object = {}) => ({
   data: { recordId: 'r1' },
   retryCount: 0,
   retryLimit: 2,
+  expireInSeconds: 300,
   signal: new AbortController().signal,
   ...overrides,
 });
@@ -160,6 +161,15 @@ describe('constructor', () => {
     );
   });
 
+  it('rejects an invalid default expiry', () => {
+    expect(() => makeQueue({ defaultExpireSeconds: 0 })).toThrow(
+      'defaultExpireSeconds must be a positive integer of at most 24 hours',
+    );
+    expect(() => makeQueue({ defaultExpireSeconds: 86_401 })).toThrow(
+      'defaultExpireSeconds must be a positive integer of at most 24 hours',
+    );
+  });
+
   it('falls back to console.error when no onError is supplied', () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
@@ -185,7 +195,7 @@ describe('enqueue option mapping', () => {
         dedupeKey: 'issue:r1',
         fairnessKey: 'tenant-a',
         startAfter,
-        expireSeconds: 120,
+        expireSeconds: 60,
         retry: { limit: 3, backoffSeconds: 30, backoffMaxSeconds: 600 },
       },
     );
@@ -196,7 +206,7 @@ describe('enqueue option mapping', () => {
         singletonKey: 'issue:r1',
         group: { id: 'tenant-a' },
         startAfter,
-        expireInSeconds: 120,
+        expireInSeconds: 60,
         retryLimit: 3,
         retryDelay: 30,
         retryBackoff: true,
@@ -208,25 +218,42 @@ describe('enqueue option mapping', () => {
   it('sends no options when none are given', async () => {
     const queue = makeQueue();
     await queue.enqueue('issue', { recordId: 'r1' });
-    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, {});
+    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, { expireInSeconds: 300 });
+  });
+
+  it('applies the constructed default expiry to sends and schedules', async () => {
+    const queue = makeQueue({ defaultExpireSeconds: 60 });
+    await queue.enqueue('issue', {});
+    await queue.schedule('issue', '0 * * * *');
+    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { expireInSeconds: 60 });
+    expect(bossMock.schedule).toHaveBeenCalledWith('issue', '0 * * * *', null, { expireInSeconds: 60 });
   });
 
   it('applies retry without backoff as a bare retryLimit', async () => {
     const queue = makeQueue();
     await queue.enqueue('issue', {}, { retry: { limit: 1 } });
-    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { retryLimit: 1 });
+    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { expireInSeconds: 300, retryLimit: 1 });
   });
 
   it('falls back to the constructor defaultRetry when the send names none', async () => {
     const queue = makeQueue({ defaultRetry: { limit: 5, backoffSeconds: 10 } });
     await queue.enqueue('issue', {});
-    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { retryLimit: 5, retryDelay: 10, retryBackoff: true });
+    expect(bossMock.send).toHaveBeenCalledWith(
+      'issue',
+      {},
+      {
+        expireInSeconds: 300,
+        retryLimit: 5,
+        retryDelay: 10,
+        retryBackoff: true,
+      },
+    );
   });
 
   it('lets a per-send retry override the defaultRetry', async () => {
     const queue = makeQueue({ defaultRetry: { limit: 5 } });
     await queue.enqueue('issue', {}, { retry: { limit: 0 } });
-    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { retryLimit: 0 });
+    expect(bossMock.send).toHaveBeenCalledWith('issue', {}, { expireInSeconds: 300, retryLimit: 0 });
   });
 });
 
@@ -272,7 +299,7 @@ describe('transactional enqueue', () => {
     const queue = makeQueue();
     const tx = { executeSql: jest.fn(async () => ({ rows: [] })) };
     await queue.enqueueWithin(tx, 'issue', { recordId: 'r1' });
-    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, { db: tx });
+    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, { expireInSeconds: 300, db: tx });
   });
 });
 
@@ -292,7 +319,7 @@ describe('declareQueue', () => {
     const tx = { executeSql: jest.fn(async () => ({ rows: [] })) };
     await queue.enqueueWithin(tx, 'verify', { recordId: 'r1' });
     expect(bossMock.createQueue).toHaveBeenCalledTimes(1);
-    expect(bossMock.send).toHaveBeenCalledWith('verify', { recordId: 'r1' }, { db: tx });
+    expect(bossMock.send).toHaveBeenCalledWith('verify', { recordId: 'r1' }, { expireInSeconds: 300, db: tx });
   });
 
   it('rejects a send whose policy contradicts the declared queue', async () => {
@@ -695,9 +722,9 @@ describe('handler context and settlement', () => {
     await callback([job({ retryCount: 1, retryLimit: 2 })]);
     await callback([job({ retryCount: 2, retryLimit: 2 })]);
     expect(contexts).toMatchObject([
-      { attempt: 1, isFinalAttempt: false },
-      { attempt: 2, isFinalAttempt: false },
-      { attempt: 3, isFinalAttempt: true },
+      { attempt: 1, isFinalAttempt: false, expireSeconds: 300 },
+      { attempt: 2, isFinalAttempt: false, expireSeconds: 300 },
+      { attempt: 3, isFinalAttempt: true, expireSeconds: 300 },
     ]);
   });
 
@@ -778,7 +805,14 @@ describe('scheduling', () => {
     const queue = makeQueue();
     await queue.schedule('cvc-refresh', '0 3 * * *', { source: 'cron' });
     expect(bossMock.createQueue).toHaveBeenCalledWith('cvc-refresh', { policy: 'standard', notify: true });
-    expect(bossMock.schedule).toHaveBeenCalledWith('cvc-refresh', '0 3 * * *', { source: 'cron' }, {});
+    expect(bossMock.schedule).toHaveBeenCalledWith(
+      'cvc-refresh',
+      '0 3 * * *',
+      { source: 'cron' },
+      {
+        expireInSeconds: 300,
+      },
+    );
   });
 
   it('rejects scheduling a queue declared as deduplicating', async () => {

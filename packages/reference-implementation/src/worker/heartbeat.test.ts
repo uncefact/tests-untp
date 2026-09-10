@@ -33,6 +33,7 @@ describe('startHeartbeat', () => {
       logger: log as never,
       path: file,
       intervalMs: 1_000,
+      maxJobMs: 300_000,
       now: () => clock,
       ...extra,
     });

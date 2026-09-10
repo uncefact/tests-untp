@@ -38,6 +38,8 @@ export interface JobContext {
    * still be cut short; see the final-attempt settlement contract above.
    */
   isFinalAttempt: boolean;
+  /** The expiry in seconds carried by this job when it was enqueued. */
+  expireSeconds: number;
   /** Fires when the queue asks the handler to stop (shutdown, expiry). */
   signal: AbortSignal;
 }

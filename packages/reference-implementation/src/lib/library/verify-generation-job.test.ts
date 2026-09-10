@@ -95,6 +95,7 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     sourceChanged: null,
     lastSourceCheckAt: null,
     ...overrides,
+    schemaConformanceMessage: overrides.schemaConformanceMessage ?? null,
   };
 }
 
@@ -217,6 +218,7 @@ function context(overrides: Partial<JobContext> = {}): JobContext {
     jobId: 'job-1',
     attempt: 1,
     isFinalAttempt: false,
+    expireSeconds: 300,
     signal: new AbortController().signal,
     ...overrides,
   };
@@ -253,6 +255,7 @@ function dependencies(overrides: Partial<VerifyGenerationDependencies> = {}): Ve
     verifyDigest: jest.fn().mockResolvedValue(true),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolveVerifier: jest.fn().mockResolvedValue(verifier as any),
+    checkSchemaConformance: jest.fn().mockResolvedValue({ result: CheckResult.NOT_RUN, message: null }),
     settleComplete: jest.fn().mockResolvedValue({ outcome: 'applied' }),
     settleFailed: jest.fn().mockResolvedValue({ outcome: 'applied' }),
     ...overrides,
@@ -302,6 +305,7 @@ describe('verifyGenerationHandler preconditions', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: {
         retrieval: CheckResult.NOT_RUN,
         decryption: CheckResult.NOT_RUN,
@@ -416,9 +420,10 @@ describe('verifyGenerationHandler on a copy that is not a credential', () => {
       expect(deps.settleComplete).toHaveBeenCalledWith({
         id: RUN_ID,
         tenantId: TENANT_ID,
+        schemaConformanceMessage: null,
         checks: { ...ESTABLISHED_CHECKS, proof: CheckResult.FAIL },
       });
-      expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+      expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI, expect.any(Number));
       expect(deps.verifyDigest).toHaveBeenCalled();
       expect(verifier.verify).not.toHaveBeenCalled();
       expect(deps.settleFailed).not.toHaveBeenCalled();
@@ -434,13 +439,14 @@ describe('verifyGenerationHandler on a copy that is not a credential', () => {
     });
     await verifyGenerationHandler(deps)(JOB, context());
 
-    expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+    expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI, expect.any(Number));
     const digestInput = (deps.verifyDigest as jest.Mock).mock.calls[0][1] as Uint8Array;
     expect(deps.verifyDigest).toHaveBeenCalledWith('zQmStoredDigest', digestInput);
     expect(Buffer.from(digestInput).toString('utf8')).toBe('<html>supplier page</html>');
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: { ...ESTABLISHED_CHECKS, proof: CheckResult.FAIL },
     });
   });
@@ -527,6 +533,7 @@ describe('verifyGenerationHandler when the digest cannot be checked', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: expect.objectContaining({ retrieval: CheckResult.PASS, digest }),
       failure: {
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
@@ -550,11 +557,15 @@ describe('verifyGenerationHandler on native records', () => {
 
     await verifyGenerationHandler(deps)({ ...JOB, generation: 2 }, context());
 
-    expect(deps.fetchStoredCopy).toHaveBeenCalledWith('https://storage.example/native/credential-a');
+    expect(deps.fetchStoredCopy).toHaveBeenCalledWith(
+      'https://storage.example/native/credential-a',
+      expect.any(Number),
+    );
     expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: {
         ...ESTABLISHED_CHECKS,
         proof: CheckResult.PASS,
@@ -583,6 +594,7 @@ describe('verifyGenerationHandler on native records', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: { ...ESTABLISHED_CHECKS, digest: CheckResult.FAIL },
       failure: {
         code: CheckRunFailureCode.STORED_COPY_CORRUPT,
@@ -599,17 +611,54 @@ describe('verifyGenerationHandler on native records', () => {
 // ---------------------------------------------------------------------------
 
 describe('verifyGenerationHandler settlement from the verifier', () => {
+  it('settles the advisory failure and message while the verifier checks still complete', async () => {
+    verifier.verify.mockResolvedValue(verified());
+    const deps = dependencies({
+      getRecord: jest.fn().mockResolvedValue(
+        record({
+          parent: {
+            detailsStatus: CredentialDetailsStatus.EXTRACTED,
+            coreCredentialType: CoreCredentialType.DPP,
+            coreDataModelVersion: '0.7.0',
+          },
+        }),
+      ),
+      checkSchemaConformance: jest.fn().mockResolvedValue({
+        result: CheckResult.FAIL,
+        message: '/credentialSubject/name (is required)',
+      }),
+    });
+
+    await verifyGenerationHandler(deps)(JOB, context());
+
+    expect(deps.checkSchemaConformance).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detailsStatus: CredentialDetailsStatus.EXTRACTED,
+        coreCredentialType: CoreCredentialType.DPP,
+        coreDataModelVersion: '0.7.0',
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    expect(deps.settleComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        schemaConformanceMessage: '/credentialSubject/name (is required)',
+        checks: expect.objectContaining({ schemaConformance: CheckResult.FAIL, proof: CheckResult.PASS }),
+      }),
+    );
+  });
+
   it('passes proof, status and temporal on a verified credential, keeping the checks the run already recorded', async () => {
     verifier.verify.mockResolvedValue(verified());
     const deps = dependencies();
     await verifyGenerationHandler(deps)(JOB, context());
 
-    expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI);
+    expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI, expect.any(Number));
     expect(deps.resolveVerifier).toHaveBeenCalledWith(TENANT_ID);
     expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: {
         ...ESTABLISHED_CHECKS,
         proof: CheckResult.PASS,
@@ -632,6 +681,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: {
         ...ESTABLISHED_CHECKS,
         proof: CheckResult.NOT_RUN,
@@ -656,6 +706,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: { ...ESTABLISHED_CHECKS, proof: CheckResult.FAIL },
     });
   });
@@ -668,6 +719,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: { ...ESTABLISHED_CHECKS, proof: CheckResult.FAIL },
     });
   });
@@ -687,6 +739,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: {
         ...ESTABLISHED_CHECKS,
         decryption: CheckResult.PASS,
@@ -695,6 +748,51 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
         temporal: CheckResult.PASS,
       },
     });
+  });
+
+  it('skips conformance after the copy consumes the attempt deadline but still invokes the verifier', async () => {
+    try {
+      verifier.verify.mockResolvedValue(verified());
+      let now = 0;
+      jest.spyOn(Date, 'now').mockImplementation(() => now);
+      const deps = dependencies({
+        fetchStoredCopy: jest.fn().mockImplementation(async () => {
+          now = 297_000;
+          return storedBytes(JSON.stringify(CREDENTIAL));
+        }),
+      });
+
+      await verifyGenerationHandler(deps)(JOB, context({ expireSeconds: 300 }));
+
+      expect(deps.checkSchemaConformance).not.toHaveBeenCalled();
+      expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('handles a conformance rejection after its timeout has already settled the attempt', async () => {
+    // Promise.race must retain a rejection reaction on a losing stage. Fails
+    // if a slow validator can produce an unhandled error after the verifier
+    // and settlement have moved on.
+    jest.useFakeTimers();
+    try {
+      let rejectLate: (reason?: unknown) => void = () => undefined;
+      const late = new Promise<never>((_resolve, reject) => {
+        rejectLate = reject;
+      });
+      const deps = dependencies({ checkSchemaConformance: jest.fn(() => late) });
+      const settled = verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true, expireSeconds: 300 }));
+
+      await jest.advanceTimersByTimeAsync(290_000);
+      await settled;
+      rejectLate(new Error('late validator failure'));
+      await Promise.resolve();
+
+      expect(deps.settleComplete).toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -720,6 +818,7 @@ describe('verifyGenerationHandler on a transient failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: noChecksRun(),
       failure: {
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
@@ -753,6 +852,7 @@ describe('verifyGenerationHandler on a transient failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: ESTABLISHED_CHECKS,
       failure: {
         code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
@@ -838,6 +938,7 @@ describe('verifyGenerationHandler on a terminal failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: noChecksRun(),
       failure: terminalFailure('it is not valid JSON'),
     });
@@ -983,6 +1084,7 @@ describe('verifyGenerationHandler on a terminal failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: noChecksRun(),
       failure: {
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
@@ -1090,7 +1192,7 @@ describe('the default stored-copy read', () => {
     global.fetch = jest.fn().mockResolvedValue(streamed(Buffer.from(body, 'utf8'), headers).response) as never;
   }
 
-  const read = () => defaultVerifyGenerationDependencies().fetchStoredCopy(STORAGE_URI);
+  const read = () => defaultVerifyGenerationDependencies().fetchStoredCopy(STORAGE_URI, 10_000);
 
   /** The StoredCopyReadError a read rejected with, so its kind can be asserted. */
   async function rejection(): Promise<StoredCopyReadError> {
@@ -1278,6 +1380,7 @@ describe('verifyGenerationHandler on a stored-copy read failure', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: noChecksRun(),
       failure: {
         code: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
@@ -1320,6 +1423,7 @@ describe('verifyGenerationHandler when the verifier cannot be reached', () => {
     expect(deps.settleFailed).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
       checks: ESTABLISHED_CHECKS,
       failure: {
         code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
@@ -1350,12 +1454,13 @@ describe('verifyGenerationHandler when the verifier cannot be reached', () => {
       const deps = dependencies();
 
       const settled = verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true }));
-      await jest.advanceTimersByTimeAsync(60_000);
+      await jest.advanceTimersByTimeAsync(290_000);
       await settled;
 
       expect(deps.settleFailed).toHaveBeenCalledWith({
         id: RUN_ID,
         tenantId: TENANT_ID,
+        schemaConformanceMessage: null,
         checks: ESTABLISHED_CHECKS,
         failure: {
           code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
@@ -1399,10 +1504,9 @@ describe('registerLibraryJobs', () => {
 });
 
 describe('VERIFY_JOB_ENQUEUE_OPTIONS', () => {
-  it('retries four times on a capped exponential backoff inside a two-minute attempt budget', () => {
+  it('retries four times on a capped exponential backoff without an expiry override', () => {
     expect(VERIFY_JOB_ENQUEUE_OPTIONS).toEqual({
       retry: { limit: 4, backoffSeconds: 30, backoffMaxSeconds: 600 },
-      expireSeconds: 120,
     });
   });
 });

@@ -125,6 +125,7 @@ function run(overrides: Partial<CheckRun> = {}): CheckRun {
     sourceChanged: null,
     lastSourceCheckAt: null,
     ...overrides,
+    schemaConformanceMessage: overrides.schemaConformanceMessage ?? null,
   };
 }
 
@@ -449,6 +450,36 @@ describe('toCredentialRecord', () => {
     expect(
       toCredentialRecord(record({ run: { ...settled, status: CheckResult.FAIL } }), { now: NOW }).verification.summary,
     ).toBe('not_conformant');
+  });
+
+  it('adds the advisory warning only for a failed newest conformance result with a message', () => {
+    const failed = {
+      state: CheckRunState.COMPLETE,
+      schemaConformance: CheckResult.FAIL,
+      schemaConformanceMessage: '/credentialSubject/name (is required)',
+      proof: CheckResult.PASS,
+      status: CheckResult.PASS,
+      temporal: CheckResult.PASS,
+      completedAt: new Date('2026-09-03T11:00:05.000Z'),
+    };
+
+    expect(toCredentialRecord(record({ run: failed }), { now: NOW }).warnings).toContainEqual({
+      code: 'SCHEMA_CONFORMANCE_ADVISORY',
+      message: '/credentialSubject/name (is required)',
+    });
+    expect(toNativeCredentialRecord(nativeRecord({ run: run(failed) }), { now: NOW }).warnings).toContainEqual({
+      code: 'SCHEMA_CONFORMANCE_ADVISORY',
+      message: '/credentialSubject/name (is required)',
+    });
+    expect(
+      toCredentialRecord(record({ run: { ...failed, schemaConformanceMessage: null } }), { now: NOW }).warnings,
+    ).not.toContainEqual(expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY' }));
+    expect(
+      toCredentialRecord(
+        record({ run: { ...failed, state: CheckRunState.PENDING, schemaConformance: CheckResult.NOT_RUN } }),
+        { now: NOW },
+      ).warnings,
+    ).not.toContainEqual(expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY' }));
   });
 
   it.each([

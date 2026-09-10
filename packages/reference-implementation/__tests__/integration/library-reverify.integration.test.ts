@@ -111,6 +111,12 @@ const DPP = {
   credentialSubject: { id: 'https://supplier.example/products/1', name: 'Battery pack' },
 };
 const DPP_TEXT = JSON.stringify(DPP);
+const DPP_070 = {
+  ...DPP,
+  '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+  type: ['VerifiableCredential', 'DigitalProductPassport'],
+  name: 'Battery pack passport',
+};
 const RECOVERY_DPP = {
   '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'],
   type: ['VerifiableCredential', 'DigitalProductPassport'],
@@ -178,6 +184,7 @@ function context(overrides: Partial<JobContext> = {}): JobContext {
     isFinalAttempt: false,
     signal: new AbortController().signal,
     ...overrides,
+    expireSeconds: overrides.expireSeconds ?? 300,
   };
 }
 
@@ -393,6 +400,7 @@ async function insertProtectedExternal(options: {
   encrypted?: boolean;
   decryptionKey?: string;
   contentKind?: ExternalContentKind;
+  coreDataModelVersion?: string;
 }): Promise<string> {
   const created = await createExternalCredential({
     tenantId: SYSTEM_TENANT_ID,
@@ -417,7 +425,7 @@ async function insertProtectedExternal(options: {
       fields: DETAILS,
       credentialType: 'DigitalProductPassport',
       coreCredentialType: CoreCredentialType.DPP,
-      coreDataModelVersion: '0.6.0',
+      coreDataModelVersion: options.coreDataModelVersion ?? '0.6.0',
     },
     checkRun: {
       state: CheckRunState.PENDING,
@@ -588,6 +596,59 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       summary: 'verified',
       checks: { retrieval: 'not_run', decryption: 'not_run', digest: 'not_run', proof: 'pass' },
     });
+  });
+
+  it('settles a conforming 0.7.0 DPP as pass and a missing-name DPP as an advisory fail', async () => {
+    // Fails if the worker skips the core schema, checks a tenant data-model
+    // row instead of the system schema, or lets the advisory result change
+    // the verified summary. The second copy proves the first schema pointer
+    // is persisted and projected as the warning's message.
+    const verifier: IVerifiableCredentialService = {
+      sign: jest.fn(),
+      verify: jest.fn().mockResolvedValue({ verified: true }),
+    };
+    const handler = verifyGenerationHandler({
+      ...defaultVerifyGenerationDependencies(),
+      resolveVerifier: async () => verifier,
+    });
+    const cases = [
+      { name: 'conforming', credential: DPP_070, expected: CheckResult.PASS },
+      { name: 'missing-name', credential: { ...DPP_070, name: undefined }, expected: CheckResult.FAIL },
+    ];
+
+    for (const testCase of cases) {
+      const envelope = envelopedCredential(testCase.credential);
+      const body = JSON.stringify(envelope);
+      const storagePath = `/storage/schema-conformance-${testCase.name}.json`;
+      const sourcePath = `/supplier/schema-conformance-${testCase.name}.json`;
+      fixtures.set(storagePath, { body });
+      fixtures.set(sourcePath, { body });
+      const copyDigest = await digest(new TextEncoder().encode(body));
+      const recordId = await insertProtectedExternal({
+        sourcePath,
+        storagePath,
+        sourceDigest: copyDigest,
+        storageDigest: copyDigest,
+        coreDataModelVersion: '0.7.0',
+      });
+      await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
+      await handler((await jobsFor(recordId))[0], context({ isFinalAttempt: true }));
+
+      const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
+      expect(settled?.checkRun).toMatchObject({
+        state: CheckRunState.COMPLETE,
+        schemaConformance: testCase.expected,
+      });
+      const projected = toCredentialRecord(settled as never);
+      expect(projected.verification.summary).toBe('verified');
+      if (testCase.expected === CheckResult.FAIL) {
+        expect(projected.warnings).toContainEqual(
+          expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY', message: expect.stringContaining('/name') }),
+        );
+      } else {
+        expect(projected.warnings).not.toContainEqual(expect.objectContaining({ code: 'SCHEMA_CONFORMANCE_ADVISORY' }));
+      }
+    }
   });
 
   it('serialises two concurrent module calls into one pending generation and one job', async () => {

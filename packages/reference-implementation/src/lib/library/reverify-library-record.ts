@@ -52,6 +52,7 @@ import {
   type RegisterExternalCredentialInput,
 } from './register-external-credential';
 import { fetchStoredCopyBytes, StoredCopyReadError } from './verify-generation-job';
+import { readWorkerJobTimeoutSeconds } from '@/lib/config/worker-job-timeout.config';
 import { errorNameOf, removeStoredObject, storageCoordinatesForLog } from './remove-stored-object';
 import {
   DECRYPTION_REQUIRED_MESSAGE,
@@ -158,7 +159,7 @@ export type ReverifyLibraryRecordDependencies = {
    * member, so a partially constructed deps object in a test cannot fall
    * through to the real `fetch`.
    */
-  fetchStoredCopy: (uri: string) => Promise<Uint8Array>;
+  fetchStoredCopy: (uri: string, timeoutMs: number) => Promise<Uint8Array>;
 };
 
 export function defaultReverifyLibraryRecordDependencies(): ReverifyLibraryRecordDependencies {
@@ -467,13 +468,14 @@ async function acquireStoredCopy(
   ref: { recordId: string; tenantId: string },
   custody: ReverificationCustodySnapshot,
   storageUri: string,
-  fetchStoredCopy: (uri: string) => Promise<Uint8Array>,
+  fetchStoredCopy: (uri: string, timeoutMs: number) => Promise<Uint8Array>,
+  timeoutMs: number,
   earned: AcquisitionChecks,
 ): Promise<AcquisitionResult> {
   const storageDigestMultibase = custody.storageDigestMultibase;
   let bytes: Uint8Array;
   try {
-    bytes = await fetchStoredCopy(storageUri);
+    bytes = await fetchStoredCopy(storageUri, timeoutMs);
   } catch (error) {
     return { outcome: 'settled', prepared: storedCopyFailure(ref, 'read-failed', error, { ...earned }, custody) };
   }
@@ -690,6 +692,7 @@ async function recoverExternalRecord(
         reservedCustody,
         reservedCustody.storageUri,
         deps.fetchStoredCopy,
+        readWorkerJobTimeoutSeconds() * 1_000,
         earned,
       );
       prepared =

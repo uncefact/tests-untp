@@ -491,7 +491,8 @@ model CheckRun {
   proof             CheckResult @default(NOT_RUN)
   status            CheckResult @default(NOT_RUN)
   temporal          CheckResult @default(NOT_RUN)
-  schemaConformance CheckResult @default(NOT_RUN)
+  schemaConformance        CheckResult @default(NOT_RUN)
+  schemaConformanceMessage String?
 
   failureCode      CheckRunFailureCode?
   failureMessage   String?

@@ -197,6 +197,7 @@ describe('register an external credential, end to end', () => {
       isFinalAttempt: false,
       signal: new AbortController().signal,
       ...overrides,
+      expireSeconds: overrides.expireSeconds ?? 300,
     };
   }
 
