@@ -17,7 +17,7 @@ Every UNTP release from 0.6.0 onwards (0.6.0, 0.6.1 and 0.7.0 today):
 - The 0.7.0 Conformity Scheme schema and the 0.7.0 Identity Resolver link set schema.
 - The W3C Verifiable Credentials Data Model v2 context (`https://www.w3.org/ns/credentials/v2`), which every credential declares, and its JSON Schema.
 
-Extension schemas and contexts hosted elsewhere (for example a sector's own credential type) are not bundled. A fetch failure for one of those still fails the request as before.
+Extension schemas and contexts hosted elsewhere (for example a sector's own credential type) are not bundled. On the issuance route, a fetch failure for one of those still fails the request as before. On the worker path, a failure to fetch an extension context settles `schemaConformance: not_run` and verification continues; extension schemas are never checked there at all.
 
 ## What happens during an outage
 
