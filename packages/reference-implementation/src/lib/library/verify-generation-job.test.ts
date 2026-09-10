@@ -28,6 +28,7 @@ jest.mock('@/lib/services/resolve-vc-service', () => ({ resolveVcService: jest.f
 import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/encryption';
 import type { EncryptedEnvelope } from '@uncefact/untp-ri-services/encryption';
 import type { VerifyResult } from '@uncefact/untp-ri-services';
+import { setImmediate } from 'node:timers';
 import {
   CheckResult,
   CheckRunFailureCode,
@@ -864,8 +865,9 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
 
       await jest.advanceTimersByTimeAsync(290_000);
       await settled;
+      jest.useRealTimers();
       rejectLate(new Error('late validator failure'));
-      await Promise.resolve();
+      await new Promise((resolve) => setImmediate(resolve));
 
       expect(deps.settleComplete).toHaveBeenCalled();
       expect(unhandledRejections).toEqual([]);

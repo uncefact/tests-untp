@@ -5,7 +5,7 @@ import {
   MIN_WORKER_JOB_TIMEOUT_SECONDS,
   readWorkerJobTimeoutSeconds,
 } from './worker-job-timeout.config';
-import { MAX_JOB_EXPIRE_SECONDS } from '../jobs/pg-boss-job-queue';
+import { MAX_JOB_EXPIRE_SECONDS } from '../jobs/job-expiry';
 
 describe('readWorkerJobTimeoutSeconds', () => {
   it('uses the five-minute default when unset or blank', () => {

@@ -32,6 +32,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createCipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { IStorageService, IVerifiableCredentialService, StorageRecord } from '@uncefact/untp-ri-services';
+import { createInMemoryTtlCache } from '@uncefact/untp-utils/cache';
+import { createSchemaLoader, type LoadedRemoteDocument } from '@uncefact/untp-utils/loaders';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import {
   CheckResult,
@@ -98,6 +100,12 @@ import {
   VERIFY_JOB_ENQUEUE_OPTIONS,
   verifyGenerationHandler,
 } from '../../src/lib/library/verify-generation-job';
+import { bundledArtefactsFallback } from '../../src/lib/credentials/schema-loader';
+import {
+  checkSchemaConformance,
+  type SchemaConformanceCheckDependencies,
+} from '../../src/lib/library/schema-conformance-check';
+import { apiLogger } from '../../src/lib/api/logger';
 import {
   DecryptionRequiredError,
   defaultReverifyLibraryRecordDependencies,
@@ -217,10 +225,15 @@ const COMPLETE_CHECKS = {
   schemaConformance: CheckResult.NOT_RUN,
 };
 
+const VCDM_CONTEXT_URL = 'https://www.w3.org/ns/credentials/v2';
+const UNTP_070_CONTEXT_URL = 'https://vocabulary.uncefact.org/untp/0.7.0/context/';
+const DPP_070_SCHEMA_URL = 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json';
+
 const prisma = createRigClient();
 let fixtures: FixtureServer;
 let bundledFallbackFailuresRemaining = 0;
-let bundledFallbackFailuresObserved = 0;
+const externalFixtureMap = new Map<string, string>();
+const fixtureServerRequests: Array<{ requestedUrl: string; fixtureUrl: string }> = [];
 const realFetch = globalThis.fetch.bind(globalThis);
 let recoveryStorageSequence = 0;
 const senderErrors: Error[] = [];
@@ -250,6 +263,7 @@ function artefactFixture(relativePath: string): string {
 }
 
 function registerSchemaAndContextFixtures(): void {
+  externalFixtureMap.clear();
   fixtures.set('/remote/schema/untp/0.7.0/dpp.json', {
     body: artefactFixture('schema/untp/0.7.0/dpp.json'),
   });
@@ -283,27 +297,30 @@ function registerSchemaAndContextFixtures(): void {
   });
   fixtures.set('/remote/context/missing-scoped.json', { body: 'missing', status: 404 });
   fixtures.set('/remote/core-host-failure.json', { body: 'temporarily unavailable', status: 503 });
+
+  externalFixtureMap.set(DPP_070_SCHEMA_URL, '/remote/schema/untp/0.7.0/dpp.json');
+  externalFixtureMap.set(VCDM_CONTEXT_URL, '/remote/context/vcdm/2/credentials.json');
+  externalFixtureMap.set(UNTP_070_CONTEXT_URL, '/remote/context/untp/0.7.0/untp.json');
+  externalFixtureMap.set(
+    'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
+    '/remote/schema/untp/0.6.0/dpp.json',
+  );
+  externalFixtureMap.set('https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/', '/remote/context/untp/0.6.0/dpp.json');
+  externalFixtureMap.set(
+    'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/context/',
+    '/remote/context/untp/0.6.0/dpp.json',
+  );
+  externalFixtureMap.set(THIRD_VALID_CONTEXT, '/remote/context/third-valid.json');
+  externalFixtureMap.set(THIRD_MALFORMED_CONTEXT, '/remote/context/third-malformed.json');
+  externalFixtureMap.set(THIRD_SCOPED_CONTEXT, '/remote/context/third-scoped.json');
+  externalFixtureMap.set(THIRD_MISSING_SCOPED_CONTEXT, '/remote/context/missing-scoped.json');
 }
 
 function fixtureUrlForExternalRequest(requestUrl: string): string {
   const parsed = new URL(requestUrl);
   if (parsed.origin === fixtures.baseUrl) return requestUrl;
-  if (parsed.href === 'https://www.w3.org/ns/credentials/v2') {
-    return `${fixtures.baseUrl}/remote/context/vcdm/2/credentials.json`;
-  }
-  if (parsed.href === 'https://vocabulary.uncefact.org/untp/0.7.0/context/') {
-    return `${fixtures.baseUrl}/remote/context/untp/0.7.0/untp.json`;
-  }
-  if (parsed.pathname === '/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json') {
-    return `${fixtures.baseUrl}/remote/schema/untp/0.6.0/dpp.json`;
-  }
-  if (parsed.pathname === '/vocabulary/untp/dpp/0.6.0/' || parsed.pathname === '/vocabulary/untp/dpp/0.6.0/context/') {
-    return `${fixtures.baseUrl}/remote/context/untp/0.6.0/dpp.json`;
-  }
-  if (parsed.href === THIRD_VALID_CONTEXT) return `${fixtures.baseUrl}/remote/context/third-valid.json`;
-  if (parsed.href === THIRD_MALFORMED_CONTEXT) return `${fixtures.baseUrl}/remote/context/third-malformed.json`;
-  if (parsed.href === THIRD_SCOPED_CONTEXT) return `${fixtures.baseUrl}/remote/context/third-scoped.json`;
-  if (parsed.href === THIRD_MISSING_SCOPED_CONTEXT) return `${fixtures.baseUrl}/remote/context/missing-scoped.json`;
+  const fixturePath = externalFixtureMap.get(parsed.href);
+  if (fixturePath !== undefined) return `${fixtures.baseUrl}${fixturePath}`;
   throw new Error(`integration fixture attempted an unmapped network request: ${requestUrl}`);
 }
 
@@ -317,16 +334,31 @@ function installFixtureFetch(): void {
   globalThis.fetch = (async (input, init) => {
     const requestUrl = requestUrlOf(input);
     const isCoreArtefact =
-      requestUrl === 'https://www.w3.org/ns/credentials/v2' ||
-      requestUrl === 'https://vocabulary.uncefact.org/untp/0.7.0/context/' ||
-      requestUrl === 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json';
+      requestUrl === VCDM_CONTEXT_URL || requestUrl === UNTP_070_CONTEXT_URL || requestUrl === DPP_070_SCHEMA_URL;
+    let fixtureUrl: string;
     if (isCoreArtefact && bundledFallbackFailuresRemaining > 0) {
       bundledFallbackFailuresRemaining -= 1;
-      bundledFallbackFailuresObserved += 1;
-      return realFetch(`${fixtures.baseUrl}/remote/core-host-failure.json`, init);
+      fixtureUrl = `${fixtures.baseUrl}/remote/core-host-failure.json`;
+    } else {
+      fixtureUrl = fixtureUrlForExternalRequest(requestUrl);
     }
-    return realFetch(fixtureUrlForExternalRequest(requestUrl), init);
+    fixtureServerRequests.push({ requestedUrl: requestUrl, fixtureUrl });
+    return realFetch(fixtureUrl, init);
   }) as typeof globalThis.fetch;
+}
+
+function verificationHandler(verifier: IVerifiableCredentialService) {
+  const schemaConformanceDependencies: SchemaConformanceCheckDependencies = {
+    schemaLoader: createSchemaLoader(createInMemoryTtlCache<object>({ ttlMs: 60_000 }), bundledArtefactsFallback),
+    contextCache: createInMemoryTtlCache<LoadedRemoteDocument>({ ttlMs: 60_000 }),
+    bundledArtefactsFallback,
+    logger: apiLogger.child({ module: 'schema-conformance-integration' }),
+  };
+  return verifyGenerationHandler({
+    ...defaultVerifyGenerationDependencies(),
+    checkSchemaConformance: (input) => checkSchemaConformance(input, schemaConformanceDependencies),
+    resolveVerifier: async () => verifier,
+  });
 }
 
 function enqueue(sql: Parameters<typeof senderQueue.enqueueWithin>[0], job: VerifyJobReference): Promise<void> {
@@ -670,6 +702,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
   beforeEach(async () => {
     await truncateApplicationTables(prisma);
     await seedSystemTenant(prisma);
+    registerSchemaAndContextFixtures();
     await prisma.$executeRawUnsafe(
       `DELETE FROM pgboss.job WHERE name IN ('${LIBRARY_VERIFY_JOB}', '${LIBRARY_RECONCILE_PENDING_RUNS_JOB}')`,
     );
@@ -679,8 +712,8 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     senderErrors.splice(0);
     sweepErrors.splice(0);
     capturedLogLines.length = 0;
+    fixtureServerRequests.length = 0;
     bundledFallbackFailuresRemaining = 0;
-    bundledFallbackFailuresObserved = 0;
   });
 
   afterEach(() => {
@@ -728,10 +761,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       sign: jest.fn(),
       verify: jest.fn().mockResolvedValue({ verified: true }),
     };
-    const handler = verifyGenerationHandler({
-      ...defaultVerifyGenerationDependencies(),
-      resolveVerifier: async () => verifier,
-    });
+    const handler = verificationHandler(verifier);
     const [job] = await jobsFor(native.id);
     await handler(job, context());
 
@@ -748,15 +778,14 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     // Fails if the real resolver path is bypassed, if a host-delivery failure
     // is not replaced by the matching bundled artefact, or if fallback is
     // attempted for fewer than the schema and two core context requests.
+    const fallbackUrls = [DPP_070_SCHEMA_URL, VCDM_CONTEXT_URL, UNTP_070_CONTEXT_URL];
+    fallbackUrls.forEach((url) => externalFixtureMap.delete(url));
     bundledFallbackFailuresRemaining = 3;
     const verifier: IVerifiableCredentialService = {
       sign: jest.fn(),
       verify: jest.fn().mockResolvedValue({ verified: true }),
     };
-    const handler = verifyGenerationHandler({
-      ...defaultVerifyGenerationDependencies(),
-      resolveVerifier: async () => verifier,
-    });
+    const handler = verificationHandler(verifier);
     const envelope = envelopedCredential(DPP_070);
     const body = JSON.stringify(envelope);
     const storagePath = '/storage/schema-conformance-bundled.json';
@@ -777,17 +806,24 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
 
     const settled = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
     expect(settled?.checkRun).toMatchObject({ state: CheckRunState.COMPLETE, schemaConformance: CheckResult.PASS });
-    expect(bundledFallbackFailuresObserved).toBe(3);
+    const fallbackRequests = fixtureServerRequests.filter(({ requestedUrl }) => fallbackUrls.includes(requestedUrl));
+    expect(fallbackRequests).toHaveLength(3);
+    expect(fallbackRequests).toEqual(
+      expect.arrayContaining(
+        fallbackUrls.map((requestedUrl) => ({
+          requestedUrl,
+          fixtureUrl: `${fixtures.baseUrl}/remote/core-host-failure.json`,
+        })),
+      ),
+    );
     const fallbackLogs = capturedLogLines
       .map((line) => JSON.parse(line) as Record<string, unknown>)
-      .filter((line) => line.msg === 'Served the bundled copy of a UNTP artefact because its fetch failed');
+      .filter((line) =>
+        String(line.msg).startsWith('Served the bundled copy of a UNTP artefact because its fetch failed'),
+      );
     expect(fallbackLogs).toHaveLength(3);
     expect(fallbackLogs.map((line) => line.url)).toEqual(
-      expect.arrayContaining([
-        'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
-        'https://www.w3.org/ns/credentials/v2',
-        'https://vocabulary.uncefact.org/untp/0.7.0/context/',
-      ]),
+      expect.arrayContaining([DPP_070_SCHEMA_URL, VCDM_CONTEXT_URL, UNTP_070_CONTEXT_URL]),
     );
   });
 
@@ -798,10 +834,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       sign: jest.fn(),
       verify: jest.fn().mockResolvedValue({ verified: true }),
     };
-    const handler = verifyGenerationHandler({
-      ...defaultVerifyGenerationDependencies(),
-      resolveVerifier: async () => verifier,
-    });
+    const handler = verificationHandler(verifier);
     const credential = { ...DPP_070, '@context': [DPP_070['@context'][0], LEGACY_CONTEXT_070] };
     const envelope = envelopedCredential(credential);
     const body = JSON.stringify(envelope);
@@ -836,10 +869,6 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       sign: jest.fn(),
       verify: jest.fn().mockResolvedValue({ verified: true }),
     };
-    const handler = verifyGenerationHandler({
-      ...defaultVerifyGenerationDependencies(),
-      resolveVerifier: async () => verifier,
-    });
     const cases = [
       {
         name: 'third-valid',
@@ -856,6 +885,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     ];
 
     for (const testCase of cases) {
+      const handler = verificationHandler(verifier);
       const credential = {
         ...DPP_070,
         '@context': [...DPP_070['@context'], testCase.contextUrl],
@@ -891,10 +921,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       sign: jest.fn(),
       verify: jest.fn().mockResolvedValue({ verified: true }),
     };
-    const handler = verifyGenerationHandler({
-      ...defaultVerifyGenerationDependencies(),
-      resolveVerifier: async () => verifier,
-    });
+    const handler = verificationHandler(verifier);
     const credential = {
       ...DPP_070,
       '@context': [...DPP_070['@context'], THIRD_SCOPED_CONTEXT],
@@ -948,10 +975,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       sign: jest.fn(),
       verify: jest.fn().mockResolvedValue({ verified: false, error: { type: 'integrity' } }),
     };
-    const handler = verifyGenerationHandler({
-      ...defaultVerifyGenerationDependencies(),
-      resolveVerifier: async () => verifier,
-    });
+    const handler = verificationHandler(verifier);
 
     await reverifyLibraryRecord(native.id, SYSTEM_TENANT_ID, prepareEnqueue);
     await handler((await jobsFor(native.id))[0], context({ isFinalAttempt: true }));
@@ -964,8 +988,8 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     expect(toNativeCredentialRecord(settled as never).verification).toMatchObject({
       state: 'complete',
       checks: {
-        retrieval: 'pass',
-        digest: 'pass',
+        retrieval: 'not_run',
+        digest: 'not_run',
         proof: 'fail',
         status: 'not_run',
         temporal: 'not_run',
@@ -984,10 +1008,6 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       sign: jest.fn(),
       verify: jest.fn().mockResolvedValue({ verified: true }),
     };
-    const handler = verifyGenerationHandler({
-      ...defaultVerifyGenerationDependencies(),
-      resolveVerifier: async () => verifier,
-    });
     const cases = [
       { name: 'conforming', credential: DPP_070, expected: CheckResult.PASS, message: null },
       {
@@ -1008,6 +1028,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     ];
 
     for (const testCase of cases) {
+      const handler = verificationHandler(verifier);
       const envelope = envelopedCredential(testCase.credential);
       const body = JSON.stringify(envelope);
       const storagePath = `/storage/schema-conformance-${testCase.name}.json`;

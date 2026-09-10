@@ -1,4 +1,4 @@
-import { MAX_JOB_EXPIRE_SECONDS } from '../jobs/pg-boss-job-queue';
+import { MAX_JOB_EXPIRE_SECONDS } from '../jobs/job-expiry';
 
 export const DEFAULT_WORKER_JOB_TIMEOUT_SECONDS = 300;
 export const MIN_WORKER_JOB_TIMEOUT_SECONDS = 30;

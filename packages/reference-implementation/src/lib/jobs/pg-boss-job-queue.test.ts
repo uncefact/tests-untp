@@ -30,7 +30,8 @@ jest.mock('pg-boss', () => {
 });
 
 import { JobQueueError } from './errors';
-import { MAX_JOB_EXPIRE_SECONDS, PgBossJobQueue } from './pg-boss-job-queue';
+import { MAX_JOB_EXPIRE_SECONDS } from './job-expiry';
+import { PgBossJobQueue } from './pg-boss-job-queue';
 
 const { __bossMock: bossMock, __mockState: mockState } = jest.requireMock('pg-boss') as {
   __bossMock: Record<string, jest.Mock>;

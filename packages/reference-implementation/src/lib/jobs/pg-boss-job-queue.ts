@@ -10,8 +10,7 @@ import type {
   StopOptions,
   QueueProbe,
 } from './types';
-
-export const MAX_JOB_EXPIRE_SECONDS = 24 * 60 * 60;
+import { MAX_JOB_EXPIRE_SECONDS } from './job-expiry';
 
 /**
  * Options for {@link PgBossJobQueue}. The database arrives by injection;
