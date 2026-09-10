@@ -9,6 +9,8 @@ The library holds every credential a tenant has, whether the tenant issued it th
 
 This page covers listing the library, fetching several records by id, registering an external credential, retrieving one record, updating its recipient annotations, re-verifying a record and deleting a record.
 
+Native records keep the credential record id returned by issuance, so existing ids can be used with [library detail](#retrieve-one-library-record) after migrating from the retired credentials routes.
+
 :::tip[Interactive API documentation]
 The Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) carries the exact request and response schemas for the operations on this page. This page explains the behaviour, and Swagger carries the payload shapes. Every library endpoint requires authentication. See [Authentication](../authentication#obtaining-a-token) for how to obtain a Bearer token.
 :::

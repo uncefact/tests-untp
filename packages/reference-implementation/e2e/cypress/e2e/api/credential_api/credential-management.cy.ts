@@ -270,16 +270,14 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/credentials/:id — retrieves the encrypted credential', () => {
-      cy.request(`/api/v1/credentials/${encryptedCredentialId}`).then((response) => {
+    it('GET /api/v1/library/:id: retrieves the encrypted credential', () => {
+      cy.request(`/api/v1/library/${encryptedCredentialId}`).then((response) => {
         expect(response.status).to.eq(200);
         const cred = response.body;
         expect(cred.id).to.eq(encryptedCredentialId);
         expect(cred.storageUri).to.be.a('string');
         expect(cred.digestMultibase).to.be.a('string');
-        expect(cred.credentialType).to.eq('DigitalProductPassport');
-        expect(cred.isPublished).to.be.false;
-        // API defaults encrypt to true, so decryptionKey is present
+        expect(cred.credential.credentialType).to.eq('DPP');
         expect(cred.decryptionKey).to.be.a('string');
       });
     });
@@ -305,8 +303,8 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/credentials/:id — unencrypted credential has null decryptionKey', () => {
-      cy.request(`/api/v1/credentials/${unencryptedCredentialId}`).then((response) => {
+    it('GET /api/v1/library/:id: unencrypted credential has null decryptionKey', () => {
+      cy.request(`/api/v1/library/${unencryptedCredentialId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.decryptionKey).to.be.null;
       });
@@ -329,8 +327,8 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/credentials/:id — retrieves the published credential', () => {
-      cy.request(`/api/v1/credentials/${publishedCredentialId}`).then((response) => {
+    it('GET /api/v1/library/:id: retrieves the published credential', () => {
+      cy.request(`/api/v1/library/${publishedCredentialId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(publishedCredentialId);
       });
@@ -427,28 +425,34 @@ describe('Credential API', { testIsolation: false }, () => {
   });
 
   // -----------------------------------------------------------------------
-  // Validation errors
+  // Retired list route and issuance validation
   // -----------------------------------------------------------------------
-  describe('Validation errors', () => {
-    it('returns 400 naming the bound when the list limit exceeds the deployment maximum', () => {
+  describe('Retired list route and issuance validation', () => {
+    it('returns 410 when the retired list limit exceeds the former deployment maximum', () => {
       cy.request({
         method: 'GET',
         url: '/api/v1/credentials?limit=100000',
         failOnStatusCode: false,
       }).then((response) => {
-        expect(response.status).to.eq(400);
-        expect(response.body.error).to.contain('limit');
+        expect(response.status).to.eq(410);
+        expect(response.body).to.deep.eq({
+          error: 'This route has been retired. Use GET /api/v1/library instead.',
+          code: 'ROUTE_RETIRED',
+        });
       });
     });
 
-    it('returns 400 for a malformed strict-integer limit (1abc)', () => {
+    it('returns 410 for a malformed strict-integer limit (1abc) on the retired list', () => {
       cy.request({
         method: 'GET',
         url: '/api/v1/credentials?limit=1abc',
         failOnStatusCode: false,
       }).then((response) => {
-        expect(response.status).to.eq(400);
-        expect(response.body.error).to.contain('limit');
+        expect(response.status).to.eq(410);
+        expect(response.body).to.deep.eq({
+          error: 'This route has been retired. Use GET /api/v1/library instead.',
+          code: 'ROUTE_RETIRED',
+        });
       });
     });
 
@@ -571,139 +575,26 @@ describe('Credential API', { testIsolation: false }, () => {
   });
 
   // -----------------------------------------------------------------------
-  // List credentials
+  // Retired list route and library replacement
   // -----------------------------------------------------------------------
-  describe('List credentials', () => {
-    it('GET /api/v1/credentials — lists credentials with pagination metadata', () => {
-      cy.request('/api/v1/credentials').then((response) => {
-        expect(response.status).to.eq(200);
-
-        // Paginated response shape
-        expect(response.body.data).to.be.an('array');
-        expect(response.body).to.not.have.property('ok');
-        expect(response.body.pagination).to.exist;
-        expect(response.body.pagination.total).to.be.a('number');
-        expect(response.body.pagination.limit).to.eq(20);
-        expect(response.body.pagination.offset).to.eq(0);
-        expect(response.body.pagination.hasMore).to.be.a('boolean');
-
-        // Should contain at least the credentials issued earlier in the suite
-        expect(response.body.data.length).to.be.at.least(2);
-
-        // Verify credential shape
-        const cred = response.body.data[0];
-        expect(cred.id).to.be.a('string');
-        expect(cred.storageUri).to.be.a('string');
-        expect(cred.digestMultibase).to.be.a('string');
-        expect(cred.credentialType).to.be.a('string');
-        expect(cred).to.have.property('isPublished');
-        expect(cred).to.have.property('createdAt');
-        expect(cred).to.have.property('updatedAt');
-      });
-    });
-
-    it('GET /api/v1/credentials?credentialType=DigitalProductPassport — filters by type', () => {
-      cy.request('/api/v1/credentials?credentialType=DigitalProductPassport').then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.at.least(1);
-
-        // All returned credentials should be DPP type
-        response.body.data.forEach((cred: any) => {
-          expect(cred.credentialType).to.eq('DigitalProductPassport');
+  describe('Retired list route and library replacement', () => {
+    it('GET /api/v1/credentials: returns the retirement response after authentication', () => {
+      cy.request({ method: 'GET', url: '/api/v1/credentials', failOnStatusCode: false }).then((response) => {
+        expect(response.status).to.eq(410);
+        expect(response.body).to.deep.eq({
+          error: 'This route has been retired. Use GET /api/v1/library instead.',
+          code: 'ROUTE_RETIRED',
         });
       });
     });
 
-    it('GET /api/v1/credentials?isPublished=true — filters by published status', () => {
-      cy.request('/api/v1/credentials?isPublished=true').then((response) => {
+    it('GET /api/v1/library?origin=native: still finds an issued record', () => {
+      cy.request('/api/v1/library?origin=native&sort=createdAt:desc').then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array');
-
-        // All returned credentials should be published
-        response.body.data.forEach((cred: any) => {
-          expect(cred.isPublished).to.be.true;
-        });
-      });
-    });
-
-    it('GET /api/v1/credentials?isPublished=false — filters by unpublished', () => {
-      cy.request('/api/v1/credentials?isPublished=false').then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array');
-
-        response.body.data.forEach((cred: any) => {
-          expect(cred.isPublished).to.be.false;
-        });
-      });
-    });
-
-    it('GET /api/v1/credentials?limit=1 — respects limit', () => {
-      cy.request('/api/v1/credentials?limit=1').then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.have.length(1);
-        expect(response.body.pagination.limit).to.eq(1);
-        expect(response.body.pagination.hasMore).to.be.true;
-      });
-    });
-
-    it('GET /api/v1/credentials?limit=1&offset=1 — respects offset', () => {
-      cy.request('/api/v1/credentials?limit=1&offset=1').then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.have.length(1);
-        expect(response.body.pagination.offset).to.eq(1);
-      });
-    });
-
-    it('GET /api/v1/credentials?credentialType=NonExistent — returns empty for unknown type', () => {
-      cy.request('/api/v1/credentials?credentialType=NonExistentType').then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array').and.have.length(0);
-        expect(response.body.pagination.total).to.eq(0);
-      });
-    });
-
-    it('GET /api/v1/credentials?isPublished=yes — returns 400 for invalid boolean', () => {
-      cy.request({
-        method: 'GET',
-        url: '/api/v1/credentials?isPublished=yes',
-        failOnStatusCode: false,
-      }).then((response) => {
-        expect(response.status).to.eq(400);
-        expect(response.body.error).to.be.a('string');
-      });
-    });
-
-    it('GET /api/v1/credentials?limit=0 — returns 400 for invalid limit', () => {
-      cy.request({
-        method: 'GET',
-        url: '/api/v1/credentials?limit=0',
-        failOnStatusCode: false,
-      }).then((response) => {
-        expect(response.status).to.eq(400);
-        expect(response.body.error).to.be.a('string');
-      });
-    });
-
-    it('GET /api/v1/credentials?offset=-1 — returns 400 for invalid offset', () => {
-      cy.request({
-        method: 'GET',
-        url: '/api/v1/credentials?offset=-1',
-        failOnStatusCode: false,
-      }).then((response) => {
-        expect(response.status).to.eq(400);
-        expect(response.body.error).to.be.a('string');
-      });
-    });
-
-    it('GET /api/v1/credentials?limit=abc — returns 400 for non-numeric limit', () => {
-      cy.request({
-        method: 'GET',
-        url: '/api/v1/credentials?limit=abc',
-        failOnStatusCode: false,
-      }).then((response) => {
-        expect(response.status).to.eq(400);
-        expect(response.body.error).to.be.a('string');
+        const record = response.body.data.find((row: any) => row.id === encryptedCredentialId);
+        expect(record, 'issued record in native library results').to.exist;
+        expect(record.origin).to.eq('native');
+        expect(record.credential.credentialType).to.eq('DPP');
       });
     });
   });
@@ -712,13 +603,17 @@ describe('Credential API', { testIsolation: false }, () => {
   // Error handling
   // -----------------------------------------------------------------------
   describe('Error handling', () => {
-    it('GET /api/v1/credentials/:id — returns 404 for nonexistent credential', () => {
+    it('GET /api/v1/credentials/:id: returns 410 for an issued credential id', () => {
       cy.request({
         method: 'GET',
-        url: '/api/v1/credentials/nonexistent-id',
+        url: `/api/v1/credentials/${encryptedCredentialId}`,
         failOnStatusCode: false,
       }).then((response) => {
-        expect(response.status).to.eq(404);
+        expect(response.status).to.eq(410);
+        expect(response.body).to.deep.eq({
+          error: 'This route has been retired. Use GET /api/v1/library/{id} instead.',
+          code: 'ROUTE_RETIRED',
+        });
       });
     });
   });

@@ -43,7 +43,6 @@ import {
 } from '@/lib/library/credential-record-projection';
 import { libraryReadFailureSchema } from '@/lib/library/library-read-errors';
 import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
-import { CredentialDetailsError, CredentialDetailsStatus, CoreCredentialType } from '@/lib/prisma/generated';
 import {
   conformitySchemeSummarySchema,
   conformityProfileSummarySchema,
@@ -89,85 +88,6 @@ export const credentialWarningSchema = z.object({
 export const credentialIssueResponseSchema = z.object({
   credentialId: z.string().describe('Database ID of the stored credential record'),
   warnings: z.array(credentialWarningSchema).optional().describe('Advisory warnings (e.g. publishing failures)'),
-});
-
-/**
- * Every descriptive field captured at issue time (#952) shares the same null
- * reason: the credential carried none, or it has not been read yet.
- * `extraAbsenceReason` adds a field-specific reason ahead of that shared one.
- */
-function describeCapturedField(subject: string, extraAbsenceReason?: string): string {
-  const carriesNone = extraAbsenceReason
-    ? `the credential carries no usable value there or ${extraAbsenceReason}`
-    : 'the credential carries no usable value there';
-  return `${subject} read from the signed credential at issue time (null if ${carriesNone}; unknown rather than absent while detailsStatus is not EXTRACTED)`;
-}
-
-/** Credential resource as returned by GET /credentials and GET /credentials/:id. */
-export const credentialSchema = z.object({
-  id: z.string().describe('Database ID'),
-  tenantId: z.string().describe('Tenant ID'),
-  storageUri: z.string().describe('URI where the credential is stored'),
-  digestMultibase: z.string().describe('Multibase-encoded multihash digest of the stored credential content'),
-  credentialType: z.string().describe('Type of credential (e.g. DigitalProductPassport)'),
-  coreCredentialType: z
-    .nativeEnum(CoreCredentialType)
-    .nullable()
-    .describe(
-      'The UNTP core credential type the credential type resolves to (DPP, DCC, DFR, DTE or DIA), or null when that kind is unknown or unresolved, which covers an extension whose core kind is not known and a credential issued before this field existed whose recorded type resolved to no core kind',
-    ),
-  decryptionKey: z.string().nullable().describe('AES-GCM decryption key (null if unencrypted)'),
-  isPublished: z.boolean().describe('Whether the credential has been published to IDR'),
-  organisationId: z.string().nullable().describe('ID of the linked organisation entity (null if none)'),
-  facilityId: z.string().nullable().describe('ID of the linked facility entity (null if none)'),
-  productId: z.string().nullable().describe('ID of the linked product entity (null if none)'),
-  name: z.string().nullable().describe(describeCapturedField('Credential name')),
-  issuerName: z.string().nullable().describe(describeCapturedField('Issuer name')),
-  issuerDid: z.string().nullable().describe(describeCapturedField('Issuer DID')),
-  subjectName: z
-    .string()
-    .nullable()
-    .describe(
-      describeCapturedField(
-        "Subject name (read where the credential's data model places it; the first subject when the credential carries several)",
-      ),
-    ),
-  subjectId: z
-    .string()
-    .nullable()
-    .describe(
-      describeCapturedField(
-        "Subject id (read where the credential's data model places it; the first subject when the credential carries several)",
-      ),
-    ),
-  validFrom: z
-    .string()
-    .datetime()
-    .nullable()
-    .describe(describeCapturedField('ISO 8601 datetime when the credential becomes valid')),
-  validUntil: z
-    .string()
-    .datetime()
-    .nullable()
-    .describe(describeCapturedField('ISO 8601 datetime when the credential expires')),
-  detailsStatus: z
-    .nativeEnum(CredentialDetailsStatus)
-    .describe(
-      'Whether the descriptive fields were read from the signed credential (EXTRACTED), have not been read yet (EXTRACTION_PENDING), or could not be read (EXTRACTION_FAILED). EXTRACTED means the read ran, so a null field there is a value the credential does not carry. Under the other two a null field is unknown rather than known to be absent',
-    ),
-  detailsError: z
-    .nativeEnum(CredentialDetailsError)
-    .nullable()
-    .describe(
-      'Why the descriptive fields could not be read, when detailsStatus is EXTRACTION_FAILED. `UNREADABLE_ENVELOPE` means the signed credential could not be decoded, `BRIDGE_ERROR` that its data model could not be read, and `DECRYPT_FAILED` that a stored credential could not be opened. Null in every other state',
-    ),
-  createdAt: z.string().datetime().describe('ISO 8601 timestamp'),
-  updatedAt: z
-    .string()
-    .datetime()
-    .describe(
-      'ISO 8601 timestamp of the last change to the record or its descriptive fields; a change to the stored copy alone, such as a key rewrap, does not move it',
-    ),
 });
 
 // ============================================================================
@@ -553,7 +473,6 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     DidDocument: didDocumentResponseSchema,
     CredentialIssueRequest: credentialIssueRequestSchema,
     CredentialIssueResponse: credentialIssueResponseSchema,
-    Credential: credentialSchema,
     CredentialWarning: credentialWarningSchema,
     Registrar: registrarSchema,
     SchemeQualifier: schemeQualifierSchema,

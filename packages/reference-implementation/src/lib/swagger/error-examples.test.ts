@@ -15,7 +15,7 @@ type MediaType = { schema?: { $ref?: string }; examples?: Record<string, { summa
 type ResponseObject = {
   $ref?: string;
   description?: string;
-  headers?: Record<string, { description?: string; schema?: { type?: string } }>;
+  headers?: Record<string, { description?: string; schema?: { type?: string; enum?: string[] } }>;
   content?: Record<string, MediaType>;
 };
 type Spec = {
@@ -90,6 +90,35 @@ describe('published error response examples', () => {
       error: 'This credential is already registered as record clw0dup1ic4terecord000001.',
       code: 'DUPLICATE_CREDENTIAL',
     });
+  });
+
+  it('pins both retired response bodies and their no-store header schemas', () => {
+    const cases = [
+      {
+        route: '/credentials',
+        body: {
+          error: 'This route has been retired. Use GET /api/v1/library instead.',
+          code: 'ROUTE_RETIRED',
+        },
+      },
+      {
+        route: '/credentials/{id}',
+        body: {
+          error: 'This route has been retired. Use GET /api/v1/library/{id} instead.',
+          code: 'ROUTE_RETIRED',
+        },
+      },
+    ];
+
+    for (const { route, body } of cases) {
+      const response = spec.paths?.[route]?.get?.responses?.['410'];
+
+      expect(response?.headers?.['Cache-Control']?.schema).toEqual({ type: 'string', enum: ['no-store'] });
+      expect(response?.content?.['application/json']?.schema).toEqual({
+        $ref: '#/components/schemas/ErrorResponse',
+      });
+      expect(response?.content?.['application/json']?.examples?.retired?.value).toEqual(body);
+    }
   });
 
   it('documents 413 on every operation that accepts a request body, by reference', () => {

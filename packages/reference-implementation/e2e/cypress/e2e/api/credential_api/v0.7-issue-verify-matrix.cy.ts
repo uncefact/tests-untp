@@ -8,7 +8,7 @@
  *      schema. Only the issuer DID, credential id, and validity window are
  *      overridden so the credential is owned by the test tenant's default DID
  *      and is currently valid.
- *   2. Fetches the stored enveloped VC URI via `GET /api/v1/credentials/:id`.
+ *   2. Fetches the stored enveloped VC URI via `GET /api/v1/library/:id`.
  *   3. Fetches the enveloped VC body from the storage service (Docker
  *      internal host rewritten to the Cypress-reachable host).
  *   4. Cross-origin to the Playground, uploads the enveloped VC, and
@@ -117,8 +117,9 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
           expect(issueResponse.body.credentialId).to.be.a('string');
           const credentialId = issueResponse.body.credentialId as string;
 
-          cy.request({ method: 'GET', url: `/api/v1/credentials/${credentialId}` }).then((getResponse) => {
+          cy.request({ method: 'GET', url: `/api/v1/library/${credentialId}` }).then((getResponse) => {
             expect(getResponse.status).to.eq(200);
+            expect(getResponse.body.id).to.eq(credentialId);
             expect(getResponse.body.storageUri).to.be.a('string');
             const storageUri = hostReachableStorageUri(getResponse.body.storageUri as string);
 

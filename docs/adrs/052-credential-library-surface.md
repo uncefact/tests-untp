@@ -2,6 +2,7 @@
 
 - **Date:** 2026-08-21
 - **Status:** accepted
+- **Update (2026-09-10):** Decision 3 is implemented by #965 with `ROUTE_RETIRED` responses.
 
 ## Context
 

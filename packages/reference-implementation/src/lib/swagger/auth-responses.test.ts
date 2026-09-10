@@ -43,7 +43,7 @@ type Response = {
   description?: string;
   content?: Record<string, { schema?: { $ref?: string } }>;
 };
-type Operation = { requestBody?: unknown; responses?: Record<string, Response> };
+type Operation = { requestBody?: unknown; deprecated?: boolean; responses?: Record<string, Response> };
 type Spec = {
   paths?: Record<string, Record<string, Operation>>;
   components?: { responses?: Record<string, unknown>; schemas?: Record<string, unknown> };
@@ -174,6 +174,17 @@ describe('shared auth responses', () => {
       undocumented: [...exported].filter((id) => !documented.has(id)).sort(),
       unimplemented: [...documented].filter((id) => !exported.has(id)).sort(),
     }).toEqual({ undocumented: [], unimplemented: [] });
+  });
+
+  it.each([
+    ['/credentials', 'RETIRED: use GET /api/v1/library'],
+    ['/credentials/{id}', 'RETIRED: use GET /api/v1/library/{id}'],
+  ])('documents %s as deprecated with exactly its retirement responses', (route, summary) => {
+    const operation = spec.paths?.[route]?.get as (Operation & { summary?: string }) | undefined;
+
+    expect(operation?.deprecated).toBe(true);
+    expect(operation?.summary).toBe(summary);
+    expect(Object.keys(operation?.responses ?? {}).sort()).toEqual(['401', '403', '410', '500']);
   });
 
   it('documents both auth responses on every guarded operation, by reference', () => {

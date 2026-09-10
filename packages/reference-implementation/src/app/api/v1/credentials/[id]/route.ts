@@ -1,18 +1,18 @@
-import { NextResponse } from 'next/server';
-import { NotFoundError } from '@/lib/api/errors';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
-import { getCredentialById } from '@/lib/prisma/repositories';
-import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection';
-import { apiLogger } from '@/lib/api/logger';
-
-const logger = apiLogger.child({ route: '/api/v1/credentials/[id]' });
+import { retiredRoute } from '@/lib/api/retired-route';
 
 /**
  * @swagger
  * /credentials/{id}:
  *   get:
- *     summary: Get a credential by ID
- *     description: Retrieves a specific credential record by its database ID
+ *     operationId: getCredentialRetired
+ *     summary: 'RETIRED: use GET /api/v1/library/{id}'
+ *     deprecated: true
+ *     description: |
+ *       Retired with no deprecation window. Authentication and tenant
+ *       resolution run before retirement. The supplied id is not looked up.
+ *       Use GET /api/v1/library/{id} with the same credential record id.
+ *       See the migration guide at `/docs/migration-guides/ri-v0.5`.
  *     tags:
  *       - Credentials
  *     parameters:
@@ -21,42 +21,36 @@ const logger = apiLogger.child({ route: '/api/v1/credentials/[id]' });
  *         required: true
  *         schema:
  *           type: string
- *         description: The database ID of the credential
+ *         description: Credential record id. The retired route does not look it up.
  *     responses:
- *       200:
- *         description: Credential retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Credential'
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
  *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
- *       404:
- *         description: Credential not found
+ *       410:
+ *         description: |
+ *           This route has been retired. Use GET /api/v1/library/{id} instead.
+ *           Returned after authentication and tenant resolution succeed.
+ *         headers:
+ *           Cache-Control:
+ *             description: Prevents caching of the retirement response.
+ *             schema:
+ *               type: string
+ *               enum: [no-store]
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               retired:
+ *                 value:
+ *                   error: This route has been retired. Use GET /api/v1/library/{id} instead.
+ *                   code: ROUTE_RETIRED
  *       500:
- *         description: Server error
+ *         description: 'The request could not be completed and the response body is sanitised.'
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
-  const { id } = await params;
-  logger.info({ credentialId: id }, 'Looking up credential');
-
-  const credential = await getCredentialById(id, tenantId);
-  if (!credential) {
-    throw new NotFoundError('Credential not found');
-  }
-
-  logger.info({ credentialId: credential.id }, 'Credential retrieved');
-
-  const decryptionKey = revealDecryptionKey(credential.decryptionKey);
-  return NextResponse.json({ ...credential, decryptionKey });
-});
+export const GET = withTenantAuth(async () => retiredRoute('GET /api/v1/library/{id}'));

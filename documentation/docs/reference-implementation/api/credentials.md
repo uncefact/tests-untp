@@ -9,10 +9,11 @@ Credentials are the core output of the Reference Implementation. Everything else
 
 A credential is a digitally signed statement. A company issues a credential that says "this product was made sustainably" or "this facility passed a conformity assessment". Because the credential is cryptographically signed, anyone who receives it can verify that the statement hasn't been tampered with and that it really came from the company that claims to have issued it, without needing to contact the issuer directly.
 
-The Credentials API has two sides:
+The Credentials API has three related surfaces:
 
-- **Issuance** (authenticated) — a tenant creates a credential, the system validates it, signs it, stores it, and optionally publishes it so it can be discovered by resolving an identifier.
-- **Verification** (public, no login required) — anyone with a link to a stored credential can check whether it's genuine, untampered, and still valid.
+- **Issuance** (authenticated): a tenant creates a credential, the system validates it, signs it, stores it, and optionally publishes it so it can be discovered by resolving an identifier.
+- **Library access** (authenticated): a tenant lists and retrieves the credential records it issued or received, including custody details on record detail.
+- **Verification** (public, no login required): anyone with a link to a stored credential can check whether it's genuine, untampered, and still valid.
 
 :::tip[Interactive API documentation]
 The Reference Implementation includes a Swagger UI at [`/api-docs`](http://localhost:3003/api-docs) with full request/response schemas you can try directly from the browser. The endpoint descriptions below focus on behaviour and internal logic. Refer to Swagger for exact payload shapes. All endpoints except [Verify](#verify-a-credential) require authentication. See [Authentication](../authentication#obtaining-a-token) for how to obtain a Bearer token.
@@ -54,14 +55,14 @@ The type of credential determines what kind of data it contains and which schema
 
 When a credential is issued, two things are created: the **signed credential** (stored externally by the [storage service](./services)) and a **credential record** (stored in the Reference Implementation's database, tracking metadata like the storage URI, hash, and published status).
 
-By default, the [storage service](./services) **encrypts** the signed credential before storing it, so the file at the storage URI is unreadable on its own. The storage service returns the decryption key once, when the credential is stored, and the Reference Implementation saves it on the credential record. Reading the record through this API includes that key, so it can be presented alongside the storage URI during [verification](#verify-a-credential).
+By default, the [storage service](./services) **encrypts** the signed credential before storing it, so the file at the storage URI is unreadable on its own. The storage service returns the decryption key once, when the credential is stored, and the Reference Implementation saves it on the credential record. Issuance returns the credential record id. An authenticated `GET /api/v1/library/{id}` returns the storage URI and a `decryptionKey` for an encrypted record when this service holds one and can reveal it, and `null` otherwise (see the [library detail contract](./library#retrieve-one-library-record)), so the key can be supplied during [verification](#verify-a-credential).
 
 This matters for privacy: a credential about a product's supply chain might contain commercially sensitive information. Encryption ensures that only someone with the key can read it, even if they have the storage URL.
 
-| Setting | What Happens |
-|---------|-------------|
-| `encrypt: true` (default) | Credential encrypted before storage. A `decryptionKey` is returned. |
-| `encrypt: false` | Credential stored in plaintext. Anyone with the URL can read it. |
+| Setting                   | What Happens                                                                                                                                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `encrypt: true` (default) | Credential encrypted before storage. The [library detail](./library#retrieve-one-library-record) returns a `decryptionKey` when this service holds one and can reveal it, and `null` otherwise. |
+| `encrypt: false`          | Credential stored in plaintext. Anyone with the URL can read it.                                                                                                                                |
 
 ### Integrity Hashing
 
@@ -126,11 +127,11 @@ sequenceDiagram
 
 The three required fields are validated:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `credentialPayload` | object | Yes | The full credential payload conforming to the UNTP schema for the specified type and version |
-| `credentialType` | string | Yes | Must match a registered [data model](./data-models) (e.g., `DigitalProductPassport`) |
-| `version` | string | Yes | Must match a registered data model version (e.g., `0.6.1`) |
+| Field               | Type   | Required | Description                                                                                  |
+| ------------------- | ------ | -------- | -------------------------------------------------------------------------------------------- |
+| `credentialPayload` | object | Yes      | The full credential payload conforming to the UNTP schema for the specified type and version |
+| `credentialType`    | string | Yes      | Must match a registered [data model](./data-models) (e.g., `DigitalProductPassport`)         |
+| `version`           | string | Yes      | Must match a registered data model version (e.g., `0.6.1`)                                   |
 
 #### Stage 2: Data Model Resolution
 
@@ -153,27 +154,27 @@ For [Digital Conformity Credentials](./data-models) (DCC), the issuance pipeline
 
 CVC validation is advisory only. It never blocks issuance. If the check fails or no matching scheme is available, the credential is issued with warnings in the response. Warning codes include:
 
-| Code | Meaning |
-|------|---------|
-| `conformity-scheme.not-found` | A referenced conformity scheme URI is not in the locally known catalogue |
-| `conformity-profile.not-found` | A referenced profile URI is not found within the scheme |
-| `conformity-profile.not-specified` | The claim references no profile, so criterion and topic checks were not performed (criteria are published per versioned profile) |
-| `conformity-criterion.not-in-profile` | A claimed criterion is not one the referenced profile publishes |
-| `conformity-criterion.missing` | A criterion the profile defines is absent from the claim |
-| `conformity-criterion.topic-mismatch` | A criterion's declared conformity topics do not match those the criterion defines |
-| `conformity-assessment.topic-mismatch` | An assessment declares a conformity topic that none of its assessed criteria define |
-| `conformity-claim.validation-error` | Validation could not be performed (extraction or infrastructure failure) |
+| Code                                   | Meaning                                                                                                                          |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `conformity-scheme.not-found`          | A referenced conformity scheme URI is not in the locally known catalogue                                                         |
+| `conformity-profile.not-found`         | A referenced profile URI is not found within the scheme                                                                          |
+| `conformity-profile.not-specified`     | The claim references no profile, so criterion and topic checks were not performed (criteria are published per versioned profile) |
+| `conformity-criterion.not-in-profile`  | A claimed criterion is not one the referenced profile publishes                                                                  |
+| `conformity-criterion.missing`         | A criterion the profile defines is absent from the claim                                                                         |
+| `conformity-criterion.topic-mismatch`  | A criterion's declared conformity topics do not match those the criterion defines                                                |
+| `conformity-assessment.topic-mismatch` | An assessment declares a conformity topic that none of its assessed criteria define                                              |
+| `conformity-claim.validation-error`    | Validation could not be performed (extraction or infrastructure failure)                                                         |
 
 Criterion and topic warnings name the versioned profile URI they were checked against in their message, since profile URIs carry a version segment and the same criterion can differ between profile versions.
 
 Alongside `code` and `message`, a warning can carry structured fields so a client can act on it without reading the message text:
 
-| Field | What it carries |
-|-------|-----------------|
-| `received` | The value that triggered the warning, such as the criterion URI the profile does not publish |
-| `expected` | The value or shape that was expected, where there is one |
-| `pointer` | A JSON pointer to the place in the credential you submitted that the warning concerns, for example `/credentialSubject/conformityAssessment/0/assessmentCriteria/1/id` |
-| `remediation` | What to do about it, where the check can say |
+| Field         | What it carries                                                                                                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `received`    | The value that triggered the warning, such as the criterion URI the profile does not publish                                                                           |
+| `expected`    | The value or shape that was expected, where there is one                                                                                                               |
+| `pointer`     | A JSON pointer to the place in the credential you submitted that the warning concerns, for example `/credentialSubject/conformityAssessment/0/assessmentCriteria/1/id` |
+| `remediation` | What to do about it, where the check can say                                                                                                                           |
 
 A pointer appears only where the warning has a location in your credential and that location resolves, so treat it as present-or-absent rather than guaranteed. Two warnings never carry one, because their subject is not in the document at all. `conformity-criterion.missing` names a criterion the claim never declared, so read `expected` for the criterion the profile publishes. `conformity-profile.not-specified` reports the absence of a profile and carries neither `received` nor `expected`, so the message is the whole of it.
 
@@ -198,17 +199,17 @@ The **VC service** is resolved from the issuer DID's associated service instance
 
 The **storage service** and **IDR service** follow the standard [resolution chain](../services/service-architecture#system-services-vs-tenant-services):
 
-| Service | Purpose | How Resolved |
-|---------|---------|-------------|
-| **VC Service** | Signs the credential payload | From the issuer DID's associated service instance |
-| **Storage Service** | Stores the signed credential | `storageOptions.serviceInstanceId`, or tenant primary, or system default |
-| **IDR Service** | Publishes links (only when `publish: true`) | From the resolved identifier's scheme, then its registrar, then the tenant/system default |
+| Service             | Purpose                                     | How Resolved                                                                              |
+| ------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **VC Service**      | Signs the credential payload                | From the issuer DID's associated service instance                                         |
+| **Storage Service** | Stores the signed credential                | `storageOptions.serviceInstanceId`, or tenant primary, or system default                  |
+| **IDR Service**     | Publishes links (only when `publish: true`) | From the resolved identifier's scheme, then its registrar, then the tenant/system default |
 
 #### Stage 7: Sign, Store, and Record
 
 The credential payload is signed by the VC service, producing an [Enveloped Verifiable Credential](https://www.w3.org/TR/vc-data-model-2.0/#enveloped-verifiable-credentials). The signed credential is then stored by the storage service.
 
-**Encryption**: By default, the stored credential is encrypted with AES-GCM. The decryption key is returned in the credential record and must be provided when [verifying](#verify-a-credential) encrypted credentials. Set `storageOptions.encrypt` to `false` to store the credential unencrypted.
+**Encryption**: By default, the stored credential is encrypted with AES-GCM. Issuance returns the credential record id, and an authenticated `GET /api/v1/library/{id}` returns a `decryptionKey` for an encrypted record when this service holds one and can reveal it, and `null` otherwise (see the [library detail contract](./library#retrieve-one-library-record)). Supply that key when [verifying](#verify-a-credential) an encrypted credential. Set `storageOptions.encrypt` to `false` to store the credential unencrypted.
 
 **Entity linking**: The data model bridge extracts entity references (organisations, facilities, products) from the credential payload. The primary entity (priority: product > facility > organisation) is linked to the credential record in the database. This link is best-effort enrichment; it never gates the optional publishing step, and a match that fails to link (for example the entity was deleted between extraction and insert) is reported as an advisory `ENTITY_LINK_FAILED` warning rather than affecting the credential or the publish.
 
@@ -217,29 +218,30 @@ The credential payload is signed by the VC service, producing an [Enveloped Veri
 When `publishingOptions.publish` is `true`, the Reference Implementation publishes a link to the stored credential on the [Identity Resolver](./identifiers#what-are-links) for the credential's own identifier. This makes the credential discoverable via that identifier's scheme (e.g., resolving a GS1 GTIN leads to the credential).
 
 Publishing resolves its target from the same reference used for entity linking (priority: product > facility > organisation), looked up against the tenant's identifiers rather than against master data. Publishing requires that lookup to resolve to exactly one identifier with:
+
 - An [identifier scheme](./identifiers#what-is-an-identifier-scheme) that has a primary key
 - A registrar with a namespace
 - An IDR service instance (configured on the scheme, the registrar, or the tenant/system default)
 
 When publishing cannot complete, the credential is still issued and returned, and a warning names the unmet prerequisite along with what to do about it:
 
-| Code | Meaning | What to do |
-|------|---------|------------|
-| `REFS_EXTRACTION_FAILED` | No identifier could be read from the credential payload. | Check the subject carries the identifier fields its data model defines, such as a `registeredId`. |
-| `PUBLISH_REFERENCE_MISSING` | The payload carries no identifier to publish under. | Check the subject carries the identifier fields its data model defines. |
-| `PUBLISH_SCHEME_INCOMPLETE` | The identifier resolved to a scheme without a primary key, or a registrar without a namespace. | Complete the scheme and registrar configuration, then issue again. |
-| `PUBLISH_IDENTIFIER_UNKNOWN` | No identifier matching the value is registered for the tenant, or the scheme named in `identifierSchemeId` does not hold that value. | Register the identifier under a scheme, or correct `identifierSchemeId`. |
-| `PUBLISH_IDENTIFIER_AMBIGUOUS` | The value exists under more than one scheme, so the target is not decidable. | Set `publishingOptions.identifierSchemeId` to the scheme you want to publish under. |
-| `PUBLISH_IDR_UNAVAILABLE` | No Identity Resolver service is configured for the scheme, registrar, or tenant. | Ask your operator to configure an IDR service instance. |
-| `PUBLISH_TARGET_UNRESOLVED` | The identifier lookup itself failed, so no publish was attempted. | The credential was issued; ask your operator to check the service. |
-| `PUBLISH_LINKS_UNBUILDABLE` | The credential links could not be built from the stored credential. | The credential was issued and stored; ask your operator to check the storage response. |
-| `IDR_PUBLISH_FAILED` | The Identity Resolver rejected the links. | Check the scheme is registered with the resolver, then issue again once it is. |
-| `IDR_PUBLISH_UNCONFIRMED` | The resolver could not be reached or did not answer, so whether the links were registered is unknown. | Ask your operator to check the resolver before issuing again: a second publish of the same links is rejected as a duplicate. |
-| `DB_STATUS_UPDATE_FAILED` | The links are live on the resolver, but the stored published status could not be saved. | The credential is discoverable; only the local status is stale. |
-| `ENTITY_LINK_FAILED` | The credential could not be linked to its master-data record, which no longer exists. | Optional enrichment only; publishing and the credential itself are unaffected. |
-| `DETAILS_EXTRACTION_FAILED` | The credential's name, issuer, subject and validity dates could not be read from it, so they are not recorded against it. | The credential can be retrieved and verified as usual. Only its stored summary is missing. The warning names the correlation ID to quote to your operator, who can find the cause in the logs. |
-| `IDEMPOTENCY_RESPONSE_NOT_RECORDED` | The credential was issued and a retry with this key returns it, but the warnings on this response may not be repeated. | A retry with this key returns this credential. The warnings on this response may differ. |
-| `IDEMPOTENCY_RESPONSE_UNREADABLE` | The credential was issued by an earlier request with this key, but the response recorded for it could not be read, so any warnings from that response are not repeated here. | The credential itself is unaffected. Quote the correlation ID to your operator, who can find the cause in the logs. |
+| Code                                | Meaning                                                                                                                                                                      | What to do                                                                                                                                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REFS_EXTRACTION_FAILED`            | No identifier could be read from the credential payload.                                                                                                                     | Check the subject carries the identifier fields its data model defines, such as a `registeredId`.                                                                                              |
+| `PUBLISH_REFERENCE_MISSING`         | The payload carries no identifier to publish under.                                                                                                                          | Check the subject carries the identifier fields its data model defines.                                                                                                                        |
+| `PUBLISH_SCHEME_INCOMPLETE`         | The identifier resolved to a scheme without a primary key, or a registrar without a namespace.                                                                               | Complete the scheme and registrar configuration, then issue again.                                                                                                                             |
+| `PUBLISH_IDENTIFIER_UNKNOWN`        | No identifier matching the value is registered for the tenant, or the scheme named in `identifierSchemeId` does not hold that value.                                         | Register the identifier under a scheme, or correct `identifierSchemeId`.                                                                                                                       |
+| `PUBLISH_IDENTIFIER_AMBIGUOUS`      | The value exists under more than one scheme, so the target is not decidable.                                                                                                 | Set `publishingOptions.identifierSchemeId` to the scheme you want to publish under.                                                                                                            |
+| `PUBLISH_IDR_UNAVAILABLE`           | No Identity Resolver service is configured for the scheme, registrar, or tenant.                                                                                             | Ask your operator to configure an IDR service instance.                                                                                                                                        |
+| `PUBLISH_TARGET_UNRESOLVED`         | The identifier lookup itself failed, so no publish was attempted.                                                                                                            | The credential was issued; ask your operator to check the service.                                                                                                                             |
+| `PUBLISH_LINKS_UNBUILDABLE`         | The credential links could not be built from the stored credential.                                                                                                          | The credential was issued and stored; ask your operator to check the storage response.                                                                                                         |
+| `IDR_PUBLISH_FAILED`                | The Identity Resolver rejected the links.                                                                                                                                    | Check the scheme is registered with the resolver, then issue again once it is.                                                                                                                 |
+| `IDR_PUBLISH_UNCONFIRMED`           | The resolver could not be reached or did not answer, so whether the links were registered is unknown.                                                                        | Ask your operator to check the resolver before issuing again: a second publish of the same links is rejected as a duplicate.                                                                   |
+| `DB_STATUS_UPDATE_FAILED`           | The links are live on the resolver, but the stored published status could not be saved.                                                                                      | The credential is discoverable; only the local status is stale.                                                                                                                                |
+| `ENTITY_LINK_FAILED`                | The credential could not be linked to its master-data record, which no longer exists.                                                                                        | Optional enrichment only; publishing and the credential itself are unaffected.                                                                                                                 |
+| `DETAILS_EXTRACTION_FAILED`         | The credential's name, issuer, subject and validity dates could not be read from it, so they are not recorded against it.                                                    | The credential can be retrieved and verified as usual. Only its stored summary is missing. The warning names the correlation ID to quote to your operator, who can find the cause in the logs. |
+| `IDEMPOTENCY_RESPONSE_NOT_RECORDED` | The credential was issued and a retry with this key returns it, but the warnings on this response may not be repeated.                                                       | A retry with this key returns this credential. The warnings on this response may differ.                                                                                                       |
+| `IDEMPOTENCY_RESPONSE_UNREADABLE`   | The credential was issued by an earlier request with this key, but the response recorded for it could not be read, so any warnings from that response are not repeated here. | The credential itself is unaffected. Quote the correlation ID to your operator, who can find the cause in the logs.                                                                            |
 
 The IDR entry's `description` field is taken from the linked primary entity's `description`, falling back to the entity's `name`, and then to the link title (`publishingOptions.linkTitle`, or the data model's name) when no entity is linked, since the resolver requires a non-empty description.
 
@@ -249,22 +251,22 @@ A supplied `humanVerificationUrl` keeps its own query string and fragment, but t
 
 When the credential was stored encrypted, the published credential link declares `encryptionMethod: AES-256`, so a consumer reading the resolver's link set can tell the target is encrypted before fetching it. That value is the vocabulary the UNTP Identity Resolver API definition declares for the field (`none`, `AES-128`, `AES-256`) rather than the cipher name; the Pyx Identity Resolver bundled with the Reference Implementation validates against the same list, and a consumer that has fetched the document reads the cipher from the stored envelope's `type` field (`aes-256-gcm`), as the Playground does. Neither verification link carries the field, because those links point at verification surfaces rather than at the encrypted document.
 
-The published link does **not** carry the credential's decryption key. The key is not registered on the Identity Resolver; it is shared out of band, so access to an encrypted credential does not travel with its discovery link (regardless of whether a given resolver is publicly readable). A credential stored encrypted (the storage default) therefore needs its decryption key supplied out of band to verify, and the published link alone verifies a credential stored unencrypted. The issuing tenant can retrieve that decryption key from the credential's [Get a Credential](#get-a-credential) response and share it through a channel of its choosing. This differs from a link shared directly as a single-link capability, which may embed the key (see [the verify page](../verify-page#decryption)).
+The published link does **not** carry the credential's decryption key. The key is not registered on the Identity Resolver; it is shared out of band, so access to an encrypted credential does not travel with its discovery link (regardless of whether a given resolver is publicly readable). A credential stored encrypted (the storage default) therefore needs its decryption key supplied out of band to verify, and the published link alone verifies a credential stored unencrypted. The issuing tenant can retrieve that decryption key from the credential's [library detail](./library#retrieve-one-library-record) and share it through a channel of its choosing. This differs from a link shared directly as a single-link capability, which may embed the key (see [the verify page](../verify-page#decryption)).
 
 `RI_APP_URL` is validated when the application starts (see [Startup](../operations/startup#base-url-validation)), so a deployment that could not build a safe default link fails at boot rather than at request time. Omitting `humanVerificationUrl` is always a valid request; supplying it overrides the default for deployments that host verification elsewhere.
 
-| Publishing Option | Type | Description |
-|-------------------|------|-------------|
-| `publish` | boolean | Whether to publish to the identity resolver |
-| `linkType` | string | Link relation type (defaults to the IDR service's configured default link type) |
-| `linkTitle` | string | Human-readable title for the link (defaults to the data model name) |
-| `qualifierPath` | string | Qualifier path for sub-identifiers, e.g., `/10/LOT123/21/SER456` (defaults to `/`) |
-| `machineVerificationUrl` | string | URL for machine-readable verification of the credential. Must be a well-formed HTTP(S) URL without embedded credentials |
-| `humanVerificationUrl` | string | URL for human-readable verification of the credential (defaults to `${RI_APP_URL}/verify`, this RI's verify page, when publishing). Must be a well-formed HTTP(S) URL without embedded credentials |
-| `hreflang` | string[] | Well-formed BCP 47 language tags for the link's target content |
-| `additionalRels` | string[] | Additional link relation types to attach beyond `linkType` |
-| `public` | boolean | Whether the published link is publicly resolvable |
-| `accessRole` | string[] | UNTP access roles allowed to retrieve the published links, from the [UNTP access role vocabulary](https://untp.unece.org/docs/specification/DecentralisedAccessControl) (e.g. `untp:accessRole#Regulator`); attached to the credential and human verification links |
+| Publishing Option        | Type     | Description                                                                                                                                                                                                                                                         |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `publish`                | boolean  | Whether to publish to the identity resolver                                                                                                                                                                                                                         |
+| `linkType`               | string   | Link relation type (defaults to the IDR service's configured default link type)                                                                                                                                                                                     |
+| `linkTitle`              | string   | Human-readable title for the link (defaults to the data model name)                                                                                                                                                                                                 |
+| `qualifierPath`          | string   | Qualifier path for sub-identifiers, e.g., `/10/LOT123/21/SER456` (defaults to `/`)                                                                                                                                                                                  |
+| `machineVerificationUrl` | string   | URL for machine-readable verification of the credential. Must be a well-formed HTTP(S) URL without embedded credentials                                                                                                                                             |
+| `humanVerificationUrl`   | string   | URL for human-readable verification of the credential (defaults to `${RI_APP_URL}/verify`, this RI's verify page, when publishing). Must be a well-formed HTTP(S) URL without embedded credentials                                                                  |
+| `hreflang`               | string[] | Well-formed BCP 47 language tags for the link's target content                                                                                                                                                                                                      |
+| `additionalRels`         | string[] | Additional link relation types to attach beyond `linkType`                                                                                                                                                                                                          |
+| `public`                 | boolean  | Whether the published link is publicly resolvable                                                                                                                                                                                                                   |
+| `accessRole`             | string[] | UNTP access roles allowed to retrieve the published links, from the [UNTP access role vocabulary](https://untp.unece.org/docs/specification/DecentralisedAccessControl) (e.g. `untp:accessRole#Regulator`); attached to the credential and human verification links |
 
 ## Issuance Endpoints
 
@@ -278,67 +280,36 @@ Validates, signs, stores, and optionally publishes a verifiable credential. Retu
 
 **Request body fields:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `credentialPayload` | object | Yes | Full credential payload conforming to the UNTP schema for the specified type and version |
-| `credentialType` | string | Yes | Registered data model type (e.g., `DigitalProductPassport`) |
-| `version` | string | Yes | Registered data model version (e.g., `0.6.1`) |
-| `storageOptions.serviceInstanceId` | string | No | Explicit storage service instance. If provided, it must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404 |
-| `storageOptions.encrypt` | boolean | No | Whether to encrypt (default: `true`) |
-| `publishingOptions.publish` | boolean | No | Whether to publish to IDR |
-| `publishingOptions.linkType` | string | No | Link relation type |
-| `publishingOptions.linkTitle` | string | No | Link title (defaults to data model name) |
-| `publishingOptions.identifierSchemeId` | string | No | Scheme to publish under, needed only when the credential's identifier value exists under more than one scheme |
-| `publishingOptions.qualifierPath` | string | No | Qualifier path (default: `/`) |
-| `publishingOptions.machineVerificationUrl` | string | No | Machine verification URL |
-| `publishingOptions.humanVerificationUrl` | string | No | Human verification URL (defaults to `${RI_APP_URL}/verify` when publishing) |
-| `publishingOptions.hreflang` | string[] | No | BCP 47 language tags for the link's target content |
-| `publishingOptions.additionalRels` | string[] | No | Additional link relation types beyond `linkType` |
-| `publishingOptions.public` | boolean | No | Whether the published link is publicly resolvable |
-| `publishingOptions.accessRole` | string[] | No | UNTP access roles governing who the published links are surfaced to (e.g. `untp:accessRole#Regulator`) |
+| Field                                      | Type     | Required | Description                                                                                                                                                      |
+| ------------------------------------------ | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `credentialPayload`                        | object   | Yes      | Full credential payload conforming to the UNTP schema for the specified type and version                                                                         |
+| `credentialType`                           | string   | Yes      | Registered data model type (e.g., `DigitalProductPassport`)                                                                                                      |
+| `version`                                  | string   | Yes      | Registered data model version (e.g., `0.6.1`)                                                                                                                    |
+| `storageOptions.serviceInstanceId`         | string   | No       | Explicit storage service instance. If provided, it must be accessible to the tenant (its own, or a system default); otherwise the request is rejected with a 404 |
+| `storageOptions.encrypt`                   | boolean  | No       | Whether to encrypt (default: `true`)                                                                                                                             |
+| `publishingOptions.publish`                | boolean  | No       | Whether to publish to IDR                                                                                                                                        |
+| `publishingOptions.linkType`               | string   | No       | Link relation type                                                                                                                                               |
+| `publishingOptions.linkTitle`              | string   | No       | Link title (defaults to data model name)                                                                                                                         |
+| `publishingOptions.identifierSchemeId`     | string   | No       | Scheme to publish under, needed only when the credential's identifier value exists under more than one scheme                                                    |
+| `publishingOptions.qualifierPath`          | string   | No       | Qualifier path (default: `/`)                                                                                                                                    |
+| `publishingOptions.machineVerificationUrl` | string   | No       | Machine verification URL                                                                                                                                         |
+| `publishingOptions.humanVerificationUrl`   | string   | No       | Human verification URL (defaults to `${RI_APP_URL}/verify` when publishing)                                                                                      |
+| `publishingOptions.hreflang`               | string[] | No       | BCP 47 language tags for the link's target content                                                                                                               |
+| `publishingOptions.additionalRels`         | string[] | No       | Additional link relation types beyond `linkType`                                                                                                                 |
+| `publishingOptions.public`                 | boolean  | No       | Whether the published link is publicly resolvable                                                                                                                |
+| `publishingOptions.accessRole`             | string[] | No       | UNTP access roles governing who the published links are surfaced to (e.g. `untp:accessRole#Regulator`)                                                           |
 
 Every field is shape-checked at the boundary: a missing or mistyped field is rejected with a 400 that names it, and unknown fields are ignored. The verification URLs must be well-formed HTTP(S) URLs without embedded credentials, `hreflang` entries must be well-formed [BCP 47](https://www.rfc-editor.org/rfc/rfc5646.html) language tags, and `linkType` must not be blank. Passing `null` for `storageOptions` or `publishingOptions` is rejected; omit them instead.
 
 **Request headers:**
 
-| Header | Required | Description |
-|--------|----------|-------------|
-| `Idempotency-Key` | No | A non-blank string of at most 255 characters after trimming, using only printable ASCII. Keys are scoped to the authenticated tenant. |
+| Header            | Required | Description                                                                                                                           |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `Idempotency-Key` | No       | A non-blank string of at most 255 characters after trimming, using only printable ASCII. Keys are scoped to the authenticated tenant. |
 
 When the header is present, a retry while the original is still running, including while it publishes, is rejected with `409` and code `IDEMPOTENCY_KEY_IN_FLIGHT`. Once the original has delivered its response, the same key and the same raw request body replay that `201`, warnings included; the recorded-but-undelivered case below is the one exception to warnings coming back. A later request with the same key and a different body is rejected with `422` and code `IDEMPOTENCY_KEY_MISMATCH`. If the original never delivered a response, a retry after the configured window replays the credential it recorded, or issues afresh only when no credential was recorded. A key whose credential was later removed is free again. Omitting the header leaves issuance unchanged.
 
 A request body larger than the configured maximum is rejected with HTTP `413` and code `REQUEST_BODY_TOO_LARGE`. The message names the limit in bytes. The operator sets the bound. See [Startup](../operations/startup#request-body-size-limit).
-
----
-
-### List Credentials
-
-```
-GET /api/v1/credentials
-```
-
-Returns a paginated list of credentials for the authenticated tenant. Each entry carries the same fields as [Get a Credential](#get-a-credential), including `coreCredentialType`, the UNTP core credential type the credential's type resolves to.
-
-**Query parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `credentialType` | string | none | Filter by credential type (case-sensitive exact match) |
-| `isPublished` | `"true"` or `"false"` | none | Filter by published status |
-| `limit` | integer | Defaults to 20, or the [configured maximum](../operations/api-pagination#maximum-page-size) when it is lower | A value above the maximum is rejected with a 400 that names the maximum |
-| `offset` | integer | `0` | Number of results to skip |
-
-Pagination values must be plain decimal integers, and a repeated query parameter is rejected with a 400.
-
----
-
-### Get a Credential
-
-```
-GET /api/v1/credentials/{id}
-```
-
-Retrieves a specific credential record by its database ID. The response includes the storage URI, hash, decryption key (if encrypted), credential type and the UNTP core credential type it resolves to (`coreCredentialType`, one of `DPP`, `DCC`, `DFR`, `DTE` or `DIA`, or null when that type is unknown or unresolved), published status, linked entity IDs, and the descriptive fields (name, issuer, subject, validity period) read from the signed credential at issue time. A null `coreCredentialType` covers an extension whose core type is not known, and a credential issued before this field existed whose recorded type resolved to no core type, such as one that names neither a core type nor a registered extension data model. See the `detailsStatus` field in the Swagger schema for what a null descriptive field means on a given row.
 
 ## Verification Endpoint
 
@@ -376,24 +347,24 @@ sequenceDiagram
 
 **Request body fields:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `uri` | string (URL) | Yes | Storage URI where the credential is stored. Must be HTTP(S) without embedded userinfo credentials. |
-| `digestMultibase` | string | No | Expected multibase-encoded digest of the credential content. If provided, the fetched credential's digest is verified against it. |
-| `hash` | string | No | Expected SHA-256 hash (64-character hex string), accepted for links created before [the digest migration](../../migration-guides/v0.7.0#dependent-service-updates). Prefer `digestMultibase`. |
-| `decryptionKey` | string | No | AES-GCM decryption key (64-character hex string). Required for encrypted credentials. |
+| Field             | Type         | Required | Description                                                                                                                                                                                   |
+| ----------------- | ------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uri`             | string (URL) | Yes      | Storage URI where the credential is stored. Must be HTTP(S) without embedded userinfo credentials.                                                                                            |
+| `digestMultibase` | string       | No       | Expected multibase-encoded digest of the credential content. If provided, the fetched credential's digest is verified against it.                                                             |
+| `hash`            | string       | No       | Expected SHA-256 hash (64-character hex string), accepted for links created before [the digest migration](../../migration-guides/v0.7.0#dependent-service-updates). Prefer `digestMultibase`. |
+| `decryptionKey`   | string       | No       | AES-GCM decryption key (64-character hex string). Required for encrypted credentials.                                                                                                         |
 
 The endpoint always returns HTTP 200 for a completed verification attempt, even if the credential fails verification. Check the `verified` field for the outcome. Processing errors that prevent a verification attempt return 422 with a `code` field:
 
-| Code | Meaning |
-|------|---------|
-| `INVALID_RESPONSE` | The storage URI's response is not valid JSON, or is valid JSON that is not an object (a literal `null`, an array, or a primitive), before or after decryption. |
-| `DECRYPTION_REQUIRED` | The credential is encrypted and no `decryptionKey` was supplied. The [verify page](../verify-page#decryption) prompts for the key in this case. |
-| `ENVELOPE_INVALID` | The stored encrypted envelope is structurally corrupted (wrong IV or auth-tag length). Re-supplying the key will not help. |
-| `DECRYPTION_FAILED` | The decryption key does not match the credential. This is almost always a wrong key, but AES-GCM cannot distinguish a wrong key from ciphertext tampered at valid lengths. |
-| `DECRYPTED_NOT_JSON` | Decryption succeeded but the content is not valid JSON, so the stored credential is corrupted. |
-| `DIGEST_MISMATCH` | The fetched credential does not match the digest in the request. |
-| `UNSUPPORTED_CREDENTIAL_TYPE` | The credential is not an `EnvelopedVerifiableCredential`. |
+| Code                          | Meaning                                                                                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INVALID_RESPONSE`            | The storage URI's response is not valid JSON, or is valid JSON that is not an object (a literal `null`, an array, or a primitive), before or after decryption.             |
+| `DECRYPTION_REQUIRED`         | The credential is encrypted and no `decryptionKey` was supplied. The [verify page](../verify-page#decryption) prompts for the key in this case.                            |
+| `ENVELOPE_INVALID`            | The stored encrypted envelope is structurally corrupted (wrong IV or auth-tag length). Re-supplying the key will not help.                                                 |
+| `DECRYPTION_FAILED`           | The decryption key does not match the credential. This is almost always a wrong key, but AES-GCM cannot distinguish a wrong key from ciphertext tampered at valid lengths. |
+| `DECRYPTED_NOT_JSON`          | Decryption succeeded but the content is not valid JSON, so the stored credential is corrupted.                                                                             |
+| `DIGEST_MISMATCH`             | The fetched credential does not match the digest in the request.                                                                                                           |
+| `UNSUPPORTED_CREDENTIAL_TYPE` | The credential is not an `EnvelopedVerifiableCredential`.                                                                                                                  |
 
 Upstream failures (storage unreachable, non-2xx, oversized response, VC service failure) return 502 with `UPSTREAM_ERROR` or `VC_SERVICE_ERROR`.
 
@@ -407,12 +378,30 @@ This endpoint reads the shared credential-fetch settings below on every request,
 
 The following settings are shared by verification, external registration and the supplier-source check used by re-verification. The private-address setting also controls the existing stored-address URL checks on registrar, identifier-link, data-model, service and credential publishing routes.
 
-| Variable                   | Default            | Description                                                                                                                                                                                                                                                                                    |
-| -------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Variable                   | Default            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `FETCH_ALLOW_PRIVATE_URLS` | `false`            | Permits private or reserved destinations for caller-supplied credential retrieval and relaxes the stored-address checks for registrars, identifier links, data models, service URLs and credential publishing URLs. The credential fetch still parses the URL, requires a name that resolves, follows and re-checks each redirect hop, pins the connection to the resolved addresses and enforces the response-size limit. The connection is pinned to the set of addresses the name resolved to at validation time. Node's address selection tries those addresses within the request budget, so a `localhost` that resolves to both `::1` and `127.0.0.1` reaches whichever listens. Use it only for local development: with it on, an anonymous caller of the verify endpoint can make the server fetch any address it can route to, including the cloud metadata service. Only exact lowercase `true` enables it, and it does not remove `http(s)` scheme or userinfo validation. |
-| `FETCH_MAX_RESPONSE_SIZE`  | `10485760` (10 MB) | Maximum response size in bytes. A value the parser cannot read as a positive number falls back to the default rather than failing startup.                                                                                                                                                      |
-| `FETCH_TIMEOUT_MS`         | `10000`            | Time budget for fetching the credential, in milliseconds, covering the wait for DNS, connect, redirects and body (maximum 120000). Also applies when registering or re-verifying an external library credential. Startup fails when the value is not a positive integer within that ceiling. |
+| `FETCH_MAX_RESPONSE_SIZE`  | `10485760` (10 MB) | Maximum response size in bytes. A value the parser cannot read as a positive number falls back to the default rather than failing startup.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `FETCH_TIMEOUT_MS`         | `10000`            | Time budget for fetching the credential, in milliseconds, covering the wait for DNS, connect, redirects and body (maximum 120000). Also applies when registering or re-verifying an external library credential. Startup fails when the value is not a positive integer within that ceiling.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 Old names remain supported during RI v0.5 and produce a startup warning when used alone. Setting both names for one setting, including equal values, fails startup. See the [startup configuration table](../operations/startup#credential-fetch-settings) and the [v0.5 migration guide](../../migration-guides/ri-v0.5#credential-fetch-settings-have-new-names) for the complete mapping and conflict rules.
 
 The redirect chain is capped at three additional hops on both settings. That cap is fixed, not an environment variable, and a chain that exceeds it returns 502 with `UPSTREAM_ERROR`.
+
+## Retired read routes
+
+### List Credentials (retired) {#list-credentials}
+
+```
+GET /api/v1/credentials
+```
+
+This route is retired and returns `410 Gone` after authentication and tenant resolution succeed, with `code: ROUTE_RETIRED`. Use the [Library API](./library) for the combined inventory.
+
+### Get a Credential (retired) {#get-a-credential}
+
+```
+GET /api/v1/credentials/{id}
+```
+
+This route is retired and returns `410 Gone` after authentication and tenant resolution succeed, with `code: ROUTE_RETIRED`. Use [Library API detail](./library#retrieve-one-library-record) with the same record id for the stored credential and its custody fields.

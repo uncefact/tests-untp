@@ -99,7 +99,11 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
       security: [{ BearerAuth: [] }],
       tags: [
         { name: 'DIDs', description: 'Decentralised Identifier management' },
-        { name: 'Credentials', description: 'Verifiable Credential issuance' },
+        {
+          name: 'Credentials',
+          description:
+            'Verifiable Credential issuance and public verification. The two retired read operations remain documented for migration.',
+        },
         { name: 'Library', description: 'Credential library: records of issued and registered credentials' },
         { name: 'Registrars', description: 'Identifier registrar management' },
         { name: 'Schemes', description: 'Identifier scheme management' },

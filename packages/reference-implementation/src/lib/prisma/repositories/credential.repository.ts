@@ -12,7 +12,6 @@ import {
 import { prisma } from '../prisma';
 import { linkClaimToRecord } from './idempotency-key.repository';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
-import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
 import type { ProtectedDecryptionKey } from '@/lib/credentials/decryption-key-protection';
 
@@ -83,17 +82,6 @@ export type CredentialDetailsInput =
       detailsError: CredentialDetailsError;
     }
   | { details?: undefined; detailsStatus?: undefined; detailsError?: undefined };
-
-/**
- * Options for listing credentials
- */
-export type ListCredentialsOptions = {
-  tenantId: string;
-  credentialType?: string;
-  isPublished?: boolean;
-  limit?: number;
-  offset?: number;
-};
 
 type CredentialWithRecord = Credential & { record: LibraryRecord };
 
@@ -204,53 +192,6 @@ export async function createCredential(
     const credential = await run(false);
     return { credential, entityLinkFailed: true };
   }
-}
-
-/**
- * Retrieves a credential by its ID
- */
-export async function getCredentialById(id: string, tenantId: string): Promise<CredentialRecord | null> {
-  const row = await prisma.credential.findFirst({
-    where: { id, tenantId },
-    include: { record: true },
-  });
-  return row ? flattenCredential(row) : null;
-}
-
-/**
- * Lists credentials with optional filtering and pagination.
- * Returns matching records alongside the total count for the filter
- * criteria (via a parallel count query).
- */
-export async function listCredentials(
-  options: ListCredentialsOptions,
-): Promise<{ data: CredentialRecord[]; total: number }> {
-  const { tenantId, credentialType, isPublished, limit, offset } = options;
-
-  const where: Prisma.CredentialWhereInput = { tenantId };
-
-  if (credentialType !== undefined) {
-    where.record = { credentialType };
-  }
-
-  if (isPublished !== undefined) {
-    where.isPublished = isPublished;
-  }
-
-  const [rows, total] = await Promise.all([
-    prisma.credential.findMany({
-      where,
-      include: { record: true },
-      take: limit ?? DEFAULT_PAGE_LIMIT,
-      skip: offset,
-      // Ordered by the timestamp the response carries, the parent's, with the
-      // id as a tie-break so a page boundary is stable.
-      orderBy: [{ record: { createdAt: 'desc' } }, { id: 'desc' }],
-    }),
-    prisma.credential.count({ where }),
-  ]);
-
-  return { data: rows.map(flattenCredential), total };
 }
 
 /**

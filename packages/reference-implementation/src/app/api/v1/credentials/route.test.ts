@@ -106,7 +106,6 @@ const { IdrPublishError: RealIdrPublishError } = jest.requireActual('@uncefact/u
 
 // Repository mocks
 const mockUpdateCredentialPublished = jest.fn();
-const mockListCredentials = jest.fn();
 const mockGetDidByDid = jest.fn();
 const mockFindConformityScheme = jest.fn();
 const mockClaimIdempotencyKey = jest.fn();
@@ -115,7 +114,6 @@ const mockFindIdempotencyKey = jest.fn();
 const mockReleaseIdempotencyKey = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({
   updateCredentialPublished: (...args: unknown[]) => mockUpdateCredentialPublished(...args),
-  listCredentials: (...args: unknown[]) => mockListCredentials(...args),
   getDidByDid: (...args: unknown[]) => mockGetDidByDid(...args),
   findConformitySchemeByCanonicalId: (...args: unknown[]) => mockFindConformityScheme(...args),
   CREDENTIAL_ISSUANCE_OPERATION: 'credential.issue',
@@ -123,12 +121,6 @@ jest.mock('@/lib/prisma/repositories', () => ({
   completeIdempotencyKey: (...args: unknown[]) => mockCompleteIdempotencyKey(...args),
   findIdempotencyKey: (...args: unknown[]) => mockFindIdempotencyKey(...args),
   releaseIdempotencyKey: (...args: unknown[]) => mockReleaseIdempotencyKey(...args),
-}));
-
-// Pass stored keys through by default; individual tests override per call
-const mockRevealDecryptionKey = jest.fn((...args: unknown[]) => args[0]);
-jest.mock('@/lib/credentials/decryption-key-protection', () => ({
-  revealDecryptionKey: (...args: unknown[]) => mockRevealDecryptionKey(...args),
 }));
 
 // Conformity-vocabulary validator mock — the real cross-check is unit-tested in
@@ -148,7 +140,6 @@ jest.mock('@/lib/api/validation', () => {
 });
 
 import { IdempotencyOperation } from '@/lib/prisma/generated';
-import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';
 import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
 
@@ -2449,46 +2440,33 @@ describe('POST /api/v1/credentials', () => {
 describe('GET /api/v1/credentials', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockListCredentials.mockResolvedValue({ data: [], total: 0 });
   });
 
-  it('rejects a limit above the deployment maximum with a 400 naming the bound, without querying', async () => {
-    const req = createFakeGetRequest({ limit: String(MAX_PAGE_LIMIT + 1) });
+  it('returns the list retirement body without inspecting the query', async () => {
+    const req = createFakeGetRequest({ credentialType: 'DigitalProductPassport', isPublished: 'true' });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('limit');
-    expect(json.error).toContain(String(MAX_PAGE_LIMIT));
-    expect(mockListCredentials).not.toHaveBeenCalled();
+    expect(res.status).toBe(410);
+    expect(json).toEqual({
+      error: 'This route has been retired. Use GET /api/v1/library instead.',
+      code: 'ROUTE_RETIRED',
+    });
   });
 
-  it.each([
-    ['1abc', 'limit'],
-    ['0x10', 'limit'],
-    ['1e3', 'limit'],
-  ])('rejects the malformed strict-integer limit %s with a 400', async (value, fieldNamed) => {
-    const req = createFakeGetRequest({ limit: value });
+  it.each(['0', 'abc', '100000'])('returns 410 for a retired query with limit=%s', async (limit) => {
+    const req = createFakeGetRequest({ limit });
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain(fieldNamed);
-    expect(mockListCredentials).not.toHaveBeenCalled();
+    expect(res.status).toBe(410);
+    expect(json).toEqual({
+      error: 'This route has been retired. Use GET /api/v1/library instead.',
+      code: 'ROUTE_RETIRED',
+    });
   });
 
-  it.each([
-    ['', 'empty'],
-    ['   ', 'whitespace'],
-    ['NoSuchType', 'unknown'],
-  ])('keeps accepting a %j (%s) credentialType filter as a 200', async (value) => {
-    const req = createFakeGetRequest({ credentialType: value });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    expect(res.status).toBe(200);
-    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ credentialType: value }));
-  });
-
-  it('rejects a repeated query parameter with a 400', async () => {
+  it('returns the same retirement body for repeated query parameters', async () => {
     const url = new URL('http://localhost/api/v1/credentials');
     url.searchParams.append('credentialType', 'A');
     url.searchParams.append('credentialType', 'B');
@@ -2496,176 +2474,22 @@ describe('GET /api/v1/credentials', () => {
     const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
     const json = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('credentialType');
-    expect(mockListCredentials).not.toHaveBeenCalled();
-  });
-
-  it('returns 200 with default pagination when no params provided', async () => {
-    const req = createFakeGetRequest();
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(mockListCredentials).toHaveBeenCalledWith({
-      tenantId: 'tenant-1',
-      credentialType: undefined,
-      isPublished: undefined,
-      limit: undefined,
-      offset: undefined,
+    expect(res.status).toBe(410);
+    expect(json).toEqual({
+      error: 'This route has been retired. Use GET /api/v1/library instead.',
+      code: 'ROUTE_RETIRED',
     });
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('data');
-    expect(json).toHaveProperty('pagination');
-    expect(Array.isArray(json.data)).toBe(true);
   });
 
-  it('passes credentialType filter to repository', async () => {
-    const req = createFakeGetRequest({ credentialType: 'DPP' });
-    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+  it('returns the retirement body without querying when no query is supplied', async () => {
+    const res = await GET(createFakeGetRequest(), AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
+    const json = await res.json();
 
-    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ credentialType: 'DPP' }));
-  });
-
-  it('returns 500 when a stored decryption key cannot be decrypted', async () => {
-    mockListCredentials.mockResolvedValue({
-      data: [{ id: 'cred-1', decryptionKey: 'stored-envelope' }],
-      total: 1,
+    expect(res.status).toBe(410);
+    expect(json).toEqual({
+      error: 'This route has been retired. Use GET /api/v1/library instead.',
+      code: 'ROUTE_RETIRED',
     });
-    mockRevealDecryptionKey.mockImplementationOnce(() => {
-      throw new Error('Failed to decrypt the stored credential decryption key.');
-    });
-
-    const req = createFakeGetRequest();
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(500);
-    // The underlying message names the operator's encryption key and the
-    // failing row, so neither reaches the caller; both go to the log.
-    expect(json.error).not.toContain('cred-1');
-    expect(json.error).not.toContain('DATA_ENCRYPTION_KEY');
-    expect(json.error).not.toContain('decrypt the stored credential');
-  });
-
-  it('reveals stored decryption keys in the listed credentials', async () => {
-    mockListCredentials.mockResolvedValue({
-      data: [{ id: 'cred-1', decryptionKey: 'stored-envelope' }],
-      total: 1,
-    });
-    mockRevealDecryptionKey.mockReturnValueOnce('plain-key');
-
-    const req = createFakeGetRequest();
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(mockRevealDecryptionKey).toHaveBeenCalledWith('stored-envelope');
-    expect(json.data[0].decryptionKey).toBe('plain-key');
-  });
-
-  it('passes isPublished=true filter to repository', async () => {
-    const req = createFakeGetRequest({ isPublished: 'true' });
-    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-
-    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ isPublished: true }));
-  });
-
-  it('passes isPublished=false filter to repository', async () => {
-    const req = createFakeGetRequest({ isPublished: 'false' });
-    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-
-    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ isPublished: false }));
-  });
-
-  it('passes limit and offset to repository', async () => {
-    const req = createFakeGetRequest({ limit: '10', offset: '20' });
-    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-
-    expect(mockListCredentials).toHaveBeenCalledWith(expect.objectContaining({ limit: 10, offset: 20 }));
-  });
-
-  it('returns 400 for invalid limit', async () => {
-    const req = createFakeGetRequest({ limit: 'abc' });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('limit');
-  });
-
-  it('returns 400 for limit=0', async () => {
-    const req = createFakeGetRequest({ limit: '0' });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 400 for invalid offset', async () => {
-    const req = createFakeGetRequest({ offset: '-1' });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('offset');
-  });
-
-  it('returns 400 for invalid isPublished value', async () => {
-    const req = createFakeGetRequest({ isPublished: 'yes' });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain('isPublished');
-  });
-
-  it('returns empty results for unknown credentialType (not 400)', async () => {
-    mockListCredentials.mockResolvedValue({ data: [], total: 0 });
-
-    const req = createFakeGetRequest({ credentialType: 'UnknownType' });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(json.data).toEqual([]);
-  });
-
-  it('returns correct pagination metadata', async () => {
-    mockListCredentials.mockResolvedValue({ data: [{ id: 'c1' }, { id: 'c2' }], total: 5 });
-
-    const req = createFakeGetRequest({ limit: '2', offset: '0' });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(json.pagination).toEqual({ total: 5, limit: 2, offset: 0, hasMore: true });
-  });
-
-  it('returns hasMore=false on last page', async () => {
-    mockListCredentials.mockResolvedValue({ data: [{ id: 'c1' }], total: 3 });
-
-    const req = createFakeGetRequest({ limit: '2', offset: '2' });
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(json.pagination).toEqual({ total: 3, limit: 2, offset: 2, hasMore: false });
-  });
-
-  it('passes combined credentialType and isPublished filters to repository', async () => {
-    const req = createFakeGetRequest({ credentialType: 'DPP', isPublished: 'true' });
-    await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-
-    expect(mockListCredentials).toHaveBeenCalledWith(
-      expect.objectContaining({ credentialType: 'DPP', isPublished: true }),
-    );
-  });
-
-  it('returns 500 when repository throws', async () => {
-    mockListCredentials.mockRejectedValue(new Error('Database connection lost'));
-
-    const req = createFakeGetRequest();
-    const res = await GET(req, AUTH_CONTEXT as unknown as Parameters<typeof GET>[1]);
-    const json = await res.json();
-
-    expect(res.status).toBe(500);
-    expect(json.error).toContain('Database connection lost');
   });
 });
 isolateFetchAllowPrivateUrlsEnv();
