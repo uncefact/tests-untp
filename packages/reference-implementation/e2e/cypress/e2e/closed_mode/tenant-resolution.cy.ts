@@ -7,22 +7,26 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
-import { config } from '../../support/config';
+import { config, requireDbAccess, requireE2eRealm } from '../../support/config';
 
-describe('Closed mode — tenant resolution', { testIsolation: false }, () => {
+describe('Closed mode  -  tenant resolution', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
   const ADMIN_EMAIL = config.user.email;
   const ADMIN_PASSWORD = config.user.password;
   const USER_EMAIL = config.user2.email;
   const USER_PASSWORD = config.user2.password || config.user.password;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'Closed-mode tenant and user verification use Postgres without an RI API equivalent.');
+    requireE2eRealm(this, 'Closed-mode group tenancy uses the e2e realm groups.');
     // Clean up any leftover data from previous runs
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
   });
 
   after(() => {
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
+    if (config.capabilities.dbAccess) {
+      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
+    }
   });
 
   describe('First user sign-in provisions tenant', () => {

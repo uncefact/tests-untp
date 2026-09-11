@@ -8,11 +8,14 @@
  *
  * Requires: docker-compose.e2e.yml (standard E2E stack)
  */
-describe('Open mode — service account API', { testIsolation: false }, () => {
+import { config, requireDbAccess, runTag } from '../../support/config';
+
+describe('Open mode  -  service account API', { testIsolation: false }, () => {
   let accessToken: string;
   let tokenSub: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'Service-account user and tenant cleanup use Postgres without RI user routes.');
     // Fetch a service account token from Keycloak
     cy.task('getServiceAccountToken').then((result: any) => {
       accessToken = result.accessToken;
@@ -27,10 +30,10 @@ describe('Open mode — service account API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupServiceAccountData', { sub: tokenSub });
+    if (config.capabilities.dbAccess) cy.task('cleanupServiceAccountData', { sub: tokenSub });
   });
 
-  it('GET /api/v1/dids — authenticates and auto-provisions tenant', () => {
+  it('GET /api/v1/dids  -  authenticates and auto-provisions tenant', () => {
     cy.request({
       method: 'GET',
       url: '/api/v1/dids',
@@ -42,8 +45,8 @@ describe('Open mode — service account API', { testIsolation: false }, () => {
     });
   });
 
-  it('POST /api/v1/dids — creates a DID via service account', () => {
-    const RUN_ID = Date.now();
+  it('POST /api/v1/dids  -  creates a DID via service account', () => {
+    const RUN_ID = runTag();
 
     cy.request({
       method: 'POST',
@@ -54,7 +57,7 @@ describe('Open mode — service account API', { testIsolation: false }, () => {
         method: 'DID_WEB',
         alias: `e2e-sa-open-${RUN_ID}`,
         name: `Open SA DID ${RUN_ID}`,
-        description: 'Created by open mode service account E2E test',
+        description: `Created by open mode service account E2E test ${RUN_ID}`,
       },
     }).then((response) => {
       expect(response.status).to.eq(201);
@@ -64,7 +67,7 @@ describe('Open mode — service account API', { testIsolation: false }, () => {
 
   it('verifies the service account user was auto-provisioned with a tenant', () => {
     cy.task('cleanupServiceAccountData', { sub: tokenSub }).then((result: any) => {
-      // This is a verification step — if result is not null, the user+tenant were provisioned
+      // This is a verification step  -  if result is not null, the user+tenant were provisioned
       expect(result).to.not.be.null;
       expect(result.userId).to.be.a('string');
       expect(result.tenantId).to.be.a('string');

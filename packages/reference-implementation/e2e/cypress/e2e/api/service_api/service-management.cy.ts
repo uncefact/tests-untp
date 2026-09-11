@@ -1,5 +1,5 @@
 import { SYSTEM_VC_SERVICE_ID, SYSTEM_STORAGE_SERVICE_ID } from '../../../../../src/lib/prisma/constants';
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 interface ServiceInstance {
   id: string;
@@ -12,11 +12,12 @@ interface ServiceInstance {
 }
 
 describe('Service API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let createdServiceId: string;
   let testTenantId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant and users before testing service instances.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -28,8 +29,10 @@ describe('Service API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
@@ -41,7 +44,7 @@ describe('Service API', { testIsolation: false }, () => {
           serviceType: 'VC',
           adapterType: 'VCKIT',
           name: `E2E Test VC Service ${RUN_ID}`,
-          description: 'Created by Cypress E2E test',
+          description: `Created by Cypress E2E test ${RUN_ID}`,
           config: {
             baseUrl: config.services.vckit.baseUrl,
             apiKey: 'e2e-test-key-123',
@@ -79,7 +82,7 @@ describe('Service API', { testIsolation: false }, () => {
         expect(response.body.serviceType).to.eq('VC');
         expect(response.body.adapterType).to.eq('VCKIT');
         expect(response.body.name).to.eq(`E2E Test VC Service ${RUN_ID}`);
-        expect(response.body.description).to.eq('Created by Cypress E2E test');
+        expect(response.body.description).to.eq(`Created by Cypress E2E test ${RUN_ID}`);
       });
     });
 

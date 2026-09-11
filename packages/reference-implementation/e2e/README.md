@@ -8,7 +8,7 @@ Playground E2E lives in its own package at `packages/untp-playground/e2e/`. See 
 
 | Category        | Directory                  | Runs when                        |
 | --------------- | -------------------------- | -------------------------------- |
-| **API tests**   | `cypress/e2e/api/`         | Always                           |
+| **API tests**   | `cypress/e2e/api/`         | `E2E_DB_ACCESS=true` (compose)   |
 | **Open mode**   | `cypress/e2e/open_mode/`   | `E2E_TENANT_MODE=open` (default) |
 | **Closed mode** | `cypress/e2e/closed_mode/` | `E2E_TENANT_MODE=closed`         |
 
@@ -95,9 +95,9 @@ pnpm test:e2e:ri:closed
 docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --profile ri --profile playground down -v
 ```
 
-## Testing a Deployed Instance
+## Running against a deployed instance
 
-To run E2E tests against deployed instances of the RI and Playground (e.g. staging, production):
+The suite can target a deployed RI and its dependent services using configuration only. It does not assume that the RI is hosted by this repository.
 
 ### Prerequisites
 
@@ -105,62 +105,77 @@ To run E2E tests against deployed instances of the RI and Playground (e.g. stagi
 
    - The RI application URL
    - The identity provider (Keycloak or Zitadel)
-   - The PostgreSQL database (direct connection for test setup/cleanup)
+   - VCKit, the storage service, the Identity Resolver, and the Playground when the relevant specs are enabled
 
-2. **Database access**:
+2. **Identity-provider fixtures**:
 
-   - Managed databases (DigitalOcean, AWS RDS, etc.) require SSL and restrict connections to trusted IP addresses.
-   - Add the test runner's IP to the database's **trusted sources** or firewall rules.
-   - SSL is enabled automatically when `E2E_DB_HOST` is not `localhost`.
+   - One test user and a second test user with passwords
+   - Two service-account clients with client credentials
+   - Credentials and redirect URIs configured for the deployed RI
+   - A dedicated group or tenant containing no operator data
+   - A second group for closed-mode tenant-isolation tests
+   - For Zitadel, `E2E_IDP_AUDIENCE` must identify the project used by the service-account clients
 
-3. **Identity provider**:
-   - The RI's OIDC redirect URI must be registered in the IDP client configuration (e.g. `https://your-ri.example.com/api/auth/callback/zitadel`).
-   - **Two test users** with passwords (for multi-user tenant tests).
-   - **Two service accounts** with client credentials (for API auth tests).
-   - All test users and service accounts must be in a **dedicated test group** (e.g. `org-e2e`), not a group containing real data. Tests clean up all resource data within the test tenant.
-   - For closed mode tenant isolation tests, a second group is needed (e.g. `org-e2e-beta`) with one SA assigned to each group.
-   - For **Zitadel**: set `E2E_IDP_AUDIENCE` to the project ID so service account tokens include the `groups` claim.
+3. **The e2e realm is optional**. The compose stack imports `cypress/fixtures/keycloak-realm-e2e.json` with its named users, service-account clients and groups. A deployed instance uses its own identity provider, so set `E2E_IDP_E2E_REALM=false` and the cases that depend on the realm fixture (browser login with the fixture users, closed-mode group tenancy) skip with a stated reason; the service-account API cases run with whatever two client-credential accounts you configure.
+
+4. **Database access is optional**. Leave `E2E_DB_ACCESS` unset or set it to `false` for a deployment run. Set it to `true` only for the compose-only database fallback, with the database host, port, credentials, and SSL setting configured. The deployed-instance path uses the RI API for resource cleanup and never needs database credentials.
 
 ### Setup
 
-1. Create `packages/reference-implementation/e2e/.env.e2e` and set your deployment's URLs, credentials, and DB connection using the variables listed in [Environment Variables](#environment-variables) below:
+1. Create `packages/reference-implementation/e2e/.env.e2e` and set the URLs, credentials, dependent-service settings, tenant settings, and capability flags listed in [Environment Variables](#environment-variables) below:
 
    ```bash
    touch packages/reference-implementation/e2e/.env.e2e
-   # Edit .env.e2e with your deployment's URLs, credentials, and DB connection
+   # Edit .env.e2e with the deployment configuration
    ```
 
 2. Run the tests (from repo root):
 
    ```bash
-   pnpm test:e2e:ri              # Uses E2E_TENANT_MODE from .env.e2e
-   pnpm test:e2e:ri:open         # Explicit open mode
-   pnpm test:e2e:ri:closed       # Explicit closed mode
-   pnpm test:e2e:playground      # Playground E2E (runs from packages/untp-playground/e2e/)
+   pnpm --dir packages/reference-implementation/e2e test:e2e
+   pnpm --dir packages/reference-implementation/e2e test:e2e:open
+   pnpm --dir packages/reference-implementation/e2e test:e2e:closed
    ```
 
 ### Test Data Safety
 
-Tests are designed to be safe to run against deployed instances, including production, provided the test users are in a **dedicated test tenant** (i.e. their own IDP group that contains no real data).
+Each Cypress run has one tag, `e2e-<RUN_ID>`. `runTag()` exposes that value to specs. Every record created by a spec carries the tag in an API-visible name, alias, description, identifier value, canonical identifier, or caller-selected id.
 
 #### What tests clean up
 
-- **Per-spec cleanup** (`before`/`after` hooks): Each spec deletes all resource data (credentials, DIDs, services, products, facilities, etc.) from the test tenant via direct DB operations. In closed mode, the tenant record itself is preserved. Only the data within it is deleted.
-- **User cleanup** (`before` hooks): Test user and OAuth Account records are deleted before each spec to prevent `OAuthAccountNotLinked` errors from stale sessions.
-- **Service account cleanup**: The service account test specs clean up their own auto-provisioned SA users and associated tenants via the `cleanupServiceAccountData` task.
-- **Global cleanup** (`after:run`): After all specs complete, Cypress runs a final cleanup that removes:
-  - Human test users (`E2E_USER_EMAIL`, `E2E_USER2_EMAIL`) and their OAuth Account records
-  - Orphaned OAuth Account records (where the user was already deleted)
+- **Per-spec API cleanup**: the support hook lists every RI collection for every authenticated actor used by the run and deletes only rows containing that run's tag. It runs in dependency order and repeats safely if a row has already gone.
+- **Final API cleanup and proof**: the harness `after:run` repeats the tagged deletion, then lists every collection again. Any leftover id or listing failure fails the run and is reported.
+- **Compose fallback**: when `E2E_DB_ACCESS=true`, database cleanup is a compose-only fallback for native credentials, CVC records, and identity-provider users or tenants that have no RI delete route. It remains tag-scoped for resource rows and reports failures.
+- **Object storage**: the MinIO sweep is enabled only with database access and removes only object keys containing the current run tag.
 
 #### What tests never touch
 
 - **System seed data**: System DIDs, system service instances, and seeded data models are never modified or deleted.
-- **Other tenants**: Cleanup only affects the tenant the test user belongs to. Real users in other IDP groups/tenants are completely isolated.
-- **Real user accounts**: Cleanup targets users by their configured test email addresses or by the absence of an email (SA users). Real user accounts with different email addresses are never affected.
+- **Other tagged data**: API cleanup matches the current run tag rather than deleting by tenant, user, or collection-wide ownership.
+- **Conformity records without routes**: the RI currently exposes CVC listing routes but no CVC delete routes. The CVC seeding spec is therefore gated on `E2E_DB_ACCESS` and uses the compose fallback.
+- **Identity-provider users and tenants**: these have no RI API cleanup equivalent and the specs that create them are gated on `E2E_DB_ACCESS`.
 
 #### Tenant isolation
 
-In closed mode, the tenant is determined by the IDP group claim. Test users must be assigned to a dedicated test group (e.g. `org-e2e`) that maps to a tenant used exclusively for testing. This ensures cleanup never affects production data. Multiple test tenants can coexist (e.g. `org-e2e-alpha` and `org-e2e-beta` for tenant isolation tests).
+In closed mode, the tenant is determined by the IDP group claim. Test users and service accounts must be assigned to dedicated test groups such as `org-e2e-alpha` and `org-e2e-beta`. `E2E_RESIDUE_POLICY=fail` is the default and refuses to start when an earlier `e2e-<other-run-id>` tag is listed. `E2E_RESIDUE_POLICY=clean` attempts the same tag-scoped API cleanup first and fails if it cannot converge.
+
+#### Configuration inputs and capabilities
+
+The following inputs are the complete configuration surface used by the RI e2e harness. Values are read from the process environment or `.env.e2e`; `CYPRESS_` variables are also available through Cypress environment merging.
+
+- RI: `CYPRESS_BASE_URL`
+- Identity provider: `E2E_IDP_PROVIDER`, `E2E_IDP_BASE_URL`, `E2E_IDP_REALM`, `E2E_IDP_CLIENT_ID`, `E2E_IDP_CLIENT_SECRET`, `E2E_IDP_AUDIENCE`
+- Human accounts: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`, `E2E_USER2_EMAIL`, `E2E_USER2_PASSWORD`
+- Service accounts: `E2E_SA1_CLIENT_ID`, `E2E_SA1_CLIENT_SECRET`, `E2E_SA2_CLIENT_ID`, `E2E_SA2_CLIENT_SECRET`
+- VCKit: `E2E_VCKIT_BASE_URL`, `E2E_VCKIT_API_KEY`, `E2E_VCKIT_DID_WEB_RESOLVABLE`
+- Storage: `E2E_STORAGE_BASE_URL`, `E2E_STORAGE_API_KEY`, `E2E_STORAGE_API_VERSION`, `E2E_STORAGE_PUBLIC_BUCKET`, `E2E_STORAGE_PRIVATE_BUCKET`
+- Identity Resolver and Playground: `E2E_IDR_PUBLIC_BASE_URL`, `E2E_IDR_API_KEY`, `PLAYGROUND_BASE_URL`
+- MinIO cleanup: `OBJECT_STORAGE_BUCKET_NAME`, `APP_ENDPOINT`, `OBJECT_STORAGE_PORT`, `OBJECT_STORAGE_USE_SSL`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`
+- Tenant fixtures: `E2E_TENANT_MODE`, `E2E_TEST_ORG_ID`, `E2E_GROUP_ALPHA`, `E2E_GROUP_BETA`
+- Harness controls: `E2E_DB_ACCESS`, `E2E_RESIDUE_POLICY`, optional `E2E_RUN_ID`, and the private-address capability inputs `FETCH_ALLOW_PRIVATE_URLS`, `VERIFY_ALLOW_PRIVATE_URLS`, `CYPRESS_VERIFY_ALLOW_PRIVATE_URLS`
+- Compose database fallback: `E2E_DB_HOST`, `E2E_DB_PORT`, `E2E_DB_USER`, `E2E_DB_PASSWORD`, `E2E_DB_NAME`, `E2E_DB_SSL_REJECT_UNAUTHORIZED`
+
+The capability flags are `E2E_DB_ACCESS`, `E2E_VCKIT_DID_WEB_RESOLVABLE`, and the private-address setting. The compose `test:e2e:open` and `test:e2e:closed` scripts set `E2E_DB_ACCESS=true`; all other invocations default to `false`. The proposed `E2E_IDP_E2E_REALM` identity-provider capability flag remains an unresolved orchestration decision and is not silently enabled here.
 
 ### Environment Variables
 

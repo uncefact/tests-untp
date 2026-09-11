@@ -1,13 +1,16 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Identifier API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
+  const IDENTIFIER_VALUE = `${RUN_ID}-primary`;
+  const UPDATED_IDENTIFIER_VALUE = `${RUN_ID}-updated`;
   let testTenantId: string;
   let registrarId: string;
   let schemeId: string;
   let createdIdentifierId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant, schemes, and users before testing identifiers.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -36,7 +39,7 @@ describe('Identifier API', { testIsolation: false }, () => {
           registrarId,
           name: `Ident Test ABN Scheme ${RUN_ID}`,
           primaryKey: `abn-${RUN_ID}`,
-          validationPattern: '^\\d{11}$',
+          validationPattern: '^e2e-\\d{10,}.*$',
           linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
@@ -46,29 +49,31 @@ describe('Identifier API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
-    it('POST /api/v1/identifiers — creates an identifier', () => {
+    it('POST /api/v1/identifiers  -  creates an identifier', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/identifiers',
         body: {
           schemeId,
-          value: '51824753556',
+          value: IDENTIFIER_VALUE,
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
-        expect(response.body.value).to.eq('51824753556');
+        expect(response.body.value).to.eq(IDENTIFIER_VALUE);
         expect(response.body.schemeId).to.eq(schemeId);
 
         createdIdentifierId = response.body.id;
       });
     });
 
-    it('GET /api/v1/identifiers — lists identifiers', () => {
+    it('GET /api/v1/identifiers  -  lists identifiers', () => {
       cy.request('/api/v1/identifiers').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.not.have.property('ok');
@@ -80,7 +85,7 @@ describe('Identifier API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/identifiers — filters by schemeId', () => {
+    it('GET /api/v1/identifiers  -  filters by schemeId', () => {
       cy.request(`/api/v1/identifiers?schemeId=${schemeId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.pagination).to.exist;
@@ -90,33 +95,33 @@ describe('Identifier API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/identifiers/:id — retrieves a specific identifier', () => {
+    it('GET /api/v1/identifiers/:id  -  retrieves a specific identifier', () => {
       cy.request(`/api/v1/identifiers/${createdIdentifierId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(createdIdentifierId);
-        expect(response.body.value).to.eq('51824753556');
+        expect(response.body.value).to.eq(IDENTIFIER_VALUE);
       });
     });
 
-    it('PATCH /api/v1/identifiers/:id — updates identifier value', () => {
+    it('PATCH /api/v1/identifiers/:id  -  updates identifier value', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/identifiers/${createdIdentifierId}`,
-        body: { value: '12345678901' },
+        body: { value: UPDATED_IDENTIFIER_VALUE },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.value).to.eq('12345678901');
+        expect(response.body.value).to.eq(UPDATED_IDENTIFIER_VALUE);
       });
     });
 
-    it('GET /api/v1/identifiers/:id — confirms update persisted', () => {
+    it('GET /api/v1/identifiers/:id  -  confirms update persisted', () => {
       cy.request(`/api/v1/identifiers/${createdIdentifierId}`).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body.value).to.eq('12345678901');
+        expect(response.body.value).to.eq(UPDATED_IDENTIFIER_VALUE);
       });
     });
 
-    it('DELETE /api/v1/identifiers/:id — deletes the identifier', () => {
+    it('DELETE /api/v1/identifiers/:id  -  deletes the identifier', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/identifiers/${createdIdentifierId}`,
@@ -125,7 +130,7 @@ describe('Identifier API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/identifiers/:id — returns 404 after deletion', () => {
+    it('GET /api/v1/identifiers/:id  -  returns 404 after deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/identifiers/${createdIdentifierId}`,
@@ -141,7 +146,7 @@ describe('Identifier API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/identifiers',
-        body: { value: '51824753556' },
+        body: { value: IDENTIFIER_VALUE },
         failOnStatusCode: false,
       }).then((response) => {
         expect(response.status).to.eq(400);
@@ -203,7 +208,7 @@ describe('Identifier API', { testIsolation: false }, () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/identifiers',
-        body: { schemeId, value: '99988877766' },
+        body: { schemeId, value: `${RUN_ID}-temporary` },
       }).then((createResponse) => {
         const tempId = createResponse.body.id;
 
@@ -232,7 +237,7 @@ describe('Identifier API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — returns 404 for nonexistent identifier', () => {
+    it('PATCH  -  returns 404 for nonexistent identifier', () => {
       cy.request({
         method: 'PATCH',
         url: '/api/v1/identifiers/nonexistent-id',
@@ -244,7 +249,7 @@ describe('Identifier API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — returns 404 for nonexistent identifier', () => {
+    it('DELETE  -  returns 404 for nonexistent identifier', () => {
       cy.request({
         method: 'DELETE',
         url: '/api/v1/identifiers/nonexistent-id',

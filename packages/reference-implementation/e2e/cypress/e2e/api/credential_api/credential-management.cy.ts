@@ -1,7 +1,7 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Credential API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let testTenantId: string;
   let defaultDidValue: string;
   let tenantDidValue: string;
@@ -29,7 +29,8 @@ describe('Credential API', { testIsolation: false }, () => {
     };
   }
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite uses Postgres tenant and user fixtures, including native credential cleanup.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -46,7 +47,7 @@ describe('Credential API', { testIsolation: false }, () => {
       body: {
         serviceType: 'VC',
         adapterType: 'VCKIT',
-        name: 'E2E VCKit VC',
+        name: `E2E VCKit VC ${RUN_ID}`,
         config: {
           baseUrl: config.services.vckit.baseUrl,
           apiKey: config.services.vckit.apiKey,
@@ -65,7 +66,7 @@ describe('Credential API', { testIsolation: false }, () => {
       body: {
         serviceType: 'STORAGE',
         adapterType: 'UNCEFACT_STORAGE',
-        name: 'E2E Storage',
+        name: `E2E Storage ${RUN_ID}`,
         config: {
           baseUrl: config.services.storage.baseUrl,
           apiKey: config.services.storage.apiKey,
@@ -82,8 +83,10 @@ describe('Credential API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   // -----------------------------------------------------------------------
@@ -126,7 +129,7 @@ describe('Credential API', { testIsolation: false }, () => {
     });
 
     after(() => {
-      cy.task('cleanupForeignTenantDid');
+      if (config.capabilities.dbAccess) cy.task('cleanupForeignTenantDid');
     });
 
     it('issues a credential using the system default DID', () => {
@@ -223,7 +226,7 @@ describe('Credential API', { testIsolation: false }, () => {
         body: {
           serviceType: 'VC',
           adapterType: 'VCKIT',
-          name: 'E2E VCKit VC Secondary',
+          name: `E2E VCKit VC Secondary ${RUN_ID}`,
           config: {
             baseUrl: config.services.vckit.baseUrl,
             apiKey: config.services.vckit.apiKey,

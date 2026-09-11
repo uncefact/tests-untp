@@ -24,7 +24,7 @@
  * applies to every supported UNTP version rather than only the newest.
  */
 
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 const PLAYGROUND_BASE_URL = Cypress.env('PLAYGROUND_BASE_URL') || 'http://localhost:4000';
 
@@ -56,13 +56,14 @@ const MATRIX: MatrixEntry[] = [
 ];
 
 describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => {
-  const RUN_ID = String(Date.now());
+  const RUN_ID = runTag();
   const VALID_FROM = new Date().toISOString();
   const VALID_UNTIL = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
   let testTenantId: string;
   let defaultDidValue: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This matrix seeds a Postgres tenant and deletes native credentials.');
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email] });
 
@@ -84,7 +85,7 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
 
   after(() => {
     const preserveTenant = config.tenantMode === 'closed';
-    if (testTenantId) {
+    if (config.capabilities.dbAccess && testTenantId) {
       cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
     }
   });
@@ -95,10 +96,11 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
       // Resolved relative to the Cypress project root (packages/.../e2e).
       cy.readFile(`../src/templates/v0.7.0/${entry.templateDir}/example-data.json`).then((credentialPayload) => {
         // The template is the issued credential. Override only the fields the
-        // test owns: a unique id, the tenant's default issuer DID, and a
-        // current validity window. `cy.readFile` re-parses per test, so
-        // mutating it in place is safe.
+        // test owns: a unique id and name, the tenant's default issuer DID,
+        // and a current validity window. `cy.readFile` re-parses per test,
+        // so mutating it in place is safe.
         credentialPayload.id = `urn:uuid:e2e-v070-${entry.credentialType}-${RUN_ID}`;
+        credentialPayload.name = `E2E ${entry.credentialType} ${RUN_ID}`;
         credentialPayload.issuer.id = defaultDidValue;
         credentialPayload.validFrom = VALID_FROM;
         credentialPayload.validUntil = VALID_UNTIL;

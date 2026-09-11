@@ -31,7 +31,7 @@ Cypress.Commands.add('apiLogin', (username?: string, password?: string) => {
 
   // Click the provider button to trigger the redirect
   cy.get('body').then(($body) => {
-    // NextAuth shows provider buttons — find and click the right one
+    // NextAuth shows provider buttons  -  find and click the right one
     const buttons = $body.find('button');
     const providerButton = buttons.filter((_i, el) => {
       const text = el.textContent?.toLowerCase() || '';
@@ -66,5 +66,6 @@ Cypress.Commands.add('apiLogin', (username?: string, password?: string) => {
   cy.request('/api/auth/session').then(({ body }) => {
     expect(body?.user?.id, 'authenticated session user ID').to.be.a('string').and.not.be.empty;
     expect(body.error, 'session authentication error').to.be.undefined;
+    return cy.getAllCookies().then((cookies) => cy.task('captureSessionCookies', { cookies }));
   });
 });

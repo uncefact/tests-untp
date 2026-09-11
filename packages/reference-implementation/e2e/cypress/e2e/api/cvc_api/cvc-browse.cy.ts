@@ -1,4 +1,4 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 /**
  * Conformity Vocabulary Catalogue browse API (E2E).
@@ -16,14 +16,15 @@ describe('Conformity Vocabulary browse API', { testIsolation: false }, () => {
   let criterion: string;
   let topic: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'The RI exposes no CVC delete routes, so this fixture requires the Postgres fallback.');
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email] });
 
     cy.apiLogin();
     cy.task('seedTestOrg', { userEmail: config.user.email }).then((result) => {
       testTenantId = (result as { tenantId: string }).tenantId;
-      cy.task('seedConformitySchemes', { tenantId: testTenantId }).then((seeded) => {
+      cy.task('seedConformitySchemes', { tenantId: testTenantId, tag: runTag() }).then((seeded) => {
         const s = seeded as { scheme: string; profile: string; criterion: string; topic: string };
         scheme = s.scheme;
         profile = s.profile;
@@ -34,13 +35,13 @@ describe('Conformity Vocabulary browse API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    if (testTenantId) {
+    if (config.capabilities.dbAccess && testTenantId) {
+      const preserveTenant = config.tenantMode === 'closed';
       cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
     }
   });
 
-  it('GET /api/v1/cvc/schemes — returns the seeded scheme by its canonical URI', () => {
+  it('GET /api/v1/cvc/schemes  -  returns the seeded scheme by its canonical URI', () => {
     cy.request({ method: 'GET', url: '/api/v1/cvc/schemes' }).then((res) => {
       expect(res.status).to.eq(200);
       expect(res.body).to.not.have.property('ok');
@@ -50,7 +51,7 @@ describe('Conformity Vocabulary browse API', { testIsolation: false }, () => {
     });
   });
 
-  it("GET /api/v1/cvc/profiles?schemeId — returns the chosen scheme's profiles", () => {
+  it("GET /api/v1/cvc/profiles?schemeId  -  returns the chosen scheme's profiles", () => {
     cy.request({ method: 'GET', url: `/api/v1/cvc/profiles?schemeId=${encodeURIComponent(scheme)}` }).then((res) => {
       expect(res.status).to.eq(200);
       const ids = (res.body.data as Array<{ id: string }>).map((entry) => entry.id);
@@ -58,7 +59,7 @@ describe('Conformity Vocabulary browse API', { testIsolation: false }, () => {
     });
   });
 
-  it("GET /api/v1/cvc/criteria?profileId — returns the chosen profile's criteria with their topics", () => {
+  it("GET /api/v1/cvc/criteria?profileId  -  returns the chosen profile's criteria with their topics", () => {
     cy.request({ method: 'GET', url: `/api/v1/cvc/criteria?profileId=${encodeURIComponent(profile)}` }).then((res) => {
       expect(res.status).to.eq(200);
       const found = (

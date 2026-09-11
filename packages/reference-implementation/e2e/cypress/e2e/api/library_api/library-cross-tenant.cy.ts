@@ -1,11 +1,12 @@
-import { config } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 import { waitForGeneration } from '../../../support/library';
 
 describe('Library API cross-tenant journey', { testIsolation: false }, () => {
-  // Fresh per test attempt so a Cypress retry never reuses an alias, key or label.
-  let RUN_ID = String(Date.now());
+  // The run tag, so every record is cleaned and proven by the harness, plus
+  // the attempt number so a Cypress retry never reuses an alias, key or label.
+  let RUN_ID = runTag();
   beforeEach(() => {
-    RUN_ID = String(Date.now());
+    RUN_ID = `${runTag()}-r${Cypress.currentRetry}`;
   });
   const SA1 = config.serviceAccounts.sa1;
   const SA2 = config.serviceAccounts.sa2;

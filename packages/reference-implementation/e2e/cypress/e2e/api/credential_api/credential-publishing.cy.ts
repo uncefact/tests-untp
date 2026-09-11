@@ -1,4 +1,4 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 /**
  * Publishes a credential with access roles and asserts the resulting link
@@ -7,10 +7,10 @@ import { config } from '../../../support/config';
  * to the latter two only.
  */
 describe('Credential publishing to the Identity Resolver', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   const NAMESPACE = `e2e-pub-${RUN_ID}`;
   const PRIMARY_KEY = `arn-${RUN_ID}`;
-  const IDENTIFIER_VALUE = '90664869327';
+  const IDENTIFIER_VALUE = RUN_ID;
   const MACHINE_VERIFICATION_URL = 'https://verify.example.com/api/verify';
   const ACCESS_ROLES = ['untp:accessRole#Regulator', 'untp:accessRole#Auditor'];
 
@@ -20,7 +20,8 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
   let defaultDidValue: string;
   let publishedCredentialId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant and deletes native credentials and resolver fixtures.');
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
 
@@ -36,7 +37,7 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       body: {
         serviceType: 'VC',
         adapterType: 'VCKIT',
-        name: 'E2E VCKit VC (publishing)',
+        name: `E2E VCKit VC (publishing) ${RUN_ID}`,
         config: {
           baseUrl: config.services.vckit.baseUrl,
           apiKey: config.services.vckit.apiKey,
@@ -52,7 +53,7 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       body: {
         serviceType: 'STORAGE',
         adapterType: 'UNCEFACT_STORAGE',
-        name: 'E2E Storage (publishing)',
+        name: `E2E Storage (publishing) ${RUN_ID}`,
         config: {
           baseUrl: config.services.storage.baseUrl,
           apiKey: config.services.storage.apiKey,
@@ -92,7 +93,7 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
             registrarId: res.body.id,
             name: `E2E ARN Scheme ${RUN_ID}`,
             primaryKey: PRIMARY_KEY,
-            validationPattern: '^\\d{11}$',
+            validationPattern: '^e2e-\\d{10,}.*$',
             linkTemplate: '/{primaryKey}/{value}',
           },
         });
@@ -141,7 +142,8 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
             shortcode: PRIMARY_KEY,
             ai: PRIMARY_KEY,
             type: 'I',
-            regex: '^\\d{11}$',
+            // The same pattern as the RI scheme above: the identifier carries the run tag.
+            regex: '^e2e-\\d{10,}.*$',
           },
         ],
       },
@@ -159,8 +161,10 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       failOnStatusCode: false,
     }).then((res) => expect(res.status).to.be.oneOf([200, 204, 404]));
 
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   // Publishing and asserting are separate tests so a retry of the

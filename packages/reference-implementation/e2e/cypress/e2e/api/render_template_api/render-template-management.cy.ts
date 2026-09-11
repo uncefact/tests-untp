@@ -1,13 +1,14 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Render Template API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let dataModelId: string;
   let createdTemplateId: string;
   let rt2024TemplateId: string;
   let testTenantId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant and storage service before testing templates.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -27,12 +28,14 @@ describe('Render Template API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
-    it('POST — creates a WebRenderingTemplate2022 render template', function () {
+    it('POST  -  creates a WebRenderingTemplate2022 render template', function () {
       if (!dataModelId) this.skip();
 
       cy.request({
@@ -64,7 +67,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST — creates a RenderTemplate2024 with optional fields', function () {
+    it('POST  -  creates a RenderTemplate2024 with optional fields', function () {
       if (!dataModelId) this.skip();
 
       cy.request({
@@ -91,7 +94,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST — creates with isDefault', function () {
+    it('POST  -  creates with isDefault', function () {
       if (!dataModelId) this.skip();
 
       cy.request({
@@ -108,12 +111,12 @@ describe('Render Template API', { testIsolation: false }, () => {
         expect(response.status).to.eq(201);
         expect(response.body.isDefault).to.be.true;
 
-        // Clean up — only keep the other templates for remaining tests
+        // Clean up  -  only keep the other templates for remaining tests
         cy.request({ method: 'DELETE', url: `/api/v1/render-templates/${response.body.id}` });
       });
     });
 
-    it('GET /api/v1/render-templates — lists with pagination metadata', function () {
+    it('GET /api/v1/render-templates  -  lists with pagination metadata', function () {
       if (!createdTemplateId) this.skip();
 
       cy.request('/api/v1/render-templates').then((response) => {
@@ -132,7 +135,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/render-templates — filters by dataModelId', function () {
+    it('GET /api/v1/render-templates  -  filters by dataModelId', function () {
       if (!dataModelId) this.skip();
 
       cy.request(`/api/v1/render-templates?dataModelId=${dataModelId}`).then((response) => {
@@ -143,7 +146,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/render-templates/:id — retrieves a specific render template', function () {
+    it('GET /api/v1/render-templates/:id  -  retrieves a specific render template', function () {
       if (!createdTemplateId) this.skip();
 
       cy.request(`/api/v1/render-templates/${createdTemplateId}`).then((response) => {
@@ -153,7 +156,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — updates name', function () {
+    it('PATCH  -  updates name', function () {
       if (!createdTemplateId) this.skip();
 
       cy.request({
@@ -166,7 +169,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — re-uploads when template content is provided', function () {
+    it('PATCH  -  re-uploads when template content is provided', function () {
       if (!createdTemplateId) this.skip();
 
       // Capture old digest before update
@@ -188,7 +191,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — updates isDefault', function () {
+    it('PATCH  -  updates isDefault', function () {
       if (!createdTemplateId) this.skip();
 
       cy.request({
@@ -201,7 +204,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — updates RenderTemplate2024 fields', function () {
+    it('PATCH  -  updates RenderTemplate2024 fields', function () {
       if (!rt2024TemplateId) this.skip();
 
       cy.request({
@@ -215,7 +218,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET — confirms PATCH updates persisted', function () {
+    it('GET  -  confirms PATCH updates persisted', function () {
       if (!createdTemplateId) this.skip();
 
       cy.request(`/api/v1/render-templates/${createdTemplateId}`).then((response) => {
@@ -225,7 +228,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — deletes a render template with 204', function () {
+    it('DELETE  -  deletes a render template with 204', function () {
       if (!createdTemplateId) this.skip();
 
       cy.request({
@@ -237,7 +240,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET — returns 404 after deletion', function () {
+    it('GET  -  returns 404 after deletion', function () {
       if (!createdTemplateId) this.skip();
 
       cy.request({
@@ -250,7 +253,7 @@ describe('Render Template API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — cleans up RT2024 template', function () {
+    it('DELETE  -  cleans up RT2024 template', function () {
       if (!rt2024TemplateId) this.skip();
 
       cy.request({
@@ -286,7 +289,7 @@ describe('Render Template API', { testIsolation: false }, () => {
     });
   });
 
-  describe('Validation errors — POST', () => {
+  describe('Validation errors  -  POST', () => {
     it('returns 400 when name is missing', () => {
       cy.request({
         method: 'POST',
@@ -511,7 +514,7 @@ describe('Render Template API', { testIsolation: false }, () => {
     });
   });
 
-  describe('Validation errors — PATCH', () => {
+  describe('Validation errors  -  PATCH', () => {
     let tempTemplateId: string;
 
     before(function () {
@@ -668,7 +671,7 @@ describe('Render Template API', { testIsolation: false }, () => {
     });
   });
 
-  describe('Validation errors — GET and DELETE', () => {
+  describe('Validation errors  -  GET and DELETE', () => {
     it('returns 404 for nonexistent render template on GET', () => {
       cy.request({
         method: 'GET',

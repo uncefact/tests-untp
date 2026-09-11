@@ -1,11 +1,12 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Registrar API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let createdRegistrarId: string;
   let testTenantId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant and users before testing registrars.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -17,12 +18,14 @@ describe('Registrar API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
-    it('POST /api/v1/registrars — creates a registrar', () => {
+    it('POST /api/v1/registrars  -  creates a registrar', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/registrars',
@@ -41,7 +44,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/registrars — lists registrars', () => {
+    it('GET /api/v1/registrars  -  lists registrars', () => {
       cy.request('/api/v1/registrars').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.not.have.property('ok');
@@ -54,7 +57,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/registrars/:id — retrieves a specific registrar', () => {
+    it('GET /api/v1/registrars/:id  -  retrieves a specific registrar', () => {
       cy.request(`/api/v1/registrars/${createdRegistrarId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(createdRegistrarId);
@@ -62,7 +65,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/registrars/:id — updates registrar name', () => {
+    it('PATCH /api/v1/registrars/:id  -  updates registrar name', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/registrars/${createdRegistrarId}`,
@@ -73,7 +76,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/registrars/:id — updates namespace and url', () => {
+    it('PATCH /api/v1/registrars/:id  -  updates namespace and url', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/registrars/${createdRegistrarId}`,
@@ -88,7 +91,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/registrars/:id — confirms updates persisted', () => {
+    it('GET /api/v1/registrars/:id  -  confirms updates persisted', () => {
       cy.request(`/api/v1/registrars/${createdRegistrarId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`Updated E2E Registrar ${RUN_ID}`);
@@ -96,7 +99,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/registrars/:id — deletes the registrar', () => {
+    it('DELETE /api/v1/registrars/:id  -  deletes the registrar', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/registrars/${createdRegistrarId}`,
@@ -105,7 +108,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/registrars/:id — returns 404 after deletion', () => {
+    it('GET /api/v1/registrars/:id  -  returns 404 after deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/registrars/${createdRegistrarId}`,
@@ -219,7 +222,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — returns 404 for nonexistent registrar', () => {
+    it('PATCH  -  returns 404 for nonexistent registrar', () => {
       cy.request({
         method: 'PATCH',
         url: '/api/v1/registrars/nonexistent-id',
@@ -231,7 +234,7 @@ describe('Registrar API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — returns 404 for nonexistent registrar', () => {
+    it('DELETE  -  returns 404 for nonexistent registrar', () => {
       cy.request({
         method: 'DELETE',
         url: '/api/v1/registrars/nonexistent-id',
