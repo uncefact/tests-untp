@@ -1,13 +1,13 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runnerReachableUri, runTag } from '../../../support/config';
 
 describe('Credential API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
-  let testTenantId: string;
   let defaultDidValue: string;
   let tenantDidValue: string;
   let encryptedCredentialId: string;
   let unencryptedCredentialId: string;
   let publishedCredentialId: string;
+  let foreignDid: string;
 
   /**
    * Builds a minimal valid CredentialPayload conforming to the DPP v0.6.1 schema.
@@ -30,15 +30,28 @@ describe('Credential API', { testIsolation: false }, () => {
   }
 
   before(function () {
-    requireDbAccess(this, 'This suite uses Postgres tenant and user fixtures, including native credential cleanup.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
+    // A DID belonging to a different tenant: the second service account
+    // creates one in its own tenant through the API. It runs before the
+    // browser login, because the session cookie would otherwise ride on the
+    // request and file the DID under the signed-in user's tenant instead.
+    cy.task('getServiceAccountToken', config.serviceAccounts.sa2).then((result: any) => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        headers: { Authorization: `Bearer ${result.accessToken}` },
+        body: {
+          type: 'MANAGED',
+          method: 'DID_WEB',
+          alias: `e2e-foreign-did-${RUN_ID}`,
+          name: `E2E foreign tenant DID ${RUN_ID}`,
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        foreignDid = response.body.did;
+      });
+    });
 
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // Create VC service instance (required for signing credentials)
     cy.request({
@@ -82,19 +95,10 @@ describe('Credential API', { testIsolation: false }, () => {
     });
   });
 
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
-  });
-
   // -----------------------------------------------------------------------
   // DID ownership enforcement
   // -----------------------------------------------------------------------
   describe('DID ownership enforcement', () => {
-    let foreignDid: string;
-
     before(() => {
       // Look up the system default DID
       cy.request('/api/v1/dids').then((response) => {
@@ -121,15 +125,6 @@ describe('Credential API', { testIsolation: false }, () => {
           tenantDidValue = response.body.did;
         });
       }
-
-      // Seed a DID belonging to a different tenant
-      cy.task('seedForeignTenantDid').then((result: any) => {
-        foreignDid = result.did;
-      });
-    });
-
-    after(() => {
-      if (config.capabilities.dbAccess) cy.task('cleanupForeignTenantDid');
     });
 
     it('issues a credential using the system default DID', () => {
@@ -680,9 +675,6 @@ describe('Credential API', { testIsolation: false }, () => {
   // Error handling
   // -----------------------------------------------------------------------
   describe('Delete an issued credential', () => {
-    // The stored copy's URI as the RI returns it is reachable from the RI's
-    // network; the browser reaches the same object through the host mapping.
-    const hostReachable = (uri: string) => uri.replace('storage-service:3334', 'localhost:3334');
     let storedCopyUri: string;
     let externalSourceUri: string;
 
@@ -692,7 +684,7 @@ describe('Credential API', { testIsolation: false }, () => {
       });
       cy.request(`/api/v1/library/${unencryptedCredentialId}`).then((detail) => {
         expect(detail.status).to.eq(200);
-        storedCopyUri = hostReachable(detail.body.storageUri);
+        storedCopyUri = runnerReachableUri(detail.body.storageUri);
         cy.request({ url: storedCopyUri, failOnStatusCode: false }).its('status').should('eq', 200);
       });
       cy.request({ method: 'DELETE', url: `/api/v1/credentials/${unencryptedCredentialId}` }).then((response) => {

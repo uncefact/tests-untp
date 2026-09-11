@@ -24,7 +24,7 @@
  * applies to every supported UNTP version rather than only the newest.
  */
 
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runnerReachableUri, runTag } from '../../../support/config';
 
 const PLAYGROUND_BASE_URL = Cypress.env('PLAYGROUND_BASE_URL') || 'http://localhost:4000';
 
@@ -33,9 +33,6 @@ const PLAYGROUND_BASE_URL = Cypress.env('PLAYGROUND_BASE_URL') || 'http://localh
 // service via the published port, so we rewrite the host portion before
 // fetching. When the URI is already host-reachable (local dev), the
 // substitution is a no-op.
-function hostReachableStorageUri(uri: string): string {
-  return uri.replace('storage-service:3334', 'localhost:3334');
-}
 
 interface MatrixEntry {
   /** RI credential type discriminator, used in the issue body. */
@@ -59,18 +56,10 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
   const RUN_ID = runTag();
   const VALID_FROM = new Date().toISOString();
   const VALID_UNTIL = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
-  let testTenantId: string;
   let defaultDidValue: string;
 
   before(function () {
-    requireDbAccess(this, 'This matrix seeds a Postgres tenant and deletes native credentials.');
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result) => {
-      testTenantId = (result as { tenantId: string }).tenantId;
-    });
 
     cy.request({ method: 'GET', url: '/api/v1/dids' }).then((response) => {
       expect(response.status).to.eq(200);
@@ -81,13 +70,6 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
       expect(defaultDid, 'A default DID must be configured for the tenant').to.exist;
       defaultDidValue = defaultDid!.did;
     });
-  });
-
-  after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    if (config.capabilities.dbAccess && testTenantId) {
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   MATRIX.forEach((entry) => {
@@ -123,7 +105,7 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
             expect(getResponse.status).to.eq(200);
             expect(getResponse.body.id).to.eq(credentialId);
             expect(getResponse.body.storageUri).to.be.a('string');
-            const storageUri = hostReachableStorageUri(getResponse.body.storageUri as string);
+            const storageUri = runnerReachableUri(getResponse.body.storageUri as string);
 
             cy.request({ method: 'GET', url: storageUri }).then((vcResponse) => {
               expect(vcResponse.status).to.eq(200);

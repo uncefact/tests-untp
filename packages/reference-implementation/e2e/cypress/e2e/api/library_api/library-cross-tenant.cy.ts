@@ -1,4 +1,4 @@
-import { config, runTag } from '../../../support/config';
+import { config, runnerReachableUri, runTag } from '../../../support/config';
 import { waitForGeneration } from '../../../support/library';
 
 describe('Library API cross-tenant journey', { testIsolation: false }, () => {
@@ -10,16 +10,10 @@ describe('Library API cross-tenant journey', { testIsolation: false }, () => {
   });
   const SA1 = config.serviceAccounts.sa1;
   const SA2 = config.serviceAccounts.sa2;
-  const preserveTenant = config.tenantMode === 'closed';
 
   let tokenA: string;
   let tokenB: string;
-  let subA: string;
   let subB: string;
-
-  function decodeSub(accessToken: string): string {
-    return JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString()).sub;
-  }
 
   function buildCredentialPayload(issuerDid: string, label: string) {
     return {
@@ -56,26 +50,13 @@ describe('Library API cross-tenant journey', { testIsolation: false }, () => {
     });
   }
 
-  function hostReachableStorageUri(uri: string): string {
-    return uri.replace('storage-service:3334', 'localhost:3334');
-  }
-
   before(() => {
     cy.task('getServiceAccountToken', SA1).then((result: any) => {
       tokenA = result.accessToken;
-      subA = decodeSub(tokenA);
-      return cy.task('cleanupServiceAccountData', { sub: subA, preserveTenant });
     });
     cy.task('getServiceAccountToken', SA2).then((result: any) => {
       tokenB = result.accessToken;
-      subB = decodeSub(tokenB);
-      return cy.task('cleanupServiceAccountData', { sub: subB, preserveTenant });
     });
-  });
-
-  after(() => {
-    cy.task('cleanupServiceAccountData', { sub: subA, preserveTenant });
-    cy.task('cleanupServiceAccountData', { sub: subB, preserveTenant });
   });
 
   it('issues in tenant A, verifies in tenant B, and preserves tenant boundaries', function () {
@@ -230,7 +211,7 @@ describe('Library API cross-tenant journey', { testIsolation: false }, () => {
           method: 'POST',
           url: '/api/v1/credentials/verify',
           body: {
-            uri: hostReachableStorageUri(record.storageUri),
+            uri: runnerReachableUri(record.storageUri),
             digestMultibase: record.digestMultibase,
             decryptionKey: record.decryptionKey,
           },

@@ -8,32 +8,20 @@
  *
  * Requires: docker-compose.e2e.yml (standard E2E stack)
  */
-import { config, requireDbAccess, runTag } from '../../support/config';
+import { config, runTag } from '../../support/config';
 
 describe('Open mode  -  service account API', { testIsolation: false }, () => {
   let accessToken: string;
-  let tokenSub: string;
+  let createdDidId: string;
 
-  before(function () {
-    requireDbAccess(this, 'Service-account user and tenant cleanup use Postgres without RI user routes.');
+  before(() => {
     // Fetch a service account token from Keycloak
     cy.task('getServiceAccountToken').then((result: any) => {
       accessToken = result.accessToken;
-
-      // Decode the JWT payload to extract the sub claim for cleanup
-      const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString());
-      tokenSub = payload.sub;
-
-      // Clean up any leftover data from previous runs
-      cy.task('cleanupServiceAccountData', { sub: tokenSub });
     });
   });
 
-  after(() => {
-    if (config.capabilities.dbAccess) cy.task('cleanupServiceAccountData', { sub: tokenSub });
-  });
-
-  it('GET /api/v1/dids  -  authenticates and auto-provisions tenant', () => {
+  it('GET /api/v1/dids  -  authenticates and resolves the service account to a tenant', () => {
     cy.request({
       method: 'GET',
       url: '/api/v1/dids',
@@ -62,15 +50,18 @@ describe('Open mode  -  service account API', { testIsolation: false }, () => {
     }).then((response) => {
       expect(response.status).to.eq(201);
       expect(response.body.did).to.match(/^did:web:/);
+      createdDidId = response.body.id;
     });
   });
 
-  it('verifies the service account user was auto-provisioned with a tenant', () => {
-    cy.task('cleanupServiceAccountData', { sub: tokenSub }).then((result: any) => {
-      // This is a verification step  -  if result is not null, the user+tenant were provisioned
-      expect(result).to.not.be.null;
-      expect(result.userId).to.be.a('string');
-      expect(result.tenantId).to.be.a('string');
+  it('the provisioned tenant holds the DID the service account created', () => {
+    cy.request({
+      method: 'GET',
+      url: `/api/v1/dids/${createdDidId}`,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }).then((response) => {
+      expect(response.status).to.eq(200);
+      expect(response.body.id).to.eq(createdDidId);
     });
   });
 });

@@ -1,8 +1,7 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 describe('Facility API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
-  let testTenantId: string;
   let registrarId: string;
   let schemeId: string;
   let identifierId: string;
@@ -11,15 +10,7 @@ describe('Facility API', { testIsolation: false }, () => {
   let createdFacilityId: string;
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant, identifiers, and users before testing facilities.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // Create prerequisite chain:
     // 1. registrar -> scheme -> 2 identifiers (primary + secondary)
@@ -82,13 +73,6 @@ describe('Facility API', { testIsolation: false }, () => {
     }).then((orgResponse) => {
       organisationId = orgResponse.body[0].id;
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   describe('CRUD operations', () => {

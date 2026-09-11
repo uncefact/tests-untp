@@ -8,37 +8,18 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
-import { config, requireDbAccess, requireE2eRealm, runTag } from '../../support/config';
+import { config, runTag } from '../../support/config';
 
 describe('Closed mode: service account API', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
   let accessToken: string;
-  let tokenSub: string;
+  let createdDidId: string;
 
-  before(function () {
-    requireDbAccess(this, 'Service-account user and closed-mode tenant cleanup use Postgres without RI delete routes.');
-    requireE2eRealm(this, 'Closed-mode group tenancy uses the e2e realm groups.');
-    // Clean up any leftover closed mode data
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
-
+  before(() => {
     // Fetch a service account token
     cy.task('getServiceAccountToken').then((result: any) => {
       accessToken = result.accessToken;
-
-      // Decode the JWT payload to extract the sub claim for cleanup
-      const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString());
-      tokenSub = payload.sub;
-
-      // Clean up any leftover SA user from previous runs
-      cy.task('cleanupServiceAccountData', { sub: tokenSub, preserveTenant: true });
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
-      cy.task('cleanupServiceAccountData', { sub: tokenSub, preserveTenant: true });
-    }
   });
 
   it('GET /api/v1/dids: authenticates via bearer token and resolves tenant by group', () => {
@@ -70,34 +51,21 @@ describe('Closed mode: service account API', { testIsolation: false }, () => {
     }).then((response) => {
       expect(response.status).to.eq(201);
       expect(response.body.did).to.match(/^did:web:/);
+      createdDidId = response.body.id;
     });
   });
 
-  it('tenant was resolved with correct externalIdpGroupId', () => {
-    cy.task('verifyClosedModeTenant', { externalIdpGroupId: GROUP_CLAIM }).then((tenant: any) => {
-      expect(tenant).to.not.be.null;
-      expect(tenant.externalIdpGroupId).to.eq(GROUP_CLAIM);
-    });
-  });
-
-  it('session user and service account share the same group tenant', () => {
-    // First, sign in via browser to create a session-based user in the same group
+  it(`the group's user (${GROUP_CLAIM}) shares the tenant the service account resolved`, () => {
+    // Last in this spec: a session cookie rides on every later cy.request and
+    // would answer as the user rather than the bearer token. Every domain's
+    // cookies are cleared first so the identity provider shows its form
+    // rather than resuming an earlier single-sign-on session.
+    cy.clearAllCookies();
     cy.apiLogin(config.user.email, config.user.password);
-
-    // Both the session user and service account user should be in the same tenant
-    // because they share the /e2e-org-alpha group
-    cy.task('verifyClosedModeTenant', { externalIdpGroupId: GROUP_CLAIM }).then((tenant: any) => {
-      expect(tenant).to.not.be.null;
-
-      // Verify the service account can still call the API and gets the same tenant
-      cy.request({
-        method: 'GET',
-        url: '/api/v1/dids',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array');
-      });
+    cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
+      expect(response.status).to.eq(200);
+      expect(response.body.id).to.eq(createdDidId);
     });
+    cy.clearCookies();
   });
 });

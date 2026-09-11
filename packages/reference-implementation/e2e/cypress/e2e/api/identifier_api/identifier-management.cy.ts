@@ -1,24 +1,15 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 describe('Identifier API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
   const IDENTIFIER_VALUE = `${RUN_ID}-primary`;
   const UPDATED_IDENTIFIER_VALUE = `${RUN_ID}-updated`;
-  let testTenantId: string;
   let registrarId: string;
   let schemeId: string;
   let createdIdentifierId: string;
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant, schemes, and users before testing identifiers.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // Create prerequisite registrar → scheme chain
     cy.request({
@@ -46,13 +37,6 @@ describe('Identifier API', { testIsolation: false }, () => {
         schemeId = schemeResponse.body.id;
       });
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   describe('CRUD operations', () => {

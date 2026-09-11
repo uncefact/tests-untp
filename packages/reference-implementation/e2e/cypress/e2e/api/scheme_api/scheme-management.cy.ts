@@ -1,21 +1,12 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 describe('Scheme API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
   let registrarId: string;
   let createdSchemeId: string;
-  let testTenantId: string;
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant, registrar, and users before testing schemes.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // Create a registrar as a prerequisite for schemes
     cy.request({
@@ -29,13 +20,6 @@ describe('Scheme API', { testIsolation: false }, () => {
     }).then((response) => {
       registrarId = response.body.id;
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   describe('CRUD operations', () => {

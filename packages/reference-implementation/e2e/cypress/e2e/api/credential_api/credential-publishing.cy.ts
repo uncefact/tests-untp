@@ -1,4 +1,4 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 /**
  * Publishes a credential with access roles and asserts the resulting link
@@ -16,19 +16,11 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
 
   const idrAuthHeaders = { Authorization: `Bearer ${config.services.idr.apiKey}` };
 
-  let testTenantId: string;
   let defaultDidValue: string;
   let publishedCredentialId: string;
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant and deletes native credentials and resolver fixtures.');
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // VC and storage service instances, required for signing and storing
     cy.request({
@@ -160,11 +152,6 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
       qs: { namespace: NAMESPACE },
       failOnStatusCode: false,
     }).then((res) => expect(res.status).to.be.oneOf([200, 204, 404]));
-
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   // Publishing and asserting are separate tests so a retry of the
@@ -199,6 +186,9 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
         version: '0.6.1',
         publishingOptions: {
           publish: true,
+          // Named here rather than left to the instance's configured default,
+          // so the link-type assertion below holds on any deployment.
+          linkType: 'untp:dpp',
           machineVerificationUrl: MACHINE_VERIFICATION_URL,
           accessRole: ACCESS_ROLES,
         },
@@ -275,7 +265,6 @@ describe('Credential publishing to the Identity Resolver', { testIsolation: fals
 
       const credentialLink = links.find((l: any) => l.mimeType === 'application/json');
       expect(credentialLink, 'credential link').to.exist;
-      // SYSTEM_IDR_DEFAULT_LINK_TYPE in docker-compose.e2e.yml
       expect(credentialLink.linkType).to.eq('untp:dpp');
       expect(credentialLink.targetUrl).to.be.a('string').and.not.eq(MACHINE_VERIFICATION_URL);
       expect(credentialLink.accessRole).to.have.members(ACCESS_ROLES);

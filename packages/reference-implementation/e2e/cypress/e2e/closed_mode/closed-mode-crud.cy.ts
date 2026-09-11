@@ -7,27 +7,15 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
-import { config, requireDbAccess, requireE2eRealm, runTag } from '../../support/config';
+import { config, runTag } from '../../support/config';
 
 describe('Closed mode  -  DID CRUD', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
   const RUN_ID = runTag();
   let createdDidId: string;
 
-  before(function () {
-    requireDbAccess(this, 'Closed-mode tenant provisioning and cleanup use Postgres without an RI tenant route.');
-    requireE2eRealm(this, 'Closed-mode group tenancy uses the e2e realm groups.');
-    // Clean up any leftover data from previous runs
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
-
-    // Login  -  triggers closed mode tenant provisioning
+  before(() => {
     cy.apiLogin(config.user.email, config.user.password);
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
-    }
   });
 
   it('POST /api/v1/dids  -  creates a managed DID', () => {

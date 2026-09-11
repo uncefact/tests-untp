@@ -1,8 +1,7 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 describe('Verify Page', { testIsolation: false }, () => {
   const RUN_ID = runTag();
-  let testTenantId: string;
   let defaultDidValue: string;
   let unencryptedUri: string;
   let unencryptedDigest: string;
@@ -39,15 +38,7 @@ describe('Verify Page', { testIsolation: false }, () => {
   // ── Setup ──────────────────────────────────────────────────────────
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant and deletes native credentials.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // VC service instance
     cy.request({
@@ -92,13 +83,6 @@ describe('Verify Page', { testIsolation: false }, () => {
       expect(defaultDid).to.exist;
       defaultDidValue = defaultDid.did;
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   // ── Issue credentials for verification ─────────────────────────────
