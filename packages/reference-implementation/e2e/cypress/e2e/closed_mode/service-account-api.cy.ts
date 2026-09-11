@@ -57,7 +57,10 @@ describe('Closed mode: service account API', { testIsolation: false }, () => {
 
   it(`the group's user (${GROUP_CLAIM}) shares the tenant the service account resolved`, () => {
     // Last in this spec: a session cookie rides on every later cy.request and
-    // would answer as the user rather than the bearer token.
+    // would answer as the user rather than the bearer token. Every domain's
+    // cookies are cleared first so the identity provider shows its form
+    // rather than resuming an earlier single-sign-on session.
+    cy.clearAllCookies();
     cy.apiLogin(config.user.email, config.user.password);
     cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
       expect(response.status).to.eq(200);
