@@ -19,14 +19,11 @@ import { resolveDataEncryptionKey } from '../lib/encryption/resolve-data-encrypt
 import { createJobQueue, resolveQueueConnectionString } from '../lib/jobs/app-job-queue';
 import type { JobQueue } from '../lib/jobs/types';
 import { LIBRARY_RECONCILE_PENDING_RUNS_JOB, LIBRARY_VERIFY_JOB } from '../lib/jobs/queue-names';
-import {
-  readReconcilePendingRunsBatchSize,
-  readReconcilePendingRunsCron,
-} from '../lib/config/reconcile-pending-runs.config';
-import { readWorkerJobTimeoutSeconds } from '../lib/config/worker-job-timeout.config';
 import { registerPendingRunReconciliation } from '../lib/library/reconcile-pending-runs-job';
 import { registerLibraryJobs } from '../lib/library/verify-generation-job';
 import { prisma } from '../lib/prisma/prisma';
+import { assertWorkerEncryptionKeyConfigured, runBootPreflight } from '../boot/boot-preflight';
+import type { WorkerConfiguration } from './configuration';
 import { WorkerBootError } from './errors';
 import { startHeartbeat, type Heartbeat } from './heartbeat';
 import { assertSchemaReady, listImageMigrations, prismaMigrationRows } from './schema-readiness';
@@ -47,13 +44,8 @@ export interface RunWorkerOptions {
  */
 export async function requireEncryptionKeyOnBoot(): Promise<void> {
   const resolved = resolveDataEncryptionKey();
-  if (!resolved.key) {
-    throw new WorkerBootError(
-      'worker.encryption-key-missing',
-      'DATA_ENCRYPTION_KEY must be set for the worker: every job it runs needs it, and a worker without it would settle real work as failed',
-    );
-  }
-  await validateConfiguredEncryptionKey(resolved.key);
+  const key = assertWorkerEncryptionKeyConfigured(resolved);
+  await validateConfiguredEncryptionKey(key);
 }
 
 /**
@@ -73,29 +65,16 @@ async function scheduleReconciliation(queue: JobQueue, cron: string): Promise<vo
   }
 }
 
-/**
- * Reads the worker's settings before the queue is constructed, so a
- * malformed value fails the boot with the variable named instead of starting
- * a consumer and failing on the first tick or the first job: the sweep
- * cadence, which the schedule step needs, the per-tick cap, which the sweep
- * reads on each tick, and the worker job timeout, which every queue job
- * carries. The reader's message already names the variable and the fix,
- * so it is the boot error's message and no cause is attached that would
- * print it twice.
- */
-function resolveWorkerConfiguration(): { reconciliationCron: string } {
-  try {
-    const reconciliationCron = readReconcilePendingRunsCron();
-    readReconcilePendingRunsBatchSize();
-    readWorkerJobTimeoutSeconds();
-    return { reconciliationCron };
-  } catch (error) {
-    throw new WorkerBootError('worker.configuration-invalid', error instanceof Error ? error.message : String(error));
-  }
-}
-
 export async function runWorker(options: RunWorkerOptions): Promise<void> {
   const logger = appLogger.child({ module: 'worker' });
+
+  // The container entrypoint runs this before schema convergence. A worker
+  // started from a checkout must enforce the same environment contract before
+  // its existing image and database checks.
+  const { workerConfiguration }: { workerConfiguration: WorkerConfiguration } = await runBootPreflight(
+    'worker',
+    logger,
+  );
 
   const imageMigrations = listImageMigrations(options.migrationsDir);
 
@@ -109,7 +88,7 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
 
   await assertSchemaReady(prismaMigrationRows(prisma), imageMigrations);
   await requireEncryptionKeyOnBoot();
-  const { reconciliationCron } = resolveWorkerConfiguration();
+  const { reconciliationCron, jobTimeoutSeconds } = workerConfiguration;
 
   const queue = createJobQueue();
   registerLibraryJobs(queue);
@@ -157,7 +136,7 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
       probe: () => queue.probe(),
       // The health window must outlast the longest legitimate job by the
       // heartbeat sampling interval, with slack.
-      maxJobMs: readWorkerJobTimeoutSeconds() * 1_000 + 60_000,
+      maxJobMs: jobTimeoutSeconds * 1_000 + 60_000,
     });
   }
 

@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveServiceName } from '../lib/observability/resource';
 import { startNodeSdk } from '../lib/observability/start-sdk';
+import { formatWorkerBootFailure } from './format-boot-failure';
 import { readReferenceImplementationVersion } from './version';
 import { defaultMigrationsDir } from './schema-readiness';
 
@@ -48,13 +49,6 @@ main().catch((error: unknown) => {
   // the cause chain: the same named failure can have different fixes (a
   // migrations directory that is missing versus one the user cannot read).
   // eslint-disable-next-line no-console
-  console.error(`Worker boot failed: ${describe(error)}`);
+  console.error(formatWorkerBootFailure(error));
   process.exit(1);
 });
-
-function describe(error: unknown, depth = 0): string {
-  if (!(error instanceof Error)) return String(error);
-  const code = 'code' in error && error.code !== undefined ? ` [${String(error.code)}]` : '';
-  const cause = error.cause !== undefined && depth < 4 ? `\n  caused by: ${describe(error.cause, depth + 1)}` : '';
-  return `${error.message}${code}${cause}`;
-}

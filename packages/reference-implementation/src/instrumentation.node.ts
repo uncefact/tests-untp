@@ -1,14 +1,14 @@
 /**
- * Node-side process boot: encryption key validation, then OpenTelemetry SDK
- * initialisation.
+ * Node-side process boot: shared configuration preflight, database-backed
+ * encryption key validation, then queue and OpenTelemetry initialisation.
  *
  * Loaded dynamically by `instrumentation.ts` at process startup when
  * running under the Node.js runtime. `register()` there awaits
- * {@link registerNode}, and Next.js does not start serving requests until
- * that promise settles (and crashes startup if it rejects), which is what
- * makes this the right place for a fail-fast check: a DATA_ENCRYPTION_KEY
- * that cannot decrypt existing data is caught here instead of on the first
- * request that happens to touch it (#762).
+ * {@link registerNode}. Configuration that can be checked without the
+ * database is shared with the container entrypoint, while a
+ * DATA_ENCRYPTION_KEY that cannot decrypt existing data remains here so it
+ * can inspect the migrated schema instead of the first request that touches
+ * it (#762).
  *
  * @see ../../../docs/observability.md
  * @see ../../../documentation/docs/reference-implementation/operations/startup.md
@@ -18,35 +18,14 @@ import { startNodeSdk } from './lib/observability/start-sdk';
 import { apiLogger } from './lib/api/logger';
 import { warnOnRejectedMaxPageLimitOverride } from './lib/api/pagination';
 import { warnOnRejectedMaxBatchLimitOverride } from './lib/api/batch-limits';
-import { resolveDataEncryptionKey } from './lib/encryption/resolve-data-encryption-key';
 import { validateConfiguredEncryptionKey } from './lib/encryption/encryption-key-boot';
-import { resolveAppUrl } from './lib/config/app-url.config';
 import { startSeededSchemeRefreshInterval } from './lib/cvc/seeded-refresh-interval';
-import { validateHttpUserAgentOnBoot } from './lib/config/http-user-agent.config';
-import { validateCacheMaxEntriesOnBoot } from './lib/config/cache-max-entries.config';
-import { validateBundledArtefactsFallbackOnBoot } from '@/lib/config/bundled-artefacts-fallback.config';
-import { validateStaleClaimOnBoot } from './lib/config/idempotency-claim.config';
-import { validateMaxRequestBodyBytesOnBoot } from './lib/config/request-body-limit.config';
-import { validateFetchSettingsOnBoot } from './lib/config/credential-fetch.config';
+import { runBootPreflight } from './boot/boot-preflight';
 import { startJobQueue, stopJobQueue } from './lib/jobs/app-job-queue';
 
 export async function registerNode(): Promise<void> {
-  // Fail the boot on a missing or unusable RI_APP_URL: it backs the OIDC
-  // post-logout redirect and the default human verification link, and the
-  // identity-provider documentation requires it (#823).
-  resolveAppUrl();
-  // Fail the boot on an unsendable RI_HTTP_USER_AGENT override; unset and
-  // blank are fine (the guarded fetchers use their built-in default).
-  validateHttpUserAgentOnBoot();
-  // Fail the boot on an invalid CACHE_MAX_ENTRIES override; unset uses the default.
-  validateCacheMaxEntriesOnBoot();
-  validateBundledArtefactsFallbackOnBoot();
-  validateStaleClaimOnBoot();
-  validateMaxRequestBodyBytesOnBoot();
-  // Fail the boot on a conflicting or invalid fetch setting, and warn on a
-  // deprecated name, before encryption and queue startup.
-  validateFetchSettingsOnBoot(apiLogger);
-  await validateEncryptionKeyOnBoot();
+  const { key } = await runBootPreflight('web', apiLogger);
+  await validateEncryptionKeyOnBoot(key);
   await startJobQueueOnBoot();
   startOpenTelemetry();
   // Periodic refresh of seeded conformity schemes (#728). Validates
@@ -55,22 +34,17 @@ export async function registerNode(): Promise<void> {
 }
 
 /**
- * Skipped entirely when DATA_ENCRYPTION_KEY is not set: a deployment with no
- * encryption configured yet is a supported state (the seed and the service
- * resolution chain both already tolerate it), so there is nothing to
- * validate. `resolveDataEncryptionKey` still throws here when the removed
- * SERVICE_ENCRYPTION_KEY name is the only one set, or holds a value that
- * differs from DATA_ENCRYPTION_KEY; this just makes those failures surface
- * at boot instead of on first use. The
- * stale-name warning is left to `getEncryptionService()` below (it logs
- * the same warning internally) rather than duplicated here.
+ * Rechecks the configured key against existing encrypted data after schema
+ * convergence. The shared preflight has already resolved the key name and
+ * consistency rules, format, and placeholder policy. A keyless web
+ * deployment remains valid, while a configured key must still decrypt a
+ * database-backed sample before the process serves requests.
  */
-async function validateEncryptionKeyOnBoot(): Promise<void> {
-  const resolved = resolveDataEncryptionKey();
-  if (!resolved.key) {
+async function validateEncryptionKeyOnBoot(key: string | undefined): Promise<void> {
+  if (!key) {
     return;
   }
-  await validateConfiguredEncryptionKey(resolved.key);
+  await validateConfiguredEncryptionKey(key);
 }
 
 /**

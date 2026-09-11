@@ -29,7 +29,7 @@ Running the application on the host does not go through the container entrypoint
 pnpm exec tsx --env-file=../../.env prisma/backfills/2026-05-19-hex-to-multibase.ts
 ```
 
-Inside the published Docker image it has normally already run at start. To run it again there, note that unlike the other maintenance scripts it does not build a database connection string from the `RI_POSTGRES_*` variables, so it needs the entrypoint to do that for it. Run it as a one-off container, the same way the [encryption audit](../encryption-audit#running-with-the-application-stopped) does, with the skip variables stopping the entrypoint's own migration and seed work first:
+Inside the published Docker image it has normally already run at start. To run it again there, note that unlike the other maintenance scripts it does not build a database connection string from the `RI_POSTGRES_*` variables, so it needs the entrypoint to do that for it. Run it as a one-off container, the same way the [encryption audit](../encryption-audit#running-with-the-application-stopped) does. The boot preflight runs for the web and worker processes, not for this maintenance command. The skip variables still stop the entrypoint's own migration and seed work first:
 
 ```bash
 docker compose run --rm \

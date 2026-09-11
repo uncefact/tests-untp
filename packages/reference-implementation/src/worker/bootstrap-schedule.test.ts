@@ -44,6 +44,9 @@ jest.mock('@/lib/jobs/app-job-queue', () => ({
   createJobQueue: jest.fn(() => fakeQueue),
   resolveQueueConnectionString: jest.fn(() => 'postgresql://u:p@h:5432/db'),
 }));
+// Telemetry construction is covered by the preflight and SDK tests. Keep the
+// NodeSDK's Node-only dependency graph out of this handler-focused jsdom suite.
+jest.mock('../lib/observability/start-sdk', () => ({ buildNodeSdk: jest.fn() }));
 
 import { LIBRARY_RECONCILE_PENDING_RUNS_JOB } from '@/lib/jobs/queue-names';
 import { runWorker } from './bootstrap';

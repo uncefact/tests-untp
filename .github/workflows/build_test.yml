@@ -316,7 +316,13 @@ jobs:
           set -euo pipefail
           docker run --rm --entrypoint node app:e2e --import tsx \
             --input-type=module -e "await import('/app/src/worker/bootstrap.ts'); console.log('worker bootstrap imports cleanly')"
-          out=$(docker run --rm --entrypoint node app:e2e --import tsx src/worker/main.ts 2>&1 || true)
+          # The worker runs the shared configuration preflight before its
+          # database-target check, so give it the placeholder key a local
+          # deployment may use; the check under test is the one after it.
+          out=$(docker run --rm --entrypoint node \
+            -e DATA_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000 \
+            -e DEPLOYMENT_ENVIRONMENT=local \
+            app:e2e --import tsx src/worker/main.ts 2>&1 || true)
           echo "$out" | grep -q 'jobs.database-url-missing' || { echo "::error::worker entrypoint did not reach the database-target check"; echo "$out"; exit 1; }
           echo "$out" | grep -q 'version unresolved' && { echo "::error::worker could not resolve its package version in the image"; echo "$out"; exit 1; }
           docker run --rm --entrypoint sh app:e2e -c 'test -x /app/docker-worker-entrypoint.sh && test -x /app/docker-worker-healthcheck.sh && test -f /app/tsconfig.json && test "$TSX_TSCONFIG_PATH" = /app/tsconfig.json'

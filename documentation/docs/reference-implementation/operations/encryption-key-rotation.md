@@ -33,7 +33,7 @@ docker compose run --rm \
   ri node_modules/.bin/tsx scripts/rotate-encryption-key.ts
 ```
 
-Both keys arrive from `.env` like every other variable. The two `SKIP_` variables stop the image's entrypoint running migrations and the database seed before the command: the seed validates `DATA_ENCRYPTION_KEY` against existing encrypted data, which fails by design while the database is still under the old key. Skipping both keeps the rotation the only thing touching the database.
+Both keys arrive from `.env` like every other variable. The boot preflight runs for the web and worker processes, not for this maintenance command. The two `SKIP_` variables still stop the image's entrypoint running migrations and the database seed before the command: the seed validates `DATA_ENCRYPTION_KEY` against existing encrypted data, which fails by design while the database is still under the old key. Skipping both keeps the rotation the only thing touching the database.
 
 The command needs a database target: a pre-set `RI_DATABASE_URL` is honoured as given, and the `RI_POSTGRES_*` variables are used to construct one only when it is absent (the same rule the application, audit, and backfill follow).
 

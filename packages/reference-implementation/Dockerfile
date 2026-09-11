@@ -188,6 +188,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 # they document which files the seed and the operator scripts need, and
 # copying a superset is harmless.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/lib ./src/lib
+COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/boot ./src/boot
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/worker ./src/worker
 # tsx resolves the @/ alias only through a tsconfig, and looks for one from the
 # process working directory, so the worker gets an image-local tsconfig whose
@@ -211,12 +212,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation
 COPY --from=builder --chown=nextjs:nodejs /app/packages/reference-implementation/src/package.json ./src/package.json
 
 COPY --chown=nextjs:nodejs packages/reference-implementation/docker-entrypoint.sh ./docker-entrypoint.sh
+COPY --chown=nextjs:nodejs packages/reference-implementation/docker-entrypoint-role.sh ./docker-entrypoint-role.sh
 # The worker container replaces the entrypoint with this wrapper and the
 # image's HTTP healthcheck with this check (see the scripts and the compose
 # files); neither is the default.
 COPY --chown=nextjs:nodejs packages/reference-implementation/docker-worker-entrypoint.sh ./docker-worker-entrypoint.sh
 COPY --chown=nextjs:nodejs packages/reference-implementation/docker-worker-healthcheck.sh ./docker-worker-healthcheck.sh
-RUN chmod +x ./docker-entrypoint.sh ./docker-worker-entrypoint.sh ./docker-worker-healthcheck.sh
+RUN chmod +x ./docker-entrypoint.sh ./docker-entrypoint-role.sh ./docker-worker-entrypoint.sh ./docker-worker-healthcheck.sh
 
 USER nextjs
 

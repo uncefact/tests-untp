@@ -3,6 +3,33 @@ set -e
 
 echo "Starting reference-implementation entrypoint..."
 
+# The worker wrapper passes its role as the first argument. The marker is
+# consumed before the command is inspected or exec'd; no marker means web.
+. /app/docker-entrypoint-role.sh
+if ! RI_PROCESS_ROLE="$(derive_process_role "${1-}")"; then
+    exit 1
+fi
+if [ "${1-}" = "--process-role=worker" ]; then
+    shift
+fi
+export RI_PROCESS_ROLE
+
+if is_maintenance_command "$@"; then
+    echo "Boot preflight not applied to maintenance command"
+else
+    # Validate settings before any database connection or schema convergence.
+    # The script exits non-zero on a rejected setting, so set -e leaves the
+    # database untouched and the server is never exec'd. Unlike the sibling
+    # flags, this bypass uses exact true because it skips a guard for an
+    # irreversible migration.
+    if [ "${SKIP_PREFLIGHT:-false}" != "true" ]; then
+        /app/node_modules/.bin/tsx /app/src/boot/preflight.ts
+        echo "Preflight passed"
+    else
+        echo "WARNING: Skipping boot preflight (SKIP_PREFLIGHT=true); a configuration the application would refuse may reach database migrations" >&2
+    fi
+fi
+
 # Construct RI_DATABASE_URL from individual Postgres variables if not already set
 if [ -z "$RI_DATABASE_URL" ] && [ -n "$RI_POSTGRES_HOST" ]; then
     RI_POSTGRES_USER="${RI_POSTGRES_USER:-postgres}"

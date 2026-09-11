@@ -3,6 +3,7 @@ import { NodeSDK } from '@opentelemetry/sdk-node';
 import type { NodeSDKConfiguration } from '@opentelemetry/sdk-node';
 
 import { buildInstrumentations } from './instrumentations';
+import { buildOtlpTraceExporterOptions } from './otlp-trace-exporter-options';
 import { buildResource } from './resource';
 
 export interface StartNodeSdkOptions {
@@ -10,6 +11,35 @@ export interface StartNodeSdkOptions {
   serviceName: string;
   /** Overrides the version `buildResource` would read from the package. */
   serviceVersion?: string;
+}
+
+/**
+ * Build the configuration passed to the OpenTelemetry Node SDK without
+ * starting it. The SDK constructs environment-selected log and metric
+ * exporters while it consumes this configuration.
+ */
+function buildNodeSdkConfiguration(
+  options: StartNodeSdkOptions,
+  overrides: Partial<NodeSDKConfiguration> = {},
+): Partial<NodeSDKConfiguration> {
+  return {
+    resource: buildResource({ serviceName: options.serviceName, serviceVersion: options.serviceVersion }),
+    serviceName: options.serviceName,
+    traceExporter: new OTLPTraceExporter(buildOtlpTraceExporterOptions()),
+    instrumentations: buildInstrumentations(),
+    ...overrides,
+  };
+}
+
+/**
+ * Construct an unstarted SDK from the shared configuration.
+ *
+ * `NodeSDK` constructs its environment-selected log and metric exporters in
+ * its constructor, while provider registration and resource detection wait
+ * for `start()`.
+ */
+export function buildNodeSdk(options: StartNodeSdkOptions, overrides: Partial<NodeSDKConfiguration> = {}): NodeSDK {
+  return new NodeSDK(buildNodeSdkConfiguration(options, overrides));
 }
 
 /**
@@ -26,17 +56,7 @@ export interface StartNodeSdkOptions {
  * `OTEL_SERVICE_NAME` (see `resource.ts`).
  */
 export function startNodeSdk(options: StartNodeSdkOptions, overrides: Partial<NodeSDKConfiguration> = {}): NodeSDK {
-  // `overrides` exist for the emission test, which swaps the exporter and
-  // detectors to read spans in memory while still driving this function.
-  const sdk = new NodeSDK({
-    resource: buildResource({ serviceName: options.serviceName, serviceVersion: options.serviceVersion }),
-    serviceName: options.serviceName,
-    traceExporter: new OTLPTraceExporter({
-      url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://localhost:4317',
-    }),
-    instrumentations: buildInstrumentations(),
-    ...overrides,
-  });
+  const sdk = buildNodeSdk(options, overrides);
   sdk.start();
   return sdk;
 }
