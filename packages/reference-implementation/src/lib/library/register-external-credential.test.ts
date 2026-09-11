@@ -24,11 +24,7 @@ import {
   type RegisterExternalCredentialInput,
 } from './register-external-credential';
 
-jest.mock('@/lib/api/logger', () => {
-  const logger = { info: jest.fn(), warn: jest.fn(), error: jest.fn(), child: jest.fn() };
-  logger.child.mockReturnValue(logger);
-  return { apiLogger: logger };
-});
+jest.mock('@/lib/api/logger');
 
 // The resolver package ships as ESM the unit runtime cannot load; the fetch
 // helper is injected anyway, so only its error classes are needed here.

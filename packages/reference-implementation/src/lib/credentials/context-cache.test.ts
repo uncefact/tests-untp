@@ -1,15 +1,5 @@
-const mockWarn = jest.fn();
-
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    child: () => ({
-      warn: mockWarn,
-      info: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-    }),
-  },
-}));
+jest.mock('@/lib/api/logger');
+const mockWarn = (jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>).warn;
 
 import { readContextCacheTtlMs } from './context-cache';
 

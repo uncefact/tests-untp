@@ -12,7 +12,7 @@ import { prisma } from '../prisma';
 import { linkClaimToRecord } from './idempotency-key.repository';
 import { noChecksRun, type CheckResults, type CheckRunFailure } from './check-run.repository';
 import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
 import type { ProtectedDecryptionKey } from '@/lib/credentials/decryption-key-protection';
@@ -28,7 +28,7 @@ import {
 } from '@/lib/library/library-record-view';
 import { lockLibraryRecordForUpdate } from './library-record.repository';
 
-const logger = apiLogger.child({ module: 'external-credential.repository' });
+const logger = appLogger.child({ module: 'external-credential.repository' });
 
 /**
  * The durable copy a registration stored, all or nothing. `decryptionKey` is

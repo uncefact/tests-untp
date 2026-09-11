@@ -12,7 +12,7 @@ const logger = {
 };
 
 jest.mock('@uncefact/untp-ri-services', () => ({ decodeCredential }));
-jest.mock('@/lib/api/logger', () => ({ apiLogger: logger }));
+jest.mock('@/lib/api/logger');
 jest.mock('@uncefact/untp-utils/validation', () => {
   const actual = jest.requireActual('@uncefact/untp-utils/validation');
   return { ...actual, validateAgainstSchemas, validateJsonLd, describeJsonLdFailure };

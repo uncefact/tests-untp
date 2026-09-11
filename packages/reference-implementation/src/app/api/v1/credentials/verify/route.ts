@@ -1,6 +1,6 @@
 import { TextDecoder } from 'node:util';
 import { NextResponse } from 'next/server';
-import { apiLogger } from '@/lib/api/logger';
+import { apiLogger, appLogger } from '@/lib/api/logger';
 import { ValidationError, parseRequestBody } from '@/lib/api/validation';
 import { verifyCredentialRequestSchema } from '@/lib/api/request-schemas/credential';
 import { withPublicRoute } from '@/lib/api/with-public-route';
@@ -24,6 +24,7 @@ import {
 } from '@/lib/credentials/fetch-credential-document';
 
 const logger = apiLogger.child({ route: '/api/v1/credentials/verify' });
+const decryptionLogger = appLogger.child({ module: 'decrypt-credential' });
 
 const JWT_PREFIX = 'data:application/vc+jwt,';
 
@@ -317,13 +318,16 @@ export const POST = withPublicRoute(async (req) => {
     logger.info('Decrypting credential');
     let decryptedString: string;
     try {
-      decryptedString = decryptCredential({
-        cipherText: fetchedData.cipherText,
-        key: body.decryptionKey,
-        iv: fetchedData.iv,
-        tag: fetchedData.tag,
-        type: fetchedData.type,
-      });
+      decryptedString = decryptCredential(
+        {
+          cipherText: fetchedData.cipherText,
+          key: body.decryptionKey,
+          iv: fetchedData.iv,
+          tag: fetchedData.tag,
+          type: fetchedData.type,
+        },
+        decryptionLogger,
+      );
     } catch (e: unknown) {
       logger.warn({ uri: credentialUri, err: e }, 'Credential decryption failed');
       return NextResponse.json(

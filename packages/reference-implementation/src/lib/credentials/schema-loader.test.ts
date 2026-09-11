@@ -1,19 +1,9 @@
-const mockWarn = jest.fn();
+jest.mock('@/lib/api/logger');
+const mockWarn = (jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>).warn;
 
 jest.mock('@uncefact/untp-utils/loaders', () => ({
   ...jest.requireActual('@uncefact/untp-utils/loaders'),
   createSchemaLoader: jest.fn(() => ({ load: jest.fn() })),
-}));
-
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    child: () => ({
-      warn: mockWarn,
-      info: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-    }),
-  },
 }));
 
 import { logBundledFallback, readSchemaCacheTtlMs } from './schema-loader';

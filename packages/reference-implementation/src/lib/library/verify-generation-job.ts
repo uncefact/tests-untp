@@ -36,7 +36,7 @@ import { revealDecryptionKey } from '@/lib/credentials/decryption-key-protection
 import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import type { EnqueueOptions, JobContext, JobHandler, JobQueue } from '@/lib/jobs/types';
 import { LIBRARY_VERIFY_JOB } from '@/lib/jobs/queue-names';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import { DECRYPTION_REQUIRED_MESSAGE } from './reverify-messages';
 import {
@@ -65,7 +65,8 @@ export const VERIFY_JOB_ENQUEUE_OPTIONS = {
   retry: { limit: 4, backoffSeconds: 30, backoffMaxSeconds: 600 },
 } satisfies EnqueueOptions;
 
-const logger = apiLogger.child({ module: 'verify-generation-job' });
+const logger = appLogger.child({ module: 'verify-generation-job' });
+const decryptionLogger = appLogger.child({ module: 'decrypt-credential' });
 
 /**
  * Typed against the reference the register side enqueues, so a field added
@@ -79,8 +80,9 @@ const logger = apiLogger.child({ module: 'verify-generation-job' });
  * business outcome (the same verifier instance, the same checks, the same
  * settlement). Observability-only fields qualify. Anything with business
  * effect, whatever its default, is a new queue name, worked only by workers
- * that know it. `VerifyJobReference` is the whole payload; the type-level
- * guard is `src/worker/payload-contract.test.ts`.
+ * that know it. `VerifyJobReference` is the handler's core payload. The queue
+ * may add the optional shared `JobData` envelope, which the schema strips
+ * before parsing; the type-level guard is `src/worker/payload-contract.test.ts`.
  */
 const verifyJobReferenceSchema: z.ZodType<VerifyJobReference, z.ZodTypeDef, unknown> = z
   .object({
@@ -769,13 +771,16 @@ async function readStoredCopy(
       // Bytes, not the string form: the storage service digested the
       // plaintext it was handed, and a copy whose plaintext is not valid
       // UTF-8 does not survive a decode and re-encode.
-      plaintextBytes = decryptCredentialToBytes({
-        cipherText: parsed.cipherText,
-        key,
-        iv: parsed.iv,
-        tag: parsed.tag,
-        type: parsed.type,
-      });
+      plaintextBytes = decryptCredentialToBytes(
+        {
+          cipherText: parsed.cipherText,
+          key,
+          iv: parsed.iv,
+          tag: parsed.tag,
+          type: parsed.type,
+        },
+        decryptionLogger,
+      );
     } catch (error) {
       throw unreadable('the held key does not open it', error);
     }

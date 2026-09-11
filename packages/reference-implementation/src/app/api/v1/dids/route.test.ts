@@ -31,10 +31,8 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
 // hoisted mock rather than created fresh per child() call: the root-DID guard's
 // disabled-by-bad-config path has no response-visible effect, and this warning
 // is the only place that behaviour surfaces.
-const mockLoggerWarn = jest.fn();
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: mockLoggerWarn, error: jest.fn() }) },
-}));
+jest.mock('@/lib/api/logger');
+const mockLoggerWarn = (jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>).warn;
 
 const mockResolveDidService = jest.fn();
 const mockCreateDid = jest.fn();

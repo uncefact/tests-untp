@@ -1,26 +1,7 @@
-// The module builds its logger at import time, so the mock hands back one
 import { decodeJwt } from 'jose';
-// shared object whose `child` returns itself; every call any code path makes
-// lands in the same mock functions the assertions read.
-const loggerCalls = {
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  /** The bindings each `child` call was given, so a test can see what the handler puts on its log lines. */
-  child: jest.fn(),
-};
-jest.mock('@/lib/api/logger', () => {
-  const logger: Record<string, unknown> = {
-    info: (...args: unknown[]) => loggerCalls.info(...args),
-    warn: (...args: unknown[]) => loggerCalls.warn(...args),
-    error: (...args: unknown[]) => loggerCalls.error(...args),
-  };
-  logger.child = (bindings: unknown) => {
-    loggerCalls.child(bindings);
-    return logger;
-  };
-  return { apiLogger: logger };
-});
+// The manual mock exposes one shared logger so child calls reach these spies.
+jest.mock('@/lib/api/logger');
+const loggerCalls = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
 
 // The real resolver pulls the services server barrel, whose DID stack cannot
 // resolve under jest. The handler never uses the default dependencies.

@@ -4,9 +4,9 @@ import { prisma } from '../prisma';
 import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
 import { readStaleClaimMs } from '@/lib/config/idempotency-claim.config';
 import { getEncryptionService } from '@/lib/encryption/encryption';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 
-const logger = apiLogger.child({ module: 'idempotency-key.repository' });
+const logger = appLogger.child({ module: 'idempotency-key.repository' });
 
 /**
  * Thrown when a claim can no longer be associated with what it produced,

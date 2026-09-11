@@ -28,16 +28,8 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   };
 });
 
-const loggerCalls = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-jest.mock('@/lib/api/logger', () => {
-  const logger: Record<string, unknown> = {
-    info: (...args: unknown[]) => loggerCalls.info(...args),
-    warn: (...args: unknown[]) => loggerCalls.warn(...args),
-    error: (...args: unknown[]) => loggerCalls.error(...args),
-  };
-  logger.child = () => logger;
-  return { apiLogger: logger };
-});
+jest.mock('@/lib/api/logger');
+const loggerCalls = jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>;
 
 // The verify job module, which the route imports for the job name and its
 // enqueue options, reaches the services server barrel through the VC

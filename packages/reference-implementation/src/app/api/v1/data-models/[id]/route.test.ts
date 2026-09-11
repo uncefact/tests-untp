@@ -21,19 +21,7 @@ jest.mock('next/server', () => {
 });
 
 // Mock logger to prevent real logging during tests
-const mockLogger = {
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  child: jest.fn().mockReturnThis(),
-};
-
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    child: jest.fn().mockReturnValue(mockLogger),
-  },
-}));
+jest.mock('@/lib/api/logger');
 
 // Mock withTenantAuth — skips auth but preserves error handling via handleRouteError
 jest.mock('@/lib/api/with-tenant-auth', () => {

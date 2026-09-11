@@ -1,3 +1,5 @@
+/** @jest-environment node */
+
 // Polyfill crypto.randomUUID for the test environment
 if (!globalThis.crypto?.randomUUID) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -31,18 +33,9 @@ jest.mock('@uncefact/untp-ri-services/logging', () => ({
   createLogger: () => mockLogger(),
 }));
 
-const mockApiLoggerInfo = jest.fn();
-const mockApiLoggerWarn = jest.fn();
-const mockApiLoggerError = jest.fn();
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    info: (...args: unknown[]) => mockApiLoggerInfo(...args),
-    warn: (...args: unknown[]) => mockApiLoggerWarn(...args),
-    error: (...args: unknown[]) => mockApiLoggerError(...args),
-    debug: jest.fn(),
-    child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
-  },
-}));
+jest.mock('@/lib/api/logger');
+const mockApiLogger = jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>;
+const mockApiLoggerWarn = mockApiLogger.warn;
 
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -116,6 +109,8 @@ jest.mock('@/lib/auth/group-claim', () => ({
 import { NotFoundError, ServiceRegistryError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { ServiceError } from '@uncefact/untp-ri-services';
+import { context, trace } from '@opentelemetry/api';
+import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
 import { withTenantAuth, handleRouteError } from './with-tenant-auth';
 
 interface MockResponse {
@@ -124,6 +119,7 @@ interface MockResponse {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  traceExporter.reset();
   mockTenantMode = 'open';
   // Restore the default implementation after clearing — resetAllMocks would
   // remove the implementation, causing runWithRequestContext to return undefined
@@ -143,6 +139,22 @@ function fakeRequest(method = 'GET', headers: Record<string, string> = {}): Requ
 }
 
 const emptyRouteContext = { params: Promise.resolve({}) };
+
+const traceExporter = new tracing.InMemorySpanExporter();
+const traceSdk = new NodeSDK({
+  autoDetectResources: false,
+  instrumentations: [],
+  traceExporter,
+  spanProcessors: [new tracing.SimpleSpanProcessor(traceExporter)],
+});
+
+beforeAll(() => {
+  traceSdk.start();
+});
+
+afterAll(async () => {
+  await traceSdk.shutdown();
+});
 
 // ========================================================
 // Open mode tests (existing — regression)
@@ -594,6 +606,58 @@ describe('withTenantAuth — closed mode, bearer path', () => {
 // ========================================================
 
 describe('withTenantAuth — request context propagation', () => {
+  it('sets the request correlation id on the active route-handler span', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    const span = trace.getTracer('with-tenant-auth-tests').startSpan('route-handler');
+
+    try {
+      await context.with(trace.setSpan(context.active(), span), () =>
+        wrapped(fakeRequest('POST', { 'x-correlation-id': 'c1' }), emptyRouteContext),
+      );
+    } finally {
+      span.end();
+    }
+
+    const finishedSpan = traceExporter.getFinishedSpans().find((candidate) => candidate.name === 'route-handler');
+    expect(finishedSpan).toBeDefined();
+    expect(finishedSpan?.attributes['correlation.id']).toBe('c1');
+  });
+
+  it('sets correlation.id on the active child span without changing its parent', async () => {
+    mockGetSessionUserId.mockResolvedValue('user-1');
+    mockGetTenantId.mockResolvedValue('org-1');
+
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withTenantAuth(handler);
+    const tracer = trace.getTracer('with-tenant-auth-tests');
+    const parent = tracer.startSpan('request-parent');
+    const child = tracer.startSpan('route-handler', {}, trace.setSpan(context.active(), parent));
+
+    try {
+      await context.with(trace.setSpan(context.active(), parent), () =>
+        context.with(trace.setSpan(context.active(), child), () =>
+          wrapped(fakeRequest('POST', { 'x-correlation-id': 'child-correlation' }), emptyRouteContext),
+        ),
+      );
+    } finally {
+      child.end();
+      parent.end();
+    }
+
+    const spans = traceExporter.getFinishedSpans();
+    const finishedChild = spans.find((candidate) => candidate.spanContext().spanId === child.spanContext().spanId);
+    const finishedParent = spans.find((candidate) => candidate.spanContext().spanId === parent.spanContext().spanId);
+
+    expect(finishedChild).toBeDefined();
+    expect(finishedParent).toBeDefined();
+    expect(finishedChild?.attributes['correlation.id']).toBe('child-correlation');
+    expect(finishedParent?.attributes).not.toHaveProperty('correlation.id');
+  });
+
   it('establishes request context with correlationId from x-correlation-id header', async () => {
     mockGetSessionUserId.mockResolvedValue('user-1');
     mockGetTenantId.mockResolvedValue('org-1');

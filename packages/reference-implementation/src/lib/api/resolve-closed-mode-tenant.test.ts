@@ -3,9 +3,11 @@ const mockLogger = {
   warn: jest.fn(),
   error: jest.fn(),
   debug: jest.fn(),
+  child: jest.fn(),
 };
+mockLogger.child.mockReturnValue(mockLogger);
 jest.mock('@uncefact/untp-ri-services/logging', () => ({
-  createLogger: () => ({ child: () => mockLogger }),
+  createLogger: () => mockLogger,
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

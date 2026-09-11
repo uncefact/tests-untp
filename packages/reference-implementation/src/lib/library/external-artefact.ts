@@ -13,10 +13,11 @@ import { extractCredentialDetails } from '@/lib/credentials/extract-credential-d
 import { versionsMatchingContext } from '@/lib/credentials/bridge-version';
 import { bridgeNameOf, coreCredentialTypeFromTypes } from './core-credential-type';
 import type { ExternalDetailsCapture } from '@/lib/prisma/repositories/external-credential.repository';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 
-const logger = apiLogger.child({ module: 'external-artefact' });
+const logger = appLogger.child({ module: 'external-artefact' });
+const decryptionLogger = appLogger.child({ module: 'decrypt-credential' });
 
 /**
  * What a fetched body turned out to be once read, and if needed opened, with
@@ -92,13 +93,16 @@ export function readExternalArtefact(bytes: Uint8Array, decryptionKey: string | 
     let plaintext: Uint8Array;
     try {
       plaintext = Uint8Array.from(
-        decryptCredentialToBytes({
-          cipherText: parsed.cipherText,
-          key: decryptionKey,
-          iv: parsed.iv,
-          tag: parsed.tag,
-          type: parsed.type,
-        }),
+        decryptCredentialToBytes(
+          {
+            cipherText: parsed.cipherText,
+            key: decryptionKey,
+            iv: parsed.iv,
+            tag: parsed.tag,
+            type: parsed.type,
+          },
+          decryptionLogger,
+        ),
       );
     } catch (error) {
       // The failure's name and message are recorded, reduced by `safeError`,

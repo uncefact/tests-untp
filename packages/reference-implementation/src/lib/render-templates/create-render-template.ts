@@ -7,9 +7,9 @@ import type { RenderTemplateWithRelations } from '@/lib/prisma/repositories/rend
 import { validateRenderMethodFields } from './validate-render-method-fields';
 import type { RenderMethodFields } from './validate-render-method-fields';
 import { sanitiseTemplate } from './sanitise-template';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 
-const logger = apiLogger.child({ module: 'create-render-template' });
+const logger = appLogger.child({ module: 'create-render-template' });
 
 export type CreateRenderTemplateInput = {
   tenantId: string;

@@ -71,9 +71,7 @@ jest.mock('jose', () => ({
   decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
 }));
 
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
-}));
+jest.mock('@/lib/api/logger');
 
 import { ServiceResolutionError } from '@/lib/api/errors';
 import { SYSTEM_TENANT_ID } from '@/lib/prisma/constants';

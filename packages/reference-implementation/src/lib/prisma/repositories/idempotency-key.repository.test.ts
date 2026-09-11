@@ -1,10 +1,8 @@
 process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
 delete process.env.SERVICE_ENCRYPTION_KEY;
 
-const mockError = jest.fn();
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: mockError }) },
-}));
+jest.mock('@/lib/api/logger');
+const mockError = (jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>).error;
 
 import {
   claimIdempotencyKey,

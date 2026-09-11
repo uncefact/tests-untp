@@ -1,7 +1,5 @@
-const mockWarn = jest.fn();
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: mockWarn, error: jest.fn() }) },
-}));
+jest.mock('@/lib/api/logger');
+const mockWarn = (jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>).warn;
 
 import { sanitiseTemplate } from './sanitise-template';
 

@@ -1,8 +1,8 @@
 import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/encryption';
-import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { appLogger } from '@/lib/api/logger';
 import { resolveDataEncryptionKey, warnIfDeprecatedEncryptionKeyName } from './resolve-data-encryption-key';
 
-const logger = createLogger().child({ module: 'encryption' });
+const logger = appLogger.child({ module: 'encryption' });
 
 let cached: AesGcmEncryptionAdapter | null = null;
 

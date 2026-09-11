@@ -1,9 +1,9 @@
 import { Prisma } from '@/lib/prisma/generated';
 import { prisma } from '@/lib/prisma/prisma';
-import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { appLogger } from '@/lib/api/logger';
 import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
 
-const logger = createLogger().child({ module: 'resolve-closed-mode-tenant' });
+const logger = appLogger.child({ module: 'resolve-closed-mode-tenant' });
 
 export interface ResolvedClosedModeTenant {
   userId: string;

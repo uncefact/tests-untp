@@ -1,4 +1,5 @@
 import type { VerifyJobReference } from '@/lib/prisma/repositories/external-credential.repository';
+import type { JobPayload } from '@/lib/jobs/types';
 
 /**
  * The guard the payload rule needs (see the schema in verify-generation-job.ts).
@@ -37,11 +38,17 @@ const observabilityFieldsAreOptional: Exact<
   Omit<VerifyJobReference, CoreKey>,
   Partial<Omit<VerifyJobReference, CoreKey>>
 > = true;
+type SharedJobEnvelope = JobPayload<Record<never, never>>;
+const sharedCorrelationIdIsOptional: Exact<SharedJobEnvelope, { correlationId?: string }> = true;
 
 describe('the verify job payload contract', () => {
   it('is exactly the four identifiers plus the declared observability fields', () => {
-    expect(payloadIsExactlyTheReference && noExtraKeys && coreFieldsAreRequired && observabilityFieldsAreOptional).toBe(
-      true,
-    );
+    expect(
+      payloadIsExactlyTheReference &&
+        noExtraKeys &&
+        coreFieldsAreRequired &&
+        observabilityFieldsAreOptional &&
+        sharedCorrelationIdIsOptional,
+    ).toBe(true);
   });
 });

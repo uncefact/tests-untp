@@ -4,9 +4,9 @@ import type { Adapter, AdapterUser } from 'next-auth/adapters';
 // file was the only one importing from it; every sibling, `prisma.ts`
 // included, imports from the generated location.
 import type { PrismaClient } from '@/lib/prisma/generated';
-import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { appLogger } from '@/lib/api/logger';
 
-const logger = createLogger().child({ module: 'adapter-wrapper' });
+const logger = appLogger.child({ module: 'adapter-wrapper' });
 
 /**
  * Wraps a NextAuth adapter to check for pre-provisioned users before creating new ones.

@@ -32,19 +32,7 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   };
 });
 
-// Suppress logger output in tests
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    child: () => ({
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    }),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  },
-}));
+jest.mock('@/lib/api/logger');
 
 // Mock the new lib modules
 const mockResolveDataModel = jest.fn();

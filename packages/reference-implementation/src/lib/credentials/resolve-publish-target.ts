@@ -1,8 +1,8 @@
 import type { ExtractedRefs } from '@uncefact/untp-ri-services';
 import { findIdentifiersByValue } from '@/lib/prisma/repositories';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 
-const logger = apiLogger.child({ module: 'resolve-publish-target' });
+const logger = appLogger.child({ module: 'resolve-publish-target' });
 
 /**
  * Everything the IDR publish call needs, read from the identifier rather than

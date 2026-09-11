@@ -1,9 +1,5 @@
-const loggerCalls = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    child: () => loggerCalls,
-  },
-}));
+jest.mock('@/lib/api/logger');
+const loggerCalls = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
 
 const mockDeleteLibraryRecord = jest.fn();
 // Only the delete function is replaced; the repository's other runtime

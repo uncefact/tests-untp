@@ -24,11 +24,7 @@ jest.mock('./schema-readiness', () => ({
 jest.mock('@/lib/encryption/encryption-key-boot', () => ({
   validateConfiguredEncryptionKey: jest.fn(async () => undefined),
 }));
-jest.mock('@/lib/api/logger', () => {
-  const logger: Record<string, unknown> = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-  logger.child = () => logger;
-  return { apiLogger: logger };
-});
+jest.mock('@/lib/api/logger');
 jest.mock('@/lib/library/verify-generation-job', () => ({ registerLibraryJobs: jest.fn() }));
 jest.mock('@/lib/library/reconcile-pending-runs-job', () => ({
   registerPendingRunReconciliation: jest.fn(),

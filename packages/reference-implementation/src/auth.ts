@@ -3,10 +3,10 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/lib/prisma/prisma';
 import { authConfig } from '@/lib/auth/auth.config';
 import { handleSignIn } from '@/lib/onboarding';
-import { createLogger } from '@uncefact/untp-ri-services';
 import { withPreProvisionedUserLookup } from '@/lib/auth/adapter-wrapper';
+import { appLogger } from '@/lib/api/logger';
 
-const logger = createLogger().child({ module: 'auth' });
+const logger = appLogger.child({ module: 'auth' });
 
 /**
  * Full auth instance with PrismaAdapter for API routes and server components.

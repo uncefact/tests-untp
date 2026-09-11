@@ -44,7 +44,16 @@ export interface JobContext {
   signal: AbortSignal;
 }
 
-export type JobHandler<P> = (payload: P, context: JobContext) => Promise<void>;
+/** Optional fields carried by every queue payload outside its job-specific data. */
+export interface JobData {
+  /** Correlation id of the request that enqueued the job, when there was one. */
+  correlationId?: string;
+}
+
+/** The persisted payload shape after enqueue or sendWithTx adds its shared envelope. */
+export type JobPayload<P extends object> = P & JobData;
+
+export type JobHandler<P extends object> = (payload: JobPayload<P>, context: JobContext) => Promise<void>;
 
 export interface EnqueueOptions {
   /**

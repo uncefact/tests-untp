@@ -1,3 +1,25 @@
+/** @jest-environment node */
+
+const mockWorkerTracer = { startActiveSpan: jest.fn() };
+
+jest.mock('@opentelemetry/api', () => {
+  const actual = jest.requireActual<typeof import('@opentelemetry/api')>('@opentelemetry/api');
+  const traceApi = actual.trace;
+  const realGetTracer = traceApi.getTracer.bind(traceApi);
+  const realWorkerTracer = realGetTracer('reference-implementation.jobs');
+  mockWorkerTracer.startActiveSpan.mockImplementation((...args: unknown[]) =>
+    realWorkerTracer.startActiveSpan(...(args as Parameters<typeof realWorkerTracer.startActiveSpan>)),
+  );
+  Object.defineProperty(traceApi, 'getTracer', {
+    configurable: true,
+    value: (name: string) => (name === 'reference-implementation.jobs' ? mockWorkerTracer : realGetTracer(name)),
+  });
+  return {
+    ...actual,
+    trace: traceApi,
+  };
+});
+
 // The factory runs when pg-boss is first required (hoisted above the
 // imports below), so the mock state lives inside it and is reached back
 // through jest.requireMock.
@@ -32,6 +54,11 @@ jest.mock('pg-boss', () => {
 import { JobQueueError } from './errors';
 import { MAX_JOB_EXPIRE_SECONDS } from './job-expiry';
 import { PgBossJobQueue } from './pg-boss-job-queue';
+import { SpanStatusCode, context, trace, type Span } from '@opentelemetry/api';
+import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
+import { createLogger, getRequestContext, runWithRequestContext } from '@uncefact/untp-ri-services/logging';
+import { apiLogger } from '@/lib/api/logger';
+import { getActiveTraceContext } from '@/lib/observability/trace-context';
 
 const { __bossMock: bossMock, __mockState: mockState } = jest.requireMock('pg-boss') as {
   __bossMock: Record<string, jest.Mock>;
@@ -66,9 +93,29 @@ const job = (overrides: object = {}) => ({
   ...overrides,
 });
 
+const traceExporter = new tracing.InMemorySpanExporter();
+const traceSdk = new NodeSDK({
+  autoDetectResources: false,
+  instrumentations: [],
+  traceExporter,
+  spanProcessors: [new tracing.SimpleSpanProcessor(traceExporter)],
+});
+const apiLoggerWarn = jest.spyOn(apiLogger, 'warn').mockImplementation(() => undefined);
+
+beforeAll(() => {
+  traceSdk.start();
+});
+
+afterAll(async () => {
+  await traceSdk.shutdown();
+});
+
 beforeEach(() => {
   for (const fn of Object.values(bossMock)) fn.mockClear();
+  mockWorkerTracer.startActiveSpan.mockClear();
+  apiLoggerWarn.mockClear();
   storedQueues.clear();
+  traceExporter.reset();
   bossMock.createQueue.mockImplementation(async (...args: unknown[]) => {
     const [name, options] = args as [string, { policy: string }];
     if (!storedQueues.has(name)) storedQueues.set(name, options.policy);
@@ -190,6 +237,24 @@ describe('constructor', () => {
 });
 
 describe('enqueue option mapping', () => {
+  it('adds the current request correlation id to the persisted job data', async () => {
+    const queue = makeQueue();
+
+    await runWithRequestContext('request-correlation', () => queue.enqueue('issue', { recordId: 'r1' }));
+
+    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1', correlationId: 'request-correlation' }, {});
+  });
+
+  it('leaves job data without a correlation id outside a request context', async () => {
+    const queue = makeQueue();
+
+    await queue.enqueue('issue', { recordId: 'r1' });
+
+    const payload = bossMock.send.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload).toEqual({ recordId: 'r1' });
+    expect(payload).not.toHaveProperty('correlationId');
+  });
+
   it('maps every EnqueueOption to its pg-boss send option', async () => {
     const queue = makeQueue();
     const startAfter = new Date('2026-01-01T00:00:00Z');
@@ -304,6 +369,41 @@ describe('transactional enqueue', () => {
     const tx = { executeSql: jest.fn(async () => ({ rows: [] })) };
     await queue.enqueueWithin(tx, 'issue', { recordId: 'r1' });
     expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1' }, { db: tx });
+  });
+
+  it('adds the current request correlation id to transactional job data', async () => {
+    const queue = makeQueue();
+    const tx = { executeSql: jest.fn(async () => ({ rows: [] })) };
+
+    await runWithRequestContext('request-correlation', () => queue.enqueueWithin(tx, 'issue', { recordId: 'r1' }));
+
+    expect(bossMock.send).toHaveBeenCalledWith(
+      'issue',
+      { recordId: 'r1', correlationId: 'request-correlation' },
+      { db: tx },
+    );
+  });
+
+  it('preserves a caller-supplied correlation id in job data', async () => {
+    // Fails if the request context overwrites an id already present in the payload.
+    const queue = makeQueue();
+
+    await runWithRequestContext('request-correlation', () =>
+      queue.enqueue('issue', { recordId: 'r1', correlationId: 'caller-correlation' }),
+    );
+
+    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1', correlationId: 'caller-correlation' }, {});
+  });
+
+  it('uses the request correlation id when job data explicitly has undefined', async () => {
+    // Fails if an undefined payload field is treated as a caller-supplied id.
+    const queue = makeQueue();
+
+    await runWithRequestContext('request-correlation', () =>
+      queue.enqueue('issue', { recordId: 'r1', correlationId: undefined }),
+    );
+
+    expect(bossMock.send).toHaveBeenCalledWith('issue', { recordId: 'r1', correlationId: 'request-correlation' }, {});
   });
 });
 
@@ -764,6 +864,29 @@ describe('handler context and settlement', () => {
     await expect(callback([job({ id: 'job-9' })])).resolves.toEqual([{ id: 'job-9', status: 'completed' }]);
   });
 
+  it('keeps a completed job completed when ending its span throws', async () => {
+    const onError = jest.fn();
+    mockWorkerTracer.startActiveSpan.mockImplementationOnce(
+      async (name: string, callback: (span: Span) => Promise<unknown>) => {
+        const tracer = trace.getTracer('pg-boss-job-queue-span-end-tests');
+        return tracer.startActiveSpan(name, async (span) => {
+          span.end = () => {
+            throw new Error('span end failed');
+          };
+          return callback(span);
+        });
+      },
+    );
+    const callback = await startWithHandler(async () => undefined, { onError });
+
+    await expect(callback([job({ id: 'job-span-end-failure' })])).resolves.toEqual([
+      { id: 'job-span-end-failure', status: 'completed' },
+    ]);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('Failed to end job span') }),
+    );
+  });
+
   it('settles a throwing job as failed and persists none of the exception text', async () => {
     const onError = jest.fn();
     const callback = await startWithHandler(
@@ -819,6 +942,115 @@ describe('handler context and settlement', () => {
     });
     await callback([job({ data: { tenantId: 't1', recordId: 'r7' } })]);
     expect(payloads).toEqual([{ tenantId: 't1', recordId: 'r7' }]);
+  });
+
+  it('carries an enqueuing request correlation id into the worker handler and span', async () => {
+    let observedContext: Record<string, unknown> | undefined;
+    const queue = makeQueue();
+    queue.register('issue', async () => {
+      observedContext = getRequestContext();
+    });
+    await queue.start();
+
+    const requestSpan = trace.getTracer('pg-boss-job-queue-tests').startSpan('request');
+
+    try {
+      await context.with(trace.setSpan(context.active(), requestSpan), () =>
+        runWithRequestContext('request-correlation', () => queue.enqueue('issue', { recordId: 'r1' })),
+      );
+    } finally {
+      requestSpan.end();
+    }
+
+    const persistedPayload = bossMock.send.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    const callback = capturedWorkCallback();
+    await callback([job({ data: persistedPayload })]);
+
+    expect(observedContext).toEqual({ correlationId: 'request-correlation' });
+    const finishedSpan = traceExporter.getFinishedSpans().find((candidate) => candidate.name === 'issue');
+    expect(finishedSpan).toMatchObject({
+      name: 'issue',
+      attributes: { 'correlation.id': 'request-correlation', 'job.id': 'job-1' },
+    });
+    expect(finishedSpan?.instrumentationScope.name).toBe('reference-implementation.jobs');
+    expect(finishedSpan?.spanContext().traceId).not.toBe(requestSpan.spanContext().traceId);
+  });
+
+  it('logs a failed job with its correlation id and records the handler error on the job span', async () => {
+    // Fails if the failure reporter runs outside the job context, the handler
+    // span is omitted, or the span does not record and mark the exception.
+    const capturedLogLines: string[] = [];
+    const logger = createLogger({
+      level: 'info',
+      destination: { write: (line: string) => capturedLogLines.push(line) },
+      traceContextProvider: getActiveTraceContext,
+    });
+    const callback = await startWithHandler(
+      async () => {
+        throw new Error('handler failed');
+      },
+      { onError: (error: Error) => logger.error({ error }, 'Job failed') },
+    );
+
+    await expect(
+      callback([job({ id: 'job-failure', data: { correlationId: 'failure-correlation' } })]),
+    ).resolves.toEqual([{ id: 'job-failure', status: 'failed' }]);
+
+    const [finishedSpan] = traceExporter.getFinishedSpans();
+    expect(finishedSpan).toBeDefined();
+    const [entry] = capturedLogLines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(entry).toMatchObject({
+      correlationId: 'failure-correlation',
+      traceId: finishedSpan!.spanContext().traceId,
+      spanId: finishedSpan!.spanContext().spanId,
+      msg: 'Job failed',
+    });
+    expect(finishedSpan).toMatchObject({
+      name: 'issue',
+      attributes: { 'correlation.id': 'failure-correlation', 'job.id': 'job-failure' },
+      status: { code: SpanStatusCode.ERROR },
+    });
+    expect(finishedSpan?.events).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'exception' })]));
+  });
+
+  it('mints a fresh correlation id for each job without request correlation data', async () => {
+    const observedIds: string[] = [];
+    const queue = makeQueue();
+    queue.register('issue', async () => {
+      const correlationId = getRequestContext()?.correlationId;
+      if (typeof correlationId !== 'string') throw new Error('worker correlation id was not established');
+      observedIds.push(correlationId);
+    });
+    await queue.start();
+    const callback = capturedWorkCallback();
+
+    await callback([job({ id: 'job-without-correlation-1', data: {} })]);
+    await callback([job({ id: 'job-without-correlation-2', data: {} })]);
+
+    expect(observedIds).toHaveLength(2);
+    expect(observedIds[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(observedIds[1]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(observedIds[0]).not.toBe(observedIds[1]);
+  });
+
+  it('replaces an invalid persisted correlation id and warns once with the reason', async () => {
+    const observedIds: string[] = [];
+    const callback = await startWithHandler(async () => {
+      const correlationId = getRequestContext()?.correlationId;
+      if (typeof correlationId !== 'string') throw new Error('worker correlation id was not established');
+      observedIds.push(correlationId);
+    });
+
+    await callback([job({ id: 'job-invalid-correlation', data: { correlationId: 'bad id; DROP TABLE' } })]);
+
+    expect(observedIds).toHaveLength(1);
+    expect(observedIds[0]).not.toBe('bad id; DROP TABLE');
+    expect(observedIds[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(apiLoggerWarn).toHaveBeenCalledTimes(1);
+    expect(apiLoggerWarn).toHaveBeenCalledWith(
+      { jobId: 'job-invalid-correlation', reason: 'persisted correlationId failed validation' },
+      'Invalid persisted job correlation id; minted a replacement',
+    );
   });
 });
 

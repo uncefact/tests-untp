@@ -1,4 +1,4 @@
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { LibraryRecordOrigin } from '@/lib/prisma/generated';
 import {
   deleteLibraryRecord,
@@ -11,7 +11,7 @@ import {
   type RemoveStoredObjectOutcome,
 } from '@/lib/library/remove-stored-object';
 
-const logger = apiLogger.child({ module: 'delete-library-record' });
+const logger = appLogger.child({ module: 'delete-library-record' });
 
 /**
  * What became of the durable copy once the row was committed as deleted.

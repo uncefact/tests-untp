@@ -1,9 +1,9 @@
 import { Prisma } from '@/lib/prisma/generated';
 import { prisma } from '@/lib/prisma/prisma';
-import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { appLogger } from '@/lib/api/logger';
 import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
 
-const logger = createLogger().child({ module: 'service-account-user' });
+const logger = appLogger.child({ module: 'service-account-user' });
 
 export interface ServiceAccountClaims {
   sub: string;

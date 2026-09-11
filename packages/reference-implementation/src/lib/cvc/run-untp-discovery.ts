@@ -1,11 +1,11 @@
 import { parseConformityCatalogue } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
-import { apiLogger } from '../api/logger';
+import { appLogger } from '../api/logger';
 import { ConformityFetchStatus, ConformitySchemeSource } from '../prisma/generated';
 import { prisma } from '../prisma/prisma';
 import { ingestConformityScheme } from './ingest-conformity-scheme';
 
-const logger = apiLogger.child({ module: 'cvc-discovery' });
+const logger = appLogger.child({ module: 'cvc-discovery' });
 
 /**
  * Minimal structural shape `runUntpDiscovery` needs from a fetch response.

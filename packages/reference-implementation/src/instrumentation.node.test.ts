@@ -12,7 +12,6 @@ const mockValidateCacheMaxEntriesOnBoot = jest.fn();
 const mockValidateBundledArtefactsFallbackOnBoot = jest.fn();
 const mockValidateStaleClaimOnBoot = jest.fn();
 const mockValidateMaxRequestBodyBytesOnBoot = jest.fn();
-const mockApiLoggerWarn = jest.fn();
 
 jest.mock('@/lib/config/app-url.config', () => ({
   resolveAppUrl: (...args: unknown[]) => mockResolveAppUrl(...args),
@@ -53,12 +52,8 @@ jest.mock('@/lib/jobs/app-job-queue', () => ({
   stopJobQueue: jest.fn(async () => undefined),
 }));
 jest.mock('@/lib/cvc/seeded-refresh-interval', () => ({ startSeededSchemeRefreshInterval: jest.fn() }));
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    warn: (...args: unknown[]) => mockApiLoggerWarn(...args),
-    child: () => ({ warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() }),
-  },
-}));
+jest.mock('@/lib/api/logger');
+const mockApiLoggerWarn = (jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>).warn;
 jest.mock('@/lib/observability/instrumentations', () => ({ buildInstrumentations: () => [] }));
 jest.mock('@/lib/observability/resource', () => ({
   buildResource: () => ({}),

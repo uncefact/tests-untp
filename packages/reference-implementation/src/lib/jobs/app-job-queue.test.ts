@@ -14,12 +14,10 @@ let nextStart: () => Promise<void> = async () => {};
 /** Applied by the next construction's declareQueue, so a test can make one declaration fail. */
 let nextDeclareQueue: (name: string) => Promise<void> = async () => {};
 
-const logError = jest.fn();
-const logInfo = jest.fn();
-
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: logInfo, warn: jest.fn(), error: logError }) },
-}));
+jest.mock('@/lib/api/logger');
+const mockAppLogger = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
+const logError = mockAppLogger.error;
+const logInfo = mockAppLogger.info;
 
 jest.mock('./pg-boss-job-queue', () => ({
   PgBossJobQueue: class {

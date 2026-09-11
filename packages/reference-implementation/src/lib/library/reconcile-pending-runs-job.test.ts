@@ -1,15 +1,6 @@
 jest.mock('pg-boss', () => ({ PgBoss: class PgBoss {} }));
 
-jest.mock('@/lib/api/logger', () => {
-  const logger: Record<string, unknown> = {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    child: jest.fn(),
-  };
-  logger.child = jest.fn(() => logger);
-  return { apiLogger: logger };
-});
+jest.mock('@/lib/api/logger');
 jest.mock('@/lib/services/resolve-vc-service', () => ({ resolveVcService: jest.fn() }));
 const mockFindAbandonedPendingCheckRuns = jest.fn();
 jest.mock('@/lib/prisma/repositories/check-run.repository', () => ({

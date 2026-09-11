@@ -25,6 +25,7 @@ const loggerCalls: Record<string, unknown> = { info: jest.fn(), warn: jest.fn(),
 /** The same calls rendered by the real pino logger, for assertions about what a line CARRIES. */
 const renderedLogLines: string[] = [];
 loggerCalls.child = () => loggerCalls;
+// Keep a tee logger because this suite asserts on rendered and spy output.
 jest.mock('@/lib/api/logger', () => {
   const { createLogger } = jest.requireActual('@uncefact/untp-ri-services/logging');
   const rendering = createLogger({
@@ -39,7 +40,7 @@ jest.mock('@/lib/api/logger', () => {
     };
   const logger: Record<string, unknown> = { info: tee('info'), warn: tee('warn'), error: tee('error') };
   logger.child = () => logger;
-  return { apiLogger: logger };
+  return { appLogger: logger, apiLogger: logger };
 });
 
 jest.mock('@/lib/jobs/prisma-sql-executor', () => ({

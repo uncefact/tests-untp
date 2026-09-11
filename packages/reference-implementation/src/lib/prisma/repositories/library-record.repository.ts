@@ -20,7 +20,7 @@ import { BLOCKING_CHECKS, isNativeMasked, type LibraryCheckName } from '@/lib/li
 import type { LibraryOrigin, VerificationSummary } from '@/lib/library/credential-record-projection';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { withDeadlockRetry } from './check-run.repository';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { promoteExternalCredentialDigest } from './external-credential.repository';
 import { LibraryRecordSelectionError } from '@/lib/library/library-read-errors';
 import { StructuredError } from '@uncefact/untp-utils';
@@ -478,7 +478,7 @@ export class LibraryRecordWriteAnomalyError extends Error {
   }
 }
 
-const logger = apiLogger.child({ module: 'library-record.repository' });
+const logger = appLogger.child({ module: 'library-record.repository' });
 
 /**
  * The delete writer's own anomaly: an advisory row attached to the record
