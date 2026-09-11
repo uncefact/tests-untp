@@ -186,7 +186,7 @@ This returns both native and external records in the standard paginated envelope
       "currencyStatus": "current",
       "detailsStatus": "EXTRACTED",
       "detailsError": null,
-      "capabilities": { "deletable": false, "annotatable": false, "verifiable": true },
+      "capabilities": { "deletable": true, "annotatable": false, "verifiable": true },
       "warnings": [],
       "createdAt": "2026-07-15T09:00:00Z",
       "updatedAt": "2026-07-15T09:00:00Z"
@@ -337,7 +337,7 @@ The response is always the keyless `CredentialRecord` shape. It does not include
       "currencyStatus": "current",
       "detailsStatus": "EXTRACTED",
       "detailsError": null,
-      "capabilities": { "deletable": false, "annotatable": false, "verifiable": true },
+      "capabilities": { "deletable": true, "annotatable": false, "verifiable": true },
       "warnings": [],
       "createdAt": "2026-07-15T09:00:00Z",
       "updatedAt": "2026-07-15T09:00:00Z"
@@ -600,7 +600,7 @@ DELETE /api/v1/library/{id}
 
 This removes an external record owned by the caller's tenant. It is allowed in any verification or custody state, including a pending verification, a record with no durable copy and a no-copy record that still holds a content identity. The record, its verification history and its registration claim are removed together. A replay of the record's original registration key after deletion registers afresh, and a replay that races the delete can return `409 IDEMPOTENCY_KEY_RECORD_DELETED`.
 
-A native record is a read-only view of a credential issued by this service. It returns `403 NATIVE_CREDENTIAL_NOT_DELETABLE` and the message `This is a native credential record; it cannot be removed from the library.` An id that is absent, was already deleted, or belongs to another tenant, whether native or external, returns the same empty `204`. Repeating a successful delete is therefore safe. The deleted record is absent from subsequent list and detail reads.
+`capabilities.deletable` is `true` on records of both origins: an external record is deleted here, a native record through the credentials route. A native record is not removed through this route. It returns `403 NATIVE_CREDENTIAL_NOT_DELETABLE` and the message `This is a native credential record; it cannot be removed from the library.`; a credential this service issued is deleted with [`DELETE /api/v1/credentials/{id}`](./credentials#delete-a-credential). An id that is absent, was already deleted, or belongs to another tenant, whether native or external, returns the same empty `204`. Repeating a successful delete is therefore safe. The deleted record is absent from subsequent list and detail reads.
 
 Deleting a library record never revokes or otherwise affects the credential at its source. Verification already in progress is not cancelled. It may finish or be retried, but it cannot restore the deleted record. A run that settles after its record has gone is recorded as missing and nothing is recreated.
 
@@ -612,5 +612,5 @@ Responses:
 
 - `204` with no body, in four indistinguishable cases: the record was deleted by this call, was deleted earlier, never existed, or exists only in another tenant (whatever its origin there).
 - `401` when the request carries no valid token, as on every library operation.
-- `403 NATIVE_CREDENTIAL_NOT_DELETABLE` for a native record in the caller's tenant, with the message `This is a native credential record; it cannot be removed from the library.` Authentication can separately answer the shared tenant-assignment refusal.
+- `403 NATIVE_CREDENTIAL_NOT_DELETABLE` for a native record in the caller's tenant, with the message `This is a native credential record; it cannot be removed from the library.` Such a record is deleted through the credentials route instead. Authentication can separately answer the shared tenant-assignment refusal.
 - Sanitised `500` when the transaction failed and rolled back, or when its commit outcome could not be confirmed. Nothing was partially deleted in the first case, and the request is safe to repeat in both. After an uncertain commit a repeat answers whatever the record's state now warrants: `204` once an external record is gone, whether that earlier attempt committed or not, or `403` for a native record. While the underlying fault persists, a repeat answers this `500` again.

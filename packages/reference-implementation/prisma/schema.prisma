@@ -295,23 +295,30 @@ model LibraryRecord {
  * publication state and the master-data links.
  */
 model Credential {
-  id              String              @id
-  tenantId        String
+  id                       String              @id
+  tenantId                 String
   /// Always NATIVE (a database CHECK pins it); part of the composite foreign
   /// key so this child can only attach to a NATIVE parent of its own tenant.
-  origin          LibraryRecordOrigin @default(NATIVE)
-  storageUri      String
-  digestMultibase String
+  origin                   LibraryRecordOrigin @default(NATIVE)
+  storageUri               String
+  digestMultibase          String
   /// @encryptedAtRest The storage service's key for the private copy, protected
   /// by protectDecryptionKey (#697). Rows written before that may hold it in
   /// plaintext until backfill:decryption-keys wraps them.
-  decryptionKey   String?
-  isPublished     Boolean             @default(false)
-  organisationId  String?
-  facilityId      String?
-  productId       String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  decryptionKey            String?
+  /// Where the signed artefact's durable copy lives, as the storage adapter
+  /// named it at issuance, so deletion can remove exactly that object without
+  /// parsing the URI. Null on rows issued before these columns existed; such a
+  /// copy is left in place when the record is deleted.
+  storageServiceInstanceId String?
+  storageExternalId        String?
+  storageBucket            String?
+  isPublished              Boolean             @default(false)
+  organisationId           String?
+  facilityId               String?
+  productId                String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
 
   record       LibraryRecord       @relation(fields: [id, tenantId, origin], references: [id, tenantId, origin], onDelete: Cascade)
   tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)

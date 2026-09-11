@@ -570,7 +570,10 @@ export function toNativeCredentialRecord(
     currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, options.now ?? new Date(Date.now())),
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,
-    capabilities: { deletable: false, annotatable: false, verifiable: true },
+    // A native record is deleted through DELETE /api/v1/credentials/{id};
+    // the library route refuses it. The flag says the record can be deleted
+    // by its owner, whichever route the origin uses.
+    capabilities: { deletable: true, annotatable: false, verifiable: true },
     warnings: schemaConformanceWarnings(checkRun),
     createdAt: parent.createdAt.toISOString(),
     updatedAt: parent.updatedAt.toISOString(),

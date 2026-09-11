@@ -182,7 +182,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: false, annotatable: false, verifiable: true }
+ *                   capabilities: { deletable: true, annotatable: false, verifiable: true }
  *                   warnings: []
  *                   createdAt: '2026-07-15T09:00:00.000Z'
  *                   updatedAt: '2026-07-15T09:00:00.000Z'
@@ -209,7 +209,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: false, annotatable: false, verifiable: true }
+ *                   capabilities: { deletable: true, annotatable: false, verifiable: true }
  *                   warnings: []
  *                   createdAt: '2026-07-15T09:00:00.000Z'
  *                   updatedAt: '2026-07-15T09:00:00.000Z'

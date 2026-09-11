@@ -388,6 +388,27 @@ Old names remain supported during RI v0.5 and produce a startup warning when use
 
 The redirect chain is capped at three additional hops on both settings. That cap is fixed, not an environment variable, and a chain that exceeds it returns 502 with `UPSTREAM_ERROR`.
 
+## Delete a Credential
+
+```
+DELETE /api/v1/credentials/{id}
+```
+
+Deletes a credential this service issued, using the credential record id returned by issuance. The library record, its verification history and its issuance idempotency claim are removed in one transaction. The Reference Implementation then deletes the durable copy of the signed artefact from the storage instance, bucket and object id it recorded at issuance, and answers once that attempt has finished.
+
+Deleting a credential does not revoke it. A copy that was already shared with a verifier remains verifiable against its status list. Revocation on delete is planned for a later release. Identifier links published to the Identity Resolver for the credential are not removed and will resolve to a missing artefact.
+
+The lookup is tenant-scoped. A record that exists only in another tenant, one that was already deleted and an id that never existed all answer the same empty `204`, so repeating a delete is safe. An external library record in the caller's tenant is refused; it is deleted with [`DELETE /api/v1/library/{id}`](./library#delete-a-library-record).
+
+The durable-copy deletion is best effort and never changes the response. A copy that cannot be removed is left in place and reported in the operator log with the recorded coordinates: an unreachable storage service, a refused delete, or a credential issued before v0.5 recorded where its copy lives. Repeating the request does not retry the copy: the record is already gone, so the repeat answers `204` without touching storage, and the orphaned object is reclaimed by an operator from the logged coordinates. A crash between the commit and that log line leaves the object with no logged coordinates at all; the storage service's own listing is then the only route to it. Nothing resurrects the database record once its transaction has committed. The issuance idempotency claim is removed with the record, so the key becomes free again, as [Issue a Credential](#issue-a-credential) describes.
+
+Responses:
+
+- `204` with no body: the credential was deleted by this call, was deleted earlier, never existed, or exists only in another tenant.
+- `401` when the request carries no valid token.
+- `403 EXTERNAL_RECORD_NOT_DELETABLE_HERE` when the id names an external library record, with the message `This id is an external library record; delete it with DELETE /api/v1/library/{id}.` Authentication can separately answer the shared tenant-assignment refusal.
+- Sanitised `500` when the transaction failed and rolled back, or when its commit outcome could not be confirmed. The request is safe to repeat in both cases.
+
 ## Retired read routes
 
 ### List Credentials (retired) {#list-credentials}

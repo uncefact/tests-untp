@@ -125,7 +125,7 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *                       currencyStatus: current
  *                       detailsStatus: EXTRACTED
  *                       detailsError: null
- *                       capabilities: { deletable: false, annotatable: false, verifiable: true }
+ *                       capabilities: { deletable: true, annotatable: false, verifiable: true }
  *                       warnings: []
  *                       createdAt: '2026-07-15T09:00:00Z'
  *                       updatedAt: '2026-07-15T09:00:00Z'
