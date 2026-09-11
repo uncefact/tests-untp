@@ -13,6 +13,12 @@ This guide covers upgrading a Reference Implementation deployment from v0.4 to v
 
 A complete verification generation reads `verified` only when its `proof` check passed and no blocking check failed. Before, any complete generation with no blocking failure read `verified` as long as some check had run, so a credential the verifier refused on its validity window before examining the signature could read `verified` with `proof: not_run`. Existing generations are reclassified on read: one with `proof: not_run` now reads `not_conformant`, and re-verifying the record (`POST /api/v1/library/{id}/verify`) produces a generation with current evidence. The worker also judges the `temporal` check from the credential's own `validFrom` and `validUntil`, so an expired credential settles `verified` with `temporal: fail` and `currencyStatus: expired` whether or not the verification provider enforces the window itself. A native record's first generation still vouches for issuance only: it carries `proof: pass` with `status: not_run` and gives no revocation assurance until the record is re-verified.
 
+## Credentials this service issued can be deleted
+
+`DELETE /api/v1/credentials/{id}` removes a credential the Reference Implementation issued: the library record, its verification history and its issuance idempotency claim in one transaction, then the durable copy of the signed artefact on a best-effort basis (a copy that cannot be removed is left in place and reported with its coordinates; a repeat of the request does not retry it). The route is idempotent and tenant-scoped. It does not revoke the credential; revocation on delete is planned for a later release. See [Delete a Credential](../reference-implementation/api/credentials#delete-a-credential).
+
+The `Credential` table gains three nullable columns recording where each copy lives (`storageServiceInstanceId`, `storageExternalId`, `storageBucket`), filled by issuance from v0.5. Deleting a credential issued before the upgrade removes its record but leaves its stored copy in place, reported in the operator log with the copy's URI, because the columns that name the object are empty on those rows.
+
 ## The credentials list and detail routes are retired
 
 **Breaking change.** `GET /api/v1/credentials` and `GET /api/v1/credentials/{id}` are retired without a deprecation window. After authentication and tenant resolution succeed, both return `410 Gone` with `code: ROUTE_RETIRED` and a message naming the replacement.

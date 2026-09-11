@@ -150,6 +150,9 @@ function nativeCredential(overrides: Partial<Credential> = {}): Credential {
     tenantId: 'tenant-1',
     origin: LibraryRecordOrigin.NATIVE,
     storageUri: 'https://storage.example/native/credential-a',
+    storageServiceInstanceId: null,
+    storageExternalId: null,
+    storageBucket: null,
     digestMultibase: 'zQmNativeDigest',
     decryptionKey: null,
     isPublished: false,
@@ -733,7 +736,7 @@ describe('toNativeCredentialRecord', () => {
       issuedAt: '2026-07-15T09:00:00.000Z',
       encrypted: false,
       hasKey: false,
-      capabilities: { deletable: false, annotatable: false, verifiable: true },
+      capabilities: { deletable: true, annotatable: false, verifiable: true },
       verification: {
         generation: 1,
         state: 'complete',

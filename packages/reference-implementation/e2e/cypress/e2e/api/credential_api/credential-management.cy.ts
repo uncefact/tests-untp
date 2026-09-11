@@ -679,6 +679,67 @@ describe('Credential API', { testIsolation: false }, () => {
   // -----------------------------------------------------------------------
   // Error handling
   // -----------------------------------------------------------------------
+  describe('Delete an issued credential', () => {
+    // The stored copy's URI as the RI returns it is reachable from the RI's
+    // network; the browser reaches the same object through the host mapping.
+    const hostReachable = (uri: string) => uri.replace('storage-service:3334', 'localhost:3334');
+    let storedCopyUri: string;
+    let externalSourceUri: string;
+
+    it('DELETE /api/v1/credentials/:id: removes the record and its stored copy', () => {
+      cy.request(`/api/v1/library/${encryptedCredentialId}`).then((detail) => {
+        externalSourceUri = detail.body.storageUri;
+      });
+      cy.request(`/api/v1/library/${unencryptedCredentialId}`).then((detail) => {
+        expect(detail.status).to.eq(200);
+        storedCopyUri = hostReachable(detail.body.storageUri);
+        cy.request({ url: storedCopyUri, failOnStatusCode: false }).its('status').should('eq', 200);
+      });
+      cy.request({ method: 'DELETE', url: `/api/v1/credentials/${unencryptedCredentialId}` }).then((response) => {
+        expect(response.status).to.eq(204);
+        expect(response.body).to.be.empty;
+      });
+      cy.request({ url: `/api/v1/library/${unencryptedCredentialId}`, failOnStatusCode: false })
+        .its('status')
+        .should('eq', 404);
+      // Read the URI when this step runs, not when the chain is queued.
+      cy.then(() => cy.request({ url: storedCopyUri, failOnStatusCode: false }).its('status').should('eq', 404));
+    });
+
+    it('DELETE /api/v1/credentials/:id: repeats as an empty 204', () => {
+      cy.request({ method: 'DELETE', url: `/api/v1/credentials/${unencryptedCredentialId}` }).then((response) => {
+        expect(response.status).to.eq(204);
+        expect(response.body).to.be.empty;
+      });
+    });
+
+    it('DELETE /api/v1/credentials/:id: refuses an external library record', () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/library',
+        headers: { 'Idempotency-Key': `e2e-credential-delete-refusal-${RUN_ID}` },
+        body: {
+          sourceUrl: externalSourceUri,
+          annotations: { displayName: `E2E external for delete refusal ${RUN_ID}`, declaredCredentialType: 'DPP' },
+        },
+      }).then((registered) => {
+        expect(registered.status).to.eq(201);
+        expect(registered.body.origin).to.eq('external');
+        cy.request({
+          method: 'DELETE',
+          url: `/api/v1/credentials/${registered.body.id}`,
+          failOnStatusCode: false,
+        }).then((response) => {
+          expect(response.status).to.eq(403);
+          expect(response.body.code).to.eq('EXTERNAL_RECORD_NOT_DELETABLE_HERE');
+        });
+        // The refusal left the external record in place. This suite's own
+        // teardown removes it today; API teardown follows in the suite rewrite.
+        cy.request(`/api/v1/library/${registered.body.id}`).its('body.origin').should('eq', 'external');
+      });
+    });
+  });
+
   describe('Error handling', () => {
     it('GET /api/v1/credentials/:id: returns 410 for an issued credential id', () => {
       cy.request({

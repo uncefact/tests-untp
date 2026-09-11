@@ -6,11 +6,14 @@ import {
   type CoreCredentialType,
   type Credential,
   type LibraryRecord,
-  type Prisma,
+  Prisma,
   IdempotencyOperation,
 } from '../generated';
 import { prisma } from '../prisma';
 import { linkClaimToRecord } from './idempotency-key.repository';
+import { lockLibraryRecordsForUpdate } from './library-record.repository';
+import { withDeadlockRetry } from './check-run.repository';
+import type { StoredObjectCoordinates } from '@/lib/library/remove-stored-object';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
 import type { ProtectedDecryptionKey } from '@/lib/credentials/decryption-key-protection';
@@ -47,6 +50,14 @@ export type CreateCredentialInput = {
   digestMultibase: string;
   /** Already wrapped by protectDecryptionKey; a raw storage-service key is a type error. */
   decryptionKey?: ProtectedDecryptionKey;
+  /**
+   * The durable copy's coordinates as the storage adapter named them, kept so
+   * deletion removes exactly that object. Issuance always supplies them; the
+   * fields are optional only for callers that have no copy to name.
+   */
+  storageServiceInstanceId?: string | null;
+  storageExternalId?: string | null;
+  storageBucket?: string | null;
   /** The type issuance was asked for: an extension's own name when it is one. */
   credentialType: string;
   /** The core kind the type resolves to (ADR-053 decision 8); null when unknown. */
@@ -156,6 +167,9 @@ export async function createCredential(
     storageUri: input.storageUri,
     digestMultibase: input.digestMultibase,
     decryptionKey: input.decryptionKey,
+    storageServiceInstanceId: input.storageServiceInstanceId ?? null,
+    storageExternalId: input.storageExternalId ?? null,
+    storageBucket: input.storageBucket ?? null,
     isPublished: input.isPublished ?? false,
   };
   const linkedChildData = {
@@ -220,4 +234,77 @@ export async function updateCredentialPublished(
   } catch (e) {
     mapDatabaseError(e, { notFound: 'Credential not found' });
   }
+}
+
+export type DeleteNativeCredentialResult =
+  | { outcome: 'missing' }
+  | { outcome: 'external' }
+  | { outcome: 'deleted'; storage: StoredObjectCoordinates };
+
+/**
+ * Deletes one tenant-owned native credential: the library record and, by
+ * cascade, its `Credential` child, its check runs and its idempotency claim.
+ * The parent is locked `FOR UPDATE` in the same ascending-id statement every
+ * other library writer uses, so a verification run or a recovery cannot
+ * interleave with the delete. An id that is absent or belongs to another
+ * tenant is `missing`; an external record is reported as such so the caller
+ * can point at the library route rather than removing it here. The returned
+ * storage coordinates are an owned snapshot for the post-commit cleanup; no
+ * storage call is made while the transaction is open. Nothing here revokes
+ * the credential at its source.
+ */
+export async function deleteNativeCredential(input: {
+  recordId: string;
+  tenantId: string;
+}): Promise<DeleteNativeCredentialResult> {
+  const attempt = () =>
+    prisma.$transaction(
+      async (tx) => {
+        const locked = await lockLibraryRecordsForUpdate(tx, [input.recordId], input.tenantId);
+        if (!locked.has(input.recordId)) return { outcome: 'missing' as const };
+
+        const record = await tx.libraryRecord.findFirst({
+          where: { id: input.recordId, tenantId: input.tenantId },
+          select: {
+            origin: true,
+            credential: {
+              select: {
+                storageUri: true,
+                storageServiceInstanceId: true,
+                storageExternalId: true,
+                storageBucket: true,
+              },
+            },
+          },
+        });
+        if (record === null) return { outcome: 'missing' as const };
+        if (record.origin !== LibraryRecordOrigin.NATIVE) return { outcome: 'external' as const };
+
+        const storage: StoredObjectCoordinates = {
+          storageUri: record.credential?.storageUri ?? null,
+          storageServiceInstanceId: record.credential?.storageServiceInstanceId ?? null,
+          storageExternalId: record.credential?.storageExternalId ?? null,
+          storageBucket: record.credential?.storageBucket ?? null,
+        };
+
+        // The origin predicate is defence in depth on the one statement that
+        // cascades: the row was read as NATIVE under this lock and origin
+        // never changes, so an external parent can never be the row removed.
+        await tx.libraryRecord.delete({
+          where: {
+            id_tenantId_origin: { id: input.recordId, tenantId: input.tenantId, origin: LibraryRecordOrigin.NATIVE },
+          },
+        });
+        return { outcome: 'deleted' as const, storage };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 5_000, timeout: 15_000 },
+    );
+
+  // A database error propagates unmapped so the route can hand it to the
+  // shared mapper, as the library delete does.
+  return withDeadlockRetry(attempt, {
+    recordId: input.recordId,
+    tenantId: input.tenantId,
+    op: 'deleteNativeCredential',
+  });
 }

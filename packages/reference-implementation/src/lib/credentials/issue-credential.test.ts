@@ -72,6 +72,8 @@ const STORAGE_RESPONSE = {
   uri: 'https://storage.example.com/abc',
   digestMultibase: 'zTESTabc',
   decryptionKey: 'key-1',
+  externalId: 'object-abc',
+  bucket: 'private-bucket',
 };
 
 const ENTITY_REFS = {
@@ -169,6 +171,9 @@ describe('issueCredential', () => {
         tenantId: TENANT_ID,
         storageUri: STORAGE_RESPONSE.uri,
         digestMultibase: STORAGE_RESPONSE.digestMultibase,
+        storageServiceInstanceId: 'storage-inst-1',
+        storageExternalId: STORAGE_RESPONSE.externalId,
+        storageBucket: STORAGE_RESPONSE.bucket,
         credentialType: 'DigitalProductPassport',
         coreDataModelVersion: '0.6.1',
         isPublished: false,

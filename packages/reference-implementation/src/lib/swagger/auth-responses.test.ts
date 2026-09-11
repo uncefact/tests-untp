@@ -31,6 +31,8 @@ const COMBINED_FORBIDDEN_OPERATIONS = new Map([
   ['delete /services/{id}', 'system default'],
   ['patch /library/{id}', 'no recipient annotations'],
   ['delete /library/{id}', 'cannot be removed from the library'],
+  // A native credential's delete route does not remove an external record.
+  ['delete /credentials/{id}', 'external library record'],
 ]);
 
 // This exemption can only go stale in the safe direction: an entry for a route
