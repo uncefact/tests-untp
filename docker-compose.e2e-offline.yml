@@ -1,0 +1,40 @@
+# Compose override for the open-mode RI E2E run without publishing-host DNS.
+# Docker's embedded DNS server still resolves service names on a user-defined
+# network and forwards external names to the configured DNS servers. See:
+# https://docs.docker.com/engine/network/#dns-services
+services:
+  coredns:
+    image: coredns/coredns:1.11.4
+    command: ['-conf', '/etc/coredns/Corefile']
+    volumes:
+      - ./packages/reference-implementation/e2e/infra/offline-dns/Corefile:/etc/coredns/Corefile:ro
+    networks:
+      default:
+        ipv4_address: 172.31.240.53
+
+  app:
+    dns:
+      - 172.31.240.53
+    depends_on:
+      coredns:
+        condition: service_started
+
+  app-worker:
+    dns:
+      - 172.31.240.53
+    depends_on:
+      coredns:
+        condition: service_started
+
+  untp-playground:
+    dns:
+      - 172.31.240.53
+    depends_on:
+      coredns:
+        condition: service_started
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.240.0/24

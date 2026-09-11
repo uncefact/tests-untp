@@ -1,0 +1,23 @@
+# Compose override for the open-mode RI E2E run using the v0.4 fetch names.
+services:
+  app:
+    environment:
+      # Non-default values that still let every credential in the suite
+      # through: the default response size is 10 MiB and the default timeout
+      # 30 s, so these are distinguishable in the app log without breaking a
+      # real encrypted envelope (several KiB) or a slow first fetch.
+      VERIFY_ALLOW_PRIVATE_URLS: 'true'
+      VERIFY_MAX_CREDENTIAL_SIZE: '5242880'
+      VERIFY_FETCH_TIMEOUT_MS: '20000'
+      FETCH_ALLOW_PRIVATE_URLS: ''
+      FETCH_MAX_RESPONSE_SIZE: ''
+      FETCH_TIMEOUT_MS: ''
+
+  app-worker:
+    environment:
+      VERIFY_ALLOW_PRIVATE_URLS: 'true'
+      VERIFY_MAX_CREDENTIAL_SIZE: '5242880'
+      VERIFY_FETCH_TIMEOUT_MS: '20000'
+      FETCH_ALLOW_PRIVATE_URLS: ''
+      FETCH_MAX_RESPONSE_SIZE: ''
+      FETCH_TIMEOUT_MS: ''

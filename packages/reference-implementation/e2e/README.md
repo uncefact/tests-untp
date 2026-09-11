@@ -53,6 +53,36 @@ docker compose -f docker-compose.e2e.yml --profile ri --profile playground down 
 
 > **Important**: Always use `-v` when tearing down. Without it, stale user records persist in the database and cause `OAuthAccountNotLinked` errors on the next run.
 
+### Offline publishing-host run
+
+The offline override adds a CoreDNS service that returns NXDOMAIN for the publishing hosts while forwarding other DNS queries. It is an open-mode run, so use the open E2E command.
+
+```bash
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-offline.yml --profile ri --profile playground up -d --build
+pnpm test:e2e:ri:open
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-offline.yml --profile ri --profile playground down -v
+```
+
+CI also probes `untp.unece.org` from `app`, `app-worker`, and `untp-playground` before Cypress starts. Each lookup must fail with `ENOTFOUND`.
+
+### Legacy fetch settings run
+
+Before running this stack, remove `FETCH_ALLOW_PRIVATE_URLS` and `VERIFY_ALLOW_PRIVATE_URLS` from the repository-root `.env`. Cypress reads that file, so the shell below must be the only source for the private-address capability.
+
+```bash
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground up -d --build
+VERIFY_ALLOW_PRIVATE_URLS=true pnpm --filter reference-implementation-e2e test:e2e:open -- --spec cypress/e2e/api/credential_api/credential-verify.cy.ts
+docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground down -v
+```
+
+The CI job checks the app logs for the deprecation warning emitted for each v0.4 `VERIFY_*` name.
+
+### Bundled artefact drift
+
+The nightly workflow and `workflow_dispatch` run install, build, and `artefacts:check` for `@uncefact/untp-utils`. The check fetches each upstream copy, compares it with the bundle, names any differing artefact, and writes nothing.
+
+When the check fails, review the named upstream change first. Run `artefacts:refresh` in a PR to update the bundle after that review. Do not run `artefacts:refresh` in CI.
+
 ### Closed mode (local)
 
 Both `-f` flags must be passed together on every compose invocation for closed mode, including any later ad-hoc command such as restarting a single service. Dropping the `docker-compose.e2e-closed.yml` override reverts `TENANT_MODE` to open.

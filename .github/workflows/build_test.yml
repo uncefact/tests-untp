@@ -255,6 +255,8 @@ jobs:
             'packages/reference-implementation/e2e/**' \
             'docker-compose.e2e.yml' \
             'docker-compose.e2e-closed.yml' \
+            'docker-compose.e2e-offline.yml' \
+            'docker-compose.e2e-legacy-fetch.yml' \
             '.github/workflows/build_test.yml' \
             | wc -l | tr -d ' ')
 
@@ -393,6 +395,8 @@ jobs:
             'packages/reference-implementation/e2e/**' \
             'docker-compose.e2e.yml' \
             'docker-compose.e2e-closed.yml' \
+            'docker-compose.e2e-offline.yml' \
+            'docker-compose.e2e-legacy-fetch.yml' \
             '.github/workflows/build_test.yml' \
             | wc -l | tr -d ' ')
 
@@ -422,7 +426,7 @@ jobs:
           cache-to: type=gha,scope=untp-playground-e2e,mode=max
 
   e2e-ri:
-    name: E2E RI (${{ matrix.mode }})
+    name: E2E RI (${{ matrix.name }})
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     # Job level, not step level: it has to reach the `Start RI stack` step, so
@@ -444,8 +448,13 @@ jobs:
         include:
           - mode: open
             compose-override: ''
+            name: open
           - mode: closed
             compose-override: '-f docker-compose.e2e-closed.yml'
+            name: closed
+          - mode: open
+            compose-override: '-f docker-compose.e2e-offline.yml'
+            name: offline
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -499,15 +508,17 @@ jobs:
             'packages/reference-implementation/e2e/**' \
             'docker-compose.e2e.yml' \
             'docker-compose.e2e-closed.yml' \
+            'docker-compose.e2e-offline.yml' \
+            'docker-compose.e2e-legacy-fetch.yml' \
             '.github/workflows/build_test.yml' \
             | wc -l | tr -d ' ')
 
           if [ "$task_count" -gt 0 ] || [ "$extra_changed" -gt 0 ]; then
             echo "result=true" >> "$GITHUB_OUTPUT"
-            echo "RI E2E (${{ matrix.mode }}) will run. turbo task_count=$task_count, extra_changed=$extra_changed."
+            echo "RI E2E (${{ matrix.name }}) will run. turbo task_count=$task_count, extra_changed=$extra_changed."
           else
             echo "result=false" >> "$GITHUB_OUTPUT"
-            echo "RI E2E (${{ matrix.mode }}) skipped. Reference-implementation dep graph unaffected and no RI e2e/compose/workflow files changed."
+            echo "RI E2E (${{ matrix.name }}) skipped. Reference-implementation dep graph unaffected and no RI e2e/compose/workflow files changed."
           fi
 
       # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
@@ -578,7 +589,7 @@ jobs:
           load: true
           cache-from: type=gha,scope=untp-playground-e2e
 
-      - name: Start RI stack (${{ matrix.mode }})
+      - name: Start RI stack (${{ matrix.name }})
         if: steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground up -d --no-build
 
@@ -619,17 +630,28 @@ jobs:
             exit 1
           fi
           if ! curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
-            echo "::error::App did not respond on :3003 within 180s (${{ matrix.mode }} mode)"
+            echo "::error::App did not respond on :3003 within 180s (${{ matrix.name }} run)"
             docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs app
             exit 1
           fi
           if ! curl -sS -o /dev/null -m 2 http://localhost:4000 2>/dev/null; then
-            echo "::error::Playground did not respond on :4000 within 180s (${{ matrix.mode }} mode)"
+            echo "::error::Playground did not respond on :4000 within 180s (${{ matrix.name }} run)"
             docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground logs untp-playground
             exit 1
           fi
 
-      - name: Run RI E2E tests (${{ matrix.mode }} mode)
+      - name: Prove publishing-host DNS denial
+        if: steps.affected.outputs.result == 'true' && matrix.name == 'offline'
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose_args=(-f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground)
+          for service in app app-worker untp-playground; do
+            echo "--- Checking publishing-host DNS denial in $service ---"
+            docker compose "${compose_args[@]}" exec -T "$service" node -e 'require("node:dns").promises.lookup("untp.unece.org").then(() => { console.error("untp.unece.org unexpectedly resolved"); process.exit(1); }, (error) => { if (error.code !== "ENOTFOUND") { console.error("Expected ENOTFOUND, received " + (error.code || error.message)); process.exit(1); } console.log("untp.unece.org denied with ENOTFOUND"); });'
+          done
+
+      - name: Run RI E2E tests (${{ matrix.name }})
         if: steps.affected.outputs.result == 'true'
         run: pnpm --filter reference-implementation-e2e test:e2e:${{ matrix.mode }}
         env:
@@ -644,7 +666,7 @@ jobs:
         if: failure() && steps.affected.outputs.result == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: cypress-ri-${{ matrix.mode }}-artifacts
+          name: cypress-ri-${{ matrix.name }}-artifacts
           path: |
             packages/reference-implementation/e2e/cypress/screenshots
             packages/reference-implementation/e2e/cypress/videos
@@ -655,6 +677,211 @@ jobs:
       - name: Stop RI stack
         if: always() && steps.affected.outputs.result == 'true'
         run: docker compose -f docker-compose.e2e.yml ${{ matrix.compose-override }} --profile ri --profile playground down -v
+
+  e2e-ri-legacy-fetch-settings:
+    name: E2E RI (legacy fetch settings)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      VERIFY_ALLOW_PRIVATE_URLS: 'true'
+    needs: [quality, qa, build-e2e-image-ri, build-e2e-image-playground]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Restore node_modules cache
+        id: cache-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            packages/*/e2e/node_modules
+            ~/.cache/Cypress
+          key: node-modules-v4-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies (fallback if cache restore missed)
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Check whether legacy RI E2E should run
+        id: affected
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          affected_json=$(pnpm --silent turbo run build --filter='untp-reference-implementation...[origin/next]' --dry-run=json)
+          if [ -z "$affected_json" ]; then
+            echo "::error::turbo dry-run produced empty output"
+            exit 1
+          fi
+          task_count=$(echo "$affected_json" | jq '.tasks | length')
+          if ! [[ "$task_count" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not parse turbo task count: '$task_count'"
+            echo "--- Raw output ---"
+            echo "$affected_json"
+            exit 1
+          fi
+
+          extra_changed=$(git diff --name-only origin/next...HEAD -- \
+            'packages/reference-implementation/e2e/**' \
+            'docker-compose.e2e.yml' \
+            'docker-compose.e2e-closed.yml' \
+            'docker-compose.e2e-offline.yml' \
+            'docker-compose.e2e-legacy-fetch.yml' \
+            '.github/workflows/build_test.yml' \
+            | wc -l | tr -d ' ')
+
+          if [ "$task_count" -gt 0 ] || [ "$extra_changed" -gt 0 ]; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+            echo "Legacy RI E2E will run. turbo task_count=$task_count, extra_changed=$extra_changed."
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+            echo "Legacy RI E2E skipped. Reference-implementation dep graph unaffected and no RI e2e/compose/workflow files changed."
+          fi
+
+      # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+      # https://github.com/uncefact/tests-untp/issues/344
+      #
+      # Background each rm so the kernel can parallelise unlink syscalls
+      # across cores. The big paths dominate wall time when run sequentially;
+      # in parallel the total drops to roughly the slowest single rm.
+      - name: Free up space on ubuntu runner for E2E tests
+        if: steps.affected.outputs.result == 'true'
+        run: |
+          set -e
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" &
+          sudo rm -rf /opt/microsoft &
+          sudo rm -rf /opt/pipx &
+          sudo rm -rf /usr/local/.ghcup &
+          sudo rm -rf /usr/local/graalvm* &
+          sudo rm -rf /usr/local/julia* &
+          sudo rm -rf /usr/local/lib/android &
+          sudo rm -rf /usr/local/share/chromium &
+          sudo rm -rf /usr/local/share/powershell &
+          sudo rm -rf /usr/local/share/vcpkg &
+          sudo rm -rf /usr/share/dotnet &
+          sudo rm -rf /usr/share/miniconda &
+          sudo rm -rf /usr/share/swift &
+          wait
+          docker image prune -af
+
+      - name: Set up Docker Buildx
+        if: steps.affected.outputs.result == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build RI image (with cache)
+        if: steps.affected.outputs.result == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/reference-implementation/Dockerfile
+          target: development
+          tags: app:e2e
+          load: true
+          cache-from: type=gha,scope=reference-implementation-e2e
+
+      - name: Build playground image (with cache)
+        if: steps.affected.outputs.result == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/untp-playground/Dockerfile
+          tags: untp-playground:e2e
+          load: true
+          cache-from: type=gha,scope=untp-playground-e2e
+
+      - name: Start RI stack (legacy fetch settings)
+        if: steps.affected.outputs.result == 'true'
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground up -d --no-build
+
+      - name: Wait for app and playground containers
+        if: steps.affected.outputs.result == 'true'
+        run: |
+          echo "--- Waiting up to 180s for app on http://localhost:3003 and playground on http://localhost:4000 ---"
+          now=$(date +%s)
+          deadline=$((now + 180))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            app_ok=0
+            pg_ok=0
+            curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null && app_ok=1
+            curl -sS -o /dev/null -m 2 http://localhost:4000 2>/dev/null && pg_ok=1
+            if [ "$app_ok" = 1 ] && [ "$pg_ok" = 1 ]; then
+              echo "--- Both services responding ---"
+              break
+            fi
+            sleep 2
+          done
+          echo "--- Container status ---"
+          docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground ps
+          if ! curl -sS -o /dev/null -m 2 http://localhost:3003 2>/dev/null; then
+            echo "::error::App did not respond on :3003 within 180s (legacy fetch settings)"
+            docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground logs app
+            exit 1
+          fi
+          if ! curl -sS -o /dev/null -m 2 http://localhost:4000 2>/dev/null; then
+            echo "::error::Playground did not respond on :4000 within 180s (legacy fetch settings)"
+            docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground logs untp-playground
+            exit 1
+          fi
+
+      - name: Assert legacy fetch-setting deprecation warnings
+        if: steps.affected.outputs.result == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_logs=$(docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground logs --no-color app)
+          for warning in \
+            'VERIFY_ALLOW_PRIVATE_URLS was renamed to FETCH_ALLOW_PRIVATE_URLS in v0.5 and will stop being read in v0.6. Rename VERIFY_ALLOW_PRIVATE_URLS to FETCH_ALLOW_PRIVATE_URLS, keeping its value, and restart.' \
+            'VERIFY_MAX_CREDENTIAL_SIZE was renamed to FETCH_MAX_RESPONSE_SIZE in v0.5 and will stop being read in v0.6. Rename VERIFY_MAX_CREDENTIAL_SIZE to FETCH_MAX_RESPONSE_SIZE, keeping its value, and restart.' \
+            'VERIFY_FETCH_TIMEOUT_MS was renamed to FETCH_TIMEOUT_MS in v0.5 and will stop being read in v0.6. Rename VERIFY_FETCH_TIMEOUT_MS to FETCH_TIMEOUT_MS, keeping its value, and restart.'; do
+            if ! grep -Fq "$warning" <<< "$app_logs"; then
+              echo "::error::Missing legacy fetch-setting warning: $warning"
+              exit 1
+            fi
+            echo "Found warning: $warning"
+          done
+
+      - name: Run legacy fetch-settings E2E spec
+        if: steps.affected.outputs.result == 'true'
+        # Invoked through `exec` rather than the package script so the `--spec`
+        # filter reaches Cypress; the script form ran the whole suite.
+        run: pnpm --filter reference-implementation-e2e exec cypress run --spec cypress/e2e/api/credential_api/credential-verify.cy.ts
+        env:
+          E2E_TENANT_MODE: open
+          NODE_OPTIONS: '--no-experimental-require-module --no-experimental-detect-module' # See issue https://github.com/cypress-io/github-action/issues/1408
+          CYPRESS_PLAYGROUND_BASE_URL: 'http://localhost:4000'
+
+      - name: Dump RI and Playground container logs on failure
+        if: failure() && steps.affected.outputs.result == 'true'
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground logs app untp-playground
+
+      - name: Upload Cypress artifacts on failure
+        if: failure() && steps.affected.outputs.result == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-ri-legacy-fetch-settings-artifacts
+          path: |
+            packages/reference-implementation/e2e/cypress/screenshots
+            packages/reference-implementation/e2e/cypress/videos
+            packages/reference-implementation/e2e/cypress/downloads
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop RI stack
+        if: steps.affected.outputs.result == 'true'
+        run: docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-legacy-fetch.yml --profile ri --profile playground down -v
 
   e2e-playground:
     name: E2E (untp-playground)
