@@ -1,4 +1,4 @@
-import { buildLocationInformation, buildAddress } from './location.js';
+import { buildLocationInformation, buildAddress, resolveCountry } from './location.js';
 import type { UntpLocation } from '../types.js';
 
 describe('buildLocationInformation', () => {
@@ -153,5 +153,30 @@ describe('buildAddress', () => {
       addressLocality: 'Sydney',
     });
     expect(result?.postalCode).toBeUndefined();
+  });
+
+  it('reduces a code/name addressCountry to its code (v0.6.x addressCountry is a plain string)', () => {
+    const address = {
+      streetAddress: '123 Main St',
+      addressCountry: { code: 'AU', name: 'Australia' },
+    };
+
+    const result = buildAddress(address);
+
+    expect(result?.addressCountry).toBe('AU');
+  });
+});
+
+describe('resolveCountry', () => {
+  it('returns undefined when addressCountry is undefined', () => {
+    expect(resolveCountry(undefined)).toBeUndefined();
+  });
+
+  it('wraps a plain string as {code}', () => {
+    expect(resolveCountry('AU')).toEqual({ code: 'AU' });
+  });
+
+  it('passes a code/name object through as-is', () => {
+    expect(resolveCountry({ code: 'AU', name: 'Australia' })).toEqual({ code: 'AU', name: 'Australia' });
   });
 });
