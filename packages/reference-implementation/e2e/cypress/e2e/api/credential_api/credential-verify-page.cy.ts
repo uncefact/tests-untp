@@ -1,7 +1,7 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Verify Page', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let testTenantId: string;
   let defaultDidValue: string;
   let unencryptedUri: string;
@@ -38,7 +38,8 @@ describe('Verify Page', { testIsolation: false }, () => {
 
   // ── Setup ──────────────────────────────────────────────────────────
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant and deletes native credentials.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -55,7 +56,7 @@ describe('Verify Page', { testIsolation: false }, () => {
       body: {
         serviceType: 'VC',
         adapterType: 'VCKIT',
-        name: 'Verify Page E2E VCKit',
+        name: `Verify Page E2E VCKit ${RUN_ID}`,
         config: {
           baseUrl: config.services.vckit.baseUrl,
           apiKey: config.services.vckit.apiKey,
@@ -72,7 +73,7 @@ describe('Verify Page', { testIsolation: false }, () => {
       body: {
         serviceType: 'STORAGE',
         adapterType: 'UNCEFACT_STORAGE',
-        name: 'Verify Page E2E Storage',
+        name: `Verify Page E2E Storage ${RUN_ID}`,
         config: {
           baseUrl: config.services.storage.baseUrl,
           apiKey: config.services.storage.apiKey,
@@ -94,8 +95,10 @@ describe('Verify Page', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   // ── Issue credentials for verification ─────────────────────────────
@@ -248,7 +251,7 @@ describe('Verify Page', { testIsolation: false }, () => {
       cy.contains('Invalid verification link').should('not.exist');
 
       if (ssrfEnabled) {
-        // SSRF validation rejects the URL — page shows the rejection message
+        // SSRF validation rejects the URL  -  page shows the rejection message
         cy.contains('DNS resolution failed', { matchCase: false, timeout: 30000 }).should('be.visible');
       } else {
         // The API returns 502 UPSTREAM_ERROR; the page displays its message

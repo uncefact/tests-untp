@@ -1,19 +1,20 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('DID API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let testTenantId: string;
   let createdDidId: string;
   let createdDid: string;
   let defaultDidId: string;
   let vcServiceInstanceId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant and user before testing DID routes.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
 
-    // Login first — NextAuth creates the User record on first login
+    // Login first  -  NextAuth creates the User record on first login
     cy.apiLogin();
 
     // Seed test organisation and link the logged-in user
@@ -28,7 +29,7 @@ describe('DID API', { testIsolation: false }, () => {
       body: {
         serviceType: 'VC',
         adapterType: 'VCKIT',
-        name: 'E2E VCKit VC',
+        name: `E2E VCKit VC ${RUN_ID}`,
         config: {
           baseUrl: config.services.vckit.baseUrl,
           apiKey: config.services.vckit.apiKey,
@@ -42,12 +43,14 @@ describe('DID API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
-    it('POST /api/v1/dids — creates a managed DID', () => {
+    it('POST /api/v1/dids  -  creates a managed DID', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
@@ -56,7 +59,7 @@ describe('DID API', { testIsolation: false }, () => {
           method: 'DID_WEB',
           alias: `e2e-test-${RUN_ID}`,
           name: `E2E Test DID ${RUN_ID}`,
-          description: 'Created by Cypress E2E test',
+          description: `Created by Cypress E2E test ${RUN_ID}`,
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
@@ -66,7 +69,7 @@ describe('DID API', { testIsolation: false }, () => {
         expect(response.body.status).to.eq('ACTIVE');
         expect(response.body.id).to.be.a('string');
         expect(response.body.name).to.eq(`E2E Test DID ${RUN_ID}`);
-        expect(response.body.description).to.eq('Created by Cypress E2E test');
+        expect(response.body.description).to.eq(`Created by Cypress E2E test ${RUN_ID}`);
         expect(response.body.method).to.eq('DID_WEB');
         expect(response.body.serviceInstanceId).to.be.a('string');
 
@@ -75,7 +78,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/dids — lists DIDs with pagination metadata', () => {
+    it('GET /api/v1/dids  -  lists DIDs with pagination metadata', () => {
       cy.request('/api/v1/dids').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.not.have.property('ok');
@@ -99,7 +102,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/dids/:id — retrieves a specific DID', () => {
+    it('GET /api/v1/dids/:id  -  retrieves a specific DID', () => {
       cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.not.have.property('ok');
@@ -110,7 +113,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/dids/:id — updates DID name', () => {
+    it('PATCH /api/v1/dids/:id  -  updates DID name', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/dids/${createdDidId}`,
@@ -123,7 +126,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/dids/:id — updates DID description', () => {
+    it('PATCH /api/v1/dids/:id  -  updates DID description', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/dids/${createdDidId}`,
@@ -134,7 +137,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/dids/:id — sets isDefault on a managed DID', () => {
+    it('PATCH /api/v1/dids/:id  -  sets isDefault on a managed DID', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/dids/${createdDidId}`,
@@ -145,14 +148,14 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/dids/:id — confirms isDefault persisted', () => {
+    it('GET /api/v1/dids/:id  -  confirms isDefault persisted', () => {
       cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.isDefault).to.eq(true);
       });
     });
 
-    it('GET /api/v1/dids/:id — confirms updates persisted', () => {
+    it('GET /api/v1/dids/:id  -  confirms updates persisted', () => {
       cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`Updated E2E DID ${RUN_ID}`);
@@ -160,8 +163,8 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/dids/:id/document — retrieves DID document', () => {
-      // Use the system default DID — it points to a real domain that VCKit
+    it('GET /api/v1/dids/:id/document  -  retrieves DID document', () => {
+      // Use the system default DID  -  it points to a real domain that VCKit
       // can resolve.  Locally-created did:web DIDs have fake aliases and
       // cannot be resolved over HTTPS.
       cy.request(`/api/v1/dids/${defaultDidId}/document`).then((response) => {
@@ -172,7 +175,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/dids/:id/verify — verifies DID', () => {
+    it('POST /api/v1/dids/:id/verify  -  verifies DID', () => {
       cy.request({
         method: 'POST',
         url: `/api/v1/dids/${createdDidId}/verify`,
@@ -190,7 +193,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/dids/:id/verify — returns 400 for system default DID', () => {
+    it('POST /api/v1/dids/:id/verify  -  returns 400 for system default DID', () => {
       cy.request({
         method: 'POST',
         url: `/api/v1/dids/${defaultDidId}/verify`,
@@ -201,7 +204,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/dids/:id — unsets isDefault before deletion', () => {
+    it('PATCH /api/v1/dids/:id  -  unsets isDefault before deletion', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/dids/${createdDidId}`,
@@ -212,7 +215,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/dids/:id — deletes a managed DID', () => {
+    it('DELETE /api/v1/dids/:id  -  deletes a managed DID', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/dids/${createdDidId}`,
@@ -222,7 +225,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/dids/:id — returns 404 after deletion', () => {
+    it('GET /api/v1/dids/:id  -  returns 404 after deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/dids/${createdDidId}`,
@@ -331,7 +334,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — deletes a self-managed DID', () => {
+    it('DELETE  -  deletes a self-managed DID', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/dids/${selfManagedDidId}`,
@@ -340,7 +343,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET — returns 404 after self-managed DID deletion', () => {
+    it('GET  -  returns 404 after self-managed DID deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/dids/${selfManagedDidId}`,
@@ -355,7 +358,7 @@ describe('DID API', { testIsolation: false }, () => {
     let importedDidId: string;
     const importedDidString = `did:web:imported-${RUN_ID}.example.com`;
 
-    it('POST /api/v1/dids/import — imports an external DID with UNVERIFIED status', () => {
+    it('POST /api/v1/dids/import  -  imports an external DID with UNVERIFIED status', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids/import',
@@ -365,7 +368,7 @@ describe('DID API', { testIsolation: false }, () => {
           keyId: `imported-key-${RUN_ID}`,
           serviceInstanceId: vcServiceInstanceId,
           name: `E2E Imported DID ${RUN_ID}`,
-          description: 'Imported by Cypress E2E test',
+          description: `Imported by Cypress E2E test ${RUN_ID}`,
         },
       }).then((response) => {
         expect(response.status).to.eq(201);
@@ -379,7 +382,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/dids/:id — retrieves the imported DID', () => {
+    it('GET /api/v1/dids/:id  -  retrieves the imported DID', () => {
       cy.request(`/api/v1/dids/${importedDidId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`E2E Imported DID ${RUN_ID}`);
@@ -388,7 +391,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/dids/:id/verify — verification updates imported DID status', () => {
+    it('POST /api/v1/dids/:id/verify  -  verification updates imported DID status', () => {
       cy.request({
         method: 'POST',
         url: `/api/v1/dids/${importedDidId}/verify`,
@@ -399,7 +402,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/dids/import — returns 400 for missing required fields', () => {
+    it('POST /api/v1/dids/import  -  returns 400 for missing required fields', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids/import',
@@ -411,7 +414,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/dids/import — returns 400 for missing method', () => {
+    it('POST /api/v1/dids/import  -  returns 400 for missing method', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids/import',
@@ -427,7 +430,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/dids/import — returns 400 for missing keyId', () => {
+    it('POST /api/v1/dids/import  -  returns 400 for missing keyId', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids/import',
@@ -442,7 +445,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/dids/import — returns error for duplicate DID', () => {
+    it('POST /api/v1/dids/import  -  returns error for duplicate DID', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids/import',
@@ -452,7 +455,7 @@ describe('DID API', { testIsolation: false }, () => {
           keyId: `imported-key-duplicate-${RUN_ID}`,
           serviceInstanceId: vcServiceInstanceId,
           name: `E2E Duplicate Imported DID ${RUN_ID}`,
-          description: 'Duplicate import by Cypress E2E test',
+          description: `Duplicate import by Cypress E2E test ${RUN_ID}`,
         },
         failOnStatusCode: false,
       }).then((response) => {
@@ -465,7 +468,7 @@ describe('DID API', { testIsolation: false }, () => {
     let duplicateTestDidId: string;
     const duplicateAlias = `e2e-dup-${RUN_ID}`;
 
-    it('POST — creates a DID for the duplicate test', () => {
+    it('POST  -  creates a DID for the duplicate test', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
@@ -481,7 +484,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST — returns 409 when creating a DID with the same alias', () => {
+    it('POST  -  returns 409 when creating a DID with the same alias', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
@@ -499,7 +502,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — cleans up the duplicate test DID', () => {
+    it('DELETE  -  cleans up the duplicate test DID', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/dids/${duplicateTestDidId}`,
@@ -510,7 +513,7 @@ describe('DID API', { testIsolation: false }, () => {
   });
 
   describe('Error handling', () => {
-    it('GET — returns 404 for non-existent DID', () => {
+    it('GET  -  returns 404 for non-existent DID', () => {
       cy.request({
         method: 'GET',
         url: '/api/v1/dids/nonexistent-id',
@@ -521,7 +524,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — returns 404 for non-existent DID', () => {
+    it('PATCH  -  returns 404 for non-existent DID', () => {
       cy.request({
         method: 'PATCH',
         url: '/api/v1/dids/nonexistent-id',
@@ -533,7 +536,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — returns 404 for non-existent DID', () => {
+    it('DELETE  -  returns 404 for non-existent DID', () => {
       cy.request({
         method: 'DELETE',
         url: '/api/v1/dids/nonexistent-id',
@@ -544,7 +547,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — returns 400 when deleting the default DID', () => {
+    it('DELETE  -  returns 400 when deleting the default DID', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/dids/${defaultDidId}`,
@@ -555,7 +558,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — returns 404 when attempting to set isDefault on system default DID', () => {
+    it('PATCH  -  returns 404 when attempting to set isDefault on system default DID', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/dids/${defaultDidId}`,
@@ -567,7 +570,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST — returns 400 for invalid type', () => {
+    it('POST  -  returns 400 for invalid type', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
@@ -579,7 +582,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST — returns 400 for missing method', () => {
+    it('POST  -  returns 400 for missing method', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
@@ -591,7 +594,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST — returns 400 for missing alias', () => {
+    it('POST  -  returns 400 for missing alias', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
@@ -603,7 +606,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST — returns 400 for invalid method', () => {
+    it('POST  -  returns 400 for invalid method', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
@@ -615,8 +618,8 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — returns 400 for empty body', () => {
-      // Need a valid DID to test — use the default
+    it('PATCH  -  returns 400 for empty body', () => {
+      // Need a valid DID to test  -  use the default
       cy.request({
         method: 'PATCH',
         url: `/api/v1/dids/${defaultDidId}`,
@@ -628,7 +631,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /document — returns 404 for non-existent DID', () => {
+    it('GET /document  -  returns 404 for non-existent DID', () => {
       cy.request({
         method: 'GET',
         url: '/api/v1/dids/nonexistent-id/document',
@@ -639,7 +642,7 @@ describe('DID API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /verify — returns 404 for non-existent DID', () => {
+    it('POST /verify  -  returns 404 for non-existent DID', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/dids/nonexistent-id/verify',

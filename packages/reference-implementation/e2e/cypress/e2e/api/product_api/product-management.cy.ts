@@ -1,7 +1,7 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Product API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let testTenantId: string;
   let registrarId: string;
   let schemeId: string;
@@ -14,7 +14,8 @@ describe('Product API', { testIsolation: false }, () => {
   let itemProductId: string;
   let standaloneItemId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant, identifiers, and users before testing products.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -43,7 +44,7 @@ describe('Product API', { testIsolation: false }, () => {
           registrarId,
           name: `Prod Test Scheme ${RUN_ID}`,
           primaryKey: `prod-key-${RUN_ID}`,
-          validationPattern: '^\\d{11}$',
+          validationPattern: '^e2e-\\d{10,}.*$',
           linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
@@ -55,7 +56,7 @@ describe('Product API', { testIsolation: false }, () => {
           url: '/api/v1/identifiers',
           body: {
             schemeId,
-            value: '11111111111',
+            value: `${RUN_ID}-primary`,
           },
         }).then((identResponse) => {
           identifierId = identResponse.body.id;
@@ -67,7 +68,7 @@ describe('Product API', { testIsolation: false }, () => {
           url: '/api/v1/identifiers',
           body: {
             schemeId,
-            value: '22222222222',
+            value: `${RUN_ID}-secondary`,
           },
         }).then((secIdentResponse) => {
           secondaryIdentifierId = secIdentResponse.body.id;
@@ -95,12 +96,14 @@ describe('Product API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
-    it('POST /api/v1/products — creates a MODEL product', () => {
+    it('POST /api/v1/products  -  creates a MODEL product', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/products',
@@ -124,7 +127,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/products — creates a BATCH product with MODEL parent', () => {
+    it('POST /api/v1/products  -  creates a BATCH product with MODEL parent', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/products',
@@ -147,7 +150,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/products — creates an ITEM product with BATCH parent', () => {
+    it('POST /api/v1/products  -  creates an ITEM product with BATCH parent', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/products',
@@ -170,7 +173,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/products — creates an ITEM product with no parent', () => {
+    it('POST /api/v1/products  -  creates an ITEM product with no parent', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/products',
@@ -192,7 +195,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products — lists products', () => {
+    it('GET /api/v1/products  -  lists products', () => {
       cy.request('/api/v1/products').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.not.have.property('ok');
@@ -204,7 +207,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products — filters by level', () => {
+    it('GET /api/v1/products  -  filters by level', () => {
       cy.request('/api/v1/products?level=MODEL').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -216,7 +219,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products — filters by parentId', () => {
+    it('GET /api/v1/products  -  filters by parentId', () => {
       cy.request(`/api/v1/products?parentId=${modelProductId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -231,7 +234,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products — filters by organisationId', () => {
+    it('GET /api/v1/products  -  filters by organisationId', () => {
       cy.request(`/api/v1/products?organisationId=${organisationId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -242,7 +245,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products — filters by facilityId', () => {
+    it('GET /api/v1/products  -  filters by facilityId', () => {
       cy.request(`/api/v1/products?facilityId=${facilityId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -253,7 +256,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products/:id — retrieves specific product', () => {
+    it('GET /api/v1/products/:id  -  retrieves specific product', () => {
       cy.request(`/api/v1/products/${modelProductId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(modelProductId);
@@ -262,7 +265,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/products/:id — updates name', () => {
+    it('PATCH /api/v1/products/:id  -  updates name', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/products/${modelProductId}`,
@@ -273,7 +276,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/products/:id — level is stripped (immutable)', () => {
+    it('PATCH /api/v1/products/:id  -  level is stripped (immutable)', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/products/${modelProductId}`,
@@ -285,7 +288,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products/:id — confirms update persisted', () => {
+    it('GET /api/v1/products/:id  -  confirms update persisted', () => {
       cy.request(`/api/v1/products/${modelProductId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`Still Model ${RUN_ID}`);
@@ -293,7 +296,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/products/:id — assigns identifiers', () => {
+    it('PATCH /api/v1/products/:id  -  assigns identifiers', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/products/${modelProductId}`,
@@ -306,7 +309,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products/:id — confirms identifiers assigned', () => {
+    it('GET /api/v1/products/:id  -  confirms identifiers assigned', () => {
       cy.request(`/api/v1/products/${modelProductId}`).then((response) => {
         expect(response.status).to.eq(200);
 
@@ -387,7 +390,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('deletes BATCH — detaches ITEM children', () => {
+    it('deletes BATCH  -  detaches ITEM children', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/products/${batchProductId}`,
@@ -430,7 +433,7 @@ describe('Product API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/products/:id — returns 404 after deletion', () => {
+    it('GET /api/v1/products/:id  -  returns 404 after deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/products/${modelProductId}`,

@@ -7,26 +7,30 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
-import { config } from '../../support/config';
+import { config, requireDbAccess, requireE2eRealm, runTag } from '../../support/config';
 
-describe('Closed mode — DID CRUD', { testIsolation: false }, () => {
+describe('Closed mode  -  DID CRUD', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let createdDidId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'Closed-mode tenant provisioning and cleanup use Postgres without an RI tenant route.');
+    requireE2eRealm(this, 'Closed-mode group tenancy uses the e2e realm groups.');
     // Clean up any leftover data from previous runs
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
 
-    // Login — triggers closed mode tenant provisioning
+    // Login  -  triggers closed mode tenant provisioning
     cy.apiLogin(config.user.email, config.user.password);
   });
 
   after(() => {
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
+    if (config.capabilities.dbAccess) {
+      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
+    }
   });
 
-  it('POST /api/v1/dids — creates a managed DID', () => {
+  it('POST /api/v1/dids  -  creates a managed DID', () => {
     cy.request({
       method: 'POST',
       url: '/api/v1/dids',
@@ -35,7 +39,7 @@ describe('Closed mode — DID CRUD', { testIsolation: false }, () => {
         method: 'DID_WEB',
         alias: `e2e-closed-${RUN_ID}`,
         name: `Closed Mode DID ${RUN_ID}`,
-        description: 'Created by closed mode E2E test',
+        description: `Created by closed mode E2E test ${RUN_ID}`,
       },
     }).then((response) => {
       expect(response.status).to.eq(201);
@@ -47,7 +51,7 @@ describe('Closed mode — DID CRUD', { testIsolation: false }, () => {
     });
   });
 
-  it('GET /api/v1/dids — lists DIDs including the one just created', () => {
+  it('GET /api/v1/dids  -  lists DIDs including the one just created', () => {
     cy.request('/api/v1/dids').then((response) => {
       expect(response.status).to.eq(200);
       expect(response.body.data).to.be.an('array');
@@ -58,7 +62,7 @@ describe('Closed mode — DID CRUD', { testIsolation: false }, () => {
     });
   });
 
-  it('GET /api/v1/dids/:id — retrieves the specific DID', () => {
+  it('GET /api/v1/dids/:id  -  retrieves the specific DID', () => {
     cy.request(`/api/v1/dids/${createdDidId}`).then((response) => {
       expect(response.status).to.eq(200);
       expect(response.body.id).to.eq(createdDidId);

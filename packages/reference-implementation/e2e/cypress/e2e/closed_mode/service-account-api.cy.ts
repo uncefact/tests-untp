@@ -8,14 +8,16 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
-import { config } from '../../support/config';
+import { config, requireDbAccess, requireE2eRealm, runTag } from '../../support/config';
 
 describe('Closed mode: service account API', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
   let accessToken: string;
   let tokenSub: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'Service-account user and closed-mode tenant cleanup use Postgres without RI delete routes.');
+    requireE2eRealm(this, 'Closed-mode group tenancy uses the e2e realm groups.');
     // Clean up any leftover closed mode data
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
 
@@ -33,8 +35,10 @@ describe('Closed mode: service account API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
-    cy.task('cleanupServiceAccountData', { sub: tokenSub, preserveTenant: true });
+    if (config.capabilities.dbAccess) {
+      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
+      cy.task('cleanupServiceAccountData', { sub: tokenSub, preserveTenant: true });
+    }
   });
 
   it('GET /api/v1/dids: authenticates via bearer token and resolves tenant by group', () => {
@@ -50,7 +54,7 @@ describe('Closed mode: service account API', { testIsolation: false }, () => {
   });
 
   it('POST /api/v1/dids: creates a DID via service account', () => {
-    const RUN_ID = Date.now();
+    const RUN_ID = runTag();
 
     cy.request({
       method: 'POST',
@@ -61,7 +65,7 @@ describe('Closed mode: service account API', { testIsolation: false }, () => {
         method: 'DID_WEB',
         alias: `e2e-sa-closed-${RUN_ID}`,
         name: `Closed SA DID ${RUN_ID}`,
-        description: 'Created by closed mode service account E2E test',
+        description: `Created by closed mode service account E2E test ${RUN_ID}`,
       },
     }).then((response) => {
       expect(response.status).to.eq(201);

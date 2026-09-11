@@ -1,7 +1,7 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Facility API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let testTenantId: string;
   let registrarId: string;
   let schemeId: string;
@@ -10,7 +10,8 @@ describe('Facility API', { testIsolation: false }, () => {
   let organisationId: string;
   let createdFacilityId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant, identifiers, and users before testing facilities.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -41,7 +42,7 @@ describe('Facility API', { testIsolation: false }, () => {
           registrarId,
           name: `Fac Test Scheme ${RUN_ID}`,
           primaryKey: `fac-pk-${RUN_ID}`,
-          validationPattern: '^\\d{11}$',
+          validationPattern: '^e2e-\\d{10,}.*$',
           linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
@@ -53,7 +54,7 @@ describe('Facility API', { testIsolation: false }, () => {
           url: '/api/v1/identifiers',
           body: {
             schemeId,
-            value: '11111111111',
+            value: `${RUN_ID}-primary`,
           },
         }).then((identResponse) => {
           identifierId = identResponse.body.id;
@@ -65,7 +66,7 @@ describe('Facility API', { testIsolation: false }, () => {
           url: '/api/v1/identifiers',
           body: {
             schemeId,
-            value: '22222222222',
+            value: `${RUN_ID}-secondary`,
           },
         }).then((secIdentResponse) => {
           secondaryIdentifierId = secIdentResponse.body.id;
@@ -84,12 +85,14 @@ describe('Facility API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
-    it('POST /api/v1/facilities — creates facilities', () => {
+    it('POST /api/v1/facilities  -  creates facilities', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/facilities',
@@ -110,7 +113,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/facilities — lists facilities', () => {
+    it('GET /api/v1/facilities  -  lists facilities', () => {
       cy.request('/api/v1/facilities').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.not.have.property('ok');
@@ -122,7 +125,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/facilities — filters by search', () => {
+    it('GET /api/v1/facilities  -  filters by search', () => {
       cy.request(`/api/v1/facilities?search=E2E Facility ${RUN_ID}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -134,7 +137,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/facilities — filters by organisationId', () => {
+    it('GET /api/v1/facilities  -  filters by organisationId', () => {
       cy.request(`/api/v1/facilities?organisationId=${organisationId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -146,7 +149,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/facilities/:id — retrieves specific facility', () => {
+    it('GET /api/v1/facilities/:id  -  retrieves specific facility', () => {
       cy.request(`/api/v1/facilities/${createdFacilityId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(createdFacilityId);
@@ -154,7 +157,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/facilities/:id — updates name', () => {
+    it('PATCH /api/v1/facilities/:id  -  updates name', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/facilities/${createdFacilityId}`,
@@ -165,14 +168,14 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/facilities/:id — confirms update persisted', () => {
+    it('GET /api/v1/facilities/:id  -  confirms update persisted', () => {
       cy.request(`/api/v1/facilities/${createdFacilityId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`Updated Facility ${RUN_ID}`);
       });
     });
 
-    it('PATCH /api/v1/facilities/:id — assigns primary identifier', () => {
+    it('PATCH /api/v1/facilities/:id  -  assigns primary identifier', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/facilities/${createdFacilityId}`,
@@ -183,7 +186,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/facilities/:id — assigns secondary identifiers', () => {
+    it('PATCH /api/v1/facilities/:id  -  assigns secondary identifiers', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/facilities/${createdFacilityId}`,
@@ -195,7 +198,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/facilities/:id — confirms identifiers assigned', () => {
+    it('GET /api/v1/facilities/:id  -  confirms identifiers assigned', () => {
       cy.request(`/api/v1/facilities/${createdFacilityId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.primaryIdentifierId).to.eq(identifierId);
@@ -204,7 +207,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/facilities/:id — clears secondary identifiers', () => {
+    it('PATCH /api/v1/facilities/:id  -  clears secondary identifiers', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/facilities/${createdFacilityId}`,
@@ -216,7 +219,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/facilities/:id — deletes the facility', () => {
+    it('DELETE /api/v1/facilities/:id  -  deletes the facility', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/facilities/${createdFacilityId}`,
@@ -225,7 +228,7 @@ describe('Facility API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/facilities/:id — returns 404 after deletion', () => {
+    it('GET /api/v1/facilities/:id  -  returns 404 after deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/facilities/${createdFacilityId}`,

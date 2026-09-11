@@ -1,12 +1,13 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Scheme API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let registrarId: string;
   let createdSchemeId: string;
   let testTenantId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant, registrar, and users before testing schemes.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -31,12 +32,14 @@ describe('Scheme API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
-    it('POST /api/v1/schemes — creates a scheme', () => {
+    it('POST /api/v1/schemes  -  creates a scheme', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/schemes',
@@ -58,7 +61,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('POST /api/v1/schemes — creates a scheme with qualifiers', () => {
+    it('POST /api/v1/schemes  -  creates a scheme with qualifiers', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/schemes',
@@ -90,12 +93,12 @@ describe('Scheme API', { testIsolation: false }, () => {
         expect(keys).to.include('lot');
         expect(keys).to.include('serial');
 
-        // Clean up this scheme — we only need the first one for remaining tests
+        // Clean up this scheme  -  we only need the first one for remaining tests
         cy.request({ method: 'DELETE', url: `/api/v1/schemes/${response.body.id}` });
       });
     });
 
-    it('GET /api/v1/schemes — lists schemes', () => {
+    it('GET /api/v1/schemes  -  lists schemes', () => {
       cy.request('/api/v1/schemes').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.not.have.property('ok');
@@ -107,7 +110,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/schemes — filters by registrarId', () => {
+    it('GET /api/v1/schemes  -  filters by registrarId', () => {
       cy.request(`/api/v1/schemes?registrarId=${registrarId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.pagination).to.exist;
@@ -117,7 +120,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/schemes/:id — retrieves a specific scheme', () => {
+    it('GET /api/v1/schemes/:id  -  retrieves a specific scheme', () => {
       cy.request(`/api/v1/schemes/${createdSchemeId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(createdSchemeId);
@@ -125,7 +128,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/schemes/:id — updates scheme name', () => {
+    it('PATCH /api/v1/schemes/:id  -  updates scheme name', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/schemes/${createdSchemeId}`,
@@ -136,7 +139,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/schemes/:id — adds qualifiers via update', () => {
+    it('PATCH /api/v1/schemes/:id  -  adds qualifiers via update', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/schemes/${createdSchemeId}`,
@@ -156,7 +159,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/schemes/:id — replaces qualifiers on update', () => {
+    it('PATCH /api/v1/schemes/:id  -  replaces qualifiers on update', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/schemes/${createdSchemeId}`,
@@ -176,7 +179,7 @@ describe('Scheme API', { testIsolation: false }, () => {
         },
       }).then((response) => {
         expect(response.status).to.eq(200);
-        // Previous 'cpv' qualifier should be gone — qualifiers are replaced, not appended
+        // Previous 'cpv' qualifier should be gone  -  qualifiers are replaced, not appended
         expect(response.body.qualifiers).to.have.length(2);
         const keys = response.body.qualifiers.map((q: any) => q.key);
         expect(keys).to.include('lot');
@@ -185,7 +188,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/schemes/:id — confirms updates persisted', () => {
+    it('GET /api/v1/schemes/:id  -  confirms updates persisted', () => {
       cy.request(`/api/v1/schemes/${createdSchemeId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`Updated ABN Scheme ${RUN_ID}`);
@@ -193,7 +196,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/schemes/:id — deletes the scheme', () => {
+    it('DELETE /api/v1/schemes/:id  -  deletes the scheme', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/schemes/${createdSchemeId}`,
@@ -202,7 +205,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/schemes/:id — returns 404 after deletion', () => {
+    it('GET /api/v1/schemes/:id  -  returns 404 after deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/schemes/${createdSchemeId}`,
@@ -385,7 +388,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH — returns 404 for nonexistent scheme', () => {
+    it('PATCH  -  returns 404 for nonexistent scheme', () => {
       cy.request({
         method: 'PATCH',
         url: '/api/v1/schemes/nonexistent-id',
@@ -397,7 +400,7 @@ describe('Scheme API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE — returns 404 for nonexistent scheme', () => {
+    it('DELETE  -  returns 404 for nonexistent scheme', () => {
       cy.request({
         method: 'DELETE',
         url: '/api/v1/schemes/nonexistent-id',

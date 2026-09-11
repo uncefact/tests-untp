@@ -7,6 +7,13 @@ import util from 'util';
 import { Client, ClientOptions } from 'minio';
 import pg from 'pg';
 import { readFetchAllowPrivateUrlsIfSet } from '../src/lib/config/credential-fetch.config';
+import {
+  cleanupRunData,
+  findTaggedRows,
+  type CleanupActor,
+  type CleanupFailure,
+  type CleanupOptions,
+} from './cypress/support/cleanup';
 const { Client: PgClient } = pg;
 
 // Load .env.e2e from this e2e workspace's root.
@@ -97,6 +104,111 @@ function requireResolvedKeyToMatchApplicationSetting(resolvedValue: unknown): vo
 
 const execPromise = util.promisify(exec);
 
+const E2E_DB_ACCESS = (process.env.E2E_DB_ACCESS ?? 'false') === 'true';
+// The compose stack imports the e2e realm fixture; a deployed instance's own
+// identity provider has no such clients or groups, so realm-bound cases skip.
+const E2E_IDP_E2E_REALM = (process.env.E2E_IDP_E2E_REALM ?? 'true') === 'true';
+const RUN_ID = process.env.E2E_RUN_ID ?? `${Date.now()}${Math.floor(Math.random() * 1_000_000)}`;
+if (!/^\d{10,}$/.test(RUN_ID)) {
+  throw new Error('E2E_RUN_ID must be numeric and contain at least 10 digits.');
+}
+const RUN_TAG = `e2e-${RUN_ID}`;
+const RESIDUE_POLICY = process.env.E2E_RESIDUE_POLICY ?? 'fail';
+if (RESIDUE_POLICY !== 'fail' && RESIDUE_POLICY !== 'clean') {
+  throw new Error(`E2E_RESIDUE_POLICY must be either fail or clean, received ${RESIDUE_POLICY}.`);
+}
+
+const registeredActors = new Map<string, CleanupActor>();
+const serviceAccountSubjects = new Map<string, string>();
+const testTenantIds = new Set<string>();
+let residueChecked = false;
+
+function recordActor(actor: CleanupActor): void {
+  registeredActors.set(actor.name, actor);
+}
+
+function actorNameForClient(clientId: string): string {
+  const sa2ClientId = process.env.E2E_SA2_CLIENT_ID || 'ri-service-account-e2e-2';
+  return clientId === sa2ClientId ? 'service-account-2' : 'service-account-1';
+}
+
+function tokenSubject(accessToken: string): string {
+  const encodedPayload = accessToken.split('.')[1];
+  if (!encodedPayload) throw new Error('Service account token had no JWT payload for cleanup.');
+  const payload = JSON.parse(
+    Buffer.from(encodedPayload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(),
+  ) as {
+    sub?: unknown;
+  };
+  if (typeof payload.sub !== 'string' || !payload.sub) {
+    throw new Error('Service account token had no subject claim for cleanup.');
+  }
+  return payload.sub;
+}
+
+async function requestServiceAccountToken(options?: { clientId?: string; clientSecret?: string }) {
+  const provider = process.env.E2E_IDP_PROVIDER || 'keycloak';
+  const idpBaseUrl = process.env.E2E_IDP_BASE_URL || 'http://localhost:8081';
+  const clientId = options?.clientId ?? (process.env.E2E_SA1_CLIENT_ID || 'ri-service-account-e2e');
+  const clientSecret = options?.clientSecret ?? (process.env.E2E_SA1_CLIENT_SECRET || 'e2e-service-account-secret');
+
+  let tokenUrl: string;
+  let scope: string;
+
+  if (provider === 'zitadel') {
+    tokenUrl = `${idpBaseUrl}/oauth/v2/token`;
+    const audience = process.env.E2E_IDP_AUDIENCE || '';
+    scope = `openid urn:zitadel:iam:org:project:id:${audience}:aud urn:zitadel:iam:org:projects:roles`;
+  } else {
+    const realm = process.env.E2E_IDP_REALM || 'ri-e2e';
+    tokenUrl = `${idpBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
+    scope = 'openid';
+  }
+
+  const params = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope,
+  });
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to get service account token: ${response.status} ${text}`);
+  }
+
+  const data = (await response.json()) as { access_token?: string };
+  if (!data.access_token) throw new Error(`Service account token response for ${clientId} had no access_token.`);
+  const actor = actorNameForClient(clientId);
+  recordActor({ name: actor, headers: { Authorization: `Bearer ${data.access_token}` } });
+  serviceAccountSubjects.set(actor, tokenSubject(data.access_token));
+  return { accessToken: data.access_token };
+}
+
+async function ensureServiceAccountActors(): Promise<void> {
+  const clients = [
+    {
+      clientId: process.env.E2E_SA1_CLIENT_ID || 'ri-service-account-e2e',
+      clientSecret: process.env.E2E_SA1_CLIENT_SECRET || 'e2e-service-account-secret',
+    },
+    {
+      clientId: process.env.E2E_SA2_CLIENT_ID || 'ri-service-account-e2e-2',
+      clientSecret: process.env.E2E_SA2_CLIENT_SECRET || 'e2e-service-account-secret-2',
+    },
+  ];
+  for (const client of clients) {
+    if (!registeredActors.has(actorNameForClient(client.clientId))) await requestServiceAccountToken(client);
+  }
+}
+
+function formatCleanupFailures(failures: CleanupFailure[]): string[] {
+  return failures.map(({ actor, collection, message }) => `${actor}/${collection}: ${message}`);
+}
+
 function getDbClient() {
   const isRemoteDb = process.env.E2E_DB_HOST && process.env.E2E_DB_HOST !== 'localhost';
   const rejectUnauthorized = (process.env.E2E_DB_SSL_REJECT_UNAUTHORIZED ?? 'true') === 'true';
@@ -176,6 +288,294 @@ async function deleteTenantData(client: any, tenantId: string, options?: { prese
   }
 }
 
+async function deleteTaggedTenantData(client: any, tenantId: string, tag: string): Promise<void> {
+  const tagPattern = `%${tag}%`;
+
+  await client.query(`DELETE FROM "ConformityProfileCriterion" WHERE id LIKE $1`, [tagPattern]);
+  await client.query(
+    `DELETE FROM "ConformityProfile" WHERE "tenantId" = $1 AND (id LIKE $2 OR "canonicalId" LIKE $2 OR name LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "ConformityScheme" WHERE "tenantId" = $1 AND (id LIKE $2 OR "canonicalId" LIKE $2 OR name LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "ConformityCriterion" WHERE "tenantId" = $1 AND (id LIKE $2 OR "canonicalId" LIKE $2 OR name LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+
+  await client.query(
+    `DELETE FROM "LibraryRecord"
+     WHERE "tenantId" = $1
+       AND (id LIKE $2 OR name LIKE $2 OR "issuerName" LIKE $2 OR "issuerDid" LIKE $2 OR "subjectName" LIKE $2 OR "subjectId" LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(`DELETE FROM "RenderTemplate" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2)`, [
+    tenantId,
+    tagPattern,
+  ]);
+  await client.query(
+    `DELETE FROM "DataModel"
+     WHERE "tenantId" = $1
+       AND (id LIKE $2 OR name LIKE $2 OR "schemaUrl" LIKE $2 OR "contextUrl" LIKE $2 OR "websiteUrl" LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+
+  await client.query(
+    `DELETE FROM "Product"
+     WHERE "tenantId" = $1
+       AND (id LIKE $2 OR name LIKE $2 OR description LIKE $2)
+       AND "parentId" IN (SELECT id FROM "Product" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2 OR description LIKE $2))`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "Product" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2 OR description LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "Facility" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2 OR description LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "OrganisationEntity" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2 OR description LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(`DELETE FROM "Identifier" WHERE "tenantId" = $1 AND (id LIKE $2 OR value LIKE $2)`, [
+    tenantId,
+    tagPattern,
+  ]);
+  await client.query(
+    `DELETE FROM "SchemeQualifier" WHERE "schemeId" IN (SELECT id FROM "IdentifierScheme" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2 OR "primaryKey" LIKE $2))`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "IdentifierScheme" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2 OR "primaryKey" LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "Registrar" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2 OR namespace LIKE $2 OR url LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "Did"
+     WHERE "tenantId" = $1 AND (id LIKE $2 OR did LIKE $2 OR name LIKE $2 OR description LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+  await client.query(
+    `DELETE FROM "ServiceInstance" WHERE "tenantId" = $1 AND (id LIKE $2 OR name LIKE $2 OR description LIKE $2)`,
+    [tenantId, tagPattern],
+  );
+
+  const taggedTenant = await client.query(`SELECT id FROM "Tenant" WHERE id = $1 AND (id LIKE $2 OR name LIKE $2)`, [
+    tenantId,
+    tagPattern,
+  ]);
+  if (taggedTenant.rowCount > 0) {
+    await client.query(`UPDATE "User" SET "tenantId" = NULL WHERE "tenantId" = $1`, [tenantId]);
+    await client.query(`DELETE FROM "Tenant" WHERE id = $1`, [tenantId]);
+  }
+}
+
+async function cleanupTaggedDatabaseData(tag: string): Promise<string[]> {
+  const client = getDbClient();
+  const failures: string[] = [];
+  try {
+    await client.connect();
+    const tagPattern = `%${tag}%`;
+    const taggedTenants = await client.query<{ tenantId: string }>(
+      `SELECT DISTINCT "tenantId" AS "tenantId"
+       FROM (
+         SELECT "tenantId" FROM "LibraryRecord"
+          WHERE id LIKE $1 OR name LIKE $1 OR "issuerName" LIKE $1 OR "issuerDid" LIKE $1 OR "subjectName" LIKE $1 OR "subjectId" LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "RenderTemplate" WHERE id LIKE $1 OR name LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "DataModel"
+          WHERE id LIKE $1 OR name LIKE $1 OR "schemaUrl" LIKE $1 OR "contextUrl" LIKE $1 OR "websiteUrl" LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "Product" WHERE id LIKE $1 OR name LIKE $1 OR description LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "Facility" WHERE id LIKE $1 OR name LIKE $1 OR description LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "OrganisationEntity" WHERE id LIKE $1 OR name LIKE $1 OR description LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "Identifier" WHERE id LIKE $1 OR value LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "IdentifierScheme" WHERE id LIKE $1 OR name LIKE $1 OR "primaryKey" LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "Registrar" WHERE id LIKE $1 OR name LIKE $1 OR namespace LIKE $1 OR url LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "Did" WHERE id LIKE $1 OR did LIKE $1 OR name LIKE $1 OR description LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "ServiceInstance" WHERE id LIKE $1 OR name LIKE $1 OR description LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "ConformityScheme" WHERE id LIKE $1 OR "canonicalId" LIKE $1 OR name LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "ConformityProfile" WHERE id LIKE $1 OR "canonicalId" LIKE $1 OR name LIKE $1
+         UNION ALL
+         SELECT "tenantId" FROM "ConformityCriterion" WHERE id LIKE $1 OR "canonicalId" LIKE $1 OR name LIKE $1
+         UNION ALL
+         SELECT id AS "tenantId" FROM "Tenant" WHERE id LIKE $1 OR name LIKE $1
+       ) AS tagged
+       WHERE "tenantId" IS NOT NULL`,
+      [tagPattern],
+    );
+    for (const row of taggedTenants.rows) testTenantIds.add(row.tenantId);
+
+    for (const tenantId of testTenantIds) {
+      try {
+        await deleteTaggedTenantData(client, tenantId, tag);
+      } catch (error) {
+        failures.push(
+          `database fallback for tenant ${tenantId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  } finally {
+    await client.end();
+  }
+  return failures;
+}
+
+async function cleanupDatabaseUsers(errors: string[]): Promise<void> {
+  const client = getDbClient();
+  try {
+    await client.connect();
+    const emails = [
+      process.env.E2E_USER_EMAIL || 'e2e-admin@test.local',
+      process.env.E2E_USER2_EMAIL || 'e2e-user@test.local',
+    ];
+    for (const email of emails) {
+      try {
+        await client.query(`DELETE FROM "Account" WHERE "userId" IN (SELECT id FROM "User" WHERE email = $1)`, [email]);
+      } catch (error) {
+        errors.push(`OAuth accounts for ${email}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      try {
+        await client.query(`DELETE FROM "User" WHERE email = $1`, [email]);
+      } catch (error) {
+        errors.push(`user ${email}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  } catch (error) {
+    errors.push(`database user cleanup connection: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    try {
+      await client.end();
+    } catch (error) {
+      errors.push(`database user cleanup close: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+async function cleanupDatabaseServiceAccounts(errors: string[]): Promise<void> {
+  if (serviceAccountSubjects.size === 0) return;
+
+  const client = getDbClient();
+  try {
+    await client.connect();
+    const preserveTenant = (process.env.E2E_TENANT_MODE || 'open') === 'closed';
+    for (const [actor, sub] of serviceAccountSubjects) {
+      try {
+        const userResult = await client.query(`SELECT id, "tenantId" FROM "User" WHERE "authProviderId" = $1`, [sub]);
+        if (userResult.rowCount === 0) continue;
+
+        const { id: userId, tenantId } = userResult.rows[0];
+        if (tenantId) {
+          testTenantIds.add(tenantId);
+          await deleteTenantData(client, tenantId, { preserveTenant });
+        }
+        await client.query(`DELETE FROM "Account" WHERE "userId" = $1`, [userId]);
+        await client.query(`DELETE FROM "User" WHERE id = $1`, [userId]);
+      } catch (error) {
+        errors.push(`service account ${actor}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  } catch (error) {
+    errors.push(`service-account cleanup connection: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    try {
+      await client.end();
+    } catch (error) {
+      errors.push(`service-account cleanup close: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+async function cleanupIdentityResolverNamespace(namespace: string): Promise<string | undefined> {
+  try {
+    const baseUrl = process.env.E2E_IDR_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const url = new URL('/api/v4/identifiers', baseUrl);
+    url.searchParams.set('namespace', namespace);
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${process.env.E2E_IDR_API_KEY || 'test123'}` },
+    });
+    if (response.ok || response.status === 404) return undefined;
+    const body = await response.text();
+    // Pyx IDR v4 answers 400 rather than 404 for a namespace it does not
+    // hold; a namespace the run never registered is a clean state.
+    if (response.status === 400 && /not found/i.test(body)) return undefined;
+    return `DELETE ${url.pathname}?namespace=${namespace} returned ${response.status}${
+      body ? ` ${body.slice(0, 500)}` : ''
+    }`;
+  } catch (error) {
+    return `DELETE Identity Resolver namespace ${namespace} failed: ${
+      error instanceof Error ? error.message : String(error)
+    }`;
+  }
+}
+
+async function clearTaggedObjectStore({
+  bucketName,
+  prefix,
+  tag,
+  minioConfig,
+}: {
+  bucketName: string;
+  prefix?: string;
+  tag: string;
+  minioConfig: ClientOptions;
+}): Promise<{ success: boolean; message?: string }> {
+  try {
+    if (!bucketName) {
+      return {
+        success: false,
+        message: 'Bucket name is required.',
+      };
+    }
+
+    const minioClient = new Client(minioConfig);
+    const bucketExists = await minioClient.bucketExists(bucketName);
+    if (!bucketExists) {
+      return {
+        success: false,
+        message: `Bucket ${bucketName} does not exist.`,
+      };
+    }
+
+    const objects: string[] = [];
+    const bucketStream = minioClient.listObjectsV2(bucketName, prefix, true);
+
+    await new Promise<void>((resolve, reject) => {
+      bucketStream.on('data', (obj) => {
+        if (obj.name && obj.name.includes(tag)) objects.push(obj.name);
+      });
+      bucketStream.on('error', (err) => reject(err));
+      bucketStream.on('end', () => resolve());
+    });
+
+    if (objects.length > 0) {
+      await minioClient.removeObjects(bucketName, objects);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, message: error?.message ?? 'Unknown error' };
+  }
+}
+
 export default defineConfig({
   env: {
     idrBucketName: process.env.OBJECT_STORAGE_BUCKET_NAME || 'idr-bucket-1',
@@ -223,6 +623,12 @@ export default defineConfig({
     // Test organisation
     TEST_ORG_ID: process.env.E2E_TEST_ORG_ID || 'e2e-test-org',
 
+    // Instance contract
+    RUN_ID,
+    E2E_DB_ACCESS,
+    E2E_IDP_E2E_REALM,
+    RESIDUE_POLICY,
+
     // Tenant mode
     TENANT_MODE: process.env.E2E_TENANT_MODE || 'open',
 
@@ -248,55 +654,180 @@ export default defineConfig({
     defaultBrowser: 'chrome',
     setupNodeEvents(on, config) {
       requireResolvedKeyToMatchApplicationSetting(config.env.VERIFY_ALLOW_PRIVATE_URLS);
+      const cleanupBaseUrl = config.baseUrl ?? 'http://localhost:3003';
 
-      // Clean up all test artefacts after all specs complete
       on('after:run', async () => {
-        const client = getDbClient();
-        const cleanupErrors: unknown[] = [];
-        const recordCleanupFailure = (scope: string, error: unknown) => {
-          console.error(`E2E cleanup failed for ${scope}:`, error);
-          cleanupErrors.push(error);
-        };
-
+        const cleanupErrors: string[] = [];
         try {
-          await client.connect();
-
-          // Clean up human test users and their OAuth accounts
-          const userEmail = process.env.E2E_USER_EMAIL || 'e2e-admin@test.local';
-          const user2Email = process.env.E2E_USER2_EMAIL || 'e2e-user@test.local';
-          for (const email of [userEmail, user2Email]) {
-            try {
-              await client.query(`DELETE FROM "Account" WHERE "userId" IN (SELECT id FROM "User" WHERE email = $1)`, [
-                email,
-              ]);
-            } catch (error) {
-              recordCleanupFailure(`OAuth accounts for ${email}`, error);
-            }
-
-            try {
-              await client.query(`DELETE FROM "User" WHERE email = $1`, [email]);
-            } catch (error) {
-              recordCleanupFailure(`user ${email}`, error);
-            }
-          }
+          if (E2E_DB_ACCESS) await ensureServiceAccountActors();
         } catch (error) {
-          recordCleanupFailure('database connection', error);
-        } finally {
-          try {
-            await client.end();
-          } catch (error) {
-            recordCleanupFailure('database client close', error);
-          }
+          cleanupErrors.push(`service-account setup: ${error instanceof Error ? error.message : String(error)}`);
         }
 
+        const actors = [...registeredActors.values()];
+        if (actors.length === 0 && E2E_DB_ACCESS) {
+          cleanupErrors.push('No authenticated actors were available for API cleanup.');
+        }
+
+        const cleanupOptions: CleanupOptions = {
+          baseUrl: cleanupBaseUrl,
+          tag: RUN_TAG,
+          actors,
+        };
+        const apiCleanup = await cleanupRunData(cleanupOptions);
+        for (const failure of apiCleanup.failures) {
+          console.error(`E2E API cleanup failure: ${failure.actor}/${failure.collection}: ${failure.message}`);
+        }
+
+        if (E2E_DB_ACCESS) {
+          const resolverCleanupError = await cleanupIdentityResolverNamespace(`e2e-pub-${RUN_TAG}`);
+          if (resolverCleanupError) cleanupErrors.push(`Identity Resolver cleanup: ${resolverCleanupError}`);
+
+          try {
+            cleanupErrors.push(...(await cleanupTaggedDatabaseData(RUN_TAG)));
+          } catch (error) {
+            cleanupErrors.push(`database fallback: ${error instanceof Error ? error.message : String(error)}`);
+          }
+
+          const objectStoreCleanup = await clearTaggedObjectStore({
+            bucketName: config.env.idrBucketName as string,
+            prefix: 'gs1',
+            tag: RUN_TAG,
+            minioConfig: config.env.idrMinioConfig as ClientOptions,
+          });
+          if (!objectStoreCleanup.success) {
+            cleanupErrors.push(`object store cleanup: ${objectStoreCleanup.message ?? 'unknown failure'}`);
+          }
+
+          await cleanupDatabaseServiceAccounts(cleanupErrors);
+          await cleanupDatabaseUsers(cleanupErrors);
+        }
+
+        const proof = await findTaggedRows(cleanupOptions, (tags) => tags.includes(RUN_TAG));
+        for (const failure of proof.failures) {
+          console.error(`E2E cleanup proof failure: ${failure.actor}/${failure.collection}: ${failure.message}`);
+        }
+        for (const row of proof.rows) {
+          console.error(
+            `E2E cleanup proof found ${row.collection} row ${row.id} for ${row.actor} carrying ${row.tags.join(', ')}.`,
+          );
+        }
+
+        cleanupErrors.push(...formatCleanupFailures(proof.failures));
+        cleanupErrors.push(
+          ...proof.rows.map(
+            (row) => `${row.actor}/${row.collection}: leftover row ${row.id} carrying ${row.tags.join(', ')}`,
+          ),
+        );
+        if (!E2E_DB_ACCESS) cleanupErrors.push(...formatCleanupFailures(apiCleanup.failures));
+
         if (cleanupErrors.length > 0) {
-          const aggregateError = new AggregateError(cleanupErrors, 'E2E cleanup failed');
-          console.error('E2E cleanup failed after all cleanup attempts:', aggregateError);
-          throw aggregateError;
+          // Cypress prints only the aggregate's message, so each entry is
+          // written out here where it can be read.
+          for (const entry of cleanupErrors) console.error(`E2E cleanup: ${entry}`);
+          throw new AggregateError(cleanupErrors, 'E2E cleanup or proof failed');
         }
       });
 
       on('task', {
+        async prepareE2ERun() {
+          if (!E2E_DB_ACCESS) return null;
+          await ensureServiceAccountActors();
+          return null;
+        },
+        async cleanupE2ERunData() {
+          if (E2E_DB_ACCESS) await ensureServiceAccountActors();
+          if (registeredActors.size === 0) return { failures: [], matchedRows: 0 };
+          const result = await cleanupRunData({
+            baseUrl: cleanupBaseUrl,
+            tag: RUN_TAG,
+            actors: [...registeredActors.values()],
+          });
+          for (const failure of result.failures) {
+            console.error(
+              `E2E per-spec API cleanup failure: ${failure.actor}/${failure.collection}: ${failure.message}`,
+            );
+          }
+          if (!E2E_DB_ACCESS && result.failures.length > 0) {
+            throw new AggregateError(formatCleanupFailures(result.failures), 'E2E per-spec API cleanup failed');
+          }
+          return result;
+        },
+        captureSessionCookies({ cookies }: { cookies: Array<{ name: string; value: string }> }) {
+          if (!Array.isArray(cookies) || cookies.length === 0) {
+            throw new Error('The session user did not provide any cookies for API cleanup.');
+          }
+          const cookieHeader = cookies.map(({ name, value }) => `${name}=${value}`).join('; ');
+          recordActor({ name: 'session-user', headers: { Cookie: cookieHeader } });
+          return null;
+        },
+        async checkE2EResidue() {
+          if (!E2E_DB_ACCESS) return null;
+          if (residueChecked) return null;
+          residueChecked = true;
+          await ensureServiceAccountActors();
+
+          const options: CleanupOptions = {
+            baseUrl: cleanupBaseUrl,
+            tag: RUN_TAG,
+            actors: [...registeredActors.values()],
+          };
+          const residue = await findTaggedRows(options, (tags) => tags.some((tag) => tag !== RUN_TAG));
+          const failures = formatCleanupFailures(residue.failures);
+          if (failures.length > 0) {
+            throw new Error(`E2E residue check could not list every collection:\n${failures.join('\n')}`);
+          }
+          if (residue.rows.length === 0) return null;
+
+          const rowSummary = residue.rows.map(
+            (row) => `${row.actor}/${row.collection}/${row.id}: ${row.tags.join(', ')}`,
+          );
+          if (RESIDUE_POLICY === 'fail') {
+            throw new Error(`E2E residue from an earlier run was found:\n${rowSummary.join('\n')}`);
+          }
+
+          const residueTags = [...new Set(residue.rows.flatMap((row) => row.tags))];
+          const cleanupFailures: CleanupFailure[] = [];
+          for (const tag of residueTags) {
+            const result = await cleanupRunData({ ...options, tag });
+            for (const failure of result.failures) {
+              console.error(
+                `E2E residue API cleanup failure: ${failure.actor}/${failure.collection}: ${failure.message}`,
+              );
+            }
+            if (!E2E_DB_ACCESS) cleanupFailures.push(...result.failures);
+            if (E2E_DB_ACCESS) {
+              try {
+                cleanupFailures.push(
+                  ...(await cleanupTaggedDatabaseData(tag)).map((message) => ({
+                    actor: 'database fallback',
+                    collection: 'tagged rows',
+                    message,
+                  })),
+                );
+              } catch (error) {
+                cleanupFailures.push({
+                  actor: 'database fallback',
+                  collection: 'tagged rows',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          }
+
+          if (cleanupFailures.length > 0) {
+            throw new Error(`E2E residue cleanup failed:\n${formatCleanupFailures(cleanupFailures).join('\n')}`);
+          }
+          const remaining = await findTaggedRows(options, (tags) => tags.some((tag) => residueTags.includes(tag)));
+          if (remaining.failures.length > 0 || remaining.rows.length > 0) {
+            throw new Error(
+              `E2E residue cleanup did not converge:\n${formatCleanupFailures(remaining.failures)
+                .concat(remaining.rows.map((row) => `${row.actor}/${row.collection}/${row.id}: ${row.tags.join(', ')}`))
+                .join('\n')}`,
+            );
+          }
+          return null;
+        },
         writeToFile({ fileName, data }: { fileName: string; data: any }) {
           const filePath = path.resolve('cypress/fixtures/credentials-e2e', fileName);
           fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
@@ -314,48 +845,15 @@ export default defineConfig({
         async clearObjectStore({
           bucketName,
           prefix,
+          tag,
           minioConfig,
         }: {
           bucketName: string;
           prefix?: string;
+          tag: string;
           minioConfig: ClientOptions;
         }) {
-          try {
-            if (!bucketName) {
-              return {
-                success: false,
-                message: 'Bucket name is required.',
-              };
-            }
-
-            const minioClient = new Client(minioConfig);
-            const bucketExists = await minioClient.bucketExists(bucketName);
-            if (!bucketExists) {
-              return {
-                success: false,
-                message: `Bucket ${bucketName} does not exist.`,
-              };
-            }
-
-            const objects: string[] = [];
-            const bucketStream = minioClient.listObjectsV2(bucketName, prefix, true); // true for recursive
-
-            // Collect all object names
-            await new Promise<void>((resolve, reject) => {
-              bucketStream.on('data', (obj) => obj.name && objects.push(obj.name));
-              bucketStream.on('error', (err) => reject(err));
-              bucketStream.on('end', () => resolve());
-            });
-
-            if (objects.length > 0) {
-              await minioClient.removeObjects(bucketName, objects);
-            }
-
-            return { success: true };
-          } catch (error: any) {
-            console.log('clearObjectStore skipped:', error?.message ?? error);
-            return { success: false, message: error?.message ?? 'Unknown error' };
-          }
+          return clearTaggedObjectStore({ bucketName, prefix, tag, minioConfig });
         },
         deleteFile(filePath) {
           return new Promise((resolve, reject) => {
@@ -367,36 +865,41 @@ export default defineConfig({
             });
           });
         },
-        async seedConformitySchemes({ tenantId }: { tenantId: string }) {
+        async seedConformitySchemes({ tenantId, tag }: { tenantId: string; tag?: string }) {
           const client = getDbClient();
-          const scheme = 'https://e2e.example/scheme';
-          const profile = 'https://e2e.example/scheme/profile/1.0.0';
-          const criterion = 'https://e2e.example/scheme/criterion/1.0.0';
-          const topic = 'https://vocabulary.example.com/conformity-topic/e2e';
+          const seedTag = tag ?? RUN_TAG;
+          const scheme = `https://e2e.example/${seedTag}/scheme`;
+          const profile = `${scheme}/profile/1.0.0`;
+          const criterion = `${scheme}/criterion/1.0.0`;
+          const topic = `https://vocabulary.example.com/conformity-topic/${seedTag}`;
           try {
             await client.connect();
             await client.query(
               `INSERT INTO "ConformityScheme" (id, "canonicalId", name, "specVersion", source, "sourceUrl", "lastFetchStatus", "tenantId", "createdAt", "updatedAt")
                VALUES ($1, $2, 'E2E Scheme', '0.7.0', 'TENANT_IMPORTED', $3, 'SUCCESS', $4, NOW(), NOW())
                ON CONFLICT (id) DO NOTHING`,
-              [`e2e-cvc-scheme-${tenantId}`, scheme, `${scheme}.json`, tenantId],
+              [`${seedTag}-cvc-scheme-${tenantId}`, scheme, `${scheme}.json`, tenantId],
             );
             await client.query(
               `INSERT INTO "ConformityProfile" (id, "canonicalId", name, version, status, "tenantId", "schemeId", "createdAt", "updatedAt")
                VALUES ($1, $2, 'E2E Profile', '1.0.0', 'active', $3, $4, NOW(), NOW())
                ON CONFLICT (id) DO NOTHING`,
-              [`e2e-cvc-profile-${tenantId}`, profile, tenantId, `e2e-cvc-scheme-${tenantId}`],
+              [`${seedTag}-cvc-profile-${tenantId}`, profile, tenantId, `${seedTag}-cvc-scheme-${tenantId}`],
             );
             await client.query(
               `INSERT INTO "ConformityCriterion" (id, "canonicalId", name, version, status, topics, tags, "tenantId", "createdAt", "updatedAt")
                VALUES ($1, $2, 'E2E Criterion', '1.0.0', 'active', $3::jsonb, ARRAY['e2e']::text[], $4, NOW(), NOW())
                ON CONFLICT (id) DO NOTHING`,
-              [`e2e-cvc-criterion-${tenantId}`, criterion, JSON.stringify([{ canonicalId: topic }]), tenantId],
+              [`${seedTag}-cvc-criterion-${tenantId}`, criterion, JSON.stringify([{ canonicalId: topic }]), tenantId],
             );
             await client.query(
               `INSERT INTO "ConformityProfileCriterion" (id, "profileId", "criterionId")
                VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
-              [`e2e-cvc-join-${tenantId}`, `e2e-cvc-profile-${tenantId}`, `e2e-cvc-criterion-${tenantId}`],
+              [
+                `${seedTag}-cvc-join-${tenantId}`,
+                `${seedTag}-cvc-profile-${tenantId}`,
+                `${seedTag}-cvc-criterion-${tenantId}`,
+              ],
             );
             return { scheme, profile, criterion, topic };
           } finally {
@@ -428,6 +931,7 @@ export default defineConfig({
               // Clean existing test data so tests start fresh
               await deleteTenantData(client, tenantId, { preserveTenant: true });
 
+              testTenantIds.add(tenantId);
               return { tenantId, userId: result.rows[0].id };
             }
 
@@ -436,10 +940,10 @@ export default defineConfig({
             await client.query(
               `
               INSERT INTO "Tenant" (id, name, "createdAt", "updatedAt")
-              VALUES ($1, 'E2E Test Organisation', NOW(), NOW())
-              ON CONFLICT (id) DO UPDATE SET "updatedAt" = NOW()
+              VALUES ($1, $2, NOW(), NOW())
+               ON CONFLICT (id) DO UPDATE SET "updatedAt" = NOW()
             `,
-              [testOrgId],
+              [testOrgId, `E2E Test Organisation ${RUN_TAG}`],
             );
 
             const result = await client.query(
@@ -453,6 +957,7 @@ export default defineConfig({
               throw new Error(`User with email ${userEmail} not found. Has the user logged in?`);
             }
 
+            testTenantIds.add(testOrgId);
             return { tenantId: testOrgId, userId: result.rows[0].id };
           } finally {
             await client.end();
@@ -462,6 +967,7 @@ export default defineConfig({
           const client = getDbClient();
           try {
             await client.connect();
+            testTenantIds.add(tenantId);
             await deleteTenantData(client, tenantId, { preserveTenant });
             return null;
           } finally {
@@ -483,6 +989,7 @@ export default defineConfig({
             }
 
             const tenantId = tenantResult.rows[0].id;
+            testTenantIds.add(tenantId);
             await deleteTenantData(client, tenantId);
 
             return { tenantId };
@@ -538,45 +1045,7 @@ export default defineConfig({
           }
         },
         async getServiceAccountToken(options?: { clientId?: string; clientSecret?: string }) {
-          const provider = process.env.E2E_IDP_PROVIDER || 'keycloak';
-          const idpBaseUrl = process.env.E2E_IDP_BASE_URL || 'http://localhost:8081';
-          const clientId = options?.clientId ?? (process.env.E2E_SA1_CLIENT_ID || 'ri-service-account-e2e');
-          const clientSecret =
-            options?.clientSecret ?? (process.env.E2E_SA1_CLIENT_SECRET || 'e2e-service-account-secret');
-
-          let tokenUrl: string;
-          let scope: string;
-
-          if (provider === 'zitadel') {
-            tokenUrl = `${idpBaseUrl}/oauth/v2/token`;
-            const audience = process.env.E2E_IDP_AUDIENCE || '';
-            scope = `openid urn:zitadel:iam:org:project:id:${audience}:aud urn:zitadel:iam:org:projects:roles`;
-          } else {
-            const realm = process.env.E2E_IDP_REALM || 'ri-e2e';
-            tokenUrl = `${idpBaseUrl}/realms/${realm}/protocol/openid-connect/token`;
-            scope = 'openid';
-          }
-
-          const params = new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: clientId,
-            client_secret: clientSecret,
-            scope,
-          });
-
-          const response = await fetch(tokenUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString(),
-          });
-
-          if (!response.ok) {
-            const text = await response.text();
-            throw new Error(`Failed to get service account token: ${response.status} ${text}`);
-          }
-
-          const data = await response.json();
-          return { accessToken: data.access_token };
+          return requestServiceAccountToken(options);
         },
         async cleanupServiceAccountData({ sub, preserveTenant }: { sub: string; preserveTenant?: boolean }) {
           const client = getDbClient();
@@ -595,6 +1064,7 @@ export default defineConfig({
             const { id: userId, tenantId } = userResult.rows[0];
 
             if (tenantId) {
+              testTenantIds.add(tenantId);
               await deleteTenantData(client, tenantId, { preserveTenant });
             }
 
@@ -630,24 +1100,25 @@ export default defineConfig({
           const client = getDbClient();
           try {
             await client.connect();
-            const foreignTenantId = 'e2e-foreign-tenant';
-            const foreignDidId = 'e2e-foreign-did';
-            const foreignDid = `did:web:foreign-tenant.example.com:e2e-${Date.now()}`;
+            const foreignTenantId = `${RUN_TAG}-foreign-tenant`;
+            const foreignDidId = `${RUN_TAG}-foreign-did`;
+            const foreignDid = `did:web:foreign-tenant.example.com:${RUN_TAG}`;
+            testTenantIds.add(foreignTenantId);
 
             // Create a foreign tenant (update timestamp if it already exists from a previous run)
             await client.query(
               `INSERT INTO "Tenant" (id, name, "createdAt", "updatedAt")
-               VALUES ($1, 'E2E Foreign Tenant', NOW(), NOW())
+               VALUES ($1, $2, NOW(), NOW())
                ON CONFLICT (id) DO UPDATE SET "updatedAt" = NOW()`,
-              [foreignTenantId],
+              [foreignTenantId, `E2E Foreign Tenant ${RUN_TAG}`],
             );
 
             // Create a DID belonging to that foreign tenant
             await client.query(
               `INSERT INTO "Did" (id, "tenantId", did, type, method, "keyId", name, status, "isDefault", "createdAt", "updatedAt")
-               VALUES ($1, $2, $3, 'MANAGED', 'DID_WEB', 'foreign-key-1', 'Foreign DID', 'ACTIVE', false, NOW(), NOW())
+              VALUES ($1, $2, $3, 'MANAGED', 'DID_WEB', 'foreign-key-1', $4, 'ACTIVE', false, NOW(), NOW())
                ON CONFLICT (id) DO UPDATE SET did = $3, "updatedAt" = NOW()`,
-              [foreignDidId, foreignTenantId, foreignDid],
+              [foreignDidId, foreignTenantId, foreignDid, `Foreign DID ${RUN_TAG}`],
             );
 
             return { tenantId: foreignTenantId, didId: foreignDidId, did: foreignDid };
@@ -659,7 +1130,9 @@ export default defineConfig({
           const client = getDbClient();
           try {
             await client.connect();
-            await deleteTenantData(client, 'e2e-foreign-tenant');
+            const foreignTenantId = `${RUN_TAG}-foreign-tenant`;
+            testTenantIds.add(foreignTenantId);
+            await deleteTenantData(client, foreignTenantId);
             return null;
           } finally {
             await client.end();

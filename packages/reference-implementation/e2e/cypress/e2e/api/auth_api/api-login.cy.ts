@@ -1,15 +1,17 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, requireE2eRealm, runTag } from '../../../support/config';
 
 describe('API login', { retries: 0 }, () => {
   let tenantId: string | undefined;
 
-  beforeEach(() => {
+  beforeEach(function () {
+    requireDbAccess(this, 'This regression fixture deletes test users and seeds a tenant through Postgres.');
+    requireE2eRealm(this, 'Browser login uses the e2e realm users.');
     tenantId = undefined;
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
   });
 
   afterEach(() => {
-    if (tenantId) {
+    if (config.capabilities.dbAccess && tenantId) {
       cy.task('cleanupTestData', { tenantId, preserveTenant: config.tenantMode === 'closed' });
     }
   });
@@ -43,8 +45,8 @@ describe('API login', { retries: 0 }, () => {
       // Exercise real middleware/session-cookie renewal immediately after
       // login, including a second request using the newly issued cookie.
       cy.request('POST', '/api/v1/registrars', {
-        name: 'API login regression registrar',
-        namespace: `api-login-${Date.now()}`,
+        name: `API login regression registrar ${runTag()}`,
+        namespace: `api-login-${runTag()}`,
         url: 'https://example.com',
       }).then(({ status, body }) => {
         expect(status).to.eq(201);

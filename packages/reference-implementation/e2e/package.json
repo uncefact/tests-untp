@@ -7,8 +7,8 @@
   "scripts": {
     "cypress:open": "cypress open",
     "test:e2e": "cypress run",
-    "test:e2e:open": "E2E_TENANT_MODE=open cypress run",
-    "test:e2e:closed": "E2E_TENANT_MODE=closed cypress run"
+    "test:e2e:open": "E2E_DB_ACCESS=${E2E_DB_ACCESS-true} E2E_TENANT_MODE=open cypress run",
+    "test:e2e:closed": "E2E_DB_ACCESS=${E2E_DB_ACCESS-true} E2E_TENANT_MODE=closed cypress run"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",

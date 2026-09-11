@@ -1,7 +1,7 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Credential Verify API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let testTenantId: string;
   let defaultDidValue: string;
   let unencryptedUri: string;
@@ -29,7 +29,8 @@ describe('Credential Verify API', { testIsolation: false }, () => {
 
   // ── Setup ──────────────────────────────────────────────────────────
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant and deletes native credentials.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -46,7 +47,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
       body: {
         serviceType: 'VC',
         adapterType: 'VCKIT',
-        name: 'Verify E2E VCKit',
+        name: `Verify E2E VCKit ${RUN_ID}`,
         config: {
           baseUrl: config.services.vckit.baseUrl,
           apiKey: config.services.vckit.apiKey,
@@ -63,7 +64,7 @@ describe('Credential Verify API', { testIsolation: false }, () => {
       body: {
         serviceType: 'STORAGE',
         adapterType: 'UNCEFACT_STORAGE',
-        name: 'Verify E2E Storage',
+        name: `Verify E2E Storage ${RUN_ID}`,
         config: {
           baseUrl: config.services.storage.baseUrl,
           apiKey: config.services.storage.apiKey,
@@ -85,8 +86,10 @@ describe('Credential Verify API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   // ── Issue credentials for verification ─────────────────────────────

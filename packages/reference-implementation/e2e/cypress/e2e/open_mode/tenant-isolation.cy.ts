@@ -7,9 +7,9 @@
  *
  * Requires: docker-compose.e2e.yml (standard E2E stack, TENANT_MODE=open)
  */
-import { config } from '../../support/config';
+import { config, requireDbAccess, runTag } from '../../support/config';
 
-describe('Open mode — tenant isolation', { testIsolation: false }, () => {
+describe('Open mode  -  tenant isolation', { testIsolation: false }, () => {
   const SA1 = config.serviceAccounts.sa1;
   const SA2 = config.serviceAccounts.sa2;
 
@@ -23,7 +23,8 @@ describe('Open mode — tenant isolation', { testIsolation: false }, () => {
     return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()).sub;
   }
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'Service-account user and tenant cleanup use Postgres without RI user routes.');
     // Get tokens for both service accounts
     cy.task('getServiceAccountToken', SA1).then((result: any) => {
       token1 = result.accessToken;
@@ -39,12 +40,14 @@ describe('Open mode — tenant isolation', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupServiceAccountData', { sub: sub1 });
-    cy.task('cleanupServiceAccountData', { sub: sub2 });
+    if (config.capabilities.dbAccess) {
+      cy.task('cleanupServiceAccountData', { sub: sub1 });
+      cy.task('cleanupServiceAccountData', { sub: sub2 });
+    }
   });
 
   it('SA1 creates a DID', () => {
-    const RUN_ID = Date.now();
+    const RUN_ID = runTag();
 
     cy.request({
       method: 'POST',
@@ -55,7 +58,7 @@ describe('Open mode — tenant isolation', { testIsolation: false }, () => {
         method: 'DID_WEB',
         alias: `e2e-iso-open-sa1-${RUN_ID}`,
         name: `Open Isolation SA1 DID ${RUN_ID}`,
-        description: 'Created by SA1 for open mode isolation test',
+        description: `Created by SA1 for open mode isolation test ${RUN_ID}`,
       },
     }).then((response) => {
       expect(response.status).to.eq(201);
@@ -123,7 +126,7 @@ describe('Open mode — tenant isolation', { testIsolation: false }, () => {
   });
 
   it('confirms SA1 and SA2 are in separate tenants', () => {
-    // SA1's DID should still exist — SA2's delete attempt must have been rejected
+    // SA1's DID should still exist  -  SA2's delete attempt must have been rejected
     cy.request({
       method: 'GET',
       url: `/api/v1/dids/${did1Id}`,

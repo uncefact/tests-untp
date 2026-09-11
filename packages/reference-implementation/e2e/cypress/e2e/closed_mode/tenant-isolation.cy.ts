@@ -10,7 +10,7 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay (TENANT_MODE=closed)
  */
-import { config } from '../../support/config';
+import { config, requireDbAccess, requireE2eRealm, runTag } from '../../support/config';
 
 describe('Closed mode: tenant isolation', { testIsolation: false }, () => {
   const SA1 = config.serviceAccounts.sa1;
@@ -24,7 +24,9 @@ describe('Closed mode: tenant isolation', { testIsolation: false }, () => {
   let sub2: string;
   let did1Id: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'Closed-mode group tenants and service-account users have no RI API cleanup equivalent.');
+    requireE2eRealm(this, 'Closed-mode group tenancy uses the e2e realm groups.');
     // Clean up both groups' data
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_ALPHA });
     cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_BETA });
@@ -46,14 +48,16 @@ describe('Closed mode: tenant isolation', { testIsolation: false }, () => {
   });
 
   after(() => {
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_ALPHA });
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_BETA });
-    cy.task('cleanupServiceAccountData', { sub: sub1, preserveTenant: true });
-    cy.task('cleanupServiceAccountData', { sub: sub2, preserveTenant: true });
+    if (config.capabilities.dbAccess) {
+      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_ALPHA });
+      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_BETA });
+      cy.task('cleanupServiceAccountData', { sub: sub1, preserveTenant: true });
+      cy.task('cleanupServiceAccountData', { sub: sub2, preserveTenant: true });
+    }
   });
 
   it('SA1 (alpha) creates a DID', () => {
-    const RUN_ID = Date.now();
+    const RUN_ID = runTag();
 
     cy.request({
       method: 'POST',
@@ -64,7 +68,7 @@ describe('Closed mode: tenant isolation', { testIsolation: false }, () => {
         method: 'DID_WEB',
         alias: `e2e-iso-closed-alpha-${RUN_ID}`,
         name: `Closed Isolation Alpha DID ${RUN_ID}`,
-        description: 'Created by SA1 (alpha) for closed mode isolation test',
+        description: `Created by SA1 (alpha) for closed mode isolation test ${RUN_ID}`,
       },
     }).then((response) => {
       expect(response.status).to.eq(201);

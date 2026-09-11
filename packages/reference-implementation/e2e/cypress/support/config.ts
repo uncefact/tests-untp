@@ -5,6 +5,8 @@
  * in cypress.config.ts. Do NOT import this file from cypress.config.ts
  * or any Node.js task. Those should read from config.env.* directly.
  */
+export { requireDbAccess, requireE2eRealm, runTag } from './instance-contract';
+
 export const config = {
   idp: {
     provider: Cypress.env('IDP_PROVIDER') as 'keycloak' | 'zitadel',
@@ -53,6 +55,10 @@ export const config = {
     },
   },
   tenantMode: (Cypress.env('TENANT_MODE') || 'open') as 'open' | 'closed',
+  capabilities: {
+    dbAccess: Cypress.env('E2E_DB_ACCESS') === true,
+    e2eRealm: Cypress.env('E2E_IDP_E2E_REALM') === true,
+  },
   testOrg: {
     id: Cypress.env('TEST_ORG_ID') as string,
   },

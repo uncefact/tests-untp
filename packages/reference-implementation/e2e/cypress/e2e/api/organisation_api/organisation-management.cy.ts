@@ -1,7 +1,7 @@
-import { config } from '../../../support/config';
+import { config, requireDbAccess, runTag } from '../../../support/config';
 
 describe('Organisation API', { testIsolation: false }, () => {
-  const RUN_ID = Date.now();
+  const RUN_ID = runTag();
   let testTenantId: string;
   let registrarId: string;
   let schemeId: string;
@@ -9,7 +9,8 @@ describe('Organisation API', { testIsolation: false }, () => {
   let secondaryIdentifierId: string;
   let createdOrgId: string;
 
-  before(() => {
+  before(function () {
+    requireDbAccess(this, 'This suite seeds a Postgres tenant, identifiers, and users before testing organisations.');
     // Clean up any stale data from a previous failed run
     cy.task('cleanupTestData', { tenantId: config.testOrg.id });
     cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
@@ -38,7 +39,7 @@ describe('Organisation API', { testIsolation: false }, () => {
           registrarId,
           name: `Org Test ABN Scheme ${RUN_ID}`,
           primaryKey: `abn-${RUN_ID}`,
-          validationPattern: '^\\d{11}$',
+          validationPattern: '^e2e-\\d{10,}.*$',
           linkTemplate: '/{primaryKey}/{value}',
         },
       }).then((schemeResponse) => {
@@ -50,7 +51,7 @@ describe('Organisation API', { testIsolation: false }, () => {
           url: '/api/v1/identifiers',
           body: {
             schemeId,
-            value: '11111111111',
+            value: `${RUN_ID}-primary`,
           },
         }).then((identResponse) => {
           identifierId = identResponse.body.id;
@@ -62,7 +63,7 @@ describe('Organisation API', { testIsolation: false }, () => {
           url: '/api/v1/identifiers',
           body: {
             schemeId,
-            value: '22222222222',
+            value: `${RUN_ID}-secondary`,
           },
         }).then((secIdentResponse) => {
           secondaryIdentifierId = secIdentResponse.body.id;
@@ -72,12 +73,14 @@ describe('Organisation API', { testIsolation: false }, () => {
   });
 
   after(() => {
-    const preserveTenant = config.tenantMode === 'closed';
-    cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    if (config.capabilities.dbAccess) {
+      const preserveTenant = config.tenantMode === 'closed';
+      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
+    }
   });
 
   describe('CRUD operations', () => {
-    it('POST /api/v1/organisations — creates organisations', () => {
+    it('POST /api/v1/organisations  -  creates organisations', () => {
       cy.request({
         method: 'POST',
         url: '/api/v1/organisations',
@@ -96,7 +99,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/organisations — lists organisations', () => {
+    it('GET /api/v1/organisations  -  lists organisations', () => {
       cy.request('/api/v1/organisations').then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body).to.not.have.property('ok');
@@ -108,7 +111,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/organisations — filters by search', () => {
+    it('GET /api/v1/organisations  -  filters by search', () => {
       cy.request(`/api/v1/organisations?search=Test Organisation ${RUN_ID}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.data).to.be.an('array');
@@ -120,7 +123,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/organisations/:id — retrieves specific organisation', () => {
+    it('GET /api/v1/organisations/:id  -  retrieves specific organisation', () => {
       cy.request(`/api/v1/organisations/${createdOrgId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(createdOrgId);
@@ -128,7 +131,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/organisations/:id — updates name', () => {
+    it('PATCH /api/v1/organisations/:id  -  updates name', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/organisations/${createdOrgId}`,
@@ -139,14 +142,14 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/organisations/:id — confirms update persisted', () => {
+    it('GET /api/v1/organisations/:id  -  confirms update persisted', () => {
       cy.request(`/api/v1/organisations/${createdOrgId}`).then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.name).to.eq(`Updated Organisation ${RUN_ID}`);
       });
     });
 
-    it('PATCH /api/v1/organisations/:id — assigns primary identifier', () => {
+    it('PATCH /api/v1/organisations/:id  -  assigns primary identifier', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/organisations/${createdOrgId}`,
@@ -157,7 +160,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/organisations/:id — assigns secondary identifiers', () => {
+    it('PATCH /api/v1/organisations/:id  -  assigns secondary identifiers', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/organisations/${createdOrgId}`,
@@ -167,7 +170,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/organisations/:id — confirms identifiers assigned', () => {
+    it('GET /api/v1/organisations/:id  -  confirms identifiers assigned', () => {
       cy.request(`/api/v1/organisations/${createdOrgId}`).then((response) => {
         expect(response.status).to.eq(200);
 
@@ -180,7 +183,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('PATCH /api/v1/organisations/:id — clears secondary identifiers', () => {
+    it('PATCH /api/v1/organisations/:id  -  clears secondary identifiers', () => {
       cy.request({
         method: 'PATCH',
         url: `/api/v1/organisations/${createdOrgId}`,
@@ -191,7 +194,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('DELETE /api/v1/organisations/:id — deletes the organisation', () => {
+    it('DELETE /api/v1/organisations/:id  -  deletes the organisation', () => {
       cy.request({
         method: 'DELETE',
         url: `/api/v1/organisations/${createdOrgId}`,
@@ -200,7 +203,7 @@ describe('Organisation API', { testIsolation: false }, () => {
       });
     });
 
-    it('GET /api/v1/organisations/:id — returns 404 after deletion', () => {
+    it('GET /api/v1/organisations/:id  -  returns 404 after deletion', () => {
       cy.request({
         method: 'GET',
         url: `/api/v1/organisations/${createdOrgId}`,
