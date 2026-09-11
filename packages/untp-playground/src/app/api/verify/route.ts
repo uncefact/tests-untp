@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validityWindowError } from '@/lib/validityWindow';
 
 const verificationServiceUrl = process.env.VERIFICATION_SERVICE_URL;
 const verificationServiceToken = process.env.VERIFICATION_SERVICE_TOKEN;
@@ -31,6 +32,10 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
+    if (data?.verified === true) {
+      const error = validityWindowError(credential);
+      if (error) return NextResponse.json({ ...data, verified: false, error });
+    }
     return NextResponse.json(data);
   } catch (error) {
     console.error('Verification proxy error:', error);

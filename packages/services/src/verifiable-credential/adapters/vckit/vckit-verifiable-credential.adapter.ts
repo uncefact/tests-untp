@@ -11,9 +11,11 @@ import type {
   UNTPVerifiableCredential,
   EnvelopedVerifiableCredential,
   VerifyResult,
+  VerifyOptions,
 } from '../../types.js';
 import { VC_CONTEXT_V2, VC_TYPE, VerificationErrorCode } from '../../types.js';
 import { VcSignError, VcVerifyError, VcCredentialStatusError } from '../../errors.js';
+import { checkValidityWindow } from '../../common/validity-window.js';
 import type { VCKitVerifiableCredentialConfig } from './vckit-verifiable-credential.schema.js';
 import {
   vckitVerifiableCredentialConfigSchema,
@@ -104,13 +106,23 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
     return this.issueVerifiableCredential(vc);
   }
 
-  async verify(credential: EnvelopedVerifiableCredential): Promise<VerifyResult> {
+  async verify(credential: EnvelopedVerifiableCredential, options?: VerifyOptions): Promise<VerifyResult> {
     if (!credential) throw new VcVerifyError('Credential is required');
 
+    // With the window enforced, this adapter judges validFrom and validUntil
+    // itself after the provider answers (see checkValidityWindow); a caller
+    // that needs proof and status evidence for a credential outside its
+    // window asks for the window to be skipped, which also relaxes the
+    // provider's own JOSE exp and nbf policies. Signature and status
+    // policies are never relaxed here.
+    const skipValidityWindow = options?.validityWindow === false;
     const verifyParams = {
       credential,
       fetchRemoteContexts: true,
-      policies: { credentialStatus: true },
+      policies: {
+        credentialStatus: true,
+        ...(skipValidityWindow ? { issuanceDate: false, expirationDate: false } : {}),
+      },
     };
 
     this.logger.debug('Verifying credential');
@@ -128,7 +140,16 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
     }
 
     const vckitResult = parseVerifyResponse(await response.json());
-    const result = transformVerifyResult(vckitResult);
+    let result = transformVerifyResult(vckitResult);
+    if (result.verified && !skipValidityWindow) {
+      // VCKit's own window check reads only the JOSE exp and nbf claims, which
+      // the VCDM 2.0 issuer does not set, so the credential's validFrom and
+      // validUntil are judged here for every caller (see checkValidityWindow).
+      const window = checkValidityWindow(credential);
+      if (window.result === 'fail') {
+        result = { verified: false, error: { type: VerificationErrorCode.Temporal, message: window.message } };
+      }
+    }
     this.logger.info({ verified: result.verified }, 'Credential verification complete');
     return result;
   }

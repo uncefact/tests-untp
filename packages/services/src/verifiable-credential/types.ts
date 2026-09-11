@@ -280,6 +280,26 @@ export type VerifyResult = {
   error?: VerificationError;
 };
 
+/**
+ * Options for {@link IVerifiableCredentialService.verify}.
+ */
+export type VerifyOptions = {
+  /**
+   * Whether the adapter judges the credential's own `validFrom` and
+   * `validUntil` (see `checkValidityWindow`) after the provider answers and
+   * reports a temporal failure when the credential is outside them or a
+   * bound cannot be read. Defaults to true, with the provider's own temporal
+   * policies at their defaults; for a `vc+jwt` envelope the pinned provider
+   * reads only the JOSE `exp` and `nbf` claims, which the issuer does not
+   * set, so its answer alone establishes nothing about the window. False
+   * skips the adapter's judgement and also sends the provider's
+   * `issuanceDate` and `expirationDate` policies as false; signature and
+   * status checking stay enabled (a provider still stops at its first
+   * failure).
+   */
+  validityWindow?: boolean;
+};
+
 export const VC_SERVICE_TYPE = 'VC' as const;
 
 /**
@@ -292,5 +312,5 @@ export interface IVerifiableCredentialService {
   sign(payload: CredentialPayload): Promise<EnvelopedVerifiableCredential>;
 
   /** Verifies an enveloped credential's signature and status. */
-  verify(credential: EnvelopedVerifiableCredential): Promise<VerifyResult>;
+  verify(credential: EnvelopedVerifiableCredential, options?: VerifyOptions): Promise<VerifyResult>;
 }

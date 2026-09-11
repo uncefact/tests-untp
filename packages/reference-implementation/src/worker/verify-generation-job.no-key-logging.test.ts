@@ -152,6 +152,7 @@ function dependencies(overrides: Partial<VerifyGenerationDependencies> = {}): Ve
     checkSchemaConformance: jest.fn().mockResolvedValue({ result: CheckResult.NOT_RUN, message: null }),
     settleComplete: jest.fn().mockResolvedValue({ outcome: 'applied' }),
     settleFailed: jest.fn().mockResolvedValue({ outcome: 'applied' }),
+    now: () => new Date('2026-09-11T00:00:00.000Z'),
     ...overrides,
   };
 }

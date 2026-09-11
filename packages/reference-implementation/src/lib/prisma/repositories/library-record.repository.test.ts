@@ -429,14 +429,34 @@ describe('buildLibraryListQuery', () => {
     const nativeBranch = rendered.slice(nativeStart, externalStart);
 
     // Fails if worker-only acquisition or custody failures are allowed to
-    // affect the native public summary after projection masks them.
+    // affect the native public summary after projection masks them, or if
+    // the summary stops turning on the proof check. Temporal and schema
+    // conformance never decide a summary, so neither appears.
     expect(nativeBranch).toContain('n."proof"');
     expect(nativeBranch).toContain('n."status"');
-    expect(nativeBranch).toContain('n."temporal"');
-    expect(nativeBranch).toContain('n."schemaConformance"');
+    expect(nativeBranch).not.toContain('n."temporal"');
+    expect(nativeBranch).not.toContain('n."schemaConformance"');
     expect(nativeBranch).not.toContain('n."retrieval"');
     expect(nativeBranch).not.toContain('n."decryption"');
     expect(nativeBranch).not.toContain('n."digest"');
+  });
+
+  it('binds a passing proof into the verified status filter of both origin branches', () => {
+    const query = buildLibraryListQuery({ tenantId: 'tenant-1', status: 'verified' });
+    const { sql, values } = query as unknown as { sql: string; values: unknown[] };
+    // The SQL twin of the projection rule: each origin branch compares the
+    // proof column for equality with the bound PASS value. Placeholders are
+    // walked in order so each is paired with the value bound to it. Fails if
+    // the filter goes back to "any check ran" or binds another result; the
+    // list integration suite pins the same rule against Postgres.
+    const proofValues: unknown[] = [];
+    [...sql.matchAll(/\?/g)].forEach((match, index) => {
+      const before = sql.slice(Math.max(0, (match.index ?? 0) - 16), match.index);
+      if (/n\."proof" = $/.test(before)) proofValues.push(values[index]);
+    });
+    // Per branch: the blocking-failure exclusion binds FAIL, the requirement binds PASS.
+    expect(proofValues).toEqual([CheckResult.FAIL, CheckResult.PASS, CheckResult.FAIL, CheckResult.PASS]);
+    expect(sql).not.toContain('n."temporal"');
   });
 });
 

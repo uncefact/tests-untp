@@ -9,6 +9,10 @@ import Disclaimer from '.././\_disclaimer.mdx';
 
 This guide covers upgrading a Reference Implementation deployment from v0.4 to v0.5.
 
+## A library summary of `verified` now requires a passing proof
+
+A complete verification generation reads `verified` only when its `proof` check passed and no blocking check failed. Before, any complete generation with no blocking failure read `verified` as long as some check had run, so a credential the verifier refused on its validity window before examining the signature could read `verified` with `proof: not_run`. Existing generations are reclassified on read: one with `proof: not_run` now reads `not_conformant`, and re-verifying the record (`POST /api/v1/library/{id}/verify`) produces a generation with current evidence. The worker also judges the `temporal` check from the credential's own `validFrom` and `validUntil`, so an expired credential settles `verified` with `temporal: fail` and `currencyStatus: expired` whether or not the verification provider enforces the window itself. A native record's first generation still vouches for issuance only: it carries `proof: pass` with `status: not_run` and gives no revocation assurance until the record is re-verified.
+
 ## The credentials list and detail routes are retired
 
 **Breaking change.** `GET /api/v1/credentials` and `GET /api/v1/credentials/{id}` are retired without a deprecation window. After authentication and tenant resolution succeed, both return `410 Gone` with `code: ROUTE_RETIRED` and a message naming the replacement.

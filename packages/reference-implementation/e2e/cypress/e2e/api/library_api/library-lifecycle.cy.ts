@@ -19,8 +19,17 @@ describe('Library API lifecycle', { testIsolation: false }, () => {
     return JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString()).sub;
   }
 
-  function buildCredentialPayload(label: string) {
+  // A current window by default so the temporal check judges real bounds;
+  // a credential without bounds is valid indefinitely and also passes.
+  function buildCredentialPayload(
+    label: string,
+    window: { validFrom?: string; validUntil?: string } = {
+      validFrom: '2026-01-01T00:00:00Z',
+      validUntil: '2036-01-01T00:00:00Z',
+    },
+  ) {
     return {
+      ...window,
       '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
       id: `urn:uuid:e2e-library-${label}-${RUN_ID}`,
       type: ['DigitalProductPassport', 'VerifiableCredential'],
@@ -51,14 +60,18 @@ describe('Library API lifecycle', { testIsolation: false }, () => {
     });
   }
 
-  function issueCredential(label: string, encrypt: boolean): Cypress.Chainable<string> {
+  function issueCredential(
+    label: string,
+    encrypt: boolean,
+    window?: { validFrom?: string; validUntil?: string },
+  ): Cypress.Chainable<string> {
     return cy
       .request({
         method: 'POST',
         url: '/api/v1/credentials',
         headers: { Authorization: `Bearer ${token}` },
         body: {
-          credentialPayload: buildCredentialPayload(label),
+          credentialPayload: buildCredentialPayload(label, window),
           credentialType: 'DigitalProductPassport',
           version: '0.6.1',
           storageOptions: { encrypt },
@@ -320,6 +333,43 @@ describe('Library API lifecycle', { testIsolation: false }, () => {
       .then((response) => {
         expect(response.status).to.eq(200);
         expect(response.body.id).to.eq(survivorRecordId);
+      });
+  });
+
+  it('settles an expired but genuine credential as verified with a failed temporal check', () => {
+    // Verified means authentic, untampered with and not revoked; expiry is
+    // evidence, not a block. The provider may not enforce the validity
+    // window for this envelope format, so the worker judges it from the
+    // credential's own claims. Fails if an expired credential reads
+    // temporal pass, or if proof is not established for it.
+    let recordId: string;
+    issueCredential(`expired-${RUN_ID}`, false, {
+      validFrom: '2020-01-01T00:00:00Z',
+      validUntil: '2021-01-01T00:00:00Z',
+    })
+      .then((credentialId) =>
+        cy.request({
+          method: 'GET',
+          url: `/api/v1/library/${credentialId}`,
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      )
+      .then((response) => registerCredential(response.body.storageUri, `expired-${RUN_ID}`))
+      .then((registration) => {
+        recordId = registration.id;
+        return waitForGeneration(recordId, token, 1);
+      })
+      .then((record) => {
+        expect(record.verification.state).to.eq('complete');
+        expect(record.verification.summary).to.eq('verified');
+        expect(record.verification.checks).to.include({
+          retrieval: 'pass',
+          digest: 'pass',
+          proof: 'pass',
+          status: 'pass',
+          temporal: 'fail',
+        });
+        expect(record.currencyStatus).to.eq('expired');
       });
   });
 
