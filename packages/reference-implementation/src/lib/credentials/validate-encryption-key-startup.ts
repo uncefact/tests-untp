@@ -4,9 +4,9 @@ import type { IEncryptionService } from '@uncefact/untp-ri-services/encryption';
 // has no tsconfig.json to resolve path aliases.
 import { parseEnvelope } from './decryption-key-protection';
 import { ENVELOPE_STORE_IDS, ENVELOPE_STORE_INFO, type EnvelopeStoreId, type EnvelopeStores } from './envelope-stores';
-import { apiLogger } from '../api/logger';
+import { appLogger } from '../api/logger';
 
-const logger = apiLogger.child({ module: 'validate-encryption-key-startup' });
+const logger = appLogger.child({ module: 'validate-encryption-key-startup' });
 
 const DOCS_URL =
   'https://uncefact.github.io/tests-untp/docs/next/reference-implementation/operations/startup#encryption-key-validation';

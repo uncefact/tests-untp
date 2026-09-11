@@ -11,6 +11,7 @@ import { resolveClosedModeTenant } from '@/lib/api/resolve-closed-mode-tenant';
 import { validateServiceAccountToken, extractBearerToken } from '@/lib/auth/token-validator';
 import { prisma } from '@/lib/prisma/prisma';
 import { auth } from '@/auth';
+import { trace } from '@opentelemetry/api';
 import { runWithRequestContext, updateRequestContext, isValidCorrelationId } from '@uncefact/untp-ri-services/logging';
 
 // Re-export for backwards compatibility — consumers that import from
@@ -48,6 +49,7 @@ export function withTenantAuth(handler: RouteHandler) {
       // length/charset rule is replaced, never echoed into logs or responses.
       const raw = req.headers.get('x-correlation-id');
       const correlationId = raw && isValidCorrelationId(raw) ? raw : crypto.randomUUID();
+      trace.getActiveSpan()?.setAttribute('correlation.id', correlationId);
       if (raw && correlationId !== raw) {
         apiLogger.warn(
           { inboundLength: raw.length, replacedWith: correlationId },

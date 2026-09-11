@@ -1,11 +1,11 @@
 import type { PrismaClient } from '@/lib/prisma/generated';
-import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { appLogger } from '@/lib/api/logger';
 import { getTenantConfig } from '@/lib/auth/tenant-config';
 import { extractGroupClaim } from '@/lib/auth/group-claim';
 import { decodeAccessToken } from '@/lib/auth/oidc-token';
 import { isUniqueConstraintViolation } from '@/lib/prisma/db-errors';
 
-const logger = createLogger().child({ module: 'handle-sign-in' });
+const logger = appLogger.child({ module: 'handle-sign-in' });
 
 interface UserProfile {
   name?: string | null;

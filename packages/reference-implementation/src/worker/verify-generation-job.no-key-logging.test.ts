@@ -1,12 +1,15 @@
 const capturedLogLines: string[] = [];
 
+// Keep the real logger because this suite asserts on rendered log lines.
 jest.mock('@/lib/api/logger', () => {
   const { createLogger } = jest.requireActual('@uncefact/untp-ri-services/logging');
+  const appLogger = createLogger({
+    level: 'debug',
+    destination: { write: (line: string) => capturedLogLines.push(line) },
+  });
   return {
-    apiLogger: createLogger({
-      level: 'debug',
-      destination: { write: (line: string) => capturedLogLines.push(line) },
-    }).child({ module: 'worker' }),
+    appLogger,
+    apiLogger: appLogger.child({ module: 'worker' }),
   };
 });
 

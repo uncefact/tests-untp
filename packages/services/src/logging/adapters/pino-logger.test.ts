@@ -1,6 +1,18 @@
 import pino from 'pino';
-import { Writable } from 'stream';
-import { PinoLoggerAdapter, registerRequestContextProvider } from './pino-logger.js';
+import * as requestContext from '../request-context.js';
+import { runWithRequestContext, updateRequestContext } from '../request-context.js';
+import { PinoLoggerAdapter } from './pino-logger.js';
+
+function createCapture(): {
+  destination: { write: (msg: string) => void };
+  entries: () => Record<string, unknown>[];
+} {
+  const lines: string[] = [];
+  return {
+    destination: { write: (msg: string) => void lines.push(msg.trim()) },
+    entries: () => lines.map((line) => JSON.parse(line)),
+  };
+}
 
 describe('PinoLoggerAdapter', () => {
   describe('child method optimization', () => {
@@ -60,198 +72,95 @@ describe('PinoLoggerAdapter', () => {
     });
   });
 
-  describe('registerRequestContextProvider and mixin', () => {
-    function createSink(): { sink: Writable; getLines: () => string[] } {
+  describe('request context and mixin', () => {
+    function createSink(): { sink: { write: (msg: string) => void }; getLines: () => string[] } {
       const lines: string[] = [];
-      const sink = new Writable({
-        write(chunk, _encoding, cb) {
-          lines.push(chunk.toString().trim());
-          cb();
-        },
-      });
+      const sink = {
+        write: (msg: string) => lines.push(msg.trim()),
+      };
       return { sink, getLines: () => lines };
     }
 
-    afterEach(() => {
-      // Reset the module-level provider to avoid leaking state between tests
-      registerRequestContextProvider(undefined as unknown as () => Record<string, unknown> | undefined);
-    });
-
-    it('should register a provider that gets called during logging', () => {
-      const provider = jest.fn().mockReturnValue({ correlationId: 'corr-abc' });
-      registerRequestContextProvider(provider);
-
-      const adapter = new PinoLoggerAdapter({ level: 'info' });
-      adapter.info('hello');
-
-      expect(provider).toHaveBeenCalled();
-    });
-
-    it('should return empty object from mixin when no provider is registered', () => {
+    it('does not add request fields outside a request context', () => {
+      // Fails if the adapter retains request context after its owning scope ends.
       const { sink, getLines } = createSink();
+      const adapter = new PinoLoggerAdapter({ level: 'info', destination: sink });
 
-      // No provider registered (reset in afterEach), so mixin inside
-      // PinoLoggerAdapter would return {}. Verify with a raw pino logger
-      // using the same mixin pattern.
-      const loggerWithMixin = pino(
-        {
-          level: 'info',
-          mixin() {
-            // Mirrors PinoLoggerAdapter's mixin when no provider is set
-            return {};
-          },
-        },
-        sink,
-      );
+      adapter.info('outside request');
 
-      loggerWithMixin.info('no context');
-
-      const lines = getLines();
-      expect(lines.length).toBeGreaterThanOrEqual(1);
-      const parsed = JSON.parse(lines[lines.length - 1]);
-      expect(parsed).not.toHaveProperty('correlationId');
+      const [entry] = getLines().map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(entry).not.toHaveProperty('correlationId');
     });
 
-    it('should return empty object from mixin when provider returns undefined', () => {
-      const provider = jest.fn().mockReturnValue(undefined);
-      registerRequestContextProvider(provider);
+    it('adds the current request fields to a real pino log line', () => {
+      // Fails if the mixin stops reading the active request context at log time.
+      const lines: string[] = [];
+      const sink = { write: (msg: string) => lines.push(msg.trim()) };
+      const adapter = new PinoLoggerAdapter({ level: 'info', destination: sink });
 
-      const { sink, getLines } = createSink();
-
-      // Create a raw pino logger that exercises the same mixin logic
-      const loggerWithMixin = pino(
-        {
-          level: 'info',
-          mixin() {
-            const context = provider();
-            return context ? { ...context } : {};
-          },
-        },
-        sink,
-      );
-
-      loggerWithMixin.info('no context');
-
-      const lines = getLines();
-      expect(lines.length).toBeGreaterThanOrEqual(1);
-      const parsed = JSON.parse(lines[lines.length - 1]);
-      expect(parsed).not.toHaveProperty('correlationId');
-      expect(provider).toHaveBeenCalled();
-    });
-
-    it('should spread all context fields when provider returns a context object', () => {
-      const provider = jest.fn().mockReturnValue({ correlationId: 'req-123', userId: 'user-1', tenantId: 'tenant-1' });
-      registerRequestContextProvider(provider);
-
-      const { sink, getLines } = createSink();
-
-      // Create a raw pino logger that mirrors PinoLoggerAdapter's mixin
-      const loggerWithMixin = pino(
-        {
-          level: 'info',
-          mixin() {
-            const context = provider();
-            return context ? { ...context } : {};
-          },
-        },
-        sink,
-      );
-
-      loggerWithMixin.info('test message');
-
-      const lines = getLines();
-      expect(lines.length).toBeGreaterThanOrEqual(1);
-      const parsed = JSON.parse(lines[lines.length - 1]);
-      expect(parsed.correlationId).toBe('req-123');
-      expect(parsed.userId).toBe('user-1');
-      expect(parsed.tenantId).toBe('tenant-1');
-    });
-
-    it('should inject only correlationId when no extension fields are set', () => {
-      const provider = jest.fn().mockReturnValue({ correlationId: 'req-456' });
-      registerRequestContextProvider(provider);
-
-      const { sink, getLines } = createSink();
-
-      const loggerWithMixin = pino(
-        {
-          level: 'info',
-          mixin() {
-            const context = provider();
-            return context ? { ...context } : {};
-          },
-        },
-        sink,
-      );
-
-      loggerWithMixin.info('test message');
-
-      const lines = getLines();
-      expect(lines.length).toBeGreaterThanOrEqual(1);
-      const parsed = JSON.parse(lines[lines.length - 1]);
-      expect(parsed.correlationId).toBe('req-456');
-      expect(parsed).not.toHaveProperty('userId');
-      expect(parsed).not.toHaveProperty('tenantId');
-    });
-
-    it('should return empty object from mixin when provider throws and log via console.error', () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      const providerError = new Error('provider failure');
-      const provider = jest.fn().mockImplementation(() => {
-        throw providerError;
+      runWithRequestContext('req-123', () => {
+        adapter.info('request log');
       });
-      registerRequestContextProvider(provider);
 
-      const adapter = new PinoLoggerAdapter({ level: 'info' });
-      expect(() => adapter.info('should not crash')).not.toThrow();
-      expect(provider).toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to get request context for logging:', providerError);
-
-      consoleErrorSpy.mockRestore();
+      const [entry] = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(entry).toMatchObject({ correlationId: 'req-123', msg: 'request log' });
     });
 
-    it('should inherit mixin behaviour in child loggers', () => {
-      const provider = jest.fn().mockReturnValue({ correlationId: 'req-child-456', userId: 'child-user' });
-      registerRequestContextProvider(provider);
-
+    it('keeps request fields in child loggers', () => {
+      // Fails if child loggers stop using the parent's per-call mixin.
       const { sink, getLines } = createSink();
+      const childLogger = new PinoLoggerAdapter({ level: 'info', destination: sink }).child({ module: 'child-mod' });
 
-      const loggerWithMixin = pino(
-        {
-          level: 'info',
-          mixin() {
-            const context = provider();
-            return context ? { ...context } : {};
-          },
-        },
-        sink,
-      );
+      runWithRequestContext('req-child-456', () => {
+        childLogger.info('child log entry');
+      });
 
-      const childLogger = loggerWithMixin.child({ module: 'child-mod' });
-      childLogger.info('child log entry');
+      const [entry] = getLines().map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(entry).toMatchObject({ correlationId: 'req-child-456', module: 'child-mod', msg: 'child log entry' });
+    });
 
-      const lines = getLines();
-      expect(lines.length).toBeGreaterThanOrEqual(1);
-      const parsed = JSON.parse(lines[lines.length - 1]);
-      expect(parsed.correlationId).toBe('req-child-456');
-      expect(parsed.userId).toBe('child-user');
-      expect(parsed.module).toBe('child-mod');
+    it('includes extension fields added to the request context in a real log line', () => {
+      // Fails if the mixin reads only the initial correlation id and misses later context updates.
+      const { sink, getLines } = createSink();
+      const adapter = new PinoLoggerAdapter({ level: 'info', destination: sink });
+
+      runWithRequestContext('req-extension-789', () => {
+        updateRequestContext({ userId: 'user-123', tenantId: 'tenant-456' });
+        adapter.info('extended request log');
+      });
+
+      const [entry] = getLines().map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(entry).toMatchObject({
+        correlationId: 'req-extension-789',
+        userId: 'user-123',
+        tenantId: 'tenant-456',
+        msg: 'extended request log',
+      });
+    });
+
+    it('keeps request fields in grandchild loggers', () => {
+      // Fails if a second child level loses the parent's per-call mixin.
+      const { sink, getLines } = createSink();
+      const grandchildLogger = new PinoLoggerAdapter({ level: 'info', destination: sink })
+        .child({ service: 'api' })
+        .child({ module: 'grandchild' });
+
+      runWithRequestContext('req-grandchild-012', () => {
+        grandchildLogger.info('grandchild log entry');
+      });
+
+      const [entry] = getLines().map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(entry).toMatchObject({
+        correlationId: 'req-grandchild-012',
+        service: 'api',
+        module: 'grandchild',
+        msg: 'grandchild log entry',
+      });
     });
   });
 });
 
 describe('PinoLoggerAdapter redaction', () => {
-  function createCapture(): {
-    destination: { write: (msg: string) => void };
-    entries: () => Record<string, unknown>[];
-  } {
-    const lines: string[] = [];
-    return {
-      destination: { write: (msg: string) => void lines.push(msg.trim()) },
-      entries: () => lines.map((line) => JSON.parse(line)),
-    };
-  }
-
   it('redacts a top-level decryptionKey field', () => {
     const capture = createCapture();
     const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
@@ -414,18 +323,178 @@ describe('PinoLoggerAdapter redaction', () => {
   });
 });
 
-describe('PinoLoggerAdapter LOG_REDACT_PATHS environment variable', () => {
-  function createCapture(): {
-    destination: { write: (msg: string) => void };
-    entries: () => Record<string, unknown>[];
-  } {
-    const lines: string[] = [];
-    return {
-      destination: { write: (msg: string) => void lines.push(msg.trim()) },
-      entries: () => lines.map((line) => JSON.parse(line)),
-    };
-  }
+describe('PinoLoggerAdapter trace context', () => {
+  it('adds the provider trace fields to a real pino log line without changing correlationId', () => {
+    const capture = createCapture();
+    const traceContextProvider = jest.fn(() => ({
+      traceId: '0123456789abcdef0123456789abcdef',
+      spanId: '0123456789abcdef',
+      traceFlags: 1,
+    }));
+    const logger = new PinoLoggerAdapter({
+      level: 'info',
+      correlationId: 'c1',
+      destination: capture.destination,
+      traceContextProvider,
+    });
 
+    logger.info({ traceId: 'bogus' }, 'request log');
+
+    const [entry] = capture.entries();
+    expect(entry).toMatchObject({
+      correlationId: 'c1',
+      traceId: '0123456789abcdef0123456789abcdef',
+      spanId: '0123456789abcdef',
+      traceFlags: 1,
+      msg: 'request log',
+    });
+    expect(traceContextProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mutate the object passed to a log call when adding context', () => {
+    const capture = createCapture();
+    const logContext = { event: 'request' };
+    const logger = new PinoLoggerAdapter({
+      level: 'info',
+      destination: capture.destination,
+      traceContextProvider: () => ({
+        traceId: '0123456789abcdef0123456789abcdef',
+        spanId: '0123456789abcdef',
+      }),
+    });
+
+    logger.info(logContext, 'request log');
+
+    expect(logContext).toEqual({ event: 'request' });
+  });
+
+  it('does not retain trace context when the same object is logged outside a span', () => {
+    const capture = createCapture();
+    const logContext = { event: 'request' };
+    let activeTraceContext: { traceId: string; spanId: string; traceFlags?: number } | undefined = {
+      traceId: '0123456789abcdef0123456789abcdef',
+      spanId: '0123456789abcdef',
+    };
+    const logger = new PinoLoggerAdapter({
+      level: 'info',
+      destination: capture.destination,
+      traceContextProvider: () => activeTraceContext,
+    });
+
+    logger.info(logContext, 'inside span');
+    activeTraceContext = undefined;
+    logger.info(logContext, 'outside span');
+
+    const [inside, outside] = capture.entries();
+    expect(inside).toMatchObject({
+      traceId: '0123456789abcdef0123456789abcdef',
+      spanId: '0123456789abcdef',
+    });
+    expect(outside).not.toHaveProperty('traceId');
+    expect(outside).not.toHaveProperty('spanId');
+    expect(outside).not.toHaveProperty('traceFlags');
+    expect(logContext).toEqual({ event: 'request' });
+  });
+
+  it('logs a frozen object without mutating it', () => {
+    const capture = createCapture();
+    const logContext = Object.freeze({ event: 'request' });
+    const logger = new PinoLoggerAdapter({
+      level: 'info',
+      destination: capture.destination,
+      traceContextProvider: () => ({
+        traceId: '0123456789abcdef0123456789abcdef',
+        spanId: '0123456789abcdef',
+      }),
+    });
+
+    expect(() => logger.info(logContext, 'frozen request log')).not.toThrow();
+
+    const [entry] = capture.entries();
+    expect(entry).toMatchObject({
+      event: 'request',
+      traceId: '0123456789abcdef0123456789abcdef',
+      spanId: '0123456789abcdef',
+    });
+  });
+
+  it('omits all trace fields when the provider has no active span', () => {
+    const capture = createCapture();
+    const logger = new PinoLoggerAdapter({
+      level: 'info',
+      destination: capture.destination,
+      traceContextProvider: () => undefined,
+    });
+
+    logger.info('outside span');
+
+    const [entry] = capture.entries();
+    expect(entry).not.toHaveProperty('traceId');
+    expect(entry).not.toHaveProperty('spanId');
+    expect(entry).not.toHaveProperty('traceFlags');
+  });
+
+  it('does not break logging when the trace provider throws and reports it once', () => {
+    // Fails if provider errors escape the mixin or the designed report is removed or duplicated.
+    const capture = createCapture();
+    const providerError = new Error('trace provider failure');
+    const traceContextProvider = jest.fn(() => {
+      throw providerError;
+    });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination, traceContextProvider });
+
+    try {
+      expect(() => {
+        logger.info('provider failure is tolerated');
+        logger.info('provider failure is tolerated again');
+      }).not.toThrow();
+
+      const [entry] = capture.entries();
+      expect(entry).toMatchObject({ msg: 'provider failure is tolerated' });
+      expect(entry).not.toHaveProperty('traceId');
+      expect(capture.entries()).toHaveLength(2);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to get trace context for logging:', providerError);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('does not break logging when reading request context throws and reports it once', () => {
+    // Fails if a request-context read can escape the mixin and break a log line.
+    const capture = createCapture();
+    const requestContextError = new Error('request context failure');
+    const getRequestContextSpy = jest.spyOn(requestContext, 'getRequestContext').mockImplementation(
+      () =>
+        ({
+          get correlationId(): string {
+            throw requestContextError;
+          },
+        }) as never,
+    );
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const logger = new PinoLoggerAdapter({ level: 'info', destination: capture.destination });
+
+    try {
+      expect(() => {
+        logger.info('request context failure is tolerated');
+        logger.info('request context failure is tolerated again');
+      }).not.toThrow();
+
+      const [entry] = capture.entries();
+      expect(entry).toMatchObject({ msg: 'request context failure is tolerated' });
+      expect(capture.entries()).toHaveLength(2);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to get request context for logging:', requestContextError);
+    } finally {
+      getRequestContextSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    }
+  });
+});
+
+describe('PinoLoggerAdapter LOG_REDACT_PATHS environment variable', () => {
   const originalValue = process.env.LOG_REDACT_PATHS;
 
   afterEach(() => {

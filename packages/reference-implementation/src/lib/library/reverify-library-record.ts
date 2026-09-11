@@ -13,7 +13,7 @@ import {
   type FetchedDocument,
 } from '@/lib/credentials/fetch-credential-document';
 import { ConfigDecryptionError, ConfigValidationError, NotFoundError, ServiceResolutionError } from '@/lib/api/errors';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import { getLibraryRecordById } from '@/lib/prisma/repositories/library-record.repository';
 import { LibraryRecordShapeError, type LibraryRecordDetailView } from '@/lib/library/library-record-view';
@@ -68,7 +68,7 @@ import {
   cannotAcceptSupplierKey,
 } from './reverify-messages';
 
-const logger = apiLogger.child({ module: 'reverify-library-record' });
+const logger = appLogger.child({ module: 'reverify-library-record' });
 
 /**
  * Refuses a BODYLESS request against a record that already holds a durable

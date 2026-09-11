@@ -3,11 +3,9 @@ export {};
 import fs from 'fs';
 import path from 'path';
 
-const mockWarn = jest.fn();
-const mockError = jest.fn();
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: mockWarn, error: mockError }) },
-}));
+jest.mock('@/lib/api/logger');
+let mockWarn: jest.Mock;
+let mockError: jest.Mock;
 
 const originalEnv = process.env;
 
@@ -18,6 +16,9 @@ const PLACEHOLDER_KEY = '0'.repeat(64);
 beforeEach(() => {
   jest.resetModules();
   jest.clearAllMocks();
+  const mockAppLogger = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
+  mockWarn = mockAppLogger.warn;
+  mockError = mockAppLogger.error;
   process.env = { ...originalEnv, DATA_ENCRYPTION_KEY: ACTIVE_KEY };
 });
 

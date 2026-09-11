@@ -1,10 +1,6 @@
 const validateConfiguredEncryptionKey = jest.fn(async () => undefined);
 jest.mock('@/lib/encryption/encryption-key-boot', () => ({ validateConfiguredEncryptionKey }));
-jest.mock('@/lib/api/logger', () => {
-  const logger: Record<string, unknown> = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-  logger.child = () => logger;
-  return { apiLogger: logger };
-});
+jest.mock('@/lib/api/logger');
 // The handler graph reaches the services server barrel, whose DID stack
 // cannot resolve under jest; the boot's own order is what is under test.
 jest.mock('@/lib/library/verify-generation-job', () => ({ registerLibraryJobs: jest.fn() }));

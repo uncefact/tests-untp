@@ -1,9 +1,15 @@
 import { PgBoss, type JobWithMetadata, type SendOptions } from 'pg-boss';
+import { randomUUID } from 'node:crypto';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
+import { getRequestContext, isValidCorrelationId, runWithRequestContext } from '@uncefact/untp-ri-services/logging';
+import { apiLogger } from '@/lib/api/logger';
 import { JobQueueError } from './errors';
 import type {
   EnqueueOptions,
   JobContext,
+  JobData,
   JobHandler,
+  JobPayload,
   JobQueue,
   RegisterOptions,
   SqlExecutor,
@@ -44,6 +50,7 @@ export interface PgBossJobQueueOptions {
 }
 
 type QueuePolicy = 'standard' | 'short';
+const workerTracer = trace.getTracer('reference-implementation.jobs');
 
 interface Registration {
   name: string;
@@ -142,7 +149,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
   ): Promise<void> {
     validateEnqueueOptions(options);
     await this.ensureQueue(name, this.queuePolicy(options));
-    const jobId = await this.boss.send(name, payload, { ...this.sendOptions(options), db: tx });
+    const jobId = await this.boss.send(name, addRequestCorrelation(payload), { ...this.sendOptions(options), db: tx });
     await this.assertInserted(jobId, name, options);
   }
 
@@ -175,7 +182,7 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
   async enqueue<P extends object>(name: string, payload: P, options?: EnqueueOptions): Promise<void> {
     validateEnqueueOptions(options);
     await this.ensureQueue(name, this.queuePolicy(options));
-    const jobId = await this.boss.send(name, payload, this.sendOptions(options));
+    const jobId = await this.boss.send(name, addRequestCorrelation(payload), this.sendOptions(options));
     await this.assertInserted(jobId, name, options);
   }
 
@@ -345,49 +352,110 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
             ? { localGroupConcurrency: registration.options.perKeyConcurrency }
             : {}),
         },
+        /**
+         * Each queue job starts a new worker trace. Only the correlation id
+         * crosses the queue, so the enqueuing request and this job remain
+         * separate traces joined by that id.
+         */
         async (jobs: JobWithMetadata<object>[]) =>
           Promise.all(
             jobs.map(async (job) => {
+              const { correlationId, replacedInvalidCorrelationId } = correlationIdForJob(job.data);
               const validExpireSeconds =
                 Number.isInteger(job.expireInSeconds) && job.expireInSeconds > 0 ? job.expireInSeconds : undefined;
-              const expireSeconds = validExpireSeconds ?? this.defaultExpireSeconds;
-              if (expireSeconds === undefined) {
-                const message = `job '${job.id}' carried an invalid expireInSeconds value and no adapter default was configured`;
-                this.onError(new Error(message));
-                throw new JobQueueError({
-                  code: 'jobs.invalid-job-expiry',
-                  message,
-                  received: job.expireInSeconds,
-                });
-              }
-              if (validExpireSeconds === undefined) {
-                this.onError(
-                  new Error(`job '${job.id}' carried an invalid expireInSeconds value; using the adapter default`),
-                );
-              }
-              const context: JobContext = {
-                jobId: job.id,
-                attempt: job.retryCount + 1,
-                isFinalAttempt: job.retryCount >= job.retryLimit,
-                expireSeconds,
-                signal: job.signal,
-              };
-              try {
-                await registration.handler(job.data, context);
-                return { id: job.id, status: 'completed' as const };
-              } catch (error) {
-                // The failure is recorded without the exception's text: job
-                // rows and their dead-letter copies persist as plain text,
-                // and exception messages routinely carry URLs, inputs, and
-                // other material the confidentiality contract keeps out of
-                // the queue's tables. The detail goes to the error channel.
-                this.onError(
-                  error instanceof Error
-                    ? error
-                    : new Error(`job '${registration.name}' ${job.id} failed: ${String(error)}`),
-                );
-                return { id: job.id, status: 'failed' as const };
-              }
+              return runWithRequestContext(correlationId, async () => {
+                const expireSeconds = validExpireSeconds ?? this.defaultExpireSeconds;
+                if (expireSeconds === undefined) {
+                  const message = `job '${job.id}' carried an invalid expireInSeconds value and no adapter default was configured`;
+                  this.onError(new Error(message));
+                  throw new JobQueueError({
+                    code: 'jobs.invalid-job-expiry',
+                    message,
+                    received: job.expireInSeconds,
+                  });
+                }
+                if (validExpireSeconds === undefined) {
+                  this.onError(
+                    new Error(`job '${job.id}' carried an invalid expireInSeconds value; using the adapter default`),
+                  );
+                }
+                const context: JobContext = {
+                  jobId: job.id,
+                  attempt: job.retryCount + 1,
+                  isFinalAttempt: job.retryCount >= job.retryLimit,
+                  expireSeconds,
+                  signal: job.signal,
+                };
+                try {
+                  return await workerTracer.startActiveSpan(registration.name, async (span) => {
+                    try {
+                      span.setAttributes({ 'correlation.id': correlationId, 'job.id': job.id });
+                    } catch (error) {
+                      this.onError(
+                        new Error(`Failed to set attributes on job span '${registration.name}' ${job.id}`, {
+                          cause: error,
+                        }),
+                      );
+                    }
+                    if (replacedInvalidCorrelationId) {
+                      apiLogger.warn(
+                        { jobId: job.id, reason: 'persisted correlationId failed validation' },
+                        'Invalid persisted job correlation id; minted a replacement',
+                      );
+                    }
+                    try {
+                      await registration.handler(job.data as JobPayload<object>, context);
+                      return { id: job.id, status: 'completed' as const };
+                    } catch (error) {
+                      // The failure is recorded without the exception's text:
+                      // job rows and their dead-letter copies persist as plain
+                      // text, and exception messages routinely carry URLs,
+                      // inputs, and other material the confidentiality
+                      // contract keeps out of the queue's tables. The detail
+                      // goes to the error channel while the job span is active.
+                      const failure =
+                        error instanceof Error
+                          ? error
+                          : new Error(`job '${registration.name}' ${job.id} failed: ${String(error)}`);
+                      try {
+                        span.recordException(failure);
+                      } catch (recordError) {
+                        this.onError(
+                          new Error(`Failed to record exception on job span '${registration.name}' ${job.id}`, {
+                            cause: recordError,
+                          }),
+                        );
+                      }
+                      try {
+                        span.setStatus({ code: SpanStatusCode.ERROR });
+                      } catch (statusError) {
+                        this.onError(
+                          new Error(`Failed to set error status on job span '${registration.name}' ${job.id}`, {
+                            cause: statusError,
+                          }),
+                        );
+                      }
+                      this.onError(failure);
+                      return { id: job.id, status: 'failed' as const };
+                    } finally {
+                      try {
+                        span.end();
+                      } catch (endError) {
+                        this.onError(
+                          new Error(`Failed to end job span '${registration.name}' ${job.id}`, { cause: endError }),
+                        );
+                      }
+                    }
+                  });
+                } catch (error) {
+                  this.onError(
+                    error instanceof Error
+                      ? error
+                      : new Error(`job '${registration.name}' ${job.id} failed: ${String(error)}`),
+                  );
+                  return { id: job.id, status: 'failed' as const };
+                }
+              });
             }),
           ),
       );
@@ -523,6 +591,25 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
     await creation;
     return this.ensureQueue(name, policy);
   }
+}
+
+function addRequestCorrelation<P extends object>(payload: P): JobPayload<P> {
+  const correlationId = getRequestContext()?.correlationId;
+  const payloadCorrelationId = (payload as JobData).correlationId;
+  if (correlationId === undefined || payloadCorrelationId != null) return payload as JobPayload<P>;
+  return { ...payload, correlationId };
+}
+
+function correlationIdForJob(data: unknown): { correlationId: string; replacedInvalidCorrelationId: boolean } {
+  if (data !== null && typeof data === 'object') {
+    const correlationId = (data as JobData).correlationId;
+    if (correlationId === undefined) return { correlationId: randomUUID(), replacedInvalidCorrelationId: false };
+    if (typeof correlationId === 'string' && isValidCorrelationId(correlationId)) {
+      return { correlationId, replacedInvalidCorrelationId: false };
+    }
+    return { correlationId: randomUUID(), replacedInvalidCorrelationId: true };
+  }
+  return { correlationId: randomUUID(), replacedInvalidCorrelationId: false };
 }
 
 function validateRetry(

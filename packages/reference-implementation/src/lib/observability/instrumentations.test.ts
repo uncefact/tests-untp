@@ -19,6 +19,7 @@ describe('buildInstrumentations', () => {
 
     expect(mockGetNodeAutoInstrumentations).toHaveBeenCalledWith({
       '@opentelemetry/instrumentation-fs': { enabled: false },
+      '@opentelemetry/instrumentation-pino': { enabled: false },
     });
   });
 
@@ -27,6 +28,7 @@ describe('buildInstrumentations', () => {
 
     expect(mockGetNodeAutoInstrumentations).toHaveBeenCalledWith({
       '@opentelemetry/instrumentation-fs': { enabled: true },
+      '@opentelemetry/instrumentation-pino': { enabled: false },
     });
   });
 

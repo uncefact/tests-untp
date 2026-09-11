@@ -1,14 +1,29 @@
-export {};
+/** @jest-environment node */
+
+const mockCapturedLogLines: string[] = [];
 
 const loggerCalls = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+// Keep a split logger because this suite asserts on rendered and spy output.
 jest.mock('@/lib/api/logger', () => {
+  const actual = jest.requireActual('@uncefact/untp-ri-services/logging');
+  const { getActiveTraceContext } = jest.requireActual(
+    '@/lib/observability/trace-context',
+  ) as typeof import('@/lib/observability/trace-context');
+  const decryptionLogger = actual.createLogger({
+    level: 'debug',
+    destination: { write: (line: string) => mockCapturedLogLines.push(line) },
+    traceContextProvider: getActiveTraceContext,
+  });
   const logger: Record<string, unknown> = {
     info: (...args: unknown[]) => loggerCalls.info(...args),
     warn: (...args: unknown[]) => loggerCalls.warn(...args),
     error: (...args: unknown[]) => loggerCalls.error(...args),
+    debug: jest.fn(),
+    child: jest.fn((bindings: { module?: string }) =>
+      bindings.module === 'decrypt-credential' ? decryptionLogger.child(bindings) : logger,
+    ),
   };
-  logger.child = () => logger;
-  return { apiLogger: logger };
+  return { appLogger: logger, apiLogger: logger };
 });
 
 /** Set by a test to stand in for the registry lookup; the real one otherwise. */
@@ -35,6 +50,8 @@ jest.mock('@/lib/credentials/extract-credential-details', () => {
 
 import { decodeJwt } from 'jose';
 import { createCipheriv, randomBytes } from 'node:crypto';
+import { context, trace } from '@opentelemetry/api';
+import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
 import { AesGcmEncryptionAdapter, EncryptionAlgorithm } from '@uncefact/untp-ri-services/encryption';
 import type { UNTPVerifiableCredential } from '@uncefact/untp-ri-services';
 import {
@@ -44,6 +61,14 @@ import {
   ExternalContentKind,
 } from '@/lib/prisma/generated';
 import { captureExternalDetails, readExternalArtefact } from './external-artefact';
+
+const traceExporter = new tracing.InMemorySpanExporter();
+const traceSdk = new NodeSDK({
+  autoDetectResources: false,
+  instrumentations: [],
+  traceExporter,
+  spanProcessors: [new tracing.SimpleSpanProcessor(traceExporter)],
+});
 
 const DPP_060_CONTEXT = 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/';
 const DPP_061_CONTEXT = 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/';
@@ -103,9 +128,18 @@ function encryptedEnvelope(plaintext: string, key = KEY) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockCapturedLogLines.length = 0;
   getBridgeOverride = undefined;
   extractOverride = undefined;
   (decodeJwt as jest.Mock).mockImplementation(decodeCompactJwt);
+});
+
+beforeAll(() => {
+  traceSdk.start();
+});
+
+afterAll(async () => {
+  await traceSdk.shutdown();
 });
 
 describe('readExternalArtefact', () => {
@@ -466,6 +500,29 @@ describe('captureExternalDetails', () => {
 });
 
 describe('readExternalArtefact logging', () => {
+  it('passes the registration reader decryption through a trace-aware logger', () => {
+    const raw = JSON.stringify(encryptedEnvelope(JSON.stringify(enveloped(dppPayload()))));
+    const span = trace.getTracer('external-artefact-tests').startSpan('library-registration');
+
+    try {
+      context.with(trace.setSpan(context.active(), span), () => {
+        const reading = readExternalArtefact(bytes(raw), KEY);
+        expect(reading.outcome).toBe('opened');
+      });
+    } finally {
+      span.end();
+    }
+
+    const entries = mockCapturedLogLines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) {
+      expect(entry).toMatchObject({
+        traceId: span.spanContext().traceId,
+        spanId: span.spanContext().spanId,
+      });
+    }
+  });
+
   it('warns with the cause when the supplied key does not open the envelope', () => {
     // The cause tells a wrong key from a damaged ciphertext. Fails if the
     // catch goes back to swallowing it.

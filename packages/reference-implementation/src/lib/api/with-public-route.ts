@@ -1,5 +1,6 @@
 import { handleRouteError } from '@/lib/api/handle-route-error';
 import { apiLogger } from '@/lib/api/logger';
+import { trace } from '@opentelemetry/api';
 import { runWithRequestContext, isValidCorrelationId } from '@uncefact/untp-ri-services/logging';
 
 type PublicRouteHandler = (req: Request) => Promise<Response>;
@@ -12,6 +13,7 @@ export function withPublicRoute(handler: PublicRouteHandler) {
     // length/charset rule is replaced, never echoed into logs or responses.
     const raw = req.headers.get('x-correlation-id');
     const correlationId = raw && isValidCorrelationId(raw) ? raw : crypto.randomUUID();
+    trace.getActiveSpan()?.setAttribute('correlation.id', correlationId);
     if (raw && correlationId !== raw) {
       logger.warn(
         { inboundLength: raw.length, replacedWith: correlationId },

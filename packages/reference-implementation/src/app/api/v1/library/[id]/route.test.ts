@@ -17,12 +17,8 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   };
 });
 
-const loggerCalls = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    child: () => loggerCalls,
-  },
-}));
+jest.mock('@/lib/api/logger');
+const loggerCalls = jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>;
 
 const mockGetLibraryRecordById = jest.fn();
 const mockUpdateLibraryRecordAnnotations = jest.fn();

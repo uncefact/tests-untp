@@ -12,15 +12,17 @@ jest.mock('@uncefact/untp-ri-services', () => ({
 }));
 
 jest.mock('@uncefact/untp-ri-services/logging', () => ({
-  createLogger: () => ({
-    child: () => ({
+  createLogger: () => {
+    const logger = {
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
-      child: jest.fn().mockReturnValue({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }),
-    }),
-  }),
+      child: jest.fn(),
+    };
+    logger.child.mockReturnValue(logger);
+    return logger;
+  },
 }));
 
 // Mock next/server before importing route handlers

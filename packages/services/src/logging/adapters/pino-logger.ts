@@ -1,18 +1,6 @@
 import pino from 'pino';
 import type { LoggerService, LogContext, LoggerConfig } from '../types.js';
-
-type RequestContextProvider = () => Record<string, unknown> | undefined;
-let _requestContextProvider: RequestContextProvider | undefined;
-
-/**
- * Register a function that provides the current request context.
- * Called automatically when `@uncefact/untp-ri-services/logging` is imported.
- * The provider is invoked on every log call via pino's mixin, so loggers
- * created at module scope still pick up request-scoped context fields.
- */
-export function registerRequestContextProvider(fn: RequestContextProvider): void {
-  _requestContextProvider = fn;
-}
+import { getRequestContext } from '../request-context.js';
 
 /**
  * Secret-bearing field names redacted by default. `decryptionKey` protects
@@ -41,6 +29,9 @@ const DEFAULT_REDACT_PATHS = [
   '*.config.headers.Authorization',
   '*.config.headers.authorization',
 ];
+
+let requestContextFailureReported = false;
+let traceContextFailureReported = false;
 
 /**
  * Deployment-supplied redaction paths from the LOG_REDACT_PATHS environment
@@ -100,17 +91,55 @@ export class PinoLoggerAdapter implements LoggerService {
           paths: [...DEFAULT_REDACT_PATHS, ...envRedactPaths, ...(config.redactPaths ?? [])],
           censor: '[REDACTED]',
         },
+        // Pino's default lets log-call fields override mixin fields. Trace
+        // identifiers come from the active span, so the mixin is authoritative.
+        mixinMergeStrategy(mergeObject, mixinObject) {
+          return { ...mergeObject, ...mixinObject };
+        },
         mixin() {
-          if (_requestContextProvider) {
-            try {
-              const context = _requestContextProvider();
-              return context ? { ...context } : {};
-            } catch (e) {
+          let context: Record<string, unknown> | undefined;
+          try {
+            const requestContext = getRequestContext();
+            context = requestContext === undefined ? undefined : { ...requestContext };
+          } catch (e) {
+            if (!requestContextFailureReported) {
+              requestContextFailureReported = true;
               console.error('Failed to get request context for logging:', e);
-              return {};
             }
           }
-          return {};
+
+          let traceContext: { traceId: string; spanId: string; traceFlags?: number } | undefined;
+          if (config.traceContextProvider) {
+            try {
+              const providedTraceContext = config.traceContextProvider();
+              traceContext =
+                providedTraceContext === undefined
+                  ? undefined
+                  : {
+                      traceId: providedTraceContext.traceId,
+                      spanId: providedTraceContext.spanId,
+                      ...(providedTraceContext.traceFlags === undefined
+                        ? {}
+                        : { traceFlags: providedTraceContext.traceFlags }),
+                    };
+            } catch (e) {
+              if (!traceContextFailureReported) {
+                traceContextFailureReported = true;
+                console.error('Failed to get trace context for logging:', e);
+              }
+            }
+          }
+
+          return {
+            ...(context ?? {}),
+            ...(traceContext === undefined
+              ? {}
+              : {
+                  traceId: traceContext.traceId,
+                  spanId: traceContext.spanId,
+                  ...(traceContext.traceFlags === undefined ? {} : { traceFlags: traceContext.traceFlags }),
+                }),
+          };
         },
         ...(config.pretty &&
           !config.destination && {

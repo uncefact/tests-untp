@@ -1,10 +1,10 @@
 import { createInMemoryTtlCache, type TtlCache } from '@uncefact/untp-utils/cache';
 import type { LoadedRemoteDocument } from '@uncefact/untp-utils/loaders';
-import { apiLogger } from '../api/logger';
+import { appLogger } from '../api/logger';
 import { readCacheMaxEntries } from '../config/cache-max-entries.config';
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
-const logger = apiLogger.child({ module: 'context-cache' });
+const logger = appLogger.child({ module: 'context-cache' });
 
 export function readContextCacheTtlMs(env: Record<string, string | undefined> = process.env): number {
   const raw = env.CONTEXT_CACHE_TTL_MS;

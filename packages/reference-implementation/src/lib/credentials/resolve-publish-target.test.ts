@@ -3,9 +3,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   findIdentifiersByValue: (...args: unknown[]) => mockFindIdentifiersByValue(...args),
 }));
 
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
-}));
+jest.mock('@/lib/api/logger');
 
 import { resolvePublishTarget } from './resolve-publish-target';
 

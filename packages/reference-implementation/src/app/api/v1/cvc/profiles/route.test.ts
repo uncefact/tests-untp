@@ -19,9 +19,7 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   };
 });
 
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
-}));
+jest.mock('@/lib/api/logger');
 
 const mockListProfiles = jest.fn();
 jest.mock('@/lib/prisma/repositories', () => ({

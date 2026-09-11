@@ -1,6 +1,6 @@
 import type { ServiceType, AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 import { adapterRegistry } from '@uncefact/untp-ri-services/server';
-import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { appLogger } from '@/lib/api/logger';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { getInstanceByResolution } from '@/lib/prisma/repositories';
 import {
@@ -10,7 +10,7 @@ import {
   ConfigValidationError,
 } from '@/lib/api/errors';
 
-const logger = createLogger().child({ module: 'resolve-service' });
+const logger = appLogger.child({ module: 'resolve-service' });
 
 /**
  * Shape returned by resolveService — the resolved adapter

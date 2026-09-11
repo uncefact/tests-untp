@@ -72,17 +72,7 @@ jest.mock('@uncefact/untp-ri-services', () => {
   };
 });
 
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    child: jest.fn().mockReturnValue({
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    }),
-  },
-}));
+jest.mock('@/lib/api/logger');
 
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { POST, GET } from './route';

@@ -1,4 +1,4 @@
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { LibraryRecordOrigin } from '@/lib/prisma/generated';
 import { deleteNativeCredential } from '@/lib/prisma/repositories/credential.repository';
 import {
@@ -9,7 +9,7 @@ import {
   type StoredObjectCoordinates,
 } from '@/lib/library/remove-stored-object';
 
-const logger = apiLogger.child({ module: 'delete-native-credential' });
+const logger = appLogger.child({ module: 'delete-native-credential' });
 
 export type DeleteNativeCredentialAndCopyResult =
   | { outcome: 'missing' }

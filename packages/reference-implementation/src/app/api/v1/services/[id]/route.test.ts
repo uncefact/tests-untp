@@ -100,21 +100,7 @@ jest.mock('@uncefact/untp-ri-services', () => {
   };
 });
 
-// ---------------------------------------------------------------------------
-// Mock logger
-// ---------------------------------------------------------------------------
-
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: {
-    child: jest.fn().mockReturnValue({
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      child: jest.fn().mockReturnThis(),
-    }),
-  },
-}));
+jest.mock('@/lib/api/logger');
 
 // ---------------------------------------------------------------------------
 // Import route handlers AFTER all mocks

@@ -1,7 +1,10 @@
 'use server';
 
 import { auth } from '@/auth';
+import { appLogger } from '@/lib/api/logger';
 import { getOidcEndpoints } from '@/lib/auth/oidc-discovery';
+
+const logger = appLogger.child({ module: 'auth-actions' });
 
 /**
  * Returns the OIDC end_session_endpoint URL for logging out of the identity provider.
@@ -31,7 +34,7 @@ export async function getLogoutUrl(): Promise<string | null> {
 
     return logoutUrl.toString();
   } catch (error) {
-    console.error('Failed to construct OIDC logout URL. Falling back to local-only logout.', error);
+    logger.error({ error }, 'Failed to construct OIDC logout URL. Falling back to local-only logout.');
     return null;
   }
 }

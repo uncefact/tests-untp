@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ForbiddenError, unexpectedErrorMessage } from '@/lib/api/errors';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { retiredRoute } from '@/lib/api/retired-route';
@@ -8,7 +8,7 @@ import { deleteNativeCredentialAndCopy } from '@/lib/credentials/delete-native-c
 import { isDatabaseError } from '@/lib/prisma/db-errors';
 import { getRequestContext } from '@uncefact/untp-ri-services/logging';
 
-const logger = apiLogger.child({ module: 'credentials-id-route' });
+const logger = appLogger.child({ module: 'credentials-id-route' });
 
 const EXTERNAL_DELETE_MESSAGE = 'This id is an external library record; delete it with DELETE /api/v1/library/{id}.';
 

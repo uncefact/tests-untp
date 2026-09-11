@@ -34,7 +34,7 @@ import { protectDecryptionKey, type ProtectedDecryptionKey } from '@/lib/credent
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import type { SqlExecutor } from '@/lib/jobs/types';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import {
   captureExternalDetails,
@@ -61,7 +61,7 @@ import { DECRYPTION_REQUIRED_MESSAGE, STORED_COPY_KEY_MISMATCH_MESSAGE } from '.
  * written, logged or enqueued (ADR-055 decision 1).
  */
 
-const logger = apiLogger.child({ module: 'register-external-credential' });
+const logger = appLogger.child({ module: 'register-external-credential' });
 
 /**
  * What every caller of the pipeline supplies, whatever it acquired the bytes

@@ -1,16 +1,17 @@
 # Observability
 
-This repository's observability story is being built out incrementally. The current state is a **walking skeleton** that proves the end-to-end pipeline from one app (the reference implementation) into a local trace backend. Logs, metrics, and broader app coverage land in follow-up tickets.
+This repository's observability story is being built out incrementally. The current state is a **walking skeleton** that proves the end-to-end pipeline from one app (the reference implementation) into a local trace backend. Metrics and broader app coverage land in follow-up tickets.
 
 ## What works today
 
 - The reference implementation is instrumented with the OpenTelemetry Node SDK and exports OTLP traces.
 - A local Tempo backend, a local OTel agent (collector in agent mode), and a local Grafana run alongside the app under a Docker Compose profile.
 - Traces from any request to the reference implementation are visible in Grafana, indexed by the `service.name`, `service.version`, and `deployment.environment.name` resource attributes.
+- Structured log lines written through a logger configured with `traceContextProvider` carry `traceId`, `spanId` and `traceFlags` while a valid span is active. In the reference implementation, that is the root application logger and its children. The span active in a route handler carries the `correlation.id` attribute. In the web process this is Next's internal route span, not the top-level server span, so query Tempo with `{ .correlation.id = "…" }` without a `kind` filter. Worker jobs start separate traces and carry the enqueuing request's correlation id, or a fresh id for scheduler jobs.
 
 ## What is intentionally not wired yet
 
-- **Pino structured logging** lands with [#593](https://github.com/uncefact/tests-untp/issues/593).
+- **Shipping Pino structured logs to Loki** lands with [#593](https://github.com/uncefact/tests-untp/issues/593).
 - **OpenTelemetry metrics** (request rate, latency, error rate, runtime) land with [#594](https://github.com/uncefact/tests-untp/issues/594).
 - **Playground instrumentation** lands with [#597](https://github.com/uncefact/tests-untp/issues/597), once #593 and #594 give it a fully exercised template to follow.
 - **Custom domain spans** on the credential pipeline, adapter invocations, etc. (per ADR 019) are a follow-up to the walking skeleton.
@@ -24,11 +25,11 @@ docker compose --profile local-observability up -d --build
 
 This brings up the app and shared services plus three observability containers:
 
-| Service | Image | Purpose |
-|---|---|---|
+| Service      | Image                                  | Purpose                                                  |
+| ------------ | -------------------------------------- | -------------------------------------------------------- |
 | `otel-agent` | `otel/opentelemetry-collector-contrib` | Receives OTLP from the app on `:4317`, exports to Tempo. |
-| `tempo` | `grafana/tempo` | Trace storage. |
-| `grafana` | `grafana/grafana` | Dashboard / Explore UI. |
+| `tempo`      | `grafana/tempo`                        | Trace storage.                                           |
+| `grafana`    | `grafana/grafana`                      | Dashboard / Explore UI.                                  |
 
 When everything is healthy, the reference implementation is at `http://localhost:3003` and Grafana is at `http://localhost:3030`. Grafana ships with the default `admin`/`admin` login and may prompt you to set a new password on first sign-in.
 
@@ -74,7 +75,7 @@ The emitted `service.name` is read from `OTEL_SERVICE_NAME` and defaults to `ref
 
 Set `OTEL_SERVICE_NAME` when more than one thing reports into the same stack and they need to be told apart, such as a variation of the reference implementation running alongside the original. The environment is carried separately, in `deployment.environment.name`.
 
-Auto-instrumentation is provided by `@opentelemetry/auto-instrumentations-node`, which covers HTTP, `fetch` (undici), `pg`, `pino` and other common libraries. It does not cover Prisma (that is the separate `@prisma/instrumentation`, not installed), so there are no Prisma spans; database activity shows up as `pg` spans where a query goes through the `pg` driver (the job queue), and not for Prisma's own queries. Next.js spans (scope `next.js`) come from Next's own tracer in the web process rather than from this list; the worker runs no Next and emits none.
+Auto-instrumentation is provided by `@opentelemetry/auto-instrumentations-node`, which covers HTTP, `fetch` (undici), `pg` and other common libraries. `@opentelemetry/instrumentation-pino` is disabled because the application's Pino mixin supplies the single set of camelCase trace fields. `@opentelemetry/instrumentation-fs` is disabled because Next.js and Node filesystem calls create high-cardinality, low-value noise. The auto-instrumentation does not cover Prisma (that is the separate `@prisma/instrumentation`, not installed), so there are no Prisma spans; database activity shows up as `pg` spans where a query goes through the `pg` driver (the job queue), and not for Prisma's own queries. Next.js spans (scope `next.js`) come from Next's own tracer in the web process rather than from this list; the worker runs no Next and emits none.
 
 The background worker is a second process from the same image and reports under its own `service.name`, `reference-implementation-worker` by default (the compose file passes `OTEL_WORKER_SERVICE_NAME` through as the worker's `OTEL_SERVICE_NAME`). A dashboard filtered on the web process's name will not show the worker's spans; filter on both, or on `service.version`, which the two share. The `fs` instrumentation is disabled by default (`packages/reference-implementation/src/lib/observability/instrumentations.ts`): it turns every filesystem call Next.js and Node make internally into a span, which floods traces with high-cardinality, low-value noise.
 

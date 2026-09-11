@@ -1,6 +1,4 @@
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
-}));
+jest.mock('@/lib/api/logger');
 
 const mockGetDataModelById = jest.fn();
 const mockCreateRenderTemplateRepo = jest.fn();

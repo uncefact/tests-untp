@@ -8,9 +8,9 @@ import { StructuredError } from '@uncefact/untp-utils';
 // Relative imports (not the @/ alias): this module runs inside the Docker
 // image via tsx, where no tsconfig.json exists to resolve path aliases.
 import { getEncryptionService } from '../encryption/encryption';
-import { apiLogger } from '../api/logger';
+import { appLogger } from '../api/logger';
 
-const logger = apiLogger.child({ module: 'decryption-key-protection' });
+const logger = appLogger.child({ module: 'decryption-key-protection' });
 
 declare const protectedDecryptionKey: unique symbol;
 

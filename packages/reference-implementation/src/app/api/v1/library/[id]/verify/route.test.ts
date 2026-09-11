@@ -27,9 +27,8 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   };
 });
 
-const loggerCalls: Record<string, unknown> = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
-loggerCalls.child = () => loggerCalls;
-jest.mock('@/lib/api/logger', () => ({ apiLogger: loggerCalls }));
+jest.mock('@/lib/api/logger');
+const loggerCalls = jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>;
 
 jest.mock('@/lib/services/resolve-vc-service', () => ({ resolveVcService: jest.fn() }));
 jest.mock('@uncefact/untp-utils/resolvers', () => ({

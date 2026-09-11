@@ -25,7 +25,7 @@ import { CheckResult, CoreCredentialType, CredentialDetailsStatus } from '@/lib/
 import { contextCache } from '@/lib/credentials/context-cache';
 import { bundledArtefactsFallback, schemaLoader } from '@/lib/credentials/schema-loader';
 import { bridgeNameOf } from './core-credential-type';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 
 const MAX_MESSAGE_LENGTH = 1_024;
 const TRUNCATION_MARKER = '...';
@@ -99,7 +99,7 @@ const defaultDependencies: SchemaConformanceCheckDependencies = {
   schemaLoader,
   contextCache,
   bundledArtefactsFallback,
-  logger: apiLogger.child({ module: 'schema-conformance-check' }),
+  logger: appLogger.child({ module: 'schema-conformance-check' }),
 };
 
 /**

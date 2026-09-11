@@ -1,3 +1,21 @@
+/** @jest-environment node */
+
+const mockCapturedLogLines: string[] = [];
+
+// Keep the real logger because this suite asserts on rendered trace fields.
+jest.mock('@/lib/api/logger', () => {
+  const actual = jest.requireActual('@uncefact/untp-ri-services/logging');
+  const { getActiveTraceContext } = jest.requireActual(
+    '@/lib/observability/trace-context',
+  ) as typeof import('@/lib/observability/trace-context');
+  const appLogger = actual.createLogger({
+    level: 'error',
+    destination: { write: (line: string) => mockCapturedLogLines.push(line) },
+    traceContextProvider: getActiveTraceContext,
+  });
+  return { appLogger, apiLogger: appLogger.child({ module: 'api' }) };
+});
+
 const mockAuth = jest.fn();
 jest.mock('@/auth', () => ({
   auth: () => mockAuth(),
@@ -9,9 +27,28 @@ jest.mock('@/lib/auth/oidc-discovery', () => ({
 }));
 
 import { getLogoutUrl } from './actions';
+import { context, trace } from '@opentelemetry/api';
+import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
+
+const traceExporter = new tracing.InMemorySpanExporter();
+const traceSdk = new NodeSDK({
+  autoDetectResources: false,
+  instrumentations: [],
+  traceExporter,
+  spanProcessors: [new tracing.SimpleSpanProcessor(traceExporter)],
+});
+
+beforeAll(() => {
+  traceSdk.start();
+});
+
+afterAll(async () => {
+  await traceSdk.shutdown();
+});
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockCapturedLogLines.length = 0;
   process.env.RI_APP_URL = 'http://localhost:3003';
 
   mockGetOidcEndpoints.mockResolvedValue({
@@ -66,6 +103,28 @@ describe('getLogoutUrl', () => {
     const url = await getLogoutUrl();
 
     expect(url).toBeNull();
+  });
+
+  it('logs discovery failure with the active span trace ids', async () => {
+    mockAuth.mockResolvedValue({ id_token: 'test-id-token' });
+    mockGetOidcEndpoints.mockRejectedValue(new Error('Discovery failed'));
+    const span = trace.getTracer('auth-actions-tests').startSpan('logout');
+
+    try {
+      await context.with(trace.setSpan(context.active(), span), async () => {
+        await expect(getLogoutUrl()).resolves.toBeNull();
+      });
+    } finally {
+      span.end();
+    }
+
+    const [entry] = mockCapturedLogLines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(entry).toMatchObject({
+      module: 'auth-actions',
+      traceId: span.spanContext().traceId,
+      spanId: span.spanContext().spanId,
+      msg: 'Failed to construct OIDC logout URL. Falling back to local-only logout.',
+    });
   });
 
   it('uses discovered end_session_endpoint', async () => {

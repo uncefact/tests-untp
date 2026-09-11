@@ -13,7 +13,7 @@
  * container's health signal.
  */
 import type { NodeSDK } from '@opentelemetry/sdk-node';
-import { apiLogger } from '../lib/api/logger';
+import { appLogger } from '../lib/api/logger';
 import { validateConfiguredEncryptionKey } from '../lib/encryption/encryption-key-boot';
 import { resolveDataEncryptionKey } from '../lib/encryption/resolve-data-encryption-key';
 import { createJobQueue, resolveQueueConnectionString } from '../lib/jobs/app-job-queue';
@@ -95,7 +95,7 @@ function resolveWorkerConfiguration(): { reconciliationCron: string } {
 }
 
 export async function runWorker(options: RunWorkerOptions): Promise<void> {
-  const logger = apiLogger.child({ module: 'worker' });
+  const logger = appLogger.child({ module: 'worker' });
 
   const imageMigrations = listImageMigrations(options.migrationsDir);
 

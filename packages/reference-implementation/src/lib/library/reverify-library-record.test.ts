@@ -12,6 +12,7 @@ jest.mock('pg-boss', () => ({ PgBoss: class PgBoss {} }));
  */
 const renderedLogLines: string[] = [];
 
+// Keep the real logger because this suite asserts on rendered log lines.
 jest.mock('@/lib/api/logger', () => {
   const { createLogger } = jest.requireActual('@uncefact/untp-ri-services/logging');
   const rendering = createLogger({
@@ -24,9 +25,14 @@ jest.mock('@/lib/api/logger', () => {
       logLines.push({ level, message: String(args[args.length - 1]) });
       (rendering as Record<string, (...a: unknown[]) => void>)[level](...args);
     };
-  const logger: Record<string, unknown> = { info: record('info'), warn: record('warn'), error: record('error') };
+  const logger: Record<string, unknown> = {
+    debug: jest.fn(),
+    info: record('info'),
+    warn: record('warn'),
+    error: record('error'),
+  };
   logger.child = () => logger;
-  return { apiLogger: logger };
+  return { appLogger: logger, apiLogger: logger };
 });
 
 jest.mock('@/lib/services/resolve-vc-service', () => ({ resolveVcService: jest.fn() }));

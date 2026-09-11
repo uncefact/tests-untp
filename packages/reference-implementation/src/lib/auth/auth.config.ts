@@ -10,13 +10,13 @@
  */
 
 import { type NextAuthConfig } from 'next-auth';
-import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { appLogger } from '@/lib/api/logger';
 import { getTenantConfig } from '@/lib/auth/tenant-config';
 import { extractGroupClaim } from '@/lib/auth/group-claim';
 import { refreshOidcToken, decodeAccessToken } from '@/lib/auth/oidc-token';
 import { getOidcProvider } from '@/lib/auth/oidc-provider';
 
-const logger = createLogger().child({ module: 'auth-config' });
+const logger = appLogger.child({ module: 'auth-config' });
 
 const tenantConfig = getTenantConfig();
 

@@ -1,8 +1,6 @@
 export {};
 
-jest.mock('@/lib/api/logger', () => ({
-  apiLogger: { child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
-}));
+jest.mock('@/lib/api/logger');
 
 const ACTIVE_KEY = 'a'.repeat(64);
 const OUTGOING_KEY = 'd'.repeat(64);

@@ -25,15 +25,7 @@ jest.mock('@uncefact/untp-ri-services/logging', () => ({
   updateRequestContext: (...args: unknown[]) => mockUpdateRequestContext(...args),
 }));
 
-const mockApiLogger = {
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  debug: jest.fn(),
-  child: jest.fn(),
-};
-mockApiLogger.child.mockReturnValue(mockApiLogger);
-jest.mock('@/lib/api/logger', () => ({ apiLogger: mockApiLogger }));
+jest.mock('@/lib/api/logger');
 
 const mockAuth = jest.fn();
 jest.mock('@/auth', () => ({ auth: () => mockAuth() }));

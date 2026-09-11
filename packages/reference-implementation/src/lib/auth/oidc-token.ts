@@ -1,7 +1,7 @@
-import { createLogger } from '@uncefact/untp-ri-services/logging';
+import { appLogger } from '@/lib/api/logger';
 import { getOidcEndpoints } from '@/lib/auth/oidc-discovery';
 
-const logger = createLogger().child({ module: 'oidc-token' });
+const logger = appLogger.child({ module: 'oidc-token' });
 
 const REFRESH_TIMEOUT_MS = 5000;
 

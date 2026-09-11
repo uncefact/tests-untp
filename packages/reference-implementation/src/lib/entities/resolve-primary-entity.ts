@@ -4,9 +4,9 @@ import {
   getFacilityByIdentifierValue,
   getOrganisationByIdentifierValue,
 } from '@/lib/prisma/repositories';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 
-const logger = apiLogger.child({ module: 'resolve-primary-entity' });
+const logger = appLogger.child({ module: 'resolve-primary-entity' });
 
 export type PrimaryEntityResult = {
   primaryIdentifier?: string;

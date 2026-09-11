@@ -22,17 +22,10 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
   };
 });
 
-const mockError = jest.fn();
-const mockInfo = jest.fn();
-jest.mock('@/lib/api/logger', () => {
-  const logger: Record<string, unknown> = {
-    error: (...args: unknown[]) => mockError(...args),
-    warn: jest.fn(),
-    info: (...args: unknown[]) => mockInfo(...args),
-  };
-  logger.child = () => logger;
-  return { apiLogger: logger };
-});
+jest.mock('@/lib/api/logger');
+const logger = jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>;
+const mockError = logger.error;
+const mockInfo = logger.info;
 
 const mockBatchGetLibraryRecords = jest.fn();
 jest.mock('@/lib/prisma/repositories/library-record.repository', () => ({

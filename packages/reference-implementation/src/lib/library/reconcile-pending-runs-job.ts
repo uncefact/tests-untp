@@ -9,11 +9,11 @@ import { LIBRARY_RECONCILE_PENDING_RUNS_JOB } from '@/lib/jobs/queue-names';
 import { readReconcilePendingRunsBatchSize } from '@/lib/config/reconcile-pending-runs.config';
 import { readWorkerJobTimeoutSeconds } from '@/lib/config/worker-job-timeout.config';
 import { VERIFY_JOB_ENQUEUE_OPTIONS } from './verify-generation-job';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 
 const RECONCILIATION_BOUND_SECONDS = 30 * 60;
 type RetryLadder = NonNullable<EnqueueOptions['retry']>;
-const logger = apiLogger.child({ module: 'reconcile-pending-runs-job' });
+const logger = appLogger.child({ module: 'reconcile-pending-runs-job' });
 
 export type ReconcilePendingRunsDependencies = {
   findAbandoned: (cutoff: Date) => Promise<CheckRun[]>;

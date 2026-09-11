@@ -16,11 +16,11 @@ import { CredentialDetailsError, CredentialDetailsStatus, type CoreCredentialTyp
 import { protectDecryptionKey } from './decryption-key-protection';
 import { resolvePrimaryEntity } from '@/lib/entities/resolve-primary-entity';
 import type { PrimaryEntityResult } from '@/lib/entities/resolve-primary-entity';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { extractCredentialDetails } from './extract-credential-details';
 import type { CredentialDetailsInput } from '@/lib/prisma/repositories/credential.repository';
 
-const logger = apiLogger.child({ module: 'issue-credential' });
+const logger = appLogger.child({ module: 'issue-credential' });
 
 export type IssueCredentialInput = {
   tenantId: string;

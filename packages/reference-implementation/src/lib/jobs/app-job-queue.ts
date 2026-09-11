@@ -1,4 +1,4 @@
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import { databaseUrlFromEnvParts } from '@/lib/prisma/database-url';
 import { JobQueueError } from './errors';
@@ -17,7 +17,7 @@ import { readWorkerJobTimeoutSeconds } from '../config/worker-job-timeout.config
  * queue rather than a half-built one.
  */
 
-const logger = apiLogger.child({ module: 'job-queue' });
+const logger = appLogger.child({ module: 'job-queue' });
 
 let instance: PgBossJobQueue | undefined;
 let started: Promise<JobQueue> | undefined;

@@ -1,7 +1,7 @@
 import sanitizeHtml from 'sanitize-html';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 
-const logger = apiLogger.child({ module: 'sanitise-template' });
+const logger = appLogger.child({ module: 'sanitise-template' });
 
 /**
  * Tags to add beyond sanitize-html defaults.

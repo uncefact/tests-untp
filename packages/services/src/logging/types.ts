@@ -25,6 +25,12 @@ export interface LoggerConfig {
   pretty?: boolean;
   correlationId?: string;
   /**
+   * Supplies the active trace identifiers for each log line. The provider is
+   * evaluated by the logger's mixin, so it can read request or job scope at
+   * log time while the services package remains independent of a tracing SDK.
+   */
+  traceContextProvider?: () => { traceId: string; spanId: string; traceFlags?: number } | undefined;
+  /**
    * Additional redaction paths merged with the built-in sensitive-field
    * defaults and any paths supplied via the LOG_REDACT_PATHS environment
    * variable. An invalid pino path fails logger construction.

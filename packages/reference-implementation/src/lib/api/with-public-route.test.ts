@@ -1,3 +1,5 @@
+/** @jest-environment node */
+
 // Polyfill crypto.randomUUID for the test environment
 if (!globalThis.crypto?.randomUUID) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -41,9 +43,28 @@ jest.mock('@/lib/api/handle-route-error', () => ({
 }));
 
 import { withPublicRoute } from './with-public-route';
+import { context, trace } from '@opentelemetry/api';
+import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
+
+const traceExporter = new tracing.InMemorySpanExporter();
+const traceSdk = new NodeSDK({
+  autoDetectResources: false,
+  instrumentations: [],
+  traceExporter,
+  spanProcessors: [new tracing.SimpleSpanProcessor(traceExporter)],
+});
+
+beforeAll(() => {
+  traceSdk.start();
+});
+
+afterAll(async () => {
+  await traceSdk.shutdown();
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
+  traceExporter.reset();
   mockRunWithRequestContext.mockImplementation((_correlationId: string, callback: () => unknown) => callback());
 });
 
@@ -59,6 +80,52 @@ function fakeRequest(method = 'GET', headers: Record<string, string> = {}): Requ
 }
 
 describe('withPublicRoute', () => {
+  it('sets the request correlation id on the active route-handler span', async () => {
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withPublicRoute(handler);
+    const span = trace.getTracer('with-public-route-tests').startSpan('route-handler');
+
+    try {
+      await context.with(trace.setSpan(context.active(), span), () =>
+        wrapped(fakeRequest('POST', { 'x-correlation-id': 'c1' })),
+      );
+    } finally {
+      span.end();
+    }
+
+    const finishedSpan = traceExporter.getFinishedSpans().find((candidate) => candidate.name === 'route-handler');
+    expect(finishedSpan).toBeDefined();
+    expect(finishedSpan?.attributes['correlation.id']).toBe('c1');
+  });
+
+  it('sets correlation.id on the active child span without changing its parent', async () => {
+    const handler = jest.fn().mockResolvedValue({ status: 200 });
+    const wrapped = withPublicRoute(handler);
+    const tracer = trace.getTracer('with-public-route-tests');
+    const parent = tracer.startSpan('request-parent');
+    const child = tracer.startSpan('route-handler', {}, trace.setSpan(context.active(), parent));
+
+    try {
+      await context.with(trace.setSpan(context.active(), parent), () =>
+        context.with(trace.setSpan(context.active(), child), () =>
+          wrapped(fakeRequest('POST', { 'x-correlation-id': 'child-correlation' })),
+        ),
+      );
+    } finally {
+      child.end();
+      parent.end();
+    }
+
+    const spans = traceExporter.getFinishedSpans();
+    const finishedChild = spans.find((candidate) => candidate.spanContext().spanId === child.spanContext().spanId);
+    const finishedParent = spans.find((candidate) => candidate.spanContext().spanId === parent.spanContext().spanId);
+
+    expect(finishedChild).toBeDefined();
+    expect(finishedParent).toBeDefined();
+    expect(finishedChild?.attributes['correlation.id']).toBe('child-correlation');
+    expect(finishedParent?.attributes).not.toHaveProperty('correlation.id');
+  });
+
   it('calls handler and returns its response', async () => {
     const handlerResponse = { status: 200, json: async () => ({ valid: true }) };
     const handler = jest.fn().mockResolvedValue(handlerResponse);

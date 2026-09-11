@@ -24,7 +24,7 @@ import {
   type ExternalDetailsCapture,
   type ExternalStorageInput,
 } from './external-credential.repository';
-import { apiLogger } from '@/lib/api/logger';
+import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import {
   ABANDONED_CUSTODY_UNKNOWN_MESSAGE,
@@ -38,7 +38,7 @@ import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
 export { CHECK_NAMES } from '@/lib/library/check-rules';
 import type { CredentialOutcome, RecoverInRequestOutcome } from '@/lib/library/register-external-credential';
 
-const logger = apiLogger.child({ module: 'check-run.repository' });
+const logger = appLogger.child({ module: 'check-run.repository' });
 
 // CHECK_NAMES is owned by check-rules.ts so the projection and list SQL share it.
 export type CheckName = LibraryCheckName;
