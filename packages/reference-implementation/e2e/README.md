@@ -129,13 +129,17 @@ The suite can target a deployed RI and its dependent services using configuratio
    # Edit .env.e2e with the deployment configuration
    ```
 
-2. Run the tests (from repo root):
+2. Run the tests (from repo root). The same commands serve the compose stack and a deployed instance; for a deployment, declare the two capabilities the compose stack has and a deployment does not:
 
    ```bash
-   pnpm --dir packages/reference-implementation/e2e test:e2e
-   pnpm --dir packages/reference-implementation/e2e test:e2e:open
-   pnpm --dir packages/reference-implementation/e2e test:e2e:closed
+   export E2E_DB_ACCESS=false E2E_IDP_E2E_REALM=false   # deployment run: API-only cleanup, own identity provider
+   pnpm test:e2e:ri              # Uses E2E_TENANT_MODE from .env.e2e
+   pnpm test:e2e:ri:open         # Explicit open mode
+   pnpm test:e2e:ri:closed       # Explicit closed mode
+   pnpm test:e2e:playground      # Playground E2E (runs from packages/untp-playground/e2e/)
    ```
+
+   The `:open` and `:closed` scripts default `E2E_DB_ACCESS` to `true` for the compose stack; a value set in the environment wins.
 
 ### Test Data Safety
 
