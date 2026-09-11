@@ -10,6 +10,7 @@ export type {
   UNTPVerifiableCredential,
   RenderMethod,
   VerifyResult,
+  VerifyOptions,
   IVerifiableCredentialService,
 } from './verifiable-credential/types.js';
 export * from './did-manager/types.js';
@@ -143,6 +144,10 @@ export {
   vckitVerifiableCredentialSensitiveFields,
 } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.schema.js';
 export { decodeCredential } from './verifiable-credential/common/decode-credential.js';
+export {
+  checkValidityWindow,
+  type EnvelopeValidityWindowOutcome,
+} from './verifiable-credential/common/validity-window.js';
 
 // ── Data model bridges ──────────────────────────────────────────────────────
 export type {

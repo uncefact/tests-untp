@@ -66,21 +66,22 @@ export { BLOCKING_CHECKS, NATIVE_MASKED_CHECKS } from './check-rules';
 
 /**
  * The contract's derivation rule for a complete generation: any blocking
- * `fail` is `not_conformant`; otherwise `verified`, as long as at least one
- * check of any kind ran. A generation where nothing ran at all is the only
- * other `not_conformant`.
+ * `fail` is `not_conformant`; otherwise `verified` only when the proof
+ * check passed, and `not_conformant` when it did not run.
  *
- * The "at least one" test spans every check rather than the blocking ones,
- * because the published checks are what this reads and a native generation
- * publishes its acquisition and custody results as `not_run` whatever the
- * worker recorded. Counting only blocking checks would call a native run
- * `not_conformant` while the identical worker outcome on an external record
- * read `verified`, which is a statement about the record's origin dressed up
- * as a statement about its credential.
+ * `verified` means the credential is authentic, untampered with and not
+ * revoked. Proof is the only check that establishes the first two, so a
+ * generation whose proof was never established cannot be `verified` however
+ * many other checks ran: a verifier that stopped at the validity window, or
+ * a run that never reached the verifier, must not read as a verified
+ * credential. A revoked credential fails the blocking `status` check and is
+ * `not_conformant` by the first clause. Native masking blanks acquisition
+ * and custody checks but never proof, so a native and an external record
+ * with the same worker outcome still read the same.
  */
 export function deriveCompleteSummary(checks: VerificationChecks): 'verified' | 'not_conformant' {
   if (BLOCKING_CHECKS.some((name) => checks[name] === 'fail')) return 'not_conformant';
-  return CHECK_NAMES.some((name) => checks[name] !== 'not_run') ? 'verified' : 'not_conformant';
+  return checks.proof === 'pass' ? 'verified' : 'not_conformant';
 }
 
 const envelopeBase = {
@@ -134,7 +135,7 @@ const failedEnvelopeSchema = z
   .strict();
 
 const verificationEnvelopeDescription =
-  'Discriminated by `state`. A `pending` envelope has neither `completedAt` nor `failure`; `complete` has `completedAt` and no `failure`; `failed` has both. A `complete` summary is derived from the published checks. Any failed blocking check (retrieval, decryption, digest, proof, status) is `not_conformant`. Otherwise it is `verified`, as long as at least one check ran; a generation where nothing ran is `not_conformant`. A failed `temporal` or `schemaConformance` never makes it `not_conformant`. A settled external generation that attempted a source comparison also carries `sourceChanged` and `lastSourceCheckAt`, together or not at all. `sourceChanged` is null when the comparison was attempted and the source could not be checked.';
+  'Discriminated by `state`. A `pending` envelope has neither `completedAt` nor `failure`; `complete` has `completedAt` and no `failure`; `failed` has both. A `complete` summary is derived from the published checks. Any failed blocking check (retrieval, decryption, digest, proof, status) is `not_conformant`. Otherwise it is `verified` only when `proof` passed; a generation whose proof was not established is `not_conformant`. A failed `temporal` or `schemaConformance` never makes it `not_conformant`. A settled external generation that attempted a source comparison also carries `sourceChanged` and `lastSourceCheckAt`, together or not at all. `sourceChanged` is null when the comparison was attempted and the source could not be checked.';
 
 /**
  * What the record schemas add to the envelope's own description, and why it
@@ -159,7 +160,7 @@ export const verificationEnvelopeSchema = z
         code: z.ZodIssueCode.custom,
         path: ['summary'],
         message:
-          'summary must be derived from the published checks: not_conformant when a blocking check failed or nothing ran, otherwise verified',
+          'summary must be derived from the published checks: not_conformant when a blocking check failed or proof did not pass, otherwise verified',
       });
     }
     if (envelope.state === 'pending') return;

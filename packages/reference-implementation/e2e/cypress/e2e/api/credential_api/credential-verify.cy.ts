@@ -10,8 +10,9 @@ describe('Credential Verify API', { testIsolation: false }, () => {
   let encryptedDigest: string;
   let encryptedKey: string;
 
-  function buildCredentialPayload(issuerDid: string) {
+  function buildCredentialPayload(issuerDid: string, window: { validFrom?: string; validUntil?: string } = {}) {
     return {
+      ...window,
       '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
       id: `urn:uuid:verify-e2e-${RUN_ID}`,
       type: ['DigitalProductPassport', 'VerifiableCredential'],
@@ -159,6 +160,42 @@ describe('Credential Verify API', { testIsolation: false }, () => {
         );
         expect(response.body.decodedCredential).to.exist;
       });
+    });
+
+    it('reports an expired credential as not verified with a temporal reason', () => {
+      // The verification provider does not judge validFrom or validUntil for
+      // this envelope format, so the service does. Fails if an expired
+      // credential verifies true through the public route.
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: buildCredentialPayload(defaultDidValue, {
+            validFrom: '2020-01-01T00:00:00Z',
+            validUntil: '2021-01-01T00:00:00Z',
+          }),
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+          storageOptions: { encrypt: false },
+        },
+      })
+        .then((response) => {
+          expect(response.status).to.eq(201);
+          return cy.request(`/api/v1/library/${response.body.credentialId}`);
+        })
+        .then((res) =>
+          cy.request({
+            method: 'POST',
+            url: '/api/v1/credentials/verify',
+            body: { uri: res.body.storageUri, digestMultibase: res.body.digestMultibase },
+          }),
+        )
+        .then((response) => {
+          expect(response.status).to.eq(200);
+          expect(response.body.verified).to.be.false;
+          expect(response.body.error).to.include({ type: 'temporal' });
+          expect(response.body.error.message).to.contain('expired');
+        });
     });
 
     it('verifies an encrypted credential with decryptionKey', () => {

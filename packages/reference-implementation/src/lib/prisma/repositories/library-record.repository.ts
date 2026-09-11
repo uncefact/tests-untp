@@ -16,7 +16,7 @@ import {
   type ExternalLibraryRecordView,
   type LibraryRecordDetailView,
 } from '@/lib/library/library-record-view';
-import { BLOCKING_CHECKS, CHECK_NAMES, isNativeMasked, type LibraryCheckName } from '@/lib/library/check-rules';
+import { BLOCKING_CHECKS, isNativeMasked, type LibraryCheckName } from '@/lib/library/check-rules';
 import type { LibraryOrigin, VerificationSummary } from '@/lib/library/credential-record-projection';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { withDeadlockRetry } from './check-run.repository';
@@ -147,32 +147,32 @@ function checkNotEquals(name: LibraryCheckName, result: CheckResult): Prisma.Sql
   return Prisma.sql`${checkColumn(name)} <> ${enumValue(result, 'CheckResult')}`;
 }
 
+/**
+ * The SQL twin of `deriveCompleteSummary` in credential-record-projection.ts:
+ * a complete generation is not conformant when a blocking check failed or
+ * the proof check did not pass, and verified otherwise. Native masking hides
+ * acquisition and custody checks from the summary, never proof, so both
+ * origins apply the same proof test. A change to one rule is a change to
+ * both; the projection tests and the list integration suite pin them.
+ */
 function summaryIsNotConformant(native: boolean): Prisma.Sql {
   const blocking = BLOCKING_CHECKS.filter((name) => (native && isNativeMasked(name) ? false : true));
-  const ran = native ? CHECK_NAMES.filter((name) => !isNativeMasked(name)) : [...CHECK_NAMES];
   const failedBlocking = Prisma.sql`(${Prisma.join(
     blocking.map((name) => checkEquals(name, CheckResult.FAIL)),
     ' OR ',
   )})`;
-  const noChecksRan = Prisma.sql`NOT (${Prisma.join(
-    ran.map((name) => checkNotEquals(name, CheckResult.NOT_RUN)),
-    ' OR ',
-  )})`;
-  return Prisma.sql`(${failedBlocking} OR ${noChecksRan})`;
+  const proofNotPassed = checkNotEquals('proof', CheckResult.PASS);
+  return Prisma.sql`(${failedBlocking} OR ${proofNotPassed})`;
 }
 
 function summaryIsVerified(native: boolean): Prisma.Sql {
   const blocking = BLOCKING_CHECKS.filter((name) => (native && isNativeMasked(name) ? false : true));
-  const ran = native ? CHECK_NAMES.filter((name) => !isNativeMasked(name)) : [...CHECK_NAMES];
   const noBlockingFailure = Prisma.sql`NOT (${Prisma.join(
     blocking.map((name) => checkEquals(name, CheckResult.FAIL)),
     ' OR ',
   )})`;
-  const atLeastOneCheck = Prisma.sql`(${Prisma.join(
-    ran.map((name) => checkNotEquals(name, CheckResult.NOT_RUN)),
-    ' OR ',
-  )})`;
-  return Prisma.sql`(${noBlockingFailure} AND ${atLeastOneCheck})`;
+  const proofPassed = checkEquals('proof', CheckResult.PASS);
+  return Prisma.sql`(${noBlockingFailure} AND ${proofPassed})`;
 }
 
 function statusPredicate(status: NonNullable<ListLibraryRecordsOptions['status']>): Prisma.Sql {

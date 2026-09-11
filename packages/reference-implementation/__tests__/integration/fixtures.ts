@@ -23,6 +23,16 @@ import {
 } from '../../src/lib/prisma/repositories/external-credential.repository';
 import { noChecksRun } from '../../src/lib/prisma/repositories/check-run.repository';
 
+/**
+ * A complete run in which the verifier stopped at the validity window:
+ * acquisition and digest ran, proof and status did not, temporal failed.
+ * Not conformant under the summary rule, because proof was never
+ * established.
+ */
+function temporalOnly(): ReturnType<typeof noChecksRun> {
+  return { ...noChecksRun(), retrieval: CheckResult.PASS, digest: CheckResult.PASS, temporal: CheckResult.FAIL };
+}
+
 export { SYSTEM_TENANT_ID };
 
 /**
@@ -296,7 +306,7 @@ export type ExternalCredentialFixtureOptions = {
   coreCredentialType?: CoreCredentialType | null;
   detailsStatus?: CredentialDetailsStatus;
   encrypted?: boolean | null;
-  run?: 'pending' | 'complete' | 'failed' | 'notConformant' | 'nothingRan';
+  run?: 'pending' | 'complete' | 'failed' | 'notConformant' | 'nothingRan' | 'temporalOnly';
   issuerName?: string;
   issuerDid?: string;
   validFrom?: Date | null;
@@ -368,11 +378,13 @@ export async function insertExternalCredential(
                 ? { ...allPass, proof: CheckResult.FAIL }
                 : run === 'nothingRan'
                   ? noChecksRun()
-                  : allPass,
+                  : run === 'temporalOnly'
+                    ? temporalOnly()
+                    : allPass,
             enqueue: async () => undefined,
           },
   });
-  if (run === 'complete' || run === 'notConformant' || run === 'nothingRan') {
+  if (run === 'complete' || run === 'notConformant' || run === 'nothingRan' || run === 'temporalOnly') {
     await prisma.checkRun.update({
       where: { id: created.checkRun.id },
       data: {
@@ -381,7 +393,9 @@ export async function insertExternalCredential(
           ? { ...allPass, proof: CheckResult.FAIL }
           : run === 'nothingRan'
             ? noChecksRun()
-            : allPass),
+            : run === 'temporalOnly'
+              ? temporalOnly()
+              : allPass),
         completedAt: new Date('2026-08-01T00:00:00.000Z'),
         failureCode: null,
         failureMessage: null,

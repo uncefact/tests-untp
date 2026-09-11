@@ -1,4 +1,5 @@
 // The module builds its logger at import time, so the mock hands back one
+import { decodeJwt } from 'jose';
 // shared object whose `child` returns itself; every call any code path makes
 // lands in the same mock functions the assertions read.
 const loggerCalls = {
@@ -208,6 +209,33 @@ function nativeRecord(
   };
 }
 
+/**
+ * The RI unit config maps `jose` to a mock, so the decoder behind the
+ * temporal check sees nothing unless the mock is taught to read a payload.
+ */
+function decodeJwtForReal(): void {
+  (decodeJwt as jest.Mock).mockImplementation((token: string) =>
+    JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()),
+  );
+}
+
+/** A decodable envelope whose payload carries the given validity window. */
+function enveloped(window: { validFrom?: string; validUntil?: string }) {
+  const payload = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiableCredential'],
+    issuer: 'did:web:issuer.example',
+    credentialSubject: { id: 'https://example.com/subject' },
+    ...window,
+  };
+  const b64 = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: 'EnvelopedVerifiableCredential',
+    id: `data:application/vc+jwt,${b64({ alg: 'ES256', typ: 'vc+jwt' })}.${b64(payload)}.sig`,
+  };
+}
+
 const CREDENTIAL = {
   '@context': ['https://www.w3.org/ns/credentials/v2'],
   type: 'EnvelopedVerifiableCredential',
@@ -259,6 +287,7 @@ function dependencies(overrides: Partial<VerifyGenerationDependencies> = {}): Ve
     checkSchemaConformance: jest.fn().mockResolvedValue({ result: CheckResult.NOT_RUN, message: null }),
     settleComplete: jest.fn().mockResolvedValue({ outcome: 'applied' }),
     settleFailed: jest.fn().mockResolvedValue({ outcome: 'applied' }),
+    now: () => new Date('2026-09-11T00:00:00.000Z'),
     ...overrides,
   };
 }
@@ -571,7 +600,7 @@ describe('verifyGenerationHandler on native records', () => {
         ...ESTABLISHED_CHECKS,
         proof: CheckResult.PASS,
         status: CheckResult.PASS,
-        temporal: CheckResult.PASS,
+        temporal: CheckResult.NOT_RUN,
       },
     });
   });
@@ -675,7 +704,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     });
   });
 
-  it('passes proof, status and temporal on a verified credential, keeping the checks the run already recorded', async () => {
+  it('passes proof and status on a verified credential and leaves temporal to the claims, keeping the checks the run already recorded', async () => {
     verifier.verify.mockResolvedValue(verified());
     const deps = dependencies();
     await verifyGenerationHandler(deps)(JOB, context());
@@ -691,7 +720,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
         ...ESTABLISHED_CHECKS,
         proof: CheckResult.PASS,
         status: CheckResult.PASS,
-        temporal: CheckResult.PASS,
+        temporal: CheckResult.NOT_RUN,
       },
     });
     expect(loggerCalls.info).toHaveBeenCalledWith('Generation settled');
@@ -718,6 +747,167 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
         ...failed,
       },
     });
+  });
+
+  it('asks the verifier again without the validity window after a temporal failure and records its proof and status', async () => {
+    // An expired credential fails at the verifier's window check before the
+    // signature is examined, so the first answer says nothing about proof.
+    // Fails if the worker records proof and status as not_run from the first
+    // answer alone, or if the second call still enforces the window.
+    verifier.verify.mockResolvedValueOnce(notVerified('temporal')).mockResolvedValueOnce(verified());
+    const deps = dependencies();
+    await verifyGenerationHandler(deps)(JOB, context());
+
+    expect(verifier.verify).toHaveBeenCalledTimes(2);
+    expect(verifier.verify).toHaveBeenNthCalledWith(2, expect.anything(), { validityWindow: false });
+    expect(deps.settleComplete).toHaveBeenCalledWith({
+      id: RUN_ID,
+      tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
+      checks: {
+        ...ESTABLISHED_CHECKS,
+        proof: CheckResult.PASS,
+        status: CheckResult.PASS,
+        temporal: CheckResult.FAIL,
+      },
+    });
+  });
+
+  it.each([
+    ['status', { status: CheckResult.FAIL }],
+    ['integrity', { proof: CheckResult.FAIL }],
+  ])('keeps the temporal failure and records the %s failure the second answer names', async (type, failed) => {
+    verifier.verify.mockResolvedValueOnce(notVerified('temporal')).mockResolvedValueOnce(notVerified(type));
+    const deps = dependencies();
+    await verifyGenerationHandler(deps)(JOB, context());
+
+    expect(deps.settleComplete).toHaveBeenCalledWith({
+      id: RUN_ID,
+      tenantId: TENANT_ID,
+      schemaConformanceMessage: null,
+      checks: {
+        ...ESTABLISHED_CHECKS,
+        proof: CheckResult.NOT_RUN,
+        status: CheckResult.NOT_RUN,
+        temporal: CheckResult.FAIL,
+        ...failed,
+      },
+    });
+  });
+
+  it('treats a failed second verifier call as the verifier being unavailable and keeps the temporal failure', async () => {
+    verifier.verify.mockResolvedValueOnce(notVerified('temporal')).mockRejectedValueOnce(new Error('vckit down'));
+    const deps = dependencies();
+    await verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true }));
+
+    expect(deps.settleComplete).not.toHaveBeenCalled();
+    // The first answer's temporal failure is established evidence and rides
+    // with the unavailability; fails if the second call's failure publishes
+    // the earlier progress snapshot instead.
+    expect(deps.settleFailed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: expect.objectContaining({ code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE }),
+        checks: expect.objectContaining({ temporal: CheckResult.FAIL, proof: CheckResult.NOT_RUN }),
+      }),
+    );
+  });
+
+  it('does not make the second verifier call once the attempt has been aborted', async () => {
+    const controller = new AbortController();
+    verifier.verify.mockImplementationOnce(async () => {
+      controller.abort(new Error('queue abandoned the attempt'));
+      return notVerified('temporal');
+    });
+    const deps = dependencies();
+    await verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true, signal: controller.signal }));
+
+    expect(verifier.verify).toHaveBeenCalledTimes(1);
+    expect(deps.settleComplete).not.toHaveBeenCalled();
+    expect(deps.settleFailed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: expect.objectContaining({ code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE }),
+      }),
+    );
+  });
+
+  it('does not make the second verifier call when the attempt has no budget left', async () => {
+    jest.useFakeTimers({ now: new Date('2026-09-11T00:00:00.000Z') });
+    try {
+      verifier.verify.mockImplementationOnce(async () => {
+        jest.setSystemTime(new Date('2026-09-11T00:10:00.000Z'));
+        return notVerified('temporal');
+      });
+      const deps = dependencies();
+      await verifyGenerationHandler(deps)(JOB, context({ isFinalAttempt: true, expireSeconds: 60 }));
+
+      expect(verifier.verify).toHaveBeenCalledTimes(1);
+      expect(deps.settleFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          failure: expect.objectContaining({ code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE }),
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['expired', { validFrom: '2020-01-01T00:00:00Z', validUntil: '2021-01-01T00:00:00Z' }],
+    ['not yet valid', { validFrom: '2035-01-01T00:00:00Z' }],
+  ])(
+    "fails the temporal check from the credential's own claims when it is %s, whatever the verifier said",
+    async (_label, window) => {
+      // The pinned provider does not enforce the validity window for this
+      // envelope format, so the worker judges it too. Fails if temporal is
+      // taken from the verifier alone.
+      decodeJwtForReal();
+      verifier.verify.mockResolvedValue(verified());
+      const deps = dependencies({
+        fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes(JSON.stringify(enveloped(window)))),
+      });
+      await verifyGenerationHandler(deps)(JOB, context());
+
+      expect(verifier.verify).toHaveBeenCalledTimes(1);
+      expect(deps.settleComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          checks: expect.objectContaining({
+            proof: CheckResult.PASS,
+            status: CheckResult.PASS,
+            temporal: CheckResult.FAIL,
+          }),
+        }),
+      );
+    },
+  );
+
+  it('passes the temporal check from a current window, and from no window at all, never from the provider', async () => {
+    decodeJwtForReal();
+    // A provider that fails proof still lets the claims judge temporal, so
+    // this case cannot pass on the provider's success alone.
+    verifier.verify.mockResolvedValue(notVerified('integrity'));
+    const current = dependencies({
+      fetchStoredCopy: jest
+        .fn()
+        .mockResolvedValue(
+          storedBytes(
+            JSON.stringify(enveloped({ validFrom: '2026-01-01T00:00:00Z', validUntil: '2027-01-01T00:00:00Z' })),
+          ),
+        ),
+    });
+    await verifyGenerationHandler(current)(JOB, context());
+    expect(current.settleComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ checks: expect.objectContaining({ temporal: CheckResult.PASS }) }),
+    );
+
+    // Without a bound the credential is valid indefinitely (VCDM 2.0), so
+    // the check passes on the claims, not on the provider's success.
+    const unbounded = dependencies({
+      fetchStoredCopy: jest.fn().mockResolvedValue(storedBytes(JSON.stringify(enveloped({})))),
+    });
+    await verifyGenerationHandler(unbounded)(JOB, context());
+    expect(unbounded.settleComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ checks: expect.objectContaining({ temporal: CheckResult.PASS }) }),
+    );
   });
 
   it('warns and fails proof when the verifier names a type this build does not know', async () => {
@@ -773,7 +963,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
         decryption: CheckResult.PASS,
         proof: CheckResult.PASS,
         status: CheckResult.PASS,
-        temporal: CheckResult.PASS,
+        temporal: CheckResult.NOT_RUN,
       },
     });
   });
@@ -812,7 +1002,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     // findRun, or if a stage is given the raw expiry instead of the remaining
     // allowance. At t=20 s the copy gets 270 s; after it consumes 10 s, the
     // schema deadline is the t=290 s settlement deadline and the verifier
-    // race gets the 260 s balance.
+    // resolution and its call each race the 260 s balance.
     jest.useFakeTimers();
     let now = 0;
     const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
@@ -837,7 +1027,7 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
 
       await verifyGenerationHandler(deps)(JOB, context({ expireSeconds: 300 }));
 
-      expect(timeoutSpy.mock.calls.map((call) => call[1])).toEqual([260_000, 260_000]);
+      expect(timeoutSpy.mock.calls.map((call) => call[1])).toEqual([260_000, 260_000, 260_000]);
       expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
     } finally {
       timeoutSpy.mockRestore();

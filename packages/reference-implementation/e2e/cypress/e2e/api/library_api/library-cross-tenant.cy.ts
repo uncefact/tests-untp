@@ -22,6 +22,9 @@ describe('Library API cross-tenant journey', { testIsolation: false }, () => {
 
   function buildCredentialPayload(issuerDid: string, label: string) {
     return {
+      // A current window so the temporal check runs and passes.
+      validFrom: '2026-01-01T00:00:00Z',
+      validUntil: '2036-01-01T00:00:00Z',
       '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
       id: `urn:uuid:e2e-library-cross-tenant-${label}-${RUN_ID}`,
       type: ['DigitalProductPassport', 'VerifiableCredential'],

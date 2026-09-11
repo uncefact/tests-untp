@@ -327,6 +327,48 @@ describe('register an external credential, end to end', () => {
     expect(toCredentialRecord(settled as NonNullable<typeof settled>).verification.summary).toBe('not_conformant');
   });
 
+  it('settles an expired but genuine credential as verified with the temporal check failed', async () => {
+    // The verifier stops at the validity window, so the worker asks it again
+    // without the window to establish proof and status. Fails if the second
+    // call is not made, if its answer is not recorded, or if the summary
+    // rule accepts a generation without a passing proof.
+    const record = await register('/dpp.json');
+    verify
+      .mockResolvedValueOnce({ verified: false, error: { type: 'temporal' as never, message: 'expired' } })
+      .mockResolvedValueOnce({ verified: true });
+
+    await handler((await jobsFor(record.record.id))[0], context());
+
+    expect(verify).toHaveBeenCalledTimes(2);
+    expect(verify).toHaveBeenNthCalledWith(2, expect.anything(), { validityWindow: false });
+    const settled = await getExternalCredentialById(record.record.id, SYSTEM_TENANT_ID);
+    expect(settled?.checkRun).toMatchObject({
+      state: CheckRunState.COMPLETE,
+      proof: CheckResult.PASS,
+      status: CheckResult.PASS,
+      temporal: CheckResult.FAIL,
+    });
+    expect(toCredentialRecord(settled as NonNullable<typeof settled>).verification.summary).toBe('verified');
+  });
+
+  it('settles an expired credential whose signature does not verify as not conformant', async () => {
+    const record = await register('/dpp.json');
+    verify
+      .mockResolvedValueOnce({ verified: false, error: { type: 'temporal' as never, message: 'expired' } })
+      .mockResolvedValueOnce({ verified: false, error: { type: 'integrity' as never, message: 'bad signature' } });
+
+    await handler((await jobsFor(record.record.id))[0], context());
+
+    const settled = await getExternalCredentialById(record.record.id, SYSTEM_TENANT_ID);
+    expect(settled?.checkRun).toMatchObject({
+      state: CheckRunState.COMPLETE,
+      proof: CheckResult.FAIL,
+      status: CheckResult.NOT_RUN,
+      temporal: CheckResult.FAIL,
+    });
+    expect(toCredentialRecord(settled as NonNullable<typeof settled>).verification.summary).toBe('not_conformant');
+  });
+
   it('opens an encrypted source with the supplied key and the job verifies the decrypted copy', async () => {
     const record = await register('/encrypted.json', { decryptionKey: SUPPLIER_KEY });
 

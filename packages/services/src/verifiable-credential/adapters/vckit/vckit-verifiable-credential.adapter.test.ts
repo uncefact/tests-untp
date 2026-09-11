@@ -9,6 +9,12 @@ import type { VCKitVerifiableCredentialConfig } from './vckit-verifiable-credent
 import type { LoggerService } from '../../../logging/types';
 import type { CredentialPayload, EnvelopedVerifiableCredential, CredentialStatus } from '../../types';
 
+// jose ships ESM the services Jest config does not transform; the decoder
+// only needs the payload segment read, which this mock does for real.
+jest.mock('jose', () => ({
+  decodeJwt: (token: string) => JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')),
+}));
+
 // httpFetch normalises headers into a Headers instance; match by reading through it.
 const headersMatching = (pairs: Record<string, string>) => ({
   asymmetricMatch: (actual: unknown) => {
@@ -299,6 +305,59 @@ describe('VCKitVerifiableCredentialService', () => {
           }),
         }),
       );
+    });
+
+    it('reports a temporal failure for an expired credential the provider accepted, unless the window is skipped', async () => {
+      // The pinned VCKit never checks validFrom or validUntil for a vc+jwt
+      // envelope, so the adapter judges them. Fails if the provider's
+      // verified:true is passed through for an expired credential.
+      const b64 = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+      const expired = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        type: 'EnvelopedVerifiableCredential',
+        id: `data:application/vc+jwt,${b64({ alg: 'EdDSA' })}.${b64({ validUntil: '2021-01-01T00:00:00Z' })}.sig`,
+      } as unknown as typeof mockEnvelopedCredential;
+      mockFetch.mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({ verified: true }) });
+      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+
+      const enforced = await adapter.verify(expired);
+      expect(enforced).toEqual({
+        verified: false,
+        error: { type: VerificationErrorCode.Temporal, message: expect.stringContaining('expired') },
+      });
+
+      const skipped = await adapter.verify(expired, { validityWindow: false });
+      expect(skipped).toEqual({ verified: true });
+    });
+
+    it('skips only the validity window when asked, keeping the signature and status policies', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: jest.fn().mockResolvedValue({ verified: true }) });
+
+      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+      await adapter.verify(mockEnvelopedCredential, { validityWindow: false });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://vckit.example.com/agent/routeVerificationCredential',
+        expect.objectContaining({
+          body: JSON.stringify({
+            credential: mockEnvelopedCredential,
+            fetchRemoteContexts: true,
+            policies: { credentialStatus: true, issuanceDate: false, expirationDate: false },
+          }),
+        }),
+      );
+    });
+
+    it('sends only the provider default policies when the option is true or absent', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({ verified: true }) });
+
+      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+      await adapter.verify(mockEnvelopedCredential, { validityWindow: true });
+      await adapter.verify(mockEnvelopedCredential, {});
+
+      for (const call of mockFetch.mock.calls) {
+        expect(JSON.parse(call[1].body).policies).toEqual({ credentialStatus: true });
+      }
     });
 
     it('should return { verified: false, error } for unverified credential with error code mapping', async () => {

@@ -183,7 +183,7 @@ describe('deriveCompleteSummary', () => {
     expect([...BLOCKING_CHECKS]).toEqual(['retrieval', 'decryption', 'digest', 'proof', 'status']);
   });
 
-  it('is verified when every blocking check that ran passed and at least one ran', () => {
+  it('is verified when proof passed and no blocking check failed', () => {
     expect(deriveCompleteSummary(checks({ retrieval: 'pass', digest: 'pass', proof: 'pass', status: 'pass' }))).toBe(
       'verified',
     );
@@ -202,14 +202,26 @@ describe('deriveCompleteSummary', () => {
     expect(deriveCompleteSummary(checks())).toBe('not_conformant');
   });
 
-  it('is verified when a non-blocking check is all that ran', () => {
+  it('is not conformant when the proof check did not run, however many other checks did', () => {
+    // Verified means authentic, untampered with and not revoked, and only the
+    // proof check establishes the first two. A verifier that stopped at the
+    // validity window, or a run that never reached the verifier, leaves proof
+    // not_run and must not read as verified. Fails if the rule goes back to
+    // "any check ran".
+    expect(deriveCompleteSummary(checks({ temporal: 'pass', schemaConformance: 'pass' }))).toBe('not_conformant');
+    expect(deriveCompleteSummary(checks({ temporal: 'fail' }))).toBe('not_conformant');
+    expect(
+      deriveCompleteSummary(checks({ retrieval: 'pass', decryption: 'pass', digest: 'pass', status: 'pass' })),
+    ).toBe('not_conformant');
+  });
+
+  it('is verified when proof passed, whether or not the masked or non-blocking checks ran', () => {
     // A native generation publishes its acquisition and custody checks as
-    // not_run whatever the worker recorded, so counting only blocking checks
-    // would make a native run not_conformant while the same worker outcome on
-    // an external record read verified. Fails if the "at least one ran" test
-    // goes back to spanning the blocking checks only.
-    expect(deriveCompleteSummary(checks({ temporal: 'pass', schemaConformance: 'pass' }))).toBe('verified');
-    expect(deriveCompleteSummary(checks({ temporal: 'fail' }))).toBe('verified');
+    // not_run whatever the worker recorded; proof is never masked, so a
+    // native and an external record with the same worker outcome read the
+    // same. Fails if verified starts to depend on a masked check.
+    expect(deriveCompleteSummary(checks({ proof: 'pass' }))).toBe('verified');
+    expect(deriveCompleteSummary(checks({ proof: 'pass', status: 'pass', temporal: 'fail' }))).toBe('verified');
   });
 
   it('lets temporal and schemaConformance fail without changing a verified summary', () => {
@@ -785,13 +797,12 @@ describe('toNativeCredentialRecord', () => {
     });
   });
 
-  it('gives a temporal-only generation the same summary on a native and an external record', () => {
+  it('gives a temporal-only generation the same not-conformant summary on a native and an external record', () => {
     // The verifier reported a temporal failure and said nothing about proof
-    // or status. Native masking then blanks retrieval, decryption and digest,
-    // so a summary counting only blocking checks would call the native record
-    // not_conformant and the external one verified from one worker outcome.
-    // Fails if the summary is derived from anything but the published checks,
-    // or if the "at least one ran" test excludes temporal.
+    // or status, so proof was never established. Native masking blanks
+    // retrieval, decryption and digest but not proof, so both origins read
+    // the same. Fails if a generation without a passing proof can read as
+    // verified on either origin, or if the two origins disagree.
     const worker = {
       generation: 2,
       state: CheckRunState.COMPLETE,
@@ -809,10 +820,10 @@ describe('toNativeCredentialRecord', () => {
 
     expect(native.verification).toMatchObject({
       state: 'complete',
-      summary: 'verified',
+      summary: 'not_conformant',
       checks: checks({ temporal: 'fail' }),
     });
-    expect(external.verification).toMatchObject({ state: 'complete', summary: 'verified' });
+    expect(external.verification).toMatchObject({ state: 'complete', summary: 'not_conformant' });
     expect(native.verification.summary).toBe(external.verification.summary);
   });
 

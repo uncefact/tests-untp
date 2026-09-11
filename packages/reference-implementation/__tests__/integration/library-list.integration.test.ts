@@ -230,6 +230,9 @@ describe('GET /library repository query against migrated Postgres', () => {
     const verifiedId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'complete' });
     const notConformantId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'notConformant' });
     const nothingRanId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'nothingRan' });
+    // Proof never established: the SQL filter and the projection must both
+    // call this not conformant, never verified.
+    const temporalOnlyId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'temporalOnly' });
     const failedId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'failed' });
     const severalGenerationsId = await insertExternalCredential(prisma, OWNER_TENANT_ID, { run: 'complete' });
     await appendFailedRun(severalGenerationsId, 2);
@@ -246,7 +249,8 @@ describe('GET /library repository query against migrated Postgres', () => {
     expect((await summaries({ status: 'verified' })).ids).toEqual(expect.arrayContaining([nativeId, verifiedId]));
     expect((await summaries({ status: 'pending' })).ids).toEqual([pendingId]);
     const notConformantPage = await summaries({ status: 'not_conformant' });
-    expect(notConformantPage.ids).toEqual(expect.arrayContaining([notConformantId, nothingRanId]));
+    expect(notConformantPage.ids).toEqual(expect.arrayContaining([notConformantId, nothingRanId, temporalOnlyId]));
+    expect((await summaries({ status: 'verified' })).ids).not.toContain(temporalOnlyId);
     const failedPage = await summaries({ status: 'failed' });
     expect(failedPage.ids).toEqual(expect.arrayContaining([failedId, severalGenerationsId]));
     const newestFailed = failedPage.projected.find((row) => row.id === severalGenerationsId);

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import {
+  checkValidityWindow,
   decryptCredentialToBytes,
   hasValidEnvelopeStructure,
   isEncryptedEnvelope,
@@ -140,6 +141,8 @@ export type VerifyGenerationDependencies = {
   checkSchemaConformance: (input: SchemaConformanceCheckInput) => Promise<SchemaConformanceResult>;
   settleComplete: (input: SettleCheckRunCompleteInput) => Promise<CheckRunSettleOutcome>;
   settleFailed: (input: SettleCheckRunFailedInput) => Promise<CheckRunSettleOutcome>;
+  /** The clock the temporal check is judged against; the wall clock when omitted. */
+  now?: () => Date;
 };
 
 export function defaultVerifyGenerationDependencies(): VerifyGenerationDependencies {
@@ -153,6 +156,7 @@ export function defaultVerifyGenerationDependencies(): VerifyGenerationDependenc
     checkSchemaConformance,
     settleComplete: settleCheckRunComplete,
     settleFailed: settleCheckRunFailed,
+    now: () => new Date(),
   };
 }
 
@@ -536,19 +540,44 @@ async function runStoredCopyChecks(
   progress.checks = conformanceChecks;
   progress.schemaConformanceMessage = conformance.message;
 
-  let result: VerifyResult;
-  const verifierTimeoutMs = remaining();
+  let verifierResults: Pick<CheckResults, 'proof' | 'status' | 'temporal'>;
   try {
     // Resolving the tenant's verifier and calling it are one unavailability
-    // for the caller: neither ran a check. The call has no signal of its own,
-    // so it is bounded here; a hung request must not hold a worker slot past
-    // the attempt's expiry or keep the final attempt from settling.
-    result = await withTimeout(
-      deps.resolveVerifier(record.record.tenantId).then((verifier) => verifier.verify(credential)),
-      verifierTimeoutMs,
-      'the verifier call',
-    );
+    // for the caller: neither ran a check. The calls have no signal of their
+    // own, so each is bounded by what is left of the attempt; a hung request
+    // must not hold a worker slot past the attempt's expiry or keep the
+    // final attempt from settling.
+    const verifier = await withTimeout(deps.resolveVerifier(record.record.tenantId), remaining(), 'the verifier');
+    const first = verifierChecks(await withTimeout(verifier.verify(credential), remaining(), 'the verifier call'));
+    // What the first answer established survives a failed second call: the
+    // failure handler publishes this progress with the unavailability.
+    progress.checks = { ...conformanceChecks, ...first };
+    verifierResults = first;
+    if (first.temporal === CheckResult.FAIL) {
+      // The verifier stopped at the validity window and said nothing about
+      // proof or status, which a verified summary needs. Ask again with the
+      // window skipped, unless the attempt is already abandoned or out of
+      // budget, in which case the retry ladder asks instead.
+      throwIfAborted(context);
+      const budget = remaining();
+      if (budget <= 0) throw new Error('the second verifier call had no budget left');
+      const second = verifierChecks(
+        await withTimeout(verifier.verify(credential, { validityWindow: false }), budget, 'the second verifier call'),
+      );
+      if (second.temporal === CheckResult.FAIL) {
+        // The verifier ignored the request to skip the window, so proof and
+        // status stay unestablished; the summary rule keeps that from
+        // reading as verified.
+        logger.warn(
+          { recordId: record.record.id },
+          'Verifier reported a temporal failure with the validity window skipped; proof and status not established',
+        );
+      } else {
+        verifierResults = { ...second, temporal: CheckResult.FAIL };
+      }
+    }
   } catch (error) {
+    if (error instanceof TransientVerificationError) throw error;
     throw new TransientVerificationError(
       {
         code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
@@ -561,7 +590,41 @@ async function runStoredCopyChecks(
   // caught here, after the call, rather than settling a result the queue
   // already counts as failed.
   throwIfAborted(context);
-  return { checks: { ...conformanceChecks, ...verifierChecks(result) }, schemaConformanceMessage: conformance.message };
+  // The temporal check is owned here as well as by the verifier: a provider
+  // that does not enforce the validity window for this envelope format
+  // (the pinned VCKit does not) would otherwise let an expired credential
+  // publish temporal PASS. Either side failing fails the check.
+  const temporal = combineTemporal(
+    verifierResults.temporal,
+    temporalFromClaims(credential, (deps.now ?? (() => new Date()))()),
+  );
+  return {
+    checks: { ...conformanceChecks, ...verifierResults, temporal },
+    schemaConformanceMessage: conformance.message,
+  };
+}
+
+/**
+ * The validity window the credential itself claims, judged at `now`, as a
+ * check result: FAIL outside `validFrom`..`validUntil` or when a bound is
+ * present but is not a date-time, PASS inside the window or with no bound at
+ * all (valid indefinitely), NOT_RUN only when the envelope cannot be decoded,
+ * which the proof check owns. The judgement itself is the shared services helper so
+ * every verification path in the system applies the same rule.
+ */
+export function temporalFromClaims(credential: EnvelopedVerifiableCredential, now: Date): CheckResult {
+  const window = checkValidityWindow(credential, now);
+  if (window.result === 'fail') return CheckResult.FAIL;
+  if (window.result === 'pass') return CheckResult.PASS;
+  return CheckResult.NOT_RUN;
+}
+
+function combineTemporal(fromVerifier: CheckResult, fromClaims: CheckResult): CheckResult {
+  // An explicit temporal failure from the verifier dominates; otherwise the
+  // credential's own claims decide, and only a readable, current window
+  // passes. The verifier's overall success never counts as temporal evidence.
+  if (fromVerifier === CheckResult.FAIL) return CheckResult.FAIL;
+  return fromClaims;
 }
 
 type StoredCopy = {
@@ -757,14 +820,19 @@ async function readStoredCopy(
 
 /**
  * The verifier reports one outcome and, on failure, one reason (#759 owns
- * finer granularity). A verified credential passed proof, status and the
- * temporal check; a failed one records the check its reason names as
+ * finer granularity). A verified credential passed proof and status (the
+ * caller judges temporal from the credential's own claims); a failed one records the check its reason names as
  * failed and leaves the other two as not run, because the verifier did not
- * say whether it reached them.
+ * say whether it reached them. The caller asks again without the validity
+ * window when the reason is temporal.
  */
 function verifierChecks(result: VerifyResult): Pick<CheckResults, 'proof' | 'status' | 'temporal'> {
   if (result.verified) {
-    return { proof: CheckResult.PASS, status: CheckResult.PASS, temporal: CheckResult.PASS };
+    // A verified answer establishes proof and status and nothing about the
+    // validity window for this envelope format (the provider reads only the
+    // JOSE exp and nbf claims); the caller judges temporal from the
+    // credential's own claims.
+    return { proof: CheckResult.PASS, status: CheckResult.PASS, temporal: CheckResult.NOT_RUN };
   }
   const notRun = { proof: CheckResult.NOT_RUN, status: CheckResult.NOT_RUN, temporal: CheckResult.NOT_RUN };
   // The adapter's error codes are the strings 'status', 'integrity' and
