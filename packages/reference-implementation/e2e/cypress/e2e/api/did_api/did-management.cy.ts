@@ -1,26 +1,15 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 describe('DID API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
-  let testTenantId: string;
   let createdDidId: string;
   let createdDid: string;
   let defaultDidId: string;
   let vcServiceInstanceId: string;
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant and user before testing DID routes.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     // Login first  -  NextAuth creates the User record on first login
     cy.apiLogin();
-
-    // Seed test organisation and link the logged-in user
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // Create VC service instance (needed for DID import)
     cy.request({
@@ -40,13 +29,6 @@ describe('DID API', { testIsolation: false }, () => {
       expect(res.status).to.eq(201);
       vcServiceInstanceId = res.body.id;
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   describe('CRUD operations', () => {

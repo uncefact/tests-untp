@@ -1,21 +1,12 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 describe('Data Model API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
   let parentConfigId: string;
   let createdDataModelId: string;
-  let testTenantId: string;
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant and user before testing data-model routes.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // Find a core data model to use as parent for extension tests
     cy.request('/api/v1/data-models').then((response) => {
@@ -23,13 +14,6 @@ describe('Data Model API', { testIsolation: false }, () => {
       expect(core, 'a seeded core data model').to.exist;
       parentConfigId = core.id;
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   describe('Listing core data models', () => {

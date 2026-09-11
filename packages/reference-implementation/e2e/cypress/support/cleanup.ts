@@ -30,7 +30,13 @@ export type ResidueRow = {
 type Collection = {
   name: string;
   path: string;
-  deletePath?: (id: string) => string;
+  deletePath?: (id: string, row: Record<string, unknown>) => string;
+  beforeDelete?: (
+    options: CleanupOptions,
+    actor: CleanupActor,
+    id: string,
+    row: Record<string, unknown>,
+  ) => Promise<void>;
 };
 
 type ApiBody = {
@@ -43,7 +49,16 @@ type ApiBody = {
 };
 
 const COLLECTIONS: Collection[] = [
-  { name: 'library records', path: '/api/v1/library', deletePath: (id) => `/api/v1/library/${encodeURIComponent(id)}` },
+  {
+    name: 'library records',
+    path: '/api/v1/library',
+    // A credential this service issued is deleted through the credentials
+    // route; the library route refuses native records.
+    deletePath: (id, row) =>
+      row.origin === 'native'
+        ? `/api/v1/credentials/${encodeURIComponent(id)}`
+        : `/api/v1/library/${encodeURIComponent(id)}`,
+  },
   {
     name: 'render templates',
     path: '/api/v1/render-templates',
@@ -80,7 +95,24 @@ const COLLECTIONS: Collection[] = [
     path: '/api/v1/registrars',
     deletePath: (id) => `/api/v1/registrars/${encodeURIComponent(id)}`,
   },
-  { name: 'DIDs', path: '/api/v1/dids', deletePath: (id) => `/api/v1/dids/${encodeURIComponent(id)}` },
+  {
+    name: 'DIDs',
+    path: '/api/v1/dids',
+    deletePath: (id) => `/api/v1/dids/${encodeURIComponent(id)}`,
+    // A DID flagged default cannot be deleted; an interrupted run can leave a
+    // tagged DID in that state, so the flag is cleared first.
+    beforeDelete: async (options, actor, id, row) => {
+      if (row.isDefault !== true) return;
+      const response = await fetch(apiUrl(options.baseUrl, `/api/v1/dids/${encodeURIComponent(id)}`), {
+        method: 'PATCH',
+        headers: { ...actor.headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDefault: false }),
+      });
+      if (!response.ok && response.status !== 404) {
+        throw new Error(`PATCH /api/v1/dids/${id} (clear default) returned ${await responseDescription(response)}`);
+      }
+    },
+  },
   {
     name: 'service instances',
     path: '/api/v1/services',
@@ -120,15 +152,6 @@ function collectionPaths(collection: Collection, context: ListingContext): strin
   return [collection.path];
 }
 
-async function hasNoTenant(response: Response): Promise<boolean> {
-  try {
-    const body = (await response.clone().json()) as { error?: unknown };
-    return typeof body.error === 'string' && body.error.includes('No tenant found');
-  } catch {
-    return false;
-  }
-}
-
 async function listCollection(
   options: CleanupOptions,
   actor: CleanupActor,
@@ -145,13 +168,6 @@ async function listCollection(
       const response = await fetch(apiUrl(options.baseUrl, collectionPath, offset), {
         headers: actor.headers,
       });
-      if (response.status === 403 && (await hasNoTenant(response))) {
-        // An actor whose tenant no longer exists owns nothing the API can
-        // list: a spec's own teardown removed it. That is a clean state for
-        // this actor, not a listing failure.
-        finished = true;
-        break;
-      }
       if (!response.ok) {
         throw new Error(`GET ${collectionPath} returned ${await responseDescription(response)}`);
       }
@@ -182,7 +198,12 @@ async function listCollection(
         });
       }
 
-      if (body.pagination?.hasMore !== true) {
+      // A page that does not say whether more follow is not evidence that
+      // none do: the enumeration is reported as incomplete rather than clean.
+      if (body.pagination === undefined || typeof body.pagination.hasMore !== 'boolean') {
+        throw new Error(`GET ${collectionPath} returned a page without a boolean pagination.hasMore`);
+      }
+      if (!body.pagination.hasMore) {
         finished = true;
         break;
       }
@@ -243,6 +264,7 @@ async function deleteRow(
   actor: CleanupActor,
   collection: Collection,
   id: string,
+  row: Record<string, unknown>,
 ): Promise<CleanupFailure | undefined> {
   if (!collection.deletePath) {
     return {
@@ -252,7 +274,8 @@ async function deleteRow(
     };
   }
 
-  const path = collection.deletePath(id);
+  if (collection.beforeDelete) await collection.beforeDelete(options, actor, id, row);
+  const path = collection.deletePath(id, row);
   const response = await fetch(apiUrl(options.baseUrl, path), {
     method: 'DELETE',
     headers: actor.headers,
@@ -313,7 +336,7 @@ export async function cleanupRunData(options: CleanupOptions): Promise<CleanupRe
         }
 
         try {
-          const failure = await deleteRow(options, actor, collection, id);
+          const failure = await deleteRow(options, actor, collection, id, row);
           if (failure) failures.push(failure);
         } catch (error) {
           failures.push({

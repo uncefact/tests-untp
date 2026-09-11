@@ -1,21 +1,6 @@
-import { config, requireDbAccess, requireE2eRealm, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 describe('API login', { retries: 0 }, () => {
-  let tenantId: string | undefined;
-
-  beforeEach(function () {
-    requireDbAccess(this, 'This regression fixture deletes test users and seeds a tenant through Postgres.');
-    requireE2eRealm(this, 'Browser login uses the e2e realm users.');
-    tenantId = undefined;
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-  });
-
-  afterEach(() => {
-    if (config.capabilities.dbAccess && tenantId) {
-      cy.task('cleanupTestData', { tenantId, preserveTenant: config.tenantMode === 'closed' });
-    }
-  });
-
   for (const useSecondUser of [false, true]) {
     it(`keeps ${
       useSecondUser ? 'an explicitly selected' : 'the default'
@@ -37,10 +22,6 @@ describe('API login', { retries: 0 }, () => {
       } else {
         cy.apiLogin();
       }
-
-      cy.task<{ tenantId: string }>('seedTestOrg', { userEmail: user.email }).then((result) => {
-        tenantId = result.tenantId;
-      });
 
       // Exercise real middleware/session-cookie renewal immediately after
       // login, including a second request using the newly issued cookie.

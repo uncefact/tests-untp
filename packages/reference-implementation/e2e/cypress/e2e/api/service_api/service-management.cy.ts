@@ -1,5 +1,5 @@
 import { SYSTEM_VC_SERVICE_ID, SYSTEM_STORAGE_SERVICE_ID } from '../../../../../src/lib/prisma/constants';
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 interface ServiceInstance {
   id: string;
@@ -14,25 +14,9 @@ interface ServiceInstance {
 describe('Service API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
   let createdServiceId: string;
-  let testTenantId: string;
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant and users before testing service instances.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   describe('CRUD operations', () => {

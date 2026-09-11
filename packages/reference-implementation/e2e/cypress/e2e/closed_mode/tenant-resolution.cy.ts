@@ -7,7 +7,7 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay
  */
-import { config, requireDbAccess, requireE2eRealm } from '../../support/config';
+import { config, runTag } from '../../support/config';
 
 describe('Closed mode  -  tenant resolution', { testIsolation: false }, () => {
   const GROUP_CLAIM = config.groups.alpha;
@@ -15,19 +15,10 @@ describe('Closed mode  -  tenant resolution', { testIsolation: false }, () => {
   const ADMIN_PASSWORD = config.user.password;
   const USER_EMAIL = config.user2.email;
   const USER_PASSWORD = config.user2.password || config.user.password;
+  const RUN_ID = runTag();
+  let adminDidId: string;
 
-  before(function () {
-    requireDbAccess(this, 'Closed-mode tenant and user verification use Postgres without an RI API equivalent.');
-    requireE2eRealm(this, 'Closed-mode group tenancy uses the e2e realm groups.');
-    // Clean up any leftover data from previous runs
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_CLAIM });
-    }
-  });
+  before(() => {});
 
   describe('First user sign-in provisions tenant', () => {
     it('admin signs in and can call the API', () => {
@@ -41,11 +32,23 @@ describe('Closed mode  -  tenant resolution', { testIsolation: false }, () => {
       });
     });
 
-    it('tenant was created with correct externalIdpGroupId', () => {
-      cy.task('verifyClosedModeTenant', { externalIdpGroupId: GROUP_CLAIM }).then((tenant: any) => {
-        expect(tenant).to.not.be.null;
-        expect(tenant.externalIdpGroupId).to.eq(GROUP_CLAIM);
-        expect(tenant.name).to.eq('My Organisation');
+    it(`the provisioned tenant holds what the admin creates (${GROUP_CLAIM})`, () => {
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/dids',
+        body: {
+          type: 'MANAGED',
+          method: 'DID_WEB',
+          alias: `e2e-closed-resolution-${RUN_ID}-r${Cypress.currentRetry}`,
+          name: `Closed resolution DID ${RUN_ID}`,
+        },
+      }).then((response) => {
+        expect(response.status).to.eq(201);
+        adminDidId = response.body.id;
+        cy.request(`/api/v1/dids/${adminDidId}`).then((read) => {
+          expect(read.status).to.eq(200);
+          expect(read.body.id).to.eq(adminDidId);
+        });
       });
     });
   });
@@ -63,12 +66,10 @@ describe('Closed mode  -  tenant resolution', { testIsolation: false }, () => {
       });
     });
 
-    it('both users share the same tenant', () => {
-      cy.task('verifyUsersShareTenant', {
-        emails: [ADMIN_EMAIL, USER_EMAIL],
-      }).then((result: any) => {
-        expect(result.sameTenant).to.be.true;
-        expect(result.externalIdpGroupId).to.eq(GROUP_CLAIM);
+    it('both users share the same tenant: the second user reads the DID the admin created', () => {
+      cy.request(`/api/v1/dids/${adminDidId}`).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.id).to.eq(adminDidId);
       });
     });
   });

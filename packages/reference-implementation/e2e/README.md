@@ -8,7 +8,7 @@ Playground E2E lives in its own package at `packages/untp-playground/e2e/`. See 
 
 | Category        | Directory                  | Runs when                        |
 | --------------- | -------------------------- | -------------------------------- |
-| **API tests**   | `cypress/e2e/api/`         | `E2E_DB_ACCESS=true` (compose)   |
+| **API tests**   | `cypress/e2e/api/`         | any instance (API only)          |
 | **Open mode**   | `cypress/e2e/open_mode/`   | `E2E_TENANT_MODE=open` (default) |
 | **Closed mode** | `cypress/e2e/closed_mode/` | `E2E_TENANT_MODE=closed`         |
 
@@ -97,7 +97,7 @@ docker compose -f docker-compose.e2e.yml -f docker-compose.e2e-closed.yml --prof
 
 ## Running against a deployed instance
 
-The suite can target a deployed RI and its dependent services using configuration only. It does not assume that the RI is hosted by this repository.
+The suite targets any instance of the RI and its dependent services using configuration only: the compose stack in this repository, an instance provisioned in CI, or a deployment. Every spec runs the same way against each. Nothing in the suite reads or writes the RI's database; every record it needs is created through the RI API, tagged with the run id, and deleted through the RI API again.
 
 ### Prerequisites
 
@@ -107,18 +107,14 @@ The suite can target a deployed RI and its dependent services using configuratio
    - The identity provider (Keycloak or Zitadel)
    - VCKit, the storage service, the Identity Resolver, and the Playground when the relevant specs are enabled
 
-2. **Identity-provider fixtures**:
+2. **Identity-provider accounts** the suite signs in with. The compose stack imports `cypress/fixtures/keycloak-realm-e2e.json`, which defines all of them; a deployment provides its own:
 
-   - One test user and a second test user with passwords
-   - Two service-account clients with client credentials
-   - Credentials and redirect URIs configured for the deployed RI
-   - A dedicated group or tenant containing no operator data
-   - A second group for closed-mode tenant-isolation tests
-   - For Zitadel, `E2E_IDP_AUDIENCE` must identify the project used by the service-account clients
+   - Two users with passwords. In open mode each user's first sign-in provisions that user's own tenant, so nothing has to exist before the run. In closed mode both users belong to the same group.
+   - Two service-account clients with client credentials. In open mode each resolves to its own tenant; in closed mode one belongs to the first group and the other to a second group.
+   - Redirect URIs configured for the RI under test.
+   - For Zitadel, `E2E_IDP_AUDIENCE` must identify the project used by the service-account clients.
 
-3. **The e2e realm is optional**. The compose stack imports `cypress/fixtures/keycloak-realm-e2e.json` with its named users, service-account clients and groups. A deployed instance uses its own identity provider, so set `E2E_IDP_E2E_REALM=false` and the cases that depend on the realm fixture (browser login with the fixture users, closed-mode group tenancy) skip with a stated reason; the service-account API cases run with whatever two client-credential accounts you configure.
-
-4. **Database access is optional**. Leave `E2E_DB_ACCESS` unset or set it to `false` for a deployment run. Set it to `true` only for the compose-only database fallback, with the database host, port, credentials, and SSL setting configured. The deployed-instance path uses the RI API for resource cleanup and never needs database credentials.
+3. **A tenant containing no operator data.** The suite creates records only under the accounts above. Do not point it at accounts whose tenants hold data you want to keep: the records it creates are its own, but an operator reviewing the tenant will see tagged test records while a run is in progress.
 
 ### Setup
 
@@ -129,17 +125,14 @@ The suite can target a deployed RI and its dependent services using configuratio
    # Edit .env.e2e with the deployment configuration
    ```
 
-2. Run the tests (from repo root). The same commands serve the compose stack and a deployed instance; for a deployment, declare the two capabilities the compose stack has and a deployment does not:
+2. Run the tests (from repo root). The same commands serve the compose stack and a deployed instance:
 
    ```bash
-   export E2E_DB_ACCESS=false E2E_IDP_E2E_REALM=false   # deployment run: API-only cleanup, own identity provider
    pnpm test:e2e:ri              # Uses E2E_TENANT_MODE from .env.e2e
    pnpm test:e2e:ri:open         # Explicit open mode
    pnpm test:e2e:ri:closed       # Explicit closed mode
    pnpm test:e2e:playground      # Playground E2E (runs from packages/untp-playground/e2e/)
    ```
-
-   The `:open` and `:closed` scripts default `E2E_DB_ACCESS` to `true` for the compose stack; a value set in the environment wins.
 
 ### Test Data Safety
 
@@ -147,21 +140,20 @@ Each Cypress run has one tag, `e2e-<RUN_ID>`. `runTag()` exposes that value to s
 
 #### What tests clean up
 
-- **Per-spec API cleanup**: the support hook lists every RI collection for every authenticated actor used by the run and deletes only rows containing that run's tag. It runs in dependency order and repeats safely if a row has already gone.
-- **Final API cleanup and proof**: the harness `after:run` repeats the tagged deletion, then lists every collection again. Any leftover id or listing failure fails the run and is reported.
-- **Compose fallback**: when `E2E_DB_ACCESS=true`, database cleanup is a compose-only fallback for native credentials, CVC records, and identity-provider users or tenants that have no RI delete route. It remains tag-scoped for resource rows and reports failures.
-- **Object storage**: the MinIO sweep is enabled only with database access and removes only object keys containing the current run tag.
+- **Per-spec API cleanup**: the support hook lists every RI collection for every authenticated actor used by the run (both signed-in users and both service accounts) and deletes only rows containing that run's tag, in dependency order. Credentials the RI issued go through `DELETE /api/v1/credentials/{id}` and external library records through `DELETE /api/v1/library/{id}`; a run-owned DID still flagged default has the flag cleared first. Deleting is idempotent, so a row that has already gone is not a failure. The RI removes a deleted credential's stored copy on a best-effort basis (see the [credentials API](../../../documentation/docs/reference-implementation/api/credentials.md#delete-a-credential)); the proof below covers RI records, and a copy the RI could not remove is reported in the RI's own log, not by the suite.
+- **Final API cleanup and proof**: the harness `after:run` repeats the tagged deletion, retires the one Identity Resolver namespace the publishing spec registered (`e2e-pub-<tag>`, through the resolver's own API), then lists every collection again. Any leftover id or listing failure fails the run and is reported.
+- **Residue check**: before the first spec, the harness lists every collection and refuses to start when a row carries an `e2e-<other-run-id>` tag from an earlier run (`E2E_RESIDUE_POLICY=fail`, the default). `E2E_RESIDUE_POLICY=clean` runs the same tag-scoped API cleanup for those tags first and fails if it cannot converge. A run killed before its final cleanup leaves tagged rows behind; the next run's residue check finds them, and `clean` is the recovery. The Identity Resolver namespace the publishing spec registers is recorded in `.e2e-run-state/resolver-namespaces.json` before registration; a run retires its own namespace at the end and any namespace an earlier run left there at the start, through the resolver's API, and refuses to start if that fails.
 
 #### What tests never touch
 
-- **System seed data**: System DIDs, system service instances, and seeded data models are never modified or deleted.
-- **Other tagged data**: API cleanup matches the current run tag rather than deleting by tenant, user, or collection-wide ownership.
-- **Conformity records without routes**: the RI currently exposes CVC listing routes but no CVC delete routes. The CVC seeding spec is therefore gated on `E2E_DB_ACCESS` and uses the compose fallback.
-- **Identity-provider users and tenants**: these have no RI API cleanup equivalent and the specs that create them are gated on `E2E_DB_ACCESS`.
+- **System seed data**: system DIDs, system service instances, and seeded data models are never modified or deleted.
+- **Other tagged data**: cleanup matches the current run tag rather than deleting by tenant, user, or collection-wide ownership.
+- **Users and tenants**: the accounts the suite signs in with are the operator's fixtures, and so are the RI users and tenants those accounts' first sign-ins provision. Signing in does create them; the suite keeps them deliberately, because the RI has no route to remove a user or a tenant and the next run signs in as the same accounts. They hold no test records once cleanup has run. Point the suite only at accounts set aside for it.
+- **Conformity vocabulary entries**: the RI exposes browse routes only. The CVC spec exercises the browse contract against whatever the instance holds and creates nothing.
 
 #### Tenant isolation
 
-In closed mode, the tenant is determined by the IDP group claim. Test users and service accounts must be assigned to dedicated test groups such as `org-e2e-alpha` and `org-e2e-beta`. `E2E_RESIDUE_POLICY=fail` is the default and refuses to start when an earlier `e2e-<other-run-id>` tag is listed. `E2E_RESIDUE_POLICY=clean` attempts the same tag-scoped API cleanup first and fails if it cannot converge.
+In closed mode, the tenant is determined by the IDP group claim. The two users and the first service account belong to one group and the second service account to another, such as `org-e2e-alpha` and `org-e2e-beta`, named in `E2E_GROUP_ALPHA` and `E2E_GROUP_BETA`.
 
 #### Configuration inputs and capabilities
 
@@ -172,14 +164,12 @@ The following inputs are the complete configuration surface used by the RI e2e h
 - Human accounts: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`, `E2E_USER2_EMAIL`, `E2E_USER2_PASSWORD`
 - Service accounts: `E2E_SA1_CLIENT_ID`, `E2E_SA1_CLIENT_SECRET`, `E2E_SA2_CLIENT_ID`, `E2E_SA2_CLIENT_SECRET`
 - VCKit: `E2E_VCKIT_BASE_URL`, `E2E_VCKIT_API_KEY`, `E2E_VCKIT_DID_WEB_RESOLVABLE`
-- Storage: `E2E_STORAGE_BASE_URL`, `E2E_STORAGE_API_KEY`, `E2E_STORAGE_API_VERSION`, `E2E_STORAGE_PUBLIC_BUCKET`, `E2E_STORAGE_PRIVATE_BUCKET`
+- Storage: `E2E_STORAGE_BASE_URL` (as the RI reaches it), `E2E_STORAGE_PUBLIC_BASE_URL` (the same service as the test runner reaches it; specs that fetch a stored copy rewrite the RI's prefix to this one), `E2E_STORAGE_API_KEY`, `E2E_STORAGE_API_VERSION`, `E2E_STORAGE_PUBLIC_BUCKET`, `E2E_STORAGE_PRIVATE_BUCKET`
 - Identity Resolver and Playground: `E2E_IDR_PUBLIC_BASE_URL`, `E2E_IDR_API_KEY`, `PLAYGROUND_BASE_URL`
-- MinIO cleanup: `OBJECT_STORAGE_BUCKET_NAME`, `APP_ENDPOINT`, `OBJECT_STORAGE_PORT`, `OBJECT_STORAGE_USE_SSL`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`
-- Tenant fixtures: `E2E_TENANT_MODE`, `E2E_TEST_ORG_ID`, `E2E_GROUP_ALPHA`, `E2E_GROUP_BETA`
-- Harness controls: `E2E_DB_ACCESS`, `E2E_RESIDUE_POLICY`, optional `E2E_RUN_ID`, and the private-address capability inputs `FETCH_ALLOW_PRIVATE_URLS`, `VERIFY_ALLOW_PRIVATE_URLS`, `CYPRESS_VERIFY_ALLOW_PRIVATE_URLS`
-- Compose database fallback: `E2E_DB_HOST`, `E2E_DB_PORT`, `E2E_DB_USER`, `E2E_DB_PASSWORD`, `E2E_DB_NAME`, `E2E_DB_SSL_REJECT_UNAUTHORIZED`
+- Tenant mode and groups: `E2E_TENANT_MODE`, `E2E_GROUP_ALPHA`, `E2E_GROUP_BETA`
+- Harness controls: `E2E_RESIDUE_POLICY`, optional `E2E_RUN_ID`, and the private-address capability inputs `FETCH_ALLOW_PRIVATE_URLS`, `VERIFY_ALLOW_PRIVATE_URLS`, `CYPRESS_VERIFY_ALLOW_PRIVATE_URLS`
 
-The capability flags are `E2E_DB_ACCESS`, `E2E_VCKIT_DID_WEB_RESOLVABLE`, and the private-address setting. The compose `test:e2e:open` and `test:e2e:closed` scripts set `E2E_DB_ACCESS=true`; all other invocations default to `false`. The proposed `E2E_IDP_E2E_REALM` identity-provider capability flag remains an unresolved orchestration decision and is not silently enabled here.
+The capability flags are `E2E_VCKIT_DID_WEB_RESOLVABLE` and the private-address setting. There is no database or object-store configuration: the suite never connects to either.
 
 ### Environment Variables
 
@@ -194,10 +184,7 @@ All variables and their defaults are set in [`cypress.config.ts`](./cypress.conf
 | `E2E_IDP_BASE_URL`                  | Identity provider URL                                                                                                                                              | `http://localhost:8081`                                                     |
 | `E2E_IDP_AUDIENCE`                  | Zitadel project ID (Zitadel only)                                                                                                                                  | (none)                                                                      |
 | `E2E_TENANT_MODE`                   | `open` or `closed`                                                                                                                                                 | `open`                                                                      |
-| `E2E_DB_HOST`                       | PostgreSQL host                                                                                                                                                    | `localhost`                                                                 |
-| `E2E_DB_PORT`                       | PostgreSQL port                                                                                                                                                    | `5433`                                                                      |
 | `E2E_USER2_PASSWORD`                | Second test user password (if different from first)                                                                                                                | (empty)                                                                     |
-| `E2E_DB_SSL_REJECT_UNAUTHORIZED`    | Reject self-signed DB certs                                                                                                                                        | `true`                                                                      |
 | `FETCH_ALLOW_PRIVATE_URLS`          | Application setting the harness reads to initialise its private-address capability key. Set to `false` when testing a deployment that rejects private addresses.   | Harness: `true` when neither application name is set; application: `false`. |
 | `CYPRESS_VERIFY_ALLOW_PRIVATE_URLS` | Cypress input for the retained `VERIFY_ALLOW_PRIVATE_URLS` capability key. It is honoured only when neither application name is set, and never configures the app. | Unset.                                                                      |
 

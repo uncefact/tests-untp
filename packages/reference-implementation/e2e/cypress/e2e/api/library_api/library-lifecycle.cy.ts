@@ -9,15 +9,9 @@ describe('Library API lifecycle', { testIsolation: false }, () => {
     RUN_ID = `${runTag()}-r${Cypress.currentRetry}`;
   });
   const SA1 = config.serviceAccounts.sa1;
-  const preserveTenant = config.tenantMode === 'closed';
 
   let token: string;
-  let sub: string;
   let issuerDid: string;
-
-  function decodeSub(accessToken: string): string {
-    return JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString()).sub;
-  }
 
   // A current window by default so the temporal check judges real bounds;
   // a credential without bounds is valid indefinitely and also passes.
@@ -116,8 +110,6 @@ describe('Library API lifecycle', { testIsolation: false }, () => {
   before(() => {
     cy.task('getServiceAccountToken', SA1).then((result: any) => {
       token = result.accessToken;
-      sub = decodeSub(token);
-      cy.task('cleanupServiceAccountData', { sub, preserveTenant });
       cy.request({
         method: 'GET',
         url: '/api/v1/dids',
@@ -129,10 +121,6 @@ describe('Library API lifecycle', { testIsolation: false }, () => {
         issuerDid = defaultDid.did;
       });
     });
-  });
-
-  after(() => {
-    cy.task('cleanupServiceAccountData', { sub, preserveTenant });
   });
 
   it('registers, verifies, annotates, batch-gets and deletes an external record', () => {

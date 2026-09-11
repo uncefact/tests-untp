@@ -66,6 +66,6 @@ Cypress.Commands.add('apiLogin', (username?: string, password?: string) => {
   cy.request('/api/auth/session').then(({ body }) => {
     expect(body?.user?.id, 'authenticated session user ID').to.be.a('string').and.not.be.empty;
     expect(body.error, 'session authentication error').to.be.undefined;
-    return cy.getAllCookies().then((cookies) => cy.task('captureSessionCookies', { cookies }));
+    return cy.getAllCookies().then((cookies) => cy.task('captureSessionCookies', { cookies, user }));
   });
 });

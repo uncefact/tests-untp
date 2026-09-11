@@ -10,7 +10,7 @@
  *
  * Requires: docker-compose.e2e-closed.yml overlay (TENANT_MODE=closed)
  */
-import { config, requireDbAccess, requireE2eRealm, runTag } from '../../support/config';
+import { config, runTag } from '../../support/config';
 
 describe('Closed mode: tenant isolation', { testIsolation: false }, () => {
   const SA1 = config.serviceAccounts.sa1;
@@ -20,40 +20,17 @@ describe('Closed mode: tenant isolation', { testIsolation: false }, () => {
 
   let token1: string;
   let token2: string;
-  let sub1: string;
-  let sub2: string;
   let did1Id: string;
 
-  before(function () {
-    requireDbAccess(this, 'Closed-mode group tenants and service-account users have no RI API cleanup equivalent.');
-    requireE2eRealm(this, 'Closed-mode group tenancy uses the e2e realm groups.');
-    // Clean up both groups' data
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_ALPHA });
-    cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_BETA });
-
+  before(() => {
     // Get tokens for both service accounts
     cy.task('getServiceAccountToken', SA1).then((result: any) => {
       token1 = result.accessToken;
-      const payload = JSON.parse(Buffer.from(token1.split('.')[1], 'base64').toString());
-      sub1 = payload.sub;
-      cy.task('cleanupServiceAccountData', { sub: sub1, preserveTenant: true });
     });
 
     cy.task('getServiceAccountToken', SA2).then((result: any) => {
       token2 = result.accessToken;
-      const payload = JSON.parse(Buffer.from(token2.split('.')[1], 'base64').toString());
-      sub2 = payload.sub;
-      cy.task('cleanupServiceAccountData', { sub: sub2, preserveTenant: true });
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_ALPHA });
-      cy.task('cleanupClosedModeData', { externalIdpGroupId: GROUP_BETA });
-      cy.task('cleanupServiceAccountData', { sub: sub1, preserveTenant: true });
-      cy.task('cleanupServiceAccountData', { sub: sub2, preserveTenant: true });
-    }
   });
 
   it('SA1 (alpha) creates a DID', () => {
@@ -135,15 +112,28 @@ describe('Closed mode: tenant isolation', { testIsolation: false }, () => {
     });
   });
 
-  it('tenants were resolved to separate groups', () => {
-    cy.task('verifyClosedModeTenant', { externalIdpGroupId: GROUP_ALPHA }).then((alpha: any) => {
-      expect(alpha).to.not.be.null;
-      expect(alpha.externalIdpGroupId).to.eq(GROUP_ALPHA);
-    });
-
-    cy.task('verifyClosedModeTenant', { externalIdpGroupId: GROUP_BETA }).then((beta: any) => {
-      expect(beta).to.not.be.null;
-      expect(beta.externalIdpGroupId).to.eq(GROUP_BETA);
+  it(`the groups resolved to separate tenants: SA2 (${GROUP_BETA}) owns a DID SA1 (${GROUP_ALPHA}) cannot read`, () => {
+    const RUN_ID = runTag();
+    cy.request({
+      method: 'POST',
+      url: '/api/v1/dids',
+      headers: { Authorization: `Bearer ${token2}` },
+      body: {
+        type: 'MANAGED',
+        method: 'DID_WEB',
+        alias: `e2e-iso-closed-sa2-${RUN_ID}`,
+        name: `Closed Isolation SA2 DID ${RUN_ID}`,
+      },
+    }).then((created) => {
+      expect(created.status).to.eq(201);
+      cy.request({
+        method: 'GET',
+        url: `/api/v1/dids/${created.body.id}`,
+        headers: { Authorization: `Bearer ${token1}` },
+        failOnStatusCode: false,
+      })
+        .its('status')
+        .should('eq', 404);
     });
   });
 

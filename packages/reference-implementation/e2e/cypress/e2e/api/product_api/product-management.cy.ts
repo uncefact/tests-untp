@@ -1,8 +1,7 @@
-import { config, requireDbAccess, runTag } from '../../../support/config';
+import { config, runTag } from '../../../support/config';
 
 describe('Product API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
-  let testTenantId: string;
   let registrarId: string;
   let schemeId: string;
   let identifierId: string;
@@ -15,15 +14,7 @@ describe('Product API', { testIsolation: false }, () => {
   let standaloneItemId: string;
 
   before(function () {
-    requireDbAccess(this, 'This suite seeds a Postgres tenant, identifiers, and users before testing products.');
-    // Clean up any stale data from a previous failed run
-    cy.task('cleanupTestData', { tenantId: config.testOrg.id });
-    cy.task('cleanupTestUsers', { emails: [config.user.email, config.user2.email] });
-
     cy.apiLogin();
-    cy.task('seedTestOrg', { userEmail: config.user.email }).then((result: any) => {
-      testTenantId = result.tenantId;
-    });
 
     // Create prerequisite registrar -> scheme -> 2 identifiers chain
     cy.request({
@@ -93,13 +84,6 @@ describe('Product API', { testIsolation: false }, () => {
     }).then((facResponse) => {
       facilityId = facResponse.body[0].id;
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      const preserveTenant = config.tenantMode === 'closed';
-      cy.task('cleanupTestData', { tenantId: testTenantId, preserveTenant });
-    }
   });
 
   describe('CRUD operations', () => {

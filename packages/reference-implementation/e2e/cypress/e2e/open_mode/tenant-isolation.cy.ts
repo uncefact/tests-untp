@@ -7,7 +7,7 @@
  *
  * Requires: docker-compose.e2e.yml (standard E2E stack, TENANT_MODE=open)
  */
-import { config, requireDbAccess, runTag } from '../../support/config';
+import { config, runTag } from '../../support/config';
 
 describe('Open mode  -  tenant isolation', { testIsolation: false }, () => {
   const SA1 = config.serviceAccounts.sa1;
@@ -15,35 +15,17 @@ describe('Open mode  -  tenant isolation', { testIsolation: false }, () => {
 
   let token1: string;
   let token2: string;
-  let sub1: string;
-  let sub2: string;
   let did1Id: string;
 
-  function decodeSub(token: string): string {
-    return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()).sub;
-  }
-
-  before(function () {
-    requireDbAccess(this, 'Service-account user and tenant cleanup use Postgres without RI user routes.');
+  before(() => {
     // Get tokens for both service accounts
     cy.task('getServiceAccountToken', SA1).then((result: any) => {
       token1 = result.accessToken;
-      sub1 = decodeSub(token1);
-      cy.task('cleanupServiceAccountData', { sub: sub1 });
     });
 
     cy.task('getServiceAccountToken', SA2).then((result: any) => {
       token2 = result.accessToken;
-      sub2 = decodeSub(token2);
-      cy.task('cleanupServiceAccountData', { sub: sub2 });
     });
-  });
-
-  after(() => {
-    if (config.capabilities.dbAccess) {
-      cy.task('cleanupServiceAccountData', { sub: sub1 });
-      cy.task('cleanupServiceAccountData', { sub: sub2 });
-    }
   });
 
   it('SA1 creates a DID', () => {
