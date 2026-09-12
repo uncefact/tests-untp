@@ -1,3 +1,5 @@
+import { describeBootError } from './boot/describe-boot-error';
+
 /**
  * Next.js instrumentation hook entry point.
  *
@@ -12,7 +14,36 @@
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { registerNode } = await import('./instrumentation.node');
-    await registerNode();
+    try {
+      const { registerNode } = await import('./instrumentation.node');
+      await registerNode();
+    } catch (error: unknown) {
+      try {
+        await reportNodeBootFailure(error);
+      } finally {
+        process.exit(1);
+      }
+    }
+  }
+}
+
+async function reportNodeBootFailure(error: unknown): Promise<void> {
+  try {
+    const [{ apiLogger }, { safeError }] = await Promise.all([
+      import('./lib/api/logger'),
+      import('./lib/api/safe-error'),
+    ]);
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error && error.code !== undefined
+        ? String(error.code)
+        : undefined;
+    apiLogger.error(
+      { error: safeError(error), ...(code === undefined ? {} : { code }) },
+      'Node instrumentation boot failed',
+    );
+  } catch {
+    // Invalid LOG_REDACT_PATHS can prevent apiLogger from being constructed.
+    // The original boot failure still has to reach stderr before exit.
+    console.error(`Node instrumentation boot failed: ${describeBootError(error)}`);
   }
 }

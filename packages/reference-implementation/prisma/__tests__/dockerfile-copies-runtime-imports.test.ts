@@ -64,6 +64,9 @@ function entryPoints(): string[] {
     // The worker entrypoint (#985) and the modules beside it; their @/ imports
     // are covered by the src/lib directory copy and are not walked here.
     ...list(path.join(packageRoot, 'src/worker')),
+    // The preflight runs from the image before migrations, so its relative
+    // imports must remain covered by the Dockerfile too.
+    ...list(path.join(packageRoot, 'src/boot')),
   ];
 }
 

@@ -7,22 +7,26 @@ title: Startup
 
 Before the Reference Implementation begins accepting requests, its database schema must be up to date, and a set of default records must exist for the system to function, such as data models, default service instances, and render templates.
 
-Rather than requiring operators to run these steps manually, the Docker container's [entrypoint script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/docker-entrypoint.sh) handles them automatically. The entrypoint script applies database migrations, converts existing rows to the formats the current version writes, and seeds default records before starting the application. A database that is already up to date needs no migrations applied and no rows converted, but the conversion step still scans the credential and render template tables on every start, so the time that takes grows with both tables.
+Rather than requiring operators to run these steps manually, the Docker container's [entrypoint script](https://github.com/uncefact/tests-untp/blob/main/packages/reference-implementation/docker-entrypoint.sh) handles them automatically. The entrypoint script validates the configuration, applies database migrations, converts existing rows to the formats the current version writes, and seeds default records before starting the application. A database that is already up to date needs no migrations applied and no rows converted, but the conversion step still scans the credential and render template tables on every start, so the time that takes grows with both tables.
 
 How this is triggered depends on how you run the Reference Implementation:
 
-- **Docker** — The container's entrypoint script runs migrations, data backfills, and seeding automatically before starting the application. This applies whether you are using the Docker Compose configuration from the [repository](https://github.com/uncefact/tests-untp) or the standalone [Docker image](https://github.com/orgs/uncefact/packages/container/package/tests-untp%2Freference-implementation).
+- **Docker** — The container's entrypoint script runs the boot preflight, migrations, data backfills, and seeding automatically before starting the application. This applies whether you are using the Docker Compose configuration from the [repository](https://github.com/uncefact/tests-untp) or the standalone [Docker image](https://github.com/orgs/uncefact/packages/container/package/tests-untp%2Freference-implementation).
 - **Local development** does not go through the entrypoint, so none of these steps happen on their own. See the [repository README](https://github.com/uncefact/tests-untp) for setup instructions. Where an existing database still needs the digest conversion, run it by hand with the command in the [digest multibase backfill reference](./backfills/digest-multibase).
 
 This page walks through what happens during startup, what gets created, and how to control the process.
 
 ## What Happens on Startup
 
-The entrypoint script runs three steps in order before the application begins accepting requests:
+The entrypoint script runs four steps in order before the application begins accepting requests:
 
 ```mermaid
 flowchart TD
-    Start["Entrypoint script runs"] --> Migrations{"Run migrations?"}
+    Start["Entrypoint script runs"] --> Preflight{"Run boot preflight?"}
+    Preflight -->|"Yes (default)"| RunPreflight["Validate boot configuration"]
+    Preflight -->|"No (SKIP_PREFLIGHT=true)"| SkipPreflight["Skip boot preflight"]
+    RunPreflight --> Migrations
+    SkipPreflight --> Migrations
     Migrations -->|"Yes (default)"| RunMigrations["Apply pending database migrations"]
     Migrations -->|"No (SKIP_MIGRATIONS=true)"| SkipMigrations["Skip migrations"]
     RunMigrations --> Backfills{"Run backfills?"}
@@ -38,9 +42,25 @@ flowchart TD
     SkipSeed --> App
 ```
 
-All three steps are **idempotent** — they can run repeatedly without duplicating data or causing errors. Migrations that have already been applied are skipped. Backfills leave rows they have already converted alone. Seed records that already exist are updated if the environment variables have changed (upsert), so you can modify configuration values and restart the container to apply them.
+The migration, backfill and seed steps are **idempotent** — they can run repeatedly without duplicating data or causing errors. Migrations that have already been applied are skipped. Backfills leave rows they have already converted alone. Seed records that already exist are updated if the environment variables have changed (upsert), so you can modify configuration values and restart the container to apply them.
 
 Note the path the diagram takes when migrations are skipped. `SKIP_MIGRATIONS=true` skips the backfills as well, because they sit inside the same `SKIP_MIGRATIONS` guard as `migrate deploy`.
+
+## Step 0: Boot Preflight
+
+Before it constructs `RI_DATABASE_URL` or runs migrations, the entrypoint validates the configuration that does not require database tables. It uses the same validators as the application boot hook, so a rejected setting stops the container before migrations, backfills or seed writes, exits non-zero, and leaves the database untouched.
+For the web role, it validates `RI_APP_URL`, `RI_HTTP_USER_AGENT`, `CACHE_MAX_ENTRIES`, `BUNDLED_ARTEFACTS_FALLBACK`, `IDEMPOTENCY_STALE_CLAIM_MINUTES`, `MAX_REQUEST_BODY_BYTES`, `FETCH_ALLOW_PRIVATE_URLS`, `VERIFY_ALLOW_PRIVATE_URLS`, `FETCH_MAX_RESPONSE_SIZE`, `VERIFY_MAX_CREDENTIAL_SIZE`, `FETCH_TIMEOUT_MS`, `VERIFY_FETCH_TIMEOUT_MS`, `CVC_REFRESH_INTERVAL_HOURS`, and `WORKER_JOB_TIMEOUT_SECONDS`.
+For the worker role, it validates `RI_HTTP_USER_AGENT`, `CACHE_MAX_ENTRIES`, `BUNDLED_ARTEFACTS_FALLBACK`, `WORKER_JOB_TIMEOUT_SECONDS`, `LIBRARY_RECONCILE_PENDING_RUNS_CRON`, `LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE`, and the required `DATA_ENCRYPTION_KEY`; it skips the web-only settings.
+Both roles validate `DATA_ENCRYPTION_KEY` and `SERVICE_ENCRYPTION_KEY` naming and consistency, the encryption key format and placeholder policy using `DEPLOYMENT_ENVIRONMENT`, the OTLP gRPC exporter settings (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` and `OTEL_EXPORTER_OTLP_TRACES_HEADERS` when set), and `LOG_REDACT_PATHS` while the preflight logger is constructed.
+The entrypoint derives the role from its first argument marker, uses the web role when the marker is absent, and refuses any other marker value.
+Recognised maintenance commands do not run this preflight; their own configuration checks apply, while `SKIP_MIGRATIONS=true` and `SKIP_SEED=true` still skip migrations and the seed.
+A successful check prints `Preflight passed`. A rejected setting prints one stderr line beginning `Preflight failed:` in the web role or `Worker boot failed:` in the worker role, followed by the message and stable code where one exists, and the container exits 1.
+
+| Variable         | Description                                               | Default |
+| ---------------- | --------------------------------------------------------- | ------- |
+| `SKIP_PREFLIGHT` | Set to exactly `true` to bypass boot configuration checks | `false` |
+
+`SKIP_PREFLIGHT=true` is the only value that bypasses this step. The entrypoint warns that it skipped the boot preflight and that a configuration the application would refuse may reach database migrations. The application still performs its server-side checks when the web process starts, and the worker still performs its existing database-backed key check. A well-formed key that does not decrypt existing data remains checked after migrations because that check needs database tables.
 
 ## Step 1: Database Migrations
 
@@ -113,7 +133,7 @@ Render templates are loaded from `packages/reference-implementation/src/template
 
 ## Step 4: Application Start
 
-Once migrations, backfills, and seeding are complete, the application starts and begins accepting requests on port 3003.
+Once migrations, backfills, and seeding are complete, the application starts and begins accepting requests on port 3003. A refused server start exits 1. The web preflight reports `Preflight failed: <message>`, and a worker refusal reports `Worker boot failed: <message> [<code>]` when a stable code is present, so a refused process is not left serving 500 responses.
 
 ### Base URL Validation
 
@@ -199,16 +219,20 @@ The settlement is state-guarded in both directions. A job that finishes after th
 
 ### Worker Boot
 
-The worker is a second container from the same image (`ri-worker` in Docker Compose; `pnpm start:worker` in a checkout) with its own entrypoint and no port. It boots in this order, and each step fails the boot with a message naming what is wrong:
+The worker is a second container from the same image (`ri-worker` in Docker Compose; `pnpm start:worker` in a checkout) with its own entrypoint and no port.
 
-1. OpenTelemetry starts first, under its own service name (`OTEL_SERVICE_NAME`, default `reference-implementation-worker`), so the worker's traces are told apart from the web process's.
+The shared entrypoint derives the role from its first argument: `--process-role=worker` is the worker role, no marker is the web role, and any other marker is refused. The worker preflight does not require `RI_APP_URL`, `MAX_REQUEST_BODY_BYTES`, `IDEMPOTENCY_STALE_CLAIM_MINUTES` or the caller-supplied fetch settings, but it does require `DATA_ENCRYPTION_KEY` and checks the worker timeout and reconciliation settings. An invalid `RI_HTTP_USER_AGENT`, `CACHE_MAX_ENTRIES` or `BUNDLED_ARTEFACTS_FALLBACK` refuses worker boot, because all three govern work the worker itself does. The worker also applies the environment-only encryption format and placeholder checks and validates the OTLP gRPC exporter settings when set. The database-backed key check remains in step 4 below.
+
+After the worker process starts OpenTelemetry under its own service name (`OTEL_SERVICE_NAME`, default `reference-implementation-worker`), its boot checks run in this order, and each step fails the boot with a message naming what is wrong:
+
+1. The shared boot preflight runs first in the container entrypoint, in its worker role, and the worker bootstrap repeats it before the image and database checks. It requires `DATA_ENCRYPTION_KEY` and checks the worker timeout and reconciliation cadence and batch-size settings before those checks.
 2. The migrations this build ships are listed from the image (a build with none, or an unreadable directory, fails here, before any network), then the database target is resolved the same way the web process resolves it (`RI_DATABASE_URL`, or the `RI_POSTGRES_*` parts).
 3. Every migration this build ships must already be applied. The worker never runs migrations, backfills or the seed; the web container owns them. A database that is ahead of the worker's build passes, so an older worker beside a newer web process during a rolling deploy starts normally. A database missing one of the build's migrations does not, and the message names the migration: start the web container first.
-4. `DATA_ENCRYPTION_KEY` must be set, and it is checked against existing data the same way the web process checks it. The web process may run without a key when nothing is encrypted yet; the worker may not, because every job it runs needs the key, and a worker without one would record real work as failed.
-5. The worker's settings are read and checked: the reconciliation cadence (`LIBRARY_RECONCILE_PENDING_RUNS_CRON`), the per-tick cap (`LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE`) and `WORKER_JOB_TIMEOUT_SECONDS` (default 300 seconds, range 30 seconds to 24 hours). The last setting is the expiry and working budget for every job the queue sends or schedules. The web process reads the same setting twice: when it constructs its queue, and inside the key-bearing recovery on `POST /api/v1/library/{id}/verify`, which bounds its read of the record's own durable copy by the same number of seconds. Both services must therefore carry the same value, and raising it for a slow worker also raises what a caller can wait on that route. A value that cannot be used fails the boot with `worker.configuration-invalid`, naming the variable, before the queue exists.
+4. `DATA_ENCRYPTION_KEY` is checked against existing data the same way the web process checks it. The web process may run without a key when nothing is encrypted yet; the worker may not, because every job it runs needs the key, and a worker without one would record real work as failed.
+5. The settings returned by the preflight are used for the reconciliation cadence (`LIBRARY_RECONCILE_PENDING_RUNS_CRON`), the per-tick cap (`LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE`) and `WORKER_JOB_TIMEOUT_SECONDS` (default 300 seconds, range 30 seconds to 24 hours). The last setting is the expiry and working budget for every job the queue sends or schedules. The web process reads the same setting twice: when it constructs its queue, and inside the key-bearing recovery on `POST /api/v1/library/{id}/verify`, which bounds its read of the record's own durable copy by the same number of seconds. Both services must therefore carry the same value, and raising it for a slow worker also raises what a caller can wait on that route.
 6. The job handlers are registered, the shutdown handlers are installed, the queue is started, the reconciliation sweep above is scheduled, and the heartbeat below begins.
 
-The worker does not require the settings only the web process reads (`RI_APP_URL` among them); an environment that omits them still starts a worker. A boot failure is one line on stderr, `Worker boot failed: <message> [<code>]`, with the cause chain beneath it, and exit code 1. An invalid `LOG_REDACT_PATHS` fails the same way with the logger's own message naming the path.
+The worker does not require the settings only the web process reads (`RI_APP_URL` among them); an environment that omits them still starts a worker. A refused worker preflight is one line on stderr beginning `Worker boot failed:`, with the stable code in brackets when one exists, and exit code 1. Later worker boot failures use the same framing. An invalid `LOG_REDACT_PATHS` fails the same way with the logger's own message naming the path.
 
 **Stopping.** Three numbers govern a stop, each with its own job. On `SIGTERM` or `SIGINT` the worker stops taking jobs and gives a running one **30 seconds** to finish (the drain); a job still running then is failed by the queue and retried later. The whole shutdown (drain, queue release, database disconnect, telemetry flush with 5 seconds to reach the collector) must finish inside a **45-second** process deadline, after which the worker exits non-zero. The container's grace period, **60 seconds**, sits above that deadline so the runtime never kills the process before it has exited on its own terms: `stop_grace_period: 60s` in Compose (already set on `ri-worker`), `terminationGracePeriodSeconds: 60` in Kubernetes, `docker stop -t 60` by hand. So a job that needs 40 seconds is interrupted by the drain even though it fits the container's grace period. The worker exits non-zero if the queue release or the database disconnect fails or the deadline passes; a second signal exits at once; a telemetry flush that fails, which is the normal case when no collector is running, is logged and does not change the exit code. After an abrupt kill the interrupted job is not handed over at once: it stays claimed until its `WORKER_JOB_TIMEOUT_SECONDS` attempt expiry, five minutes by default, and the queue's maintenance sweep notices, then waits out the retry backoff (30 seconds as the base, growing and randomised on later attempts), so the next attempt comes minutes later on the same job id, provided the job has attempts left (four retries). A job that exhausts them settles its generation as a retryable failure on that final attempt, and a job that never reports at all is settled by the reconciliation sweep above. Either way the caller re-verifies the record to run the check again.
 

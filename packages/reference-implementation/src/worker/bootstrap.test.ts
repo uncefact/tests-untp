@@ -11,8 +11,11 @@ jest.mock('@/lib/prisma/prisma', () => ({
 // pg-boss ships ESM only and the unit config does not transform it; the
 // queue is not under test here.
 jest.mock('@/lib/jobs/app-job-queue', () => ({ createJobQueue: jest.fn(), resolveQueueConnectionString: jest.fn() }));
+// Telemetry construction is covered by the preflight and SDK tests. Keep the
+// NodeSDK's Node-only dependency graph out of this handler-focused jsdom suite.
+jest.mock('../lib/observability/start-sdk', () => ({ buildNodeSdk: jest.fn() }));
 
-import { requireEncryptionKeyOnBoot } from './bootstrap';
+import { requireEncryptionKeyOnBoot, runWorker } from './bootstrap';
 
 const KEY = 'a'.repeat(64);
 
@@ -20,10 +23,12 @@ describe('requireEncryptionKeyOnBoot', () => {
   const saved = {
     DATA_ENCRYPTION_KEY: process.env.DATA_ENCRYPTION_KEY,
     SERVICE_ENCRYPTION_KEY: process.env.SERVICE_ENCRYPTION_KEY,
+    WORKER_JOB_TIMEOUT_SECONDS: process.env.WORKER_JOB_TIMEOUT_SECONDS,
   };
   beforeEach(() => {
     delete process.env.DATA_ENCRYPTION_KEY;
     delete process.env.SERVICE_ENCRYPTION_KEY;
+    delete process.env.WORKER_JOB_TIMEOUT_SECONDS;
     validateConfiguredEncryptionKey.mockClear();
   });
   afterEach(() => {
@@ -50,5 +55,19 @@ describe('requireEncryptionKeyOnBoot', () => {
     process.env.DATA_ENCRYPTION_KEY = KEY;
     await expect(requireEncryptionKeyOnBoot()).resolves.toBeUndefined();
     expect(validateConfiguredEncryptionKey).toHaveBeenCalledWith(KEY);
+  });
+
+  it('runs the shared worker preflight before the existing image checks', async () => {
+    process.env.DATA_ENCRYPTION_KEY = KEY;
+    process.env.WORKER_JOB_TIMEOUT_SECONDS = '5';
+
+    await expect(
+      runWorker({
+        sdk: { shutdown: jest.fn() },
+        migrationsDir: '/directory-that-does-not-exist',
+      }),
+    ).rejects.toThrow(
+      'WORKER_JOB_TIMEOUT_SECONDS must be an integer number of seconds between 30 and 86400 when set; fix or unset it (unset uses 300).',
+    );
   });
 });
