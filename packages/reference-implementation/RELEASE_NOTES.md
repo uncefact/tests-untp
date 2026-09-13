@@ -1,8 +1,92 @@
 # UNTP Reference Implementation release notes
 
-## Unreleased
+## 0.5.0 - 2026-09-14
 
-**Breaking change: credentials read routes retired.** `GET /api/v1/credentials` and `GET /api/v1/credentials/{id}` now return `410 Gone` after authentication and tenant resolution succeed, with no deprecation window. Migrate to `/api/v1/library` and `/api/v1/library/{id}`. The replacement list contains no key material; retrieve a specific credential's key through its detail route. See the [v0.5 migration guide](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.5).
+v0.4 made the Reference Implementation safe to run in front of real data. v0.5 is about what a tenant holds rather than what it issues: a credential library that covers both the credentials you issued and the ones you received, with verification that runs in the background instead of blocking a request. Work that cannot finish inside a request now runs in a second container, so deploying v0.5 means deploying two.
+
+The headline changes: the library gives a tenant one inventory for issued and received credentials, with durable copies and asynchronous verification. The deployment now needs a worker beside the web container, and the upgrade applies ten database migrations plus an operator-run backfill. Several environment variables and API contracts have changed, including the removal of the old encryption-key name and the retirement of two credentials read routes. The sections below cover these and the rest.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.5.0`, `:latest`)
+- Upgrading from v0.4: this release removes an environment variable the v0.4 notes told you was optional to rename, renames three more, replaces the durable-copy read timeout, adds a second container you must deploy, adds ten database migrations and an operator-run backfill, and retires two API routes without a deprecation window. Read the [v0.5 migration guide](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.5) before you upgrade.
+- Back up first: one migration restructures the credential tables under a new parent record, and there is no reverse migration. Returning to v0.4 means restoring the paired database backup and encryption key.
+
+### A credential library, not just a credential list
+
+v0.5 gives each tenant one inventory for credentials it issued and credentials it received. The library supports registration, list, batch-get, detail, recipient annotations, deletion and re-verification. Registering a received credential stores a durable copy, so the tenant's record remains available if the sender removes its copy. Detail is the only route that returns key material or storage coordinates. List and batch-get rows are keyless by design.
+
+A row that cannot be built no longer prevents the rest of a library page from being read. List and batch-get responses return a `failures` array alongside `data`, still at HTTP 200. Pagination counts readable and failed rows, so callers advance by `limit` rather than by `data.length`. See the [Library API](https://uncefact.github.io/tests-untp/docs/reference-implementation/api/library).
+
+A `verified` summary now means that proof passed and no blocking check failed. Generations settled under the earlier rule are reclassified when read, so re-verify a record to refresh its evidence.
+
+The tenant-scoped, idempotent `DELETE /api/v1/credentials/{id}` removes the library record, verification history and issuance idempotency claim in one transaction, then makes a best-effort attempt to remove the durable copy from its recorded coordinates. For a credential issued before v0.5, the record is deleted but its copy remains and its URI is logged because the new coordinates are empty.
+
+The old credentials read routes are gone. `GET /api/v1/credentials` and `GET /api/v1/credentials/{id}` now return `410 Gone` after authentication and tenant resolution succeed, with `code: ROUTE_RETIRED` and no deprecation window. Use `/api/v1/library` and `/api/v1/library/{id}` instead.
+
+The v0.4 notes said: "The credentials endpoints still return the plaintext key to callers who are entitled to it, unwrapping it on read." Those routes are the ones this release retires. The library detail route is now the place to retrieve a key when the service holds one and can reveal it.
+
+Worker-settled library verification also runs an advisory schema-conformance check after credential details have been extracted. `schemaConformance` settles to `pass` or `fail` when the system core schema and JSON-LD document can be checked. A failure adds a `SCHEMA_CONFORMANCE_ADVISORY` warning and does not change the verification summary. The check remains `not_run` when its prerequisites or artefacts are unavailable. See the [library verification envelope](https://uncefact.github.io/tests-untp/docs/reference-implementation/api/library#the-verification-envelope).
+
+Verification now judges the credential's own `validFrom` and `validUntil` wherever a credential is verified, including the public `POST /api/v1/credentials/verify` route and the verify page. An unreadable bound fails the temporal check rather than being treated as absent.
+
+### Background work runs in its own container
+
+Verification that follows library registration or re-verification now runs in the background. `POST /api/v1/library/{id}/verify` returns `202` with the current record, and the worker performs the durable-copy read and verification. A slow or unreachable storage service no longer holds that request open.
+
+The worker is a second container from the same image with `/app/docker-worker-entrypoint.sh` as its entrypoint and `/app/docker-worker-healthcheck.sh` as its healthcheck. It never migrates, seeds or runs backfills. It refuses to boot until the migrations in its image are applied, so the web container goes first. It also requires `DATA_ENCRYPTION_KEY`, where a keyless web process can start when it has no encrypted data. See [Worker Boot](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/worker#worker-boot).
+
+The worker's background-job expiry and working budget are now controlled by `WORKER_JOB_TIMEOUT_SECONDS`, which defaults to 300 seconds and accepts 30 seconds to 24 hours. The web and worker must receive the same value. `LIBRARY_STORED_COPY_READ_TIMEOUT_MS` is removed and ignored if it remains set. The shared setting also bounds the in-request durable-copy read used by key-bearing recovery. With the default, the pending-run reconciliation cutoff is 60 minutes rather than 30 minutes.
+
+The job queue and the worker are the foundation later releases build on for work that cannot finish inside a request, including bulk issuance. See the [Worker operations page](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/worker).
+
+### Traces from both processes
+
+The Reference Implementation and its worker export OpenTelemetry traces over OTLP. Each process uses its own service name so a dashboard can tell web requests and background work apart. Traces carry the package version and deployment environment as resource attributes. The SDK always exports traces, and `OTEL_EXPORTER_OTLP_ENDPOINT` points the exporter at a collector. Use the `local-observability` Compose profile for a local collector, Tempo and Grafana. The emitted web service name is now taken from `OTEL_SERVICE_NAME` (#989), and the worker's is taken from `OTEL_WORKER_SERVICE_NAME` through its Compose mapping. Log lines written through the application logger inside a span carry `traceId`, `spanId` and `traceFlags` beside `correlationId`. The span active in a route handler, which is Next's internal route span rather than the top-level server span, carries `correlation.id`, so query Tempo with `{ .correlation.id = "…" }` without a span-kind filter. A request-enqueued job carries the request's correlation id, and its worker job span is named after its queue and carries `correlation.id` and `job.id`. Request and job traces remain separate and are joined by the correlation id. OpenTelemetry pino instrumentation is disabled because the logger's own mixin supplies these fields. See [Observability](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/observability) for the settings and verification steps.
+
+Metrics and log shipping to a log store are not part of this release.
+
+### The key variable rename is finished
+
+v0.4 renamed `SERVICE_ENCRYPTION_KEY` to `DATA_ENCRYPTION_KEY` and kept reading the old name with a warning. The v0.4 notes said: "The old name still works and logs a deprecation warning, so the rename is not a prerequisite for upgrading." That promise ends in v0.5. A deployment holding its key only under `SERVICE_ENCRYPTION_KEY` now fails to start with a rename message. Both names set to different values also refuse to run. Both names set to the same value use `DATA_ENCRYPTION_KEY` and log a reminder to remove the old name.
+
+The container entrypoint now runs this configuration preflight before database URL construction and migrations, and exits 1 with the validation message when boot is refused. `SKIP_PREFLIGHT=true` is the exact bypass and emits a warning; recognised audit, rotation and backfill maintenance commands run their own checks instead of this preflight.
+
+The rotation command reads its own key pair and is unaffected by the application fallback removal. Encrypted idempotency response bodies are now included with service configurations and credential decryption keys in encryption audits and key rotations. See the [v0.5 migration guide](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.5#service_encryption_key-is-no-longer-read).
+
+### Retrying a write no longer risks a second credential
+
+`POST /api/v1/credentials` now accepts an `Idempotency-Key`. A retry with the same key and body replays the original response, a retry while the first request is in progress returns `409 IDEMPOTENCY_KEY_IN_FLIGHT`, and the same key with a different body returns `422 IDEMPOTENCY_KEY_MISMATCH`.
+
+Every API route that accepts a body now has a default request limit of 5 MiB (5242880 bytes). An over-limit body returns `413 REQUEST_BODY_TOO_LARGE`, including when the body is malformed. Set `MAX_REQUEST_BODY_BYTES` to a higher integer when larger requests are required. The value must be at least 1024 or the process fails to start.
+
+### Credentials describe themselves
+
+Credential records now carry the name, issuer name and DID, subject name and id, validity dates, core credential type and core data model version that were extracted from the credential. Failed extraction is stored as a status and reported as a warning rather than silently producing blank fields.
+
+Credentials issued before v0.5 remain readable, but their descriptive fields remain pending until an operator runs `backfill:credential-details`. The command reads and decrypts each stored credential, reports every failed row and exits non-zero when any row fails. See the [credential details backfill](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/backfills/credential-details).
+
+### The deployment keeps working when the UNTP host does not
+
+The image bundles the UNTP and VC Data Model schemas and contexts used by the Reference Implementation. A failed fetch of a bundled artefact falls back to the copy in the image with a warning. `BUNDLED_ARTEFACTS_FALLBACK=false` restores strict host-fetch behaviour. Extension schemas and contexts that are not bundled remain dependent on their host.
+
+This changes the meaning of `SCHEMA_FETCH_FAILED` and `JSONLD_CONTEXT_FETCH_FAILED`: with fallback enabled, either code can describe a fetch that was replaced by a bundled copy rather than a host outage. See [Bundled UNTP Artefacts](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/bundled-untp-artefacts).
+
+### What the server will fetch, and what it tells a resolver
+
+The SSRF guard now rejects IPv4-compatible IPv6 addresses, the 6bone address range and IPv6 addresses outside the allocated `2000::/3` Global Unicast block. `did:web` resolution pins connections to the validated address set, caps responses at 1 MiB, allows three additional redirects and applies a 10 second resolver timeout. Each redirect hop is checked again.
+
+The three shared caller-supplied fetch settings are now named `FETCH_ALLOW_PRIVATE_URLS`, `FETCH_MAX_RESPONSE_SIZE` and `FETCH_TIMEOUT_MS`. The old names remain supported with a warning during v0.5. The bundled Compose file no longer forces the private-address setting on, so a deployment that set nothing changes from permissive to strict. Set `FETCH_ALLOW_PRIVATE_URLS=true` explicitly when private service addresses are required.
+
+The SSRF helpers moved from `@uncefact/untp-ri-services/server` to `@uncefact/untp-utils/node`. The validated URL result also carries all validated addresses in `addresses`, so consumers that use its type must update. Published encrypted credential links now carry `encryptionMethod: "AES-256"`, while unencrypted targets omit the field. Link registration and update requests accept only `none`, `AES-128` or `AES-256`.
+
+### Smaller changes
+
+- **Keycloak moves to 26.7** for CVE-2026-18963. The bundled Compose web step recreates Keycloak and upgrades existing volumes in place.
+- **Storage URIs use the storage service's `DOMAIN`.** The bundled `localhost:host-gateway` mappings let `ri` and `ri-worker` reach the `localhost` URIs they receive; a separately managed deployment must provide the same name reachability or set `DOMAIN` to a resolvable container name.
+- **The storage service accepts more content types.** External credential registration stores JSON and binary durable copies, so `ALLOWED_UPLOAD_TYPES` gained `application/json`, `application/octet-stream` and `text/plain`. Deployments running their own storage service need the same change.
+- **Batch reads have a bound.** `POST /api/v1/library/batch-get` accepts up to `API_MAX_BATCH_LIMIT` ids, default 500, counted before duplicates are removed.
+- **Concurrent library edits use `If-Version`.** `PATCH /api/v1/library/{id}` requires the header and returns `409 VERSION_CONFLICT` for a stale version.
+- **A NUL in an annotation is a 400, not a 500.** Registering a record with a NUL character in `displayName` or `notes` now reports the field before the database write.
+- **The encrypted-column check covers new secret fields.** `pnpm build` fails when an encrypted column annotation is missing.
 
 ## 0.4.0 - 2026-08-17
 

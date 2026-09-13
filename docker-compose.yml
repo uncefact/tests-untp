@@ -130,6 +130,14 @@ services:
       VERIFY_MAX_CREDENTIAL_SIZE: ${VERIFY_MAX_CREDENTIAL_SIZE:-}
       FETCH_TIMEOUT_MS: ${FETCH_TIMEOUT_MS:-}
       VERIFY_FETCH_TIMEOUT_MS: ${VERIFY_FETCH_TIMEOUT_MS:-}
+      # Controls bundled artefact fallback.
+      BUNDLED_ARTEFACTS_FALLBACK:
+      # Remote artefact cache lifetimes use the application default when unset.
+      SCHEMA_CACHE_TTL_MS: ${SCHEMA_CACHE_TTL_MS:-}
+      CONTEXT_CACHE_TTL_MS: ${CONTEXT_CACHE_TTL_MS:-}
+      # Pass through only when set so startup validation sees an absent override.
+      CACHE_MAX_ENTRIES:
+      RI_HTTP_USER_AGENT:
       # System default service instances (used by seed.ts)
       SYSTEM_VC_BASE_URL: http://vckit-api:3332
       SYSTEM_VC_API_KEY: ${SYSTEM_VC_API_KEY:-test123}
@@ -164,6 +172,10 @@ services:
       # default applies. A `${VAR:-}` form would inject an empty string and
       # trigger the startup warning on every stock boot.
       API_MAX_BATCH_LIMIT:
+      # Controls the web request-body limit.
+      MAX_REQUEST_BODY_BYTES:
+      # Controls the web idempotency stale-claim window.
+      IDEMPOTENCY_STALE_CLAIM_MINUTES:
       # Read by this process as well as the worker. Keep the value the same
       # across both services so one background-work budget is in force.
       WORKER_JOB_TIMEOUT_SECONDS:
@@ -176,6 +188,16 @@ services:
     # No healthcheck here. The image carries its own HEALTHCHECK, so the probe
     # ships with the container rather than being repeated by every consumer.
     # Add a healthcheck: block back here to override it for this deployment.
+    # The storage service hands back URIs on its published host name (DOMAIN,
+    # localhost in this file). Map localhost inside the container to the host so
+    # the process can read back what it stored, as the e2e stack does. Docker
+    # appends this gateway entry after the existing 127.0.0.1 and ::1 localhost
+    # entries, so localhost still resolves to loopback first. Node tries every
+    # address and falls through to the gateway; clients such as wget or curl
+    # that stop at the first address still get connection refused. Do not pin a
+    # single address for localhost, or this fix is silently undone.
+    extra_hosts:
+      - 'localhost:host-gateway'
     depends_on:
       keycloak:
         condition: service_started
@@ -227,6 +249,29 @@ services:
       LIBRARY_RECONCILE_PENDING_RUNS_CRON: ${LIBRARY_RECONCILE_PENDING_RUNS_CRON:-}
       LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE: ${LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE:-}
       WORKER_JOB_TIMEOUT_SECONDS:
+      # These settings pass through only when set.
+      # Controls bundled artefact fallback.
+      BUNDLED_ARTEFACTS_FALLBACK:
+      # Remote artefact cache lifetimes use the application default when unset.
+      SCHEMA_CACHE_TTL_MS: ${SCHEMA_CACHE_TTL_MS:-}
+      CONTEXT_CACHE_TTL_MS: ${CONTEXT_CACHE_TTL_MS:-}
+      # Pass through only when set so startup validation sees an absent override.
+      CACHE_MAX_ENTRIES:
+      RI_HTTP_USER_AGENT:
+      # Controls the worker heartbeat path.
+      WORKER_HEARTBEAT_PATH:
+      # Controls the worker heartbeat age limit.
+      WORKER_HEARTBEAT_MAX_AGE_SECONDS:
+    # The storage service hands back URIs on its published host name (DOMAIN,
+    # localhost in this file). Map localhost inside the container to the host so
+    # the process can read back what it stored, as the e2e stack does. Docker
+    # appends this gateway entry after the existing 127.0.0.1 and ::1 localhost
+    # entries, so localhost still resolves to loopback first. Node tries every
+    # address and falls through to the gateway; clients such as wget or curl
+    # that stop at the first address still get connection refused. Do not pin a
+    # single address for localhost, or this fix is silently undone.
+    extra_hosts:
+      - 'localhost:host-gateway'
     depends_on:
       ri-db:
         condition: service_healthy
