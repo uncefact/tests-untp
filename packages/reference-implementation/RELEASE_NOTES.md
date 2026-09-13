@@ -1,6 +1,6 @@
 # UNTP Reference Implementation release notes
 
-## 0.5.0 - 2026-09-11
+## 0.5.0 - 2026-09-14
 
 v0.4 made the Reference Implementation safe to run in front of real data. v0.5 is about what a tenant holds rather than what it issues: a credential library that covers both the credentials you issued and the ones you received, with verification that runs in the background instead of blocking a request. Work that cannot finish inside a request now runs in a second container, so deploying v0.5 means deploying two.
 
