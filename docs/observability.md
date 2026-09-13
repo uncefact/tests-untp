@@ -1,5 +1,7 @@
 # Observability
 
+For operator-facing instructions, see the [Reference Implementation observability page](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/observability).
+
 This repository's observability story is being built out incrementally. The current state is a **walking skeleton** that proves the end-to-end pipeline from one app (the reference implementation) into a local trace backend. Metrics and broader app coverage land in follow-up tickets.
 
 ## What works today

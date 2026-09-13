@@ -36,6 +36,8 @@ pnpm build
 pnpm start
 ```
 
+Run `pnpm start:worker` in a second terminal beside the web process. Both processes need the same database and `DATA_ENCRYPTION_KEY`.
+
 > **Note**: Ensure you have completed the [Prerequisites](../../README.md#prerequisites) in the root README before running locally.
 
 The RI runs on [http://localhost:3003](http://localhost:3003) with hot reloading enabled.
