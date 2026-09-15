@@ -190,47 +190,32 @@ describe('buildDppSubject (v0.7.0)', () => {
       expect(facility.type).toEqual(['Facility']);
     });
 
-    it('maps full facility including id, name, description, registeredId, idScheme', () => {
+    it('maps id, name, and registeredId (producedAtFacility is a facility reference, not the full Facility node)', () => {
       const subject = bridge.buildSubject(createBridgeEntities());
       const facility = subject.producedAtFacility as Record<string, unknown>;
 
-      expect(facility.id).toBe('did:web:example.com:facility:1');
-      expect(facility.name).toBe('Test Facility');
-      expect(facility.description).toBe('A test facility for unit tests');
-      expect(facility.registeredId).toBe('4012345000009');
-      expect(facility.idScheme).toEqual({
-        type: ['IdentifierScheme'],
-        id: 'https://id.gs1.org/414/',
-        name: 'Global Location Number (GLN)',
+      expect(facility).toEqual({
+        type: ['Facility'],
+        id: 'did:web:example.com:facility:1',
+        name: 'Test Facility',
+        registeredId: '4012345000009',
       });
     });
 
-    it('maps locationInformation when geo fields are present', () => {
+    it('omits registeredId when facility has no primaryIdentifier', () => {
+      const subject = bridge.buildSubject(
+        createBridgeEntities({ facility: createFacility({ primaryIdentifier: null }) }),
+      );
+      const facility = subject.producedAtFacility as Record<string, unknown>;
+      expect(facility.registeredId).toBeUndefined();
+    });
+
+    it('does not emit description, idScheme, locationInformation, or address (undeclared at this schema path)', () => {
       const subject = bridge.buildSubject(createBridgeEntities());
       const facility = subject.producedAtFacility as Record<string, unknown>;
-      expect(facility.locationInformation).toEqual({
-        type: ['Location'],
-        plusCode: '4RRH469X+VF',
-        geoLocation: { type: 'Point', coordinates: [151.2093, -33.8688] },
-      });
-    });
 
-    it('maps address when present', () => {
-      const subject = bridge.buildSubject(createBridgeEntities());
-      const facility = subject.producedAtFacility as Record<string, unknown>;
-      expect(facility.address).toEqual({
-        type: ['Address'],
-        streetAddress: '123 Test Street',
-        postalCode: '2000',
-        addressLocality: 'Sydney',
-        addressRegion: 'NSW',
-        addressCountry: 'AU',
-      });
-    });
-
-    it('omits both location and address when facility has no location data', () => {
-      const subject = bridge.buildSubject(createBridgeEntities({ facility: createFacility({ location: null }) }));
-      const facility = subject.producedAtFacility as Record<string, unknown>;
+      expect(facility.description).toBeUndefined();
+      expect(facility.idScheme).toBeUndefined();
       expect(facility.locationInformation).toBeUndefined();
       expect(facility.address).toBeUndefined();
     });
@@ -298,7 +283,11 @@ describe('buildDppSubject (v0.7.0)', () => {
           conformity: [
             createConformityInput({
               criteria: [
-                { id: 'https://example.org/criteria/1', name: 'Criterion 1', conformityTopic: 'environment.emissions' },
+                {
+                  id: 'https://example.org/criteria/1',
+                  name: 'Criterion 1',
+                  conformityTopics: [{ id: 'https://example.org/topic/emissions', name: 'Emissions' }],
+                },
               ],
             }),
           ],
@@ -310,10 +299,90 @@ describe('buildDppSubject (v0.7.0)', () => {
           type: ['Criterion'],
           id: 'https://example.org/criteria/1',
           name: 'Criterion 1',
-          conformityTopic: 'environment.emissions',
+          conformityTopic: [
+            { type: ['ConformityTopic'], id: 'https://example.org/topic/emissions', name: 'Emissions' },
+          ],
         },
       ]);
       expect(claim.assessmentCriteria).toBeUndefined();
+    });
+
+    // Anchored to the published example DPP (Copper Concentrate, Cu 30%):
+    // Claim.conformityTopic is required by the schema (DigitalProductPassport.json,
+    // #/$defs/Claim) and is distinct from the undeclared-but-tolerated per-criterion
+    // field — the published instance carries the GHG topic at both levels.
+    it('builds claim-level conformityTopic aggregated from its criteria (required by schema)', () => {
+      const subject = bridge.buildSubject(
+        createBridgeEntities({
+          conformity: [
+            createConformityInput({
+              criteria: [
+                {
+                  id: 'https://sample-scheme.coppermark.org/criteria/ghg-management/v3',
+                  name: 'GHG Emissions Management (Coppermark RRA Criterion 26)',
+                  conformityTopics: [
+                    {
+                      id: 'https://vocabulary.uncefact.org/conformity-topic/greenhouse-gas-emissions',
+                      name: 'Greenhouse Gas Emissions',
+                      definition:
+                        'Assessment of direct and indirect greenhouse gas emissions across scopes 1, 2, and 3, including measurement, reporting, and reduction targets aligned with climate science.',
+                    },
+                  ],
+                },
+              ],
+            }),
+          ],
+        }),
+      );
+      const claim = (subject.performanceClaim as Record<string, unknown>[])[0];
+      expect(claim.conformityTopic).toEqual([
+        {
+          type: ['ConformityTopic'],
+          id: 'https://vocabulary.uncefact.org/conformity-topic/greenhouse-gas-emissions',
+          name: 'Greenhouse Gas Emissions',
+          definition:
+            'Assessment of direct and indirect greenhouse gas emissions across scopes 1, 2, and 3, including measurement, reporting, and reduction targets aligned with climate science.',
+        },
+      ]);
+    });
+
+    it('deduplicates claim-level conformityTopic across criteria sharing the same topic', () => {
+      const subject = bridge.buildSubject(
+        createBridgeEntities({
+          conformity: [
+            createConformityInput({
+              criteria: [
+                {
+                  id: 'https://example.org/criteria/1',
+                  name: 'Criterion 1',
+                  conformityTopics: [{ id: 'https://example.org/topic/emissions', name: 'Emissions' }],
+                },
+                {
+                  id: 'https://example.org/criteria/2',
+                  name: 'Criterion 2',
+                  conformityTopics: [{ id: 'https://example.org/topic/emissions', name: 'Emissions' }],
+                },
+              ],
+            }),
+          ],
+        }),
+      );
+      const claim = (subject.performanceClaim as Record<string, unknown>[])[0];
+      expect(claim.conformityTopic).toEqual([
+        { type: ['ConformityTopic'], id: 'https://example.org/topic/emissions', name: 'Emissions' },
+      ]);
+    });
+
+    it('omits claim-level conformityTopic when no criterion declares a topic', () => {
+      const subject = bridge.buildSubject(
+        createBridgeEntities({
+          conformity: [
+            createConformityInput({ criteria: [{ id: 'https://example.org/criteria/1', name: 'Criterion 1' }] }),
+          ],
+        }),
+      );
+      const claim = (subject.performanceClaim as Record<string, unknown>[])[0];
+      expect(claim.conformityTopic).toBeUndefined();
     });
 
     it('filters out criteria with empty-string id', () => {
