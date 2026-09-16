@@ -1,6 +1,32 @@
+/**
+ * Fetches verifier-supplied HTTPS documents through the shared resolver. The
+ * resolver validates and pins every redirect hop, and one 10-second budget
+ * covers DNS, redirects, transport and body reading. Private-address details
+ * stay in server logs and are not included in the response.
+ *
+ * @see https://github.com/uncefact/tests-untp/issues/825
+ * @see ../../../../../../docs/adrs/035-utils-throws-structured-errors.md
+ */
 import { NextResponse } from 'next/server';
-import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import {
+  InvalidUrlError,
+  PrivateAddressError,
+  PrivateHostnameError,
+  ResolutionEmptyError,
+  ResolutionFailedError,
+  UnsupportedSchemeError,
+  UrlValidationError,
+} from '@uncefact/untp-utils/node';
+import {
+  ResolverError,
+  ResolverHttpError,
+  ResolverRedirectMissingLocationError,
+  ResolverTimedOutError,
+  ResolverTooLargeError,
+  ResolverTooManyRedirectsError,
+  resolveDocument,
+  type LoadResult,
+} from '@uncefact/untp-utils/resolvers';
 
 export const runtime = 'nodejs';
 
@@ -26,10 +52,15 @@ const ACCEPT_PROFILES = {
 
 type AcceptProfile = keyof typeof ACCEPT_PROFILES;
 
+type FetchRequestBody = {
+  url?: unknown;
+  accept?: unknown;
+};
+
 export async function POST(request: Request): Promise<NextResponse<FetchResponse>> {
-  let parsed: { url?: unknown; accept?: unknown };
+  let parsed: unknown;
   try {
-    parsed = (await request.json()) as { url?: unknown; accept?: unknown };
+    parsed = await request.json();
   } catch {
     return NextResponse.json(
       { ok: false, error: 'invalid-url', message: 'Request body must be JSON.' },
@@ -37,7 +68,7 @@ export async function POST(request: Request): Promise<NextResponse<FetchResponse
     );
   }
 
-  if (typeof parsed.url !== 'string' || parsed.url.length === 0) {
+  if (!isFetchRequestBody(parsed) || typeof parsed.url !== 'string' || parsed.url.length === 0) {
     return NextResponse.json(
       { ok: false, error: 'invalid-url', message: 'Missing "url" string in body.' },
       { status: 400 },
@@ -45,9 +76,7 @@ export async function POST(request: Request): Promise<NextResponse<FetchResponse
   }
 
   const accept = parsed.accept === undefined ? 'json' : parsed.accept;
-  // Object.hasOwn, not `in`: prototype names ('toString', '__proto__') must 400 like any other
-  // unknown selector, before any DNS lookup or fetch.
-  if (typeof accept !== 'string' || !Object.hasOwn(ACCEPT_PROFILES, accept)) {
+  if (!isAcceptProfile(accept)) {
     return NextResponse.json(
       {
         ok: false,
@@ -58,190 +87,129 @@ export async function POST(request: Request): Promise<NextResponse<FetchResponse
     );
   }
 
-  const result = await fetchWithGuards(parsed.url, accept as AcceptProfile);
-  return NextResponse.json(result, { status: result.ok ? 200 : statusForError(result.error) });
-}
-
-async function fetchWithGuards(initialUrl: string, accept: AcceptProfile = 'json'): Promise<FetchResponse> {
-  let currentUrl = initialUrl;
-
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const validation = await validateUrl(currentUrl);
-    if (!validation.ok) return validation;
-
-    const { url } = validation;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    try {
-      // SSRF mitigations applied to `url` before reaching this point, via validateUrl above:
-      //   - protocol pinned to https
-      //   - hostname rejected if it matches a literal private/loopback host
-      //     ('localhost', '*.localhost', '::1', '0.0.0.0')
-      //   - literal IPv4 hostnames rejected if they fall in RFC1918, loopback,
-      //     link-local, or "this host" ranges
-      //   - literal IPv6 hostnames rejected if they fall in ::1, ::, unique-local
-      //     (fc/fd), or link-local (fe80) ranges
-      //   - DNS-resolved hostnames have every A/AAAA record checked against
-      //     the same private-IP rules (defeats hostnames that resolve to
-      //     internal addresses)
-      // Redirects do not bypass these checks: redirect: 'manual' returns the
-      // 3xx response to us, we resolve the Location, then validateUrl runs
-      // again on the next loop iteration.
-      // Residual risk: DNS rebinding between validateUrl's lookup and fetch's
-      // own resolve. Mitigation would require pinning the resolved IP and
-      // setting Host manually; treated as acceptable for this read-only,
-      // user-initiated proxy.
-      const response = await fetch(url, {
-        method: 'GET',
-        redirect: 'manual',
-        signal: controller.signal,
-        headers: { Accept: ACCEPT_PROFILES[accept] },
-      });
-
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location');
-        if (!location) {
-          return { ok: false, error: 'network', message: `Redirect with no Location header at ${url}.` };
-        }
-        currentUrl = new URL(location, url).toString();
-        continue;
-      }
-
-      if (response.status === 404) {
-        return { ok: false, error: 'not-found', message: `Upstream returned 404 for ${url}.` };
-      }
-
-      if (!response.ok) {
-        return { ok: false, error: 'network', message: `Upstream returned ${response.status} for ${url}.` };
-      }
-
-      const contentType = response.headers.get('content-type');
-      const body = await readWithLimit(response, MAX_RESPONSE_BYTES);
-      if (body.kind === 'too-large') {
-        return { ok: false, error: 'too-large', message: `Response exceeds ${MAX_RESPONSE_BYTES} byte limit.` };
-      }
-      return { ok: true, body: body.text, contentType, finalUrl: url };
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return { ok: false, error: 'timeout', message: `Request to ${url} timed out after ${REQUEST_TIMEOUT_MS}ms.` };
-      }
-      return { ok: false, error: 'network', message: err instanceof Error ? err.message : 'Unknown network error.' };
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  return { ok: false, error: 'too-many-redirects', message: `Exceeded ${MAX_REDIRECTS} redirect hops.` };
-}
-
-async function validateUrl(
-  input: string,
-): Promise<{ ok: true; url: string } | { ok: false; error: FetchError; message: string }> {
-  let url: URL;
+  // Everything after the resolver call stays inside the try. An unexpected throw from URL
+  // normalisation or the decode is then mapped to the closed union's network row instead of
+  // escaping as a framework 500 outside the response contract.
   try {
-    url = new URL(input);
-  } catch {
-    return { ok: false, error: 'invalid-url', message: `Not a valid URL: ${input}` };
-  }
+    const result: LoadResult = await resolveDocument(parsed.url, {
+      allowedSchemes: ['https'],
+      maxResponseBytes: MAX_RESPONSE_BYTES,
+      totalTimeoutMs: REQUEST_TIMEOUT_MS,
+      maxRedirects: MAX_REDIRECTS,
+      headers: { Accept: ACCEPT_PROFILES[accept] },
+    });
 
-  if (url.protocol !== 'https:') {
-    return { ok: false, error: 'blocked', message: `Only https: URLs are allowed (got ${url.protocol}).` };
-  }
-
-  const hostname = url.hostname;
-  if (isPrivateHostname(hostname)) {
-    return { ok: false, error: 'blocked', message: `Hostname ${hostname} is in a blocked range.` };
-  }
-
-  if (isIP(hostname) === 0) {
-    try {
-      const records = await lookup(hostname, { all: true });
-      for (const record of records) {
-        if (isPrivateIp(record.address)) {
-          return {
-            ok: false,
-            error: 'blocked',
-            message: `Hostname ${hostname} resolves to a private IP (${record.address}).`,
-          };
-        }
-      }
-    } catch {
-      return { ok: false, error: 'network', message: `Failed to resolve ${hostname}.` };
+    const finalUrl = new URL(result.finalUrl).toString();
+    if (result.status === 304) {
+      console.error('Fetch route failed', { className: 'NotModified', status: 304, finalUrl });
+      const response: FetchResponse = {
+        ok: false,
+        error: 'network',
+        message: `Upstream returned 304 for ${finalUrl}.`,
+      };
+      return NextResponse.json(response, { status: statusForError(response.error) });
     }
-  } else if (isPrivateIp(hostname)) {
-    return { ok: false, error: 'blocked', message: `Literal IP ${hostname} is in a blocked range.` };
+
+    const response: FetchResponse = {
+      ok: true,
+      body: new TextDecoder('utf-8').decode(result.body),
+      contentType: result.contentType ?? null,
+      finalUrl,
+    };
+    return NextResponse.json(response, { status: 200 });
+  } catch (error) {
+    const mapped = mapFetchError(error, parsed.url);
+    return NextResponse.json(mapped, { status: statusForError(mapped.error) });
   }
-
-  return { ok: true, url: url.toString() };
 }
 
-function isPrivateHostname(hostname: string): boolean {
-  const lower = hostname.toLowerCase();
-  return lower === 'localhost' || lower.endsWith('.localhost') || lower === '::1' || lower === '0.0.0.0';
+function isFetchRequestBody(value: unknown): value is FetchRequestBody {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isPrivateIp(ip: string): boolean {
-  if (isIP(ip) === 4) return isPrivateIpv4(ip);
-  if (isIP(ip) === 6) return isPrivateIpv6(ip);
-  return false;
+/**
+ * Object.hasOwn, not `in`: prototype names ('toString', '__proto__') must 400 like any other
+ * unknown selector, before any DNS lookup or fetch.
+ */
+function isAcceptProfile(value: unknown): value is AcceptProfile {
+  return typeof value === 'string' && Object.hasOwn(ACCEPT_PROFILES, value);
 }
 
-function isPrivateIpv4(ip: string): boolean {
-  const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return false;
-  const [a, b] = parts;
-  if (a === 10) return true;
-  if (a === 127) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 0) return true;
-  return false;
-}
+function mapFetchError(error: unknown, inputUrl: string): Exclude<FetchResponse, { ok: true }> {
+  logFetchError(error);
 
-function isPrivateIpv6(ip: string): boolean {
-  const lower = ip.toLowerCase();
-  if (lower === '::1' || lower === '::') return true;
-  if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
-  if (lower.startsWith('fe80')) return true;
-  return false;
-}
-
-async function readWithLimit(
-  response: Response,
-  limit: number,
-): Promise<{ kind: 'ok'; text: string } | { kind: 'too-large' }> {
-  if (!response.body) return { kind: 'ok', text: '' };
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-
-  let finished = false;
-  while (!finished) {
-    const { value, done } = await reader.read();
-    if (done) {
-      finished = true;
-      continue;
-    }
-    if (!value) continue;
-    total += value.byteLength;
-    if (total > limit) {
-      await reader.cancel();
-      return { kind: 'too-large' };
-    }
-    chunks.push(value);
+  if (error instanceof InvalidUrlError) {
+    return { ok: false, error: 'invalid-url', message: `Not a valid URL: ${inputUrl}` };
   }
-
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
+  if (error instanceof UnsupportedSchemeError) {
+    return {
+      ok: false,
+      error: 'blocked',
+      message: `Only https: URLs are allowed (got ${stringReceived(error, 'unknown')}:).`,
+    };
   }
-  return { kind: 'ok', text: new TextDecoder('utf-8').decode(merged) };
+  if (error instanceof PrivateHostnameError) {
+    return {
+      ok: false,
+      error: 'blocked',
+      message: `Hostname ${stringReceived(error, '(empty)')} is in a blocked range.`,
+    };
+  }
+  if (error instanceof PrivateAddressError) {
+    return { ok: false, error: 'blocked', message: error.message };
+  }
+  if (error instanceof ResolutionFailedError || error instanceof ResolutionEmptyError) {
+    return { ok: false, error: 'network', message: error.message };
+  }
+  if (error instanceof UrlValidationError) {
+    return { ok: false, error: 'invalid-url', message: `Not a valid URL: ${inputUrl}` };
+  }
+  if (error instanceof ResolverHttpError) {
+    const responseError: FetchError = error.status === 404 ? 'not-found' : 'network';
+    return {
+      ok: false,
+      error: responseError,
+      message: `Upstream returned ${error.status} for ${error.url}.`,
+    };
+  }
+  if (error instanceof ResolverTooLargeError) {
+    return { ok: false, error: 'too-large', message: `Response exceeds ${error.limit} byte limit.` };
+  }
+  if (error instanceof ResolverTooManyRedirectsError) {
+    return { ok: false, error: 'too-many-redirects', message: `Exceeded ${error.limit} redirect hops.` };
+  }
+  if (error instanceof ResolverTimedOutError) {
+    return {
+      ok: false,
+      error: 'timeout',
+      message: `Request to ${inputUrl} timed out after ${error.timeoutMs}ms (including redirects).`,
+    };
+  }
+  if (error instanceof ResolverRedirectMissingLocationError) {
+    return { ok: false, error: 'network', message: error.message };
+  }
+  // ResolverNetworkError and every remaining ResolverError subclass share this row.
+  if (error instanceof ResolverError) {
+    return { ok: false, error: 'network', message: `Could not fetch ${inputUrl}.` };
+  }
+  return { ok: false, error: 'network', message: 'Unknown network error.' };
+}
+
+function stringReceived(error: UrlValidationError, fallback: string): string {
+  return typeof error.received === 'string' ? error.received : fallback;
+}
+
+function logFetchError(error: unknown): void {
+  if (error instanceof Error) {
+    const details: { className: string; code: unknown; resolvedAddresses?: readonly string[] } = {
+      className: error.constructor.name,
+      code: 'code' in error ? (error as { code?: unknown }).code : undefined,
+    };
+    if (error instanceof PrivateAddressError) details.resolvedAddresses = error.resolvedAddresses;
+    console.error('Fetch route failed', { ...details, error });
+    return;
+  }
+  console.error('Fetch route failed', { className: typeof error, code: undefined, error });
 }
 
 function statusForError(error: FetchError): number {

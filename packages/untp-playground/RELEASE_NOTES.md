@@ -6,6 +6,30 @@ mechanics. For a technical, per-change log see [CHANGELOG.md](./CHANGELOG.md).
 
 ## Unreleased
 
+### Safer URL retrieval
+
+URLs you paste into the Playground are now retrieved through a shared,
+hardened fetch path. One 10-second budget covers looking up the address,
+following redirects and reading the document, where each redirect hop
+previously got a fresh timer of its own. Each redirect is checked before it is
+requested, and the connection uses the address that was checked, so a URL
+cannot be switched to an internal host part-way through.
+
+The range of addresses and hostnames the Playground refuses is wider:
+internal-looking suffixes such as `.internal` and `.local`, carrier-grade and
+other reserved address space, and further non-public ranges. Error messages no
+longer show the address a hostname resolved to. A URL that names a bare IPv6
+address now works when that address is public, and is refused with a clear
+message when it is not. Before, every such URL failed as a lookup error.
+
+Two cases are now refused outright. A `304 Not Modified` is reported as a
+failure instead of being followed as a redirect, and a hostname whose lookup
+returns no address is reported as a failure instead of being tried. Messages
+for connection failures are now fixed, safe text rather than the underlying
+network error. If a site labels its response with an unusual content type, the
+Playground may tell you the address did not return valid JSON instead of
+pointing out that it is a web page.
+
 ### Link sets in your report
 
 A generated report now includes every link set you loaded, with the UNTP version it was checked against, the schema result, and how many of its credential links you verified and whether each was the kind of credential its link claimed. You can generate a report from a link set alone, and you do not have to verify every link first: the coverage line records what you checked.

@@ -23,6 +23,38 @@ Resolver Link Sets` section, one block per link set, with the version it
 
 ### Changed
 
+- **Guarded URL retrieval.** `/api/fetch` now uses the shared resolver with
+  one 10 second budget covering DNS, redirects, transport and body reading,
+  rather than a separate timer per hop, and a timeout does not promise that
+  the route responds at exactly 10 seconds. Private-address rejections no
+  longer disclose the resolved IP to the browser, while the canonical policy
+  also blocks `.internal`, `.local`, `.lan`, `.corp`, `.home`, `.intranet` and
+  `.private` hostnames, and CGNAT including the cloud metadata address
+  `100.100.100.200`. IPv6 literals are now classified instead of sent to DNS:
+  the bracketed form never matched the old literal check, so every IPv6
+  literal, private or public, failed as `network` 502. A private IPv6 literal,
+  including an IPv4-mapped private one, now answers `blocked` 400, and a
+  public IPv6 literal is fetched. Each hop connects to the addresses that were
+  validated for it, closing the rebinding window between validation and
+  connection. The wider canonical address policy, including TEST-NET,
+  multicast, reserved, 6to4, documentation and other non-unicast ranges plus
+  trailing-dot hostname handling, is defined in
+  `packages/untp-utils/src/node/is-private-ip.ts`. The resolver adds its
+  default `User-Agent` at request time unless `RI_HTTP_USER_AGENT` is set to a
+  non-empty value. A `304` response is refused instead of followed, including
+  when it carries `Location`. Resolver `Content-Type` parsing preserves common
+  values such as `text/html; charset=utf-8` but returns `null` for values it
+  rejects, including valid HTTP forms using horizontal tab whitespace or
+  quoted-pair syntax. A JSON `null` request body returns `invalid-url` with
+  status 400, an empty DNS answer returns `network` with status 502, and
+  transport failures return sanitised `Could not fetch ...` text instead of
+  raw Node error details. Several message texts changed while their codes and
+  statuses did not: a blocked IPv4 literal reads
+  `Hostname <address> is in a blocked range.`, a DNS failure reads
+  `DNS resolution failed for <host>.`, a redirect without a usable `Location`
+  names the hop it came from, and the timeout message records that the budget
+  covers redirects and names the URL that was posted, where the old route
+  named the normalised redirect hop that ran out of time.
 - **`conformitySchemeResults` is now `conformitySchemes`** in the JSON report,
   and the three family arrays (`verifiableCredentials`, `conformitySchemes`,
   `linkSets`) are always present, empty when nothing of that family is loaded.
