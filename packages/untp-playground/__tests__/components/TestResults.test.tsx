@@ -12,7 +12,13 @@ import {
 import { credentialContentHash } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { validateContext } from '@/lib/contextValidation';
-import { detectExtension, SchemaFetchError, validateCredentialSchema, validateExtension } from '@/lib/schemaValidation';
+import {
+  detectExtension,
+  SchemaFetchError,
+  SchemaSelectionError,
+  validateCredentialSchema,
+  validateExtension,
+} from '@/lib/schemaValidation';
 import { detectVcdmVersion } from '@/lib/utils';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
@@ -51,7 +57,7 @@ jest.mock('sonner', () => ({
   },
 }));
 
-// Real detectCredentialType/detectVersion/isEnvelopedProof from '@/lib/credentialService' are left
+// Real detectCredentialType/isEnvelopedProof from '@/lib/credentialService' are left
 // unmocked, so grouping by detected type (#810) exercises the real detection over realistic fixtures.
 
 const untpContext = (version: string) => `https://vocabulary.uncefact.org/untp/dpp/${version}/context.jsonld`;
@@ -449,6 +455,67 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     expect(
       await screen.findByText("Ensure the credential includes the required UNTP context IRIs in the '@context' field."),
     ).toBeInTheDocument();
+  });
+
+  it('records schema selection failures without a retry toast, and still settles the later steps', async () => {
+    (validateCredentialSchema as jest.Mock).mockRejectedValue(new SchemaSelectionError('Unsupported version'));
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'untp-selection-error' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+
+    // The selection branch must fall through to Context Validation. Returning early there leaves
+    // the step non-terminal, which makes the instance non-removable and blocks report generation.
+    await waitFor(() => {
+      expect(screen.getByTestId('context-status-icon-success')).toBeInTheDocument();
+    });
+    expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
+    await userEvent.click(await screen.findByText('Fix validation error'));
+    expect(await screen.findByText(/Unsupported version/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Check the credential's type and the UNTP version in its @context/),
+    ).toBeInTheDocument();
+  });
+
+  // The ordinary journey behind the same branch: the page admits a permitted type whose @context
+  // carries no UNTP version, and the real selection code rejects it before any schema transport.
+  it('settles every step for an admitted credential whose @context carries no UNTP version', async () => {
+    const { validateCredentialSchema: realValidateCredentialSchema } =
+      jest.requireActual<typeof import('@/lib/schemaValidation')>('@/lib/schemaValidation');
+    (validateCredentialSchema as jest.Mock).mockImplementation(realValidateCredentialSchema);
+    const { toast } = require('sonner');
+    const noUntpContext: StoredCredential = {
+      original: { proof: { type: 'Ed25519Signature2020' } },
+      decoded: {
+        '@context': [VCDM_CONTEXT_URLS.v2],
+        type: ['VerifiableCredential', 'DigitalProductPassport'],
+        issuer: { id: 'did:web:acme.example' },
+        id: 'no-untp-context',
+      },
+    };
+
+    render(<Harness credentials={[noUntpContext]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('context-status-icon-success')).toBeInTheDocument();
+    });
+    expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
+    expect(toast.error).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
+    await userEvent.click(await screen.findByText('Fix validation error'));
+    expect(await screen.findByText(/Unsupported version/)).toBeInTheDocument();
   });
 
   it('blames the schema host, not the credential, when the schema could not be fetched', async () => {

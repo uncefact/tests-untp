@@ -1,11 +1,10 @@
-import { detectVersion } from '@/lib/credentialService';
 import { credentialGroupType, credentialIsTerminal, credentialTitle } from '@/lib/credentialCollection';
 import { linkSetTitle } from '@/lib/linkSetCollection';
 import { linkSetSchemaStepDetails } from '@/lib/linkSetValidation';
 import { linkTypeCoverageStepDetails } from '@/lib/linkTypeCoverage';
 import { detectExtension } from '@/lib/schemaValidation';
 import { schemeTitle } from '@/lib/schemeCollection';
-import { detectSchemeVersion } from '@/lib/schemeValidation';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import {
   CredentialReportInput,
   LinkSetReportInput,
@@ -130,7 +129,7 @@ export const generateReport = async ({
     }
     const type = credentialGroupType(credential.decoded) as PermittedCredentialType;
     const extension = detectExtension(credential.decoded);
-    const version = extension ? extension.core.version : detectVersion(credential.decoded);
+    const version = extension ? extension.core.version : detectVersionFromContext(credential.decoded) ?? 'unknown';
 
     const coreSteps = steps.filter((step) => step.id !== TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
     const extensionStep = steps.find((step) => step.id === TestCaseStepId.EXTENSION_SCHEMA_VALIDATION);
@@ -167,7 +166,7 @@ export const generateReport = async ({
       throw new Error('Cannot generate a report while a scheme is still validating.');
     }
     const decoded = scheme.decoded;
-    const version = detectSchemeVersion(decoded) ?? 'unknown';
+    const version = detectVersionFromContext(decoded) ?? 'unknown';
     const name = typeof decoded?.name === 'string' ? decoded.name : undefined;
     const id = typeof decoded?.id === 'string' ? decoded.id : undefined;
 

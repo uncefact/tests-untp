@@ -1,90 +1,128 @@
-import { detectSchemeVersion, schemeSchemaUrl, validateSchemeSchema } from '@/lib/schemeValidation';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
+import { SchemaSelectionError, validateSchemeSchema } from '@/lib/schemeValidation';
 
 describe('schemeValidation', () => {
-  describe('schemeSchemaUrl', () => {
-    it('builds the published cvc schema URL for a version', () => {
-      expect(schemeSchemaUrl('0.7.0')).toBe('https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json');
-    });
-  });
-
-  describe('detectSchemeVersion', () => {
-    it('extracts the version from the UNTP vocabulary.uncefact.org context URI', () => {
-      const scheme = {
-        '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
-        type: ['ConformityScheme'],
-      };
-      expect(detectSchemeVersion(scheme)).toBe('0.7.0');
+  describe('canonical version detection', () => {
+    it('extracts the version from a vocabulary.uncefact.org context URI', () => {
+      expect(
+        detectVersionFromContext({
+          '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+          type: ['ConformityScheme'],
+        }),
+      ).toBe('0.7.0');
     });
 
     it('extracts the version from a test.uncefact.org context URI', () => {
-      const scheme = {
-        '@context': ['https://test.uncefact.org/vocabulary/untp/cs/0.6.0/'],
-        type: ['ConformityScheme'],
-      };
-      expect(detectSchemeVersion(scheme)).toBe('0.6.0');
+      expect(
+        detectVersionFromContext({
+          '@context': ['https://test.uncefact.org/vocabulary/untp/cs/0.6.0/'],
+          type: ['ConformityScheme'],
+        }),
+      ).toBe('0.6.0');
     });
 
-    it('returns null when no UNTP context entry is present', () => {
-      const scheme = {
-        '@context': ['https://www.w3.org/ns/credentials/v2'],
-        type: ['ConformityScheme'],
-      };
-      expect(detectSchemeVersion(scheme)).toBeNull();
+    it('returns undefined when no UNTP context entry is present', () => {
+      expect(
+        detectVersionFromContext({
+          '@context': ['https://www.w3.org/ns/credentials/v2'],
+          type: ['ConformityScheme'],
+        }),
+      ).toBeUndefined();
     });
 
-    it('returns null when @context is not an array', () => {
-      expect(detectSchemeVersion({ '@context': 'not-an-array' })).toBeNull();
+    it('extracts the version from a string @context URL', () => {
+      expect(detectVersionFromContext({ '@context': 'https://vocabulary.uncefact.org/untp/0.7.0/context/' })).toBe(
+        '0.7.0',
+      );
+    });
+
+    it('returns undefined for a non-UNTP string @context URL', () => {
+      expect(detectVersionFromContext({ '@context': 'https://example.org/context/' })).toBeUndefined();
     });
 
     it('ignores non-string context entries', () => {
-      const scheme = {
-        '@context': [{ inline: 'definition' }, 'https://vocabulary.uncefact.org/untp/0.7.1/context/'],
-        type: ['ConformityScheme'],
-      };
-      expect(detectSchemeVersion(scheme)).toBe('0.7.1');
+      expect(
+        detectVersionFromContext({
+          '@context': [{ inline: 'definition' }, 'https://vocabulary.uncefact.org/untp/0.7.1/context/'],
+          type: ['ConformityScheme'],
+        }),
+      ).toBe('0.7.1');
+    });
+
+    it('preserves a multi-segment prerelease version', () => {
+      expect(
+        detectVersionFromContext({ '@context': ['https://vocabulary.uncefact.org/untp/0.7.0-rc.1/context/'] }),
+      ).toBe('0.7.0-rc.1');
     });
   });
 
-  describe('validateSchemeSchema fetch failures', () => {
+  describe('validateSchemeSchema', () => {
     const originalFetch = global.fetch;
+
     afterEach(() => {
       global.fetch = originalFetch;
     });
 
-    it.each([404, 403])('reports a missing schema when the proxy names an upstream %s', async (status) => {
+    it('builds the published cvc schema URL for a v0.7.0 scheme', async () => {
       global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 502,
-        json: async () => ({ error: `Schema host returned status ${status}`, upstreamStatus: status }),
+        ok: true,
+        json: async () => ({ type: 'object' }),
       }) as unknown as typeof fetch;
 
-      await expect(validateSchemeSchema({}, `9.9.${status}`)).rejects.toMatchObject({
-        name: 'SchemaFetchError',
-        reason: 'not-found',
-        message: expect.stringContaining('No schema published at'),
+      const result = await validateSchemeSchema({}, '0.7.0');
+
+      expect(result.schemaUrl).toBe('https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json');
+      expect(global.fetch).toHaveBeenCalledWith(`/api/schema?url=${encodeURIComponent(result.schemaUrl)}`, {
+        signal: expect.anything(),
       });
     });
 
-    it('maps the proxy invalid-json category to the parse reason', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 502,
-        json: async () => ({ error: 'Schema host returned a body that is not valid JSON', code: 'invalid-json' }),
-      }) as unknown as typeof fetch;
+    it('fails before fetching when the scheme version has no legacy schema layout', async () => {
+      global.fetch = jest.fn() as unknown as typeof fetch;
 
-      await expect(validateSchemeSchema({}, '9.9.7')).rejects.toMatchObject({ reason: 'parse' });
+      await expect(validateSchemeSchema({}, '0.6.0')).rejects.toThrow(
+        'Conformity Scheme schemas have no legacy layout before UNTP 0.7.0; detected 0.6.0.',
+      );
+      await expect(validateSchemeSchema({}, '0.6.0')).rejects.toBeInstanceOf(SchemaSelectionError);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('carries the proxy error category for any other upstream failure', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 502,
-        json: async () => ({ error: 'Schema host could not be reached' }),
-      }) as unknown as typeof fetch;
+    describe('fetch failures', () => {
+      it.each([404, 403])('reports a missing schema when the proxy names an upstream %s', async (status) => {
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: false,
+          status: 502,
+          json: async () => ({ error: `Schema host returned status ${status}`, upstreamStatus: status }),
+        }) as unknown as typeof fetch;
 
-      await expect(validateSchemeSchema({}, '9.9.8')).rejects.toMatchObject({
-        reason: 'network',
-        message: expect.stringContaining('Schema host could not be reached'),
+        await expect(validateSchemeSchema({}, `9.9.${status}`)).rejects.toMatchObject({
+          name: 'SchemaFetchError',
+          reason: 'not-found',
+          message: expect.stringContaining('No schema published at'),
+        });
+      });
+
+      it('maps the proxy invalid-json category to the parse reason', async () => {
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Schema host returned a body that is not valid JSON', code: 'invalid-json' }),
+        }) as unknown as typeof fetch;
+
+        await expect(validateSchemeSchema({}, '9.9.7')).rejects.toMatchObject({ reason: 'parse' });
+      });
+
+      it('carries the proxy error category for any other upstream failure', async () => {
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Schema host could not be reached' }),
+        }) as unknown as typeof fetch;
+
+        await expect(validateSchemeSchema({}, '9.9.8')).rejects.toMatchObject({
+          reason: 'network',
+          message: expect.stringContaining('Schema host could not be reached'),
+        });
       });
     });
   });

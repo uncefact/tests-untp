@@ -55,6 +55,27 @@ Resolver Link Sets` section, one block per link set, with the version it
   names the hop it came from, and the timeout message records that the budget
   covers redirects and names the URL that was posted, where the old route
   named the normalised redirect hop that ran out of time.
+- **Canonical UNTP artefact detection.** The Playground now uses the shared
+  artefact detector and URL builder, scans every `@context` entry, and keeps
+  the published schema URLs byte-identical for supported credential types. A
+  credential carrying its UNTP context at a position other than the second is
+  now detected, so its schema validation step runs where it previously failed
+  as an unsupported version. A core context whose version is the terminal path
+  segment without a trailing slash, such as one ending `/dpp/0.5.0`, is read as
+  its version, and schema validation then reports the exact context string the
+  published schema requires. Core detection preserves full prerelease versions.
+  Filename-shaped Digital Livestock Passport extension contexts remain supported,
+  and a dotted prerelease in one is read as its first prerelease segment, so
+  `0.4.1-beta1.2`
+  is read as `0.4.1-beta1` and matches the registry only when that shorter form
+  is itself a registered extension version. A missing version and an
+  unsupported credential type fail schema selection before fetch with
+  actionable details, as does a Digital Livestock Passport whose detected
+  version is not registered, reported as an unsupported extension version for
+  its type rather than as an unsupported type. Cards and reports retain their
+  `unknown version`, `unknown`, and `vunknown` fallbacks.
+  Conformity Schemes below 0.7.0 now fail schema selection before URL
+  construction because that schema has no published layout before UNTP 0.7.0.
 - **`conformitySchemeResults` is now `conformitySchemes`** in the JSON report,
   and the three family arrays (`verifiableCredentials`, `conformitySchemes`,
   `linkSets`) are always present, empty when nothing of that family is loaded.

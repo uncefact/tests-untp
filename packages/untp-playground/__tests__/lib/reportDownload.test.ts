@@ -45,7 +45,7 @@ describe('downloadHtml (#814)', () => {
   const credential = (
     type: 'DigitalProductPassport' | 'DigitalConformityCredential',
     title: string,
-    options: { decrypted?: boolean; url?: string } = {},
+    options: { decrypted?: boolean; url?: string; version?: string } = {},
   ): TestReportResult => ({
     status: TestCaseStatus.SUCCESS,
     title,
@@ -53,7 +53,7 @@ describe('downloadHtml (#814)', () => {
     source: options.url ? { kind: 'url', url: options.url } : { kind: 'file', filename: title },
     core: {
       type: type as PermittedCredentialType,
-      version: '0.7.0',
+      version: options.version ?? '0.7.0',
       steps: [
         ...(options.decrypted ? [step(TestCaseStepId.DECRYPTION, 'Decryption', TestCaseStatus.SUCCESS)] : []),
         step(TestCaseStepId.PROOF_TYPE, 'Proof Type Detection', TestCaseStatus.SUCCESS),
@@ -62,11 +62,11 @@ describe('downloadHtml (#814)', () => {
     },
   });
 
-  const scheme = (title: string, name: string | undefined): TestReportSchemeResult => ({
+  const scheme = (title: string, name: string | undefined, version = '0.7.0'): TestReportSchemeResult => ({
     status: TestCaseStatus.SUCCESS,
     title,
     type: 'ConformityScheme' as any,
-    version: '0.7.0',
+    version,
     ...(name && { name }),
     source: { kind: 'file', filename: `${title.toLowerCase().replace(/\s+/g, '-')}.jsonld` },
     conformityScheme: {},
@@ -186,6 +186,18 @@ describe('downloadHtml (#814)', () => {
     expect(Array.from(doc.querySelectorAll('.type-group h3')).length).toBe(2);
     expect(Array.from(doc.querySelectorAll('article[data-result="credential"] h4.result-name')).length).toBe(4);
     expect(html).not.toContain('\u2014');
+  });
+
+  it('renders the report fallback as vunknown when version detection failed', async () => {
+    const doc = await render(
+      report({
+        verifiableCredentials: [credential('DigitalProductPassport', 'unknown.json', { version: 'unknown' })],
+        conformitySchemes: [scheme('unknown-scheme.json', undefined, 'unknown')],
+      }),
+    );
+
+    expect(doc.querySelector('article[data-result="credential"] .result-name')?.textContent).toContain('vunknown');
+    expect(doc.querySelector('article[data-result="scheme"] .result-sub')?.textContent).toContain('vunknown');
   });
 
   it('names the link set a verified credential came from in its caption', async () => {

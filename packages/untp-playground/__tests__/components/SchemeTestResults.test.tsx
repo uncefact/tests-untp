@@ -2,21 +2,25 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect, useRef } from 'react';
 import { SchemeTestResults } from '@/components/SchemeTestResults';
-import { SchemaFetchError } from '@/lib/schemeValidation';
+import { SchemaFetchError, SchemaSelectionError } from '@/lib/schemeValidation';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
 import { upsert } from '@/lib/artefactCollection';
 import { schemeContentHash } from '@/lib/schemeCollection';
 import { newId } from '@/lib/id';
-import { detectSchemeVersion, validateSchemeSchema } from '@/lib/schemeValidation';
+import { validateSchemeSchema } from '@/lib/schemeValidation';
 import { validateContext } from '@/lib/contextValidation';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import type { StoredScheme, TestStep } from '@/types';
 
 jest.mock('canvas-confetti', () => jest.fn());
 jest.mock('@/components/TestResults', () => ({ confettiConfig: {}, TestResults: () => null }));
 jest.mock('@/lib/schemeValidation', () => ({
   ...jest.requireActual('@/lib/schemeValidation'),
-  detectSchemeVersion: jest.fn(),
   validateSchemeSchema: jest.fn(),
+}));
+jest.mock('@uncefact/untp-utils/artefacts', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/artefacts'),
+  detectVersionFromContext: jest.fn(),
 }));
 jest.mock('@/lib/contextValidation', () => ({ validateContext: jest.fn() }));
 
@@ -44,7 +48,7 @@ function Harness({ schemes }: { schemes: StoredScheme[] }) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (detectSchemeVersion as jest.Mock).mockReturnValue('0.7.0');
+  (detectVersionFromContext as jest.Mock).mockReturnValue('0.7.0');
   (validateSchemeSchema as jest.Mock).mockResolvedValue({ valid: true });
   (validateContext as jest.Mock).mockResolvedValue({ valid: true });
 });
@@ -70,7 +74,7 @@ describe('SchemeTestResults', () => {
   });
 
   it('surfaces the unchanged version-detection failure copy and exactly two skipped steps', async () => {
-    (detectSchemeVersion as jest.Mock).mockReturnValue(undefined);
+    (detectVersionFromContext as jest.Mock).mockReturnValue(undefined);
     render(<Harness schemes={[scheme({ id: 'x', name: 'No Context Scheme' })]} />);
 
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
@@ -78,6 +82,26 @@ describe('SchemeTestResults', () => {
     expect(await screen.findByText(/Could not detect a UNTP version from the @context/)).toBeInTheDocument();
     // Both the schema-validation and context-validation steps are skipped.
     expect(screen.getAllByText('Skipped: version detection failed.')).toHaveLength(2);
+  });
+
+  // The pre-0.7 prerequisite is a selection failure, not a transport failure: the uploader supplied
+  // the version, so the step names the fix and offers no support link. The thrown copy itself is
+  // pinned against the production code in __tests__/lib/schemeValidation.test.ts.
+  it('records the pre-0.7 prerequisite failure with advice and no support link', async () => {
+    (detectVersionFromContext as jest.Mock).mockReturnValue('0.6.0');
+    (validateSchemeSchema as jest.Mock).mockRejectedValue(
+      new SchemaSelectionError('Conformity Scheme schemas have no legacy layout before UNTP 0.7.0; detected 0.6.0.'),
+    );
+    render(<Harness schemes={[scheme({ id: 'x', name: 'Legacy Scheme' })]} />);
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+
+    expect(
+      await screen.findByText(
+        /Conformity Scheme schemas have no legacy layout before UNTP 0\.7\.0; detected 0\.6\.0\. Use a Conformity Scheme published for UNTP 0\.7\.0 or later\./,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'report an issue' })).not.toBeInTheDocument();
   });
 
   it('shows the schema service category when the schema could not be fetched', async () => {

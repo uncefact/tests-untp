@@ -2,12 +2,7 @@ import React from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
-import {
-  decodeEnvelopedCredential,
-  isEnvelopedProof,
-  detectCredentialType,
-  detectVersion,
-} from '@/lib/credentialService';
+import { decodeEnvelopedCredential, isEnvelopedProof, detectCredentialType } from '@/lib/credentialService';
 import { detectExtension, validateCredentialSchema } from '@/lib/schemaValidation';
 import { ArtefactUploader } from '@/components/ArtefactUploader';
 import { SchemeTestResults } from '@/components/SchemeTestResults';
@@ -33,7 +28,6 @@ jest.mock('@/lib/credentialService', () => ({
   isEnvelopedProof: jest.fn(),
   decodeEnvelopedCredential: jest.fn(),
   detectCredentialType: jest.fn(),
-  detectVersion: jest.fn(),
   // Real implementations: the tab-intent routing (#676) reads the link set shape and the accepted
   // family list, and mocking those would fake the very contract under test.
   isLinkSetShaped: jest.requireActual('@/lib/credentialService').isLinkSetShaped,
@@ -138,7 +132,6 @@ describe('Home Component', () => {
   it('handles valid credential upload', async () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.5.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
 
@@ -194,7 +187,6 @@ describe('Home Component', () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
-    (detectVersion as jest.Mock).mockReturnValue('0.1.0');
 
     render(<Home />);
 
@@ -227,7 +219,6 @@ describe('Home Component', () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(true);
     (decodeEnvelopedCredential as jest.Mock).mockReturnValue(mockEnvelopedCredential);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.5.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
 
@@ -423,7 +414,6 @@ describe('Tabbed artefact surface (#809)', () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
 
     // Identity is the content hash, so each upload must carry distinct content to be a new instance.
@@ -457,7 +447,6 @@ describe('Tabbed artefact surface (#809)', () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
 
     // Identical content each click -> same content hash -> the second upload replaces the first.
@@ -498,7 +487,6 @@ describe('Tabbed artefact surface (#809)', () => {
     (decodeEnvelopedCredential as jest.Mock).mockReturnValue(decodedCredential);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (validateCredentialSchema as jest.Mock).mockReturnValue({ valid: true });
 
     // Two distinct envelope shapes, so the pre-decode raw artefact differs on each upload; only the
@@ -693,7 +681,6 @@ describe('Tabbed artefact surface (#809)', () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     // Two distinct credentials, settled one at a time: the spinner must persist while any
     // instance is non-terminal, and clear only when the last one settles.
     let marker = 0;
@@ -759,7 +746,6 @@ describe('Tabbed artefact surface (#809)', () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (TestResults as jest.Mock).mockImplementation(({ collection, dispatch }: any) => (
       <button
         data-testid='mock-credential-fail'
@@ -792,7 +778,6 @@ describe('Tabbed artefact surface (#809)', () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     // First click commits a non-empty result whose step is still IN_PROGRESS (must stay
     // verifying); second click settles the same run to SUCCESS (must clear). The settle phase is
     // what makes a silently no-op commit path fail this test: the spinner would then never clear.
@@ -938,7 +923,7 @@ describe('Link Sets family (#811, tab-intent routing #676)', () => {
   });
 
   it('validates a link-set-shaped document as a credential when uploaded on the Credentials tab', async () => {
-    // AC (#676): the tab declares intent — no cross-family routing, no auto-switching.
+    // AC (#676): the tab declares intent: no cross-family routing, no auto-switching.
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
@@ -997,7 +982,6 @@ describe('verify from a link set (#812)', () => {
     jest.clearAllMocks();
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
   });
 
@@ -1136,7 +1120,6 @@ describe('link-set ingestion acceptance contract (#812 review findings)', () => 
 
   it('returns the produced instance id when the document is accepted, and binds its URL', async () => {
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
         <button
@@ -1290,7 +1273,6 @@ describe('encrypted envelopes never route into another family (#812 follow-up)',
 
   it('accepts a genuine credential that merely carries ciphertext and header claims', async () => {
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     uploadOn({
       '@context': ['https://www.w3.org/ns/credentials/v2'],
       type: ['VerifiableCredential', 'DigitalProductPassport'],
@@ -1430,7 +1412,6 @@ describe('decrypt admission, collision and re-verify identity (#813 panel ruling
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (a: any, s: any) => void }) => (
         <div>
@@ -1573,7 +1554,6 @@ describe('a known envelope verified from a link set records the link set on its 
   beforeEach(() => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (a: any, s: any) => void }) => (
@@ -1645,7 +1625,6 @@ describe('alias remap across a decrypt collision (#813 follow-up blocker)', () =
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     const envelope1 = {
       cipherText: 'SGVsbG8=',
       iv: 'nLUYsnXBY8bbXY45',
@@ -1821,7 +1800,6 @@ describe('link type coverage on the tab (#1007)', () => {
   it('shows the Link Sets failing dot from the derived assessment when a linked credential mismatches its relation', async () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
@@ -1892,7 +1870,6 @@ describe('link type coverage on the tab (#1007)', () => {
   it('forgets a binding when a re-verify is rejected, so coverage reverts to pending and the dot clears', async () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (
@@ -1961,7 +1938,6 @@ describe('link type coverage on the tab (#1007)', () => {
   it('forgets every URL an attempt touched, including the post-redirect key, unless bound again since the attempt began', async () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     let attempts: {
       begin: () => number;
@@ -2040,7 +2016,6 @@ describe('link type coverage on the tab (#1007)', () => {
   it('keeps a binding recorded by a newer Verify when an older Credentials-tab attempt fails late', async () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     let attempts: {
       begin: () => number;
@@ -2112,7 +2087,6 @@ describe('binding stamps and batched updates (#1007 panel ruling)', () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     let attempts: {
       begin: () => number;
       rejected: (urls: Array<string | undefined>, startedAt: number) => void;
@@ -2197,7 +2171,6 @@ describe('report inputs for link sets (#814)', () => {
   const uploadLinkSet = () => {
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-    (detectVersion as jest.Mock).mockReturnValue('0.6.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source: any) => void }) => (

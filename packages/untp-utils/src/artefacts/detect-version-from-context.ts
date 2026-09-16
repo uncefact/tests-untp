@@ -8,10 +8,15 @@ export const UNTP_CONTEXT_DOMAINS = ['vocabulary.uncefact.org', 'test.uncefact.o
 
 /**
  * A version segment in a UNTP-published context path. Matches a path segment
- * shaped `/{major}.{minor}.{patch}[-prerelease]/`. The pre-release suffix
- * captures common forms (`-rc1`, `-alpha.2`, `-2024-05-21`, etc.).
+ * shaped `/{major}.{minor}.{patch}[-prerelease]` when it is bounded on the
+ * left by `/` and on the right by `/` or the end of the string. It is applied
+ * to the part of the URL before any `?` or `#`, so query and fragment parts
+ * never supply the version. The pre-release suffix captures common forms (`-rc1`, `-alpha.2`,
+ * `-2024-05-21`, etc.).
+ * This identifies only the version; the published schema decides the exact
+ * context string.
  */
-const UNTP_VERSION_PATH_SEGMENT = /\/(\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)\//;
+const UNTP_VERSION_PATH_SEGMENT = /\/(\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)(?=\/|$)/;
 
 /**
  * Options for {@link detectVersionFromContext}.
@@ -30,8 +35,13 @@ export interface DetectVersionFromContextOptions {
 
 /**
  * Derives the spec version from a UNTP document's `@context` by looking for a
- * path segment shaped `/{major}.{minor}.{patch}[-prerelease]/` inside a known
- * UNTP context URL.
+ * path segment shaped `/{major}.{minor}.{patch}[-prerelease]` inside a known
+ * UNTP context URL. Only the part of the URL before any `?` or `#` is read, so
+ * a version-shaped string inside a query or fragment never supplies the
+ * version, while a version that a query or fragment immediately follows still
+ * does. Within that part the segment must be bounded on the left by `/` and on
+ * the right by `/` or the end of the string. The published schema decides the
+ * exact context string that the document must use.
  *
  * Works for any UNTP artefact that publishes a versioned context: credentials
  * (DPP, DCC, DFR, DIA, DTE), conformity schemes, identifier scheme registers,
@@ -68,7 +78,8 @@ export function detectVersionFromContext(
     if (!matchesDomain(url)) {
       continue;
     }
-    const match = url.match(UNTP_VERSION_PATH_SEGMENT);
+    const path = url.split(/[?#]/, 1)[0];
+    const match = path.match(UNTP_VERSION_PATH_SEGMENT);
     if (match) {
       return match[1];
     }

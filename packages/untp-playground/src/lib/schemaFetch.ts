@@ -35,6 +35,18 @@ export class SchemaFetchError extends Error {
   }
 }
 
+/**
+ * A credential or scheme cannot be selected for schema validation because its type, version or
+ * schema URL mapping is unsupported. The message is intended for the validation step and this
+ * error is raised before schema transport begins.
+ */
+export class SchemaSelectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SchemaSelectionError';
+  }
+}
+
 export function fetchSchema(schemaUrl: string): Promise<any> {
   return schemaCache.get(schemaUrl, () => fetchFromProxy(schemaUrl));
 }

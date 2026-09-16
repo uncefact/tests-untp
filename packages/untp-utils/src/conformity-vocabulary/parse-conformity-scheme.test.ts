@@ -47,6 +47,14 @@ describe('parseConformityScheme', () => {
       expect(scheme.specVersion).toBe('0.7.0');
     });
 
+    it('auto-detects 0.7.0 from a terminal @context path without a trailing slash', () => {
+      const scheme = parseConformityScheme(
+        minimalSchemeDoc({ '@context': ['https://vocabulary.uncefact.org/untp/0.7.0'] }),
+        { sourceUrl: 'https://example.com/scheme' },
+      );
+      expect(scheme.specVersion).toBe('0.7.0');
+    });
+
     it('honours the specVersion override', () => {
       const doc = minimalSchemeDoc({ '@context': ['https://unknown.example/ctx'] });
       const scheme = parseConformityScheme(doc, { sourceUrl: 'https://example.com/scheme', specVersion: '0.7.0' });

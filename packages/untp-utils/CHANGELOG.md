@@ -6,6 +6,15 @@ numbers follow semantic versioning. The package ships via the
 `untp-utils-v<X.Y.Z>` tag-triggered publish workflow described in
 [ADR 031](../../docs/adrs/031-per-package-tag-triggered-npm-release.md).
 
+## [Unreleased]
+
+### Changed
+
+- **artefacts:** version detection now reads a version-shaped path segment of a context URL whether or not a slash follows it, so a context URL that ends in its version segment now detects. Query and fragment parts of the URL never supply the version. The exact context string remains the schema's decision. `parseConformityScheme` therefore selects the 0.7.0 parser for a context URL ending in `/0.7.0`.
+- **artefacts:** inherited object keys such as `toString` no longer build a
+  schema or specification URL; they now throw the unknown-type error like any
+  other unrecognised name.
+
 ## [0.3.0](https://github.com/uncefact/tests-untp/compare/untp-utils-v0.2.0...untp-utils-v0.3.0) (2026-09-11)
 
 ### ⚠ BREAKING CHANGES

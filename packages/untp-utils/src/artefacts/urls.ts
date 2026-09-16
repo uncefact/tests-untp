@@ -100,14 +100,15 @@ const DOCS_VERSION_FALLBACKS: Record<string, string> = {
  * @throws {Error} When `type` is not a recognised UNTP artefact type.
  */
 export function buildSpecificationPageUrl(type: string, version: string): string {
-  const slug = UNTP_SPECIFICATION_PAGE_SLUGS[type];
-  if (!slug) {
+  if (!Object.hasOwn(UNTP_SPECIFICATION_PAGE_SLUGS, type)) {
     throw new Error(
       `Unknown UNTP artefact type "${type}". Expected one of: ${Object.keys(UNTP_SPECIFICATION_PAGE_SLUGS).join(
         ', ',
       )}.`,
     );
   }
+
+  const slug = UNTP_SPECIFICATION_PAGE_SLUGS[type];
 
   const docsVersion = DOCS_VERSION_FALLBACKS[version] ?? version;
   if (docsVersion === CURRENT_UNTP_DOCS_VERSION) {
@@ -137,12 +138,13 @@ export interface UntpArtefactUrls {
  * @throws {Error} When `type` is not a recognised UNTP artefact type.
  */
 export function buildUntpArtefactUrls(type: string, version: string): UntpArtefactUrls {
-  const shortCode = UNTP_SHORT_CREDENTIAL_TYPES[type];
-  if (!shortCode) {
+  if (!Object.hasOwn(UNTP_SHORT_CREDENTIAL_TYPES, type)) {
     throw new Error(
       `Unknown UNTP artefact type "${type}". Expected one of: ${Object.keys(UNTP_SHORT_CREDENTIAL_TYPES).join(', ')}.`,
     );
   }
+
+  const shortCode = UNTP_SHORT_CREDENTIAL_TYPES[type];
 
   if (isV070OrAbove(version)) {
     const fileName = UNTP_CORE_SCHEMA_FILENAMES[type];

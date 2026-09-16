@@ -22,7 +22,8 @@ import {
   type UntpCredentialRelation,
 } from './linkSetCollection';
 import { resolveBoundInstance, type UrlBindings } from './urlBindings';
-import { TestCaseStatus, TestCaseStepId, UNTP_SHORT_CREDENTIAL_TYPES } from '../../constants';
+import { UNTP_SHORT_CREDENTIAL_TYPES } from '@uncefact/untp-utils/artefacts';
+import { TestCaseStatus, TestCaseStepId } from '../../constants';
 
 export type RowCoverageOutcome =
   /** The row carries no UNTP credential relation, so it is not part of the check. */
