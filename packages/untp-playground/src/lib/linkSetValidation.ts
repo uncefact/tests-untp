@@ -9,27 +9,55 @@
  * but could not be compiled (nothing was assessed; retrying will not help, the operator needs to
  * know).
  *
- * The published schema is draft-07. The credential and scheme validators compile with Ajv2020,
- * which refuses a draft-07 `$schema` outright, so this module keeps its own draft-07 instances.
- * One instance per schema document, because the published `$id` is not version-qualified and Ajv
- * refuses a second distinct document under an `$id` it already holds.
+ * The published schema is draft-07, so this module supplies a draft-07 Ajv
+ * instance to the shared schema pre-check and document validator.
  */
 
 import { buildLinkSetSchemaUrl } from '@uncefact/untp-utils/artefacts';
-import type { ErrorObject } from 'ajv';
+import type { ErrorObject, ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 import type { TestStep } from '@/types';
 import { TestCaseStatus, TestCaseStepId } from '../../constants';
+import { classifySchemaFetchFailure, describeArtefactFailure, type ArtefactStepFailure } from './artefactFailure';
 import { formatValidationError, pointerSegments } from './formatValidationErrors';
 import { fetchSchema, SchemaFetchError, type SchemaFetchReason } from './schemaFetch';
+import { validateSchemaDocument } from './schemaValidation';
 
 export { buildLinkSetSchemaUrl as linkSetSchemaUrl };
 
+type CompiledLinkSetSchema = { schema: unknown; validator: Ajv; validate: ValidateFunction };
+
+// The published draft-07 schema is keyed by URL and remains stable for a browser session.
+// Keeping the schema identity with the validator avoids reusing a compiled validator for a
+// replaced response while allowing repeated validations of the same fetched schema to reuse it.
+const compiledSchemaCache = new Map<string, CompiledLinkSetSchema>();
+
 /** A validation attempt. `version` and `schemaUrl` are recorded on every outcome, including failures to assess. */
 export type LinkSetSchemaResult =
-  | { kind: 'document'; valid: boolean; errors: ErrorObject[]; version: string; schemaUrl: string }
-  | { kind: 'schema-unavailable'; reason: SchemaFetchReason; message: string; version: string; schemaUrl: string }
-  | { kind: 'schema-unusable'; message: string; version: string; schemaUrl: string };
+  | {
+      kind: 'document';
+      valid: boolean;
+      errors: ErrorObject[];
+      version: string;
+      schemaUrl: string;
+      failure?: ArtefactStepFailure;
+    }
+  | {
+      kind: 'schema-unavailable';
+      reason: SchemaFetchReason;
+      message: string;
+      version: string;
+      schemaUrl: string;
+      failure?: ArtefactStepFailure;
+    }
+  | {
+      kind: 'schema-unusable';
+      message: string;
+      version: string;
+      schemaUrl: string;
+      errors?: ErrorObject[];
+      failure?: ArtefactStepFailure;
+    };
 
 /**
  * What the Schema Validation step stores in `details`: the attempt minus the `valid` flag, which
@@ -57,7 +85,7 @@ export function toLinkSetSchemaStepDetails(result: LinkSetSchemaResult): LinkSet
  */
 export function linkSetSchemaStepDetails(step: TestStep): LinkSetSchemaStepDetails | undefined {
   const details = step.details as
-    | Partial<Record<'kind' | 'version' | 'schemaUrl' | 'errors' | 'reason' | 'message', unknown>>
+    | Partial<Record<'kind' | 'version' | 'schemaUrl' | 'errors' | 'reason' | 'message' | 'failure', unknown>>
     | undefined;
   if (!details || typeof details.version !== 'string' || typeof details.schemaUrl !== 'string') return undefined;
   if (details.kind === 'document' && Array.isArray(details.errors)) return details as LinkSetSchemaStepDetails;
@@ -73,18 +101,6 @@ export function linkSetSchemaStepDetails(step: TestStep): LinkSetSchemaStepDetai
   return undefined;
 }
 
-// Compiled validators keyed by the schema object the transport cached, never by `$id`.
-const validators = new WeakMap<object, ReturnType<Ajv['compile']>>();
-
-function compile(schema: object) {
-  const cached = validators.get(schema);
-  if (cached) return cached;
-  const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false, verbose: true });
-  const validate = ajv.compile(schema);
-  validators.set(schema, validate);
-  return validate;
-}
-
 export async function validateLinkSetSchema(document: unknown, version: string): Promise<LinkSetSchemaResult> {
   const schemaUrl = buildLinkSetSchemaUrl(version);
 
@@ -93,27 +109,60 @@ export async function validateLinkSetSchema(document: unknown, version: string):
     schema = await fetchSchema(schemaUrl);
   } catch (err) {
     if (err instanceof SchemaFetchError) {
-      return { kind: 'schema-unavailable', reason: err.reason, message: err.message, version, schemaUrl };
+      return {
+        kind: 'schema-unavailable',
+        reason: err.reason,
+        message: err.message,
+        version,
+        schemaUrl,
+        failure: classifySchemaFetchFailure(err, 'link-set'),
+      };
     }
     throw err;
   }
 
-  let validate: ReturnType<typeof compile>;
-  try {
-    if (typeof schema !== 'object' || schema === null) throw new Error('Schema is not a JSON object.');
-    validate = compile(schema);
-  } catch (err) {
-    console.error('linkSetValidation: schema could not be compiled', { schemaUrl, err });
+  const cached = compiledSchemaCache.get(schemaUrl);
+  const cachedForSchema = cached?.schema === schema ? cached : undefined;
+  const validatorAjv = cachedForSchema
+    ? cachedForSchema.validator
+    : new Ajv({ allErrors: true, strict: false, validateFormats: false, verbose: true });
+  const compiledValidator = cachedForSchema?.validate;
+  let newlyCompiled: ValidateFunction | undefined;
+  const validation = validateSchemaDocument(
+    schema,
+    document,
+    schemaUrl,
+    'link-set',
+    {
+      compiledValidator,
+      onCompiled: (validate) => {
+        newlyCompiled = validate;
+      },
+    },
+    validatorAjv,
+    'http://json-schema.org/draft-07/schema',
+  );
+  if (newlyCompiled) compiledSchemaCache.set(schemaUrl, { schema, validator: validatorAjv, validate: newlyCompiled });
+  if (validation.failure && validation.failure.class !== 'credential-invalid') {
     return {
       kind: 'schema-unusable',
-      message: err instanceof Error ? err.message : 'Schema could not be compiled.',
+      message: validation.failure.message,
+      ...(validation.errors && validation.errors.length > 0 ? { errors: validation.errors as ErrorObject[] } : {}),
       version,
       schemaUrl,
+      failure: validation.failure,
     };
   }
-
-  const valid = validate(document) === true;
-  return { kind: 'document', valid, errors: valid ? [] : [...(validate.errors ?? [])], version, schemaUrl };
+  const valid = validation.valid;
+  const errors = (validation.errors ?? []) as ErrorObject[];
+  return {
+    kind: 'document',
+    valid,
+    errors,
+    version,
+    schemaUrl,
+    ...(validation.failure ? { failure: validation.failure } : {}),
+  };
 }
 
 /** The fresh step list a link set run starts from. */
@@ -166,6 +215,38 @@ export function schemaStepMessages(
   decoded: Record<string, unknown>,
 ): SchemaStepMessage[] {
   if (!details) return [];
+
+  if (details.failure) {
+    const presentation = describeArtefactFailure(details.failure, 'link-set');
+    if (presentation) {
+      const messages: SchemaStepMessage[] = [
+        { text: `${presentation.heading}: ${presentation.message}` },
+        { text: `Next step: ${presentation.remediation}` },
+      ];
+      if (details.kind === 'document' && details.failure.class === 'credential-invalid') {
+        messages.push(
+          ...details.errors.map((error: ErrorObject) =>
+            isRelationRejection(error, decoded)
+              ? {
+                  text: `${formatValidationError(error)}. The published UNTP v${
+                    details.version
+                  } schema rejects the relation "${String(
+                    error.params?.additionalProperty,
+                  )}". This error concerns the relation name only.`,
+                  relationRule: true as const,
+                }
+              : { text: formatValidationError(error) },
+          ),
+        );
+      } else if (details.kind === 'schema-unusable' && details.errors) {
+        messages.push(
+          ...details.errors.map((error) => ({ text: `Schema diagnostic: ${formatValidationError(error)}` })),
+        );
+      }
+      return messages;
+    }
+  }
+
   if (details.kind === 'schema-unavailable') {
     // The bundled copy already stood in server-side for anything the host could not deliver, so
     // a 4xx or a non-JSON body reaching the browser usually means the version has no usable

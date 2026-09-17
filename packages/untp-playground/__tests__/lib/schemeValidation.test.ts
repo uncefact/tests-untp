@@ -1,5 +1,6 @@
 import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import { SchemaSelectionError, validateSchemeSchema } from '@/lib/schemeValidation';
+import { schemaCache } from '@/lib/schemaFetch';
 
 describe('schemeValidation', () => {
   describe('canonical version detection', () => {
@@ -62,6 +63,9 @@ describe('schemeValidation', () => {
     afterEach(() => {
       global.fetch = originalFetch;
     });
+    beforeEach(async () => {
+      await schemaCache.clear();
+    });
 
     it('builds the published cvc schema URL for a v0.7.0 scheme', async () => {
       global.fetch = jest.fn().mockResolvedValue({
@@ -80,11 +84,80 @@ describe('schemeValidation', () => {
     it('fails before fetching when the scheme version has no legacy schema layout', async () => {
       global.fetch = jest.fn() as unknown as typeof fetch;
 
-      await expect(validateSchemeSchema({}, '0.6.0')).rejects.toThrow(
-        'Conformity Scheme schemas have no legacy layout before UNTP 0.7.0; detected 0.6.0.',
-      );
-      await expect(validateSchemeSchema({}, '0.6.0')).rejects.toBeInstanceOf(SchemaSelectionError);
+      const error = await validateSchemeSchema({}, '0.6.0').catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(SchemaSelectionError);
+      expect(error).toMatchObject({
+        reason: 'scheme-version-unsupported',
+        message:
+          'The scheme declares UNTP version "0.6.0", but this Playground has schema layouts only for UNTP 0.7.0 and later.',
+      });
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('classifies an invalid schema under the carried dialect as unusable', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ $schema: 'https://json-schema.org/draft/2020-12/schema', type: 17 }),
+      }) as unknown as typeof fetch;
+
+      await expect(validateSchemeSchema({}, '9.9.20')).resolves.toMatchObject({
+        valid: false,
+        failure: {
+          class: 'unusable-artefact',
+          code: 'schema.validation.meta-schema',
+          artefactUrl: 'https://untp.unece.org/artefacts/schema/v9.9.20/cvc/ConformityScheme.json',
+        },
+      });
+    });
+
+    it('reports an uncarried scheme dialect as unknown', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ $schema: 'http://json-schema.org/draft-07/schema', type: 'object' }),
+      }) as unknown as typeof fetch;
+
+      await expect(validateSchemeSchema({}, '9.9.21')).resolves.toMatchObject({
+        valid: false,
+        failure: { class: 'unknown', code: 'schema.validation.dialect' },
+      });
+    });
+
+    it('reports a real Ajv compile throw as unknown', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { value: { $ref: '#/$defs/missing' } },
+          $defs: {},
+        }),
+      }) as unknown as typeof fetch;
+
+      await expect(validateSchemeSchema({}, '9.9.22')).resolves.toMatchObject({
+        valid: false,
+        failure: { class: 'unknown', code: 'schema.validation.compile' },
+      });
+    });
+
+    it('does not downgrade an unexpected scheme field to success', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { name: { type: 'string' } },
+          additionalProperties: false,
+        }),
+      }) as unknown as typeof fetch;
+
+      await expect(validateSchemeSchema({ name: 'scheme', unexpected: true }, '9.9.23')).resolves.toMatchObject({
+        valid: false,
+        failure: { class: 'credential-invalid', code: 'schema.validation.payload' },
+      });
     });
 
     describe('fetch failures', () => {
@@ -98,7 +171,7 @@ describe('schemeValidation', () => {
         await expect(validateSchemeSchema({}, `9.9.${status}`)).rejects.toMatchObject({
           name: 'SchemaFetchError',
           reason: 'not-found',
-          message: expect.stringContaining('No schema published at'),
+          message: expect.stringContaining(`Schema host returned status ${status}`),
         });
       });
 

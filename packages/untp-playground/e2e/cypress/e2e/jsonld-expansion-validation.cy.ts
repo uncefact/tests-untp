@@ -56,11 +56,14 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.openValidationDetails('Fix the @context');
+    cy.contains('Could not determine the cause').should('be.visible');
+    cy.openValidationDetails('Diagnostic details');
 
+    // Check the diagnostic and the separate remediation line; repeating the
+    // diagnostic would not prove that the failure copy is complete.
     cy.checkValidationErrorMessages([
       'Invalid JSON-LD syntax; invalid term definition.',
-      'Review your @context against the JSON-LD specification.',
+      'Report these details to the Playground operator.',
     ]);
   });
 
@@ -70,11 +73,12 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.openValidationDetails('Fix the @context URL');
+    cy.contains('Could not fetch').should('be.visible');
 
+    // Established fetch failures show the URL in the banner and the retry/report remediation directly.
     cy.checkValidationErrorMessages([
       'https://unresolvable-context.invalid',
-      'Open the URL in a browser. If it does not return JSON-LD, or it requires login, the playground cannot use it as a context.',
+      'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
     ]);
   });
 

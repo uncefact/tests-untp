@@ -28,6 +28,7 @@ import {
   validateLinkSetSchema,
   type LinkSetSchemaStepDetails,
 } from '@/lib/linkSetValidation';
+import { describeArtefactFailure, isUnexpectedFailure, unexpectedFailure } from '@/lib/artefactFailure';
 import { credentialIsTerminal, instanceStatus } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { fetchLinkedCredential } from '@/lib/fetchLinkedCredential';
@@ -228,6 +229,7 @@ async function runLinkSetPipeline(
     setStep(TestCaseStepId.LINKSET_SCHEMA_VALIDATION, {
       status: result.kind === 'document' && result.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
       details,
+      failure: result.failure,
     });
   } catch (err) {
     // Only a bug reaches here (the validator settles every expected failure into a result), so
@@ -239,15 +241,28 @@ async function runLinkSetPipeline(
       schemaUrl,
       err,
     });
-    setStep(TestCaseStepId.LINKSET_SCHEMA_VALIDATION, {
-      status: TestCaseStatus.FAILURE,
-      details: {
-        kind: 'schema-unusable',
-        version: stored.validationVersion,
-        schemaUrl,
-        message: err instanceof Error ? err.message : 'Schema validation failed for an unknown reason.',
-      } satisfies LinkSetSchemaStepDetails,
-    });
+    const failure = unexpectedFailure(
+      'playground.pipeline.unexpected',
+      `The link set schema step failed unexpectedly: ${err instanceof Error ? err.message : String(err)}`,
+      'link-set',
+    );
+    if (
+      setStep(TestCaseStepId.LINKSET_SCHEMA_VALIDATION, {
+        status: TestCaseStatus.FAILURE,
+        details: {
+          kind: 'schema-unusable',
+          version: stored.validationVersion,
+          schemaUrl,
+          message: failure.message,
+          failure,
+        } satisfies LinkSetSchemaStepDetails,
+        failure,
+      })
+    ) {
+      if (isUnexpectedFailure(failure)) {
+        toast.error('The link set schema check failed unexpectedly. Report the details to the Playground operator.');
+      }
+    }
   }
 }
 
@@ -334,10 +349,15 @@ function LinkSetCard({
               <div className='flex items-center gap-2'>
                 <StatusIcon status={step.status} testId={step.id} />
                 <span>{step.name}</span>
+                {step.failure && (
+                  <span className='text-xs font-medium text-amber-700' data-testid='artefact-failure-class'>
+                    {describeArtefactFailure(step.failure, 'link-set')?.heading}
+                  </span>
+                )}
               </div>
               {step.id === TestCaseStepId.LINKSET_SCHEMA_VALIDATION &&
                 step.status === TestCaseStatus.FAILURE &&
-                step.details && (
+                (step.details || step.failure) && (
                   <ul
                     className='mt-1 list-disc space-y-1 pl-6 text-sm text-red-600'
                     data-testid='linkset-schema-errors'

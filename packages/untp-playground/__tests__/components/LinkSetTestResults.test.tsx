@@ -1159,6 +1159,9 @@ describe('Schema Validation outcomes (#988)', () => {
       await screen.findByTestId('linkset-card-header');
       await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
       expect(screen.queryAllByTestId(/status-icon-in-progress/)).toHaveLength(0);
+      expect(toast.error).toHaveBeenCalledWith(
+        'The link set schema check failed unexpectedly. Report the details to the Playground operator.',
+      );
     } finally {
       spy.mockRestore();
     }

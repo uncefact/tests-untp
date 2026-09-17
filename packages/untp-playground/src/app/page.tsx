@@ -443,20 +443,24 @@ export default function Home() {
     const credentialType = credentialGroupType(decodedCredential);
 
     if (!credentialType || !isPermittedCredentialType(credentialType as PermittedCredentialType)) {
-      // The unclassified-artefact message names every accepted family, read from the detection
-      // layer so a new family appears here automatically (#676).
-      const acceptedFamiliesText = acceptedArtefactFamilies().join(', ');
+      const declaredTypes: string[] = Array.isArray(decodedCredential.type)
+        ? decodedCredential.type.filter((value: unknown): value is string => typeof value === 'string')
+        : typeof decodedCredential.type === 'string'
+          ? [decodedCredential.type]
+          : [];
+      const declaredTypesText =
+        declaredTypes.length > 0 ? declaredTypes.map((value) => `"${value}"`).join(', ') : 'none';
       dispatchError([
         {
-          keyword: 'required',
-          instancePath: '/type',
+          keyword: 'unsupportedCredentialType',
+          instancePath: '',
           params: {
-            missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
-            receivedValue: normalizedCredential,
-            allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
-            solution: `Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential'), or add the artefact on its own tab. The Playground accepts: ${acceptedFamiliesText}.`,
+            declaredTypes,
+            supportedTypes: permittedCredentialTypes,
           },
-          message: `The credential type is missing or invalid. The Playground accepts: ${acceptedFamiliesText}.`,
+          message: `The declared type(s) ${declaredTypesText} are not a UNTP credential type the Playground validates. Supported types: ${permittedCredentialTypes.join(
+            ', ',
+          )}.`,
         },
       ]);
       return { accepted: false };

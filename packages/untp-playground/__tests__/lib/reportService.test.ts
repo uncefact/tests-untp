@@ -8,6 +8,7 @@ import { reportName } from '../../config';
 import { generateReport } from '@/lib/reportService';
 import { TestCaseStatus } from '../../constants';
 import { toSchemeStructuralParseDetails } from '@/lib/schemeStructure';
+import { classifyJsonLdFailure, notExecutedFailure } from '@/lib/artefactFailure';
 
 jest.mock('@/lib/credentialService');
 jest.mock('@/lib/schemaValidation');
@@ -118,6 +119,233 @@ describe('generateReport', () => {
       conformitySchemes: [],
       linkSets: [],
     });
+  });
+
+  it('preserves a context upstream status in the generated JSON report', async () => {
+    const contextUrl = 'https://publisher.example/context.jsonld';
+    const contextFailure = classifyJsonLdFailure(
+      {
+        kind: 'context-fetch',
+        code: 'resolver.http-error',
+        url: contextUrl,
+        upstreamStatus: 503,
+        detail: 'upstream unavailable',
+      },
+      'context',
+    );
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      credentialInstances: [
+        {
+          ...mockCredentialInstance,
+          steps: [
+            ...mockCredentialInstance.steps,
+            {
+              id: TestCaseStepId.CONTEXT_VALIDATION,
+              name: 'JSON-LD Document Expansion and Context Validation',
+              status: TestCaseStatus.FAILURE,
+              failure: contextFailure,
+            },
+          ],
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    const reportJson = JSON.parse(JSON.stringify(report));
+    expect(reportJson.verifiableCredentials[0].core.steps).toContainEqual(
+      expect.objectContaining({
+        id: TestCaseStepId.CONTEXT_VALIDATION,
+        failure: expect.objectContaining({
+          class: 'could-not-fetch',
+          code: 'context.fetch',
+          artefactUrl: contextUrl,
+          upstreamStatus: 503,
+        }),
+      }),
+    );
+  });
+
+  it('projects context service and upstream statuses for both failure classes', async () => {
+    const declaredUrl = 'https://vocabulary.uncefact.org/untp/0.7.0/context/';
+    const credentialFailure = classifyJsonLdFailure(
+      {
+        kind: 'context-fetch',
+        code: 'resolver.http-error',
+        url: declaredUrl,
+        upstreamStatus: 404,
+        detail: 'upstream returned 404',
+      },
+      'context',
+      '0.7.0',
+      new Set([declaredUrl]),
+      { untpContextUrls: new Set([declaredUrl]), serviceStatus: 422 },
+    );
+    const serviceFailure = classifyJsonLdFailure(
+      { kind: 'service', detail: 'The context service answered 502.' },
+      'context',
+      undefined,
+      undefined,
+      { serviceStatus: 502 },
+    );
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      credentialInstances: [
+        {
+          ...mockCredentialInstance,
+          steps: [
+            ...mockCredentialInstance.steps,
+            {
+              id: TestCaseStepId.CONTEXT_VALIDATION,
+              name: 'Declared context failure',
+              status: TestCaseStatus.FAILURE,
+              failure: credentialFailure,
+            },
+            {
+              id: TestCaseStepId.CONTEXT_VALIDATION,
+              name: 'Context service failure',
+              status: TestCaseStatus.FAILURE,
+              failure: serviceFailure,
+            },
+          ],
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    const steps = JSON.parse(JSON.stringify(report)).verifiableCredentials[0].core.steps;
+    expect(steps).toContainEqual(
+      expect.objectContaining({
+        failure: expect.objectContaining({
+          class: 'credential-invalid',
+          serviceStatus: 422,
+          upstreamStatus: 404,
+        }),
+      }),
+    );
+    expect(steps).toContainEqual(
+      expect.objectContaining({
+        failure: expect.objectContaining({ class: 'could-not-fetch', serviceStatus: 502 }),
+      }),
+    );
+  });
+
+  it('projects the service status for every context outcome that received a response', async () => {
+    const remoteContextUrl = 'https://publisher.example/remote-context.jsonld';
+    const failures: Array<NonNullable<TestStep['failure']>> = [
+      classifyJsonLdFailure(
+        {
+          kind: 'context-invalid',
+          code: 'resolver.invalid-json',
+          url: remoteContextUrl,
+          detail: 'the remote context was not usable',
+        },
+        'context',
+        undefined,
+        undefined,
+        { serviceStatus: 422 },
+      ),
+      classifyJsonLdFailure(
+        {
+          kind: 'context-invalid',
+          code: 'invalid scoped context',
+          url: remoteContextUrl,
+          detail: 'the invalid context origin was not established',
+        },
+        'context',
+        undefined,
+        undefined,
+        { serviceStatus: 422 },
+      ),
+      classifyJsonLdFailure(
+        {
+          kind: 'document',
+          source: 'safe-mode-event',
+          code: 'invalid property',
+          detail: 'bad property',
+          fields: { property: 'unknownTerm' },
+        },
+        'context',
+        undefined,
+        undefined,
+        { serviceStatus: 422 },
+      ),
+      classifyJsonLdFailure(
+        {
+          kind: 'document',
+          source: 'safe-mode-event',
+          code: 'invalid @language value',
+          detail: 'bad language',
+          fields: { language: 'en_US!' },
+        },
+        'context',
+        undefined,
+        undefined,
+        { serviceStatus: 422 },
+      ),
+      classifyJsonLdFailure(
+        {
+          kind: 'service',
+          detail: 'The Playground context service answered 200 but the result did not finish arriving within 15s.',
+        },
+        'context',
+        undefined,
+        undefined,
+        { serviceStatus: 200 },
+      ),
+    ];
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      credentialInstances: [
+        {
+          ...mockCredentialInstance,
+          steps: [
+            ...mockCredentialInstance.steps,
+            ...failures.map((failure, index) => ({
+              id: TestCaseStepId.CONTEXT_VALIDATION,
+              name: `Context outcome ${index + 1}`,
+              status: TestCaseStatus.FAILURE,
+              failure,
+            })),
+          ],
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    const projectedFailures = JSON.parse(JSON.stringify(report)).verifiableCredentials[0].core.steps;
+    expect(projectedFailures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          failure: expect.objectContaining({
+            class: 'unusable-artefact',
+            code: 'context.invalid',
+            serviceStatus: 422,
+          }),
+        }),
+        expect.objectContaining({
+          failure: expect.objectContaining({ class: 'unknown', code: 'context.invalid', serviceStatus: 422 }),
+        }),
+        expect.objectContaining({
+          failure: expect.objectContaining({
+            class: 'credential-invalid',
+            code: 'context.document.invalid-property',
+            serviceStatus: 422,
+          }),
+        }),
+        expect.objectContaining({
+          failure: expect.objectContaining({ class: 'unknown', code: 'context.document.unknown', serviceStatus: 422 }),
+        }),
+        expect.objectContaining({
+          failure: expect.objectContaining({
+            class: 'could-not-fetch',
+            code: 'context.service',
+            serviceStatus: 200,
+            message: expect.stringContaining('did not finish arriving within 15s'),
+          }),
+        }),
+      ]),
+    );
   });
 
   it('should throw an error if no valid credential or scheme instances are provided', async () => {
@@ -324,6 +552,12 @@ describe('generateReport', () => {
         name: 'Structural Parse',
         status: TestCaseStatus.FAILURE,
         details: structuralDetails,
+        failure: {
+          class: 'credential-invalid',
+          code: 'conformity-scheme.parse-failed',
+          message: 'The Conformity Scheme document failed structural parsing.',
+          remediation: 'Correct the listed fields in the Conformity Scheme document.',
+        },
       },
       {
         id: TestCaseStepId.CONTEXT_VALIDATION,
@@ -350,6 +584,94 @@ describe('generateReport', () => {
     });
   });
 
+  const schemeFailureCases: Array<{
+    label: string;
+    failure: NonNullable<TestStep['failure']>;
+  }> = [
+    {
+      label: 'could-not-fetch',
+      failure: {
+        class: 'could-not-fetch',
+        code: 'schema.fetch.upstream-status',
+        message: 'The Playground could not fetch the scheme schema (upstream status 503).',
+        remediation: 'Retry the check and report the URL to the operator if it keeps failing.',
+        artefactUrl: 'https://publisher.example/scheme.json',
+        upstreamStatus: 503,
+      },
+    },
+    {
+      label: 'unusable-artefact',
+      failure: {
+        class: 'unusable-artefact',
+        code: 'schema.fetch.invalid-json',
+        message: 'The scheme schema response was not valid JSON.',
+        remediation: 'Report the scheme schema URL to its publisher.',
+        artefactUrl: 'https://publisher.example/scheme.json',
+      },
+    },
+    {
+      label: 'credential-invalid',
+      failure: {
+        class: 'credential-invalid',
+        code: 'conformity-scheme.parse-failed',
+        message: 'The Conformity Scheme document failed structural parsing.',
+        remediation: 'Correct the listed fields in the Conformity Scheme document.',
+      },
+    },
+    {
+      label: 'unknown',
+      failure: {
+        class: 'unknown',
+        code: 'playground.pipeline.step',
+        message: 'The scheme validation step failed unexpectedly.',
+        remediation: 'Report these details to the Playground operator.',
+      },
+    },
+  ];
+
+  it.each(schemeFailureCases)('carries the $label failure on a scheme step in JSON', async ({ failure }) => {
+    const steps: TestStep[] = [
+      { id: TestCaseStepId.SCHEME_VERSION_DETECTION, name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+      { id: TestCaseStepId.SCHEME_SCHEMA_VALIDATION, name: 'Schema Validation', status: TestCaseStatus.SUCCESS },
+      { id: TestCaseStepId.SCHEME_STRUCTURAL_PARSE, name: 'Structural Parse', status: TestCaseStatus.FAILURE, failure },
+      {
+        id: TestCaseStepId.CONTEXT_VALIDATION,
+        name: 'JSON-LD Document Expansion and Context Validation',
+        status: TestCaseStatus.SUCCESS,
+      },
+    ];
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      schemeInstances: [
+        {
+          scheme: { original: {}, decoded: { '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'] } },
+          steps,
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    expect(JSON.parse(JSON.stringify(report)).conformitySchemes[0].steps[2].failure).toEqual(failure);
+  });
+
+  it('does not add failure metadata to a successful scheme step', async () => {
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      schemeInstances: [
+        {
+          scheme: { original: {}, decoded: { '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'] } },
+          steps: [
+            { id: TestCaseStepId.SCHEME_VERSION_DETECTION, name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+          ],
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    const reportJson = JSON.parse(JSON.stringify(report));
+    expect(reportJson.conformitySchemes[0].steps[0]).not.toHaveProperty('failure');
+  });
+
   it('carries the schema-selection skip marker and blocker into the JSON report', async () => {
     const skipDetails = {
       errors: [{ message: 'Skipped: schema selection failed.' }],
@@ -370,6 +692,7 @@ describe('generateReport', () => {
         name: 'Structural Parse',
         status: TestCaseStatus.FAILURE,
         details: skipDetails,
+        failure: notExecutedFailure(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, 'scheme'),
       },
       {
         id: TestCaseStepId.CONTEXT_VALIDATION,
@@ -389,6 +712,13 @@ describe('generateReport', () => {
     });
 
     expect(report.conformitySchemes[0].steps[2].details).toEqual(skipDetails);
+    expect(report.conformitySchemes[0].steps[2].failure).toEqual(
+      expect.objectContaining({
+        class: 'unknown',
+        code: 'playground.pipeline.not-executed',
+        blockedBy: TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
+      }),
+    );
   });
 
   it('carries the version-detection blocker on the Structural Parse skip into the JSON report', async () => {
@@ -594,11 +924,16 @@ describe('generateReport link sets and titles (#814)', () => {
     version: '0.7.0',
     schemaUrl: 'https://untp.example/0.7.0/linkset.json',
   };
-  const schemaStep = (status: TestCaseStatus, details: unknown = schemaDetails): TestStep => ({
+  const schemaStep = (
+    status: TestCaseStatus,
+    details: unknown = schemaDetails,
+    failure?: TestStep['failure'],
+  ): TestStep => ({
     id: TestCaseStepId.LINKSET_SCHEMA_VALIDATION,
     name: 'Schema Validation',
     status,
     ...(details !== null && { details }),
+    ...(failure && { failure }),
   });
   const coverageStep = (status: TestCaseStatus, details: Record<string, unknown>): TestStep => ({
     id: TestCaseStepId.LINKSET_LINK_TYPE_COVERAGE,
@@ -753,6 +1088,30 @@ describe('generateReport link sets and titles (#814)', () => {
     ]);
     expect(report.linkSets.map((entry) => entry.steps[0].details)).toEqual([documentFailure, unavailable, unusable]);
     expect(report.linkSets.map((entry) => entry.validationVersion)).toEqual(['0.7.0', '0.7.0', '0.7.0']);
+  });
+
+  it('copies the recorded link-set failure to the report step without reclassifying it', async () => {
+    const failure: NonNullable<TestStep['failure']> = {
+      class: 'unusable-artefact',
+      code: 'schema.fetch.invalid-json',
+      message: 'The schema body was fetched but was not valid JSON.',
+      remediation: 'Report the schema URL to its publisher.',
+      artefactUrl: schemaDetails.schemaUrl,
+    };
+    const report = await generateReport({
+      implementationName: 'Acme',
+      linkSetInstances: [
+        {
+          linkSet: stored(),
+          assessment: assessmentOf(
+            [schemaStep(TestCaseStatus.FAILURE, schemaDetails, failure), pending],
+            TestCaseStatus.FAILURE,
+          ),
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+    expect(report.linkSets[0].steps[0].failure).toEqual(failure);
   });
 
   it('refuses while a link set schema step is still running, when the assessment is missing, and on a malformed assessment', async () => {

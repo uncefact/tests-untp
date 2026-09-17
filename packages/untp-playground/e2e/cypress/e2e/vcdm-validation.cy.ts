@@ -93,7 +93,7 @@ describe('VCDM Schema Validation', () => {
     cy.contains('Add the missing "issuer" field.').should('be.visible');
   });
 
-  it('should handle schema fetch errors gracefully', () => {
+  it('should classify schema fetch errors without blaming the credential', () => {
     cy.intercept('GET', '**/api/schema*', {
       statusCode: 500,
       body: 'Schema fetch failed',
@@ -105,7 +105,11 @@ describe('VCDM Schema Validation', () => {
     cy.checkValidationStatus('VCDM Version Detection', 'success');
 
     cy.wait('@schemaFetch');
-    cy.get('[data-sonner-toast]').contains('Failed to fetch the VCDM schema').should('exist');
+    cy.contains('VCDM Schema Validation').parent().should('contain.text', 'Could not fetch');
+    cy.openErrorDetailsByStepName('VCDM Schema Validation');
+    cy.contains('Could not fetch').should('be.visible');
+    cy.contains('Retry the check').should('be.visible');
+    cy.contains('Fix validation error').should('not.exist');
   });
 
   it('should show confetti for fully valid credential', () => {

@@ -27,14 +27,23 @@ import {
 import { decodeEnvelopedCredential, isEnvelopedProof } from '@/lib/credentialService';
 import { newId } from '@/lib/id';
 import {
+  classifySchemaFetchFailure,
+  classifySchemaSelectionFailure,
+  describeArtefactFailure,
+  isUnexpectedFailure,
+  unexpectedFailure,
+  type ArtefactFailureFamily,
+} from '@/lib/artefactFailure';
+import {
+  contextEntries,
   detectExtension,
-  SchemaFetchError,
-  SchemaSelectionError,
-  schemaFetchFailureAdvice,
+  formatObserved,
   validateCredentialSchema,
   validateExtension,
 } from '@/lib/schemaValidation';
+import { SchemaFetchError, SchemaSelectionError } from '@/lib/schemaFetch';
 import { detectVcdmVersion } from '@/lib/utils';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import { validateVcdmRules } from '@/lib/vcdm-validation';
 import { verifyCredential } from '@/lib/verificationService';
 import type { ArtefactSlot, CollectionState, InstanceId, RunId } from '@/types/artefact';
@@ -43,15 +52,7 @@ import confetti from 'canvas-confetti';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  allowedContextValue,
-  allowedExtensionValue,
-  permittedCredentialTypes,
-  TestCaseStatus,
-  TestCaseStepId,
-  VCDMVersion,
-  VCProofType,
-} from '../../constants';
+import { permittedCredentialTypes, TestCaseStatus, TestCaseStepId, VCDMVersion, VCProofType } from '../../constants';
 import ValidationDetailsSheet from './ValidationDetailsSheet';
 import { DecryptCredential } from './DecryptCredential';
 import type { EncryptedCredentialEnvelope } from '@/lib/decryptCredential';
@@ -75,6 +76,63 @@ export const confettiConfig = {
   origin: { y: 0.7 },
 };
 
+function settleInitialisationFailure(item: CredentialSlot, error: unknown, dispatch: CredentialDispatch): void {
+  const failure = unexpectedFailure(
+    'playground.pipeline.initialisation',
+    `The Playground could not initialise validation for this credential: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+    'credential',
+  );
+  const result = initialisationFailureSteps(item.payload).map((step) =>
+    step.status === TestCaseStatus.SUCCESS ? step : { ...step, failure },
+  );
+  const outcome = dispatch((state) => {
+    const started = beginRun(state, item.instanceId, result, newId);
+    if (!started.runId) return started;
+    return commitResult(started.state, { instanceId: item.instanceId, runId: started.runId, result });
+  });
+  if ('applied' in outcome && outcome.applied) {
+    toast.error('Validation could not start. Report the details to the Playground operator.');
+  }
+}
+
+function failureDetails(errors: any[] = []): { errors?: any[] } {
+  return errors.length > 0 ? { errors } : {};
+}
+
+function familyForStep(stepId: TestCaseStepId): ArtefactFailureFamily {
+  switch (stepId) {
+    case TestCaseStepId.EXTENSION_SCHEMA_VALIDATION:
+      return 'extension';
+    case TestCaseStepId.VCDM_SCHEMA_VALIDATION:
+      return 'vcdm';
+    case TestCaseStepId.CONTEXT_VALIDATION:
+      return 'context';
+    case TestCaseStepId.VCDM_VERSION:
+      return 'vcdm';
+    default:
+      return 'credential';
+  }
+}
+
+/** Shared error classes cross this module boundary with their identity intact, so use instanceof. */
+function classifyPipelineError(error: unknown, schemaFamily: ArtefactFailureFamily, declaredVersion?: string) {
+  if (error instanceof SchemaFetchError) {
+    return classifySchemaFetchFailure(error, schemaFamily, declaredVersion);
+  }
+  if (error instanceof SchemaSelectionError) {
+    return classifySchemaSelectionFailure(error, schemaFamily);
+  }
+  return unexpectedFailure(
+    'playground.pipeline.step',
+    `The ${schemaFamily} validation step failed unexpectedly: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+    schemaFamily,
+  );
+}
+
 /**
  * The credential pipeline's starting step list. Proof type and VCDM version are detected
  * synchronously from the stored document, so they carry their final status immediately; every
@@ -84,12 +142,18 @@ export const confettiConfig = {
 function initialSteps(stored: StoredCredential): TestStep[] {
   const vcdmVersion = detectVcdmVersion(stored.decoded);
   const isUnsupportedVCDMVersion = vcdmVersion === VCDMVersion.UNKNOWN;
+  const observedContexts = contextEntries(stored.decoded);
 
   const steps: TestStep[] = [];
   if (stored.decryptedFromEnvelope) {
     // Decrypted this session (#813): the pipeline leads with the already-successful Decryption
     // step so the card records how the document was obtained.
-    steps.push({ id: TestCaseStepId.DECRYPTION, name: 'Decryption', status: TestCaseStatus.SUCCESS });
+    steps.push({
+      id: TestCaseStepId.DECRYPTION,
+      name: 'Decryption',
+      status: TestCaseStatus.SUCCESS,
+      failure: undefined,
+    });
   }
   steps.push(
     {
@@ -97,12 +161,29 @@ function initialSteps(stored: StoredCredential): TestStep[] {
       name: 'Proof Type Detection',
       status: TestCaseStatus.SUCCESS,
       details: { type: isEnvelopedProof(stored.original) ? VCProofType.ENVELOPING : VCProofType.EMBEDDED },
+      failure: undefined,
     },
     {
       id: TestCaseStepId.VCDM_VERSION,
       name: 'VCDM Version Detection',
       status: isUnsupportedVCDMVersion ? TestCaseStatus.FAILURE : TestCaseStatus.SUCCESS,
       details: { version: vcdmVersion },
+      ...(isUnsupportedVCDMVersion
+        ? {
+            failure: classifySchemaSelectionFailure(
+              {
+                reason: 'vcdm-version-unmapped',
+                message:
+                  observedContexts.length === 0
+                    ? 'The credential declares no @context entries, so no VCDM version can be detected.'
+                    : `The credential declares @context entries ${formatObserved(
+                        observedContexts,
+                      )}, but none carries a recognised VCDM version.`,
+              },
+              'vcdm',
+            ),
+          }
+        : { failure: undefined }),
     },
     { id: TestCaseStepId.VCDM_SCHEMA_VALIDATION, name: 'VCDM Schema Validation', status: TestCaseStatus.PENDING },
     { id: TestCaseStepId.VERIFICATION, name: 'Credential Verification', status: TestCaseStatus.PENDING },
@@ -125,6 +206,32 @@ function initialSteps(stored: StoredCredential): TestStep[] {
   return steps;
 }
 
+/** Step identities that read nothing from the document, so they can be recorded when building the real step list has already thrown. */
+function initialisationFailureSteps(stored: StoredCredential): TestStep[] {
+  const steps: TestStep[] = [];
+  if (stored.decryptedFromEnvelope) {
+    steps.push({
+      id: TestCaseStepId.DECRYPTION,
+      name: 'Decryption',
+      status: TestCaseStatus.SUCCESS,
+      failure: undefined,
+    });
+  }
+  steps.push(
+    { id: TestCaseStepId.PROOF_TYPE, name: 'Proof Type Detection', status: TestCaseStatus.FAILURE },
+    { id: TestCaseStepId.VCDM_VERSION, name: 'VCDM Version Detection', status: TestCaseStatus.FAILURE },
+    { id: TestCaseStepId.VCDM_SCHEMA_VALIDATION, name: 'VCDM Schema Validation', status: TestCaseStatus.FAILURE },
+    { id: TestCaseStepId.VERIFICATION, name: 'Credential Verification', status: TestCaseStatus.FAILURE },
+    { id: TestCaseStepId.UNTP_SCHEMA_VALIDATION, name: 'UNTP Schema Validation', status: TestCaseStatus.FAILURE },
+    {
+      id: TestCaseStepId.CONTEXT_VALIDATION,
+      name: 'JSON-LD Document Expansion and Context Validation',
+      status: TestCaseStatus.FAILURE,
+    },
+  );
+  return steps;
+}
+
 export function TestResults({ collection, dispatch, onDecrypted }: TestResultsProps) {
   // Confetti fires once per (instance, run) so it does not re-fire on unrelated re-renders.
   const confettiShownRef = useRef<Set<string>>(new Set());
@@ -139,8 +246,15 @@ export function TestResults({ collection, dispatch, onDecrypted }: TestResultsPr
         // defends against a future path that recreates a lock without one, and above all keeps
         // the pipeline off ciphertext (#813).
         if (item.payload.encryptedEnvelope) continue;
-        const { runId } = dispatch((state) => beginRun(state, item.instanceId, initialSteps(item.payload), newId));
-        if (runId) void runCredentialPipeline(item.instanceId, runId, item.payload, dispatch);
+        try {
+          // Construct the owned snapshot once. The runner receives this same value so a detector
+          // cannot produce a second, different result before the outer recovery boundary.
+          const startingSteps = initialSteps(item.payload);
+          const { runId } = dispatch((state) => beginRun(state, item.instanceId, startingSteps, newId));
+          if (runId) void runCredentialPipeline(item.instanceId, runId, item.payload, startingSteps, dispatch);
+        } catch (error) {
+          settleInitialisationFailure(item, error, dispatch);
+        }
       }
     }
   }, [collection.items, dispatch]);
@@ -242,9 +356,10 @@ async function runCredentialPipeline(
   instanceId: InstanceId,
   runId: RunId,
   stored: StoredCredential,
+  initialResult: TestStep[],
   dispatch: CredentialDispatch,
 ): Promise<void> {
-  const steps = initialSteps(stored);
+  const steps = initialResult.map((step) => ({ ...step }));
 
   // The only write path: commit the whole step list through the run guard. Returns false once the
   // run has been superseded (replaced or removed), so a stale run stops writing.
@@ -266,9 +381,9 @@ async function runCredentialPipeline(
     if (
       !setSteps([
         [TestCaseStepId.VERIFICATION, { status: TestCaseStatus.IN_PROGRESS }],
-        [TestCaseStepId.UNTP_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS }],
-        [TestCaseStepId.VCDM_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS }],
-        [TestCaseStepId.CONTEXT_VALIDATION, { status: TestCaseStatus.IN_PROGRESS }],
+        [TestCaseStepId.UNTP_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS, failure: undefined }],
+        [TestCaseStepId.VCDM_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS, failure: undefined }],
+        [TestCaseStepId.CONTEXT_VALIDATION, { status: TestCaseStatus.IN_PROGRESS, failure: undefined }],
       ])
     ) {
       return;
@@ -287,6 +402,7 @@ async function runCredentialPipeline(
             verified: verificationResult.verified,
             ...(verificationResult.error && { error: verificationResult.error }),
           },
+          failure: undefined,
         })
       ) {
         return;
@@ -307,6 +423,7 @@ async function runCredentialPipeline(
         !setStep(TestCaseStepId.VERIFICATION, {
           status: TestCaseStatus.FAILURE,
           details: { verified: false, error: description },
+          failure: undefined,
         })
       ) {
         return;
@@ -321,14 +438,22 @@ async function runCredentialPipeline(
       if (
         !setStep(TestCaseStepId.VCDM_SCHEMA_VALIDATION, {
           status: vcdmValidationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-          details: vcdmValidationResult,
+          details: vcdmValidationResult.valid ? vcdmValidationResult : failureDetails(vcdmValidationResult.errors),
+          failure: vcdmValidationResult.failure,
         })
       ) {
         return;
       }
-    } catch {
-      if (!setStep(TestCaseStepId.VCDM_SCHEMA_VALIDATION, { status: TestCaseStatus.FAILURE })) return;
-      toast.error('Failed to fetch the VCDM schema. Please contact support.');
+    } catch (error) {
+      const failure = classifyPipelineError(
+        error,
+        'vcdm',
+        detectVcdmVersion(stored.decoded) === VCDMVersion.UNKNOWN ? undefined : detectVcdmVersion(stored.decoded),
+      );
+      if (!setStep(TestCaseStepId.VCDM_SCHEMA_VALIDATION, { status: TestCaseStatus.FAILURE, failure })) return;
+      if (isUnexpectedFailure(failure)) {
+        toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
+      }
     }
 
     try {
@@ -337,53 +462,30 @@ async function runCredentialPipeline(
         !setStep(TestCaseStepId.UNTP_SCHEMA_VALIDATION, {
           status: validationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
           details: validationResult,
+          failure: validationResult.failure,
         })
       ) {
         return;
       }
     } catch (error) {
-      console.error('Schema validation error:', error);
-      // A SchemaSelectionError means selection failed before transport, so there is nothing to
-      // retry and no toast. A SchemaFetchError carries the schema service's own category, so its
-      // advice can say whether the credential's declared version or the host is the likely cause
-      // instead of always blaming the @context.
-      const selectionError = error instanceof SchemaSelectionError ? error : undefined;
-      const fetchError = error instanceof SchemaFetchError ? error : undefined;
-      const detail = selectionError
-        ? {
-            keyword: 'schema',
-            instancePath: '',
-            message: selectionError.message,
-            params: {
-              solution: "Check the credential's type and the UNTP version in its @context.",
-              receivedValue: stored,
-            },
-          }
-        : {
-            keyword: 'schema',
-            instancePath: '',
-            message: fetchError ? fetchError.message : 'Failed to fetch schema',
-            params: fetchError
-              ? { ...schemaFetchFailureAdvice(fetchError), receivedValue: stored }
-              : {
-                  missingValue: 'The schema could not be loaded due to missing UNTP context IRIs.',
-                  solution: "Ensure the credential includes the required UNTP context IRIs in the '@context' field.",
-                  allowedValue: allowedContextValue,
-                  receivedValue: stored,
-                },
-          };
+      const failure = classifyPipelineError(
+        error,
+        'credential',
+        extension?.core.version ?? detectVersionFromContext(stored.decoded),
+      );
       // The remaining steps still run: leaving one IN_PROGRESS would make the instance
       // non-terminal, and so non-removable and blocking report generation.
       if (
         !setStep(TestCaseStepId.UNTP_SCHEMA_VALIDATION, {
           status: TestCaseStatus.FAILURE,
-          details: { errors: [detail] },
+          details: failureDetails(),
+          failure,
         })
       ) {
         return;
       }
-      if (!selectionError) {
-        toast.error(fetchError ? fetchError.message : 'Failed to fetch schema. Please try again.');
+      if (isUnexpectedFailure(failure)) {
+        toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
       }
     }
 
@@ -395,32 +497,25 @@ async function runCredentialPipeline(
           details: validateContextResult.valid
             ? validateContextResult.data
             : { errors: validateContextResult.error ? [validateContextResult.error] : [] },
+          failure: validateContextResult.valid ? undefined : validateContextResult.failure,
         })
       ) {
         return;
       }
-      if (!validateContextResult.valid) {
-        toast.error('Validation of the JSON-LD context failed. Please check the View Details for more information.');
-      }
     } catch (error) {
-      console.log('Context validation error:', error);
+      const failure = classifyPipelineError(error, 'context');
       if (
         !setStep(TestCaseStepId.CONTEXT_VALIDATION, {
           status: TestCaseStatus.FAILURE,
-          details: {
-            errors: [
-              {
-                keyword: 'context',
-                message: error instanceof Error ? error.message : 'Failed to validate the JSON-LD context',
-                instancePath: '',
-              },
-            ],
-          },
+          details: failureDetails(),
+          failure,
         })
       ) {
         return;
       }
-      toast.error('Validation of the JSON-LD context failed. Please try again.');
+      if (isUnexpectedFailure(failure)) {
+        toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
+      }
     }
 
     if (extension) {
@@ -430,39 +525,44 @@ async function runCredentialPipeline(
           !setStep(TestCaseStepId.EXTENSION_SCHEMA_VALIDATION, {
             status: extensionValidationResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
             details: extensionValidationResult,
+            failure: extensionValidationResult.failure,
           })
         ) {
           return;
         }
       } catch (error) {
-        console.error('Extension schema validation error:', error);
-        const fetchError = error instanceof SchemaFetchError ? error : undefined;
-        const detail = {
-          keyword: 'schema',
-          instancePath: '',
-          message: fetchError ? fetchError.message : 'Failed to fetch extension schema',
-          params: fetchError
-            ? { ...schemaFetchFailureAdvice(fetchError), receivedValue: stored }
-            : {
-                missingValue: 'The schema could not be loaded due to missing extension context IRIs.',
-                solution: "Ensure the credential includes the required extension context IRIs in the '@context' field.",
-                allowedValue: allowedExtensionValue,
-                receivedValue: stored,
-              },
-        };
+        const failure = classifyPipelineError(error, 'extension', extension.extension.version);
         if (
           !setStep(TestCaseStepId.EXTENSION_SCHEMA_VALIDATION, {
             status: TestCaseStatus.FAILURE,
-            details: { errors: [detail] },
+            details: failureDetails(),
+            failure,
           })
         ) {
           return;
         }
-        toast.error(fetchError ? fetchError.message : 'Failed to fetch extension schema. Please try again.');
+        if (isUnexpectedFailure(failure)) {
+          toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
+        }
       }
     }
   } catch (error) {
-    console.log('Error processing credential:', error);
+    const failure = unexpectedFailure(
+      'playground.pipeline.unexpected',
+      `The Playground could not complete validation: ${error instanceof Error ? error.message : String(error)}`,
+      'credential',
+    );
+    const pendingSteps = steps.filter(
+      (step) => step.status === TestCaseStatus.PENDING || step.status === TestCaseStatus.IN_PROGRESS,
+    );
+    if (pendingSteps.length === 0) {
+      console.error('TestResults: validation escaped after all steps settled', error);
+      return;
+    }
+    const applied = setSteps(pendingSteps.map((step) => [step.id, { status: TestCaseStatus.FAILURE, failure }]));
+    if (applied) {
+      toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
+    }
   }
 }
 
@@ -622,19 +722,11 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const shouldShowDetails = useMemo(() => {
-    return (
-      step.details &&
-      ((step.details.errors && step.details.errors.length > 0) ||
-        (step.details.additionalProperties && Object.keys(step.details.additionalProperties).length > 0))
-    );
-  }, [step.details]);
+    return Boolean(step.failure || (step.details && step.details.errors && step.details.errors.length > 0));
+  }, [step.details, step.failure]);
 
-  const isAllowedTestCase = [
-    TestCaseStepId.UNTP_SCHEMA_VALIDATION,
-    TestCaseStepId.EXTENSION_SCHEMA_VALIDATION,
-    TestCaseStepId.VCDM_SCHEMA_VALIDATION,
-    TestCaseStepId.CONTEXT_VALIDATION,
-  ].includes(step.id);
+  const family = familyForStep(step.id);
+  const failurePresentation = describeArtefactFailure(step.failure, family);
 
   return (
     <div className='py-2'>
@@ -642,14 +734,21 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
         <div className='flex items-center gap-2'>
           <StatusIcon status={step.status} testId={`${step.id}`} />
           <span>{step.name}</span>
+          {failurePresentation && (
+            <span className='text-xs font-medium text-amber-700' data-testid='artefact-failure-class'>
+              {failurePresentation.heading}
+            </span>
+          )}
         </div>
-        {step.details && isAllowedTestCase && shouldShowDetails && (
+        {shouldShowDetails && (
           <ValidationDetailsSheet
             isOpen={isDetailsOpen}
             onOpenChange={setIsDetailsOpen}
-            errors={step.details.errors}
+            errors={step.details?.errors ?? []}
+            failure={step.failure}
+            family={family}
             trigger={
-              <Button variant='ghost' size='sm'>
+              <Button variant='ghost' size='sm' data-testid={`${step.id}-view-details`}>
                 View Details
               </Button>
             }

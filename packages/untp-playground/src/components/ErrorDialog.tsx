@@ -1,10 +1,14 @@
 import { ValidationError } from '@/types';
 import { formatValidationError } from '@/lib/formatValidationErrors';
+import { describeArtefactFailure, type ArtefactFailureFamily, type ArtefactStepFailure } from '@/lib/artefactFailure';
+import { acceptedArtefactFamilies } from '@/lib/credentialService';
 import { AlertCircle, Check, ChevronRight, Copy } from 'lucide-react';
 import { useState } from 'react';
 
 interface ErrorDialogProps {
   errors: any[];
+  failure?: ArtefactStepFailure;
+  family?: ArtefactFailureFamily;
   className?: string;
 }
 
@@ -28,6 +32,7 @@ const getReadableKeyword = (keyword: string) => {
     jsonldSyntax: 'JSON-LD syntax',
     jsonldValidation: 'JSON-LD validation',
     jsonldService: 'context service',
+    unsupportedCredentialType: 'unsupported credential type',
     unknown: 'unknown error',
   };
   return keywords[keyword] || keyword;
@@ -70,38 +75,8 @@ const correctiveExample = (mainError: { params?: Record<string, any>; data?: unk
   return null;
 };
 
-// A resolver code means the URL passed the guard and the host failed to
-// deliver; a guard refusal carries no code and an untyped load failure
-// carries jsonld's own, so both stay "fix the URL".
-const isHostDeliveryFailure = (params?: Record<string, any>) =>
-  params?.kind === 'context-fetch' && typeof params?.code === 'string' && params.code.startsWith('resolver.');
-
-const jsonLdHeaderText = (mainError: { keyword: string; params?: Record<string, any> }) => {
-  if (mainError.keyword === 'jsonldService') return 'Context service unavailable';
-  if (mainError.keyword === 'jsonldUrl') {
-    // The kind and code carried on params separate a URL the verifier can
-    // fix from a remote artefact that is down or unusable.
-    if (mainError.params?.kind === 'context-invalid') return 'Remote @context is not usable';
-    if (isHostDeliveryFailure(mainError.params)) return 'Remote @context could not be fetched';
-    return 'Fix the @context URL';
-  }
-  if (mainError.keyword === 'jsonldSyntax') return 'Fix the @context';
-  switch (mainError.params?.code) {
-    case 'invalid property':
-      return 'Property not defined in @context';
-    case 'relative @id reference':
-    case 'relative @type reference':
-    case 'relative @vocab reference':
-      return 'Use an absolute IRI';
-    case 'reserved term':
-    case 'reserved @id value':
-    case 'reserved @reverse value':
-      return 'Reserved JSON-LD term';
-    case 'invalid @language value':
-      return 'Invalid language tag';
-    default:
-      return 'Fix JSON-LD issue';
-  }
+const errorHeaderText = (mainError: { keyword: string; params?: Record<string, any> }) => {
+  return mainError.params?.code === 'invalid property' ? 'Property not defined in @context' : 'Diagnostic details';
 };
 
 const getFriendlyPath = (path: string) => {
@@ -156,39 +131,23 @@ const getTipMessage = (mainError: ValidationError) => {
     }
     case 'conflictingProperties':
       return 'Resolve the conflict by removing the conflicting field or updating it to a unique one.';
-    case 'jsonldUrl':
-      if (mainError.params?.kind === 'context-invalid') {
-        return 'The document at that URL is not a JSON-LD context. This is a problem with the published artefact, not with your credential; contact its publisher, or use a different @context.';
+    case 'unsupportedCredentialType': {
+      const supportedTypes = Array.isArray(mainError.params?.supportedTypes)
+        ? mainError.params.supportedTypes.filter((value: unknown): value is string => typeof value === 'string')
+        : [];
+      if (supportedTypes.length === 0) {
+        return `Add the artefact on its own tab. The Playground accepts: ${acceptedArtefactFamilies().join(', ')}.`;
       }
-      if (isHostDeliveryFailure(mainError.params)) {
-        return 'The context host did not deliver the document. Retry in a moment; if it keeps failing, the host may be down.';
-      }
-      return 'Open the URL in a browser. If it does not return JSON-LD, or it requires login, the playground cannot use it as a context.';
-    case 'jsonldService':
-      return 'The Playground could not run the context check. Your credential was not judged. Retry in a moment.';
-    case 'jsonldSyntax':
-      return mainError.params?.term
-        ? `Find "${mainError.params.term}" in your @context and either rename it or remove the redefinition.`
-        : 'Review your @context against the JSON-LD specification.';
+      return `Add one of the supported UNTP credential types: ${supportedTypes.join(
+        ', ',
+      )}, or add the artefact on its own tab. The Playground accepts: ${acceptedArtefactFamilies().join(', ')}.`;
+    }
     case 'jsonldValidation':
-      switch (mainError.params?.code) {
-        case 'invalid property':
-          return mainError.params?.property
-            ? `Add "${mainError.params.property}" to a @context, or remove it from the credential.`
-            : 'Add the property to a @context, or remove it from the credential.';
-        case 'relative @id reference':
-        case 'relative @type reference':
-        case 'relative @vocab reference':
-          return 'Replace the value with an absolute IRI such as "https://...", "did:...", or "urn:...".';
-        case 'reserved term':
-        case 'reserved @id value':
-        case 'reserved @reverse value':
-          return 'Choose a name that doesn\'t begin with "@" and doesn\'t collide with a JSON-LD keyword.';
-        case 'invalid @language value':
-          return 'Use a BCP-47 language tag, for example "en", "en-AU", or "fr-CA".';
-        default:
-          return 'Fix the value the message points to, or update the @context to allow it.';
-      }
+      return mainError.params?.code === 'invalid property'
+        ? mainError.params?.property
+          ? `Add "${mainError.params.property}" to a @context, or remove it from the credential.`
+          : 'Add the property to a @context, or remove it from the credential.'
+        : 'Report the JSON-LD diagnostic shown above.';
     case 'unknown':
       return 'The JSON-LD library returned an error without a recognised category. The message above is the raw output.';
     default:
@@ -200,9 +159,11 @@ interface ErrorDetailsProps {
   error: ValidationError;
   copied: boolean;
   onCopy: (text: string) => void;
+  showCorrections: boolean;
+  showTip: boolean;
 }
 
-const ErrorDetails: React.FC<ErrorDetailsProps> = ({ error, copied, onCopy }) => {
+const ErrorDetails: React.FC<ErrorDetailsProps> = ({ error, copied, onCopy, showCorrections, showTip }) => {
   const value = error.params?.allowedValue || error.params?.allowedValues;
   const fixExample = value ? safeStringify(value, true) : null;
 
@@ -228,25 +189,25 @@ const ErrorDetails: React.FC<ErrorDetailsProps> = ({ error, copied, onCopy }) =>
         );
       })()}
       <br />
-      {error.keyword === 'const' && (
+      {showCorrections && error.keyword === 'const' && (
         <div className='flex flex-col gap-2'>
           <p>
             Incorrect value: <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.instancePath}</code>
           </p>
         </div>
       )}
-      {error.keyword === 'required' && (
+      {showCorrections && error.keyword === 'required' && (
         <p>
           Missing field: <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.missingProperty}</code>
         </p>
       )}
-      {error.keyword === 'enum' && (
+      {showCorrections && error.keyword === 'enum' && (
         <p>
           Must be one of:{' '}
           <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.allowedValues?.join(', ')}</code>
         </p>
       )}
-      {error.keyword === 'type' && (
+      {showCorrections && error.keyword === 'type' && (
         <>
           <p>
             <b>Expected type: </b>
@@ -265,14 +226,14 @@ const ErrorDetails: React.FC<ErrorDetailsProps> = ({ error, copied, onCopy }) =>
           })()}
         </>
       )}
-      {error.keyword === 'missingValue' && <p>{error.message}</p>}
-      {error.keyword === 'minItems' && (
+      {showCorrections && error.keyword === 'missingValue' && <p>{error.message}</p>}
+      {showCorrections && error.keyword === 'minItems' && (
         <p>
           Expected minimum number of items:{' '}
           <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.minItems}</code>
         </p>
       )}
-      {error.keyword === 'conflictingProperties' && (
+      {showCorrections && error.keyword === 'conflictingProperties' && (
         <div className='flex flex-col gap-2'>
           <p>
             Conflicting field:{' '}
@@ -280,7 +241,7 @@ const ErrorDetails: React.FC<ErrorDetailsProps> = ({ error, copied, onCopy }) =>
           </p>
         </div>
       )}
-      {error.keyword === 'schema' && (
+      {showCorrections && error.keyword === 'schema' && (
         <div className='flex flex-col gap-2'>
           <p>
             Error message:
@@ -294,7 +255,7 @@ const ErrorDetails: React.FC<ErrorDetailsProps> = ({ error, copied, onCopy }) =>
         </p>
       )}
 
-      {fixExample && (
+      {showCorrections && fixExample && (
         <div className='relative mt-2'>
           <p className='text-sm'>Example: </p>
           <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
@@ -319,15 +280,22 @@ const ErrorDetails: React.FC<ErrorDetailsProps> = ({ error, copied, onCopy }) =>
         </div>
       )}
 
-      <div className='mt-3 text-sm text-blue-800 bg-blue-50 p-3 rounded'>
-        <strong>Tip: </strong>
-        {getTipMessage(error)}
-      </div>
+      {showTip && !(error.instancePath === '' && (error.keyword === 'false schema' || error.keyword === 'not')) && (
+        <div className='mt-3 text-sm text-blue-800 bg-blue-50 p-3 rounded'>
+          <strong>Tip: </strong>
+          {getTipMessage(error)}
+        </div>
+      )}
     </div>
   );
 };
 
-export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className = '' }) => {
+export const ErrorDialog: React.FC<ErrorDialogProps> = ({
+  errors = [],
+  failure,
+  family = 'credential',
+  className = '',
+}) => {
   const [expandedError, setExpandedError] = useState<number | null>(null);
   const [copiedError, setCopiedError] = useState<{ groupIndex: number; errorIndex: number } | null>(null);
 
@@ -345,17 +313,35 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
     }
   };
 
-  if (!Array.isArray(errors) || errors.length === 0) {
+  const presentation = describeArtefactFailure(failure, family);
+  const establishedFetchFailure = failure?.class === 'could-not-fetch' || failure?.class === 'unusable-artefact';
+  const displayErrors = establishedFetchFailure && failure?.code !== 'schema.validation.meta-schema' ? [] : errors;
+  const canSuggestCredentialFixes = !presentation || failure?.class === 'credential-invalid';
+
+  if (!Array.isArray(errors) || (errors.length === 0 && !presentation)) {
     return null;
   }
 
-  const { issues, warnings } = groupErrors(errors);
+  const { issues, warnings } = groupErrors(displayErrors);
   const issueCount = issues.reduce((count, group) => count + group.errors.length, 0);
   const hasIssues = issues.length > 0;
   const hasWarnings = warnings.length > 0;
 
   return (
     <div className={className}>
+      {presentation && (
+        <div className='mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4' data-testid='artefact-failure-banner'>
+          <div className='flex items-center gap-2'>
+            <AlertCircle className='h-5 w-5 text-amber-500' />
+            <h3 className='text-lg font-semibold'>{presentation.heading}</h3>
+          </div>
+          <p className='mt-2 text-sm text-gray-700'>{presentation.message}</p>
+          <p className='mt-2 text-sm text-blue-800'>{presentation.remediation}</p>
+        </div>
+      )}
+      {failure?.code === 'schema.validation.meta-schema' && displayErrors.length > 0 && (
+        <p className='mb-4 text-sm text-gray-600'>These diagnostics describe the fetched schema, not the credential.</p>
+      )}
       {hasIssues && (
         <>
           <div className='flex items-center gap-2 mb-4'>
@@ -395,13 +381,15 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                         <div className='flex-1'>
                           <div className='flex items-center gap-2'>
                             <span className='text-sm font-medium'>
-                              {mainError.keyword === 'const'
+                              {canSuggestCredentialFixes && mainError.keyword === 'const'
                                 ? 'Use the correct value'
-                                : mainError.keyword === 'enum'
+                                : canSuggestCredentialFixes && mainError.keyword === 'enum'
                                   ? 'Choose from allowed values'
-                                  : isJsonLdKeyword(mainError.keyword)
-                                    ? jsonLdHeaderText(mainError)
-                                    : 'Fix validation error'}
+                                  : presentation && failure?.class !== 'credential-invalid'
+                                    ? 'Diagnostic details'
+                                    : isJsonLdKeyword(mainError.keyword)
+                                      ? errorHeaderText(mainError)
+                                      : 'Fix validation error'}
                             </span>
                             <span
                               className={`ml-2 text-xs px-2 py-1 rounded ${
@@ -442,6 +430,8 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                                 error={error}
                                 copied={copiedError?.groupIndex === index && copiedError.errorIndex === errorIndex}
                                 onCopy={(text) => handleCopy(index, errorIndex, text)}
+                                showCorrections={canSuggestCredentialFixes}
+                                showTip={canSuggestCredentialFixes}
                               />
                             ))}
                           </div>

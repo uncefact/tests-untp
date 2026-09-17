@@ -46,6 +46,25 @@ function firstCodeOnChain(error: unknown): string | undefined {
   return undefined;
 }
 
+function resolverHttpFailureOnChain(error: unknown): { status: number; url?: string } | undefined {
+  for (let node = error, depth = 0; node !== undefined && depth < 8; depth += 1) {
+    if (
+      codeOf(node) === 'resolver.http-error' &&
+      typeof node === 'object' &&
+      node !== null &&
+      typeof (node as { status?: unknown }).status === 'number'
+    ) {
+      const resolverError = node as { status: number; url?: unknown };
+      return {
+        status: resolverError.status,
+        url: typeof resolverError.url === 'string' ? resolverError.url : undefined,
+      };
+    }
+    node = node instanceof Error ? node.cause : undefined;
+  }
+  return undefined;
+}
+
 // One loader per server process: its TTL cache dedups concurrent fetches of
 // the same context and serves repeat expansions without a network round trip.
 const documentLoader = createJsonLdDocumentLoader({
@@ -98,7 +117,21 @@ export async function POST(request: Request): Promise<NextResponse<ContextRespon
         code: firstCodeOnChain(cause),
         cause,
       });
-      return failureResponse(failure, 422);
+      const resolverFailure =
+        failure.kind === 'context-fetch' && firstCodeOnChain(cause) === 'resolver.http-error'
+          ? resolverHttpFailureOnChain(cause)
+          : undefined;
+      if (resolverFailure === undefined) return failureResponse(failure, 422);
+
+      const failureUrl = 'url' in failure && typeof failure.url === 'string' ? failure.url : undefined;
+      return failureResponse(
+        {
+          ...failure,
+          ...(failureUrl === undefined && resolverFailure.url !== undefined ? { url: resolverFailure.url } : {}),
+          upstreamStatus: resolverFailure.status,
+        },
+        422,
+      );
     }
     // Anything else is the service's own failure, never the document's, so
     // it must not be reported as a document fault.

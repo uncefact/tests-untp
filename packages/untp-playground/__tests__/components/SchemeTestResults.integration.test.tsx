@@ -3,11 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useEffect, useRef } from 'react';
 import validSample from '../../e2e/cypress/fixtures/conformity-schemes-e2e/v0.7.0-valid.json';
 import cvcSchema from '../../../untp-utils/artefacts/schema/untp/0.7.0/cvc.json';
-import {
-  buildSchemaSelectionSkipMessage,
-  buildUnsupportedParserSkipMessage,
-  SchemeTestResults,
-} from '@/components/SchemeTestResults';
+import { buildUnsupportedParserSkipMessage, SchemeTestResults } from '@/components/SchemeTestResults';
 import { bundledLoader } from '../helpers/bundledLoader';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
 import { upsert } from '@/lib/artefactCollection';
@@ -19,7 +15,7 @@ import { expandJsonLd } from '@uncefact/untp-utils/validation';
 import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from 'util';
 import type { StoredScheme, TestStep } from '@/types';
 import { TestCaseStepId } from '../../constants';
-import { SUPPORTED_CVC_SPEC_VERSIONS } from '@uncefact/untp-utils/conformity-vocabulary';
+import { toast } from 'sonner';
 
 jest.mock('canvas-confetti', () => jest.fn());
 jest.mock('@/components/TestResults', () => ({ confettiConfig: {}, TestResults: () => null }));
@@ -218,28 +214,55 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     ).toBeInTheDocument();
   });
 
-  it('skips schema selection and structural parsing for a detected 0.6.0 scheme without fetching a schema', async () => {
+  it('continues to context validation for a detected 0.6.0 scheme without fetching a schema', async () => {
     const document = { ...(validSample as Record<string, unknown>) } as Record<string, unknown>;
     document['@context'] = ['https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/'];
-    contextResponder = async () => response({ expanded: [] });
-    render(<Harness input={scheme(document)} />);
+    const contextUrl = String((document['@context'] as string[])[0]);
+    contextResponder = async () =>
+      response(
+        {
+          failure: {
+            kind: 'context-fetch',
+            code: 'resolver.http-error',
+            detail: 'context host returned status 503',
+            url: contextUrl,
+            upstreamStatus: 503,
+          },
+        },
+        422,
+      );
+    const toastSpy = jest.spyOn(toast, 'error').mockImplementation(() => undefined as never);
+    try {
+      render(<Harness input={scheme(document)} />);
 
-    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+      await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
-    expect(schemaRequests).toBe(0);
-    await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByText(buildSchemaSelectionSkipMessage())).toBeInTheDocument();
-    expect(screen.queryByText(buildUnsupportedParserSkipMessage('0.6.0'))).not.toBeInTheDocument();
-    await closeStepDetails();
-    expect(parserSpy).not.toHaveBeenCalled();
-    expect(contextRequests).toBe(1);
+      expect(schemaRequests).toBe(0);
+      await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
+      expect(
+        screen.getByText('This scheme step was not executed because step "Schema Validation" failed first.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(buildUnsupportedParserSkipMessage('0.6.0'))).not.toBeInTheDocument();
+      await closeStepDetails();
+      expect(parserSpy).not.toHaveBeenCalled();
+      expect(await screen.findByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-status-icon-failure`)).toBeInTheDocument();
+      expect(screen.getByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-row`)).toHaveTextContent('Could not fetch');
+      expect(screen.queryByText('Could not determine the cause')).not.toBeInTheDocument();
+      expect(contextRequests).toBe(1);
+      expect(toastSpy).not.toHaveBeenCalled();
+    } finally {
+      toastSpy.mockRestore();
+    }
   });
 
-  it('skips structural parsing for 0.7.0-rc.1 after the schema fetcher reports not found', async () => {
+  it.each([403, 404])('classifies a schema %s as not published for the declared version', async (status) => {
     const document = { ...(validSample as Record<string, unknown>) } as Record<string, unknown>;
     document['@context'] = ['https://test.uncefact.org/vocabulary/untp/dcc/0.7.0-rc.1/'];
     schemaResponder = () =>
-      response({ error: 'Schema host returned status 403', code: 'upstream-status', upstreamStatus: 403 }, 502);
+      response(
+        { error: `Schema host returned status ${status}`, code: 'upstream-status', upstreamStatus: status },
+        502,
+      );
     contextResponder = async () => response({ expanded: [] });
     render(<Harness input={scheme(document)} />);
 
@@ -248,16 +271,58 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     expect(schemaRequests).toBe(1);
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
     expect(requestedSchemaUrl).not.toBe('');
-    const expectedSchemaMessage = `No schema is published at ${requestedSchemaUrl}. Use a Conformity Scheme published for UNTP ${SUPPORTED_CVC_SPEC_VERSIONS.join(
-      ', ',
-    )}.`;
-    expect(screen.getByText(expectedSchemaMessage).textContent).toBe(expectedSchemaMessage);
+    const expectedSchemaMessage = `The schema at "${requestedSchemaUrl}" returned HTTP status ${status}; it was not published for declared version 0.7.0-rc.1.`;
+    expect(screen.getAllByText(expectedSchemaMessage).length).toBeGreaterThan(0);
     await closeStepDetails();
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByText(buildUnsupportedParserSkipMessage('0.7.0-rc.1'))).toBeInTheDocument();
+    expect(
+      screen.getByText(/The declared Conformity Scheme version "0\.7\.0-rc\.1" has no parser/),
+    ).toBeInTheDocument();
     await closeStepDetails();
     expect(parserSpy).not.toHaveBeenCalled();
     expect(contextRequests).toBe(1);
+  });
+
+  it.each([403, 404])('classifies a context %s as not published for the declared version', async (status) => {
+    const document = { ...(validSample as Record<string, unknown>) } as Record<string, unknown>;
+    const contextUrl = String((document['@context'] as string[])[0]);
+    contextResponder = async () =>
+      response(
+        {
+          failure: {
+            kind: 'context-fetch',
+            code: 'resolver.http-error',
+            detail: `Context host returned status ${status}`,
+            url: contextUrl,
+            upstreamStatus: status,
+          },
+        },
+        422,
+      );
+    render(<Harness input={scheme(document)} />);
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+    await openStepDetails(TestCaseStepId.CONTEXT_VALIDATION);
+
+    const expectedContextMessage = `The context at "${contextUrl}" returned HTTP status ${status}; it was not published for declared version 0.7.0.`;
+    expect(screen.getAllByText(expectedContextMessage).length).toBeGreaterThan(0);
+    expect(screen.getByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-row`)).toHaveTextContent('Scheme invalid');
+    expect(screen.getByText(/correct the scheme's declared @context version/i)).toBeInTheDocument();
+    await closeStepDetails();
+  });
+
+  it('classifies an upstream invalid JSON schema response as an unusable artefact', async () => {
+    const document = { ...(validSample as Record<string, unknown>) } as Record<string, unknown>;
+    schemaResponder = () => response({ error: 'Schema body was not JSON', code: 'invalid-json' }, 502);
+    render(<Harness input={scheme(document)} />);
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+    await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
+
+    expect(screen.getByText(/was fetched but its response was not valid JSON/)).toBeInTheDocument();
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).toHaveTextContent('Unusable artefact');
+    await closeStepDetails();
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-status-icon-success`)).toBeInTheDocument();
   });
 
   it('detects 0.7.0 when the context URL has no trailing slash while the schema judges the literal', async () => {

@@ -48,6 +48,18 @@ CONFORMITY_SCHEME_E2E_VERSIONS.forEach((spec) => {
         cy.get(`[data-testid="${SCHEME_GROUP_HEADER}"]`).click();
 
         cy.checkValidationStatus(invalidCase.failsAt, 'failure');
+        if (invalidCase.failsAt === 'Version Detection' || invalidCase.failsAt === 'Structural Parse') {
+          const rowTestId =
+            invalidCase.failsAt === 'Version Detection'
+              ? 'scheme-version-detection-row'
+              : 'scheme-structural-parse-row';
+          cy.get(`[data-testid="${rowTestId}"]`).should('contain.text', 'Scheme invalid');
+        }
+        if (invalidCase.failsAt === 'Version Detection') {
+          cy.get('[data-testid="scheme-schema-validation-row"]').should('contain.text', 'Not executed');
+          cy.get('[data-testid="scheme-structural-parse-row"]').should('contain.text', 'Not executed');
+          cy.get('[data-testid="context-row"]').should('contain.text', 'Not executed');
+        }
         cy.openErrorDetailsByStepName(invalidCase.failsAt);
         if (invalidCase.name === 'blank scheme name') {
           cy.contains('/name: scheme.name is required and must be a non-empty string.').should('be.visible');

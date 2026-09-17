@@ -19,6 +19,7 @@ jest.mock('@uncefact/untp-utils/loaders', () => {
 });
 
 import { PrivateAddressError } from '@uncefact/untp-utils/node';
+import { ResolverHttpError } from '@uncefact/untp-utils/resolvers';
 import { POST } from '@/app/api/context/route';
 
 const VCDM = 'https://www.w3.org/ns/credentials/v2';
@@ -122,6 +123,50 @@ describe('POST /api/context', () => {
       expect.objectContaining({ kind: 'context-fetch', url: blocked, code: 'url.private-address' }),
     );
     warn.mockRestore();
+  });
+
+  it.each([403, 404])('passes a resolver HTTP %s through for client-side classification', async (status) => {
+    const url = 'https://publisher.example/untp/0.7.0/context.jsonld';
+    mockLoad.mockImplementation(async (loadedUrl) => {
+      if (loadedUrl === url) throw new ResolverHttpError(url, status);
+      return bundledLoader(loadedUrl);
+    });
+
+    const response = await POST(post({ document: { '@context': [url], type: ['VerifiableCredential'] } }));
+    const json = (await response.json()) as { failure: Record<string, unknown> };
+
+    expect(response.status).toBe(422);
+    expect(json.failure).toMatchObject({
+      kind: 'context-fetch',
+      code: 'resolver.http-error',
+      url,
+      upstreamStatus: status,
+    });
+  });
+
+  it('lifts the failing URL for a scoped-context resolver HTTP error', async () => {
+    const url = 'https://publisher.example/context-b.jsonld';
+    mockLoad.mockImplementation(async (loadedUrl) => {
+      throw new ResolverHttpError(loadedUrl, 404);
+    });
+
+    const response = await POST(
+      post({
+        document: {
+          '@context': { term: { '@id': 'https://example.test/term', '@context': url } },
+          term: 'value',
+        },
+      }),
+    );
+    const json = (await response.json()) as { failure: Record<string, unknown> };
+
+    expect(response.status).toBe(422);
+    expect(json.failure).toMatchObject({
+      kind: 'context-fetch',
+      code: 'resolver.http-error',
+      url,
+      upstreamStatus: 404,
+    });
   });
 
   it('warns when a bundled context stands in for a failed fetch, naming the URL and codes', () => {

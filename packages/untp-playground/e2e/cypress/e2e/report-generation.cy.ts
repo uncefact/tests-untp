@@ -129,6 +129,10 @@ describe('Report Generation', () => {
       expect(failedVcdmVersionStep.status).to.equal(TestCaseStatus.FAILURE);
       expect(failedVcdmVersionStep.details).to.exist;
       expect(failedVcdmVersionStep.details.version).to.equal('unknown');
+      expect(failedVcdmVersionStep.failure).to.include({
+        class: 'credential-invalid',
+        code: 'schema.selection.vcdm-version-unmapped',
+      });
 
       const failedVcdmSchemaValidationStep = result.core.steps.find(
         (step: any) => step.id === 'vcdm-schema-validation',
@@ -147,6 +151,7 @@ describe('Report Generation', () => {
       expect(failedUntpSchemaValidationStep.details).to.exist;
       expect(failedUntpSchemaValidationStep.details.errors).to.be.an('array');
       expect(failedUntpSchemaValidationStep.details.errors.length).to.be.greaterThan(0);
+      expect(failedUntpSchemaValidationStep.failure).to.have.property('class');
     });
   });
 

@@ -1,4 +1,5 @@
 import { TestCaseStatus, TestCaseStepId } from '../../constants';
+import type { ArtefactStepFailure } from '../lib/artefactFailure';
 
 export interface VerificationResult {
   success: boolean;
@@ -11,4 +12,5 @@ export interface TestStep {
   name: string;
   status: TestCaseStatus;
   details?: any;
+  failure?: ArtefactStepFailure;
 }

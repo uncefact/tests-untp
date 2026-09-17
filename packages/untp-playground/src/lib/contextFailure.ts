@@ -12,4 +12,11 @@ export interface ContextServiceFailure {
 }
 
 /** Everything `POST /api/context` can report on a non-2xx answer. */
-export type ContextFailure = JsonLdFailureDescription | ContextServiceFailure;
+export type ContextFailure =
+  | (JsonLdFailureDescription & {
+      /** URL named by jsonld.js in the failure description, or lifted from the resolver's HTTP error when the description has none; present only when available. */
+      url?: string;
+      /** HTTP status the server-side resolver received from the upstream host when it failed to fetch a context; present only when a host answered. */
+      upstreamStatus?: number;
+    })
+  | ContextServiceFailure;

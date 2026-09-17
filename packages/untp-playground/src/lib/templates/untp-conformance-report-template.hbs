@@ -368,6 +368,9 @@
                       }}✕{{else}}·{{/if}}</span>
                     <span class='step-name'>{{name}}</span>
                     <span class='step-status'>{{status}}</span>
+                    {{#if failure}}
+                      <p class='err-msg' data-failure-summary='true'>{{failureSummary failure 'credential'}}</p>
+                    {{/if}}
                     {{#if details.errors}}
                       <ul class='errors'>
                         {{#each details.errors}}
@@ -403,6 +406,9 @@
                         }}✕{{else}}·{{/if}}</span>
                       <span class='step-name'>{{name}}</span>
                       <span class='step-status'>{{status}}</span>
+                      {{#if failure}}
+                        <p class='err-msg' data-failure-summary='true'>{{failureSummary failure 'extension'}}</p>
+                      {{/if}}
                       {{#if details.errors}}
                         <ul class='errors'>
                           {{#each details.errors}}
@@ -462,6 +468,9 @@
                     }}✕{{else}}·{{/if}}</span>
                   <span class='step-name'>{{name}}</span>
                   <span class='step-status'>{{status}}</span>
+                  {{#if failure}}
+                    <p class='err-msg' data-failure-summary='true'>{{failureSummary failure 'scheme'}}</p>
+                  {{/if}}
                   {{#if details.errors}}
                     <ul class='errors'>
                       {{#each details.errors}}

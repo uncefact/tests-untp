@@ -89,6 +89,7 @@ function projectLinkSet({ linkSet, assessment }: LinkSetReportInput): TestReport
     name: schemaStep.name,
     status: reportStatus(schemaStep.status, title),
     details: schemaDetails,
+    ...(schemaStep.failure && { failure: schemaStep.failure }),
   };
   // The accessor narrows the stored details; only its four fields are copied so the derived
   // coverage object's outcomes Map can never reach the JSON.
