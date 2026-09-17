@@ -102,7 +102,7 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
         {
           name: 'Credentials',
           description:
-            'Verifiable Credential issuance and public verification. The two retired read operations remain documented for migration.',
+            'Verifiable Credential issuance, public verification and native issuer-status management. The two retired record read operations remain documented for migration.',
         },
         { name: 'Library', description: 'Credential library: records of issued and registered credentials' },
         { name: 'Registrars', description: 'Identifier registrar management' },

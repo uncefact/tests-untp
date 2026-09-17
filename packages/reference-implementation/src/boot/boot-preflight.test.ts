@@ -41,8 +41,12 @@ const ENV_NAMES = [
   'OTEL_EXPORTER_OTLP_METRICS_PROTOCOL',
   'OTEL_EXPORTER_OTLP_PROTOCOL',
   'RI_PROCESS_ROLE',
-  'DEFAULT_STATUS_PURPOSES',
-  'STATUS_LOCK_ACQUIRE_MS',
+  'CREDENTIAL_STATUS_DEFAULT_PURPOSES',
+  'CREDENTIAL_STATUS_LOCK_ACQUIRE_MS',
+  'CREDENTIAL_STATUS_OPERATION_BUDGET_MS',
+  'CREDENTIAL_STATUS_RECONCILE_GRACE_MS',
+  'CREDENTIAL_STATUS_MUTATION_ENABLED',
+  'CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED',
 ] as const;
 const savedEnvironment = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 
@@ -91,12 +95,12 @@ describe('runBootPreflight', () => {
     // Catches a regression that accepts the no-status setting without warning the operator of its consequence.
     process.env.RI_APP_URL = 'https://ri.example.com';
     process.env.DATA_ENCRYPTION_KEY = KEY;
-    process.env.DEFAULT_STATUS_PURPOSES = 'none';
+    process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES = 'none';
     const logger = createLogger();
 
     await expect(runBootPreflight('web', logger)).resolves.toMatchObject({ key: KEY });
     expect(getWarn(logger)).toHaveBeenCalledWith(
-      'DEFAULT_STATUS_PURPOSES=none: credentials issued without an explicit statusPurposes carry no status entry and can never be revoked or suspended.',
+      'CREDENTIAL_STATUS_DEFAULT_PURPOSES=none: credentials issued without an explicit statusPurposes carry no status entry and can never be revoked or suspended.',
     );
   });
 
@@ -253,6 +257,20 @@ describe('runBootPreflight', () => {
   });
 
   const validatorRejectionCases = [
+    ...[
+      'CREDENTIAL_STATUS_OPERATION_BUDGET_MS',
+      'CREDENTIAL_STATUS_RECONCILE_GRACE_MS',
+      'CREDENTIAL_STATUS_MUTATION_ENABLED',
+      'CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED',
+    ].map((name) => ({
+      name,
+      role: 'web' as const,
+      setup: () => {
+        process.env.RI_APP_URL = 'https://ri.example.com';
+        process.env[name] = 'invalid';
+      },
+      message: name,
+    })),
     {
       name: 'resolveAppUrl',
       role: 'web' as const,
@@ -407,22 +425,23 @@ describe('runBootPreflight', () => {
 
   const validatorWarningCases = [
     {
-      name: 'validateStatusSettingsOnBoot for STATUS_LOCK_ACQUIRE_MS',
+      name: 'validateStatusSettingsOnBoot for CREDENTIAL_STATUS_LOCK_ACQUIRE_MS',
       setup: () => {
         process.env.RI_APP_URL = 'https://ri.example.com';
         process.env.DATA_ENCRYPTION_KEY = KEY;
-        process.env.STATUS_LOCK_ACQUIRE_MS = 'not-a-duration';
+        process.env.CREDENTIAL_STATUS_LOCK_ACQUIRE_MS = 'not-a-duration';
       },
-      warning: 'STATUS_LOCK_ACQUIRE_MS has invalid value "not-a-duration"; using the default 2000 milliseconds.',
+      warning:
+        'CREDENTIAL_STATUS_LOCK_ACQUIRE_MS has invalid value "not-a-duration"; using the default 2000 milliseconds.',
     },
     {
-      name: 'validateStatusSettingsOnBoot for non-positive STATUS_LOCK_ACQUIRE_MS',
+      name: 'validateStatusSettingsOnBoot for non-positive CREDENTIAL_STATUS_LOCK_ACQUIRE_MS',
       setup: () => {
         process.env.RI_APP_URL = 'https://ri.example.com';
         process.env.DATA_ENCRYPTION_KEY = KEY;
-        process.env.STATUS_LOCK_ACQUIRE_MS = '0';
+        process.env.CREDENTIAL_STATUS_LOCK_ACQUIRE_MS = '0';
       },
-      warning: 'STATUS_LOCK_ACQUIRE_MS has invalid value "0"; using the default 2000 milliseconds.',
+      warning: 'CREDENTIAL_STATUS_LOCK_ACQUIRE_MS has invalid value "0"; using the default 2000 milliseconds.',
     },
   ] as const;
 
@@ -441,7 +460,7 @@ describe('runBootPreflight', () => {
     expect(getWarn(logger)).toHaveBeenCalledWith(warning);
   });
 
-  it('keeps an unset STATUS_LOCK_ACQUIRE_MS silent', async () => {
+  it('keeps an unset CREDENTIAL_STATUS_LOCK_ACQUIRE_MS silent', async () => {
     // Catches a regression that warns operators when the mutex setting is intentionally absent.
     process.env.RI_APP_URL = 'https://ri.example.com';
     process.env.DATA_ENCRYPTION_KEY = KEY;

@@ -1,3 +1,9 @@
+import {
+  setCredentialStatusSchema,
+  reconcileCredentialStatusSchema,
+  credentialStatusObservationSchema,
+  credentialStatusReadSchema,
+} from '@/lib/api/request-schemas/credential-status';
 /**
  * Zod schemas for API documentation.
  *
@@ -38,6 +44,7 @@ import {
   credentialRecordWarningSchema,
   verificationEnvelopeSchema,
   credentialStatusFactsSchema,
+  lifecycleSchema,
   credentialTypeSchema,
   originSchema,
   verificationSummarySchema,
@@ -523,6 +530,11 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     VerificationEnvelope: verificationEnvelopeSchema,
     CredentialRecordWarning: credentialRecordWarningSchema,
     CredentialStatus: credentialStatusFactsSchema,
+    CredentialLifecycle: lifecycleSchema,
+    SetCredentialStatusRequest: setCredentialStatusSchema,
+    ReconcileCredentialStatusRequest: reconcileCredentialStatusSchema,
+    CredentialStatusObservation: credentialStatusObservationSchema,
+    CredentialStatusRead: credentialStatusReadSchema,
     LibraryReadFailure: libraryReadFailureSchema,
     CredentialType: credentialTypeSchema,
     Origin: originSchema,

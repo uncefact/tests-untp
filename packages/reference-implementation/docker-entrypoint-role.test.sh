@@ -24,6 +24,10 @@ is_maintenance_command pnpm backfill:decryption-keys
 is_maintenance_command pnpm backfill:credential-details
 is_maintenance_command pnpm backfill:credential-status-entries
 is_maintenance_command pnpm backfill:credential-status-attribution
+is_maintenance_command pnpm services:repair-config
+is_maintenance_command pnpm run services:repair-config
+is_maintenance_command node_modules/.bin/tsx scripts/services-repair-config.ts
+is_maintenance_command npx tsx scripts/services-repair-config.ts
 is_maintenance_command pnpm rotate:encryption-key
 if is_maintenance_command node scripts/rotate-encryption-key.ts; then
     exit 1

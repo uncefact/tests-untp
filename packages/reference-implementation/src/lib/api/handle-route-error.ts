@@ -1,3 +1,4 @@
+import { CredentialStatusError } from '@/lib/credentials/credential-status-error';
 import { NextResponse } from 'next/server';
 import {
   NotFoundError,
@@ -94,6 +95,13 @@ export function handleRouteError(e: unknown, options: HandleRouteErrorOptions = 
     const status = e.name === 'ServiceInstanceNotFoundError' ? 404 : 500;
     logger.error({ err: e, status }, 'Service registry error');
     return NextResponse.json({ error: e.message }, { status });
+  }
+  if (e instanceof CredentialStatusError) {
+    logger.error({ err: e, code: e.code, status: e.statusCode }, 'Credential status operation failed');
+    return NextResponse.json(
+      { error: e.message, code: e.code, ...(e.observed ? { observed: e.observed } : {}) },
+      { status: e.statusCode },
+    );
   }
   if (e instanceof ServiceError) {
     logger.error({ err: e, code: e.code, status: e.statusCode }, 'Service error');

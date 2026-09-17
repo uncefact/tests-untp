@@ -45,6 +45,20 @@ export type LibraryOrigin = z.infer<typeof originSchema>;
 export const verificationSummarySchema = z.enum(['pending', 'verified', 'not_conformant', 'failed']);
 export type VerificationSummary = z.infer<typeof verificationSummarySchema>;
 
+export const lifecycleSchema = z.enum(['revoked', 'suspended', 'none', 'unknown']);
+export type CredentialLifecycle = z.infer<typeof lifecycleSchema>;
+
+/** Derives issuer lifecycle from confirmed facts only, independently of verification (ADR-058). */
+export function deriveLifecycle(status: CredentialStatusFacts): CredentialLifecycle {
+  if (status.capture !== CredentialStatusCapture.CAPTURED) return 'unknown';
+  const entries = status.entries.filter(
+    (entry) => entry.statusPurpose === 'revocation' || entry.statusPurpose === 'suspension',
+  );
+  if (entries.some((entry) => entry.statusPurpose === 'revocation' && entry.value === true)) return 'revoked';
+  if (entries.some((entry) => entry.statusPurpose === 'suspension' && entry.value === true)) return 'suspended';
+  return entries.length > 0 && entries.every((entry) => entry.value === null) ? 'unknown' : 'none';
+}
+
 export const verificationChecksSchema = z
   .object({
     retrieval: checkResultSchema,
@@ -62,7 +76,7 @@ export const verificationChecksSchema = z
 
 export type VerificationChecks = z.infer<typeof verificationChecksSchema>;
 
-const credentialStatusEntrySchema = z
+export const credentialStatusEntrySchema = z
   .object({
     entryId: z.string(),
     statusPurpose: z.string(),
@@ -85,7 +99,12 @@ const credentialStatusEntrySchema = z
 
 export const credentialStatusFactsSchema = z
   .object({
-    capture: z.nativeEnum(CredentialStatusCapture),
+    capture: z
+      .nativeEnum(CredentialStatusCapture)
+      .describe(
+        'PENDING means unknown; FAILED means capture failed; CAPTURED with no entries means the credential has none.',
+      ),
+    statusCaptureError: z.string().nullable().describe('The stored capture failure class; null when none is recorded.'),
     entries: z.array(credentialStatusEntrySchema),
   })
   .strict()
@@ -223,8 +242,22 @@ export const credentialRecordWarningSchema = z.discriminatedUnion('code', [
     .strict(),
   z
     .object({
-      code: z.enum(['DECLARED_TYPE_MISMATCH', 'SCHEMA_CONFORMANCE_ADVISORY', 'DECRYPTION_KEY_UNUSED']),
+      code: z.enum([
+        'DECLARED_TYPE_MISMATCH',
+        'SCHEMA_CONFORMANCE_ADVISORY',
+        'DECRYPTION_KEY_UNUSED',
+        'STATUS_CHANGE_UNCONFIRMED',
+      ]),
       message: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      code: z.literal('ISSUER_STATUS_OBSERVATIONS_DIFFER'),
+      message: z.string(),
+      generation: z.number().int().min(1),
+      verificationSettledAt: z.string().datetime(),
+      issuerObservedAt: z.string().datetime(),
     })
     .strict(),
 ]);
@@ -299,10 +332,24 @@ export const credentialRecordSchema = z
       `${verificationEnvelopeDescription} ${nativeIssuanceAssertionNote}`,
     ),
     status: credentialStatusFactsSchema.nullable().describe('Issuer-owned status facts; null for external records.'),
+    lifecycle: lifecycleSchema
+      .nullable()
+      .describe('Confirmed issuer lifecycle, independent of verification. Null for external records.'),
     currencyStatus: z.enum(['current', 'not_yet_valid', 'expired', 'unknown']),
     detailsStatus: z.nativeEnum(CredentialDetailsStatus),
     detailsError: z.nativeEnum(CredentialDetailsError).nullable(),
-    capabilities: z.object({ deletable: z.boolean(), annotatable: z.boolean(), verifiable: z.boolean() }).strict(),
+    capabilities: z
+      .object({
+        deletable: z.boolean(),
+        annotatable: z.boolean(),
+        verifiable: z.boolean(),
+        statusManageable: z
+          .boolean()
+          .describe(
+            'Native, captured, attributed and without pending intent. Does not promise a transition is allowed or the provider is reachable.',
+          ),
+      })
+      .strict(),
     warnings: z.array(credentialRecordWarningSchema),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
@@ -564,9 +611,10 @@ function issuanceAssertionEnvelope(record: LibraryRecord): VerificationEnvelope 
   };
 }
 
-function statusFactsOf(credential: NativeLibraryRecordView['credential']): CredentialStatusFacts {
+export function statusFactsOf(credential: NativeLibraryRecordView['credential']): CredentialStatusFacts {
   return {
     capture: credential.statusCapture,
+    statusCaptureError: credential.statusCaptureError ?? null,
     entries: (credential.statusEntries ?? []).map((entry) => ({
       entryId: entry.id,
       statusPurpose: entry.statusPurpose,
@@ -588,6 +636,53 @@ function statusFactsOf(credential: NativeLibraryRecordView['credential']): Crede
   };
 }
 
+function issuerStatusWarnings(
+  recordId: string,
+  status: CredentialStatusFacts,
+  run: CheckRun | null,
+  pending: boolean,
+): CredentialRecordWarning[] {
+  const warnings: CredentialRecordWarning[] = pending
+    ? [
+        {
+          code: 'STATUS_CHANGE_UNCONFIRMED',
+          message: 'A status change is unconfirmed. The displayed lifecycle uses the last confirmed observations.',
+        },
+      ]
+    : [];
+  if (
+    status.capture !== CredentialStatusCapture.CAPTURED ||
+    run?.state !== CheckRunState.COMPLETE ||
+    (run.status !== CheckResult.PASS && run.status !== CheckResult.FAIL)
+  )
+    return warnings;
+  const confirmed = status.entries.filter(
+    (entry) => (entry.statusPurpose === 'revocation' || entry.statusPurpose === 'suspension') && entry.value !== null,
+  );
+  if (confirmed.length === 0) return warnings;
+  const lifecycleSet = confirmed.some((entry) => entry.value === true);
+  const otherSet = status.entries.some(
+    (entry) => entry.statusPurpose !== 'revocation' && entry.statusPurpose !== 'suspension' && entry.value === true,
+  );
+  if ((run.status === CheckResult.FAIL) === lifecycleSet || (!lifecycleSet && otherSet)) return warnings;
+  const timestamps = confirmed
+    .map((entry) => entry.observedAt)
+    .filter((at): at is string => at !== null)
+    .sort();
+  const issuerObservedAt = timestamps.at(-1);
+  if (!issuerObservedAt || run.completedAt === null)
+    throw new CredentialRecordProjectionError(recordId, 'differing status observations have no recorded timestamps');
+  warnings.push({
+    code: 'ISSUER_STATUS_OBSERVATIONS_DIFFER',
+    message:
+      'Verification and confirmed issuer lifecycle facts are differing observations. Neither their order nor the failing bit is established by this comparison.',
+    generation: run.generation,
+    verificationSettledAt: run.completedAt.toISOString(),
+    issuerObservedAt,
+  });
+  return warnings;
+}
+
 /**
  * Projects a native library record onto the keyless CredentialRecord shape.
  * A stored generation 1 is refused where the record is read, so the envelope
@@ -599,6 +694,9 @@ export function toNativeCredentialRecord(
   options: { now?: Date } = {},
 ): CredentialRecordResponse {
   const { record: parent, credential, checkRun } = view;
+  const status = statusFactsOf(credential);
+  const lifecycle = deriveLifecycle(status);
+  const pending = (credential.statusEntries ?? []).some((entry) => entry.pendingToken !== null);
   const projected: CredentialRecordResponse = {
     id: parent.id,
     origin: 'native',
@@ -623,15 +721,24 @@ export function toNativeCredentialRecord(
     encrypted: credential.decryptionKey !== null,
     hasKey: credential.decryptionKey !== null,
     verification: checkRun ? envelopeOf(checkRun, { origin: 'native' }) : issuanceAssertionEnvelope(parent),
-    status: statusFactsOf(credential),
+    status,
+    lifecycle,
     currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, options.now ?? new Date(Date.now())),
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,
     // A native record is deleted through DELETE /api/v1/credentials/{id};
     // the library route refuses it. The flag says the record can be deleted
     // by its owner, whichever route the origin uses.
-    capabilities: { deletable: true, annotatable: false, verifiable: true },
-    warnings: schemaConformanceWarnings(checkRun),
+    capabilities: {
+      deletable: true,
+      annotatable: false,
+      verifiable: true,
+      statusManageable:
+        credential.statusCapture === CredentialStatusCapture.CAPTURED &&
+        credential.vcServiceInstanceId !== null &&
+        !pending,
+    },
+    warnings: [...schemaConformanceWarnings(checkRun), ...issuerStatusWarnings(parent.id, status, checkRun, pending)],
     createdAt: parent.createdAt.toISOString(),
     updatedAt: parent.updatedAt.toISOString(),
   };
@@ -713,10 +820,11 @@ export function toCredentialRecord(
     hasKey: external.decryptionKey !== null,
     verification: envelopeOf(checkRun, { origin: 'external' }),
     status: null,
+    lifecycle: null,
     currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, now),
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,
-    capabilities: { deletable: true, annotatable: true, verifiable: true },
+    capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false },
     warnings,
     createdAt: parent.createdAt.toISOString(),
     updatedAt: parent.updatedAt.toISOString(),

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CoreCredentialType } from '@/lib/prisma/generated';
-import { originSchema, verificationSummarySchema } from '@/lib/library/credential-record-projection';
+import { originSchema, verificationSummarySchema, lifecycleSchema } from '@/lib/library/credential-record-projection';
 import { LIBRARY_LIST_SORTS } from '@/lib/prisma/repositories/library-record.repository';
 import {
   booleanQuerySchema,
@@ -104,6 +104,7 @@ export const listLibraryQuerySchema = z
     issuer: nonBlankString.optional(),
     encrypted: booleanQuerySchema,
     status: verificationSummarySchema.optional(),
+    lifecycle: lifecycleSchema.optional(),
     issuedFrom: libraryListCalendarDateSchema.optional(),
     issuedTo: libraryListCalendarDateSchema.optional(),
     sort: librarySortSchema.default('issuedAt:desc'),

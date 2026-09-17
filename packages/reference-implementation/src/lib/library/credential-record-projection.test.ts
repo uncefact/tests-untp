@@ -11,6 +11,7 @@ import {
   LibraryRecordOrigin,
   type CheckRun,
   type Credential,
+  type CredentialStatusEntry,
   type ExternalCredential,
   type LibraryRecord,
 } from '@/lib/prisma/generated';
@@ -406,6 +407,7 @@ describe('toCredentialRecord', () => {
       sourceUrl: 'https://supplier.example/credential-a',
       sourceDigest: 'zQmDigest',
       status: null,
+      lifecycle: null,
       resolverUri: null,
       issuedAt: '2026-07-22T10:00:00.000Z',
       encrypted: false,
@@ -420,7 +422,7 @@ describe('toCredentialRecord', () => {
       currencyStatus: 'current',
       detailsStatus: 'EXTRACTED',
       detailsError: null,
-      capabilities: { deletable: true, annotatable: true, verifiable: true },
+      capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false },
       warnings: [],
       createdAt: '2026-09-03T11:00:00.000Z',
       updatedAt: '2026-09-03T11:00:05.000Z',
@@ -694,7 +696,7 @@ describe('toCredentialRecord', () => {
 });
 
 describe('toNativeCredentialRecord', () => {
-  it('projects captured status coordinates, observations and pending facts without deriving lifecycle', () => {
+  it('projects captured status coordinates, distinct observation timestamps and pending facts', () => {
     const view = nativeRecord({ credential: { statusCapture: CredentialStatusCapture.CAPTURED } });
     view.credential.statusEntries = [
       {
@@ -727,6 +729,7 @@ describe('toNativeCredentialRecord', () => {
 
     expect(toNativeCredentialRecord(view, { now: NOW }).status).toEqual({
       capture: CredentialStatusCapture.CAPTURED,
+      statusCaptureError: null,
       entries: [
         {
           entryId: 'status-entry-1',
@@ -1327,5 +1330,150 @@ describe('credentialRecordDetailSchema and toCredentialRecordDetail', () => {
         decryptionKey: null,
       }).success,
     ).toBe(false);
+  });
+});
+
+function lifecycleEntry(statusPurpose: string, value: boolean | null, pending = false): CredentialStatusEntry {
+  return {
+    id: `entry-${statusPurpose}`,
+    credentialId: 'credential',
+    tenantId: 'tenant-1',
+    originalId: null,
+    type: 'BitstringStatusListEntry',
+    statusPurpose,
+    statusListCredential: 'https://issuer.example/list',
+    statusListIndex: '2',
+    statusListVcIssuer: 'did:web:issuer.example',
+    descriptor: {},
+    value,
+    observedAt: value === null ? null : new Date('2026-09-17T02:00:00Z'),
+    valueChangedAt: null,
+    version: 2,
+    pendingToken: pending ? 'token' : null,
+    pendingValue: pending ? true : null,
+    pendingSince: pending ? new Date('2026-09-17T03:00:00Z') : null,
+    pendingDeadline: pending ? new Date('2026-09-17T03:01:00Z') : null,
+    pendingInstanceId: pending ? 'instance' : null,
+    pendingConfigDigest: pending ? 'digest' : null,
+    acceptedReplacementDigest: null,
+    provenance: CredentialStatusProvenance.BACKFILL,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+function lifecycleView(entries: CredentialStatusEntry[], checkRun: CheckRun | null = null): NativeLibraryRecordView {
+  const view = nativeRecord({
+    credential: { statusCapture: CredentialStatusCapture.CAPTURED, vcServiceInstanceId: 'instance' },
+    run: checkRun,
+  });
+  view.credential.statusEntries = entries;
+  return view;
+}
+describe('issuer lifecycle projection', () => {
+  it('gives revocation precedence when both lifecycle bits are confirmed true', () => {
+    expect(
+      toNativeCredentialRecord(lifecycleView([lifecycleEntry('suspension', true), lifecycleEntry('revocation', true)]))
+        .lifecycle,
+    ).toBe('revoked');
+  });
+  it.each([
+    ['suspended', [lifecycleEntry('suspension', true), lifecycleEntry('revocation', null)]],
+    ['none', [lifecycleEntry('suspension', false), lifecycleEntry('revocation', null)]],
+    ['unknown', [lifecycleEntry('suspension', null), lifecycleEntry('revocation', null)]],
+    ['none', [lifecycleEntry('message', true)]],
+    ['none', [lifecycleEntry('refresh', true)]],
+    ['none', []],
+  ] as const)('derives %s from confirmed lifecycle entries only', (expected, entries) => {
+    expect(toNativeCredentialRecord(lifecycleView([...entries])).lifecycle).toBe(expected);
+  });
+  it('keeps a failed verification status after the issuer clears suspension', () => {
+    const view = lifecycleView(
+      [lifecycleEntry('suspension', false)],
+      run({
+        generation: 2,
+        state: CheckRunState.COMPLETE,
+        proof: CheckResult.PASS,
+        status: CheckResult.FAIL,
+        completedAt: new Date('2026-09-16T12:00:00Z'),
+      }),
+    );
+    const result = toNativeCredentialRecord(view);
+    expect(result.verification.summary).toBe('not_conformant');
+    expect(result.lifecycle).toBe('none');
+    expect(result.warnings).toEqual([
+      {
+        code: 'ISSUER_STATUS_OBSERVATIONS_DIFFER',
+        message: expect.any(String),
+        generation: 2,
+        verificationSettledAt: '2026-09-16T12:00:00.000Z',
+        issuerObservedAt: '2026-09-17T02:00:00.000Z',
+      },
+    ]);
+  });
+  it('warns in the reverse direction without claiming which observation is newer', () => {
+    const view = lifecycleView(
+      [lifecycleEntry('revocation', true)],
+      run({
+        generation: 3,
+        state: CheckRunState.COMPLETE,
+        proof: CheckResult.PASS,
+        status: CheckResult.PASS,
+        completedAt: new Date('2026-09-18T12:00:00Z'),
+      }),
+    );
+    expect(toNativeCredentialRecord(view).warnings).toEqual([
+      expect.objectContaining({
+        code: 'ISSUER_STATUS_OBSERVATIONS_DIFFER',
+        generation: 3,
+        verificationSettledAt: '2026-09-18T12:00:00.000Z',
+        issuerObservedAt: '2026-09-17T02:00:00.000Z',
+      }),
+    ]);
+  });
+  it.each([null, run(), run({ state: CheckRunState.COMPLETE, completedAt: NOW, status: CheckResult.NOT_RUN })])(
+    'does not infer disagreement from a missing, pending or unexecuted status check',
+    (checkRun) => {
+      expect(toNativeCredentialRecord(lifecycleView([lifecycleEntry('revocation', true)], checkRun)).warnings).toEqual(
+        [],
+      );
+    },
+  );
+  it('does not attribute a message-only failure to confirmed clear lifecycle bits', () => {
+    const checkRun = run({ state: CheckRunState.COMPLETE, completedAt: NOW, status: CheckResult.FAIL });
+    expect(
+      toNativeCredentialRecord(
+        lifecycleView([lifecycleEntry('revocation', false), lifecycleEntry('message', true)], checkRun),
+      ).warnings,
+    ).toEqual([]);
+  });
+  it('keeps pending intent as a warning and disables management without changing lifecycle', () => {
+    const result = toNativeCredentialRecord(lifecycleView([lifecycleEntry('revocation', false, true)]));
+    expect(result.lifecycle).toBe('none');
+    expect(result.capabilities.statusManageable).toBe(false);
+    expect(result.warnings).toEqual([{ code: 'STATUS_CHANGE_UNCONFIRMED', message: expect.any(String) }]);
+  });
+  it('enables management for captured attributed records and preserves capture failure information', () => {
+    expect(toNativeCredentialRecord(lifecycleView([])).capabilities.statusManageable).toBe(true);
+    const unattributed = lifecycleView([]);
+    unattributed.credential.vcServiceInstanceId = null;
+    expect(toNativeCredentialRecord(unattributed).capabilities.statusManageable).toBe(false);
+    const view = nativeRecord({
+      credential: { statusCapture: CredentialStatusCapture.FAILED, statusCaptureError: 'MALFORMED_ENTRY' },
+    });
+    expect(toNativeCredentialRecord(view)).toMatchObject({
+      lifecycle: 'unknown',
+      status: { capture: 'FAILED', statusCaptureError: 'MALFORMED_ENTRY' },
+      capabilities: { statusManageable: false },
+    });
+  });
+  it('adds the same lifecycle facts and warnings to detail responses', () => {
+    const result = toCredentialRecordDetail(lifecycleView([lifecycleEntry('suspension', true, true)]), {
+      reveal: () => 'unused',
+    });
+    expect(result).toMatchObject({
+      lifecycle: 'suspended',
+      capabilities: { statusManageable: false },
+      warnings: [{ code: 'STATUS_CHANGE_UNCONFIRMED' }],
+    });
   });
 });

@@ -15,6 +15,7 @@ import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { retiredRoute } from '@/lib/api/retired-route';
 import { resolveAppUrl, buildVerifyUrl } from '@/lib/config/app-url.config';
 import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
+import { readStatusMultiplePurposesEnabled } from '@/lib/config/credential-status.config';
 import { apiLogger } from '@/lib/api/logger';
 import { getOrMintCorrelationId } from '@uncefact/untp-ri-services/logging';
 import { resolveDataModel } from '@/lib/credentials/resolve-data-model';
@@ -390,8 +391,11 @@ async function publishIssuedCredential({
  *       a system default DID, signs it, stores the enveloped credential
  *       (optionally encrypted), optionally publishes it to the Identity
  *       Resolver, links it to its primary entity, and returns the credential ID.
- *       When statusPurposes is omitted, the deployment's DEFAULT_STATUS_PURPOSES
+ *       When statusPurposes is omitted, the deployment's CREDENTIAL_STATUS_DEFAULT_PURPOSES
  *       setting applies, with the built-in default of revocation when unset.
+ *       One purpose is allowed by default because UNTP v0.7.0 schemas accept
+ *       one credentialStatus object. Set CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED=true
+ *       to issue a credential with multiple purposes.
  *     tags:
  *       - Credentials
  *     parameters:
@@ -440,6 +444,9 @@ async function publishIssuedCredential({
  *           printable ASCII) is a 400 that names the header. An unknown data
  *           model (credentialType and version pair)
  *           and an issuer DID not registered to the tenant are also 400s.
+ *           More than one statusPurposes entry is refused by default because
+ *           UNTP v0.7.0 schemas accept one credentialStatus object. Set
+ *           CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED=true to enable multiple purposes.
  *           Payload-validation failures carry
  *           a `code`: `SCHEMA_DOCUMENT_INVALID` or `JSONLD_DOCUMENT_INVALID`
  *           mean the payload itself is invalid and the message says what to
@@ -454,6 +461,12 @@ async function publishIssuedCredential({
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               multipleStatusPurposesDisabled:
+ *                 summary: Multiple status purposes are disabled
+ *                 value:
+ *                   error: 'statusPurposes: only one status purpose can be issued while CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED is false'
+ *                   code: VALIDATION_FAILED
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
@@ -556,6 +569,13 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     },
     credentialIssueRequestSchema,
   );
+
+  if (body.statusPurposes !== undefined && body.statusPurposes.length > 1 && !readStatusMultiplePurposesEnabled()) {
+    throw new ValidationError(
+      'statusPurposes: only one status purpose can be issued while CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED is false',
+      { code: 'VALIDATION_FAILED' },
+    );
+  }
 
   const { credentialType, version } = body;
   // Omitted option objects stay empty objects, as they always have: an

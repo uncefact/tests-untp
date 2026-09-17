@@ -4,6 +4,7 @@
 - **Status:** accepted
 - **Update (2026-09-17):** Issuer-side credential status routes live under `/api/v1/credentials/{id}` beside the native credential's other lifecycle actions. The status-management routes are PR 2; PR 1 exposes only the captured status facts on the library record.
 - **Update (2026-09-10):** Decision 3 is implemented by #965 with `ROUTE_RETIRED` responses.
+- **Update (2026-09-17):** Issuer-side lifecycle actions on a native credential are available under `/api/v1/credentials/{id}/status`, beside DELETE: purpose-specific PUT and reconcile POST, plus stored or fresh status GET. Library reads present lifecycle independently from verification.
 
 ## Context
 

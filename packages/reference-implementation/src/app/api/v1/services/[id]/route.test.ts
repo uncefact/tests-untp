@@ -331,12 +331,12 @@ describe('PATCH /api/v1/services/:id', () => {
     expect(mockEncrypt).toHaveBeenCalledWith(JSON.stringify(mergedConfig), 'aes-256-gcm');
     expect(mockUpdateServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1', {
       config: JSON.stringify(encryptedEnvelope),
-      configChanged: true,
+      configChanged: expect.any(Function),
     });
     expect(json.config.baseUrl).toBe('https://new.com');
   });
 
-  it('marks a re-sent equivalent config as unchanged for the pending-status guard', async () => {
+  it('compares a re-sent equivalent config with the locked row for the pending-status guard', async () => {
     const existingPlainConfig = { apiKey: 'old-key', baseUrl: 'https://old.com' };
     const equivalentConfigPatch = { baseUrl: 'https://old.com' };
     const encryptedEnvelope = { cipherText: 'same', iv: 'iv', tag: 'tag', type: 'aes-256-gcm' };
@@ -353,8 +353,12 @@ describe('PATCH /api/v1/services/:id', () => {
     expect(res.status).toBe(200);
     expect(mockUpdateServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1', {
       config: JSON.stringify(encryptedEnvelope),
-      configChanged: false,
+      configChanged: expect.any(Function),
     });
+    const compare = mockUpdateServiceInstance.mock.calls[0][2].configChanged!;
+    expect(compare(JSON.stringify(encryptedEnvelope))).toBe(false);
+    mockDecrypt.mockReturnValue(JSON.stringify({ ...existingPlainConfig, apiKey: 'concurrently-changed' }));
+    expect(compare(JSON.stringify(encryptedEnvelope))).toBe(true);
   });
 
   // A stored record can name a serviceType/adapterType pair the registry no

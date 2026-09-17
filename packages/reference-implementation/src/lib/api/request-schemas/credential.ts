@@ -118,7 +118,7 @@ export const credentialIssueRequestSchema = z.object({
   statusPurposes: statusPurposesSchema
     .optional()
     .describe(
-      "Status-list purposes to mint. When omitted, the deployment's DEFAULT_STATUS_PURPOSES applies; if unset, the built-in default is ['revocation'].",
+      "Status-list purposes to mint. By default, only one purpose may be supplied because UNTP v0.7.0 schemas accept one credentialStatus object. Set CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED=true to enable multiple purposes. When omitted, the deployment's CREDENTIAL_STATUS_DEFAULT_PURPOSES applies; if unset, the built-in default is ['revocation'].",
     ),
   storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
   publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),

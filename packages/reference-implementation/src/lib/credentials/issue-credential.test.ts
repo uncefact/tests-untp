@@ -209,13 +209,20 @@ describe('issueCredential', () => {
       return SIGNED_CREDENTIAL;
     });
 
-    await issueCredential(buildInput({ statusPurposes: ['revocation', 'suspension'] }));
+    const previous = process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+    process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED = 'true';
+    try {
+      await issueCredential(buildInput({ statusPurposes: ['revocation', 'suspension'] }));
 
-    expect(mockWithStatusListMutex).toHaveBeenCalledTimes(2);
-    expect(mockWithStatusListMutex.mock.calls.map(([key]) => key)).toEqual([
-      'status-list:revocation',
-      'status-list:suspension',
-    ]);
+      expect(mockWithStatusListMutex).toHaveBeenCalledTimes(2);
+      expect(mockWithStatusListMutex.mock.calls.map(([key]) => key)).toEqual([
+        'status-list:revocation',
+        'status-list:suspension',
+      ]);
+    } finally {
+      if (previous === undefined) delete process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+      else process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED = previous;
+    }
   });
 
   it('maps a lost mint lock before storage and reports the orphaned entry coordinates', async () => {
@@ -265,8 +272,8 @@ describe('issueCredential', () => {
 
   it('uses the configured default when omitted and lets a request override it', async () => {
     // Catches a regression that keeps the adapter fallback or lets deployment configuration override an explicit request.
-    const previous = process.env.DEFAULT_STATUS_PURPOSES;
-    process.env.DEFAULT_STATUS_PURPOSES = 'suspension';
+    const previous = process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES;
+    process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES = 'suspension';
 
     try {
       await issueCredential(buildInput());
@@ -281,15 +288,15 @@ describe('issueCredential', () => {
         expect.objectContaining({ statusPurposes: ['revocation'] }),
       );
     } finally {
-      if (previous === undefined) delete process.env.DEFAULT_STATUS_PURPOSES;
-      else process.env.DEFAULT_STATUS_PURPOSES = previous;
+      if (previous === undefined) delete process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES;
+      else process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES = previous;
     }
   });
 
   it('passes an empty default to the service and records a signed credential without status entries', async () => {
-    // Catches a regression that turns DEFAULT_STATUS_PURPOSES=none back into revocation or mints an empty member.
-    const previous = process.env.DEFAULT_STATUS_PURPOSES;
-    process.env.DEFAULT_STATUS_PURPOSES = 'none';
+    // Catches a regression that turns CREDENTIAL_STATUS_DEFAULT_PURPOSES=none back into revocation or mints an empty member.
+    const previous = process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES;
+    process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES = 'none';
     stubVcService.service.sign.mockResolvedValueOnce(SIGNED_CREDENTIAL_WITHOUT_STATUS);
 
     try {
@@ -301,8 +308,8 @@ describe('issueCredential', () => {
       );
       expect(result.statusCaptureFailed).toBe(false);
     } finally {
-      if (previous === undefined) delete process.env.DEFAULT_STATUS_PURPOSES;
-      else process.env.DEFAULT_STATUS_PURPOSES = previous;
+      if (previous === undefined) delete process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES;
+      else process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES = previous;
     }
   });
 

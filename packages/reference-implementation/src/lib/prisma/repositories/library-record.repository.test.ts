@@ -141,7 +141,7 @@ describe('getLibraryRecordById', () => {
     expect(mockFindFirst).toHaveBeenCalledWith({
       where: { id: 'record-1', tenantId: 'tenant-1' },
       include: {
-        credential: { include: { statusEntries: true } },
+        credential: { include: { statusEntries: { orderBy: [{ statusPurpose: 'asc' }, { id: 'asc' }] } } },
         externalCredential: true,
         checkRuns: {
           orderBy: { generation: 'desc' },
@@ -212,7 +212,10 @@ describe('listLibraryRecords', () => {
     expect(mockQueryRaw).toHaveBeenCalledTimes(1);
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { tenantId: 'tenant-1', id: { in: ['record-2', 'record-1'] } },
-      include: { credential: { include: { statusEntries: true } }, externalCredential: true },
+      include: {
+        credential: { include: { statusEntries: { orderBy: [{ statusPurpose: 'asc' }, { id: 'asc' }] } } },
+        externalCredential: true,
+      },
     });
     expect(mockCheckRunFindMany).toHaveBeenCalledWith({
       where: { id: { in: ['run-2', 'run-1'] }, tenantId: 'tenant-1' },
@@ -686,7 +689,10 @@ describe('batchGetLibraryRecords', () => {
     expect(query.values).toEqual(['tenant-1', requestedIds]);
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { tenantId: 'tenant-1', id: { in: requestedIds } },
-      include: { credential: { include: { statusEntries: true } }, externalCredential: true },
+      include: {
+        credential: { include: { statusEntries: { orderBy: [{ statusPurpose: 'asc' }, { id: 'asc' }] } } },
+        externalCredential: true,
+      },
     });
     expect(result.data.map(({ record }) => record.id)).toEqual(requestedIds);
   });

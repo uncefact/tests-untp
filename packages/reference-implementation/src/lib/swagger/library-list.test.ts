@@ -45,7 +45,7 @@ describe('published GET /library contract (#962)', () => {
     operation = spec.paths?.['/library']?.get as Operation;
   });
 
-  it('publishes the operation id, all fourteen query parameters, and repeatable type encoding', () => {
+  it('publishes the operation id, all fifteen query parameters, and repeatable type encoding', () => {
     expect(operation.operationId).toBe('listLibrary');
     const parameters = operation.parameters ?? [];
     const queryParameterNames = parameters
@@ -62,6 +62,7 @@ describe('published GET /library contract (#962)', () => {
         'issuer',
         'encrypted',
         'status',
+        'lifecycle',
         'issuedFrom',
         'issuedTo',
         'sort',
@@ -86,6 +87,7 @@ describe('published GET /library contract (#962)', () => {
         CredentialType: expect.anything(),
         Origin: expect.anything(),
         VerificationSummary: expect.anything(),
+        CredentialLifecycle: expect.anything(),
       }),
     );
     const description = operation.responses?.['400']?.description ?? '';

@@ -17,7 +17,11 @@ import {
   type LibraryRecordDetailView,
 } from '@/lib/library/library-record-view';
 import { BLOCKING_CHECKS, isNativeMasked, type LibraryCheckName } from '@/lib/library/check-rules';
-import type { LibraryOrigin, VerificationSummary } from '@/lib/library/credential-record-projection';
+import type {
+  LibraryOrigin,
+  VerificationSummary,
+  CredentialLifecycle,
+} from '@/lib/library/credential-record-projection';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 import { withDeadlockRetry } from './check-run.repository';
 import { appLogger } from '@/lib/api/logger';
@@ -26,7 +30,7 @@ import { LibraryRecordSelectionError } from '@/lib/library/library-read-errors';
 import { StructuredError } from '@uncefact/untp-utils';
 
 const LIBRARY_RECORD_INCLUDE = {
-  credential: { include: { statusEntries: true } },
+  credential: { include: { statusEntries: { orderBy: [{ statusPurpose: 'asc' }, { id: 'asc' }] } } },
   externalCredential: true,
   checkRuns: {
     orderBy: { generation: 'desc' },
@@ -39,7 +43,7 @@ const LIBRARY_RECORD_INCLUDE = {
 } as const satisfies Prisma.LibraryRecordInclude;
 
 const LIBRARY_RECORD_LIST_INCLUDE = {
-  credential: { include: { statusEntries: true } },
+  credential: { include: { statusEntries: { orderBy: [{ statusPurpose: 'asc' }, { id: 'asc' }] } } },
   externalCredential: true,
 } as const satisfies Prisma.LibraryRecordInclude;
 
@@ -56,6 +60,7 @@ export type ListLibraryRecordsOptions = {
   issuer?: string;
   encrypted?: boolean;
   status?: VerificationSummary;
+  lifecycle?: CredentialLifecycle;
   issuedFrom?: Date;
   issuedTo?: Date;
   sort?: LibraryListSort;
@@ -209,6 +214,35 @@ function statusPredicate(status: NonNullable<ListLibraryRecordsOptions['status']
   }
 }
 
+function lifecyclePredicate(lifecycle: CredentialLifecycle): Prisma.Sql {
+  const entry = (predicate: Prisma.Sql) => Prisma.sql`EXISTS (
+    SELECT 1 FROM "CredentialStatusEntry" AS status_entry
+    WHERE status_entry."credentialId" = r."id"
+      AND status_entry."tenantId" = r."tenantId" AND ${predicate}
+  )`;
+  const revoked = entry(Prisma.sql`status_entry."statusPurpose" = 'revocation' AND status_entry."value" = TRUE`);
+  const suspended = entry(Prisma.sql`status_entry."statusPurpose" = 'suspension' AND status_entry."value" = TRUE`);
+  const lifecycleEntry = Prisma.sql`status_entry."statusPurpose" IN ('revocation', 'suspension')`;
+  const anyLifecycle = entry(lifecycleEntry);
+  const observed = entry(Prisma.sql`${lifecycleEntry} AND status_entry."value" IS NOT NULL`);
+  const captured = Prisma.sql`c."statusCapture" = 'CAPTURED'::"CredentialStatusCapture"`;
+  const native = Prisma.sql`r."origin" = 'NATIVE'::"LibraryRecordOrigin"`;
+  switch (lifecycle) {
+    case 'revoked':
+      return Prisma.sql`(${native} AND ${captured} AND ${revoked})`;
+    case 'suspended':
+      return Prisma.sql`(${native} AND ${captured} AND NOT ${revoked} AND ${suspended})`;
+    case 'none':
+      return Prisma.sql`(${native} AND ${captured} AND NOT ${revoked} AND NOT ${suspended} AND (NOT ${anyLifecycle} OR ${observed}))`;
+    case 'unknown':
+      return Prisma.sql`(${native} AND (NOT ${captured} OR (${anyLifecycle} AND NOT ${observed})))`;
+    default: {
+      const unhandled: never = lifecycle;
+      throw new LibraryRecordListError(`unsupported lifecycle ${String(unhandled)}`);
+    }
+  }
+}
+
 function sortExpression(sort: LibraryListSort): Prisma.Sql {
   switch (sort) {
     case 'issuedAt:asc':
@@ -268,6 +302,7 @@ export function buildLibraryListQuery(options: ListLibraryRecordsOptions): Prism
     );
   }
   if (options.status !== undefined) filters.push(statusPredicate(options.status));
+  if (options.lifecycle !== undefined) filters.push(lifecyclePredicate(options.lifecycle));
   if (options.issuedFrom !== undefined) {
     filters.push(Prisma.sql`${effectiveIssuedAt} >= ${options.issuedFrom.toISOString().slice(0, -1)}::timestamp(3)`);
   }

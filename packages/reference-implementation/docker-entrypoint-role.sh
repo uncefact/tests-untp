@@ -18,10 +18,10 @@ derive_process_role() {
 is_known_maintenance_script() {
     case "${1-}" in
         audit:encryption|backfill:decryption-keys|backfill:credential-details|backfill:credential-status-entries|\
-        backfill:credential-status-attribution|rotate:encryption-key|\
+        services:repair-config|backfill:credential-status-attribution|rotate:encryption-key|\
         scripts/audit-encryption.ts|scripts/backfill-decryption-keys.ts|scripts/backfill-credential-details.ts|\
         scripts/backfill-credential-status-entries.ts|scripts/backfill-credential-status-attribution.ts|\
-        scripts/rotate-encryption-key.ts|prisma/backfills/2026-05-19-hex-to-multibase.ts)
+        scripts/services-repair-config.ts|scripts/rotate-encryption-key.ts|prisma/backfills/2026-05-19-hex-to-multibase.ts)
             return 0
             ;;
     esac

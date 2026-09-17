@@ -414,12 +414,12 @@ describe('service-instance.repository', () => {
       mockServiceInstance.update.mockResolvedValue({ ...INSTANCE_RECORD, config: 'new-config' });
 
       await expect(
-        updateServiceInstance('instance-1', ORG_ID, { config: 'new-config', configChanged: false }),
+        updateServiceInstance('instance-1', ORG_ID, { config: 'new-config', configChanged: () => false }),
       ).resolves.toMatchObject({
         config: 'new-config',
       });
       // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked Prisma method is inspected for guard dispatch
-      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     });
 
     it('checks pending status entries for a changed effective config', async () => {
@@ -427,7 +427,7 @@ describe('service-instance.repository', () => {
       mockServiceInstance.update.mockResolvedValue({ ...INSTANCE_RECORD, config: 'new-config' });
 
       await expect(
-        updateServiceInstance('instance-1', ORG_ID, { config: 'new-config', configChanged: true }),
+        updateServiceInstance('instance-1', ORG_ID, { config: 'new-config', configChanged: () => true }),
       ).resolves.toMatchObject({
         config: 'new-config',
       });
