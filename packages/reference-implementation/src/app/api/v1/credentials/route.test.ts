@@ -306,6 +306,7 @@ describe('POST /api/v1/credentials', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.VERIFY_ALLOW_PRIVATE_URLS;
+    delete process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
     process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
     process.env.RI_APP_URL = 'http://localhost:3003';
     setupHappyPath();
@@ -843,13 +844,37 @@ describe('POST /api/v1/credentials', () => {
     expect(mockIssueCredential).not.toHaveBeenCalled();
   });
 
-  it('forwards the explicit dual-purpose issuance option', async () => {
+  it('returns 400 VALIDATION_FAILED for two status purposes by default before any provider call', async () => {
     const req = createFakeRequest(validBody({ statusPurposes: ['revocation', 'suspension'] }));
-    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
 
-    expect(mockIssueCredential).toHaveBeenCalledWith(
-      expect.objectContaining({ statusPurposes: ['revocation', 'suspension'] }),
-    );
+    expect(res.status).toBe(400);
+    expect(json).toEqual({
+      error:
+        'statusPurposes: only one status purpose can be issued while CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED is false',
+      code: 'VALIDATION_FAILED',
+    });
+    expect(mockResolveVcService).not.toHaveBeenCalled();
+    expect(mockIssueCredential).not.toHaveBeenCalled();
+  });
+
+  it('forwards the explicit dual-purpose issuance option when enabled', async () => {
+    const previous = process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+    process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED = 'true';
+
+    try {
+      const req = createFakeRequest(validBody({ statusPurposes: ['revocation', 'suspension'] }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+      expect(res.status).toBe(201);
+      expect(mockIssueCredential).toHaveBeenCalledWith(
+        expect.objectContaining({ statusPurposes: ['revocation', 'suspension'] }),
+      );
+    } finally {
+      if (previous === undefined) delete process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+      else process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED = previous;
+    }
   });
 
   describe('service resolution', () => {

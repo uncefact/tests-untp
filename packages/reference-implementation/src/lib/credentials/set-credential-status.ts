@@ -93,7 +93,7 @@ function prepare(record: StatusRecord, input: SetCredentialStatusRequest) {
  */
 export async function setCredentialStatus(input: SetCredentialStatusRequest) {
   prepare(await loadStatusRecord(input.recordId, input.tenantId), input);
-  if (process.env.STATUS_MUTATION_ENABLED !== 'true') {
+  if (process.env.CREDENTIAL_STATUS_MUTATION_ENABLED !== 'true') {
     throw new CredentialStatusError(
       'STATUS_MUTATION_DISABLED',
       'Status changes are not enabled on this deployment. Contact the operator.',

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma/prisma';
 import { appLogger } from '@/lib/api/logger';
 
-import { DEFAULT_STATUS_LOCK_ACQUIRE_MS as DEFAULT_ACQUIRE_MS } from '../config/credential-status.config';
+import { CREDENTIAL_STATUS_DEFAULT_LOCK_ACQUIRE_MS as DEFAULT_ACQUIRE_MS } from '../config/credential-status.config';
 const DEFAULT_POLL_MS = 25;
 const SETTLEMENT_ALLOWANCE_MS = 1_000;
 const CALLBACK_ERROR_UNSET = Symbol('callback error unset');
@@ -94,7 +94,7 @@ export async function withStatusListMutex<T>(
   const keyLow = hash.readInt32BE(4);
   const acquireDeadline = Math.min(
     options.deadlineAt,
-    Date.now() + integerEnv('STATUS_LOCK_ACQUIRE_MS', DEFAULT_ACQUIRE_MS),
+    Date.now() + integerEnv('CREDENTIAL_STATUS_LOCK_ACQUIRE_MS', DEFAULT_ACQUIRE_MS),
   );
   const maxWait = Math.max(0, acquireDeadline - Date.now());
   const timeout = Math.max(0, options.deadlineAt - Date.now()) + SETTLEMENT_ALLOWANCE_MS;

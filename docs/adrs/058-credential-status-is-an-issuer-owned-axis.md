@@ -2,6 +2,8 @@
 
 - **Date:** 2026-09-16
 - **Status:** accepted (2026-09-17)
+- **Update (2026-09-18):** Before the first release, the six credential status settings were renamed with the `CREDENTIAL_STATUS_` prefix: `CREDENTIAL_STATUS_DEFAULT_PURPOSES`, `CREDENTIAL_STATUS_MUTATION_ENABLED`, `CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED`, `CREDENTIAL_STATUS_OPERATION_BUDGET_MS`, `CREDENTIAL_STATUS_RECONCILE_GRACE_MS` and `CREDENTIAL_STATUS_LOCK_ACQUIRE_MS`.
+- **Update (2026-09-18):** Issuance uses one status purpose by default because UNTP v0.7.0 schemas accept one `credentialStatus` object while W3C permits an array; set `CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED=true` to re-enable multiple purposes. The ADR body is unchanged.
 - **Update (2026-09-17):** The issuance default is now a deployment setting, `DEFAULT_STATUS_PURPOSES`; the ADR body is unchanged.
 - **Update (2026-09-17):** The issuance-capture change (#716) records status purposes and issuer-service attribution at issuance, captures the returned signed entries in the parent and child transaction, exposes status facts on native library records, and provides operator-run capture and attribution backfills. Provider mutation routes and lifecycle presentation follow in the status-mutation change (#490).
 - **Update (2026-09-17):** Newly issued credentials carry `statusListIndex` as a specification-defined decimal string; previously issued numeric indexes remain readable.

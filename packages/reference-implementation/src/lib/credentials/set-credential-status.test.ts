@@ -123,10 +123,10 @@ beforeEach(() => {
   mockMutex.mockImplementation(async (_key, fn) => fn());
   mockFinalise.mockResolvedValue('finalised');
   mockClear.mockResolvedValue('cleared');
-  process.env.STATUS_MUTATION_ENABLED = 'true';
+  process.env.CREDENTIAL_STATUS_MUTATION_ENABLED = 'true';
 });
 afterEach(() => {
-  delete process.env.STATUS_MUTATION_ENABLED;
+  delete process.env.CREDENTIAL_STATUS_MUTATION_ENABLED;
   jest.restoreAllMocks();
 });
 it('returns the committed read-back observation and shares one signal across all provider calls', async () => {
@@ -145,10 +145,10 @@ it('returns the committed read-back observation and shares one signal across all
   expect(mockClear).not.toHaveBeenCalled();
 });
 it.each([undefined, 'false'] as const)(
-  'refuses mutation when STATUS_MUTATION_ENABLED is %s before reservation',
+  'refuses mutation when CREDENTIAL_STATUS_MUTATION_ENABLED is %s before reservation',
   async (enabled) => {
-    if (enabled === undefined) delete process.env.STATUS_MUTATION_ENABLED;
-    else process.env.STATUS_MUTATION_ENABLED = enabled;
+    if (enabled === undefined) delete process.env.CREDENTIAL_STATUS_MUTATION_ENABLED;
+    else process.env.CREDENTIAL_STATUS_MUTATION_ENABLED = enabled;
 
     await expect(setCredentialStatus(input)).rejects.toMatchObject({
       code: 'STATUS_MUTATION_DISABLED',

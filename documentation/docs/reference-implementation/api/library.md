@@ -68,6 +68,64 @@ The `409` row creates no durable copy of its own. A request that loses a race to
 
 `retryable: false` means the same request, unchanged, will not succeed until whatever the outcome turned on changes, and the failure message names which that is. It may be what the source serves, the record's own retained copy once that copy is what every later attempt reads, or the storage service's upload rules, which only an operator can change. `retryable: true` means a later attempt may succeed, whether unchanged (an outage cleared) or after a correction (the right key). It is a classification of what was observed, never a promise about the source.
 
+### Issuer lifecycle
+
+Native records also carry issuer-owned status facts in `status`. The object contains the capture state and the recorded entries.
+
+Each entry includes its purpose, status-list credential, canonical string index, observed value, observation timestamps and version counter. The capture state is `PENDING` before the entries are recorded. It is `CAPTURED` after they are recorded. It is `FAILED` when capture was attempted and could not complete.
+
+`entries` is empty unless the state is `CAPTURED`. It is also empty for a credential issued with no status purposes. A pending mutation contains its value, start time and deadline. `statusCaptureError` keeps the capture failure classification, or is `null` when no failure is recorded.
+
+`PENDING` means capture has not completed. `FAILED` means capture was attempted and failed. Neither state means that the credential has a set status bit. Entries are ordered by purpose and then entry id. External records return `status: null` and `lifecycle: null`.
+
+The separate `lifecycle` field uses only confirmed issuer-owned revocation and suspension entries. It has this precedence:
+
+| Lifecycle   | Meaning                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------- |
+| `revoked`   | A confirmed revocation bit is true, including when suspension is also true.                             |
+| `suspended` | No confirmed revocation bit is true and a confirmed suspension bit is true.                             |
+| `unknown`   | Capture is not `CAPTURED`, or lifecycle entries exist but none has a confirmed value.                   |
+| `none`      | No confirmed lifecycle bit is set. A captured credential with no lifecycle entries also has this value. |
+
+Unobserved entries contribute nothing. A confirmed clear entry alongside an unobserved entry therefore yields `none`.
+
+`message`, `refresh` and custom purposes never enter lifecycle. Pending requests never enter it either.
+
+`capabilities.statusManageable` describes record eligibility. It is true for a native, captured and attributed record without pending intent. It does not mean that status mutation is enabled for the deployment. A set may still answer `503 STATUS_MUTATION_DISABLED`. Reads and reconciliation remain available.
+
+This eligibility flag does not promise that a purpose exists, that a transition is allowed or that the provider is reachable. The [issuer-status routes](./credentials#change-issuer-status) enforce those conditions.
+
+Two warnings preserve the distinction between requested changes, issuer observations and verification:
+
+- `STATUS_CHANGE_UNCONFIRMED` appears while any entry has pending intent. The prior confirmed lifecycle remains visible and `statusManageable` is false.
+- `ISSUER_STATUS_OBSERVATIONS_DIFFER` appears only for a complete newest verification generation with an executed `status` check that differs from at least one confirmed lifecycle observation. This means a failed status check with no confirmed lifecycle bit set, or a passed status check with a confirmed lifecycle bit set. A known set non-lifecycle bit suppresses the first case because that bit can explain the verifier failure. The warning names `generation`, `verificationSettledAt` and `issuerObservedAt`. These are labelled observation times. They do not claim an order or identify which bit the verifier checked. Pending, failed or unexecuted verification checks do not create this warning.
+
+For example, generation 2 failed its status check and the issuer then cleared suspension. `verification.summary` remains `not_conformant`, while `lifecycle` becomes `none`. Clearing suspension supplies no proof evidence. Re-verification produces a new generation independently. There is no combined display headline.
+
+For example:
+
+```json
+{
+  "status": {
+    "capture": "CAPTURED",
+    "statusCaptureError": null,
+    "entries": [
+      {
+        "entryId": "clw0statusentry000001",
+        "statusPurpose": "revocation",
+        "statusListCredential": "https://status.example/list/1",
+        "statusListIndex": "3",
+        "value": false,
+        "observedAt": "2026-09-17T00:00:00.000Z",
+        "valueChangedAt": null,
+        "version": 1,
+        "pending": null
+      }
+    ]
+  }
+}
+```
+
 ### Encrypted sources
 
 A supplier may publish a credential encrypted. Register accepts the key in `sourceEncryption.decryptionKey`. The key is used to open the fetched body for this one request and is then forgotten: it is never stored, never logged, never placed on the job queue and never returned. Serve this endpoint over HTTPS so the key is protected in transit.
@@ -493,52 +551,6 @@ sequenceDiagram
 This returns one record of either origin. It carries the same fields the register call answers with, plus `storageUri`, `digestMultibase` and `decryptionKey`. The three added fields are always present in the JSON object, but each value can be `null`.
 
 The route is also the verification polling target. A record with `verification.state: pending` is read again later until the newest generation is `complete` or `failed`. Each read reports the stored record and custody state. The route does not fetch the durable copy, verify it, change custody columns or create a verification run.
-
-### Issuer lifecycle
-
-Native records also carry issuer-owned status facts in `status`. The object contains the capture state and the recorded entries, including each purpose, status-list credential, canonical string index, observed value, observation timestamps and the entry's version counter. The capture state is `PENDING` before the entries have been recorded, `CAPTURED` once they have been, and `FAILED` where capture was attempted and could not complete. `entries` is empty unless the state is `CAPTURED`, and it is also empty for a credential issued with no status purposes. A pending mutation, when present, is represented by its value, start time and deadline. `statusCaptureError` retains the capture failure classification, or `null` when no failure is recorded. `PENDING` means capture has not completed; `FAILED` means it was attempted and failed, rather than the credential having a set status bit. Entries are ordered by purpose, then entry id. External records return `status: null` and `lifecycle: null`.
-
-The separate `lifecycle` field uses only confirmed issuer-owned revocation and suspension entries, with this precedence:
-
-| Lifecycle   | Meaning                                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------------------- |
-| `revoked`   | A confirmed revocation bit is true, including when suspension is also true.                             |
-| `suspended` | No confirmed revocation bit is true and a confirmed suspension bit is true.                             |
-| `unknown`   | Capture is not `CAPTURED`, or lifecycle entries exist but none has a confirmed value.                   |
-| `none`      | No confirmed lifecycle bit is set. A captured credential with no lifecycle entries also has this value. |
-
-Unobserved entries contribute nothing; a confirmed clear entry alongside an unobserved entry therefore yields `none`. `message`, `refresh` and custom purposes never enter lifecycle. Pending requests never enter it either. `capabilities.statusManageable` describes record eligibility: it is true for a native, captured, attributed record without pending intent. It does not mean that status mutation is enabled for the deployment. A set may still answer `503 STATUS_MUTATION_DISABLED`; reads and reconciliation remain available. This eligibility flag does not promise that a particular purpose exists, that a transition is allowed or that the provider is reachable. The [issuer-status routes](./credentials#change-issuer-status) enforce those conditions.
-
-Two warnings preserve the distinction between requested changes, issuer observations and verification:
-
-- `STATUS_CHANGE_UNCONFIRMED` appears while any entry has pending intent. The prior confirmed lifecycle remains visible and `statusManageable` is false.
-- `ISSUER_STATUS_OBSERVATIONS_DIFFER` appears only for a complete newest verification generation with an executed `status` check that differs from at least one confirmed lifecycle observation: a failed status check with no confirmed lifecycle bit set, or a passed status check with a confirmed lifecycle bit set. A known set non-lifecycle bit suppresses the first case, because that bit can explain the verifier failure. The warning names `generation`, `verificationSettledAt` and `issuerObservedAt`. These are labelled observation times, not a claim about ordering or which bit the verifier checked. Pending, failed or unexecuted verification checks do not create this warning.
-
-For example, generation 2 failed its status check and the issuer then cleared suspension. `verification.summary` remains `not_conformant`, while `lifecycle` becomes `none`. Clearing suspension supplies no proof evidence. Re-verification produces a new generation independently; there is no combined display headline.
-
-For example:
-
-```json
-{
-  "status": {
-    "capture": "CAPTURED",
-    "statusCaptureError": null,
-    "entries": [
-      {
-        "entryId": "clw0statusentry000001",
-        "statusPurpose": "revocation",
-        "statusListCredential": "https://status.example/list/1",
-        "statusListIndex": "3",
-        "value": false,
-        "observedAt": "2026-09-17T00:00:00.000Z",
-        "valueChangedAt": null,
-        "version": 1,
-        "pending": null
-      }
-    ]
-  }
-}
-```
 
 The custody fields describe the copy held by this Reference Implementation. For an external record, `sourceUrl` is the supplier's fetch location and `sourceDigest` is the digest of the raw bytes as fetched. `storageUri` is the location of the Reference Implementation's durable copy and `digestMultibase` is the storage service's content digest for that copy. Do not substitute `sourceUrl` for `storageUri`.
 

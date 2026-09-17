@@ -40,7 +40,7 @@ import {
 } from './vckit-verifiable-credential.schema.js';
 
 const PROOF_FORMAT = 'EnvelopingProofJose';
-const DEFAULT_STATUS_PURPOSES = ['revocation'] as const;
+const CREDENTIAL_STATUS_DEFAULT_PURPOSES = ['revocation'] as const;
 
 type IssuedCredentialStatusEntry = Omit<CredentialStatusEntry, 'statusListIndex'> & {
   statusListIndex: number;
@@ -115,7 +115,7 @@ function validateStatusIssuer(value: CredentialIssuer | string, errorType: 'cred
 function statusPurposes(value: unknown): string[] {
   const rawPurposes =
     value === undefined
-      ? [...DEFAULT_STATUS_PURPOSES]
+      ? [...CREDENTIAL_STATUS_DEFAULT_PURPOSES]
       : Array.isArray(value)
         ? [...value]
         : (() => {

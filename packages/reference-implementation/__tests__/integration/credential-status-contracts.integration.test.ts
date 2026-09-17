@@ -29,7 +29,7 @@ import { createRigClient, truncateApplicationTables } from './rig/db';
 import { insertNativeCredential, seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
 
 const client = createRigClient();
-const originalAcquireMs = process.env.STATUS_LOCK_ACQUIRE_MS;
+const originalAcquireMs = process.env.CREDENTIAL_STATUS_LOCK_ACQUIRE_MS;
 
 function lockOptions(): { signal: AbortSignal; deadlineAt: number } {
   return { signal: new AbortController().signal, deadlineAt: Date.now() + 2_000 };
@@ -150,7 +150,7 @@ async function addStatusEntry(id: string, statusPurpose = 'revocation', statusLi
 
 beforeAll(async () => {
   await client.$connect();
-  process.env.STATUS_LOCK_ACQUIRE_MS = '2000';
+  process.env.CREDENTIAL_STATUS_LOCK_ACQUIRE_MS = '2000';
   mockResolveVcService.mockResolvedValue({
     instanceId: 'attribution-instance',
     service: createVerifierDouble(),
@@ -164,8 +164,8 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await client.$disconnect();
-  if (originalAcquireMs === undefined) delete process.env.STATUS_LOCK_ACQUIRE_MS;
-  else process.env.STATUS_LOCK_ACQUIRE_MS = originalAcquireMs;
+  if (originalAcquireMs === undefined) delete process.env.CREDENTIAL_STATUS_LOCK_ACQUIRE_MS;
+  else process.env.CREDENTIAL_STATUS_LOCK_ACQUIRE_MS = originalAcquireMs;
 });
 
 describe('Credential status Postgres contracts', () => {
@@ -303,17 +303,24 @@ describe('Credential status Postgres contracts', () => {
   });
 
   it('persists one issuance entry for each explicitly requested purpose', async () => {
-    const issued = await issueThroughVerifier(['revocation', 'suspension']);
+    const previous = process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+    process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED = 'true';
+    try {
+      const issued = await issueThroughVerifier(['revocation', 'suspension']);
 
-    const entries = await client.credentialStatusEntry.findMany({
-      where: { credentialId: issued.credentialId },
-      orderBy: { statusPurpose: 'asc' },
-    });
-    expect(issued.statusCaptureFailed).toBe(false);
-    expect(entries.map((entry) => [entry.statusPurpose, entry.statusListIndex, entry.provenance])).toEqual([
-      ['revocation', '3', CredentialStatusProvenance.ISSUANCE],
-      ['suspension', '4', CredentialStatusProvenance.ISSUANCE],
-    ]);
+      const entries = await client.credentialStatusEntry.findMany({
+        where: { credentialId: issued.credentialId },
+        orderBy: { statusPurpose: 'asc' },
+      });
+      expect(issued.statusCaptureFailed).toBe(false);
+      expect(entries.map((entry) => [entry.statusPurpose, entry.statusListIndex, entry.provenance])).toEqual([
+        ['revocation', '3', CredentialStatusProvenance.ISSUANCE],
+        ['suspension', '4', CredentialStatusProvenance.ISSUANCE],
+      ]);
+    } finally {
+      if (previous === undefined) delete process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+      else process.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED = previous;
+    }
   });
 
   it('retries a classified failure, converges on a second run, and reports a concurrent write race', async () => {

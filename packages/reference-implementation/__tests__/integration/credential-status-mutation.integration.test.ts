@@ -103,10 +103,10 @@ beforeEach(async () => {
   calls = [];
   onRead = undefined;
   onSet = undefined;
-  process.env.STATUS_MUTATION_ENABLED = 'true';
+  process.env.CREDENTIAL_STATUS_MUTATION_ENABLED = 'true';
 });
 afterAll(async () => {
-  delete process.env.STATUS_MUTATION_ENABLED;
+  delete process.env.CREDENTIAL_STATUS_MUTATION_ENABLED;
   await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   await client.$disconnect();
   await prisma.$disconnect();
@@ -194,8 +194,8 @@ it('uses the application clock for observations while the database owns row time
 it.each([undefined, 'false'] as const)(
   'leaves the status row untouched when mutation is disabled: %s',
   async (enabled) => {
-    if (enabled === undefined) delete process.env.STATUS_MUTATION_ENABLED;
-    else process.env.STATUS_MUTATION_ENABLED = enabled;
+    if (enabled === undefined) delete process.env.CREDENTIAL_STATUS_MUTATION_ENABLED;
+    else process.env.CREDENTIAL_STATUS_MUTATION_ENABLED = enabled;
     const before = await stored();
 
     await expect(setCredentialStatus(request())).rejects.toMatchObject({
@@ -207,7 +207,7 @@ it.each([undefined, 'false'] as const)(
   },
 );
 it('keeps stored reads and reconciliation available when mutation is disabled', async () => {
-  delete process.env.STATUS_MUTATION_ENABLED;
+  delete process.env.CREDENTIAL_STATUS_MUTATION_ENABLED;
 
   await expect(readCredentialStatus({ recordId, tenantId: SYSTEM_TENANT_ID })).resolves.toMatchObject({
     entries: [{ entryId, value: false, version: 1 }],
@@ -752,8 +752,8 @@ it('retains intent if the provider configuration becomes unreadable after a set'
 it.each([false, true])(
   'keeps uncertainty when an aborted provider request applies before abort: %s',
   async (applyBeforeAbort) => {
-    const previousBudget = process.env.STATUS_OPERATION_BUDGET_MS;
-    process.env.STATUS_OPERATION_BUDGET_MS = '2000';
+    const previousBudget = process.env.CREDENTIAL_STATUS_OPERATION_BUDGET_MS;
+    process.env.CREDENTIAL_STATUS_OPERATION_BUDGET_MS = '2000';
     let release!: () => void;
     const reply = new Promise<void>((resolve) => {
       release = resolve;
@@ -778,8 +778,8 @@ it.each([false, true])(
     } finally {
       release();
       if (calls.includes('/agent/setBitstringStatus')) await applied;
-      if (previousBudget === undefined) delete process.env.STATUS_OPERATION_BUDGET_MS;
-      else process.env.STATUS_OPERATION_BUDGET_MS = previousBudget;
+      if (previousBudget === undefined) delete process.env.CREDENTIAL_STATUS_OPERATION_BUDGET_MS;
+      else process.env.CREDENTIAL_STATUS_OPERATION_BUDGET_MS = previousBudget;
     }
     expect(bit).toBe(true);
     expect(await stored()).toMatchObject({ value: false, version: 1, pendingValue: true });

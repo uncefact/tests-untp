@@ -25,11 +25,11 @@ describe('withStatusListMutex', () => {
     jest.clearAllMocks();
     mockTransaction.mockImplementation((callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
     mockQueryRaw.mockResolvedValue([{ acquired: true }]);
-    process.env.STATUS_LOCK_ACQUIRE_MS = '40';
+    process.env.CREDENTIAL_STATUS_LOCK_ACQUIRE_MS = '40';
   });
 
   afterEach(() => {
-    delete process.env.STATUS_LOCK_ACQUIRE_MS;
+    delete process.env.CREDENTIAL_STATUS_LOCK_ACQUIRE_MS;
     jest.restoreAllMocks();
   });
 
