@@ -683,12 +683,13 @@ export function classifyJsonLdFailure(
         { artefactUrl: url, serviceStatus },
       );
     }
+    const diagnosticMessage = `The JSON-LD context check returned code "${
+      code ?? 'context-invalid'
+    }". The diagnostic does not establish retrieval or origin for the invalid definition`;
     return makeFailure(
       'unknown',
       'context.invalid',
-      `The JSON-LD context check returned code "${
-        code ?? 'context-invalid'
-      }". The diagnostic does not establish retrieval or origin for the invalid definition: ${detail}`,
+      code === 'invalid scoped context' ? `${diagnosticMessage}.` : `${diagnosticMessage}: ${detail}`,
       family,
       { artefactUrl: url, serviceStatus },
     );

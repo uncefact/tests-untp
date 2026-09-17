@@ -242,6 +242,26 @@ describe('artefact failure classes', () => {
     expect(invalidWithoutUrl.class).toBe('unknown');
     expect(invalidWithoutUrl.message).not.toMatch(/fetched|remote/i);
 
+    const invalidScopedContext = classifyJsonLdFailure({
+      kind: 'context-invalid',
+      url: 'https://publisher.example/context.jsonld',
+      detail: 'a remote @context response could not be used as a JSON-LD context',
+      code: 'invalid scoped context',
+    });
+    expect(invalidScopedContext.message).toBe(
+      'The JSON-LD context check returned code "invalid scoped context". The diagnostic does not establish retrieval or origin for the invalid definition.',
+    );
+    expect(invalidScopedContext.message).not.toContain('remote @context response');
+
+    const otherContextInvalid = classifyJsonLdFailure({
+      kind: 'context-invalid',
+      detail: 'the context definition used an unsupported value',
+      code: 'another context-invalid code',
+    });
+    expect(otherContextInvalid.message).toContain(
+      'The JSON-LD context check returned code "another context-invalid code". The diagnostic does not establish retrieval or origin for the invalid definition: the context definition used an unsupported value',
+    );
+
     expect(
       classifyJsonLdFailure({
         kind: 'context-invalid',

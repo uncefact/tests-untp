@@ -215,6 +215,44 @@ describe('contextValidation', () => {
         });
       });
 
+      it('uses the upstream status instead of generic causes and omits redundant status detail', () => {
+        const url = 'https://publisher.example/context.jsonld';
+        const detail = `could not fetch a remote @context: ${url} returned status 404.`;
+        const result = describeJsonLdError({
+          kind: 'context-fetch',
+          detail,
+          code: 'resolver.http-error',
+          url,
+          upstreamStatus: 404,
+        });
+
+        expect(result.message).toBe(`The @context at "${url}" returned HTTP 404.`);
+        expect(result.message).not.toContain('Common causes');
+        expect(result.params).toEqual({
+          kind: 'context-fetch',
+          code: 'resolver.http-error',
+          url,
+          cause: detail,
+          upstreamStatus: 404,
+        });
+      });
+
+      it('keeps redirect detail alongside an upstream status', () => {
+        const url = 'https://publisher.example/context.jsonld';
+        const redirectedUrl = 'https://redirected.example/context.jsonld';
+        const detail = `could not fetch a remote @context: ${redirectedUrl} returned status 404.`;
+        const result = describeJsonLdError({
+          kind: 'context-fetch',
+          detail,
+          code: 'resolver.http-error',
+          url,
+          upstreamStatus: 404,
+        });
+
+        expect(result.message).toBe(`The @context at "${url}" returned HTTP 404. Reported cause: ${detail}.`);
+        expect(result.message).not.toContain('Common causes');
+      });
+
       it('keeps the flat policy message when no URL is named', () => {
         const result = describeJsonLdError({
           kind: 'context-fetch',
@@ -245,14 +283,27 @@ describe('contextValidation', () => {
         });
       });
 
-      it('keeps provenance neutral when no context URL is available', () => {
+      it('suppresses an origin-asserting detail for an invalid scoped context without a URL', () => {
         const result = describeJsonLdError({
           kind: 'context-invalid',
-          detail: 'invalid scoped context',
+          detail: 'a remote @context response could not be used as a JSON-LD context',
           code: 'invalid scoped context',
         });
         expect(result.message).toContain('does not establish whether the context was fetched or where it came from');
-        expect(result.message).not.toContain('fetched but');
+        expect(result.message).not.toContain('remote @context response');
+        expect(result.message).not.toContain('Reported cause');
+      });
+
+      it('keeps the detail for another context-invalid code without a URL', () => {
+        const result = describeJsonLdError({
+          kind: 'context-invalid',
+          detail: 'a remote @context response could not be used as a JSON-LD context',
+          code: 'another context-invalid code',
+        });
+        expect(result.message).toContain('does not establish whether the context was fetched or where it came from');
+        expect(result.message).toContain(
+          'Reported cause: a remote @context response could not be used as a JSON-LD context.',
+        );
       });
     });
 

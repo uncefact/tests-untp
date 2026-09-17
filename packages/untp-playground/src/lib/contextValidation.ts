@@ -374,20 +374,31 @@ function isStringRecord(value: unknown): value is Record<string, string> {
   return isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string');
 }
 
-function describeContextFailure(failure: JsonLdContextFailure): ValidationError {
-  const { url, code } = failure;
+function describeContextFailure(failure: JsonLdContextFailure & { upstreamStatus?: number }): ValidationError {
+  const { url, code, upstreamStatus } = failure;
 
   let message: string;
   if (failure.kind === 'context-invalid') {
-    message = url
-      ? `The @context at "${url}" was fetched but isn't a usable JSON-LD context. Reported code: ${
-          code ?? 'context-invalid'
-        }. Reported cause: ${failure.detail}.`
-      : `The @context check reported "${
-          code ?? 'context-invalid'
-        }", which does not establish whether the context was fetched or where it came from. Reported cause: ${
-          failure.detail
-        }.`;
+    if (url) {
+      message = `The @context at "${url}" was fetched but isn't a usable JSON-LD context. Reported code: ${
+        code ?? 'context-invalid'
+      }. Reported cause: ${failure.detail}.`;
+    } else if (code === 'invalid scoped context') {
+      message = `The @context check reported "${
+        code ?? 'context-invalid'
+      }", which does not establish whether the context was fetched or where it came from.`;
+    } else {
+      message = `The @context check reported "${
+        code ?? 'context-invalid'
+      }", which does not establish whether the context was fetched or where it came from. Reported cause: ${
+        failure.detail
+      }.`;
+    }
+  } else if (url && upstreamStatus !== undefined) {
+    const reportedCause = failure.detail.includes(`${url} returned status ${upstreamStatus}`)
+      ? ''
+      : ` Reported cause: ${failure.detail}.`;
+    message = `The @context at "${url}" returned HTTP ${upstreamStatus}.${reportedCause}`;
   } else if (url) {
     message = `Couldn't load the @context at "${url}". Common causes: the URL is unreachable, is not https, resolves to a private address, redirected too many times, or returned a non-JSON-LD response. Reported cause: ${failure.detail}.`;
   } else {
@@ -398,7 +409,13 @@ function describeContextFailure(failure: JsonLdContextFailure): ValidationError 
     keyword: 'jsonldUrl',
     message,
     instancePath: '@context',
-    params: { kind: failure.kind, code, url, cause: failure.detail },
+    params: {
+      kind: failure.kind,
+      code,
+      url,
+      cause: failure.detail,
+      ...(upstreamStatus === undefined ? {} : { upstreamStatus }),
+    },
   };
 }
 
