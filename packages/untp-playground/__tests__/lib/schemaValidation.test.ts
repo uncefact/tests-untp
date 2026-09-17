@@ -1,8 +1,10 @@
-import { detectCredentialType, detectVersion } from '@/lib/credentialService';
+import { detectCredentialType } from '@/lib/credentialService';
+import { decodeEnvelopedCredential } from '@/lib/credentialService';
 import {
   detectExtension,
   schemaCache,
   SchemaFetchError,
+  SchemaSelectionError,
   schemaFetchFailureAdvice,
   validateCredentialSchema,
   validateExtension,
@@ -14,8 +16,8 @@ import { VCDMVersion } from '../../constants';
 global.fetch = jest.fn();
 
 jest.mock('@/lib/credentialService', () => ({
+  ...jest.requireActual('@/lib/credentialService'),
   detectCredentialType: jest.fn(),
-  detectVersion: jest.fn(),
 }));
 
 describe('schemaValidation', () => {
@@ -23,7 +25,6 @@ describe('schemaValidation', () => {
     // Clear all mocks before each test
     (global.fetch as jest.Mock).mockClear();
     (detectCredentialType as jest.Mock).mockClear();
-    (detectVersion as jest.Mock).mockClear();
     schemaCache.clear(); // Clear the cache so that fetch will be called
   });
 
@@ -45,12 +46,11 @@ describe('schemaValidation', () => {
 
       const validCredential = {
         type: 'DigitalProductPassport',
-        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0'],
+        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
         version: '0.5.0',
       };
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.5.0');
 
       const result = await validateCredentialSchema(validCredential);
       expect(result.valid).toBe(true);
@@ -64,9 +64,11 @@ describe('schemaValidation', () => {
       });
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.6.0');
 
-      await validateCredentialSchema({ type: 'DigitalProductPassport' });
+      await validateCredentialSchema({
+        type: 'DigitalProductPassport',
+        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'],
+      });
 
       expect(global.fetch).toHaveBeenCalledWith(
         `/api/schema?url=${encodeURIComponent(
@@ -82,9 +84,11 @@ describe('schemaValidation', () => {
       });
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.7.0');
 
-      await validateCredentialSchema({ type: 'DigitalProductPassport' });
+      await validateCredentialSchema({
+        type: 'DigitalProductPassport',
+        '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+      });
 
       expect(global.fetch).toHaveBeenCalledWith(
         `/api/schema?url=${encodeURIComponent(
@@ -100,9 +104,11 @@ describe('schemaValidation', () => {
       });
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalConformityCredential');
-      (detectVersion as jest.Mock).mockReturnValue('0.7.0');
 
-      await validateCredentialSchema({ type: 'DigitalConformityCredential' });
+      await validateCredentialSchema({
+        type: 'DigitalConformityCredential',
+        '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+      });
 
       expect(global.fetch).toHaveBeenCalledWith(
         `/api/schema?url=${encodeURIComponent(
@@ -111,13 +117,12 @@ describe('schemaValidation', () => {
       );
     });
 
-    describe('with real detectCredentialType and detectVersion (integration)', () => {
+    describe('with real canonical version detection (integration)', () => {
       const realCredentialService =
         jest.requireActual<typeof import('@/lib/credentialService')>('@/lib/credentialService');
 
       beforeEach(() => {
         (detectCredentialType as jest.Mock).mockImplementation(realCredentialService.detectCredentialType);
-        (detectVersion as jest.Mock).mockImplementation(realCredentialService.detectVersion);
       });
 
       it('constructs the legacy schema URL from a real v0.6.0 DPP credential', async () => {
@@ -197,9 +202,11 @@ describe('schemaValidation', () => {
         });
 
         (detectCredentialType as jest.Mock).mockReturnValue(type);
-        (detectVersion as jest.Mock).mockReturnValue('0.7.0');
 
-        await validateCredentialSchema({ type });
+        await validateCredentialSchema({
+          type,
+          '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+        });
 
         expect(global.fetch).toHaveBeenCalledWith(
           `/api/schema?url=${encodeURIComponent(
@@ -231,7 +238,6 @@ describe('schemaValidation', () => {
       };
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.4.0');
 
       const result = await validateCredentialSchema(validCredential);
       expect(result.valid).toBe(true);
@@ -246,7 +252,8 @@ describe('schemaValidation', () => {
 
       (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
 
-      await expect(validateCredentialSchema(invalidCredential)).rejects.toThrow('Unsupported credential type');
+      await expect(validateCredentialSchema(invalidCredential)).rejects.toThrow('Unsupported credential type: Unknown');
+      await expect(validateCredentialSchema(invalidCredential)).rejects.toBeInstanceOf(SchemaSelectionError);
     });
 
     it('should throw error for missing version', async () => {
@@ -255,10 +262,208 @@ describe('schemaValidation', () => {
       };
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-      (detectVersion as jest.Mock).mockReturnValue(undefined);
 
+      await expect(validateCredentialSchema(invalidCredential)).rejects.toBeInstanceOf(SchemaSelectionError);
       await expect(validateCredentialSchema(invalidCredential)).rejects.toThrow('Unsupported version');
     });
+
+    it('detects a terminal version path and lets the published schema enforce its context string', async () => {
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      const publishedDppV050Schema = require('../fixtures/untp-dpp-schema-0.5.0.json');
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(publishedDppV050Schema),
+      });
+
+      const credential = {
+        type: ['DigitalProductPassport', 'VerifiableCredential'],
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0'],
+        id: 'https://example.com/credentials/dpp-0.5.0',
+        issuer: { id: 'did:web:example.com', name: 'Example Company' },
+      };
+
+      const slashlessResult = await validateCredentialSchema(credential);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/schema?url=${encodeURIComponent(
+          'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json',
+        )}`,
+      );
+      expect(slashlessResult.valid).toBe(false);
+      expect(slashlessResult.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: 'const',
+            instancePath: '/@context',
+            params: {
+              allowedValue: [
+                'https://www.w3.org/ns/credentials/v2',
+                'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/',
+              ],
+            },
+          }),
+        ]),
+      );
+      expect(slashlessResult.errors?.every((error) => error.instancePath.startsWith('/@context'))).toBe(true);
+
+      const canonicalResult = await validateCredentialSchema({
+        ...credential,
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
+      });
+
+      expect(canonicalResult.valid).toBe(true);
+      expect(canonicalResult.errors?.some((error) => error.instancePath.startsWith('/@context'))).toBe(false);
+    });
+
+    // Expected schema URLs by row: the 0.6.0, 0.6.1 and 0.7.0 rows are the `url` fields recorded in
+    // packages/untp-utils/artefacts/manifest.json, which is independent of the builder under test.
+    // v0.5.0 is not bundled, so those five rows characterise the output of the constructor this
+    // change deletes, recorded before its deletion. The 0.5.0 DPP row is corroborated by the
+    // published schema fixture in __tests__/fixtures/untp-dpp-schema-0.5.0.json, fetched from that
+    // same URL on 2026-09-15.
+    const compatibilityCases = [
+      {
+        type: 'DigitalProductPassport',
+        context: 'https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json',
+      },
+      {
+        type: 'DigitalConformityCredential',
+        context: 'https://test.uncefact.org/vocabulary/untp/dcc/0.5.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.5.0.json',
+      },
+      {
+        type: 'DigitalTraceabilityEvent',
+        context: 'https://test.uncefact.org/vocabulary/untp/dte/0.5.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.5.0.json',
+      },
+      {
+        type: 'DigitalFacilityRecord',
+        context: 'https://test.uncefact.org/vocabulary/untp/dfr/0.5.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.5.0.json',
+      },
+      {
+        type: 'DigitalIdentityAnchor',
+        context: 'https://test.uncefact.org/vocabulary/untp/dia/0.5.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.5.0.json',
+      },
+      {
+        type: 'DigitalProductPassport',
+        context: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
+      },
+      {
+        type: 'DigitalConformityCredential',
+        context: 'https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.0.json',
+      },
+      {
+        type: 'DigitalTraceabilityEvent',
+        context: 'https://test.uncefact.org/vocabulary/untp/dte/0.6.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.0.json',
+      },
+      {
+        type: 'DigitalFacilityRecord',
+        context: 'https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.0.json',
+      },
+      {
+        type: 'DigitalIdentityAnchor',
+        context: 'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.0.json',
+      },
+      {
+        type: 'DigitalProductPassport',
+        context: 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.1.json',
+      },
+      {
+        type: 'DigitalConformityCredential',
+        context: 'https://test.uncefact.org/vocabulary/untp/dcc/0.6.1/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.1.json',
+      },
+      {
+        type: 'DigitalTraceabilityEvent',
+        context: 'https://test.uncefact.org/vocabulary/untp/dte/0.6.1/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.1.json',
+      },
+      {
+        type: 'DigitalFacilityRecord',
+        context: 'https://test.uncefact.org/vocabulary/untp/dfr/0.6.1/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.1.json',
+      },
+      {
+        type: 'DigitalIdentityAnchor',
+        context: 'https://test.uncefact.org/vocabulary/untp/dia/0.6.1/',
+        schemaUrl: 'https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.1.json',
+      },
+      {
+        type: 'DigitalProductPassport',
+        context: 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
+      },
+      {
+        type: 'DigitalConformityCredential',
+        context: 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json',
+      },
+      {
+        type: 'DigitalTraceabilityEvent',
+        context: 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.0/dte/DigitalTraceabilityEvent.json',
+      },
+      {
+        type: 'DigitalFacilityRecord',
+        context: 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.0/dfr/DigitalFacilityRecord.json',
+      },
+      {
+        type: 'DigitalIdentityAnchor',
+        context: 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.0/dia/DigitalIdentityAnchor.json',
+      },
+      {
+        type: 'ConformityScheme',
+        context: 'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json',
+      },
+    ] as const;
+
+    // AC3: the bespoke regex truncated '0.7.0-rc.1' to '0.7.0-rc'. The whole prerelease has to
+    // reach the schema URL, not just the detector's return value.
+    it('carries a multi-segment prerelease through to the schema URL', async () => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ type: 'object' }),
+      });
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+
+      await validateCredentialSchema({
+        type: 'DigitalProductPassport',
+        '@context': ['https://vocabulary.uncefact.org/untp/0.7.0-rc.1/context/'],
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/schema?url=${encodeURIComponent(
+          'https://untp.unece.org/artefacts/schema/v0.7.0-rc.1/dpp/DigitalProductPassport.json',
+        )}`,
+      );
+    });
+
+    it.each(compatibilityCases)(
+      'preserves the schema URL for $type at $context',
+      async ({ type, context, schemaUrl }) => {
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ type: 'object' }),
+        });
+        (detectCredentialType as jest.Mock).mockReturnValue(type);
+
+        await validateCredentialSchema({ type, '@context': [context] });
+
+        expect(global.fetch).toHaveBeenCalledWith(`/api/schema?url=${encodeURIComponent(schemaUrl)}`);
+      },
+    );
   });
 
   describe('validateExtension', () => {
@@ -282,7 +487,6 @@ describe('schemaValidation', () => {
       };
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.4.0');
 
       const result = await validateExtension(validExtensionCredential);
       expect(result.valid).toBe(true);
@@ -296,7 +500,6 @@ describe('schemaValidation', () => {
       };
 
       (detectCredentialType as jest.Mock).mockReturnValue('UnknownExtension');
-      (detectVersion as jest.Mock).mockReturnValue('0.1.0');
 
       await expect(validateExtension(invalidCredential)).rejects.toThrow('Unknown extension');
     });
@@ -311,7 +514,6 @@ describe('schemaValidation', () => {
       };
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.4.0');
 
       const result = detectExtension(credential);
       expect(result).toEqual({
@@ -340,10 +542,144 @@ describe('schemaValidation', () => {
       };
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
-      (detectVersion as jest.Mock).mockReturnValue('999.999.999');
 
       const result = detectExtension(credential);
       expect(result).toBeUndefined();
+    });
+
+    it('uses the first extension-domain context entry before considering later entries', () => {
+      const credential = {
+        type: 'DigitalLivestockPassport',
+        '@context': [
+          'https://aatp.foodagility.com/context/aatp-dlp-context-0.4.0.jsonld',
+          'https://aatp.foodagility.com/0.4.1-beta1/context.jsonld',
+        ],
+      };
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
+
+      expect(detectExtension(credential)).toEqual({
+        core: { type: 'DigitalProductPassport', version: '0.5.0' },
+        extension: { type: 'DigitalLivestockPassport', version: '0.4.0' },
+      });
+    });
+
+    // Disclosed behaviour: the adapter's legacy fallback stops a prerelease at the first dot, so a
+    // filename naming 0.4.1-beta1.2 is read as the registered 0.4.1-beta1. A canonical-only adapter
+    // returns undefined here, and a fallback without the prerelease group reads 0.4.1.
+    it('truncates a dotted prerelease in a filename-shaped extension context', () => {
+      const credential = {
+        type: 'DigitalLivestockPassport',
+        '@context': ['https://aatp.foodagility.com/context/aatp-dlp-context-0.4.1-beta1.2.jsonld'],
+      };
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
+
+      expect(detectExtension(credential)).toEqual({
+        core: { type: 'DigitalProductPassport', version: '0.6.0-beta7' },
+        extension: { type: 'DigitalLivestockPassport', version: '0.4.1-beta1' },
+      });
+    });
+
+    // The canonical detector keeps the whole prerelease `0.4.1-beta1.2`, which is unregistered;
+    // a fallback-only adapter would truncate it to registered `0.4.1-beta1` and select core `0.6.0-beta7`.
+    it('returns undefined for an unregistered dotted prerelease in a slash-bounded extension context', () => {
+      const credential = {
+        type: 'DigitalLivestockPassport',
+        '@context': ['https://aatp.foodagility.com/0.4.1-beta1.2/context/'],
+      };
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
+
+      expect(detectExtension(credential)).toBeUndefined();
+    });
+
+    it('keeps an unregistered extension type from reaching URL construction or fetch', async () => {
+      const credential = {
+        type: ['DigitalLivestockPassport'],
+        '@context': [
+          'https://www.w3.org/ns/credentials/v2',
+          'https://aatp.foodagility.com/9.9.9/context/',
+          'https://vocabulary.uncefact.org/untp/0.7.0/context/',
+        ],
+      };
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
+
+      // The type is recognised and the version is not, so the failure names the version, not the
+      // type. Falling through to the own-key check would report the supported type as unsupported.
+      await expect(validateCredentialSchema(credential)).rejects.toThrow(
+        'Unsupported extension version for DigitalLivestockPassport',
+      );
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    // The own-key check still owns the other half: a type in neither map. The real detector yields
+    // 'Unknown' for a credential naming none of the six core types, so this input is constructible
+    // without stubbing the detector. Every other value it can return is in one map or the other.
+    it('reports an unrecognised type from the real detector as an unsupported type, before any fetch', async () => {
+      const realCredentialService =
+        jest.requireActual<typeof import('@/lib/credentialService')>('@/lib/credentialService');
+      (detectCredentialType as jest.Mock).mockImplementation(realCredentialService.detectCredentialType);
+
+      await expect(
+        validateCredentialSchema({
+          type: ['VerifiableCredential'],
+          '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+        }),
+      ).rejects.toThrow('Unsupported credential type: Unknown');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('detects the DLP filename-embedded version from the real extension fixture', async () => {
+      const fixture = require('../../e2e/cypress/fixtures/credentials-e2e/invalid-v2-enveloped-dpp-with-extension.json');
+      const credential = decodeEnvelopedCredential(fixture);
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ type: 'object' }),
+      });
+
+      const result = await validateCredentialSchema(credential);
+
+      expect(detectExtension(credential)).toEqual({
+        core: { type: 'DigitalProductPassport', version: '0.5.0' },
+        extension: { type: 'DigitalLivestockPassport', version: '0.4.0' },
+      });
+      expect(result.valid).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/schema?url=${encodeURIComponent(
+          'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json',
+        )}`,
+      );
+    });
+
+    it('detects a core context at any array position and fails it against the published v0.5.0 schema', async () => {
+      const fixture = require('../../e2e/cypress/fixtures/credentials-e2e/invalid-schema-v2-enveloped-dpp.json');
+      const credential = decodeEnvelopedCredential(fixture);
+      // The published v0.5.0 DPP schema body, recorded verbatim on 2026-09-15 from
+      // https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json. v0.5.0 is not in
+      // the untp-utils bundled manifest, so the fixture is this suite's only copy of it.
+      const publishedDppV050Schema = require('../fixtures/untp-dpp-schema-0.5.0.json');
+
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(publishedDppV050Schema),
+      });
+
+      const result = await validateCredentialSchema(credential);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ keyword: 'const', instancePath: '/@context' }),
+          expect.objectContaining({ keyword: 'enum', instancePath: '/@context/0' }),
+        ]),
+      );
+      // The e2e spec asserts this fixture fails UNTP Schema Validation. A failure made only of
+      // additionalProperties errors is reported as valid, so the @context errors are what keep it red.
+      expect(result.errors?.every((error: any) => error.keyword === 'additionalProperties')).toBe(false);
     });
   });
 
@@ -467,7 +803,6 @@ describe('schemaValidation', () => {
 
     it('rejects a credential whose UNTP version could not be detected before fetching', async () => {
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-      (detectVersion as jest.Mock).mockReturnValue('unknown');
 
       await expect(validateCredentialSchema({ type: 'DigitalProductPassport' })).rejects.toThrow('Unsupported version');
       expect(global.fetch).not.toHaveBeenCalled();
@@ -480,14 +815,20 @@ describe('schemaValidation', () => {
           Promise.resolve({
             $schema: 'https://json-schema.org/draft/2020-12/schema',
             type: 'object',
-            properties: { type: { type: 'string' } },
+            properties: {
+              type: { type: 'string' },
+              '@context': { type: 'array' },
+            },
             additionalProperties: false,
           }),
       });
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.7.0');
 
-      const result = await validateCredentialSchema({ type: 'DigitalProductPassport', extra: 'field' });
+      const result = await validateCredentialSchema({
+        type: 'DigitalProductPassport',
+        '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+        extra: 'field',
+      });
       expect(result.valid).toBe(true);
       expect(result.errors?.map((error) => error.keyword)).toEqual(['additionalProperties']);
     });
@@ -506,7 +847,6 @@ describe('schemaValidation', () => {
           }),
       });
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.4.0');
 
       const result = await validateCredentialSchema({
         type: ['DigitalLivestockPassport'],
@@ -567,11 +907,10 @@ describe('schemaValidation', () => {
       (global.fetch as jest.Mock).mockReturnValueOnce(fetchPromise);
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.5.0');
 
       const credential = {
         type: 'DigitalProductPassport',
-        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0'],
+        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
         version: '0.5.0',
       };
 
@@ -601,11 +940,10 @@ describe('schemaValidation', () => {
         });
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
-      (detectVersion as jest.Mock).mockReturnValue('0.5.0');
 
       const credential = {
         type: 'DigitalProductPassport',
-        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0'],
+        '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.5.0/'],
         version: '0.5.0',
       };
 
@@ -640,14 +978,11 @@ describe('schemaValidation', () => {
         type: ['DigitalLivestockPassport', 'VerifiableCredential'],
         '@context': [
           'https://www.w3.org/ns/credentials/v2',
-          'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json',
+          'https://aatp.foodagility.com/context/aatp-dlp-context-0.4.0.jsonld',
         ],
       };
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
-      (detectVersion as jest.Mock).mockImplementation((_credential: any, domain?: string) =>
-        domain === 'aatp.foodagility.com' ? '0.4.0' : '0.5.0',
-      );
 
       // First call drives the relax path (DPP 0.5.0 via the DLP 0.4.0 extension).
       await validateCredentialSchema(dlpCredential);

@@ -17,7 +17,8 @@ import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
 import { validateContext } from '@/lib/contextValidation';
 import { newId } from '@/lib/id';
 import { schemeSubtitle, schemeTitle } from '@/lib/schemeCollection';
-import { detectSchemeVersion, SchemaFetchError, validateSchemeSchema } from '@/lib/schemeValidation';
+import { SchemaFetchError, SchemaSelectionError, validateSchemeSchema } from '@/lib/schemeValidation';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import type { ArtefactSlot, CollectionState, InstanceId, RunId } from '@/types/artefact';
 import type { StoredScheme, TestStep } from '@/types';
 import confetti from 'canvas-confetti';
@@ -133,7 +134,7 @@ async function runSchemePipeline(
 
   if (!setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.IN_PROGRESS })) return;
 
-  const version = detectSchemeVersion(stored.decoded);
+  const version = detectVersionFromContext(stored.decoded);
   if (!version) {
     const message =
       'Could not detect a UNTP version from the @context. Add a UNTP context URI (e.g. https://vocabulary.uncefact.org/untp/0.7.0/context/).';
@@ -208,6 +209,14 @@ function stepErrors(step: TestStep): DisplayableError[] {
 }
 
 function schemaFetchError(err: unknown): DisplayableError {
+  // Selection failed before transport on the scheme's own version, so the uploader can act on it
+  // and support cannot.
+  if (err instanceof SchemaSelectionError) {
+    return {
+      message: `${err.message} Use a Conformity Scheme published for UNTP 0.7.0 or later.`,
+      supportable: false,
+    };
+  }
   if (err instanceof SchemaFetchError) {
     switch (err.reason) {
       case 'timeout':

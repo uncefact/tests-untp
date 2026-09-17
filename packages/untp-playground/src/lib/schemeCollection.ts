@@ -7,7 +7,7 @@
  */
 
 import { hashContent } from '@/lib/hash';
-import { detectSchemeVersion } from '@/lib/schemeValidation';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import type { StoredScheme, TestStep } from '@/types';
 import { TestCaseStatus } from '../../constants';
 
@@ -44,7 +44,7 @@ export function schemeTitle(scheme: StoredScheme): string {
 
 /** Always-on subtitle: the family label with the detected UNTP context version when there is one. */
 export function schemeSubtitle(scheme: StoredScheme): string {
-  const version = detectSchemeVersion(scheme.decoded);
+  const version = detectVersionFromContext(scheme.decoded);
   return version ? `${SCHEME_FAMILY_LABEL} (v${version})` : SCHEME_FAMILY_LABEL;
 }
 

@@ -142,6 +142,15 @@ describe('credentialSubtitle', () => {
     expect(subtitle).toBe('credentials.example.org · v0.6.0 · did:web:volt.example');
   });
 
+  // AC3 at the display boundary: the bespoke regex rendered this card as 'v0.7.0-rc'.
+  it('shows the whole multi-segment prerelease in the version label', () => {
+    const doc = {
+      '@context': [VCDM_CONTEXT_URLS.v2, 'https://vocabulary.uncefact.org/untp/0.7.0-rc.1/context/'],
+      type: ['VerifiableCredential', 'DigitalProductPassport'],
+    };
+    expect(credentialSubtitle(credential(doc))).toContain('v0.7.0-rc.1');
+  });
+
   it('shows "unknown version" when no UNTP version is detected, and omits a missing issuer', () => {
     const doc = { '@context': [VCDM_CONTEXT_URLS.v2], type: ['VerifiableCredential', 'DigitalProductPassport'] };
     expect(credentialSubtitle(credential(doc))).toBe('unknown version');

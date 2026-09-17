@@ -1,11 +1,12 @@
 import { schemeContentHash, schemeIsTerminal, schemeTitle, schemeSubtitle } from '@/lib/schemeCollection';
 import type { StoredScheme, TestStep } from '@/types';
 import { TestCaseStatus, TestCaseStepId } from '../../constants';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 
-jest.mock('@/lib/schemeValidation', () => ({
-  detectSchemeVersion: jest.fn(),
+jest.mock('@uncefact/untp-utils/artefacts', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/artefacts'),
+  detectVersionFromContext: jest.fn(),
 }));
-import { detectSchemeVersion } from '@/lib/schemeValidation';
 
 const step = (status: TestCaseStatus): TestStep => ({
   id: TestCaseStepId.SCHEME_VERSION_DETECTION,
@@ -80,12 +81,12 @@ describe('schemeTitle', () => {
 
 describe('schemeSubtitle', () => {
   it('shows the family label with the detected context version', () => {
-    (detectSchemeVersion as jest.Mock).mockReturnValue('0.7.0');
+    (detectVersionFromContext as jest.Mock).mockReturnValue('0.7.0');
     expect(schemeSubtitle(scheme({}))).toBe('Conformity Scheme (v0.7.0)');
   });
 
   it('shows the family label alone when no version is detected', () => {
-    (detectSchemeVersion as jest.Mock).mockReturnValue(undefined);
+    (detectVersionFromContext as jest.Mock).mockReturnValue(undefined);
     expect(schemeSubtitle(scheme({}))).toBe('Conformity Scheme');
   });
 });

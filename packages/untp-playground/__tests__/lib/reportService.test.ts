@@ -1,5 +1,6 @@
-import { detectCredentialType, detectVersion } from '@/lib/credentialService';
+import { detectCredentialType } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import type { CredentialReportInput, StoredLinkSet, TestStep } from '@/types';
 import type { LinkSetAssessment } from '@/lib/linkTypeCoverage';
 import { TestCaseStepId } from '../../constants';
@@ -9,6 +10,10 @@ import { TestCaseStatus } from '../../constants';
 
 jest.mock('@/lib/credentialService');
 jest.mock('@/lib/schemaValidation');
+jest.mock('@uncefact/untp-utils/artefacts', () => ({
+  ...jest.requireActual('@uncefact/untp-utils/artefacts'),
+  detectVersionFromContext: jest.fn(),
+}));
 jest.mock('../../config', () => ({
   ...jest.requireActual('../../config'),
   reportName: 'UNTP',
@@ -67,7 +72,7 @@ describe('generateReport', () => {
   const mockPassStatuses = [TestCaseStatus.SUCCESS];
 
   beforeEach(() => {
-    (detectVersion as jest.Mock).mockReturnValue('1.0.0');
+    (detectVersionFromContext as jest.Mock).mockReturnValue('1.0.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     // credentialGroupType (used by generateReport to derive the report's core.type) falls back to
     // detectCredentialType when there is no extension; credentialService is wholesale-mocked here.
@@ -122,6 +127,41 @@ describe('generateReport', () => {
         passStatuses: mockPassStatuses,
       }),
     ).rejects.toThrow('No credentials, conformity schemes or link sets to generate report.');
+  });
+
+  it('writes unknown for a credential when no UNTP version is detected', async () => {
+    (detectVersionFromContext as jest.Mock).mockReturnValue(undefined);
+
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      credentialInstances: [mockCredentialInstance],
+      passStatuses: mockPassStatuses,
+    });
+
+    expect(report.verifiableCredentials[0].core.version).toBe('unknown');
+  });
+
+  it('writes unknown for a conformity scheme when no UNTP version is detected', async () => {
+    (detectVersionFromContext as jest.Mock).mockReturnValue(undefined);
+
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      schemeInstances: [
+        {
+          scheme: { original: {}, decoded: { type: ['ConformityScheme'] } },
+          steps: [
+            {
+              id: TestCaseStepId.SCHEME_VERSION_DETECTION,
+              name: 'Version Detection',
+              status: TestCaseStatus.SUCCESS,
+            },
+          ],
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    expect(report.conformitySchemes[0].version).toBe('unknown');
   });
 
   it('should generate a report with the extension', async () => {
@@ -189,6 +229,7 @@ describe('generateReport', () => {
   });
 
   it('includes scheme results, top-level metadata, and source when a scheme is provided', async () => {
+    (detectVersionFromContext as jest.Mock).mockReturnValue('0.7.0');
     const schemeInstances = [
       {
         scheme: {
@@ -343,9 +384,43 @@ describe('generateReport link sets and titles (#814)', () => {
   };
 
   beforeEach(() => {
-    (detectVersion as jest.Mock).mockReturnValue('0.7.0');
+    (detectVersionFromContext as jest.Mock).mockReturnValue('0.7.0');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
     (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+  });
+
+  // AC3 in the report contract: the real detector runs here, so a return to the truncating regex
+  // writes '0.7.0-rc' into the report JSON and fails this.
+  it('writes the whole multi-segment prerelease into the report', async () => {
+    const { detectVersionFromContext: realDetectVersionFromContext } = jest.requireActual<
+      typeof import('@uncefact/untp-utils/artefacts')
+    >('@uncefact/untp-utils/artefacts');
+    (detectVersionFromContext as jest.Mock).mockImplementation(realDetectVersionFromContext);
+    const prereleaseDpp = {
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/0.7.0-rc.1/context/'],
+      type: ['VerifiableCredential', 'DigitalProductPassport'],
+      credentialSubject: {},
+    };
+
+    const report = await generateReport({
+      implementationName: 'Prerelease',
+      credentialInstances: [
+        {
+          credential: { original: prereleaseDpp, decoded: prereleaseDpp },
+          steps: [
+            { id: TestCaseStepId.PROOF_TYPE, name: 'Proof Type Detection', status: TestCaseStatus.SUCCESS },
+            {
+              id: TestCaseStepId.UNTP_SCHEMA_VALIDATION,
+              name: 'UNTP Schema Validation',
+              status: TestCaseStatus.SUCCESS,
+            },
+          ],
+        },
+      ],
+      passStatuses: [TestCaseStatus.SUCCESS],
+    });
+
+    expect(report.verifiableCredentials[0].core.version).toBe('0.7.0-rc.1');
   });
 
   const linkSetDoc = {

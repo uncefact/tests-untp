@@ -1,15 +1,17 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
+import { API_BASE_PATH, VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
 import {
-  API_BASE_PATH,
-  UNTP_CORE_SCHEMA_FILENAMES,
+  buildUntpArtefactUrls,
+  detectVersionFromContext,
   UNTP_SHORT_CREDENTIAL_TYPES,
-  VCDM_SCHEMA_URLS,
-  VCDMVersion,
-} from '../../constants';
-import { detectCredentialType, detectVersion } from './credentialService';
-import { schemaCache } from './schemaFetch';
-import { isUntpV070OrAbove } from './utils';
+} from '@uncefact/untp-utils/artefacts';
+import { detectCredentialType } from './credentialService';
+import { schemaCache, SchemaSelectionError } from './schemaFetch';
+
+// Re-exported as the same binding: TestResults narrows on `instanceof SchemaSelectionError`
+// through this module, and the scheme validator raises the same class from its own module.
+export { SchemaSelectionError };
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -133,20 +135,31 @@ export const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
   },
 };
 
-const schemaURLConstructor = (type: string, version: string) => {
-  const shortType = UNTP_SHORT_CREDENTIAL_TYPES[type];
-
-  if (isUntpV070OrAbove(version)) {
-    const fileName = UNTP_CORE_SCHEMA_FILENAMES[type];
-    return `https://untp.unece.org/artefacts/schema/v${version}/${shortType}/${fileName}.json`;
-  }
-
-  return `https://test.uncefact.org/vocabulary/untp/${shortType}/untp-${shortType}-schema-${version}.json`;
-};
-
 const findExtensionSchemaURL = (type: string, version: string) => {
   return EXTENSION_VERSIONS[type].versions.find((v) => v.version === version)?.schema;
 };
+
+/**
+ * Keeps the DLP filename-shaped context carried by the shipped e2e fixture working while the
+ * shared detector handles version-shaped path segments. The fixture
+ * invalid-v2-enveloped-dpp-with-extension.json carries
+ * `https://aatp.foodagility.com/context/aatp-dlp-context-0.4.0.jsonld`, which the shared detector
+ * does not recognise, so that journey needs this path. Evidence that the extension has adopted a
+ * version-shaped context would allow the fallback to be removed.
+ */
+function detectExtensionVersion(credential: any, domain: string): string | undefined {
+  const context = credential?.['@context'];
+  const candidates = Array.isArray(context) ? context : [context];
+  const extensionContext = candidates.find(
+    (entry): entry is string => typeof entry === 'string' && entry.includes(domain),
+  );
+  if (!extensionContext) return undefined;
+
+  const canonicalVersion = detectVersionFromContext({ '@context': [extensionContext] }, { domain });
+  if (canonicalVersion) return canonicalVersion;
+
+  return extensionContext.match(/(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/)?.[1];
+}
 
 export async function validateCredentialSchema(credential: any): Promise<{
   valid: boolean;
@@ -155,19 +168,29 @@ export async function validateCredentialSchema(credential: any): Promise<{
   const extension = detectExtension(credential);
   const credentialType = extension ? extension.core.type : detectCredentialType(credential);
 
-  if (credentialType === 'Unknown') {
-    throw new Error('Unsupported credential type');
+  if (!extension && Object.hasOwn(EXTENSION_VERSIONS, credentialType)) {
+    throw new SchemaSelectionError(`Unsupported extension version for ${credentialType}`);
   }
 
-  const version = extension?.core?.version || detectVersion(credential);
-
-  // detectVersion reports a missing or unparseable UNTP context as the string
-  // 'unknown', which must not become a schema URL.
-  if (!version || version === 'unknown') {
-    throw new Error('Unsupported version');
+  if (!Object.hasOwn(UNTP_SHORT_CREDENTIAL_TYPES, credentialType)) {
+    throw new SchemaSelectionError(`Unsupported credential type: ${credentialType}`);
   }
 
-  const schemaUrl = schemaURLConstructor(credentialType, version);
+  const version = extension?.core?.version || detectVersionFromContext(credential);
+
+  if (!version) {
+    throw new SchemaSelectionError('Unsupported version');
+  }
+
+  let schemaUrl: string;
+  try {
+    schemaUrl = buildUntpArtefactUrls(credentialType, version).schemaUrl;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new SchemaSelectionError(error.message);
+    }
+    throw error;
+  }
 
   if (extension?.core.type === 'DigitalProductPassport' && extension?.core.version === '0.5.0') {
     const relaxFunction = (schema: any) => {
@@ -212,7 +235,7 @@ export function detectExtension(credential: any):
   if (!extension) {
     return undefined;
   }
-  const version = detectVersion(credential, extension.domain);
+  const version = detectExtensionVersion(credential, extension.domain);
   const extensionVersion = extension.versions.find((v) => v.version === version);
   if (!extensionVersion) {
     return undefined;
@@ -220,7 +243,7 @@ export function detectExtension(credential: any):
 
   return {
     core: extensionVersion.core,
-    extension: { type: credentialType, version },
+    extension: { type: credentialType, version: extensionVersion.version },
   };
 }
 

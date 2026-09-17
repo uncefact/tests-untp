@@ -8,6 +8,34 @@ import {
 } from './urls';
 
 describe('buildUntpArtefactUrls', () => {
+  // Every URL below is the one recorded in artefacts/manifest.json, except the ConformityScheme
+  // legacy entry: no pre-0.7 CVC schema is published, so that row characterises the builder's
+  // legacy branch rather than pinning a published artefact.
+  const legacySchemaUrls = {
+    DigitalProductPassport: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
+    DigitalConformityCredential: 'https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.0.json',
+    DigitalTraceabilityEvent: 'https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.0.json',
+    DigitalFacilityRecord: 'https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.0.json',
+    DigitalIdentityAnchor: 'https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.0.json',
+    ConformityScheme: 'https://test.uncefact.org/vocabulary/untp/cvc/untp-cvc-schema-0.6.0.json',
+  };
+  const artefactSchemaUrls = {
+    DigitalProductPassport: 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
+    DigitalConformityCredential: 'https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json',
+    DigitalTraceabilityEvent: 'https://untp.unece.org/artefacts/schema/v0.7.0/dte/DigitalTraceabilityEvent.json',
+    DigitalFacilityRecord: 'https://untp.unece.org/artefacts/schema/v0.7.0/dfr/DigitalFacilityRecord.json',
+    DigitalIdentityAnchor: 'https://untp.unece.org/artefacts/schema/v0.7.0/dia/DigitalIdentityAnchor.json',
+    ConformityScheme: 'https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json',
+  };
+
+  it.each(Object.entries(legacySchemaUrls))('keeps the legacy URL stable for %s', (type, schemaUrl) => {
+    expect(buildUntpArtefactUrls(type, '0.6.0').schemaUrl).toBe(schemaUrl);
+  });
+
+  it.each(Object.entries(artefactSchemaUrls))('keeps the artefacts URL byte-identical for %s', (type, schemaUrl) => {
+    expect(buildUntpArtefactUrls(type, '0.7.0').schemaUrl).toBe(schemaUrl);
+  });
+
   describe('v0.6.x (legacy layout)', () => {
     it('builds the legacy per-credential-type schema and context URLs', () => {
       expect(buildUntpArtefactUrls('DigitalProductPassport', '0.6.1')).toEqual({
@@ -80,6 +108,10 @@ describe('buildUntpArtefactUrls', () => {
     it('throws with a helpful message listing the supported types', () => {
       expect(() => buildUntpArtefactUrls('DigitalLivestockPassport', '0.7.0')).toThrow(/Unknown UNTP artefact type/);
     });
+
+    it('rejects inherited object keys', () => {
+      expect(() => buildUntpArtefactUrls('toString', '0.7.0')).toThrow('Unknown UNTP artefact type "toString"');
+    });
   });
 
   describe('exported maps', () => {
@@ -128,6 +160,10 @@ describe('buildSpecificationPageUrl', () => {
 
   it('throws for an unknown artefact type', () => {
     expect(() => buildSpecificationPageUrl('DigitalLivestockPassport', '0.7.0')).toThrow(/Unknown UNTP artefact type/);
+  });
+
+  it('rejects inherited object keys', () => {
+    expect(() => buildSpecificationPageUrl('toString', '0.7.0')).toThrow('Unknown UNTP artefact type "toString"');
   });
 
   it('keeps the slug set aligned with the short-code map', () => {

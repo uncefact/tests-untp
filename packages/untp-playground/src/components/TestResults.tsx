@@ -29,6 +29,7 @@ import { newId } from '@/lib/id';
 import {
   detectExtension,
   SchemaFetchError,
+  SchemaSelectionError,
   schemaFetchFailureAdvice,
   validateCredentialSchema,
   validateExtension,
@@ -342,23 +343,37 @@ async function runCredentialPipeline(
       }
     } catch (error) {
       console.error('Schema validation error:', error);
-      // A SchemaFetchError carries the schema service's own category, so the
-      // advice can say whether the credential's declared version or the host
-      // is the likely cause instead of always blaming the @context.
+      // A SchemaSelectionError means selection failed before transport, so there is nothing to
+      // retry and no toast. A SchemaFetchError carries the schema service's own category, so its
+      // advice can say whether the credential's declared version or the host is the likely cause
+      // instead of always blaming the @context.
+      const selectionError = error instanceof SchemaSelectionError ? error : undefined;
       const fetchError = error instanceof SchemaFetchError ? error : undefined;
-      const detail = {
-        keyword: 'schema',
-        instancePath: '',
-        message: fetchError ? fetchError.message : 'Failed to fetch schema',
-        params: fetchError
-          ? { ...schemaFetchFailureAdvice(fetchError), receivedValue: stored }
-          : {
-              missingValue: 'The schema could not be loaded due to missing UNTP context IRIs.',
-              solution: "Ensure the credential includes the required UNTP context IRIs in the '@context' field.",
-              allowedValue: allowedContextValue,
+      const detail = selectionError
+        ? {
+            keyword: 'schema',
+            instancePath: '',
+            message: selectionError.message,
+            params: {
+              solution: "Check the credential's type and the UNTP version in its @context.",
               receivedValue: stored,
             },
-      };
+          }
+        : {
+            keyword: 'schema',
+            instancePath: '',
+            message: fetchError ? fetchError.message : 'Failed to fetch schema',
+            params: fetchError
+              ? { ...schemaFetchFailureAdvice(fetchError), receivedValue: stored }
+              : {
+                  missingValue: 'The schema could not be loaded due to missing UNTP context IRIs.',
+                  solution: "Ensure the credential includes the required UNTP context IRIs in the '@context' field.",
+                  allowedValue: allowedContextValue,
+                  receivedValue: stored,
+                },
+          };
+      // The remaining steps still run: leaving one IN_PROGRESS would make the instance
+      // non-terminal, and so non-removable and blocking report generation.
       if (
         !setStep(TestCaseStepId.UNTP_SCHEMA_VALIDATION, {
           status: TestCaseStatus.FAILURE,
@@ -367,7 +382,9 @@ async function runCredentialPipeline(
       ) {
         return;
       }
-      toast.error(fetchError ? fetchError.message : 'Failed to fetch schema. Please try again.');
+      if (!selectionError) {
+        toast.error(fetchError ? fetchError.message : 'Failed to fetch schema. Please try again.');
+      }
     }
 
     try {

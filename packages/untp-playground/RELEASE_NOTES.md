@@ -30,6 +30,10 @@ network error. If a site labels its response with an unusual content type, the
 Playground may tell you the address did not return valid JSON instead of
 pointing out that it is a web page.
 
+### More precise UNTP version and schema checks
+
+The Playground now recognises a UNTP context wherever it appears in a credential's `@context`, so a credential that carries its UNTP context somewhere other than the second entry is recognised instead of being reported as an unsupported version, and its schema is checked. A context whose version is the last part of the address with no trailing slash, such as one ending `/dpp/0.5.0`, is read as its version, and schema validation then reports the exact context string the published schema requires. A complete prerelease version such as `0.7.0-rc.1` is preserved for the core credential, while a Digital Livestock Passport version read from a context filename keeps only the first part of a dotted prerelease, so `0.4.1-beta1.2` is read as `0.4.1-beta1` and is recognised only when that shorter version is one the Playground knows. Published schema addresses are unchanged for supported credential types and versions, and Digital Livestock Passport extension contexts continue to work. A missing version and an unsupported credential type are reported before any schema is fetched, with advice to check the type and `@context`, and no retry is offered; a Digital Livestock Passport whose version the Playground does not know is reported the same way, as an unsupported extension version. A Conformity Scheme older than UNTP 0.7.0 is reported as having no published schema layout, with advice to use a scheme published for 0.7.0 or later. Cards and reports keep their existing labels where no version can be detected.
+
 ### Link sets in your report
 
 A generated report now includes every link set you loaded, with the UNTP version it was checked against, the schema result, and how many of its credential links you verified and whether each was the kind of credential its link claimed. You can generate a report from a link set alone, and you do not have to verify every link first: the coverage line records what you checked.

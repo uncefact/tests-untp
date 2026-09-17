@@ -9,8 +9,9 @@
  */
 
 import { hashContent } from '@/lib/hash';
-import { detectCredentialType, detectVersion } from '@/lib/credentialService';
+import { detectCredentialType } from '@/lib/credentialService';
 import { detectExtension } from '@/lib/schemaValidation';
+import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import type { Credential, StoredCredential, TestReportStep, TestStep } from '@/types';
 import { TERMINAL_STATUSES, TestCaseStatus } from '../../constants';
 
@@ -81,7 +82,9 @@ export function credentialTitle(stored: StoredCredential): string {
 export function credentialSubtitle(stored: StoredCredential): string {
   const decoded = stored.decoded;
   const extension = detectExtension(decoded);
-  const versionLabel = extension ? extensionLabel(extension.extension) : coreVersionLabel(detectVersion(decoded));
+  const versionLabel = extension
+    ? extensionLabel(extension.extension)
+    : coreVersionLabel(detectVersionFromContext(decoded));
   const issuer = credentialIssuerId(decoded);
 
   const parts: string[] = [];
@@ -96,12 +99,12 @@ export function credentialSubtitle(stored: StoredCredential): string {
   return parts.join(' · ');
 }
 
-function coreVersionLabel(version: string): string {
-  return version && version !== 'unknown' ? `v${version}` : 'unknown version';
+function coreVersionLabel(version: string | undefined): string {
+  return version ? `v${version}` : 'unknown version';
 }
 
 function extensionLabel(extension: { type: string; version: string }): string {
-  const suffix = extension.version && extension.version !== 'unknown' ? ` v${extension.version}` : '';
+  const suffix = extension.version ? ` v${extension.version}` : '';
   return `${extension.type}${suffix}`;
 }
 
