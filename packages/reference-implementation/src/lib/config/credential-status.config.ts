@@ -60,6 +60,12 @@ export function validateStatusSettingsOnBoot(
   env: Record<string, string | undefined> = process.env,
   logger?: Pick<LoggerService, 'warn'>,
 ): void {
+  const enabled = env.STATUS_MUTATION_ENABLED;
+  if (enabled !== undefined && enabled !== '' && enabled !== 'true' && enabled !== 'false') {
+    throw new Error('STATUS_MUTATION_ENABLED must be true or false.');
+  }
+  readStatusOperationBudgetMs(env);
+  readStatusReconcileGraceMs(env);
   const purposes = readDefaultStatusPurposes(env);
   if (purposes.length === 0 && env[STATUS_PURPOSES_ENV_NAME]?.trim().toLowerCase() === 'none') {
     logger?.warn(NO_STATUS_WARNING);
@@ -73,4 +79,27 @@ export function validateStatusSettingsOnBoot(
       `${STATUS_LOCK_ACQUIRE_ENV_NAME} has invalid value "${rawAcquireMs}"; using the default ${DEFAULT_STATUS_LOCK_ACQUIRE_MS} milliseconds.`,
     );
   }
+}
+
+const DEFAULT_STATUS_OPERATION_BUDGET_MS = 30_000;
+const DEFAULT_STATUS_RECONCILE_GRACE_MS = 5_000;
+
+function readStatusDuration(name: string, fallback: number, env: Record<string, string | undefined>): number {
+  const raw = env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const value = Number(raw);
+  if (!/^[0-9]+$/.test(raw.trim()) || !Number.isSafeInteger(value) || value < 1 || value > 2_147_483_647) {
+    throw new Error(`${name} must be an integer between 1 and 2147483647 milliseconds.`);
+  }
+  return value;
+}
+
+/** The operation deadline bounds all provider calls, including lock acquisition. */
+export function readStatusOperationBudgetMs(env: Record<string, string | undefined> = process.env): number {
+  return readStatusDuration('STATUS_OPERATION_BUDGET_MS', DEFAULT_STATUS_OPERATION_BUDGET_MS, env);
+}
+
+/** Reconciliation waits this long after a pending operation's deadline. */
+export function readStatusReconcileGraceMs(env: Record<string, string | undefined> = process.env): number {
+  return readStatusDuration('STATUS_RECONCILE_GRACE_MS', DEFAULT_STATUS_RECONCILE_GRACE_MS, env);
 }

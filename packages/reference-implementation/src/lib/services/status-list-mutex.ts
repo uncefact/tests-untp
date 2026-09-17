@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma/prisma';
+import { appLogger } from '@/lib/api/logger';
 
 import { DEFAULT_STATUS_LOCK_ACQUIRE_MS as DEFAULT_ACQUIRE_MS } from '../config/credential-status.config';
 const DEFAULT_POLL_MS = 25;
 const SETTLEMENT_ALLOWANCE_MS = 1_000;
 const CALLBACK_ERROR_UNSET = Symbol('callback error unset');
+const logger = appLogger.child({ module: 'status-list-mutex' });
 
 export class StatusListMutexTimeoutError extends Error {
   constructor(key: string, cause?: unknown) {
@@ -25,7 +28,7 @@ export class StatusListLockLostError extends Error {
     readonly callbackResult: unknown,
     cause?: unknown,
   ) {
-    super(`The status-list mutex lock was lost after the callback completed for ${key}`, { cause });
+    super(`The status-list mutex lock was lost around the callback for ${key}`, { cause });
     this.name = 'StatusListLockLostError';
   }
 }
@@ -67,6 +70,8 @@ function isPoolWaitError(error: unknown): boolean {
   const candidate = error as { code?: unknown; message?: unknown };
   if (candidate.code === 'P2024') return true;
   if (typeof candidate.message !== 'string') return false;
+  if (candidate.code === 'P2028' && /Unable to start a transaction in the given time/i.test(candidate.message))
+    return true;
   return /connection pool|timed out fetching a new connection|maxwait/i.test(candidate.message);
 }
 
@@ -84,6 +89,9 @@ export async function withStatusListMutex<T>(
   fn: () => Promise<T>,
   options: { signal: AbortSignal; deadlineAt: number },
 ): Promise<T> {
+  const hash = createHash('sha256').update(key).digest();
+  const keyHigh = hash.readInt32BE(0);
+  const keyLow = hash.readInt32BE(4);
   const acquireDeadline = Math.min(
     options.deadlineAt,
     Date.now() + integerEnv('STATUS_LOCK_ACQUIRE_MS', DEFAULT_ACQUIRE_MS),
@@ -103,8 +111,17 @@ export async function withStatusListMutex<T>(
         transactionCallbackStarted = true;
         for (;;) {
           assertAvailable(options.signal, key, acquireDeadline, options.deadlineAt);
-          const rows = await tx.$queryRaw<Array<{ acquired: boolean }>>`
+          const compatibilityRows = await tx.$queryRaw<Array<{ acquired: boolean }>>`
             SELECT pg_try_advisory_xact_lock(hashtext(${key})) AS acquired
+          `;
+          if (compatibilityRows[0]?.acquired !== true) {
+            const remaining = Math.min(acquireDeadline, options.deadlineAt) - Date.now();
+            if (remaining <= 0) throw new StatusListMutexTimeoutError(key);
+            await wait(options.signal, Math.min(DEFAULT_POLL_MS, remaining));
+            continue;
+          }
+          const rows = await tx.$queryRaw<Array<{ acquired: boolean }>>`
+            SELECT pg_try_advisory_xact_lock(${keyHigh}::int, ${keyLow}::int) AS acquired
           `;
           if (rows[0]?.acquired === true) break;
           const remaining = Math.min(acquireDeadline, options.deadlineAt) - Date.now();
@@ -114,7 +131,15 @@ export async function withStatusListMutex<T>(
 
         assertAvailable(options.signal, key, acquireDeadline, options.deadlineAt);
         callbackDispatched = true;
-        callbackPromise = Promise.resolve().then(fn);
+        callbackPromise = Promise.resolve().then(() => {
+          try {
+            return fn();
+          } catch (error) {
+            callbackError = error;
+            callbackSettled = true;
+            throw error;
+          }
+        });
         try {
           callbackResult = await callbackPromise;
           callbackSettled = true;
@@ -144,7 +169,13 @@ export async function withStatusListMutex<T>(
         callbackSettled = true;
       }
     }
-    if (callbackError !== CALLBACK_ERROR_UNSET) throw callbackError;
+    if (callbackError !== CALLBACK_ERROR_UNSET) {
+      logger.warn(
+        { err: callbackError, transactionError },
+        'Status-list callback failed after its transaction also failed',
+      );
+      throw callbackError;
+    }
     throw new StatusListLockLostError(key, callbackResult, transactionError);
   }
 }

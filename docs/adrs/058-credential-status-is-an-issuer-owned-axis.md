@@ -9,6 +9,7 @@
 - **Update (2026-09-17):** The supported-purposes list is Reference Implementation policy, not part of the `packages/services` contract.
 - **Update (2026-09-17):** The status-list mutex is transaction-scoped on the shared application pool, so it remains effective through transaction pooling while holding one pool slot for the provider call.
 - **Update (2026-09-17):** Entries with `statusSize > 1` are refused during capture as `MALFORMED_ENTRY` rather than captured, per the disposition record.
+- **Update (2026-09-17):** Native issuer-status set, read and reconcile routes now expose fenced observations, with a grace window and explicit provider-change acceptance. Library lifecycle and management capability are independent of verification; pending and differing observations are warnings. Configuration repair preserves original pins and records accepted replacement digests. The shared mutex uses two signed 32-bit SHA-256 words, and loss of its transaction during a set retains pending intent as an unknown outcome. The ADR body is unchanged.
 
 ## Context
 

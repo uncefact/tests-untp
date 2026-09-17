@@ -209,11 +209,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: false
  *                   hasKey: true
  *                   verification: { generation: 3, state: pending, requestedAt: '2026-09-07T11:04:00.000Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
- *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -234,11 +235,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: false
  *                   hasKey: true
  *                   verification: { generation: 3, state: pending, requestedAt: '2026-09-07T11:03:58.000Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
- *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -259,11 +261,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: true
  *                   hasKey: true
  *                   verification: { generation: 2, state: pending, requestedAt: '2026-09-07T11:04:00.000Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
- *                   status: { capture: PENDING, entries: [] }
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: false, verifiable: true }
+ *                   status: { capture: PENDING, statusCaptureError: null, entries: [] }
+ *                   lifecycle: unknown
+ *                   capabilities: { deletable: true, annotatable: false, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-07-15T09:00:00.000Z'
  *                   updatedAt: '2026-07-15T09:00:00.000Z'
@@ -284,11 +287,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: false
  *                   hasKey: true
  *                   verification: { generation: 3, state: complete, requestedAt: '2026-09-07T11:04:00.000Z', completedAt: '2026-09-07T11:04:03.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified, sourceChanged: false, lastSourceCheckAt: '2026-09-07T11:04:00.000Z' }
- *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -309,11 +313,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: false
  *                   hasKey: true
  *                   verification: { generation: 2, state: pending, requestedAt: '2026-09-07T11:04:00.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
- *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-07T11:04:00.000Z'
@@ -334,11 +339,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: false
  *                   hasKey: true
  *                   verification: { generation: 2, state: pending, requestedAt: '2026-09-07T11:04:00.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
- *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: [{ code: DUPLICATE_CONTENT, message: 'The credential content matches record clw0ext3rn4lprotect000003.', relatedRecordId: clw0ext3rn4lprotect000003 }]
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-07T11:04:00.000Z'
@@ -359,11 +365,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: false
  *                   hasKey: false
  *                   verification: { generation: 3, state: failed, requestedAt: '2026-09-07T11:04:00.000Z', completedAt: '2026-09-07T11:04:01.000Z', checks: { retrieval: pass, decryption: not_run, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: SOURCE_NOT_CREDENTIAL, message: 'The re-fetched source did not return the credential this record already holds. Its content identity and details have been preserved unchanged; the fetched body was discarded rather than replacing them.', retryable: true }, sourceChanged: true, lastSourceCheckAt: '2026-09-07T11:04:00.000Z' }
- *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -384,11 +391,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: true
  *                   hasKey: true
  *                   verification: { generation: 3, state: pending, requestedAt: '2026-09-09T09:12:00.000Z', checks: { retrieval: pass, decryption: pass, digest: pass, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
- *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-09T09:12:00.000Z'
@@ -409,11 +417,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: true
  *                   hasKey: true
  *                   verification: { generation: 3, state: pending, requestedAt: '2026-09-09T09:12:00.000Z', checks: { retrieval: pass, decryption: pass, digest: pass, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: pending }
- *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: [{ code: DUPLICATE_CONTENT, message: 'The credential content matches record clw0ext3rn4lprotect000003.', relatedRecordId: clw0ext3rn4lprotect000003 }]
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-09T09:12:00.000Z'
@@ -434,11 +443,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: true
  *                   hasKey: false
  *                   verification: { generation: 3, state: failed, requestedAt: '2026-09-09T09:12:00.000Z', completedAt: '2026-09-09T09:12:01.000Z', checks: { retrieval: pass, decryption: fail, digest: pass, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: DECRYPTION_FAILED, message: "The supplied decryption key did not open this record's durable copy. The copy is kept exactly as it is. Retry with the correct sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify.", retryable: true } }
- *                   status: null
  *                   currencyStatus: unknown
  *                   detailsStatus: EXTRACTION_PENDING
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -459,11 +469,12 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   encrypted: true
  *                   hasKey: false
  *                   verification: { generation: 3, state: failed, requestedAt: '2026-09-09T09:12:00.000Z', completedAt: '2026-09-09T09:12:01.000Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: STORED_COPY_UNAVAILABLE, message: 'The durable copy could not be read back from storage (storage returned HTTP 404); this needs an operator to inspect the stored object.', retryable: false } }
- *                   status: null
  *                   currencyStatus: unknown
  *                   detailsStatus: EXTRACTION_PENDING
  *                   detailsError: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                   status: null
+ *                   lifecycle: null
+ *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'

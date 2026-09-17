@@ -25,11 +25,11 @@ This adapter mints one status entry per requested purpose. Requesting both `revo
 
 VCKit mints an entry by rewriting the whole encoded status list for an issuer, so two mints running at once on one list can lose an entry. The adapter therefore derives a serialisation key from the VCKit base origin and the status-list issuer and hands it to the caller's `serialise` hook, which wraps the provider call.
 
-The Reference Implementation backs that hook with a transaction-scoped database mutex. It serialises only the mints that share one coordination database and one key, at the cost of holding an application connection for the duration of the provider call. It does not serialise any other VCKit client, and it does not establish that a provider request whose outcome is unknown has stopped. The acquisition budget is `STATUS_LOCK_ACQUIRE_MS`, described under [status settings](../../operations/startup#credential-fetch-settings). A credential is not issued when the budget expires or the lock is lost, and the caller sees the `503` described under [Issue a Credential](../../api/credentials#issue-a-credential).
+The Reference Implementation backs that hook with a transaction-scoped database mutex. It serialises participating mints and status sets that share one coordination database and one key, at the cost of holding an application connection for the duration of the provider call. It does not serialise any other VCKit client, and it does not establish that a provider request whose outcome is unknown has stopped. The acquisition budget is `STATUS_LOCK_ACQUIRE_MS`, described under [status settings](../../operations/startup#credential-fetch-settings). A credential is not issued when the budget expires or the lock is lost, and the caller sees the `503` described under [Issue a Credential](../../api/credentials#issue-a-credential).
 
 VCKit's verifier fails a credential on any set bit, whatever the entry's `statusPurpose`. That is why only `revocation` and `suspension` are offered: no other purpose could be minted here and still carry its specified meaning.
 
-The status facts the Reference Implementation records are the entries returned inside the signed credential, never a second read of the provider. A response that cannot be read, is malformed, is ambiguous or omits a requested purpose is reported as a capture failure while issuance continues. Status lifecycle and mutation through this provider are documented when they are supported.
+The status entries captured at issuance come from the returned signed credential, without a second provider read during capture. A response that cannot be read, is malformed, is ambiguous or omits a requested purpose is reported as a capture failure while issuance continues. The [status API](../../api/credentials#change-issuer-status) reads and changes captured entries; only error-free singleton reads establish an observation. Unknown writes retain pending intent for explicit reconciliation.
 
 ## Multi-Tenancy
 
@@ -69,3 +69,7 @@ When creating or updating a VCKit service instance via the [Services API](../../
   "apiVersion": "1.0.0"
 }
 ```
+
+RI locking serialises participating operations sharing one coordination database and canonical provider/list identity. It does not serialise other VCKit clients or establish that an uncertain provider request has stopped.
+
+The mutex surrounds the set call only. Preliminary reads and read-back happen outside it, within the same operation deadline. Losing the lock while a set is still in flight is an unknown outcome. Where that set call itself rejects, its own failure is reported instead, so a definitive provider refusal stays definitive. See [Credential status recovery](../../operations/credential-status-recovery) before enabling mutation.

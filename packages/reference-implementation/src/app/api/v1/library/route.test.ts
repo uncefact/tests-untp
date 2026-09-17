@@ -961,7 +961,7 @@ describe('GET /api/v1/library', () => {
 
   it('passes repeatable type and the filters through after full validation', async () => {
     await get(
-      'http://localhost/api/v1/library?type=DPP&type=DFR&origin=external&organisationId=organisation-1&facilityId=facility-1&productId=product-1&issuer=Acme&encrypted=false&status=pending&issuedFrom=2026-01-01&issuedTo=2026-01-31&sort=createdAt:asc&limit=4&offset=2',
+      'http://localhost/api/v1/library?type=DPP&type=DFR&origin=external&organisationId=organisation-1&facilityId=facility-1&productId=product-1&issuer=Acme&encrypted=false&status=pending&lifecycle=unknown&issuedFrom=2026-01-01&issuedTo=2026-01-31&sort=createdAt:asc&limit=4&offset=2',
     );
 
     expect(mockListLibraryRecords).toHaveBeenCalledWith({
@@ -974,6 +974,7 @@ describe('GET /api/v1/library', () => {
       issuer: 'Acme',
       encrypted: false,
       status: 'pending',
+      lifecycle: 'unknown',
       sort: 'createdAt:asc',
       limit: 4,
       offset: 2,

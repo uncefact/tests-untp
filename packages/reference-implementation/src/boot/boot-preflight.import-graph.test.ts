@@ -37,6 +37,9 @@ const ENV_NAMES = [
   'RI_PROCESS_ROLE',
   'DEFAULT_STATUS_PURPOSES',
   'STATUS_LOCK_ACQUIRE_MS',
+  'STATUS_OPERATION_BUDGET_MS',
+  'STATUS_RECONCILE_GRACE_MS',
+  'STATUS_MUTATION_ENABLED',
 ] as const;
 const savedEnvironment = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 

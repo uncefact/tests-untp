@@ -39,6 +39,7 @@ export type ReserveStatusChangeOutcome =
   | 'version_conflict'
   | 'pending_exists'
   | 'pending_expired'
+  | 'instance_missing'
   | 'missing';
 
 export type FinaliseStatusChangeInput = {
@@ -52,9 +53,19 @@ export type FinaliseStatusChangeInput = {
   instanceId: string;
 };
 
-export type FinaliseStatusChangeOutcome = 'finalised' | 'token_mismatch' | 'version_conflict' | 'missing';
+export type FinaliseStatusChangeOutcome =
+  | 'finalised'
+  | 'token_mismatch'
+  | 'version_conflict'
+  | 'instance_missing'
+  | 'missing';
 
-export type ClearPendingIntentOutcome = 'cleared' | 'already_cleared' | 'token_mismatch' | 'missing';
+export type ClearPendingIntentOutcome =
+  | 'cleared'
+  | 'already_cleared'
+  | 'token_mismatch'
+  | 'instance_missing'
+  | 'missing';
 
 export type PersistObservationWithoutPendingInput = {
   entryId: string;
@@ -66,9 +77,15 @@ export type PersistObservationWithoutPendingInput = {
   instanceId: string;
 };
 
-export type PersistObservationWithoutPendingOutcome = 'persisted' | 'version_conflict' | 'pending_exists' | 'missing';
+export type PersistObservationWithoutPendingOutcome =
+  | 'persisted'
+  | 'version_conflict'
+  | 'pending_exists'
+  | 'instance_missing'
+  | 'missing';
 
-async function lockStatusServiceInstance(
+/** Locks the attributed tenant or system instance without falling back to a primary. */
+export async function lockStatusServiceInstance(
   tx: Prisma.TransactionClient,
   instanceId: string,
   credentialTenantId: string,
@@ -157,7 +174,7 @@ export function listCredentialStatusEntries(
 ): Promise<CredentialStatusEntry[]> {
   return tx.credentialStatusEntry.findMany({
     where: { credentialId, tenantId },
-    orderBy: { statusPurpose: 'asc' },
+    orderBy: [{ statusPurpose: 'asc' }, { id: 'asc' }],
   });
 }
 
@@ -208,7 +225,7 @@ export async function reserveStatusChange(
   const parentLocked = await lockLibraryRecordForUpdate(tx, input.credentialId, input.tenantId);
   if (!parentLocked) return classifyReservationFailure(tx, input);
   if (!(await lockStatusServiceInstance(tx, input.instanceId, input.tenantId))) {
-    return classifyReservationFailure(tx, input);
+    return 'instance_missing';
   }
   const result = await tx.$executeRaw`
     UPDATE "CredentialStatusEntry"
@@ -292,7 +309,7 @@ export async function finaliseStatusChange(
   const parentLocked = await lockLibraryRecordForUpdate(tx, input.credentialId, input.tenantId);
   if (!parentLocked) return classifyFinaliseFailure(tx, input);
   if (!(await lockStatusServiceInstance(tx, input.instanceId, input.tenantId))) {
-    return classifyFinaliseFailure(tx, input);
+    return 'instance_missing';
   }
 
   const result = await tx.$executeRaw`
@@ -330,6 +347,18 @@ export async function clearPendingIntent(
 ): Promise<ClearPendingIntentOutcome> {
   const parentLocked = await lockLibraryRecordForUpdate(tx, input.credentialId, input.tenantId);
   if (!parentLocked) return 'missing';
+  const inspected = await tx.credentialStatusEntry.findFirst({
+    where: { id: input.entryId, credentialId: input.credentialId, tenantId: input.tenantId },
+    select: { pendingInstanceId: true, pendingToken: true },
+  });
+  if (!inspected) return 'missing';
+  if (inspected.pendingToken === null) return 'already_cleared';
+  if (inspected.pendingToken !== input.token) return 'token_mismatch';
+  if (
+    inspected.pendingInstanceId === null ||
+    !(await lockStatusServiceInstance(tx, inspected.pendingInstanceId, input.tenantId))
+  )
+    return 'instance_missing';
   const result = await tx.$executeRaw`
     UPDATE "CredentialStatusEntry"
        SET "pendingValue" = NULL,
@@ -345,7 +374,10 @@ export async function clearPendingIntent(
        AND "tenantId" = ${input.tenantId}
        AND "pendingToken" = ${input.token}
   `;
-  if (result === 1) return 'cleared';
+  if (result === 1) {
+    await touchCredentialRecord(tx, input.credentialId, input.tenantId);
+    return 'cleared';
+  }
 
   const current = await tx.credentialStatusEntry.findFirst({
     where: { id: input.entryId, credentialId: input.credentialId, tenantId: input.tenantId },
@@ -375,7 +407,7 @@ export async function persistObservationWithoutPending(
   const parentLocked = await lockLibraryRecordForUpdate(tx, input.credentialId, input.tenantId);
   if (!parentLocked) return classifyObservationFailure(tx, input);
   if (!(await lockStatusServiceInstance(tx, input.instanceId, input.tenantId))) {
-    return classifyObservationFailure(tx, input);
+    return 'instance_missing';
   }
 
   const result = await tx.$executeRaw`

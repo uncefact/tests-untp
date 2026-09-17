@@ -186,6 +186,11 @@ function listResponse(
  *         schema:
  *           $ref: '#/components/schemas/VerificationSummary'
  *       - in: query
+ *         name: lifecycle
+ *         description: Confirmed issuer lifecycle, independent of status. Pending changes remain warnings. External records match no lifecycle value.
+ *         schema:
+ *           $ref: '#/components/schemas/CredentialLifecycle'
+ *       - in: query
  *         name: issuedFrom
  *         description: Inclusive UTC lower bound on effective issuedAt, falling back to createdAt. A reversed range is a 400 validation error.
  *         schema:
@@ -273,11 +278,12 @@ function listResponse(
  *                       encrypted: false
  *                       hasKey: true
  *                       verification: { generation: 1, state: complete, requestedAt: '2026-07-30T09:00:00Z', completedAt: '2026-07-30T09:00:06Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
- *                       status: null
  *                       currencyStatus: current
  *                       detailsStatus: EXTRACTED
  *                       detailsError: null
- *                       capabilities: { deletable: true, annotatable: true, verifiable: true }
+ *                       status: null
+ *                       lifecycle: null
+ *                       capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
  *                       warnings: []
  *                       createdAt: '2026-07-30T09:00:00Z'
  *                       updatedAt: '2026-07-30T09:00:06Z'
@@ -295,11 +301,12 @@ function listResponse(
  *                       encrypted: true
  *                       hasKey: true
  *                       verification: { generation: 1, state: complete, requestedAt: '2026-07-15T09:00:00Z', completedAt: '2026-07-15T09:00:00Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: pass, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: verified }
- *                       status: { capture: PENDING, entries: [] }
  *                       currencyStatus: current
  *                       detailsStatus: EXTRACTED
  *                       detailsError: null
- *                       capabilities: { deletable: true, annotatable: false, verifiable: true }
+ *                       status: { capture: PENDING, statusCaptureError: null, entries: [] }
+ *                       lifecycle: unknown
+ *                       capabilities: { deletable: true, annotatable: false, verifiable: true, statusManageable: false }
  *                       warnings: []
  *                       createdAt: '2026-07-15T09:00:00Z'
  *                       updatedAt: '2026-07-15T09:00:00Z'
@@ -361,6 +368,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
       issuer: query.issuer,
       encrypted: query.encrypted,
       status: query.status,
+      lifecycle: query.lifecycle,
       issuedFrom,
       issuedTo,
       sort: query.sort,

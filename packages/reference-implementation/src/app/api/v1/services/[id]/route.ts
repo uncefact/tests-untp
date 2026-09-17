@@ -198,7 +198,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   let encryptedConfig: string | undefined;
-  let configChanged: boolean | undefined;
+  let configChanged: ((storedConfig: string) => boolean) | undefined;
 
   if (hasConfig) {
     logger.info({ serviceInstanceId: id }, 'Decrypting existing config');
@@ -212,7 +212,6 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
     logger.info({ serviceInstanceId: id }, 'Merging config');
     const mergedConfig = { ...existingConfig, ...config };
-    configChanged = serviceInstanceConfigChanged(existingConfig, mergedConfig);
 
     logger.info({ serviceInstanceId: id }, 'Validating merged config against adapter schema');
     const { serviceType, adapterType } = existing;
@@ -231,6 +230,16 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     if (!result.success) {
       throw new ValidationError(`Invalid configuration: ${result.error.message}`);
     }
+
+    configChanged = (storedConfig) => {
+      try {
+        const current = entry.configSchema.parse(JSON.parse(getEncryptionService().decrypt(JSON.parse(storedConfig))));
+        return serviceInstanceConfigChanged(current, result.data);
+      } catch (error) {
+        logger.error({ error, serviceInstanceId: id }, 'Failed to compare the locked service configuration');
+        throw new ValidationError('Cannot update configuration: the current config could not be read.');
+      }
+    };
 
     // SSRF protection on merged config URLs
     if (!readFetchAllowPrivateUrls()) {

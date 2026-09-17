@@ -83,3 +83,30 @@ describe('validateStatusSettingsOnBoot', () => {
     );
   });
 });
+
+describe('status operation durations', () => {
+  const { readStatusOperationBudgetMs, readStatusReconcileGraceMs } =
+    jest.requireActual<typeof import('./credential-status.config')>('./credential-status.config');
+  it('uses separate operation and grace defaults and reads configured milliseconds', () => {
+    expect(readStatusOperationBudgetMs({})).toBe(30_000);
+    expect(readStatusReconcileGraceMs({})).toBe(5_000);
+    expect(readStatusOperationBudgetMs({ STATUS_OPERATION_BUDGET_MS: ' 12000 ' })).toBe(12_000);
+    expect(readStatusReconcileGraceMs({ STATUS_RECONCILE_GRACE_MS: '10' })).toBe(10);
+  });
+  it.each(['0', '-1', '1.5', '2000ms', '1e3', '2147483648'])(
+    'fails boot for unsafe or malformed duration %s',
+    (value) => {
+      expect(() => validateStatusSettingsOnBoot({ STATUS_OPERATION_BUDGET_MS: value })).toThrow(
+        'STATUS_OPERATION_BUDGET_MS',
+      );
+      expect(() => validateStatusSettingsOnBoot({ STATUS_RECONCILE_GRACE_MS: value })).toThrow(
+        'STATUS_RECONCILE_GRACE_MS',
+      );
+    },
+  );
+  it('refuses an ambiguous mutation enablement value', () => {
+    expect(() => validateStatusSettingsOnBoot({ STATUS_MUTATION_ENABLED: 'TRUE' })).toThrow('STATUS_MUTATION_ENABLED');
+    expect(() => validateStatusSettingsOnBoot({ STATUS_MUTATION_ENABLED: 'true' })).not.toThrow();
+    expect(() => validateStatusSettingsOnBoot({ STATUS_MUTATION_ENABLED: 'false' })).not.toThrow();
+  });
+});

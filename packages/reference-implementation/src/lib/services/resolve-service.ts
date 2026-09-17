@@ -1,3 +1,4 @@
+import type { ServiceInstance } from '@/lib/prisma/generated';
 import type { ServiceType, AdapterRegistryEntry } from '@uncefact/untp-ri-services';
 import { adapterRegistry } from '@uncefact/untp-ri-services/server';
 import { appLogger } from '@/lib/api/logger';
@@ -44,6 +45,16 @@ export async function resolveService<TService>(
     throw new ServiceResolutionError(serviceType, tenantId);
   }
 
+  const resolved = resolveServiceInstance<TService>(instance, serviceType, adapterLookupOverride);
+  return { service: resolved.service, instanceId: instance.id };
+}
+
+/** Resolves an already-read instance so callers can retain their transaction's configuration snapshot. */
+export function resolveServiceInstance<TService>(
+  instance: ServiceInstance,
+  serviceType: ServiceType,
+  adapterLookupOverride?: Record<string, AdapterRegistryEntry>,
+): ResolvedService<TService> & { config: unknown } {
   // Decrypt the config
   let decryptedJson: string;
   try {
@@ -90,5 +101,6 @@ export async function resolveService<TService>(
   return {
     service: adapterEntry.factory(parseResult.data, logger) as TService,
     instanceId: instance.id,
+    config: parseResult.data,
   };
 }

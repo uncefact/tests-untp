@@ -141,6 +141,9 @@ services:
       # Status issuance defaults and the bounded status-list lock acquisition.
       DEFAULT_STATUS_PURPOSES:
       STATUS_LOCK_ACQUIRE_MS:
+      STATUS_OPERATION_BUDGET_MS:
+      STATUS_RECONCILE_GRACE_MS:
+      STATUS_MUTATION_ENABLED:
       # System default service instances (used by seed.ts)
       SYSTEM_VC_BASE_URL: http://vckit-api:3332
       SYSTEM_VC_API_KEY: ${SYSTEM_VC_API_KEY:-test123}

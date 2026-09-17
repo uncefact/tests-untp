@@ -202,6 +202,48 @@ describe('Credential status Postgres contracts', () => {
     expect(maximum).toBe(2);
   });
 
+  it('waits for a previous-release single-key lock before dispatching the new mutex callback', async () => {
+    // Catches a rolling-deploy race in which an old writer and a new writer update one list concurrently.
+    const key = 'adapter:legacy-issuer';
+    let release!: () => void;
+    let entered!: () => void;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const locked = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const holder = client.$transaction(
+      async (tx) => {
+        await tx.$queryRaw<Array<{ acquired: boolean }>>`
+          SELECT pg_try_advisory_xact_lock(hashtext(${key})) AS acquired
+        `;
+        entered();
+        await hold;
+      },
+      { timeout: 10_000 },
+    );
+    await locked;
+
+    let callbackEntered = false;
+    const attempt = withStatusListMutex(
+      key,
+      async () => {
+        callbackEntered = true;
+        return 'new-writer';
+      },
+      lockOptions(),
+    );
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(callbackEntered).toBe(false);
+    } finally {
+      release();
+      await holder;
+    }
+    await expect(attempt).resolves.toBe('new-writer');
+  });
+
   it('releases the transaction-scoped lock when the callback throws', async () => {
     // Catches a regression from session-scoped advisory locking that leaks after callback failure.
     const callbackError = new Error('provider call failed');

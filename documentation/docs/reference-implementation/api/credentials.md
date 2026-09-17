@@ -154,21 +154,21 @@ For [Digital Conformity Credentials](./data-models) (DCC), the issuance pipeline
 
 CVC validation is advisory only. It never blocks issuance. If the check fails or no matching scheme is available, the credential is issued with warnings in the response. Warning codes include:
 
-| Code                                   | Meaning                                                                                                                          |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `conformity-scheme.not-found`          | A referenced conformity scheme URI is not in the locally known catalogue                                                         |
-| `conformity-profile.not-found`         | A referenced profile URI is not found within the scheme                                                                          |
-| `conformity-profile.not-specified`     | The claim references no profile, so assessment performance scores were not checked and criterion and topic checks were not performed (criteria are published per versioned profile) |
-| `conformity-criterion.not-in-profile`  | A claimed criterion is not one the referenced profile publishes                                                                  |
-| `conformity-criterion.missing`         | A criterion the profile defines is absent from the claim                                                                         |
-| `conformity-criterion.topic-mismatch`  | A criterion's declared conformity topics do not match those the criterion defines                                                |
-| `conformity-assessment.topic-mismatch` | An assessment declares a conformity topic that none of its assessed criteria define                                              |
-| `conformity-attestation.score-not-in-framework` | The attestation's profile score code is not published by the referenced scheme framework                                         |
-| `conformity-assessment.score-not-in-framework` | An assessment score code is not published by any applicable scheme, profile or referenced-criterion framework                    |
-| `conformity-scheme.wrong-tier`         | The referenced scheme id is a known profile or criterion id. `expected` carries the schemes containing the matched entry         |
-| `conformity-profile.wrong-tier`        | The referenced profile id is a known scheme or criterion id. `expected` carries the selected scheme's profile ids                |
-| `conformity-claim.validation-error`    | Validation did not complete because of extraction, infrastructure or catalogue changes between reads. Other conformity warnings in the same response still apply |
-| `conformity-claim.score-checks-unavailable` | Score codes were not checked because the scheme's stored document is unavailable. The applicable scheme, profile, criterion and topic checks still ran |
+| Code                                            | Meaning                                                                                                                                                                             |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conformity-scheme.not-found`                   | A referenced conformity scheme URI is not in the locally known catalogue                                                                                                            |
+| `conformity-profile.not-found`                  | A referenced profile URI is not found within the scheme                                                                                                                             |
+| `conformity-profile.not-specified`              | The claim references no profile, so assessment performance scores were not checked and criterion and topic checks were not performed (criteria are published per versioned profile) |
+| `conformity-criterion.not-in-profile`           | A claimed criterion is not one the referenced profile publishes                                                                                                                     |
+| `conformity-criterion.missing`                  | A criterion the profile defines is absent from the claim                                                                                                                            |
+| `conformity-criterion.topic-mismatch`           | A criterion's declared conformity topics do not match those the criterion defines                                                                                                   |
+| `conformity-assessment.topic-mismatch`          | An assessment declares a conformity topic that none of its assessed criteria define                                                                                                 |
+| `conformity-attestation.score-not-in-framework` | The attestation's profile score code is not published by the referenced scheme framework                                                                                            |
+| `conformity-assessment.score-not-in-framework`  | An assessment score code is not published by any applicable scheme, profile or referenced-criterion framework                                                                       |
+| `conformity-scheme.wrong-tier`                  | The referenced scheme id is a known profile or criterion id. `expected` carries the schemes containing the matched entry                                                            |
+| `conformity-profile.wrong-tier`                 | The referenced profile id is a known scheme or criterion id. `expected` carries the selected scheme's profile ids                                                                   |
+| `conformity-claim.validation-error`             | Validation did not complete because of extraction, infrastructure or catalogue changes between reads. Other conformity warnings in the same response still apply                    |
+| `conformity-claim.score-checks-unavailable`     | Score codes were not checked because the scheme's stored document is unavailable. The applicable scheme, profile, criterion and topic checks still ran                              |
 
 Criterion and topic warnings name the versioned profile URI they were checked against in their message, since profile URIs carry a version segment and the same criterion can differ between profile versions.
 
@@ -176,12 +176,12 @@ The two `conformity-claim.*` codes report on the check rather than on the creden
 
 Alongside `code` and `message`, a warning can carry structured fields so a client can act on it without reading the message text:
 
-| Field         | What it carries                                                                                                                                                        |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `received`    | The value that triggered the warning, such as the criterion URI the profile does not publish                                                                           |
-| `expected`    | The value or shape that was expected, where there is one                                                                                                               |
+| Field         | What it carries                                                                                                                                                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `received`    | The value that triggered the warning, such as the criterion URI the profile does not publish                                                                                                                                                |
+| `expected`    | The value or shape that was expected, where there is one                                                                                                                                                                                    |
 | `pointer`     | A JSON pointer to the place in the credential you submitted that the warning concerns, including score codes such as `/credentialSubject/profileScore/code` or `/credentialSubject/conformityAssessment/0/assessedPerformance/1/score/code` |
-| `remediation` | What to do about it, where the check can say                                                                                                                           |
+| `remediation` | What to do about it, where the check can say                                                                                                                                                                                                |
 
 A pointer appears only where the warning has a location in your credential and that location resolves, so treat it as present-or-absent rather than guaranteed. Two of the catalogue warnings never carry one, because their subject is not in the document at all. `conformity-criterion.missing` names a criterion the claim never declared, so read `expected` for the criterion the profile publishes. `conformity-profile.not-specified` reports the absence of a profile and carries neither `received` nor `expected`, so the message is the whole of it. The two `conformity-claim.*` codes carry no pointer either, since their subject is the check rather than a place in your credential.
 
@@ -448,3 +448,92 @@ GET /api/v1/credentials/{id}
 ```
 
 This route is retired and returns `410 Gone` after authentication and tenant resolution succeed, with `code: ROUTE_RETIRED`. Use [Library API detail](./library#retrieve-one-library-record) with the same record id for the stored credential and its custody fields.
+
+## Read issuer status
+
+```
+GET /api/v1/credentials/{id}/status
+GET /api/v1/credentials/{id}/status?fresh=true
+```
+
+Use the native record id, rather than the signed credential's identifier. The stored response contains `capture`, `statusCaptureError`, `attribution` (`instanceId`, `source`, `at`, or `null`) and `entries`. Each entry contains `entryId`, `statusPurpose`, its last confirmed `value` (`boolean` or `null`), `observedAt`, `valueChangedAt`, `version` and `pending` (`value`, `since`, `deadline`, or `null`). An unobserved entry has `value: null`; absence of an observation is not a clear bit. Capture-state meanings are described in the [library record](./library#issuer-lifecycle).
+
+`fresh=true` adds separate `observed` and `failures` arrays. Observations contain `entryId`, `statusPurpose`, `value` and `observedAt`. Failures name the entry, purpose, error `code` and `message`; a provider error never becomes a bit value. The read uses the recorded issuing instance, or the pinned instance while a change is pending. It writes nothing, advances no version and cannot resolve a pending change. Both forms answer with `Cache-Control: no-store`.
+
+Missing or foreign records answer `404 NOT_FOUND`; external records answer `403 EXTERNAL_CREDENTIAL_STATUS_NOT_MANAGEABLE`. An invalid `fresh` value answers `400 VALIDATION_FAILED`. Authentication requires a valid tenant identity, as on the other credential routes. A malformed native record answers `500 RECORD_UNREADABLE`; database failures use the shared sanitised `500` response.
+
+## Change issuer status
+
+```
+PUT /api/v1/credentials/{id}/status/{purpose}
+If-Version: 1
+Content-Type: application/json
+
+{ "value": true }
+```
+
+Select the purpose in the path. Only `revocation` and `suspension` can be changed, and the credential must already carry that entry. Revocation is irreversible: `value: false` is refused even if the previously observed bit was clear. Suspension can be set and cleared. Historical `refresh` entries are also irreversible, but are refused as unsupported before any transition is considered. Entries larger than one bit cannot be changed. Mutation must be [enabled by the operator](../operations/credential-status-recovery#enable-status-changes).
+
+First read the status entry's `version` and send it in `If-Version`. This is the entry version, not an annotation version or verification generation. A stale request is refused, never replayed. Unknown body keys are ignored; `value` must be a JSON boolean. The path purpose is decoded once, must contain 1 to 255 characters and cannot contain control characters.
+
+A successful response records an error-free provider observation that equals the requested value:
+
+```json
+{
+  "entryId": "clw0statusentry000001",
+  "statusPurpose": "revocation",
+  "value": true,
+  "observedAt": "2026-09-17T01:00:00.000Z",
+  "version": 2
+}
+```
+
+Before contacting the provider, the service records durable pending intent, its issuing instance, configuration digest and deadline. One deadline bounds the preliminary read, lock acquisition, set and read-back. If the preliminary read already equals the requested value, the service commits that observation without setting the bit again. Otherwise success requires both matching read-back and a database commit fenced by the reservation token and original version. A confirmed change updates library lifecycle immediately; it never rewrites a verification generation. The response is an observation, not a verification summary.
+
+| Response                                                        | Meaning and next action                                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 VALIDATION_FAILED`                                         | Supply a decimal integer header between 1 and 2147483647. A missing or malformed header, invalid body or invalid purpose is refused.                                                                                                                                                              |
+| `401` / `403`                                                   | Authentication or tenant assignment refused; an external record answers `403 EXTERNAL_CREDENTIAL_STATUS_NOT_MANAGEABLE`.                                                                                                                                                                          |
+| `404 NOT_FOUND` / `STATUS_ENTRY_NOT_FOUND`                      | No tenant-owned native record, or no captured entry for that purpose.                                                                                                                                                                                                                             |
+| `409 STATUS_METADATA_UNAVAILABLE`                               | Capture or issuing-service attribution is missing. Follow the backfill or attribution command named in the response.                                                                                                                                                                              |
+| `409 STATUS_IRREVERSIBLE`                                       | Revocation cannot be cleared. No provider call occurred.                                                                                                                                                                                                                                          |
+| `409 VERSION_CONFLICT`                                          | Re-read the current entry version before deciding on another action.                                                                                                                                                                                                                              |
+| `409 STATUS_OPERATION_IN_PROGRESS` / `STATUS_RECOVERY_REQUIRED` | Intent already exists. The latter means its deadline passed; use reconciliation. Time passing never clears intent.                                                                                                                                                                                |
+| `413 REQUEST_BODY_TOO_LARGE`                                    | Reduce the request body to the documented fields.                                                                                                                                                                                                                                                 |
+| `422 STATUS_PURPOSE_UNSUPPORTED` / `STATUS_ENTRY_UNSUPPORTED`   | Unsupported purpose or entry size. No provider set was dispatched.                                                                                                                                                                                                                                |
+| `500 RECORD_UNREADABLE`                                         | Stored status metadata is malformed. Contact the operator; this is not a caller input error.                                                                                                                                                                                                      |
+| `502 VC_STATUS_RESPONSE_INVALID`                                | The preliminary response could not establish a bit. The owned reservation was cleared and the prior fact retained.                                                                                                                                                                                |
+| `502/503 VC_SERVICE_UNAVAILABLE`                                | A pre-set read, service resolution or definitive set rejection failed. The prior fact is retained; any owned reservation is cleared when safe. A failure to clear is stated in the same response message.                                                                                         |
+| `503 STATUS_MUTATION_DISABLED`                                  | Operator enablement is required. No set was dispatched.                                                                                                                                                                                                                                           |
+| `503 STATUS_LIST_BUSY` / `STATUS_COORDINATION_UNAVAILABLE`      | Lock contention or unavailable database coordination capacity respectively. No set was dispatched.                                                                                                                                                                                                |
+| `503 STATUS_OUTCOME_UNKNOWN`                                    | A set may have applied, read-back failed, or the lock was lost while a set that did not itself fail was in flight. A set call that rejects is answered by the provider's own outcome instead. Pending intent remains and the last confirmed value is unchanged. Reconcile after the grace window. |
+| `503 STATUS_OUTCOME_MISMATCH`                                   | Read-back differed from the request. `observed.value` and `observed.observedAt` describe the read; pending intent remains. Reconcile.                                                                                                                                                             |
+| `503 STATUS_PROVIDER_CHANGED`                                   | Provider configuration changed across the operation. Pending intent remains. Establish the correct provider identity before recovery.                                                                                                                                                             |
+| `503 STATUS_PERSISTENCE_FAILED`                                 | This request could not confirm its observation in storage, or could not confirm clearing its reservation. Read stored status before acting. A changed token cannot overwrite another operation.                                                                                                   |
+| `503 STATUS_PERSISTENCE_UNCERTAIN`                              | The commit acknowledgement was lost. Read stored status to learn which state committed; do not assume pending intent remains.                                                                                                                                                                     |
+
+Other database failures before dispatch use the shared sanitised `500` response. While any pending intent exists, deletion and effective service-configuration changes are blocked. [Recovery guidance](../operations/credential-status-recovery) covers both an uncertain write and an unreachable pinned provider.
+
+## Reconcile issuer status
+
+```
+POST /api/v1/credentials/{id}/status/{purpose}/reconcile
+If-Version: 1
+Content-Type: application/json
+
+{}
+```
+
+Reconciliation reads the provider and records what it observes. It never sets a bit. With pending intent, it waits until the recorded deadline plus `STATUS_RECONCILE_GRACE_MS`, reads the pinned issuing instance and commits only if the inspected token and version still match. Before that time it answers `409 STATUS_OPERATION_IN_PROGRESS`. A failed read normally answers `503 VC_SERVICE_UNAVAILABLE`; malformed stored status input answers `500 RECORD_UNREADABLE`, an unrepresentable management entry answers `422 STATUS_ENTRY_UNSUPPORTED`, and an invalid provider response answers `502 VC_STATUS_RESPONSE_INVALID`. These failures leave all pending intent and confirmed facts unchanged, and the deterministic 422 and 502 cases say that retrying will not help.
+
+If the current provider configuration differs from the original pin, the response is `503 STATUS_PROVIDER_CHANGED`. Establish that the replacement configuration identifies the intended provider, then explicitly send `{ "acceptProviderChange": true }`. An operator's configuration repair preserves the original digest and does not supply this acknowledgement on your behalf.
+
+With no pending intent, reconciliation establishes a first or later observation using the recorded attribution. It skips the pending deadline and digest comparison, then rechecks attribution and configuration before committing. A concurrent reservation blocks persistence even if the version did not change. Both branches advance the entry version and return the same observation shape as a successful change; only a successful pending reconciliation clears the inspected intent.
+
+Reconciliation separates a deterministic fault from an unavailable provider, because only the second is worth retrying. An entry this service cannot represent answers `422 STATUS_ENTRY_UNSUPPORTED`, and an unreadable provider observation answers `502 VC_STATUS_RESPONSE_INVALID`. Both leave the pending intent unchanged and will answer the same way on a repeat, so resolve the entry or the provider before reconciling again.
+
+The shared `400`, `401`, `403`, `404`, `409 STATUS_METADATA_UNAVAILABLE`, `409 VERSION_CONFLICT`, `413` and `500 RECORD_UNREADABLE` responses apply here too. A concurrent change or failed commit answers `503 STATUS_PERSISTENCE_FAILED`; a lost commit acknowledgement answers `503 STATUS_PERSISTENCE_UNCERTAIN`. Re-read stored status before further action.
+
+After the deadline no RI request for this reservation is still on the wire, but a request VCKit had already accepted may still be applied afterwards; reconcile records what it observes, and a later drift check can still differ. The provider offers no outcome lookup or fencing.
+
+Stop admission, drain, wait for provider quiescence, then reconcile. Reconciliation is evidence of the observed bit at its timestamp, not proof that a delayed provider write can no longer arrive.

@@ -30,8 +30,8 @@ export type UpdateServiceInstanceInput = {
   name?: string;
   description?: string | null;
   config?: string; // Already encrypted by the caller
-  /** Whether the decrypted, canonical effective configuration differs. */
-  configChanged?: boolean;
+  /** Evaluates effective configuration against the row read under its update lock. */
+  configChanged?: (storedConfig: string) => boolean;
   isPrimary?: boolean;
 };
 
@@ -198,8 +198,8 @@ export async function updateServiceInstance(
   input: UpdateServiceInstanceInput,
 ): Promise<ServiceInstance> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    if (input.config !== undefined && input.configChanged !== false) {
-      await lockServiceInstanceAndAssertNoPendingStatus(tx, id, tenantId);
+    if (input.config !== undefined && !(await lockServiceInstanceForUpdate(tx, id, tenantId))) {
+      throw new NotFoundError('Service instance not found');
     }
 
     const existing = await tx.serviceInstance.findFirst({
@@ -208,6 +208,11 @@ export async function updateServiceInstance(
 
     if (!existing) {
       throw new NotFoundError('Service instance not found');
+    }
+
+    if (input.config !== undefined && (input.configChanged?.(existing.config) ?? true)) {
+      const pending = await countPendingEntriesForInstance(tx, id, tenantId);
+      if (pending > 0) throw new ServiceInstanceStatusPendingError(id, pending);
     }
 
     if (input.isPrimary) {
