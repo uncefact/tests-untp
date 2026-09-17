@@ -6,7 +6,18 @@ numbers follow semantic versioning. The package ships via the
 `untp-utils-v<X.Y.Z>` tag-triggered publish workflow described in
 [ADR 031](../../docs/adrs/031-per-package-tag-triggered-npm-release.md).
 
-## [Unreleased]
+## [0.4.0](https://github.com/uncefact/tests-untp/compare/untp-utils-v0.3.0...untp-utils-v0.4.0) (2026-09-17)
+
+### ⚠ BREAKING CHANGES
+
+- **conformity-vocabulary:** the `ConformityWarningCode` union now includes four score-membership and catalogue-tier diagnosis codes. Consumers with exhaustive switches and any total mapping keyed by the union, for example `Record<ConformityWarningCode, T>`, must handle `conformity-attestation.score-not-in-framework`, `conformity-assessment.score-not-in-framework`, `conformity-scheme.wrong-tier` and `conformity-profile.wrong-tier` ([#1068](https://github.com/uncefact/tests-untp/issues/1068)).
+- **conformity-vocabulary:** `parseConformityScheme` now throws `ConformitySchemeParseError` for a present `schemeScoringFramework`, `criterionScoringFramework` entry, `score` entry or `requiredPerformance` entry of the wrong shape, or missing its required `name` or `score`, where 0.3.0 ignored those fields. The failure pointer names the malformed field, for example `/includedProfile/0/criterionScoringFramework/0/score/1/code`. Before 0.4.0, that malformed field was ignored and parsing could return a scheme; from 0.4.0, parsing throws with the pointer in `failures` ([#1068](https://github.com/uncefact/tests-untp/issues/1068)).
+
+### Features
+
+- **conformity-vocabulary:** parse scheme, profile and criterion scoring frameworks, retaining score codes, ranks, definitions and required-performance scores.
+- **conformity-vocabulary:** validate attestation and assessment score-code membership, with a third optional reference-resolution parameter for catalogue tier diagnosis.
+- **conformity-vocabulary:** add the four warning codes `conformity-attestation.score-not-in-framework`, `conformity-assessment.score-not-in-framework`, `conformity-scheme.wrong-tier` and `conformity-profile.wrong-tier` ([#1068](https://github.com/uncefact/tests-untp/issues/1068)).
 
 ### Changed
 

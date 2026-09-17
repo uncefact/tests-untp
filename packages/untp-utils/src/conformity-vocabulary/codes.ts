@@ -6,6 +6,10 @@ export const ConformityWarningCode = {
   CriterionMissing: 'conformity-criterion.missing',
   CriterionTopicMismatch: 'conformity-criterion.topic-mismatch',
   AssessmentTopicMismatch: 'conformity-assessment.topic-mismatch',
+  AttestationScoreNotInFramework: 'conformity-attestation.score-not-in-framework',
+  AssessmentScoreNotInFramework: 'conformity-assessment.score-not-in-framework',
+  SchemeWrongTier: 'conformity-scheme.wrong-tier',
+  ProfileWrongTier: 'conformity-profile.wrong-tier',
 } as const;
 
 export type ConformityWarningCode = (typeof ConformityWarningCode)[keyof typeof ConformityWarningCode];

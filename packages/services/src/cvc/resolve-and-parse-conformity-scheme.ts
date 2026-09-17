@@ -68,6 +68,7 @@ export async function resolveAndParseConformityScheme(
     try {
       const outcome = await resolveDocumentIfChanged(input.sourceUrl, input.cached ?? {}, {
         headers: { Accept: 'application/ld+json' },
+        allowPrivateAddresses: input.allowPrivateAddresses,
       });
       if (outcome.kind === 'unchanged') return { kind: 'unchanged' };
       body = outcome.result.body;

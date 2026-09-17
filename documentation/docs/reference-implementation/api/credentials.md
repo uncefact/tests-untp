@@ -150,7 +150,7 @@ If either check fails, the request is rejected with HTTP 400, the error message 
 
 #### Stage 3.5: CVC Compliance Validation (Advisory)
 
-For [Digital Conformity Credentials](./data-models) (DCC), the issuance pipeline performs an advisory check against the locally known conformity schemes (operator-seeded in this release). This check verifies that the conformity scheme, profile, and criteria referenced in the credential payload correspond to entries in the catalogue, and that the claimed criteria line up with what the profile defines.
+For [Digital Conformity Credentials](./data-models) (DCC), the issuance pipeline performs an advisory check against the locally known conformity schemes (operator-seeded in this release). This check verifies that the conformity scheme, profile, and criteria referenced in the credential payload correspond to entries in the catalogue, and that the claimed criteria line up with what the profile defines. It also checks the score codes the credential carries against the scores the catalogue publishes, and tells you when a scheme or profile reference names a real entry at the wrong catalogue tier, such as a profile URI used where a scheme URI belongs.
 
 CVC validation is advisory only. It never blocks issuance. If the check fails or no matching scheme is available, the credential is issued with warnings in the response. Warning codes include:
 
@@ -158,14 +158,21 @@ CVC validation is advisory only. It never blocks issuance. If the check fails or
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `conformity-scheme.not-found`          | A referenced conformity scheme URI is not in the locally known catalogue                                                         |
 | `conformity-profile.not-found`         | A referenced profile URI is not found within the scheme                                                                          |
-| `conformity-profile.not-specified`     | The claim references no profile, so criterion and topic checks were not performed (criteria are published per versioned profile) |
+| `conformity-profile.not-specified`     | The claim references no profile, so assessment performance scores were not checked and criterion and topic checks were not performed (criteria are published per versioned profile) |
 | `conformity-criterion.not-in-profile`  | A claimed criterion is not one the referenced profile publishes                                                                  |
 | `conformity-criterion.missing`         | A criterion the profile defines is absent from the claim                                                                         |
 | `conformity-criterion.topic-mismatch`  | A criterion's declared conformity topics do not match those the criterion defines                                                |
 | `conformity-assessment.topic-mismatch` | An assessment declares a conformity topic that none of its assessed criteria define                                              |
-| `conformity-claim.validation-error`    | Validation could not be performed (extraction or infrastructure failure)                                                         |
+| `conformity-attestation.score-not-in-framework` | The attestation's profile score code is not published by the referenced scheme framework                                         |
+| `conformity-assessment.score-not-in-framework` | An assessment score code is not published by any applicable scheme, profile or referenced-criterion framework                    |
+| `conformity-scheme.wrong-tier`         | The referenced scheme id is a known profile or criterion id. `expected` carries the schemes containing the matched entry         |
+| `conformity-profile.wrong-tier`        | The referenced profile id is a known scheme or criterion id. `expected` carries the selected scheme's profile ids                |
+| `conformity-claim.validation-error`    | Validation did not complete because of extraction, infrastructure or catalogue changes between reads. Other conformity warnings in the same response still apply |
+| `conformity-claim.score-checks-unavailable` | Score codes were not checked because the scheme's stored document is unavailable. The applicable scheme, profile, criterion and topic checks still ran |
 
 Criterion and topic warnings name the versioned profile URI they were checked against in their message, since profile URIs carry a version segment and the same criterion can differ between profile versions.
+
+The two `conformity-claim.*` codes report on the check rather than on the credential, and neither one cancels the warnings beside it. `conformity-claim.score-checks-unavailable` means the scheme's stored document was missing or could not be read, so the score codes alone went unchecked. Ask your operator to refresh the scheme in the catalogue, then issue again if you need them checked. `conformity-claim.validation-error` covers a claim the service could not extract, an infrastructure failure, and the case where the catalogue changed while the claim was being checked, which a retry settles. In all of these cases, every other conformity warning in the same response came from a check that did run and still applies. Which checks those are depends on the claim: with no profile reference, the criterion and topic checks do not run at all, and `conformity-profile.not-specified` says so.
 
 Alongside `code` and `message`, a warning can carry structured fields so a client can act on it without reading the message text:
 
@@ -173,12 +180,12 @@ Alongside `code` and `message`, a warning can carry structured fields so a clien
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `received`    | The value that triggered the warning, such as the criterion URI the profile does not publish                                                                           |
 | `expected`    | The value or shape that was expected, where there is one                                                                                                               |
-| `pointer`     | A JSON pointer to the place in the credential you submitted that the warning concerns, for example `/credentialSubject/conformityAssessment/0/assessmentCriteria/1/id` |
+| `pointer`     | A JSON pointer to the place in the credential you submitted that the warning concerns, including score codes such as `/credentialSubject/profileScore/code` or `/credentialSubject/conformityAssessment/0/assessedPerformance/1/score/code` |
 | `remediation` | What to do about it, where the check can say                                                                                                                           |
 
-A pointer appears only where the warning has a location in your credential and that location resolves, so treat it as present-or-absent rather than guaranteed. Two warnings never carry one, because their subject is not in the document at all. `conformity-criterion.missing` names a criterion the claim never declared, so read `expected` for the criterion the profile publishes. `conformity-profile.not-specified` reports the absence of a profile and carries neither `received` nor `expected`, so the message is the whole of it.
+A pointer appears only where the warning has a location in your credential and that location resolves, so treat it as present-or-absent rather than guaranteed. Two of the catalogue warnings never carry one, because their subject is not in the document at all. `conformity-criterion.missing` names a criterion the claim never declared, so read `expected` for the criterion the profile publishes. `conformity-profile.not-specified` reports the absence of a profile and carries neither `received` nor `expected`, so the message is the whole of it. The two `conformity-claim.*` codes carry no pointer either, since their subject is the check rather than a place in your credential.
 
-The assessment-level topic check runs only when the assessment references at least one criterion and every referenced criterion resolves in the profile. An assessment that references no criteria is not warned, because its own `conformityTopic` is then the claim's only classification (the intended modelling when, for example, a scheme publishes no digital vocabulary of criteria); an unresolved criterion is reported as `conformity-criterion.not-in-profile` instead of producing a topic verdict from incomplete evidence.
+The assessment-level topic check runs only when the assessment references at least one criterion and every referenced criterion resolves in the profile. An assessment that references no criteria draws no topic warning, because its own `conformityTopic` is then the claim's only classification (the intended modelling when, for example, a scheme publishes no digital vocabulary of criteria); an unresolved criterion is reported as `conformity-criterion.not-in-profile` instead of producing a topic verdict from incomplete evidence. Its score codes are still checked, against the frameworks the scheme and the selected profile publish.
 
 #### Stage 4: Issuer DID Ownership Validation
 

@@ -10,6 +10,8 @@ version numbers follow semantic versioning. The package ships via the
 
 ### Added
 
+- **cvc:** the scheme-document ingest input accepts `allowPrivateAddresses` and forwards it to the guarded fetch.
+- **data-model-bridges:** the v0.7.0 DCC extractor projects `profileScore` and per-assessment `assessedScores` only when present, with source-map entries for each score code.
 - **logging:** `LoggerConfig` now accepts an optional `traceContextProvider`
   for adding active trace identifiers to structured log entries.
 - **encryption:** `decryptCredential` and `decryptCredentialToBytes` accept an

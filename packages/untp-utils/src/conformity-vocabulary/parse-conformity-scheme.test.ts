@@ -184,6 +184,91 @@ describe('parseConformityScheme', () => {
       const scheme = parseConformityScheme(doc, { sourceUrl: 'https://example.com/scheme' });
       expect(scheme.owner).toBeUndefined();
     });
+
+    it('parses scoring frameworks at scheme, profile and criterion tiers', () => {
+      const scheme = parseConformityScheme(
+        minimalSchemeDoc({
+          schemeScoringFramework: {
+            name: 'Overall result',
+            description: 'Scheme result',
+            score: [
+              { code: '', rank: 1 },
+              { code: '  AA  ', definition: 'Exact code' },
+            ],
+          },
+          includedProfile: [
+            profile({
+              criterionScoringFramework: [
+                { name: 'Finding result', score: [{ code: 'PARTIAL', rank: 2, definition: 'Partial' }] },
+              ],
+              criterion: [
+                criterion({
+                  conformityTopic: [],
+                  requiredPerformance: [
+                    {
+                      metric: { id: 'https://scheme.example/metric/1', name: 'Metric' },
+                      score: { code: 'MEETS', rank: 1, definition: 'Meets' },
+                    },
+                    { metric: { name: 'Measure only' } },
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+        { sourceUrl: 'https://example.com/scheme' },
+      );
+
+      expect(scheme.scoringFramework).toEqual({
+        name: 'Overall result',
+        description: 'Scheme result',
+        scores: [
+          { code: '', rank: 1 },
+          { code: '  AA  ', definition: 'Exact code' },
+        ],
+      });
+      expect(scheme.profiles[0].criterionScoringFrameworks).toEqual([
+        { name: 'Finding result', scores: [{ code: 'PARTIAL', rank: 2, definition: 'Partial' }] },
+      ]);
+      expect(scheme.profiles[0].criteria[0].requiredPerformance).toEqual([
+        {
+          metric: { canonicalId: 'https://scheme.example/metric/1', name: 'Metric' },
+          score: { code: 'MEETS', rank: 1, definition: 'Meets' },
+        },
+        { metric: { name: 'Measure only' } },
+      ]);
+    });
+
+    it('keeps an explicitly empty score list as an empty list', () => {
+      const scheme = parseConformityScheme(minimalSchemeDoc({ schemeScoringFramework: { name: 'Empty', score: [] } }), {
+        sourceUrl: 'https://example.com/scheme',
+      });
+      expect(scheme.scoringFramework).toEqual({ name: 'Empty', scores: [] });
+    });
+
+    it.each([
+      ['an empty string', ''],
+      ['whitespace', '   '],
+    ])('accepts %s as a scoring framework name', (_, name) => {
+      const scheme = parseConformityScheme(minimalSchemeDoc({ schemeScoringFramework: { name, score: [] } }), {
+        sourceUrl: 'https://example.com/scheme',
+      });
+      expect(scheme.scoringFramework?.name).toBe(name);
+    });
+
+    it('normalises scoring descriptions and definitions as non-empty strings', () => {
+      const scheme = parseConformityScheme(
+        minimalSchemeDoc({
+          schemeScoringFramework: {
+            name: 'Framework',
+            description: '  ',
+            score: [{ code: 'A', definition: '  ' }],
+          },
+        }),
+        { sourceUrl: 'https://example.com/scheme' },
+      );
+      expect(scheme.scoringFramework).toEqual({ name: 'Framework', scores: [{ code: 'A' }] });
+    });
   });
 
   describe('parse failures (accumulating)', () => {
@@ -305,6 +390,86 @@ describe('parseConformityScheme', () => {
           expect.objectContaining({ code: 'conformity-scheme.invalid-shape', pointer: '/includedProfile' }),
         ]),
       );
+    });
+
+    it.each([
+      ['scoring framework name', { schemeScoringFramework: { score: [] } }, '/schemeScoringFramework/name'],
+      [
+        'scoring framework score list',
+        { schemeScoringFramework: { name: 'Missing scores' } },
+        '/schemeScoringFramework/score',
+      ],
+      [
+        'scoring framework score code',
+        { schemeScoringFramework: { name: 'Framework', description: 'd', score: [{}] } },
+        '/schemeScoringFramework/score/0/code',
+      ],
+    ])('throws with a missing-required-field failure when %s is missing', (_, override, pointer) => {
+      expect(() =>
+        parseConformityScheme(minimalSchemeDoc(override), { sourceUrl: 'https://example.com/scheme' }),
+      ).toThrow(ConformitySchemeParseError);
+      try {
+        parseConformityScheme(minimalSchemeDoc(override), { sourceUrl: 'https://example.com/scheme' });
+      } catch (error) {
+        expect((error as ConformitySchemeParseError).failures).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ code: 'conformity-scheme.missing-required-field', pointer }),
+          ]),
+        );
+      }
+    });
+
+    it.each([
+      ['scheme framework object', { schemeScoringFramework: [] }, '/schemeScoringFramework'],
+      ['framework name', { schemeScoringFramework: { name: 17, score: [] } }, '/schemeScoringFramework/name'],
+      ['framework score list', { schemeScoringFramework: { name: 'Bad', score: {} } }, '/schemeScoringFramework/score'],
+      [
+        'score code',
+        { schemeScoringFramework: { name: 'Bad', score: [{ code: 'A' }, { code: 17 }] } },
+        '/schemeScoringFramework/score/1/code',
+      ],
+      [
+        'criterion framework score code',
+        {
+          includedProfile: [
+            profile({
+              criterionScoringFramework: [{ name: 'Bad', score: [{ code: 'A' }, { code: 17 }] }],
+            }),
+          ],
+        },
+        '/includedProfile/0/criterionScoringFramework/0/score/1/code',
+      ],
+      [
+        'score rank',
+        { schemeScoringFramework: { name: 'Bad', score: [{ code: 'A', rank: 1.5 }] } },
+        '/schemeScoringFramework/score/0/rank',
+      ],
+      [
+        'score definition',
+        { schemeScoringFramework: { name: 'Bad', score: [{ code: 'A', definition: 17 }] } },
+        '/schemeScoringFramework/score/0/definition',
+      ],
+      [
+        'criterion framework entry',
+        { includedProfile: [profile({ criterionScoringFramework: [{ name: 'Bad', score: 'not-an-array' }] })] },
+        '/includedProfile/0/criterionScoringFramework/0/score',
+      ],
+      [
+        'required performance entry',
+        { includedProfile: [profile({ criterion: [criterion({ requiredPerformance: [null] })] })] },
+        '/includedProfile/0/criterion/0/requiredPerformance/0',
+      ],
+    ])('accumulates a structural failure for a malformed %s at its pointer', (_, override, pointer) => {
+      expect(() =>
+        parseConformityScheme(minimalSchemeDoc(override), { sourceUrl: 'https://example.com/scheme' }),
+      ).toThrow(ConformitySchemeParseError);
+      try {
+        parseConformityScheme(minimalSchemeDoc(override), { sourceUrl: 'https://example.com/scheme' });
+      } catch (error) {
+        expect((error as ConformitySchemeParseError).failures).toEqual(
+          expect.arrayContaining([expect.objectContaining({ pointer, code: 'conformity-scheme.invalid-shape' })]),
+        );
+      }
     });
   });
 

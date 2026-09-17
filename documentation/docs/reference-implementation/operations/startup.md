@@ -178,7 +178,7 @@ The shared [request body size limit](./api-pagination#request-body-size) documen
 
 ### Credential Fetch Settings
 
-The web process validates the shared credential-fetch settings after the request-body limit and before encryption validation or queue startup. They apply to verification, external registration and the supplier-source check used by re-verification. `FETCH_ALLOW_PRIVATE_URLS` also controls the existing stored-address URL checks on registrar, identifier-link, data-model, service and credential publishing routes.
+The web process validates the shared credential-fetch settings after the request-body limit and before encryption validation or queue startup. They apply to verification, external registration and the supplier-source check used by re-verification. For scheme-document fetches behind seed URL entries, the seeded refresh and each per-scheme fetch of UNTP discovery, `FETCH_ALLOW_PRIVATE_URLS` permits private, loopback and reserved destinations, but it does not govern the discovery register fetch itself, the JSON-LD context loader or the schema loader. `FETCH_ALLOW_PRIVATE_URLS` also controls the existing stored-address URL checks on registrar, identifier-link, data-model, service and credential publishing routes.
 
 The address guard also refuses IPv4-compatible IPv6 addresses, the 6bone range (`3ffe::/16`), and IPv6 addresses outside the `2000::/3` Global Unicast block.
 

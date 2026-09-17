@@ -3,7 +3,10 @@ import { makeRequireString } from '../../common/require-string.js';
 import type { ValidationFailure } from '../../structured-error.js';
 import type {
   ConformityCriterion,
+  ConformityRequiredPerformance,
   ConformityProfile,
+  ConformityScore,
+  ConformityScoringFramework,
   ConformityScheme,
   ConformitySchemeOwner,
   ConformityTopic,
@@ -52,6 +55,7 @@ export function parseV070ConformityScheme(
   const canonicalId = requireString(root.id, 'scheme.id', '/id', failures);
   const name = requireString(root.name, 'scheme.name', '/name', failures);
 
+  const scoringFramework = parseScoringFramework(root.schemeScoringFramework, '/schemeScoringFramework', failures);
   const profiles = parseProfiles(root.includedProfile, '/includedProfile', failures);
 
   if (canonicalId === undefined || name === undefined) {
@@ -67,6 +71,7 @@ export function parseV070ConformityScheme(
     documentation: asNonEmptyString(root.documentation),
     owner: parseOwner(root.owner),
     profiles,
+    ...(scoringFramework && { scoringFramework }),
   };
 }
 
@@ -116,6 +121,11 @@ function parseProfile(
   const version = requireString(p.version, `profile[${index}].version`, `${pointer}/version`, failures);
   const status = requireString(p.status, `profile[${index}].status`, `${pointer}/status`, failures);
 
+  const criterionScoringFrameworks = parseScoringFrameworks(
+    p.criterionScoringFramework,
+    `${pointer}/criterionScoringFramework`,
+    failures,
+  );
   const criteria = parseCriteria(p.criterion, `${pointer}/criterion`, failures);
 
   if (!canonicalId || !name || !version || !status) {
@@ -131,6 +141,7 @@ function parseProfile(
     documentation: asNonEmptyString(p.documentation),
     validFrom: asNonEmptyString(p.validFrom),
     criteria,
+    ...(criterionScoringFrameworks && { criterionScoringFrameworks }),
   };
 }
 
@@ -179,6 +190,12 @@ function parseCriterion(
   const version = requireString(c.version, 'criterion.version', `${pointer}/version`, failures);
   const status = requireString(c.status, 'criterion.status', `${pointer}/status`, failures);
 
+  const requiredPerformance = parseRequiredPerformance(
+    c.requiredPerformance,
+    `${pointer}/requiredPerformance`,
+    failures,
+  );
+
   if (!canonicalId || !name || !version || !status) {
     return undefined;
   }
@@ -192,7 +209,239 @@ function parseCriterion(
     documentation: asNonEmptyString(c.documentation),
     topics: parseTopics(c.conformityTopic),
     tags: parseTags(c.tag),
+    ...(requiredPerformance && { requiredPerformance }),
   };
+}
+
+function isObject(input: unknown): input is Record<string, unknown> {
+  return input !== null && typeof input === 'object' && !Array.isArray(input);
+}
+
+function parseScoringFrameworks(
+  input: unknown,
+  pointer: string,
+  failures: ValidationFailure[],
+): ConformityScoringFramework[] | undefined {
+  if (input === undefined) return undefined;
+  if (!Array.isArray(input)) {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'profile.criterionScoringFramework must be an array.',
+      received: typeof input,
+      expected: 'array',
+      pointer,
+    });
+    return undefined;
+  }
+  return input.flatMap((entry, index) => {
+    const parsed = parseScoringFramework(entry, `${pointer}/${index}`, failures);
+    return parsed ? [parsed] : [];
+  });
+}
+
+function parseScoringFramework(
+  input: unknown,
+  pointer: string,
+  failures: ValidationFailure[],
+): ConformityScoringFramework | undefined {
+  if (input === undefined) return undefined;
+  if (!isObject(input)) {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'Scoring framework must be a non-null object.',
+      received: input === null ? 'null' : typeof input,
+      expected: 'object',
+      pointer,
+    });
+    return undefined;
+  }
+
+  let name: string | undefined;
+  if (typeof input.name === 'string') {
+    name = input.name;
+  } else if (input.name === undefined) {
+    failures.push({
+      code: MISSING_REQUIRED_FIELD,
+      message: 'scoringFramework.name is required.',
+      received: 'undefined',
+      expected: 'string',
+      pointer: `${pointer}/name`,
+    });
+  } else {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'scoringFramework.name must be a string.',
+      received: typeof input.name,
+      expected: 'string',
+      pointer: `${pointer}/name`,
+    });
+  }
+  const description = asNonEmptyString(input.description);
+  const scoresInput = input.score;
+  let scores: ConformityScore[] = [];
+  if (scoresInput === undefined) {
+    failures.push({
+      code: MISSING_REQUIRED_FIELD,
+      message: 'scoringFramework.score is required.',
+      received: 'undefined',
+      expected: 'array',
+      pointer: `${pointer}/score`,
+    });
+  } else if (!Array.isArray(scoresInput)) {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'scoringFramework.score must be an array.',
+      received: typeof scoresInput,
+      expected: 'array',
+      pointer: `${pointer}/score`,
+    });
+  } else {
+    scores = scoresInput.flatMap((entry, index) => {
+      const parsed = parseScore(entry, `${pointer}/score/${index}`, failures);
+      return parsed ? [parsed] : [];
+    });
+  }
+
+  if (name === undefined) return undefined;
+  return {
+    name,
+    ...(description !== undefined && { description }),
+    scores,
+  };
+}
+
+// A score code is compared with a submitted code by exact string equality, so
+// it must not pass through `requireString` or `asNonEmptyString`: those trim
+// and reject the empty string, which would silently drop or alter a published
+// code and make membership fail against a claim carrying the same literal.
+function parseScore(input: unknown, pointer: string, failures: ValidationFailure[]): ConformityScore | undefined {
+  if (!isObject(input)) {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'Score must be a non-null object.',
+      received: input === null ? 'null' : typeof input,
+      expected: 'object',
+      pointer,
+    });
+    return undefined;
+  }
+
+  let code: string | undefined;
+  if (typeof input.code === 'string') {
+    code = input.code;
+  } else if (input.code === undefined) {
+    failures.push({
+      code: MISSING_REQUIRED_FIELD,
+      message: 'score.code is required.',
+      received: 'undefined',
+      expected: 'string',
+      pointer: `${pointer}/code`,
+    });
+  } else {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'score.code must be a string.',
+      received: typeof input.code,
+      expected: 'string',
+      pointer: `${pointer}/code`,
+    });
+  }
+
+  const rank = input.rank;
+  let rankValue: number | undefined;
+  if (typeof rank === 'number' && Number.isInteger(rank)) {
+    rankValue = rank;
+  } else if (rank !== undefined) {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'score.rank must be an integer when present.',
+      received: typeof rank,
+      expected: 'integer',
+      pointer: `${pointer}/rank`,
+    });
+  }
+  const definition = input.definition;
+  let definitionValue: string | undefined;
+  if (typeof definition === 'string') {
+    definitionValue = asNonEmptyString(definition);
+  } else if (definition !== undefined) {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'score.definition must be a string when present.',
+      received: typeof definition,
+      expected: 'string',
+      pointer: `${pointer}/definition`,
+    });
+  }
+
+  if (code === undefined) return undefined;
+  return {
+    code,
+    ...(rankValue !== undefined && { rank: rankValue }),
+    ...(definitionValue !== undefined && { definition: definitionValue }),
+  };
+}
+
+function parseRequiredPerformance(
+  input: unknown,
+  pointer: string,
+  failures: ValidationFailure[],
+): ConformityRequiredPerformance[] | undefined {
+  if (input === undefined) return undefined;
+  if (!Array.isArray(input)) {
+    failures.push({
+      code: INVALID_SHAPE,
+      message: 'criterion.requiredPerformance must be an array.',
+      received: typeof input,
+      expected: 'array',
+      pointer,
+    });
+    return undefined;
+  }
+
+  return input.flatMap((entry, index) => {
+    const entryPointer = `${pointer}/${index}`;
+    if (!isObject(entry)) {
+      failures.push({
+        code: INVALID_SHAPE,
+        message: 'requiredPerformance entry must be a non-null object.',
+        received: entry === null ? 'null' : typeof entry,
+        expected: 'object',
+        pointer: entryPointer,
+      });
+      return [];
+    }
+
+    let metric: ConformityRequiredPerformance['metric'];
+    if (entry.metric !== undefined) {
+      if (!isObject(entry.metric)) {
+        failures.push({
+          code: INVALID_SHAPE,
+          message: 'requiredPerformance.metric must be an object when present.',
+          received: typeof entry.metric,
+          expected: 'object',
+          pointer: `${entryPointer}/metric`,
+        });
+      } else {
+        metric = {
+          ...(typeof entry.metric.id === 'string' && { canonicalId: entry.metric.id }),
+          ...(typeof entry.metric.name === 'string' && { name: entry.metric.name }),
+        };
+      }
+    }
+
+    let score: ConformityScore | undefined;
+    if (entry.score !== undefined) {
+      score = parseScore(entry.score, `${entryPointer}/score`, failures);
+    }
+
+    return [
+      {
+        ...(metric && { metric }),
+        ...(score && { score }),
+      },
+    ];
+  });
 }
 
 function parseTopics(input: unknown): ConformityTopic[] {
