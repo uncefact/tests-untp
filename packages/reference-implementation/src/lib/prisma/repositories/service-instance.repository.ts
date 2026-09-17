@@ -2,8 +2,14 @@ import { ServiceInstance, ServiceType, AdapterType, Prisma } from '../generated'
 import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { NotFoundError } from '@/lib/api/errors';
+import { ServiceInstanceStatusPendingError } from '@/lib/api/errors';
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
+import { countPendingEntriesForInstance } from './credential-status-entry.repository';
+import { lockServiceInstanceForUpdate } from './service-instance-lock.repository';
+import { canonicalJson } from '@uncefact/untp-utils/common';
+
+export { lockServiceInstanceForUpdate } from './service-instance-lock.repository';
 
 export type CreateServiceInstanceInput = {
   tenantId: string;
@@ -24,6 +30,8 @@ export type UpdateServiceInstanceInput = {
   name?: string;
   description?: string | null;
   config?: string; // Already encrypted by the caller
+  /** Whether the decrypted, canonical effective configuration differs. */
+  configChanged?: boolean;
   isPrimary?: boolean;
 };
 
@@ -33,6 +41,35 @@ export type ListServiceInstancesOptions = {
   limit?: number;
   offset?: number;
 };
+
+/** Compares decrypted effective configurations using the PATCH route's canonical form. */
+export function serviceInstanceConfigChanged(existingConfig: unknown, incomingConfig: unknown): boolean {
+  return canonicalJson(existingConfig) !== canonicalJson(incomingConfig);
+}
+
+/**
+ * Locks an instance and refuses an effective configuration change while it
+ * owns an unresolved status intent. `resolve-service.ts` reads `adapterType`
+ * and `config`; this PATCH has no mutable `adapterType` field, so `config` is
+ * the only effective configuration field here. Name, description and
+ * primary-status-only PATCHes do not change the adapter configuration and
+ * remain allowed while a status operation is pending. Pending entries are
+ * read without acquiring library-record locks, so writers retain the
+ * parent-then-service lock order.
+ */
+export async function lockServiceInstanceAndAssertNoPendingStatus(
+  tx: Prisma.TransactionClient,
+  id: string,
+  tenantId: string,
+  configChanged = true,
+): Promise<void> {
+  if (!(await lockServiceInstanceForUpdate(tx, id, tenantId))) {
+    throw new NotFoundError('Service instance not found');
+  }
+  if (!configChanged) return;
+  const pending = await countPendingEntriesForInstance(tx, id, tenantId);
+  if (pending > 0) throw new ServiceInstanceStatusPendingError(id, pending);
+}
 
 /**
  * Creates a new service instance. If isPrimary is true, first unsets
@@ -161,6 +198,10 @@ export async function updateServiceInstance(
   input: UpdateServiceInstanceInput,
 ): Promise<ServiceInstance> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    if (input.config !== undefined && input.configChanged !== false) {
+      await lockServiceInstanceAndAssertNoPendingStatus(tx, id, tenantId);
+    }
+
     const existing = await tx.serviceInstance.findFirst({
       where: { id, tenantId },
     });
@@ -198,10 +239,14 @@ export async function updateServiceInstance(
 }
 
 /**
- * Deletes a service instance. Cannot delete system defaults.
+ * Deletes a service instance. Cannot delete system defaults. The `force` flag
+ * only bypasses ordinary reference counts; it never bypasses the pending
+ * status-operation guard.
  */
 export async function deleteServiceInstance(id: string, tenantId: string): Promise<ServiceInstance> {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await lockServiceInstanceAndAssertNoPendingStatus(tx, id, tenantId);
+
     const existing = await tx.serviceInstance.findFirst({
       where: { id, tenantId },
     });

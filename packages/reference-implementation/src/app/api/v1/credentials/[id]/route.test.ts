@@ -114,6 +114,22 @@ describe('DELETE /api/v1/credentials/:id', () => {
     });
   });
 
+  it('maps a pending status operation through the typed conflict handler', async () => {
+    mockDeleteNativeCredentialAndCopy.mockResolvedValue({
+      outcome: 'status_change_pending',
+      statusPurposes: ['revocation', 'suspension'],
+    });
+
+    const response = await callDelete();
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        'Cannot delete credential "cred-1" while 2 pending status operations remain for purposes: revocation, suspension. Wait for the pending status operations to complete, or have an operator reconcile them.',
+      code: 'STATUS_OPERATION_IN_PROGRESS',
+    });
+  });
+
   it('returns a sanitised 500 for a failure before commit', async () => {
     mockDeleteNativeCredentialAndCopy.mockRejectedValue(new Error('unexpected failed'));
 

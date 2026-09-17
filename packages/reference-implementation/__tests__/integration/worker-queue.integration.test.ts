@@ -7,6 +7,7 @@ import { buildUntpArtefactUrls } from '@uncefact/untp-utils/artefacts';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { CheckResult, CheckRunFailureCode, CheckRunState, CoreCredentialType } from '../../src/lib/prisma/generated';
 import { createRigClient, truncateApplicationTables } from './rig/db';
+import { createVerifierDouble } from './helpers/verifiable-credential-service-double';
 import { startFixtureServer, type FixtureServer } from './rig/fixture-server';
 import { waitFor } from './rig/wait-for';
 import { seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
@@ -182,7 +183,7 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 
 function setVerifier(): jest.Mock<ReturnType<IVerifiableCredentialService['verify']>, [unknown]> {
   const verify = jest.fn<ReturnType<IVerifiableCredentialService['verify']>, [unknown]>();
-  currentVerifier = { sign: jest.fn(), verify: verify as never };
+  currentVerifier = createVerifierDouble(verify as never);
   return verify;
 }
 

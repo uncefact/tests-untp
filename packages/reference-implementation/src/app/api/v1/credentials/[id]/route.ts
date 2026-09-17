@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError, unexpectedErrorMessage } from '@/lib/api/errors';
+import { ConflictError, ForbiddenError, unexpectedErrorMessage } from '@/lib/api/errors';
 import { appLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
@@ -127,6 +127,22 @@ export const GET = withTenantAuth(async () => retiredRoute('GET /api/v1/library/
  *                 value: { error: 'No tenant found for user' }
  *               externalRecord:
  *                 value: { error: 'This id is an external library record; delete it with DELETE /api/v1/library/{id}.', code: EXTERNAL_RECORD_NOT_DELETABLE_HERE }
+ *       409:
+ *         description: >-
+ *           Conflict. Pending status operations prevent deletion until they
+ *           complete or an operator reconciles them. The response includes
+ *           the count and every pending purpose. Wait for the pending status
+ *           operations to complete, or have an operator reconcile them.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CredentialDeleteStatusOperationResponse'
+ *             examples:
+ *               pendingStatusOperation:
+ *                 summary: A pending revocation operation blocks deletion
+ *                 value:
+ *                   error: 'Cannot delete credential "credential-native-1" while 1 pending status operation remains for purposes: revocation. Wait for the pending status operations to complete, or have an operator reconcile them.'
+ *                   code: STATUS_OPERATION_IN_PROGRESS
  *       500:
  *         description: |
  *           The transaction failed and was rolled back, or its commit outcome
@@ -161,6 +177,16 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
   }
   if (result.outcome === 'external') {
     throw new ForbiddenError(EXTERNAL_DELETE_MESSAGE, 'EXTERNAL_RECORD_NOT_DELETABLE_HERE');
+  }
+  if (result.outcome === 'status_change_pending') {
+    const count = result.statusPurposes.length;
+    const purposes = result.statusPurposes.join(', ');
+    throw new ConflictError(
+      `Cannot delete credential "${id}" while ${count} pending status operation${count === 1 ? '' : 's'} ${
+        count === 1 ? 'remains' : 'remain'
+      } for purposes: ${purposes}. Wait for the pending status operations to complete, or have an operator reconcile them.`,
+      'STATUS_OPERATION_IN_PROGRESS',
+    );
   }
 
   // The use case has already committed the delete and finished its

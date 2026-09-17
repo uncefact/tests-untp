@@ -34,13 +34,6 @@
   "validFrom": "2024-03-15T12:00:00Z",
   "validUntil": "2034-03-15T12:00:00Z",
   "name": "Some name",
-  "credentialStatus": {
-    "id": "https://example-cab.com/credentials/status/3#94567",
-    "type": "BitstringStatusListEntry",
-    "statusPurpose": "refresh",
-    "statusListIndex": 94567,
-    "statusListCredential": "https://example-cab.com/credentials/status/4"
-  },
   "renderMethod": [
     {
       "type": ["RenderTemplate2024"],

@@ -4,8 +4,8 @@ import { VcDecodeError } from '../errors.js';
 
 /**
  * Decodes an enveloped verifiable credential by extracting and parsing the
- * JWT payload. This is adapter-agnostic since all UNTP enveloped credentials
- * use the same JWT envelope format regardless of which VC service signed them.
+ * JWT payload. All UNTP enveloped credentials use the same JWT envelope
+ * format regardless of which service signed them.
  *
  * @param credential - The enveloped credential to decode.
  * @returns The decoded unsigned credential content.

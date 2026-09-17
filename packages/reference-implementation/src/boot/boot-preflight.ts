@@ -3,6 +3,7 @@ import { createLogger } from '@uncefact/untp-ri-services/logging';
 import type { LoggerService } from '@uncefact/untp-ri-services/logging';
 import { validateBundledArtefactsFallbackOnBoot } from '../lib/config/bundled-artefacts-fallback.config';
 import { validateFetchSettingsOnBoot } from '../lib/config/credential-fetch.config';
+import { validateStatusSettingsOnBoot } from '../lib/config/credential-status.config';
 import { resolveAppUrl } from '../lib/config/app-url.config';
 import { validateHttpUserAgentOnBoot } from '../lib/config/http-user-agent.config';
 import { validateStaleClaimOnBoot } from '../lib/config/idempotency-claim.config';
@@ -59,6 +60,7 @@ export async function runBootPreflight(
     validateStaleClaimOnBoot();
     validateMaxRequestBodyBytesOnBoot();
     validateFetchSettingsOnBoot(logger);
+    validateStatusSettingsOnBoot(process.env, logger);
   }
 
   if (role === 'web') {

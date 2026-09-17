@@ -36,8 +36,9 @@ import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { resolvePublishTarget } from '@/lib/credentials/resolve-publish-target';
 import { validateConformityClaimAtIssuance } from '@/lib/credentials/validate-conformity-claim-at-issuance';
+import { StatusListMutexBusyError, StatusListMutexTimeoutError } from '@/lib/services/status-list-mutex';
 import type { PrimaryEntityResult } from '@/lib/entities/resolve-primary-entity';
-import { buildPublishLinks, IdrPublishError } from '@uncefact/untp-ri-services';
+import { buildPublishLinks, IdrPublishError, ServiceError } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs, StorageRecord } from '@uncefact/untp-ri-services';
 
 type CredentialWarning = {
@@ -104,6 +105,16 @@ function issuanceReplayResponse(replay: { recordId: string; responseBody: unknow
   }
   if (warnings.length > 0) {
     response.warnings = warnings;
+  }
+  if (
+    warnings.some(
+      (warning) =>
+        typeof warning === 'object' &&
+        warning !== null &&
+        (warning as { code?: unknown }).code === 'STATUS_CAPTURE_FAILED',
+    )
+  ) {
+    response.statusCaptureFailed = true;
   }
   return NextResponse.json(response, { status: 201 });
 }
@@ -379,6 +390,8 @@ async function publishIssuedCredential({
  *       a system default DID, signs it, stores the enveloped credential
  *       (optionally encrypted), optionally publishes it to the Identity
  *       Resolver, links it to its primary entity, and returns the credential ID.
+ *       When statusPurposes is omitted, the deployment's DEFAULT_STATUS_PURPOSES
+ *       setting applies, with the built-in default of revocation when unset.
  *     tags:
  *       - Credentials
  *     parameters:
@@ -420,7 +433,9 @@ async function publishIssuedCredential({
  *           (missing or mistyped credentialPayload, credentialType, version,
  *           storageOptions, or publishingOptions, including a malformed
  *           verification URL or hreflang entry; unknown body fields are
- *           ignored). An invalid Idempotency-Key header (blank, longer than
+ *           ignored). A caller-supplied credentialPayload.credentialStatus is
+ *           refused with CREDENTIAL_STATUS_NOT_ACCEPTED. An invalid
+ *           Idempotency-Key header (blank, longer than
  *           255 characters after trimming, or containing a character outside
  *           printable ASCII) is a 400 that names the header. An unknown data
  *           model (credentialType and version pair)
@@ -480,6 +495,30 @@ async function publishIssuedCredential({
  *                 value:
  *                   error: This Idempotency-Key was already used with a different request body.
  *                   code: IDEMPOTENCY_KEY_MISMATCH
+ *       503:
+ *         description: >-
+ *           Status-list coordination could not complete, so nothing was
+ *           issued. Retry shortly. `STATUS_LIST_BUSY` means the wait for the
+ *           status-list mutex expired or coordination capacity was
+ *           unavailable. `STATUS_LIST_LOCK_LOST` means the lock was lost
+ *           before the provider call completed, in which case a status entry
+ *           may already have been minted without a credential to carry it.
+ *           Neither response exposes the internal serialisation key.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               statusListBusy:
+ *                 summary: The credential status service could not accept the issuance yet
+ *                 value:
+ *                   error: The credential status service is busy. Retry shortly.
+ *                   code: STATUS_LIST_BUSY
+ *               statusListLockLost:
+ *                 summary: The status-list lock was lost during issuance
+ *                 value:
+ *                   error: The status list lock was lost before the provider call completed. Retry the request.
+ *                   code: STATUS_LIST_LOCK_LOST
  *       500:
  *         description: Server error
  *         content:
@@ -693,9 +732,32 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       bridge,
       coreDataModelVersion,
       coreCredentialType: resolveCoreCredentialType(coreDataModelType),
+      ...(body.statusPurposes !== undefined ? { statusPurposes: body.statusPurposes } : {}),
       ...(claimId !== undefined ? { idempotencyClaimId: claimId } : {}),
     });
   } catch (error) {
+    if (error instanceof StatusListMutexBusyError || error instanceof StatusListMutexTimeoutError) {
+      const busy = error instanceof StatusListMutexBusyError;
+      logger.warn(
+        {
+          err: error,
+          ...(error.cause === undefined ? {} : { cause: error.cause }),
+          tenantId,
+        },
+        busy
+          ? 'Credential issuance could not acquire status-list coordination capacity'
+          : 'Credential issuance could not acquire the status-list mutex',
+      );
+      throw new ServiceError(
+        busy
+          ? 'The credential status service is busy. Retry shortly.'
+          : "Another issuance is currently updating this credential's status list. Retry shortly.",
+        'STATUS_LIST_BUSY',
+        503,
+        undefined,
+        error,
+      );
+    }
     if (error instanceof IdempotencyClaimLostError) {
       throw new ConflictError(IDEMPOTENCY_KEY_HELD_ELSEWHERE_MESSAGE, 'IDEMPOTENCY_KEY_IN_FLIGHT');
     }
@@ -712,7 +774,15 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     throw error;
   }
 
-  const { credentialId, storageResponse, primaryEntity, entityLinkFailed, detailsExtractionFailed } = issued;
+  const {
+    credentialId,
+    storageResponse,
+    primaryEntity,
+    entityLinkFailed,
+    detailsExtractionFailed,
+    statusCaptureFailed,
+    statusCaptureFailure,
+  } = issued;
 
   if (detailsExtractionFailed) {
     warnings.push({
@@ -720,6 +790,21 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       message:
         'The credential was issued but its name, issuer, subject and validity dates could not be read from it, so they are not recorded against it.',
       remediation: `The credential itself is unaffected and can be retrieved and verified as usual. Only its stored summary is missing. Quote correlation ID ${getOrMintCorrelationId()} to your operator, who can find the cause in the logs.`,
+    });
+  }
+
+  if (statusCaptureFailed) {
+    const retryableStatusCaptureFailure =
+      statusCaptureFailure === 'DECRYPT_FAILED' || statusCaptureFailure === 'STORAGE_UNAVAILABLE';
+    warnings.push({
+      code: 'STATUS_CAPTURE_FAILED',
+      message: 'The credential was issued but its credential-status entries could not be recorded.',
+      remediation:
+        statusCaptureFailure === undefined
+          ? 'Ask your operator to run the credential-status backfill and inspect its failure report.'
+          : retryableStatusCaptureFailure
+            ? `Ask your operator to run backfill-credential-status-entries --retry-failed for ${statusCaptureFailure}.`
+            : `Ask your operator to investigate the provider output for ${statusCaptureFailure}; the entry was not recorded.`,
     });
   }
 
@@ -761,6 +846,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   logger.info({ credentialId }, 'Credential issued successfully');
   const response: Record<string, unknown> = { credentialId };
+  if (statusCaptureFailed) response.statusCaptureFailed = true;
   if (warnings.length > 0) response.warnings = warnings;
   return NextResponse.json(response, { status: 201 });
 });

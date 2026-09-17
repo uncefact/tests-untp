@@ -1,5 +1,16 @@
 import { ServiceError } from '../errors.js';
-import { VcServiceError, VcSignError, VcVerifyError, VcDecodeError, VcCredentialStatusError } from './errors.js';
+import {
+  VcServiceError,
+  VcSignError,
+  VcVerifyError,
+  VcDecodeError,
+  VcCredentialStatusError,
+  VcStatusReadError,
+  VcStatusSetError,
+  VcStatusResponseInvalidError,
+  VcStatusListNotFoundError,
+  VcStatusEntryUnsupportedError,
+} from './errors.js';
 
 describe('VC errors', () => {
   describe('VcServiceError', () => {
@@ -78,5 +89,34 @@ describe('VC errors', () => {
       expect(err.statusCode).toBe(502);
       expect(err.context).toEqual({ httpStatus: undefined });
     });
+  });
+
+  it('exposes status error contracts and keeps causes non-enumerable', () => {
+    const cause = new Error('underlying failure');
+    const read = new VcStatusReadError('read failed', 503, cause);
+    expect(read.code).toBe('VC_STATUS_READ_FAILED');
+    expect(read.statusCode).toBe(503);
+    expect(read.cause).toBe(cause);
+    expect(Object.keys(read)).not.toContain('cause');
+
+    const set = new VcStatusSetError('set failed', true, 500, cause);
+    expect(set.code).toBe('VC_STATUS_SET_FAILED');
+    expect(set.statusCode).toBe(500);
+    expect(set.mayHaveApplied).toBe(true);
+
+    const invalid = new VcStatusResponseInvalidError('bad body', cause);
+    expect(invalid.code).toBe('VC_STATUS_RESPONSE_INVALID');
+    expect(invalid.statusCode).toBe(502);
+    expect(invalid.cause).toBe(cause);
+
+    const notFound = new VcStatusListNotFoundError('missing');
+    expect(notFound.code).toBe('VC_STATUS_LIST_NOT_FOUND');
+    expect(notFound.statusCode).toBe(404);
+
+    const unsupported = new VcStatusEntryUnsupportedError('unsupported', 'index', cause);
+    expect(unsupported.code).toBe('VC_STATUS_ENTRY_UNSUPPORTED');
+    expect(unsupported.statusCode).toBe(422);
+    expect(unsupported.reason).toBe('index');
+    expect(unsupported.cause).toBe(cause);
   });
 });

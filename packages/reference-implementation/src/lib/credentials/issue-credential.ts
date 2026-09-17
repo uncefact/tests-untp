@@ -1,5 +1,6 @@
 import {
   decodeCredential,
+  ServiceError,
   type CredentialPayload,
   type EnvelopedVerifiableCredential,
   type ExtractedRefs,
@@ -9,6 +10,7 @@ import {
   type IStorageService,
   type StorageRecord,
 } from '@uncefact/untp-ri-services';
+import type { SupportedStatusPurpose } from './status-purposes';
 import type { ResolvedService } from '@/lib/services/resolve-service';
 import { createCredential } from '@/lib/prisma/repositories';
 import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
@@ -19,8 +21,14 @@ import type { PrimaryEntityResult } from '@/lib/entities/resolve-primary-entity'
 import { appLogger } from '@/lib/api/logger';
 import { extractCredentialDetails } from './extract-credential-details';
 import type { CredentialDetailsInput } from '@/lib/prisma/repositories/credential.repository';
+import { captureCredentialStatusEntries } from './capture-credential-status-entries';
+import type { StatusCaptureFailure } from './capture-credential-status-entries';
+import { withStatusListMutex } from '@/lib/services/status-list-mutex';
+import { StatusListLockLostError } from '@/lib/services/status-list-mutex';
+import { readDefaultStatusPurposes } from '@/lib/config/credential-status.config';
 
 const logger = appLogger.child({ module: 'issue-credential' });
+const SIGNING_DEADLINE_MS = 30_000;
 
 export type IssueCredentialInput = {
   tenantId: string;
@@ -42,6 +50,8 @@ export type IssueCredentialInput = {
   };
   bridge: IDataModelBridge;
   idempotencyClaimId?: string;
+  statusPurposes?: readonly SupportedStatusPurpose[];
+  signal?: AbortSignal;
 };
 
 export type IssueCredentialResult = {
@@ -61,6 +71,10 @@ export type IssueCredentialResult = {
    * the caller is told, and issuance still succeeds.
    */
   detailsExtractionFailed: boolean;
+  /** True when status facts were not readable, while issuance still succeeded. */
+  statusCaptureFailed: boolean;
+  /** The persisted capture failure class, when status capture failed. */
+  statusCaptureFailure?: StatusCaptureFailure;
 };
 
 /**
@@ -114,6 +128,11 @@ function readCredentialDetails(
   }
 }
 
+/**
+ * Issues a credential before persisting its record. The repository transaction
+ * stays outside the status-list serialisation callback because nesting it
+ * inside that callback would require a second application pool connection.
+ */
 export async function issueCredential(input: IssueCredentialInput): Promise<IssueCredentialResult> {
   const {
     tenantId,
@@ -128,9 +147,60 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
   } = input;
 
   const shouldEncrypt = storageOptions.encrypt !== false;
+  const statusPurposes = input.statusPurposes ?? readDefaultStatusPurposes();
+  const deadlineAt = Date.now() + SIGNING_DEADLINE_MS;
+  const signal = input.signal ?? AbortSignal.timeout(SIGNING_DEADLINE_MS);
 
   logger.info({ tenantId, vcInstanceId: vcService.instanceId }, 'Signing credential');
-  const signedCredential = await vcService.service.sign(credentialPayload);
+  let signedCredential: EnvelopedVerifiableCredential;
+  try {
+    signedCredential = await vcService.service.sign(credentialPayload, {
+      statusPurposes,
+      serialise: (key, fn, hookSignal) => withStatusListMutex(key, fn, { signal: hookSignal ?? signal, deadlineAt }),
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof StatusListLockLostError) {
+      const result = error.callbackResult;
+      const payloadIssuer = credentialPayload.issuer;
+      const issuerDid =
+        typeof payloadIssuer === 'string'
+          ? payloadIssuer
+          : typeof payloadIssuer === 'object' && payloadIssuer !== null && !Array.isArray(payloadIssuer)
+            ? typeof payloadIssuer.id === 'string'
+              ? payloadIssuer.id
+              : undefined
+            : undefined;
+      if (
+        typeof result === 'object' &&
+        result !== null &&
+        typeof (result as Record<string, unknown>).statusListCredential === 'string' &&
+        typeof (result as Record<string, unknown>).statusListIndex === 'string'
+      ) {
+        logger.warn(
+          {
+            ...(issuerDid === undefined ? {} : { issuerDid }),
+            orphanedEntries: [
+              {
+                statusListCredential: (result as Record<string, unknown>).statusListCredential,
+                statusListIndex: (result as Record<string, unknown>).statusListIndex,
+              },
+            ],
+          },
+          'Credential status entries were minted before issuance failed',
+        );
+      }
+      throw new ServiceError(
+        'The status list lock was lost before the provider call completed. Retry the request.',
+        'STATUS_LIST_LOCK_LOST',
+        503,
+        undefined,
+        error,
+      );
+    }
+    throw error;
+  }
+  const statusCapture = captureCredentialStatusEntries(signedCredential, statusPurposes);
   const { failed: detailsExtractionFailed, ...details } = readCredentialDetails(signedCredential, bridge);
 
   logger.info({ tenantId, storageInstanceId: storageService.instanceId, shouldEncrypt }, 'Storing credential');
@@ -155,11 +225,37 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     organisationId: primaryEntity.organisationId,
     facilityId: primaryEntity.facilityId,
     productId: primaryEntity.productId,
+    ...(!('failure' in statusCapture)
+      ? {
+          statusCapture: 'CAPTURED' as const,
+          statusCapturedAt: new Date(),
+          statusEntries: statusCapture.entries,
+        }
+      : {
+          statusCapture: 'FAILED' as const,
+          statusCaptureError: statusCapture.failure,
+          statusCapturedAt: new Date(),
+        }),
+    vcServiceInstanceId: vcService.instanceId,
+    vcServiceAttribution: 'ISSUANCE' as const,
+    vcServiceAttributedAt: new Date(),
     ...details,
     idempotencyClaimId: input.idempotencyClaimId,
   });
 
   logger.info({ tenantId, credentialId: credentialRecord.id }, 'Credential issued and stored');
+
+  if ('failure' in statusCapture) {
+    logger.warn(
+      {
+        err: statusCapture.cause,
+        failure: statusCapture.failure,
+        credentialId: credentialRecord.id,
+        tenantId,
+      },
+      'Credential-status capture failed after issuance; the credential was stored without status entries',
+    );
+  }
 
   if (entityLinkFailed) {
     logger.warn(
@@ -174,6 +270,8 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     primaryEntity,
     entityLinkFailed,
     detailsExtractionFailed,
+    statusCaptureFailed: 'failure' in statusCapture,
+    ...('failure' in statusCapture ? { statusCaptureFailure: statusCapture.failure } : {}),
   };
 }
 
@@ -187,7 +285,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
  * find it (#954, ADR-051).
  */
 async function createCredentialOrReportOrphan(
-  input: Parameters<typeof createCredential>[0] & { storageUri: string; digestMultibase: string },
+  input: Parameters<typeof createCredential>[0],
 ): Promise<Awaited<ReturnType<typeof createCredential>>> {
   try {
     return await createCredential(input);

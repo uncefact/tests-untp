@@ -98,18 +98,43 @@ export type CredentialSubject = {
 };
 
 /**
- * Credential status using W3C Bitstring Status List.
- * UNTP uses this exclusively for revocation checking.
+ * A W3C Bitstring Status List entry in the service's canonical internal form.
  *
- * @see https://www.w3.org/TR/vc-bitstring-status-list/#bitstringstatuslistentry
+ * The specification leaves `statusPurpose` open. The canonical `statusListIndex`
+ * is a decimal string for parsing, capture, storage and status management.
+ * Issued credential wire values are shaped separately by the adapter.
+ *
+ * @see https://www.w3.org/TR/2025/REC-vc-bitstring-status-list-20250515/#bitstringstatuslistentry
  */
-export type CredentialStatus = {
-  id: string;
+export type CredentialStatusEntry = {
+  id?: string;
   type: 'BitstringStatusListEntry';
-  statusPurpose: 'revocation';
-  statusListIndex: number;
+  statusPurpose: string;
+  statusListIndex: string;
   statusListCredential: string;
+  statusSize?: number;
+  statusMessage?: StatusMessage[];
+  statusReference?: string | string[];
+  [key: string]: unknown;
 };
+
+/** The status message shape defined by the Bitstring Status List specification. */
+export type StatusMessage = { status: string; message: string };
+
+/** Closed status entry shape used for storage and status-list management. */
+export type CanonicalCredentialStatusEntry = {
+  id?: string;
+  type: 'BitstringStatusListEntry';
+  statusPurpose: string;
+  statusListIndex: string;
+  statusListCredential: string;
+  statusSize?: number;
+  statusMessage?: StatusMessage[];
+  statusReference?: string | string[];
+};
+
+/** Credential status as a single entry or an ordered collection of entries. */
+export type CredentialStatus = OneOrMany<CredentialStatusEntry>;
 
 /**
  * Render method type identifiers supported by UNTP.
@@ -202,7 +227,7 @@ export type UNTPVerifiableCredential = {
   /** The subject(s) of the credential - single object for DPP/DFR/DCC, array for DTE */
   credentialSubject: OneOrMany<CredentialSubject>;
   /** Status information for revocation checking */
-  credentialStatus: CredentialStatus;
+  credentialStatus?: CredentialStatus;
   /** ISO 8601 datetime when the credential becomes valid */
   validFrom?: string;
   /** ISO 8601 datetime when the credential expires */
@@ -232,7 +257,8 @@ export type EnvelopedVerifiableCredential = {
 
 /**
  * Input payload for issuing a credential.
- * The service will add defaults for validFrom and credentialStatus.
+ * The service will add defaults for validFrom and, when status purposes are
+ * requested, credentialStatus.
  *
  * Extension support: Additional properties beyond those defined here will be
  * passed through to the issued credential.
@@ -250,6 +276,64 @@ export type CredentialPayload = {
   validUntil?: string;
   /** Optional render methods */
   renderMethod?: RenderMethod[];
+};
+
+/** Options that affect credential issuance and status-list minting. */
+export type SignOptions = {
+  /**
+   * Status purposes to mint, in the order they should appear in the VC. The
+   * Bitstring Status List specification leaves this value open. The selected
+   * service decides which purposes it can mint. An empty array means no status
+   * entries are requested. An absent option keeps the service's own default.
+   */
+  statusPurposes?: Readonly<string[]>;
+  /**
+   * Serialises the status-list rewrite performed by the callback. The key
+   * identifies the service-side list the callback will rewrite, is opaque to
+   * the caller, and is suitable only as a lock name.
+   */
+  serialise?: (
+    key: string,
+    fn: () => Promise<CredentialStatusEntry>,
+    signal?: AbortSignal,
+  ) => Promise<CredentialStatusEntry>;
+  signal?: AbortSignal;
+};
+
+/** Input for changing one status-list entry. */
+export type SetCredentialStatusInput = {
+  /** Issuer identifier of the status list addressed by `entry`. */
+  statusListIssuer: string;
+  entry: CredentialStatusEntry;
+  /** true sets the bit. */
+  value: boolean;
+  /** Serialises the service-side list rewrite performed by the request. */
+  serialise?: (key: string, fn: () => Promise<void>, signal?: AbortSignal) => Promise<void>;
+  signal: AbortSignal;
+};
+
+/** Input for reading an entry of any status purpose at a status service. */
+export type GetCredentialStatusInput = {
+  /** See SetCredentialStatusInput.statusListIssuer. */
+  statusListIssuer: string;
+  /** See SetCredentialStatusInput.entry. */
+  entry: CredentialStatusEntry;
+  /** See SetCredentialStatusInput.signal. */
+  signal: AbortSignal;
+};
+
+/**
+ * Observation of the selected entry's bit at a status service. The coordinate
+ * fields are the canonical form of the entry the caller supplied, echoed for
+ * correlation, not independently confirmed.
+ */
+export type CredentialStatusObservation = {
+  value: boolean;
+  /** ISO 8601 time at which this observation was taken. */
+  observedAt: string;
+  statusPurpose: string;
+  statusListCredential: string;
+  statusListIndex: string;
 };
 
 /**
@@ -285,17 +369,11 @@ export type VerifyResult = {
  */
 export type VerifyOptions = {
   /**
-   * Whether the adapter judges the credential's own `validFrom` and
-   * `validUntil` (see `checkValidityWindow`) after the provider answers and
-   * reports a temporal failure when the credential is outside them or a
-   * bound cannot be read. Defaults to true, with the provider's own temporal
-   * policies at their defaults; for a `vc+jwt` envelope the pinned provider
-   * reads only the JOSE `exp` and `nbf` claims, which the issuer does not
-   * set, so its answer alone establishes nothing about the window. False
-   * skips the adapter's judgement and also sends the provider's
-   * `issuanceDate` and `expirationDate` policies as false; signature and
-   * status checking stay enabled (a provider still stops at its first
-   * failure).
+   * Whether the credential's own `validFrom` and `validUntil` claims are
+   * checked after signature and status verification. A credential outside
+   * its window, or with an unreadable bound, is reported as temporally
+   * invalid. Defaults to true. False skips this check while signature and
+   * status verification remain enabled.
    */
   validityWindow?: boolean;
 };
@@ -309,7 +387,22 @@ export const VC_SERVICE_TYPE = 'VC' as const;
  */
 export interface IVerifiableCredentialService {
   /** Signs a credential payload and returns an enveloped (JWT-wrapped) credential. */
-  sign(payload: CredentialPayload): Promise<EnvelopedVerifiableCredential>;
+  sign(payload: CredentialPayload, options?: SignOptions): Promise<EnvelopedVerifiableCredential>;
+
+  /**
+   * Sets one status-list entry through the issuing service.
+   * Every throw other than `VcStatusSetError` is pre-flight and applied
+   * nothing. `VcStatusSetError.mayHaveApplied` is the only uncertainty signal.
+   */
+  setCredentialStatus(input: SetCredentialStatusInput): Promise<void>;
+
+  /**
+   * Reads one entry of any purpose through the issuing service.
+   * `VcStatusReadError`, including `VcStatusListNotFoundError`, means no
+   * observation. `VcStatusResponseInvalidError` means a 2xx body broke the
+   * contract. `VcStatusEntryUnsupportedError` is pre-flight.
+   */
+  getCredentialStatus(input: GetCredentialStatusInput): Promise<CredentialStatusObservation>;
 
   /** Verifies an enveloped credential's signature and status. */
   verify(credential: EnvelopedVerifiableCredential, options?: VerifyOptions): Promise<VerifyResult>;

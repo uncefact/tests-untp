@@ -26,7 +26,7 @@ import { LibraryRecordSelectionError } from '@/lib/library/library-read-errors';
 import { StructuredError } from '@uncefact/untp-utils';
 
 const LIBRARY_RECORD_INCLUDE = {
-  credential: true,
+  credential: { include: { statusEntries: true } },
   externalCredential: true,
   checkRuns: {
     orderBy: { generation: 'desc' },
@@ -39,7 +39,7 @@ const LIBRARY_RECORD_INCLUDE = {
 } as const satisfies Prisma.LibraryRecordInclude;
 
 const LIBRARY_RECORD_LIST_INCLUDE = {
-  credential: true,
+  credential: { include: { statusEntries: true } },
   externalCredential: true,
 } as const satisfies Prisma.LibraryRecordInclude;
 

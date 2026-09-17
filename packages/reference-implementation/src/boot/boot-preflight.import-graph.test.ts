@@ -35,6 +35,8 @@ const ENV_NAMES = [
   'OTEL_EXPORTER_OTLP_METRICS_PROTOCOL',
   'OTEL_EXPORTER_OTLP_PROTOCOL',
   'RI_PROCESS_ROLE',
+  'DEFAULT_STATUS_PURPOSES',
+  'STATUS_LOCK_ACQUIRE_MS',
 ] as const;
 const savedEnvironment = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 

@@ -1,3 +1,7 @@
+// Re-seeding the VC service instance takes its row lock and checks pending
+// status operations only when the decrypted effective configuration changes.
+// An unchanged re-seed is safe while a pending status change exists; a changed
+// configuration fails loudly until the operation completes or is reconciled.
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -56,6 +60,11 @@ import {
   SYSTEM_DID_ID,
 } from '../src/lib/prisma/constants.js';
 import { buildUntpArtefactUrls, buildSpecificationPageUrl } from '@uncefact/untp-utils/artefacts';
+import {
+  lockServiceInstanceAndAssertNoPendingStatus,
+  serviceInstanceConfigChanged,
+} from '../src/lib/prisma/repositories/service-instance.repository.js';
+import { ServiceInstanceStatusPendingError } from '../src/lib/api/errors.js';
 import { convergeCoreProvenance } from './core-seed-provenance.js';
 import {
   runSeedPreflight,
@@ -384,6 +393,7 @@ export async function main() {
     reachedCategories.add('vc');
     if (encryptionService) {
       try {
+        const activeEncryptionService = encryptionService;
         const vcAdapters = adapterRegistry[ServiceType.VC];
         const permittedVcTypes = Object.keys(vcAdapters) as Array<keyof typeof vcAdapters>;
         const resolvedVcAdapterType = (process.env.SYSTEM_VC_ADAPTER_TYPE as keyof typeof vcAdapters) || 'VCKIT';
@@ -401,27 +411,49 @@ export async function main() {
         vcAdapterType = resolvedVcAdapterType;
         const vcServiceConfig = JSON.stringify(vcConfig);
         const encryptedVcConfig = JSON.stringify(
-          encryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
+          activeEncryptionService.encrypt(vcServiceConfig, EncryptionAlgorithm.AES_256_GCM),
         );
 
-        await prisma.serviceInstance.upsert({
-          where: { id: SYSTEM_VC_SERVICE_ID },
-          update: { config: encryptedVcConfig },
-          create: {
-            id: SYSTEM_VC_SERVICE_ID,
-            tenantId: SYSTEM_TENANT_ID,
-            serviceType: PrismaServiceType.VC,
-            adapterType: resolvedVcAdapterType as unknown as PrismaAdapterType,
-            name: process.env.SYSTEM_VC_SERVICE_NAME || 'System Default VC',
-            description:
-              process.env.SYSTEM_VC_SERVICE_DESCRIPTION || 'System-wide default verifiable credential service instance',
-            config: encryptedVcConfig,
-            isPrimary: true,
-          },
+        await prisma.$transaction(async (tx) => {
+          const existing = await tx.serviceInstance.findUnique({
+            where: { id: SYSTEM_VC_SERVICE_ID },
+            select: { id: true, config: true },
+          });
+          if (existing !== null) {
+            const existingConfig = JSON.parse(activeEncryptionService.decrypt(JSON.parse(existing.config)));
+            await lockServiceInstanceAndAssertNoPendingStatus(
+              tx,
+              SYSTEM_VC_SERVICE_ID,
+              SYSTEM_TENANT_ID,
+              serviceInstanceConfigChanged(existingConfig, vcConfig),
+            );
+          }
+
+          await tx.serviceInstance.upsert({
+            where: { id: SYSTEM_VC_SERVICE_ID },
+            update: { config: encryptedVcConfig },
+            create: {
+              id: SYSTEM_VC_SERVICE_ID,
+              tenantId: SYSTEM_TENANT_ID,
+              serviceType: PrismaServiceType.VC,
+              adapterType: resolvedVcAdapterType as unknown as PrismaAdapterType,
+              name: process.env.SYSTEM_VC_SERVICE_NAME || 'System Default VC',
+              description:
+                process.env.SYSTEM_VC_SERVICE_DESCRIPTION ||
+                'System-wide default verifiable credential service instance',
+              config: encryptedVcConfig,
+              isPrimary: true,
+            },
+          });
         });
         vcSeeded = true;
         vcOutcome = 'seeded';
       } catch (error) {
+        if (error instanceof ServiceInstanceStatusPendingError) {
+          throw new Error(
+            'VC service instance seed stopped because credentials using this instance have pending status operations. An operator must wait for them to complete or reconcile them before rerunning the seed.',
+          );
+        }
         logger.warn(
           { error: error instanceof Error ? error.message : error },
           'VC service instance seed did not complete; skipping. See the attached error for the cause.',

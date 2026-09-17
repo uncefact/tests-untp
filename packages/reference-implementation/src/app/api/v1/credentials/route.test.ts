@@ -132,6 +132,7 @@ jest.mock('@/lib/api/validation', () => {
 import { IdempotencyOperation } from '@/lib/prisma/generated';
 import { POST, GET } from './route';
 import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
+import { StatusListMutexBusyError, StatusListMutexTimeoutError } from '@/lib/services/status-list-mutex';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -339,6 +340,22 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(400);
       expect(json.error).toContain('credentialPayload');
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
+    it('returns the coded 400 shape and pointer when credentialPayload includes credentialStatus', async () => {
+      // Catches a regression that lets caller status data reach validation or the provider.
+      const req = createFakeRequest(validBody({ credentialPayload: { credentialStatus: null } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json).toEqual({
+        error:
+          "credentialPayload.credentialStatus: The reference implementation mints and manages the credential's status entries; remove credentialStatus from the payload.",
+        code: 'CREDENTIAL_STATUS_NOT_ACCEPTED',
+      });
+      expect(mockValidateCredentialPayload).not.toHaveBeenCalled();
       expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
@@ -816,6 +833,25 @@ describe('POST /api/v1/credentials', () => {
 
   // ── Service resolution ──────────────────────────────────────────────
 
+  it('returns 400 for duplicate status purposes before any provider call', async () => {
+    const req = createFakeRequest(validBody({ statusPurposes: ['revocation', 'revocation'] }));
+    const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain('statusPurposes');
+    expect(mockIssueCredential).not.toHaveBeenCalled();
+  });
+
+  it('forwards the explicit dual-purpose issuance option', async () => {
+    const req = createFakeRequest(validBody({ statusPurposes: ['revocation', 'suspension'] }));
+    await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+
+    expect(mockIssueCredential).toHaveBeenCalledWith(
+      expect.objectContaining({ statusPurposes: ['revocation', 'suspension'] }),
+    );
+  });
+
   describe('service resolution', () => {
     it('resolves VC service using the DID serviceInstanceId by default', async () => {
       const req = createFakeRequest(validBody());
@@ -908,6 +944,105 @@ describe('POST /api/v1/credentials', () => {
 
       expect(res.status).toBe(201);
       expect(json.credentialId).toBe('cred-42');
+    });
+
+    it('maps a status-list mutex timeout to a sanitised 503', async () => {
+      mockIssueCredential.mockRejectedValueOnce(new StatusListMutexTimeoutError('status-list:provider:issuer'));
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(503);
+      expect(json).toEqual({
+        error: "Another issuance is currently updating this credential's status list. Retry shortly.",
+        code: 'STATUS_LIST_BUSY',
+      });
+      expect(JSON.stringify(json)).not.toContain('status-list:');
+    });
+
+    it('maps pool exhaustion to a service-busy 503 without claiming list contention', async () => {
+      // Catches a regression that presents database capacity failure as another issuance holding the list.
+      const poolError = Object.assign(new Error('Timed out fetching a new connection from the connection pool'), {
+        code: 'P2024',
+      });
+      mockIssueCredential.mockRejectedValueOnce(new StatusListMutexBusyError('status-list:provider:issuer', poolError));
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(503);
+      expect(json).toEqual({
+        error: 'The credential status service is busy. Retry shortly.',
+        code: 'STATUS_LIST_BUSY',
+      });
+      expect(JSON.stringify(json)).not.toContain('another issuance');
+    });
+
+    it('keeps issuance successful and reports a status capture failure', async () => {
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-43',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        statusCaptureFailed: true,
+      });
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.statusCaptureFailed).toBe(true);
+      expect(json.warnings).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'STATUS_CAPTURE_FAILED' })]),
+      );
+    });
+
+    it('names the retry command for a retryable status capture failure', async () => {
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-44',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        statusCaptureFailed: true,
+        statusCaptureFailure: 'STORAGE_UNAVAILABLE',
+      });
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(json.warnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'STATUS_CAPTURE_FAILED',
+            remediation: expect.stringContaining('backfill-credential-status-entries --retry-failed'),
+          }),
+        ]),
+      );
+    });
+
+    it('names provider investigation for a non-retryable status capture failure', async () => {
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-45',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        statusCaptureFailed: true,
+        statusCaptureFailure: 'MALFORMED_ENTRY',
+      });
+
+      const req = createFakeRequest(validBody());
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(json.warnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'STATUS_CAPTURE_FAILED',
+            remediation: expect.stringContaining('investigate the provider output for MALFORMED_ENTRY'),
+          }),
+        ]),
+      );
     });
   });
 
@@ -2539,6 +2674,21 @@ describe('POST /api/v1/credentials', () => {
       expect(res.status).toBe(201);
       expect(json).toEqual({ credentialId: 'cred-original' });
       expect(mockResolveDataModel).not.toHaveBeenCalled();
+    });
+
+    it('replays the status-capture response flag from its persisted warning', async () => {
+      mockFindIdempotencyKey.mockResolvedValue({
+        outcome: 'replay',
+        recordId: 'cred-status-failed',
+        responseBody: [{ code: 'STATUS_CAPTURE_FAILED', message: 'status capture failed' }],
+      });
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.statusCaptureFailed).toBe(true);
     });
 
     it('rejects a mismatched body with 422 IDEMPOTENCY_KEY_MISMATCH before validation', async () => {

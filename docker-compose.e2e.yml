@@ -175,6 +175,8 @@ services:
       - VERIFY_MAX_CREDENTIAL_SIZE=${VERIFY_MAX_CREDENTIAL_SIZE:-}
       - FETCH_TIMEOUT_MS=${FETCH_TIMEOUT_MS:-}
       - VERIFY_FETCH_TIMEOUT_MS=${VERIFY_FETCH_TIMEOUT_MS:-}
+      - DEFAULT_STATUS_PURPOSES
+      - STATUS_LOCK_ACQUIRE_MS
       # Read by this process as well as app-worker. Keep the value the same
       # across both services so one background-work budget is in force.
       - WORKER_JOB_TIMEOUT_SECONDS

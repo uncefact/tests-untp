@@ -12,6 +12,7 @@ import {
   IdempotencyOperation,
 } from '../../src/lib/prisma/generated';
 import { createRigClient, truncateApplicationTables } from './rig/db';
+import { createVerifierDouble } from './helpers/verifiable-credential-service-double';
 import { startFixtureServer, type FixtureServer } from './rig/fixture-server';
 import { seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
 import { PgBossJobQueue } from '../../src/lib/jobs/pg-boss-job-queue';
@@ -172,7 +173,7 @@ describe('register an external credential, end to end', () => {
   };
 
   const verify = jest.fn<ReturnType<IVerifiableCredentialService['verify']>, [unknown]>();
-  const verifier: IVerifiableCredentialService = { sign: jest.fn(), verify: verify as never };
+  const verifier = createVerifierDouble(verify as never);
 
   const deps: RegisterExternalCredentialDependencies = {
     fetchDocument: (href) => fetchCredentialDocument(href, { maxBytes: 1_000_000, timeoutMs: 5_000 }),

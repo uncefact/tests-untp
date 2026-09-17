@@ -1,4 +1,5 @@
 export * from './credential.repository';
+export * from './credential-status-entry.repository';
 export * from './idempotency-key.repository';
 export * from './external-credential.repository';
 export * from './library-record.repository';

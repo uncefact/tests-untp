@@ -5,14 +5,37 @@ jest.mock('@/lib/prisma/repositories', () => ({
   createCredential: (...args: unknown[]) => mockCreateCredential(...args),
 }));
 
+const mockCaptureCredentialStatusEntries = jest.fn();
+jest.mock('./capture-credential-status-entries', () => {
+  const actual = jest.requireActual('./capture-credential-status-entries');
+  return {
+    ...actual,
+    captureCredentialStatusEntries: (...args: unknown[]) => mockCaptureCredentialStatusEntries(...args),
+  };
+});
+
 const mockResolvePrimaryEntity = jest.fn();
 jest.mock('@/lib/entities/resolve-primary-entity', () => ({
   resolvePrimaryEntity: (...args: unknown[]) => mockResolvePrimaryEntity(...args),
 }));
 
-jest.mock('@uncefact/untp-ri-services', () => ({
-  decodeCredential: jest.requireActual('@uncefact/untp-ri-services').decodeCredential,
-}));
+const mockWithStatusListMutex = jest.fn(async (_key: string, fn: () => Promise<unknown>) => fn());
+jest.mock('@/lib/services/status-list-mutex', () => {
+  const actual = jest.requireActual('@/lib/services/status-list-mutex');
+  return {
+    ...actual,
+    withStatusListMutex: (...args: unknown[]) => mockWithStatusListMutex(...(args as [string, () => Promise<unknown>])),
+  };
+});
+
+jest.mock('@uncefact/untp-ri-services', () => {
+  const actual = jest.requireActual('@uncefact/untp-ri-services');
+  return {
+    ServiceError: actual.ServiceError,
+    decodeCredential: actual.decodeCredential,
+    parseCredentialStatus: actual.parseCredentialStatus,
+  };
+});
 jest.mock('@/lib/services/resolve-service', () => ({}));
 
 // decryption-key-protection is exercised for real in these tests (so the
@@ -23,6 +46,7 @@ import { decodeJwt } from 'jose';
 import { issueCredential } from './issue-credential';
 import type { IssueCredentialInput } from './issue-credential';
 import { IdempotencyClaimLostError } from '@/lib/prisma/repositories/idempotency-key.repository';
+import { StatusListLockLostError } from '@/lib/services/status-list-mutex';
 import { revealDecryptionKey } from './decryption-key-protection';
 import { CredentialDetailsError, CredentialDetailsStatus } from '@/lib/prisma/generated';
 
@@ -44,7 +68,17 @@ const SIGNED_PAYLOAD = {
   credentialSubject: { id: 'https://example.com/product/1', name: 'Merino batch' },
   validFrom: '2024-01-15T00:00:00.000Z',
   validUntil: '2025-01-15T00:00:00.000Z',
+  credentialStatus: {
+    id: 'https://status.example/entry/3',
+    type: 'BitstringStatusListEntry',
+    statusPurpose: 'revocation',
+    statusListCredential: 'https://status.example/list/1',
+    statusListIndex: 3,
+    statusSize: 1,
+  },
 };
+
+const MINTED_ENTRY = { ...SIGNED_PAYLOAD.credentialStatus, statusListIndex: '3' };
 
 function compactJwt(payload: Record<string, unknown>): string {
   const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
@@ -63,6 +97,18 @@ function decodeCompactJwt(jwt: string): Record<string, unknown> {
 const SIGNED_CREDENTIAL = {
   '@context': ['https://www.w3.org/ns/credentials/v2'],
   id: `data:application/vc+jwt,${compactJwt(SIGNED_PAYLOAD)}`,
+  type: 'EnvelopedVerifiableCredential',
+};
+
+const SIGNED_CREDENTIAL_WITHOUT_STATUS = {
+  '@context': ['https://www.w3.org/ns/credentials/v2'],
+  id: `data:application/vc+jwt,${compactJwt({
+    name: 'Wool Passport',
+    issuer: { id: 'did:web:issuer.example', name: 'Example Issuer' },
+    credentialSubject: { id: 'https://example.com/product/1', name: 'Merino batch' },
+    validFrom: '2024-01-15T00:00:00.000Z',
+    validUntil: '2025-01-15T00:00:00.000Z',
+  })}`,
   type: 'EnvelopedVerifiableCredential',
 };
 
@@ -134,13 +180,130 @@ describe('issueCredential', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (decodeJwt as jest.Mock).mockImplementation(decodeCompactJwt);
+    mockCaptureCredentialStatusEntries.mockImplementation((...args: unknown[]) => {
+      const actual = jest.requireActual(
+        './capture-credential-status-entries',
+      ) as typeof import('./capture-credential-status-entries');
+      return actual.captureCredentialStatusEntries(
+        ...(args as Parameters<typeof actual.captureCredentialStatusEntries>),
+      );
+    });
     setupHappyPath();
   });
 
   it('signs the credential payload', async () => {
     await issueCredential(buildInput());
 
-    expect(stubVcService.service.sign).toHaveBeenCalledWith(PAYLOAD);
+    expect(stubVcService.service.sign).toHaveBeenCalledWith(
+      PAYLOAD,
+      expect.objectContaining({ statusPurposes: ['revocation'], serialise: expect.any(Function) }),
+    );
+  });
+
+  it('binds the serialisation hook for each minted purpose', async () => {
+    // Catches a regression that supplies no mutex hook or binds one hook outside the per-purpose mint loop.
+    stubVcService.service.sign.mockImplementationOnce(async (_payload, options) => {
+      for (const purpose of options?.statusPurposes ?? []) {
+        await options.serialise?.(`status-list:${purpose}`, async () => MINTED_ENTRY, options.signal);
+      }
+      return SIGNED_CREDENTIAL;
+    });
+
+    await issueCredential(buildInput({ statusPurposes: ['revocation', 'suspension'] }));
+
+    expect(mockWithStatusListMutex).toHaveBeenCalledTimes(2);
+    expect(mockWithStatusListMutex.mock.calls.map(([key]) => key)).toEqual([
+      'status-list:revocation',
+      'status-list:suspension',
+    ]);
+  });
+
+  it('maps a lost mint lock before storage and reports the orphaned entry coordinates', async () => {
+    // Catches a regression that signs or stores a credential after the mint transaction lost its lock.
+    const mintedEntry = MINTED_ENTRY;
+    const transactionError = new Error('transaction completion failed');
+    stubVcService.service.sign.mockImplementationOnce(async (_payload, options) => {
+      await options?.serialise?.('status-list:revocation', async () => mintedEntry, options.signal);
+      return SIGNED_CREDENTIAL;
+    });
+    mockWithStatusListMutex.mockRejectedValueOnce(
+      new StatusListLockLostError('status-list:revocation', mintedEntry, transactionError),
+    );
+
+    await expect(
+      issueCredential(
+        buildInput({
+          credentialPayload: {
+            ...PAYLOAD,
+            issuer: { type: ['CredentialIssuer'], id: 'did:web:issuer.example', name: 'Example Issuer' },
+          },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'STATUS_LIST_LOCK_LOST',
+      statusCode: 503,
+      message: 'The status list lock was lost before the provider call completed. Retry the request.',
+      cause: expect.objectContaining({ callbackResult: mintedEntry }),
+    });
+
+    expect(stubStorageService.service.store).not.toHaveBeenCalled();
+    expect(mockCreateCredential).not.toHaveBeenCalled();
+    const logger = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
+    expect(logger.warn).toHaveBeenCalledWith(
+      {
+        issuerDid: 'did:web:issuer.example',
+        orphanedEntries: [
+          {
+            statusListCredential: 'https://status.example/list/1',
+            statusListIndex: '3',
+          },
+        ],
+      },
+      'Credential status entries were minted before issuance failed',
+    );
+  });
+
+  it('uses the configured default when omitted and lets a request override it', async () => {
+    // Catches a regression that keeps the adapter fallback or lets deployment configuration override an explicit request.
+    const previous = process.env.DEFAULT_STATUS_PURPOSES;
+    process.env.DEFAULT_STATUS_PURPOSES = 'suspension';
+
+    try {
+      await issueCredential(buildInput());
+      expect(stubVcService.service.sign).toHaveBeenLastCalledWith(
+        PAYLOAD,
+        expect.objectContaining({ statusPurposes: ['suspension'] }),
+      );
+
+      await issueCredential(buildInput({ statusPurposes: ['revocation'] }));
+      expect(stubVcService.service.sign).toHaveBeenLastCalledWith(
+        PAYLOAD,
+        expect.objectContaining({ statusPurposes: ['revocation'] }),
+      );
+    } finally {
+      if (previous === undefined) delete process.env.DEFAULT_STATUS_PURPOSES;
+      else process.env.DEFAULT_STATUS_PURPOSES = previous;
+    }
+  });
+
+  it('passes an empty default to the service and records a signed credential without status entries', async () => {
+    // Catches a regression that turns DEFAULT_STATUS_PURPOSES=none back into revocation or mints an empty member.
+    const previous = process.env.DEFAULT_STATUS_PURPOSES;
+    process.env.DEFAULT_STATUS_PURPOSES = 'none';
+    stubVcService.service.sign.mockResolvedValueOnce(SIGNED_CREDENTIAL_WITHOUT_STATUS);
+
+    try {
+      const result = await issueCredential(buildInput());
+
+      expect(stubVcService.service.sign).toHaveBeenCalledWith(PAYLOAD, expect.objectContaining({ statusPurposes: [] }));
+      expect(mockCreateCredential).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCapture: 'CAPTURED', statusEntries: [] }),
+      );
+      expect(result.statusCaptureFailed).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.DEFAULT_STATUS_PURPOSES;
+      else process.env.DEFAULT_STATUS_PURPOSES = previous;
+    }
   });
 
   it('stores the signed credential with encrypt=true by default', async () => {
@@ -233,6 +396,7 @@ describe('issueCredential', () => {
       detailsExtractionFailed: false,
       credentialId: 'cred-1',
       entityLinkFailed: false,
+      statusCaptureFailed: false,
       storageResponse: STORAGE_RESPONSE,
       primaryEntity: PRIMARY_ENTITY,
     });
@@ -254,6 +418,65 @@ describe('issueCredential', () => {
         },
         detailsStatus: CredentialDetailsStatus.EXTRACTED,
       }),
+    );
+  });
+
+  it('passes the exact captured status-entry objects to the credential repository', async () => {
+    const capturedEntry = {
+      canonical: {
+        id: 'https://status.example/entry/3',
+        type: 'BitstringStatusListEntry',
+        statusPurpose: 'revocation',
+        statusListCredential: 'https://status.example/list/1',
+        statusListIndex: '3',
+      },
+      wire: SIGNED_PAYLOAD.credentialStatus,
+      statusListVcIssuer: 'did:web:issuer.example',
+    } as never;
+    const captured = { entries: [capturedEntry] };
+    mockCaptureCredentialStatusEntries.mockReturnValueOnce(captured);
+
+    await issueCredential(buildInput());
+
+    const saved = mockCreateCredential.mock.calls[0][0];
+    expect(saved.statusEntries).toHaveLength(1);
+    expect(saved.statusEntries[0]).toBe(capturedEntry);
+  });
+
+  it('passes no status entries to the repository when capture failed', async () => {
+    mockCaptureCredentialStatusEntries.mockReturnValueOnce({ failure: 'MALFORMED_ENTRY' });
+
+    await issueCredential(buildInput());
+
+    const saved = mockCreateCredential.mock.calls[0][0];
+    expect(saved).not.toHaveProperty('statusEntries');
+    expect(saved.statusCaptureError).toBe('MALFORMED_ENTRY');
+  });
+
+  it('records a missing requested status purpose when the provider returns no status member', async () => {
+    stubVcService.service.sign.mockResolvedValueOnce({
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      id: `data:application/vc+jwt,${compactJwt({ issuer: 'did:web:issuer.example', credentialSubject: {} })}`,
+      type: 'EnvelopedVerifiableCredential',
+    });
+
+    await issueCredential(buildInput({ statusPurposes: ['revocation'] }));
+
+    expect(mockCreateCredential).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCapture: 'FAILED', statusCaptureError: 'PURPOSE_MISSING' }),
+    );
+  });
+
+  it('logs the capture cause after the credential row exists', async () => {
+    const cause = new Error('provider output was unreadable');
+    mockCaptureCredentialStatusEntries.mockReturnValueOnce({ failure: 'MALFORMED_ENTRY', cause });
+
+    await issueCredential(buildInput());
+
+    const logger = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: cause, failure: 'MALFORMED_ENTRY', credentialId: 'cred-1', tenantId: TENANT_ID }),
+      expect.stringContaining('stored without status entries'),
     );
   });
 

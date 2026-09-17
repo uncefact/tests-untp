@@ -78,6 +78,26 @@ enum LibraryRecordOrigin {
   EXTERNAL
 }
 
+/// How a persisted status entry entered the reference implementation.
+enum CredentialStatusProvenance {
+  ISSUANCE
+  BACKFILL
+}
+
+/// Why the reference implementation attributes a VC service instance to a
+/// native credential.
+enum VcServiceAttribution {
+  ISSUANCE
+  OPERATOR
+}
+
+/// Whether the signed credential's status entries have been captured.
+enum CredentialStatusCapture {
+  PENDING
+  CAPTURED
+  FAILED
+}
+
 /// What a registered external credential's durable copy turned out to hold
 /// (#955). Decides what the worker sends to the verifier and which checks can
 /// apply. CREDENTIAL is a verifiable credential in a form this system can
@@ -295,37 +315,55 @@ model LibraryRecord {
  * publication state and the master-data links.
  */
 model Credential {
-  id                       String              @id
-  tenantId                 String
+  id                         String                  @id
+  tenantId                   String
   /// Always NATIVE (a database CHECK pins it); part of the composite foreign
   /// key so this child can only attach to a NATIVE parent of its own tenant.
-  origin                   LibraryRecordOrigin @default(NATIVE)
-  storageUri               String
-  digestMultibase          String
+  origin                     LibraryRecordOrigin     @default(NATIVE)
+  storageUri                 String
+  digestMultibase            String
   /// @encryptedAtRest The storage service's key for the private copy, protected
   /// by protectDecryptionKey (#697). Rows written before that may hold it in
   /// plaintext until backfill:decryption-keys wraps them.
-  decryptionKey            String?
+  decryptionKey              String?
   /// Where the signed artefact's durable copy lives, as the storage adapter
   /// named it at issuance, so deletion can remove exactly that object without
   /// parsing the URI. Null on rows issued before these columns existed; such a
   /// copy is left in place when the record is deleted.
-  storageServiceInstanceId String?
-  storageExternalId        String?
-  storageBucket            String?
-  isPublished              Boolean             @default(false)
-  organisationId           String?
-  facilityId               String?
-  productId                String?
-  createdAt                DateTime            @default(now())
-  updatedAt                DateTime            @updatedAt
+  storageServiceInstanceId   String?
+  storageExternalId          String?
+  storageBucket              String?
+  /// Plain historical identifier of the VC service instance used for
+  /// issuance or operator attribution. It is deliberately not a foreign key:
+  /// removing the instance must not erase the evidence of which instance was
+  /// used for a credential that may still need status recovery.
+  vcServiceInstanceId        String?
+  vcServiceAttribution       VcServiceAttribution?
+  vcServiceAttributedAt      DateTime?
+  vcServiceAttributionReason String?
+  /// PENDING means status metadata is not known. CAPTURED includes a valid
+  /// empty collection, which means the signed credential carries no entries.
+  statusCapture              CredentialStatusCapture @default(PENDING)
+  statusCaptureError         String?
+  statusCapturedAt           DateTime?
+  isPublished                Boolean                 @default(false)
+  organisationId             String?
+  facilityId                 String?
+  productId                  String?
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
 
-  record       LibraryRecord       @relation(fields: [id, tenantId, origin], references: [id, tenantId, origin], onDelete: Cascade)
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  organisation OrganisationEntity? @relation(fields: [organisationId], references: [id], onDelete: SetNull)
-  facility     Facility?           @relation(fields: [facilityId], references: [id], onDelete: SetNull)
-  product      Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  record        LibraryRecord           @relation(fields: [id, tenantId, origin], references: [id, tenantId, origin], onDelete: Cascade)
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  statusEntries CredentialStatusEntry[]
+  organisation  OrganisationEntity?     @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+  facility      Facility?               @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  product       Product?                @relation(fields: [productId], references: [id], onDelete: SetNull)
 
+  /// The status-entry composite foreign key targets `(id, tenantId)` safely
+  /// because this child is database-pinned to the NATIVE origin, so every
+  /// matching credential id and tenant identifies this native child.
+  @@unique([id, tenantId])
   /// Prisma requires the defining side of a one-to-one relation to be unique
   /// over the relation's fields; the primary key already makes it so.
   @@unique([id, tenantId, origin])
@@ -333,6 +371,46 @@ model Credential {
   @@index([facilityId])
   @@index([productId])
   @@index([tenantId])
+}
+
+/**
+ * The status-list coordinates and durable intent for one native credential's
+ * captured entry. `descriptor` is the wire entry as received while the scalar
+ * coordinates are canonical queryable facts. Entries with `statusSize > 1`
+ * never reach this table because the services parser refuses them.
+ * Prisma cannot express the all-or-none pending-intent and replacement-digest
+ * checks below; the migration owns those raw SQL constraints.
+ */
+model CredentialStatusEntry {
+  id                        String                     @id @default(cuid())
+  credentialId              String
+  tenantId                  String
+  originalId                String?
+  type                      String
+  statusPurpose             String
+  statusListCredential      String
+  statusListIndex           String
+  statusListVcIssuer        String
+  descriptor                Json
+  value                     Boolean?
+  observedAt                DateTime?
+  valueChangedAt            DateTime?
+  version                   Int                        @default(1)
+  pendingValue              Boolean?
+  pendingSince              DateTime?
+  pendingDeadline           DateTime?
+  pendingToken              String?
+  pendingInstanceId         String?
+  pendingConfigDigest       String?
+  acceptedReplacementDigest String?
+  provenance                CredentialStatusProvenance
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+
+  credential Credential @relation(fields: [credentialId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([credentialId, statusPurpose])
+  @@index([tenantId, statusPurpose, value])
 }
 
 /**

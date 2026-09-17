@@ -34,7 +34,13 @@ jest.mock('@/lib/prisma/repositories/library-record.repository', () => ({
 
 jest.mock('@/lib/api/batch-limits', () => ({ MAX_BATCH_LIMIT: 3 }));
 
-import { CheckResult, CheckRunState, CoreCredentialType, LibraryRecordOrigin } from '@/lib/prisma/generated';
+import {
+  CheckResult,
+  CheckRunState,
+  CoreCredentialType,
+  CredentialStatusCapture,
+  LibraryRecordOrigin,
+} from '@/lib/prisma/generated';
 import { UNEXPECTED_ERROR_MESSAGE } from '@/lib/api/errors';
 import { credentialRecordSchema } from '@/lib/library/credential-record-projection';
 import { LibraryRecordShapeError } from '@/lib/library/library-record-view';
@@ -150,6 +156,8 @@ function nativeView(id: string) {
       storageUri: 'https://storage.example/native',
       digestMultibase: 'zQmNativeDigest',
       decryptionKey: null,
+      statusCapture: CredentialStatusCapture.PENDING,
+      statusEntries: [],
       isPublished: false,
       organisationId: null,
       facilityId: null,

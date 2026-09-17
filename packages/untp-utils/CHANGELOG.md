@@ -6,6 +6,12 @@ numbers follow semantic versioning. The package ships via the
 `untp-utils-v<X.Y.Z>` tag-triggered publish workflow described in
 [ADR 031](../../docs/adrs/031-per-package-tag-triggered-npm-release.md).
 
+## [Unreleased]
+
+### Added
+
+- **common:** add `canonicalJson` for deterministic JSON serialisation.
+
 ## [0.4.0](https://github.com/uncefact/tests-untp/compare/untp-utils-v0.3.0...untp-utils-v0.4.0) (2026-09-17)
 
 ### ⚠ BREAKING CHANGES

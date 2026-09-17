@@ -4,6 +4,9 @@ export type {
   CredentialPayload,
   CredentialIssuer,
   CredentialSubject,
+  CredentialStatusEntry,
+  CanonicalCredentialStatusEntry,
+  StatusMessage,
   CredentialStatus,
   IdentifierScheme,
   EnvelopedVerifiableCredential,
@@ -11,6 +14,10 @@ export type {
   RenderMethod,
   VerifyResult,
   VerifyOptions,
+  SignOptions,
+  SetCredentialStatusInput,
+  GetCredentialStatusInput,
+  CredentialStatusObservation,
   IVerifiableCredentialService,
 } from './verifiable-credential/types.js';
 export * from './did-manager/types.js';
@@ -41,7 +48,7 @@ export { LocalKeyGenerator } from './key-provider/adapters/local/local.adapter.j
 // Logging
 export type { LoggerService, LogContext, LoggerConfig, LogLevel } from './logging/types.js';
 export { createLogger } from './logging/factory.js';
-// correlation-context uses async_hooks (Node.js-only) — import from '@uncefact/untp-ri-services/logging' in server code
+// correlation-context uses async_hooks (Node.js-only): import from '@uncefact/untp-ri-services/logging' in server code
 
 // Registry
 export { ServiceType, AdapterType } from './registry/types.js';
@@ -136,6 +143,11 @@ export {
   VcVerifyError,
   VcDecodeError,
   VcCredentialStatusError,
+  VcStatusReadError,
+  VcStatusSetError,
+  VcStatusResponseInvalidError,
+  VcStatusListNotFoundError,
+  VcStatusEntryUnsupportedError,
 } from './verifiable-credential/errors.js';
 export { VCKIT_VC_ADAPTER_TYPE } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.adapter.js';
 export type { VCKitVerifiableCredentialConfig } from './verifiable-credential/adapters/vckit/vckit-verifiable-credential.schema.js';
@@ -148,6 +160,14 @@ export {
   checkValidityWindow,
   type EnvelopeValidityWindowOutcome,
 } from './verifiable-credential/common/validity-window.js';
+/** Status parsers require `options.source` so callers choose input or provider semantics explicitly. */
+export {
+  canonicalStatusListIndex,
+  parseCredentialStatus,
+  parseCredentialStatusEntry,
+  type CredentialStatusParseOptions,
+  type CredentialStatusParseSource,
+} from './verifiable-credential/common/credential-status.js';
 
 // ── Data model bridges ──────────────────────────────────────────────────────
 export type {

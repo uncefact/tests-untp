@@ -41,6 +41,10 @@ describe('deleteNativeCredentialAndCopy', () => {
   it.each([
     ['a missing record', { outcome: 'missing' }],
     ['an external record', { outcome: 'external' }],
+    [
+      'a credential with pending status changes',
+      { outcome: 'status_change_pending', statusPurposes: ['revocation', 'suspension'] },
+    ],
   ])('returns %s untouched without cleanup', async (_name, result) => {
     mockDeleteNativeCredential.mockResolvedValue(result);
 

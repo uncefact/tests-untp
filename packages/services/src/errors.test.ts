@@ -15,6 +15,13 @@ describe('ServiceError', () => {
     expect(err.context).toEqual({ foo: 'bar' });
   });
 
+  it('retains an optional cause as a non-enumerable native error property', () => {
+    const cause = new Error('underlying failure');
+    const err = new ServiceError('fail', 'X', 500, undefined, cause);
+    expect(err.cause).toBe(cause);
+    expect(Object.keys(err)).not.toContain('cause');
+  });
+
   it('uses subclass name when extended', () => {
     class ChildError extends ServiceError {
       constructor() {

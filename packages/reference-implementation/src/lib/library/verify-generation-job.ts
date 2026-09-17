@@ -815,12 +815,17 @@ async function readStoredCopy(
   // an encrypted non-credential copy is served as has been decoded above.
   // Pinned by the vector in verify-generation-job.digest-preimage.test.ts,
   // which carries a digest the storage service itself produced.
-  const digestInput = expectsCredential ? new TextEncoder().encode(JSON.stringify(parsed)) : plaintextBytes;
+  const digestInput = expectsCredential ? credentialDigestPreimage(parsed as object) : plaintextBytes;
   return {
     encrypted,
     digestInput,
     credential: expectsCredential ? (parsed as EnvelopedVerifiableCredential) : null,
   };
+}
+
+/** Reproduces the storage service's digest preimage for a credential object. */
+export function credentialDigestPreimage(parsed: object): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(parsed));
 }
 
 /**

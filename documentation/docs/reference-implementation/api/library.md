@@ -481,6 +481,31 @@ This returns one record of either origin. It carries the same fields the registe
 
 The route is also the verification polling target. A record with `verification.state: pending` is read again later until the newest generation is `complete` or `failed`. Each read reports the stored record and custody state. The route does not fetch the durable copy, verify it, change custody columns or create a verification run.
 
+Native records also carry issuer-owned status facts in `credential.status`. The object contains the capture state and the recorded entries, including each purpose, status-list credential, canonical string index, observed value, observation timestamps and the entry's version counter. The capture state is `PENDING` before the entries have been recorded, `CAPTURED` once they have been, and `FAILED` where capture was attempted and could not complete. `entries` is empty unless the state is `CAPTURED`, and it is also empty for a credential issued with no status purposes. A pending mutation, when present, is represented by its value, start time and deadline. These are recorded facts only: this release does not add lifecycle or capability information, and it does not filter or headline a status value. External records return `status: null`.
+
+For example:
+
+```json
+{
+  "status": {
+    "capture": "CAPTURED",
+    "entries": [
+      {
+        "entryId": "clw0statusentry000001",
+        "statusPurpose": "revocation",
+        "statusListCredential": "https://status.example/list/1",
+        "statusListIndex": "3",
+        "value": false,
+        "observedAt": "2026-09-17T00:00:00.000Z",
+        "valueChangedAt": null,
+        "version": 1,
+        "pending": null
+      }
+    ]
+  }
+}
+```
+
 The custody fields describe the copy held by this Reference Implementation. For an external record, `sourceUrl` is the supplier's fetch location and `sourceDigest` is the digest of the raw bytes as fetched. `storageUri` is the location of the Reference Implementation's durable copy and `digestMultibase` is the storage service's content digest for that copy. Do not substitute `sourceUrl` for `storageUri`.
 
 | Record state                                               | `storageUri` | `digestMultibase` | `decryptionKey`                                   |
