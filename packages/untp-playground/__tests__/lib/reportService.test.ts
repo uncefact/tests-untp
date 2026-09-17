@@ -7,6 +7,7 @@ import { TestCaseStepId } from '../../constants';
 import { reportName } from '../../config';
 import { generateReport } from '@/lib/reportService';
 import { TestCaseStatus } from '../../constants';
+import { toSchemeStructuralParseDetails } from '@/lib/schemeStructure';
 
 jest.mock('@/lib/credentialService');
 jest.mock('@/lib/schemaValidation');
@@ -301,6 +302,141 @@ describe('generateReport', () => {
     expect(report.conformitySchemes[0].status).toBe(TestCaseStatus.FAILURE);
   });
 
+  it('carries structural diagnostics and fails the report on a parse-only failure', async () => {
+    const diagnostics = [
+      {
+        code: 'conformity-scheme.missing-required-field',
+        message: 'scheme.name is required and must be a non-empty string.',
+        pointer: '/name',
+        expected: 'non-empty string',
+      },
+    ];
+    const structuralDetails = toSchemeStructuralParseDetails({
+      kind: 'document-failure',
+      errors: [{ message: '/name: scheme.name is required and must be a non-empty string.', supportable: false }],
+      diagnostics,
+    });
+    const steps: TestStep[] = [
+      { id: TestCaseStepId.SCHEME_VERSION_DETECTION, name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+      { id: TestCaseStepId.SCHEME_SCHEMA_VALIDATION, name: 'Schema Validation', status: TestCaseStatus.SUCCESS },
+      {
+        id: TestCaseStepId.SCHEME_STRUCTURAL_PARSE,
+        name: 'Structural Parse',
+        status: TestCaseStatus.FAILURE,
+        details: structuralDetails,
+      },
+      {
+        id: TestCaseStepId.CONTEXT_VALIDATION,
+        name: 'JSON-LD Document Expansion and Context Validation',
+        status: TestCaseStatus.SUCCESS,
+      },
+    ];
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      schemeInstances: [
+        {
+          scheme: { original: {}, decoded: { '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'] } },
+          steps,
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    expect(report.pass).toBe(false);
+    expect(report.conformitySchemes[0].steps).toEqual(steps);
+    expect(report.conformitySchemes[0].steps[2].details).toEqual({
+      errors: [{ message: '/name: scheme.name is required and must be a non-empty string.', supportable: false }],
+      diagnostics,
+    });
+  });
+
+  it('carries the schema-selection skip marker and blocker into the JSON report', async () => {
+    const skipDetails = {
+      errors: [{ message: 'Skipped: schema selection failed.' }],
+      diagnostics: [],
+      skipped: true,
+      blockedBy: TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
+    };
+    const steps: TestStep[] = [
+      { id: TestCaseStepId.SCHEME_VERSION_DETECTION, name: 'Version Detection', status: TestCaseStatus.SUCCESS },
+      {
+        id: TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
+        name: 'Schema Validation',
+        status: TestCaseStatus.FAILURE,
+        details: { errors: [{ message: 'schema selection failed' }] },
+      },
+      {
+        id: TestCaseStepId.SCHEME_STRUCTURAL_PARSE,
+        name: 'Structural Parse',
+        status: TestCaseStatus.FAILURE,
+        details: skipDetails,
+      },
+      {
+        id: TestCaseStepId.CONTEXT_VALIDATION,
+        name: 'JSON-LD Document Expansion and Context Validation',
+        status: TestCaseStatus.SUCCESS,
+      },
+    ];
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      schemeInstances: [
+        {
+          scheme: { original: {}, decoded: { '@context': ['https://vocabulary.uncefact.org/untp/0.6.0/'] } },
+          steps,
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    expect(report.conformitySchemes[0].steps[2].details).toEqual(skipDetails);
+  });
+
+  it('carries the version-detection blocker on the Structural Parse skip into the JSON report', async () => {
+    const skipDetails = {
+      errors: [{ message: 'Skipped: version detection failed.' }],
+      diagnostics: [],
+      skipped: true,
+      blockedBy: TestCaseStepId.SCHEME_VERSION_DETECTION,
+    };
+    const report = await generateReport({
+      implementationName: mockImplementationName,
+      schemeInstances: [
+        {
+          scheme: { original: {}, decoded: {} },
+          steps: [
+            {
+              id: TestCaseStepId.SCHEME_VERSION_DETECTION,
+              name: 'Version Detection',
+              status: TestCaseStatus.FAILURE,
+              details: { errors: [{ message: 'Could not detect a UNTP version.' }] },
+            },
+            {
+              id: TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
+              name: 'Schema Validation',
+              status: TestCaseStatus.FAILURE,
+              details: { errors: [{ message: 'Skipped: version detection failed.' }] },
+            },
+            {
+              id: TestCaseStepId.SCHEME_STRUCTURAL_PARSE,
+              name: 'Structural Parse',
+              status: TestCaseStatus.FAILURE,
+              details: skipDetails,
+            },
+            {
+              id: TestCaseStepId.CONTEXT_VALIDATION,
+              name: 'JSON-LD Document Expansion and Context Validation',
+              status: TestCaseStatus.FAILURE,
+              details: { errors: [{ message: 'Skipped: version detection failed.' }] },
+            },
+          ],
+        },
+      ],
+      passStatuses: mockPassStatuses,
+    });
+
+    expect(report.conformitySchemes[0].steps[2].details).toEqual(skipDetails);
+  });
+
   it('refuses to generate a report while a scheme instance is still validating', async () => {
     await expect(
       generateReport({
@@ -315,7 +451,24 @@ describe('generateReport', () => {
                 type: ['ConformityScheme'],
               },
             },
-            steps: [], // no settled steps yet
+            steps: [
+              {
+                id: TestCaseStepId.SCHEME_VERSION_DETECTION,
+                name: 'Version Detection',
+                status: TestCaseStatus.SUCCESS,
+              },
+              {
+                id: TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
+                name: 'Schema Validation',
+                status: TestCaseStatus.SUCCESS,
+              },
+              { id: TestCaseStepId.SCHEME_STRUCTURAL_PARSE, name: 'Structural Parse', status: TestCaseStatus.PENDING },
+              {
+                id: TestCaseStepId.CONTEXT_VALIDATION,
+                name: 'JSON-LD Document Expansion and Context Validation',
+                status: TestCaseStatus.SUCCESS,
+              },
+            ],
           },
         ],
         passStatuses: mockPassStatuses,

@@ -8,17 +8,34 @@ import {
 } from './urls';
 
 describe('buildUntpArtefactUrls', () => {
-  // Every URL below is the one recorded in artefacts/manifest.json, except the ConformityScheme
-  // legacy entry: no pre-0.7 CVC schema is published, so that row characterises the builder's
-  // legacy branch rather than pinning a published artefact.
-  const legacySchemaUrls = {
-    DigitalProductPassport: 'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
-    DigitalConformityCredential: 'https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.0.json',
-    DigitalTraceabilityEvent: 'https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.0.json',
-    DigitalFacilityRecord: 'https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.0.json',
-    DigitalIdentityAnchor: 'https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.0.json',
-    ConformityScheme: 'https://test.uncefact.org/vocabulary/untp/cvc/untp-cvc-schema-0.6.0.json',
-  };
+  // Every URL below is the one recorded in artefacts/manifest.json.
+  const legacyArtefactUrls = [
+    [
+      'DigitalProductPassport',
+      'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
+      'https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/context/',
+    ],
+    [
+      'DigitalConformityCredential',
+      'https://test.uncefact.org/vocabulary/untp/dcc/untp-dcc-schema-0.6.0.json',
+      'https://test.uncefact.org/vocabulary/untp/dcc/0.6.0/context/',
+    ],
+    [
+      'DigitalTraceabilityEvent',
+      'https://test.uncefact.org/vocabulary/untp/dte/untp-dte-schema-0.6.0.json',
+      'https://test.uncefact.org/vocabulary/untp/dte/0.6.0/context/',
+    ],
+    [
+      'DigitalFacilityRecord',
+      'https://test.uncefact.org/vocabulary/untp/dfr/untp-dfr-schema-0.6.0.json',
+      'https://test.uncefact.org/vocabulary/untp/dfr/0.6.0/context/',
+    ],
+    [
+      'DigitalIdentityAnchor',
+      'https://test.uncefact.org/vocabulary/untp/dia/untp-dia-schema-0.6.0.json',
+      'https://test.uncefact.org/vocabulary/untp/dia/0.6.0/context/',
+    ],
+  ] as const;
   const artefactSchemaUrls = {
     DigitalProductPassport: 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
     DigitalConformityCredential: 'https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json',
@@ -28,8 +45,17 @@ describe('buildUntpArtefactUrls', () => {
     ConformityScheme: 'https://untp.unece.org/artefacts/schema/v0.7.0/cvc/ConformityScheme.json',
   };
 
-  it.each(Object.entries(legacySchemaUrls))('keeps the legacy URL stable for %s', (type, schemaUrl) => {
-    expect(buildUntpArtefactUrls(type, '0.6.0').schemaUrl).toBe(schemaUrl);
+  it.each(legacyArtefactUrls)('keeps the legacy URL stable for %s', (type, schemaUrl, contextUrl) => {
+    expect(buildUntpArtefactUrls(type, '0.6.0')).toEqual({
+      schemaUrl,
+      contextUrl,
+    });
+  });
+
+  it.each(['0.6.0', 'draft'])('rejects a ConformityScheme version that has no artefacts: %s', (version) => {
+    expect(() => buildUntpArtefactUrls('ConformityScheme', version)).toThrow(
+      `ConformityScheme has no artefacts for versions before UNTP 0.7.0 and "${version}" is not a UNTP 0.7.0 or later version.`,
+    );
   });
 
   it.each(Object.entries(artefactSchemaUrls))('keeps the artefacts URL byte-identical for %s', (type, schemaUrl) => {

@@ -28,7 +28,7 @@ export const UPLOADER_FAMILIES: Record<TabId, UploaderFamilyConfig> = {
     // ADR-041: scheme identity is the content hash, so identical content replaces and revised
     // content adds a card. The copy states the shipped behaviour.
     helper:
-      'Validated as a Conformity Scheme: version detection, schema validation and JSON-LD context checks. Re-uploading the same document replaces the existing card.',
+      'Validated as a Conformity Scheme: version detection, schema validation, structural parse and JSON-LD context checks. Re-uploading the same document replaces the existing card.',
   },
   linksets: {
     heading: 'Add a link set',

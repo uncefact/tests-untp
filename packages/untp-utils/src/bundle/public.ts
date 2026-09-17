@@ -29,8 +29,9 @@ export async function bundledUntpVersions(): Promise<readonly string[]> {
 /**
  * The bundled JSON Schema for a UNTP credential type and version, for example
  * `bundledSchema('DigitalProductPassport', '0.6.0')`, or `undefined` when the
- * bundle does not carry that version. `type` accepts the names
- * `buildUntpArtefactUrls` accepts.
+ * bundle does not carry a version that has a published artefact; throws for a
+ * `ConformityScheme` below UNTP 0.7.0 because no artefact was ever published for
+ * one. `type` accepts the names `buildUntpArtefactUrls` accepts.
  */
 export async function bundledSchema(type: string, version: string): Promise<Record<string, unknown> | undefined> {
   const { buildUntpArtefactUrls } = await import('../artefacts/urls.js');
@@ -39,7 +40,10 @@ export async function bundledSchema(type: string, version: string): Promise<Reco
 
 /**
  * The bundled JSON-LD context a UNTP credential type declares at a version:
- * the per-type context before 0.7.0, the unified UNTP context from 0.7.0.
+ * the per-type context before 0.7.0, the unified UNTP context from 0.7.0, or
+ * `undefined` when the bundle does not carry a version that has a published
+ * artefact; throws for a `ConformityScheme` below UNTP 0.7.0 because no artefact
+ * was ever published for one.
  */
 export async function bundledContext(type: string, version: string): Promise<Record<string, unknown> | undefined> {
   const { buildUntpArtefactUrls } = await import('../artefacts/urls.js');

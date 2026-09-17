@@ -8,6 +8,10 @@ numbers follow semantic versioning. The package ships via the
 
 ## [Unreleased]
 
+### ⚠ BREAKING CHANGES
+
+- **artefacts:** `buildUntpArtefactUrls`, `bundledSchema` and `bundledContext` now throw for a `ConformityScheme` below UNTP 0.7.0, where they previously returned a legacy URL or `undefined`. Check `isV070OrAbove(version)` before calling them with that type.
+
 ### Changed
 
 - **artefacts:** version detection now reads a version-shaped path segment of a context URL whether or not a slash follows it, so a context URL that ends in its version segment now detects. Query and fragment parts of the URL never supply the version. The exact context string remains the schema's decision. `parseConformityScheme` therefore selects the 0.7.0 parser for a context URL ending in `/0.7.0`.

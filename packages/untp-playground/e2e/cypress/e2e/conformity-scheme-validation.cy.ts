@@ -5,12 +5,12 @@ import { CONFORMITY_SCHEME_E2E_VERSIONS } from '../fixtures/conformity-schemes-e
  * E2E matrix for ConformityScheme uploads.
  *
  * Iterates the version registry and, for each spec version, exercises:
- *   - the canonical valid sample (must reach SUCCESS on all three steps)
+ *   - the canonical valid sample (must reach SUCCESS on all four steps)
  *   - one test per malformed mutation, asserting failure surfaces on the
  *     pipeline step the registry declares.
  *
- * Extending coverage means appending to the registry; this spec file does
- * not need to change.
+ * Extending coverage means appending to the registry. The step assertions here
+ * must change when the pipeline adds a required step.
  */
 
 const SCHEME_GROUP_HEADER = 'scheme-group-header';
@@ -32,6 +32,7 @@ CONFORMITY_SCHEME_E2E_VERSIONS.forEach((spec) => {
 
       cy.checkValidationStatus('Version Detection', 'success');
       cy.checkValidationStatus('Schema Validation', 'success');
+      cy.checkValidationStatus('Structural Parse', 'success');
       cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'success');
     });
 
@@ -41,9 +42,16 @@ CONFORMITY_SCHEME_E2E_VERSIONS.forEach((spec) => {
 
         openSchemesTab();
         cy.uploadCredential(malformed);
+        if (invalidCase.name === 'blank scheme name') {
+          cy.get(`[data-testid="${SCHEME_GROUP_HEADER}"] h3`).should('have.text', 'credential.json');
+        }
         cy.get(`[data-testid="${SCHEME_GROUP_HEADER}"]`).click();
 
         cy.checkValidationStatus(invalidCase.failsAt, 'failure');
+        cy.openErrorDetailsByStepName(invalidCase.failsAt);
+        if (invalidCase.name === 'blank scheme name') {
+          cy.contains('/name: scheme.name is required and must be a non-empty string.').should('be.visible');
+        }
       });
     });
   });

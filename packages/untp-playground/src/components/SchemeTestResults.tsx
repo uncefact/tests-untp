@@ -17,10 +17,20 @@ import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
 import { validateContext } from '@/lib/contextValidation';
 import { newId } from '@/lib/id';
 import { schemeSubtitle, schemeTitle } from '@/lib/schemeCollection';
+import {
+  describeUnexpectedSchemeParse,
+  parseSchemeStructure,
+  schemeStructuralParseDetails,
+  toSchemeStructuralParseDetails,
+  type SchemeStructuralParseDetails,
+} from '@/lib/schemeStructure';
 import { SchemaFetchError, SchemaSelectionError, validateSchemeSchema } from '@/lib/schemeValidation';
+import ValidationDetailsSheet from '@/components/ValidationDetailsSheet';
 import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
+import { SUPPORTED_CVC_SPEC_VERSIONS } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { ArtefactSlot, CollectionState, InstanceId, RunId } from '@/types/artefact';
 import type { StoredScheme, TestStep } from '@/types';
+import type { DisplayableError } from '@/types/validation';
 import confetti from 'canvas-confetti';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -35,15 +45,29 @@ interface SchemeTestResultsProps {
   dispatch: SchemeDispatch;
 }
 
-const initialSteps: TestStep[] = [
-  { id: TestCaseStepId.SCHEME_VERSION_DETECTION, name: 'Version Detection', status: TestCaseStatus.PENDING },
-  { id: TestCaseStepId.SCHEME_SCHEMA_VALIDATION, name: 'Schema Validation', status: TestCaseStatus.PENDING },
-  {
-    id: TestCaseStepId.CONTEXT_VALIDATION,
-    name: 'JSON-LD Document Expansion and Context Validation',
-    status: TestCaseStatus.PENDING,
-  },
-];
+const schemeStepDefinitions = [
+  { id: TestCaseStepId.SCHEME_VERSION_DETECTION, name: 'Version Detection' },
+  { id: TestCaseStepId.SCHEME_SCHEMA_VALIDATION, name: 'Schema Validation' },
+  { id: TestCaseStepId.SCHEME_STRUCTURAL_PARSE, name: 'Structural Parse' },
+  { id: TestCaseStepId.CONTEXT_VALIDATION, name: 'JSON-LD Document Expansion and Context Validation' },
+] as const;
+
+export const SCHEME_STEP_DISPLAY_NAMES = schemeStepDefinitions.map((step) => step.name);
+
+const initialSteps: TestStep[] = schemeStepDefinitions.map((step) => ({
+  ...step,
+  status: TestCaseStatus.PENDING,
+}));
+
+export function buildSchemaSelectionSkipMessage(): string {
+  return 'Skipped: schema selection failed.';
+}
+
+export function buildUnsupportedParserSkipMessage(version: string): string {
+  return `Skipped: the Playground has no parser for UNTP ${version}; it parses ${SUPPORTED_CVC_SPEC_VERSIONS.join(
+    ', ',
+  )}.`;
+}
 
 const freshSteps = (): TestStep[] => initialSteps.map((step) => ({ ...step }));
 
@@ -146,6 +170,15 @@ async function runSchemePipeline(
       status: TestCaseStatus.FAILURE,
       details: { errors: [{ message: 'Skipped: version detection failed.' }] },
     });
+    setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+      status: TestCaseStatus.FAILURE,
+      details: {
+        errors: [{ message: 'Skipped: version detection failed.' }],
+        diagnostics: [],
+        skipped: true,
+        blockedBy: TestCaseStepId.SCHEME_VERSION_DETECTION,
+      } satisfies SchemeStructuralParseDetails,
+    });
     setStep(TestCaseStepId.CONTEXT_VALIDATION, {
       status: TestCaseStatus.FAILURE,
       details: { errors: [{ message: 'Skipped: version detection failed.' }] },
@@ -155,6 +188,7 @@ async function runSchemePipeline(
   if (!setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.SUCCESS })) return;
 
   if (!setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS })) return;
+  let schemaSelectionFailed = false;
   try {
     const result = await validateSchemeSchema(stored.decoded, version);
     setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
@@ -162,9 +196,82 @@ async function runSchemePipeline(
       details: result.valid ? undefined : { errors: result.errors },
     });
   } catch (err) {
+    schemaSelectionFailed = err instanceof SchemaSelectionError;
     setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
       status: TestCaseStatus.FAILURE,
       details: { errors: [schemaFetchError(err)] },
+    });
+  }
+
+  if (!setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, { status: TestCaseStatus.IN_PROGRESS })) return;
+  try {
+    if (schemaSelectionFailed) {
+      setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+        status: TestCaseStatus.FAILURE,
+        details: {
+          errors: [{ message: buildSchemaSelectionSkipMessage() }],
+          diagnostics: [],
+          skipped: true,
+          blockedBy: TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
+        } satisfies SchemeStructuralParseDetails,
+      });
+    } else if (!SUPPORTED_CVC_SPEC_VERSIONS.some((supportedVersion) => supportedVersion === version)) {
+      // blockedBy records the step that prevented parsing; the no-parser skip has no blocking step.
+      setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+        status: TestCaseStatus.FAILURE,
+        details: {
+          errors: [
+            {
+              message: buildUnsupportedParserSkipMessage(version),
+            },
+          ],
+          diagnostics: [],
+          skipped: true,
+        } satisfies SchemeStructuralParseDetails,
+      });
+    } else {
+      const sourceUrl = stored.source?.kind === 'url' ? stored.source.url : `urn:untp-playground:scheme:${instanceId}`;
+      const result = parseSchemeStructure(stored.decoded, { sourceUrl, specVersion: version });
+      switch (result.kind) {
+        case 'parsed':
+          setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, { status: TestCaseStatus.SUCCESS });
+          break;
+        case 'document-failure':
+          setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+            status: TestCaseStatus.FAILURE,
+            details: toSchemeStructuralParseDetails(result),
+          });
+          break;
+        case 'unsupported-version':
+          setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+            status: TestCaseStatus.FAILURE,
+            details: toSchemeStructuralParseDetails(result),
+          });
+          break;
+        case 'unexpected':
+          setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+            status: TestCaseStatus.FAILURE,
+            details: toSchemeStructuralParseDetails(result),
+          });
+          break;
+        default: {
+          const exhaustive: never = result;
+          throw new Error(`Unhandled scheme structure kind: ${JSON.stringify(exhaustive)}`);
+        }
+      }
+    }
+  } catch (err) {
+    setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+      status: TestCaseStatus.FAILURE,
+      details: {
+        errors: [
+          {
+            message: describeUnexpectedSchemeParse(err),
+            supportable: true,
+          },
+        ],
+        diagnostics: [],
+      } satisfies SchemeStructuralParseDetails,
     });
   }
 
@@ -192,11 +299,6 @@ async function runSchemePipeline(
 
 const SUPPORT_URL = process.env.NEXT_PUBLIC_SUPPORT_URL || 'https://github.com/uncefact/tests-untp/issues';
 
-interface DisplayableError {
-  message: string;
-  supportable?: boolean;
-}
-
 function stepErrors(step: TestStep): DisplayableError[] {
   const errors = step.details?.errors;
   if (!Array.isArray(errors)) return [];
@@ -208,12 +310,40 @@ function stepErrors(step: TestStep): DisplayableError[] {
   return out;
 }
 
+function isAjvError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { keyword?: unknown; instancePath?: unknown };
+  return typeof candidate.keyword === 'string' && typeof candidate.instancePath === 'string';
+}
+
+function schemeMessageDetails(errors: DisplayableError[]) {
+  return (
+    <ul className='list-disc space-y-1 pl-6 text-sm text-red-600'>
+      {errors.map((error, idx) => (
+        <li key={idx}>
+          {error.message}
+          {error.supportable && (
+            <>
+              {' '}
+              If this keeps happening,{' '}
+              <a href={SUPPORT_URL} target='_blank' rel='noopener noreferrer' className='underline'>
+                report an issue
+              </a>
+              .
+            </>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function schemaFetchError(err: unknown): DisplayableError {
   // Selection failed before transport on the scheme's own version, so the uploader can act on it
   // and support cannot.
   if (err instanceof SchemaSelectionError) {
     return {
-      message: `${err.message} Use a Conformity Scheme published for UNTP 0.7.0 or later.`,
+      message: `${err.message} Use a Conformity Scheme published for UNTP ${SUPPORTED_CVC_SPEC_VERSIONS.join(', ')}.`,
       supportable: false,
     };
   }
@@ -223,7 +353,9 @@ function schemaFetchError(err: unknown): DisplayableError {
         return { message: 'The schema service did not respond in time. Please try again.', supportable: true };
       case 'not-found':
         return {
-          message: `No schema is published at ${err.schemaUrl}. Check that the scheme's @context references a UNTP version with a published schema.`,
+          message: `No schema is published at ${
+            err.schemaUrl
+          }. Use a Conformity Scheme published for UNTP ${SUPPORTED_CVC_SPEC_VERSIONS.join(', ')}.`,
         };
       case 'parse':
         return {
@@ -280,31 +412,7 @@ function SchemeCard({ item, onRemove }: { item: SchemeSlot; onRemove: () => void
         <div className='mt-4 space-y-2 pl-6'>
           {scheme.source && <SourceCaption source={scheme.source} />}
           {steps.map((step) => (
-            <div key={step.id} className='py-2'>
-              <div className='flex items-center gap-2'>
-                <StatusIcon status={step.status} testId={step.id} />
-                <span>{step.name}</span>
-              </div>
-              {step.status === TestCaseStatus.FAILURE && stepErrors(step).length > 0 && (
-                <ul className='mt-1 list-disc space-y-1 pl-6 text-sm text-red-600'>
-                  {stepErrors(step).map((error, idx) => (
-                    <li key={idx}>
-                      {error.message}
-                      {error.supportable && (
-                        <>
-                          {' '}
-                          If this keeps happening,{' '}
-                          <a href={SUPPORT_URL} target='_blank' rel='noopener noreferrer' className='underline'>
-                            report an issue
-                          </a>
-                          .
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <SchemeStepItem key={step.id} step={step} />
           ))}
         </div>
       )}
@@ -322,5 +430,42 @@ function SchemeCard({ item, onRemove }: { item: SchemeSlot; onRemove: () => void
         <Trash2 className='h-4 w-4' />
       </button>
     </Card>
+  );
+}
+
+function SchemeStepItem({ step }: { step: TestStep }) {
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const errors = stepErrors(step);
+  const structuralDetails = schemeStructuralParseDetails(step);
+  const messageErrors = structuralDetails?.errors ?? errors;
+  const ajvErrors = step.details?.errors;
+  const usesErrorDialog =
+    step.id === TestCaseStepId.SCHEME_SCHEMA_VALIDATION &&
+    Array.isArray(ajvErrors) &&
+    ajvErrors.length > 0 &&
+    ajvErrors.every(isAjvError);
+
+  return (
+    <div className='py-2'>
+      <div className='flex items-center justify-between' data-testid={`${step.id}-row`}>
+        <div className='flex items-center gap-2'>
+          <StatusIcon status={step.status} testId={step.id} />
+          <span>{step.name}</span>
+        </div>
+        {step.status === TestCaseStatus.FAILURE && errors.length > 0 && step.details && (
+          <ValidationDetailsSheet
+            isOpen={isDetailsOpen}
+            onOpenChange={setIsDetailsOpen}
+            errors={step.details.errors}
+            content={usesErrorDialog ? undefined : schemeMessageDetails(messageErrors)}
+            trigger={
+              <Button variant='ghost' size='sm' data-testid={`${step.id}-details-trigger`}>
+                View Details
+              </Button>
+            }
+          />
+        )}
+      </div>
+    </div>
   );
 }

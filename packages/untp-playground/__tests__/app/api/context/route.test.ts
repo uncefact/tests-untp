@@ -4,9 +4,9 @@
 // jsonld runs for real here (through utils' expandJsonLd); only the document
 // loader is replaced, with one that serves the bundled UNTP and VCDM contexts,
 // so expansion is exercised offline against the published context documents.
-import type { LoadedRemoteDocument } from '@uncefact/untp-utils/loaders';
+import { bundledLoader } from '../../../helpers/bundledLoader';
 
-const mockLoad = jest.fn<Promise<LoadedRemoteDocument>, [string]>();
+const mockLoad = jest.fn<ReturnType<typeof bundledLoader>, [string]>();
 
 jest.mock('@uncefact/untp-utils/validation', () => {
   const actual = jest.requireActual('@uncefact/untp-utils/validation');
@@ -18,18 +18,11 @@ jest.mock('@uncefact/untp-utils/loaders', () => {
   return { ...actual, createJsonLdDocumentLoader: jest.fn(() => (url: string) => mockLoad(url)) };
 });
 
-import { findBundledArtefact } from '@uncefact/untp-utils/bundled-artefacts';
 import { PrivateAddressError } from '@uncefact/untp-utils/node';
 import { POST } from '@/app/api/context/route';
 
 const VCDM = 'https://www.w3.org/ns/credentials/v2';
 const UNTP = 'https://vocabulary.uncefact.org/untp/0.7.0/context/';
-
-async function bundledLoader(url: string): Promise<LoadedRemoteDocument> {
-  const document = await findBundledArtefact(url);
-  if (!document) throw new Error(`not bundled: ${url}`);
-  return { documentUrl: url, document };
-}
 
 function post(body: unknown, raw = false): Request {
   return new Request('http://localhost/api/context', {

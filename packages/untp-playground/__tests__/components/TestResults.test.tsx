@@ -478,7 +478,7 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
 
     await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
     await userEvent.click(await screen.findByText('Fix validation error'));
-    expect(await screen.findByText(/Unsupported version/)).toBeInTheDocument();
+    expect(await screen.findAllByText(/Unsupported version/)).toHaveLength(2);
     expect(
       await screen.findByText(/Check the credential's type and the UNTP version in its @context/),
     ).toBeInTheDocument();
@@ -515,7 +515,7 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
 
     await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
     await userEvent.click(await screen.findByText('Fix validation error'));
-    expect(await screen.findByText(/Unsupported version/)).toBeInTheDocument();
+    expect(await screen.findAllByText(/Unsupported version/)).toHaveLength(2);
   });
 
   it('blames the schema host, not the credential, when the schema could not be fetched', async () => {

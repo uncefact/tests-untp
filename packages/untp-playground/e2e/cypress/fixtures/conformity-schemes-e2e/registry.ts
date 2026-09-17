@@ -14,6 +14,7 @@ import v070Valid from './v0.7.0-valid.json';
  *
  *   - 'Version Detection'                                    -> @context yields no UNTP version
  *   - 'Schema Validation'                                    -> rejected by the JSON Schema
+ *   - 'Structural Parse'                                     -> the conformity parser rejects the document structure
  *   - 'JSON-LD Document Expansion and Context Validation'    -> jsonld.expand fails
  *
  * @see ../../e2e/conformity-scheme-validation.cy.ts
@@ -22,6 +23,7 @@ import v070Valid from './v0.7.0-valid.json';
 export type PipelineStep =
   | 'Version Detection'
   | 'Schema Validation'
+  | 'Structural Parse'
   | 'JSON-LD Document Expansion and Context Validation';
 
 export interface InvalidE2ECase {
@@ -72,6 +74,14 @@ const v070InvalidCases: InvalidE2ECase[] = [
       return s;
     },
     failsAt: 'Schema Validation',
+  },
+  {
+    name: 'blank scheme name',
+    mutate: (s) => {
+      s.name = '   ';
+      return s;
+    },
+    failsAt: 'Structural Parse',
   },
 
   // Missing / unusable @context: rejected by version detection
