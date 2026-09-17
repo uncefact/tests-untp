@@ -69,7 +69,9 @@ describe('VCDM Schema Validation', () => {
     cy.checkValidationStatus('VCDM Version Detection', 'failure');
     cy.checkValidationStatus('VCDM Schema Validation', 'failure');
 
-    cy.openErrorDetails();
+    // Version detection now carries its own classified details, so the first View Details button
+    // on the card is no longer the schema step's: open the schema step by name.
+    cy.openErrorDetailsByStepName('VCDM Schema Validation');
     cy.contains('Fix validation error').click();
     cy.contains('Missing field: @context').should('be.visible');
     cy.contains('Add the missing "@context" field.').should('be.visible');
