@@ -1,5 +1,11 @@
 # UNTP Reference Implementation release notes
 
+## Unreleased
+
+The Digital Conformity Credential issuance response now includes advisory warnings for unpublished score codes and references that use the wrong Conformity Vocabulary Catalogue tier. Credentials continue to issue with HTTP 201, and score warnings include the received code, published codes and a pointer to the submitted score.
+Malformed scoring content, including a wrong type, a missing required field or a score without a code, fails the schema check and is recorded as `SCHEMA_INVALID`. A refresh keeps the previous content and a first import writes nothing. The parser's own stricter rejections, recorded in the [untp-utils 0.4.0 changelog](../untp-utils/CHANGELOG.md), apply to library consumers that call `parseConformityScheme` directly, since the ingest path checks the schema first.
+Catalogue fetches now honour `FETCH_ALLOW_PRIVATE_URLS`; previously they refused private sources regardless of that setting.
+
 ## 0.5.0 - 2026-09-14
 
 v0.4 made the Reference Implementation safe to run in front of real data. v0.5 is about what a tenant holds rather than what it issues: a credential library that covers both the credentials you issued and the ones you received, with verification that runs in the background instead of blocking a request. Work that cannot finish inside a request now runs in a second container, so deploying v0.5 means deploying two.

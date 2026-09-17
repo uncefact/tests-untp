@@ -17,6 +17,8 @@ Two consequences shape everything below. Scheme content is owned and changed by 
 
 The Reference Implementation keeps its own **local catalogue** of scheme documents it has resolved. Every check it performs, and everything its API returns, is answered from that local catalogue rather than from the network.
 
+Scoring frameworks are read from the stored scheme document when a credential carrying a conformity claim is issued. The scheme-level framework, the selected profile's criterion frameworks and the required-performance scores of the assessment's referenced criteria remain scoped to the scheme document that published them, including when a criterion is shared by more than one scheme. Reading them at issuance has one visible consequence: when the stored document is absent or cannot be read, the score codes go unchecked and the issuance response says so, while the applicable scheme, profile, criterion and topic checks still run.
+
 ## Where schemes come from
 
 A fresh deployment holds no schemes at all. The core seed does not insert any, so an issuer browsing the catalogue on an untouched install gets an empty list rather than a starter set. Schemes arrive only through one of the sources below.
@@ -40,6 +42,8 @@ The manifest is the source of truth for the schemes it owns. An entry with no ma
 
 Seeded schemes also refresh their **content** from source, not just their membership. At boot every manifest entry is re-ingested; URL entries go through a conditional fetch and file entries are compared by digest, so an unchanged document is detected cheaply and skips parsing and persistence. Between boots, an interval re-fetches the URL-seeded schemes on the nominal cadence set by `CVC_REFRESH_INTERVAL_HOURS`, spread by a small jitter so instances do not all wake together (see [Startup](../operations/startup)). The periodic refresher handles URL-seeded schemes only; schemes seeded from a mounted file are re-read at boot instead.
 
+For scheme-document fetches behind seed URL entries, the seeded refresh and each per-scheme fetch of UNTP discovery, `FETCH_ALLOW_PRIVATE_URLS=true` permits private, loopback and reserved destinations; it does not govern the discovery register fetch itself, the JSON-LD context loader or the schema loader.
+
 ### Discovery from the UNTP register, not operational
 
 The intent is that the Reference Implementation reads the UNECE register named by `CVC_REGISTRY_URL`, follows each pointer URI, and ingests the schemes it finds.
@@ -56,7 +60,9 @@ No endpoint exists for this yet, and nothing in the product writes a tenant-owne
 
 Because scheme owners can change a document after it is published, a copy here is only as good as its last successful fetch. A successful re-ingest replaces the stored scheme, its profiles, and its criteria with what the document now says. Within a tenant's lane a canonical URI appears once, so a changed document updates what is already there rather than accumulating copies of the same URI beside it.
 
-A failed fetch leaves the previous content in place rather than emptying the catalogue. That is the safe behaviour, but it means a stale entry and a current one look identical through the browse API, which returns only the catalogue content and no fetch metadata. An operator checking whether refresh is actually working should look at the startup and interval logs, where each pass records what it fetched and what failed.
+A failed fetch leaves the previous content in place rather than emptying the catalogue. That is the safe behaviour, but it means a stale entry and a current one look identical through the browse API, which returns only the catalogue content and no fetch metadata. An operator checking whether refresh is actually working should look at the startup and interval logs, where each pass records what it fetched and what failed. Parse failures are logged beside the fetch failures already described.
+
+Malformed scoring content, including a wrong type, a missing required field or a score without a code, fails the schema check and is recorded as `SCHEMA_INVALID`. A refresh keeps the previous content and a first import writes nothing. The parser's own stricter rejections, recorded in the [untp-utils 0.4.0 changelog](https://github.com/uncefact/tests-untp/blob/next/packages/untp-utils/CHANGELOG.md), apply to library consumers that call `parseConformityScheme` directly, since the ingest path checks the schema first.
 
 What is implemented today is the seeded-scheme refresh described above. Refresh driven by register discovery waits on the discovery trigger, and an endpoint to force a refresh on demand rather than waiting for the interval is tracked in [#666](https://github.com/uncefact/tests-untp/issues/666).
 

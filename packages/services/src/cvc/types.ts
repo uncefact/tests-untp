@@ -44,6 +44,12 @@ export interface CachedResource {
 export interface ResolveAndParseConformitySchemeInput {
   /** Also persisted as the row's `sourceUrl`; surfaced in error messages for triage. */
   sourceUrl: string;
+  /**
+   * Exactly `true` permits private, loopback and reserved destinations for the
+   * scheme document fetch; anything else keeps the strict default. This does
+   * not affect the JSON-LD context or schema loaders.
+   */
+  allowPrivateAddresses?: boolean;
   source: ConformitySchemeSource;
   /** Use the system tenant id for `UNTP` / `SYSTEM_SEED` sources. */
   tenantId: string;

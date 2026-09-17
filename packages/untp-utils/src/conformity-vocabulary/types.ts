@@ -24,6 +24,33 @@ export interface ConformityTopic {
   definition?: string;
 }
 
+/** A code published by a conformity scoring framework. */
+export interface ConformityScore {
+  /** Exact score code. Empty strings are retained when published. */
+  code: string;
+  rank?: number;
+  definition?: string;
+}
+
+/** A named set of scores published by a scheme or profile. */
+export interface ConformityScoringFramework {
+  name: string;
+  description?: string;
+  scores: ConformityScore[];
+}
+
+/**
+ * A criterion's required performance, which may be a metric, a score, both, or
+ * neither when the publisher supplies neither.
+ */
+export interface ConformityRequiredPerformance {
+  metric?: {
+    canonicalId?: string;
+    name?: string;
+  };
+  score?: ConformityScore;
+}
+
 /**
  * A single auditable criterion within a profile.
  *
@@ -45,6 +72,8 @@ export interface ConformityCriterion {
   topics: ConformityTopic[];
   /** Free-form tags attached to the criterion. */
   tags: string[];
+  /** Performance levels required by this criterion, when published. */
+  requiredPerformance?: ConformityRequiredPerformance[];
 }
 
 /**
@@ -64,6 +93,8 @@ export interface ConformityProfile {
   validFrom?: string;
   /** Criteria inlined within this profile. */
   criteria: ConformityCriterion[];
+  /** Scoring frameworks applied to criteria in this profile, when published. */
+  criterionScoringFrameworks?: ConformityScoringFramework[];
 }
 
 /**
@@ -87,6 +118,23 @@ export interface ConformityScheme {
   documentation?: string;
   owner?: ConformitySchemeOwner;
   profiles: ConformityProfile[];
+  /** Overall scoring framework published by the scheme, when present. */
+  scoringFramework?: ConformityScoringFramework;
+}
+
+/** A catalogue match for an id that may belong to a different vocabulary tier. */
+export interface ConformityReferenceMatch {
+  tier: 'scheme' | 'profile' | 'criterion';
+  /** Canonical ids of the visible schemes containing the matched entry. */
+  schemes: string[];
+  /** Canonical ids of the visible profiles containing a matched criterion, read by wrong-tier diagnostic messages. */
+  profiles?: string[];
+}
+
+/** Catalogue matches supplied by a caller that has resolved submitted ids. */
+export interface ConformityReferenceResolution {
+  scheme?: ConformityReferenceMatch[];
+  profile?: ConformityReferenceMatch[];
 }
 
 /**
@@ -135,25 +183,29 @@ export interface ConformityClaimCriterion {
 
 /**
  * A single assessment entry on a credential's conformity claim: the criteria
- * the assessment references and the topics it declares for itself. The
- * declared topics are validated against the deduplicated union of the
- * published topics of the assessment's criteria, in one direction only: a
- * declared topic outside the union warns, while a union topic the assessment
- * does not declare is acceptable, because the assessment's topics are a
- * categorisation rather than an exhaustive enumeration.
+ * the assessment references, the topics it declares for itself, and the
+ * performance score codes it carries. The declared topics are validated
+ * against the deduplicated union of the published topics of the assessment's
+ * criteria, in one direction only: a declared topic outside the union warns,
+ * while a union topic the assessment does not declare is acceptable, because
+ * the assessment's topics are a categorisation rather than an exhaustive
+ * enumeration.
  */
 export interface ConformityClaimAssessment {
   /**
    * Criterion URIs the assessment references. Extractors must also emit every
    * entry here as a {@link ConformityClaimCriterion} in the claim's `criteria`
-   * list: the validator's assessment check skips unresolved criteria on the
-   * assumption that `conformity-criterion.not-in-profile` has already surfaced
-   * them from `criteria`, so an entry present only here would silently escape
-   * both checks.
+   * list: the validator's assessment topic and score checks both skip
+   * unresolved criteria on the assumption that
+   * `conformity-criterion.not-in-profile` has already surfaced them from
+   * `criteria`, so an entry present only here would silently escape the
+   * criterion, topic and score checks alike.
    */
   criteria: string[];
   /** Topic URIs the assessment declares for itself. */
   conformityTopics: string[];
+  /** Performance score codes extracted from this assessment; absent and empty both mean nothing to check. */
+  assessedScores?: { code: string }[];
 }
 
 /**
@@ -177,16 +229,19 @@ export interface ConformityClaim {
   /**
    * Profile URI the claim references. Optional because not every data model
    * requires a profile reference. When absent, the validator checks the scheme
-   * reference only and emits a `conformity-profile.not-specified` advisory,
-   * since criteria are published per versioned profile.
+   * reference and the attestation `profileScore`, and emits a
+   * `conformity-profile.not-specified` advisory, since criteria are published
+   * per versioned profile.
    */
   profile?: string;
+  /** Overall score code for the referenced profile, when carried by the claim. */
+  profileScore?: { code: string };
   /** Criteria the claim addresses. */
   criteria: ConformityClaimCriterion[];
   /**
-   * Assessment-level topic declarations. Optional and version-specific: an
-   * extractor populates it only when its data model classifies assessments by
-   * topic.
+   * Assessment-level topic and performance-score declarations. Optional and
+   * version-specific: an extractor populates it when its data model classifies
+   * assessments by topic, carries assessment performance scores, or both.
    */
   assessments?: ConformityClaimAssessment[];
 }

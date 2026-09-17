@@ -44,6 +44,36 @@ function scheme(): ConformityScheme {
   };
 }
 
+function scoringFramework(codes: string[]) {
+  return { name: 'Test framework', scores: codes.map((code) => ({ code })) };
+}
+
+function scoredScheme(
+  options: {
+    schemeCodes?: string[];
+    profileCodes?: string[];
+    criterionCodes?: string[];
+  } = {},
+): ConformityScheme {
+  const base = scheme();
+  const profile = base.profiles[0];
+  return {
+    ...base,
+    ...(options.schemeCodes && { scoringFramework: scoringFramework(options.schemeCodes) }),
+    profiles: [
+      {
+        ...profile,
+        ...(options.profileCodes && { criterionScoringFrameworks: [scoringFramework(options.profileCodes)] }),
+        criteria: profile.criteria.map((criterion, index) =>
+          index === 0 && options.criterionCodes
+            ? { ...criterion, requiredPerformance: options.criterionCodes.map((code) => ({ score: { code } })) }
+            : criterion,
+        ),
+      },
+    ],
+  };
+}
+
 describe('validateConformityClaim', () => {
   it('returns an empty array when the claim matches the scheme exactly', () => {
     const claim: ConformityClaim = {
@@ -248,6 +278,347 @@ describe('validateConformityClaim', () => {
       const claim: ConformityClaim = { scheme: 'https://example.com/other-scheme', criteria: [] };
       const warnings = validateConformityClaim(claim, scheme());
       expect(warnings).toHaveLength(1);
+      expect(warnings[0].code).toBe(ConformityWarningCode.SchemeNotFound);
+    });
+  });
+
+  describe('score membership', () => {
+    it('warns when the profile score is not in the scheme framework', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        profileScore: { code: 'PROFILE-UNKNOWN' },
+        criteria: [],
+      };
+      const [warning] = validateConformityClaim(claim, scoredScheme({ schemeCodes: ['A', 'B'] }));
+      expect(warning).toEqual(
+        expect.objectContaining({
+          code: ConformityWarningCode.AttestationScoreNotInFramework,
+          received: 'PROFILE-UNKNOWN',
+          expected: ['A', 'B'],
+          pointer: '/profileScore/code',
+        }),
+      );
+    });
+
+    it('accepts a profile score code published by the scheme framework', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        profileScore: { code: 'A' },
+        criteria: [],
+      };
+      const warnings = validateConformityClaim(claim, scoredScheme({ schemeCodes: ['A'] }));
+      expect(warnings).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: ConformityWarningCode.AttestationScoreNotInFramework,
+          }),
+        ]),
+      );
+    });
+
+    it('warns on a performance score outside the ordered union of published frameworks', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [{ criterion: CRITERION_A }],
+        assessments: [
+          {
+            criteria: [CRITERION_A],
+            conformityTopics: [],
+            assessedScores: [{ code: 'X' }, { code: 'UNKNOWN' }],
+          },
+        ],
+      };
+      const warnings = validateConformityClaim(
+        claim,
+        scoredScheme({ schemeCodes: ['A', 'B'], profileCodes: ['X', 'Y'], criterionCodes: ['R'] }),
+      ).filter((warning) => warning.code === ConformityWarningCode.AssessmentScoreNotInFramework);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toEqual(
+        expect.objectContaining({
+          received: 'UNKNOWN',
+          expected: ['A', 'B', 'X', 'Y', 'R'],
+          message:
+            'Assessment score code is not published by the scheme, profile or referenced-criterion frameworks that apply to profile https://example.com/scheme/full/1.0.0.',
+          pointer: '/assessments/0/assessedScores/1/code',
+        }),
+      );
+    });
+
+    it('accepts a performance code from any applicable framework, including the referenced criterion', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [{ criterion: CRITERION_A }],
+        assessments: [{ criteria: [CRITERION_A], conformityTopics: [], assessedScores: [{ code: 'R' }] }],
+      };
+      expect(
+        validateConformityClaim(
+          claim,
+          scoredScheme({ schemeCodes: ['A'], profileCodes: ['B'], criterionCodes: ['R'] }),
+        ).filter((warning) => warning.code === ConformityWarningCode.AssessmentScoreNotInFramework),
+      ).toEqual([]);
+    });
+
+    it('does not use an unreferenced criterion framework for an assessment score', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [{ criterion: CRITERION_B }],
+        assessments: [{ criteria: [CRITERION_B], conformityTopics: [], assessedScores: [{ code: 'R' }] }],
+      };
+      const warnings = validateConformityClaim(
+        claim,
+        scoredScheme({ schemeCodes: ['Q'], criterionCodes: ['R'] }),
+      ).filter((warning) => warning.code === ConformityWarningCode.AssessmentScoreNotInFramework);
+      expect(warnings).toEqual([
+        expect.objectContaining({
+          received: 'R',
+          expected: ['Q'],
+          pointer: '/assessments/0/assessedScores/0/code',
+        }),
+      ]);
+    });
+
+    it('checks the profile score without a profile and says performance scores were not checked', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profileScore: { code: 'UNKNOWN' },
+        criteria: [],
+        assessments: [{ criteria: [], conformityTopics: [], assessedScores: [{ code: 'UNKNOWN' }] }],
+      };
+      const warnings = validateConformityClaim(claim, scoredScheme({ schemeCodes: ['A'], profileCodes: ['B'] }));
+      expect(warnings.map((warning) => warning.code)).toEqual([
+        ConformityWarningCode.AttestationScoreNotInFramework,
+        ConformityWarningCode.ProfileNotSpecified,
+      ]);
+      expect(warnings[1].message).toContain('performance scores were not checked');
+      expect(warnings.some((warning) => warning.code === ConformityWarningCode.AssessmentScoreNotInFramework)).toBe(
+        false,
+      );
+    });
+
+    it('skips score checks when all published lists are empty', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        profileScore: { code: 'A' },
+        criteria: [{ criterion: CRITERION_A }],
+        assessments: [{ criteria: [CRITERION_A], conformityTopics: [], assessedScores: [{ code: 'A' }] }],
+      };
+      const warnings = validateConformityClaim(
+        claim,
+        scoredScheme({ schemeCodes: [], profileCodes: [], criterionCodes: [] }),
+      );
+      expect(warnings.some((warning) => warning.code.endsWith('score-not-in-framework'))).toBe(false);
+    });
+
+    it('suppresses an assessment score warning when any referenced criterion is unresolved', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [{ criterion: CRITERION_A }, { criterion: 'https://example.com/criterion/unknown/1.0.0' }],
+        assessments: [
+          {
+            criteria: [CRITERION_A, 'https://example.com/criterion/unknown/1.0.0'],
+            conformityTopics: [],
+            assessedScores: [{ code: 'UNKNOWN' }],
+          },
+        ],
+      };
+      const warnings = validateConformityClaim(claim, scoredScheme({ schemeCodes: ['A'] }));
+      expect(warnings.map((warning) => warning.code)).toContain(ConformityWarningCode.CriterionNotInProfile);
+      expect(warnings.map((warning) => warning.code)).not.toContain(
+        ConformityWarningCode.AssessmentScoreNotInFramework,
+      );
+    });
+
+    it('checks an assessment with no criteria against the scheme and profile frameworks', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        criteria: [],
+        assessments: [{ criteria: [], conformityTopics: [], assessedScores: [{ code: 'Q' }] }],
+      };
+      const warning = validateConformityClaim(
+        claim,
+        scoredScheme({ schemeCodes: ['A', 'B'], profileCodes: ['X'] }),
+      ).find((candidate) => candidate.code === ConformityWarningCode.AssessmentScoreNotInFramework);
+      expect(warning).toEqual(
+        expect.objectContaining({
+          received: 'Q',
+          expected: ['A', 'B', 'X'],
+          pointer: '/assessments/0/assessedScores/0/code',
+        }),
+      );
+    });
+
+    it('compares score codes exactly, preserving empty and whitespace codes', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        profileScore: { code: '  AA  ' },
+        criteria: [],
+      };
+      const scored = scoredScheme({ schemeCodes: ['', '  AA  '] });
+      expect(
+        validateConformityClaim(claim, scored).some(
+          (warning) => warning.code === ConformityWarningCode.AttestationScoreNotInFramework,
+        ),
+      ).toBe(false);
+      const mismatch = validateConformityClaim({ ...claim, profileScore: { code: 'AA' } }, scored).find(
+        (warning) => warning.code === ConformityWarningCode.AttestationScoreNotInFramework,
+      );
+      expect(mismatch).toEqual(expect.objectContaining({ received: 'AA', expected: ['', '  AA  '] }));
+    });
+
+    it('checks a profile score only against the scheme framework', () => {
+      const claim: ConformityClaim = {
+        scheme: SCHEME_URI,
+        profile: PROFILE_URI,
+        profileScore: { code: 'X' },
+        criteria: [],
+      };
+      const [warning] = validateConformityClaim(
+        claim,
+        scoredScheme({ schemeCodes: ['A', 'B'], profileCodes: ['X', 'Y'] }),
+      );
+      expect(warning).toEqual(
+        expect.objectContaining({
+          code: ConformityWarningCode.AttestationScoreNotInFramework,
+          received: 'X',
+          expected: ['A', 'B'],
+          pointer: '/profileScore/code',
+        }),
+      );
+    });
+  });
+
+  describe('catalogue tier diagnosis', () => {
+    it('reports a profile id used as a scheme id with the owning scheme', () => {
+      const claim: ConformityClaim = { scheme: 'https://scheme.example/profile/1.0.0', criteria: [] };
+      const warnings = validateConformityClaim(claim, null, {
+        scheme: [{ tier: 'profile', schemes: [SCHEME_URI] }],
+      });
+      expect(warnings).toEqual([
+        expect.objectContaining({
+          code: ConformityWarningCode.SchemeWrongTier,
+          received: claim.scheme,
+          expected: [SCHEME_URI],
+          pointer: '/scheme',
+          message: `The referenced id is a profile, not a scheme; it belongs to scheme ${SCHEME_URI}.`,
+        }),
+      ]);
+    });
+
+    it('keeps scheme-not-found when the resolver also found the expected tier', () => {
+      const claim: ConformityClaim = { scheme: SCHEME_URI, profile: PROFILE_URI, criteria: [] };
+      const warnings = validateConformityClaim(claim, null, {
+        scheme: [
+          { tier: 'scheme', schemes: [SCHEME_URI] },
+          { tier: 'profile', schemes: [SCHEME_URI] },
+        ],
+      });
+      expect(warnings[0].code).toBe(ConformityWarningCode.SchemeNotFound);
+    });
+
+    it('reports scheme and criterion ids used as a profile id at the wrong tier', () => {
+      const expectedProfiles = [PROFILE_URI];
+      const schemeWarning = validateConformityClaim(
+        { scheme: SCHEME_URI, profile: SCHEME_URI, criteria: [] },
+        scheme(),
+        { profile: [{ tier: 'scheme', schemes: [SCHEME_URI] }] },
+      )[0];
+      const criterionWarning = validateConformityClaim(
+        { scheme: SCHEME_URI, profile: CRITERION_A, criteria: [] },
+        scheme(),
+        { profile: [{ tier: 'criterion', schemes: [SCHEME_URI], profiles: [PROFILE_URI] }] },
+      )[0];
+      expect(schemeWarning).toEqual(
+        expect.objectContaining({
+          code: ConformityWarningCode.ProfileWrongTier,
+          received: SCHEME_URI,
+          expected: expectedProfiles,
+          message: expect.stringContaining('scheme'),
+        }),
+      );
+      expect(criterionWarning).toEqual(
+        expect.objectContaining({
+          code: ConformityWarningCode.ProfileWrongTier,
+          received: CRITERION_A,
+          expected: expectedProfiles,
+          message: expect.stringContaining('criterion'),
+        }),
+      );
+    });
+
+    it('keeps a profile-not-found warning and names another scheme for a mixed match', () => {
+      const warnings = validateConformityClaim(
+        { scheme: SCHEME_URI, profile: 'https://other.example/profile/1.0.0', criteria: [] },
+        scheme(),
+        {
+          profile: [
+            { tier: 'scheme', schemes: ['https://other.example'] },
+            { tier: 'profile', schemes: ['https://other.example'] },
+          ],
+        },
+      );
+      expect(warnings[0]).toEqual(
+        expect.objectContaining({
+          code: ConformityWarningCode.ProfileNotFound,
+          message: expect.stringContaining('https://other.example'),
+        }),
+      );
+    });
+
+    it('does not diagnose an orphan criterion as a wrong-tier scheme', () => {
+      const warnings = validateConformityClaim({ scheme: 'https://example.com/orphan-criterion', criteria: [] }, null, {
+        scheme: [{ tier: 'criterion', schemes: [], profiles: [PROFILE_URI] }],
+      });
+      expect(warnings[0]).toEqual(
+        expect.objectContaining({
+          code: ConformityWarningCode.SchemeNotFound,
+          received: 'https://example.com/orphan-criterion',
+        }),
+      );
+    });
+
+    it('does not diagnose an orphan criterion as a wrong-tier profile', () => {
+      const warnings = validateConformityClaim(
+        { scheme: SCHEME_URI, profile: 'https://example.com/orphan-criterion', criteria: [] },
+        scheme(),
+        { profile: [{ tier: 'criterion', schemes: [], profiles: [PROFILE_URI] }] },
+      );
+      expect(warnings[0]).toEqual(
+        expect.objectContaining({
+          code: ConformityWarningCode.ProfileNotFound,
+          received: 'https://example.com/orphan-criterion',
+          expected: [PROFILE_URI],
+        }),
+      );
+    });
+
+    it('uses the complete wrong-tier messages for scheme and criterion profile references', () => {
+      const schemeWarning = validateConformityClaim(
+        { scheme: SCHEME_URI, profile: SCHEME_URI, criteria: [] },
+        scheme(),
+        { profile: [{ tier: 'scheme', schemes: [SCHEME_URI] }] },
+      )[0];
+      const criterionWarning = validateConformityClaim(
+        { scheme: SCHEME_URI, profile: CRITERION_A, criteria: [] },
+        scheme(),
+        { profile: [{ tier: 'criterion', schemes: [SCHEME_URI], profiles: [PROFILE_URI] }] },
+      )[0];
+      expect(schemeWarning.message).toBe('The referenced id is a scheme, not a profile in the selected scheme.');
+      expect(criterionWarning.message).toBe(
+        `The referenced id is a criterion of profile ${PROFILE_URI} in scheme ${SCHEME_URI}, not a profile in the selected scheme.`,
+      );
+    });
+
+    it('does not diagnose an empty scheme match as a wrong tier', () => {
+      const warnings = validateConformityClaim({ scheme: SCHEME_URI, criteria: [] }, null, { scheme: [] });
       expect(warnings[0].code).toBe(ConformityWarningCode.SchemeNotFound);
     });
   });

@@ -9,6 +9,11 @@ jest.mock('../credentials/context-cache', () => ({
   contextCache: mockContextCache,
 }));
 
+const mockReadFetchAllowPrivateUrls = jest.fn();
+jest.mock('../config/credential-fetch.config', () => ({
+  readFetchAllowPrivateUrls: (...args: unknown[]) => mockReadFetchAllowPrivateUrls(...args),
+}));
+
 const mockMultibaseDigestFromString = jest.fn();
 jest.mock('@uncefact/untp-utils/multibase-digest', () => ({
   MultibaseDigest: {
@@ -108,9 +113,45 @@ function parsedCriterion(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockReadFetchAllowPrivateUrls.mockReset();
+  mockReadFetchAllowPrivateUrls.mockReturnValue(false);
 });
 
 describe('ingestConformityScheme', () => {
+  describe('private scheme-document destinations', () => {
+    it('reads the shared setting once when the input omits the override', async () => {
+      mockScheme.findUnique.mockResolvedValue(null);
+      mockReadFetchAllowPrivateUrls.mockReturnValue(true);
+      mockResolveAndParseConformityScheme.mockResolvedValue({
+        kind: 'failure',
+        error: { status: 'FETCH_FAILED', sourceUrl: SOURCE_URL, code: 'x', name: 'X', message: 'm' },
+      });
+
+      await ingestConformityScheme(baseInput());
+
+      expect(mockReadFetchAllowPrivateUrls).toHaveBeenCalledTimes(1);
+      expect(mockResolveAndParseConformityScheme).toHaveBeenCalledWith(
+        expect.objectContaining({ allowPrivateAddresses: true }),
+      );
+    });
+
+    it('uses an explicit override without consulting the shared setting', async () => {
+      mockScheme.findUnique.mockResolvedValue(null);
+      mockReadFetchAllowPrivateUrls.mockReturnValue(true);
+      mockResolveAndParseConformityScheme.mockResolvedValue({
+        kind: 'failure',
+        error: { status: 'FETCH_FAILED', sourceUrl: SOURCE_URL, code: 'x', name: 'X', message: 'm' },
+      });
+
+      await ingestConformityScheme(baseInput({ allowPrivateAddresses: false }));
+
+      expect(mockReadFetchAllowPrivateUrls).not.toHaveBeenCalled();
+      expect(mockResolveAndParseConformityScheme).toHaveBeenCalledWith(
+        expect.objectContaining({ allowPrivateAddresses: false }),
+      );
+    });
+  });
+
   describe('unchanged', () => {
     it('bumps lastFetchedAt only when the resolver reports unchanged', async () => {
       mockScheme.findUnique.mockResolvedValue({

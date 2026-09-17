@@ -40,6 +40,7 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
     expect(claim).toEqual({
       scheme: 'https://coppermark.org',
       profile: 'https://coppermark.org/rra/v3.0',
+      profileScore: { code: 'fully-meets' },
       criteria: [
         { criterion: 'https://coppermark.org/rra/v3.0/criterion/26', conformityTopics: [GHG] },
         { criterion: 'https://coppermark.org/rra/v3.0/criterion/27', conformityTopics: [RENEWABLE] },
@@ -54,7 +55,10 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
           criteria: ['https://coppermark.org/rra/v3.0/criterion/26', 'https://coppermark.org/rra/v3.0/criterion/27'],
           conformityTopics: [GHG],
         },
-        { criteria: ['https://coppermark.org/rra/v3.0/criterion/12'], conformityTopics: [FORCED_LABOUR] },
+        {
+          criteria: ['https://coppermark.org/rra/v3.0/criterion/12'],
+          conformityTopics: [FORCED_LABOUR],
+        },
         { criteria: ['https://coppermark.org/rra/v3.0/criterion/28'], conformityTopics: [WATER] },
       ],
     });
@@ -416,6 +420,97 @@ describe('extractDccConformityClaim (v0.7.0)', () => {
   it('returns null for an empty subject', () => {
     expect(extractDccConformityClaim({})).toBeNull();
   });
+
+  it('projects only string score codes and keeps their original performance indices', () => {
+    const subject = {
+      referenceScheme: { id: 'https://scheme.example/assurance' },
+      referenceProfile: { id: 'https://scheme.example/assurance/full/1.0.0' },
+      profileScore: { code: 17 },
+      conformityAssessment: [
+        {
+          assessedPerformance: [{ score: { code: 17 } }, { score: { code: '' } }, { score: { code: '  AA  ' } }],
+        },
+      ],
+    };
+    const extracted = extractDccConformityClaimWithProvenance(subject)!;
+
+    expect(extracted.claim).toMatchObject({
+      profile: 'https://scheme.example/assurance/full/1.0.0',
+      assessments: [{ criteria: [], conformityTopics: [], assessedScores: [{ code: '' }, { code: '  AA  ' }] }],
+    });
+    expect(extracted.claim).not.toHaveProperty('profileScore');
+    expect(extracted.sourceMap).toEqual({
+      '/scheme': '/referenceScheme/id',
+      '/profile': '/referenceProfile/id',
+      '/assessments/0/conformityTopics': '/conformityAssessment/0/conformityTopic',
+      '/assessments/0/assessedScores/0/code': '/conformityAssessment/0/assessedPerformance/1/score/code',
+      '/assessments/0/assessedScores/1/code': '/conformityAssessment/0/assessedPerformance/2/score/code',
+    });
+  });
+
+  it('composes the real score validator and pointer remapper across a measure-only performance', () => {
+    const subject = {
+      referenceScheme: { id: 'https://scheme.example/assurance' },
+      referenceProfile: { id: 'https://scheme.example/assurance/full/1.0.0' },
+      conformityAssessment: [
+        {
+          assessmentCriteria: [{ id: 'https://scheme.example/criterion/one/1.0.0' }],
+          assessedPerformance: [
+            { metric: { id: 'https://scheme.example/metric/one' } },
+            { score: { code: 'UNKNOWN' } },
+          ],
+        },
+      ],
+    };
+    const extracted = extractDccConformityClaimWithProvenance(subject)!;
+    const scheme: ConformityScheme = {
+      canonicalId: 'https://scheme.example/assurance',
+      sourceUrl: 'https://scheme.example/assurance.json',
+      specVersion: '0.7.0',
+      name: 'Example Assurance',
+      scoringFramework: { name: 'Scheme', scores: [{ code: 'A' }] },
+      profiles: [
+        {
+          canonicalId: 'https://scheme.example/assurance/full/1.0.0',
+          name: 'Full',
+          version: '1.0.0',
+          status: 'active',
+          criterionScoringFrameworks: [{ name: 'Profile', scores: [{ code: 'B' }] }],
+          criteria: [
+            {
+              canonicalId: 'https://scheme.example/criterion/one/1.0.0',
+              name: 'One',
+              version: '1.0.0',
+              status: 'active',
+              topics: [],
+              tags: [],
+              requiredPerformance: [{ score: { code: 'R' } }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const warnings = validateConformityClaim(extracted.claim, scheme);
+    const remapped = remapWarningPointers(
+      warnings,
+      extracted.sourceMap,
+      { credentialSubject: subject },
+      '/credentialSubject',
+    );
+    const warning = remapped.find((candidate) => candidate.code === 'conformity-assessment.score-not-in-framework');
+
+    expect(warning).toEqual(
+      expect.objectContaining({
+        received: 'UNKNOWN',
+        expected: ['A', 'B', 'R'],
+        pointer: '/credentialSubject/conformityAssessment/0/assessedPerformance/1/score/code',
+      }),
+    );
+    expect(
+      (subject.conformityAssessment[0].assessedPerformance as Array<{ score?: { code?: string } }>)[1].score?.code,
+    ).toBe('UNKNOWN');
+  });
 });
 
 describe('extractDccConformityClaimWithProvenance (v0.7.0)', () => {
@@ -446,6 +541,17 @@ describe('extractDccConformityClaimWithProvenance (v0.7.0)', () => {
 
     expect(sourceMap['/scheme']).toBe('/referenceScheme/id');
     expect(sourceMap['/profile']).toBe('/referenceProfile/id');
+  });
+
+  it('records the profile score path', () => {
+    const { claim, sourceMap } = extractDccConformityClaimWithProvenance({
+      referenceScheme: { id: 'https://example.com/s' },
+      referenceProfile: { id: 'https://example.com/s/p/1.0.0' },
+      profileScore: { code: 'LEVEL-1' },
+    })!;
+
+    expect(claim.profileScore).toEqual({ code: 'LEVEL-1' });
+    expect(sourceMap['/profileScore/code']).toBe('/profileScore/code');
   });
 
   it('records no profile path when the subject declares no profile', () => {

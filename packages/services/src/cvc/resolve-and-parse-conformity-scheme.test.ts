@@ -112,7 +112,31 @@ describe('resolveAndParseConformityScheme', () => {
       await resolveAndParseConformityScheme(baseInput({ cached }));
       expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(SOURCE_URL, cached, {
         headers: { Accept: 'application/ld+json' },
+        allowPrivateAddresses: undefined,
       });
+    });
+
+    it.each([
+      ['true', true, true],
+      ['false', false, false],
+      ['omitted', undefined, undefined],
+    ])('forwards an allowPrivateAddresses value unchanged when it is %s', async (_label, inputValue, expectedValue) => {
+      mockResolveDocumentIfChanged.mockResolvedValue(loadedResponse('{"id":"x"}'));
+      mockValidateJsonLd.mockResolvedValue(undefined);
+      mockValidateAgainstSchemas.mockResolvedValue(undefined);
+      mockParseConformityScheme.mockReturnValue(fakeScheme());
+
+      const input = inputValue === undefined ? baseInput() : baseInput({ allowPrivateAddresses: inputValue });
+      await resolveAndParseConformityScheme(input);
+
+      expect(mockResolveDocumentIfChanged).toHaveBeenCalledWith(
+        SOURCE_URL,
+        {},
+        {
+          headers: { Accept: 'application/ld+json' },
+          allowPrivateAddresses: expectedValue,
+        },
+      );
     });
 
     it('forwards the contextCache to validateJsonLd', async () => {
@@ -155,6 +179,7 @@ describe('resolveAndParseConformityScheme', () => {
         {},
         {
           headers: { Accept: 'application/ld+json' },
+          allowPrivateAddresses: undefined,
         },
       );
     });

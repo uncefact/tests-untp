@@ -11,10 +11,17 @@ import type { ClaimSourceMap, ConformityClaimWithProvenance, CredentialSubject }
 // a spec/schema divergence reported upstream).
 type DccTopic = { id?: string };
 type DccCriterion = { id?: string; conformityTopic?: unknown };
-type DccAssessment = { assessmentCriteria?: DccCriterion[]; conformityTopic?: unknown };
+type DccScore = { code?: unknown };
+type DccPerformance = { score?: DccScore };
+type DccAssessment = {
+  assessmentCriteria?: DccCriterion[];
+  conformityTopic?: unknown;
+  assessedPerformance?: DccPerformance[];
+};
 type DccConformitySubject = {
   referenceScheme?: { id?: string };
   referenceProfile?: { id?: string };
+  profileScore?: DccScore;
   conformityAssessment?: DccAssessment[];
 };
 
@@ -61,13 +68,32 @@ function recordTopics(
   return kept.map((topic) => topic.id);
 }
 
+/** Records kept performance score codes and their source paths. */
+function recordScores(
+  sourceMap: ClaimSourceMap,
+  claimPath: string,
+  subjectPath: string,
+  performances: DccPerformance[],
+): { code: string }[] {
+  const scores: { code: string }[] = [];
+  for (const [performanceIndex, performance] of performances.entries()) {
+    const code = performance?.score?.code;
+    if (typeof code !== 'string') continue;
+    const scoreIndex = scores.length;
+    scores.push({ code });
+    sourceMap[`${claimPath}/${scoreIndex}/code`] = `${subjectPath}/${performanceIndex}/score/code`;
+  }
+  return scores;
+}
+
 /**
  * Extracts the conformity claim from a v0.7.0 Digital Conformity Credential
  * subject into the minimal shape {@link ConformityClaim} the validator needs.
  *
  * The v0.7.0 DCC does not carry a single `conformityClaim` object; the claim is
- * assembled from `referenceScheme`, `referenceProfile`, and the criteria and
- * topic declarations across `conformityAssessment[]`. Each level's topics are
+ * assembled from `referenceScheme`, `referenceProfile`, `profileScore`, and the
+ * criteria, topic and performance-score declarations across
+ * `conformityAssessment[]`. Each level's topics are
  * extracted verbatim from where the credential declares them, with no copying
  * between levels: a criterion's `conformityTopic` entries become that
  * criterion's declared topics (absent when the credential does not classify
@@ -94,9 +120,11 @@ export function extractDccConformityClaim(subject: CredentialSubject): Conformit
  * prepending a prefix. `criteria` is flattened across every assessment and
  * records no origin, the claim says `conformityTopics` where the credential
  * says `conformityTopic`, and topic entries without a usable `id` are dropped,
- * so a projected topic index need not match its source index. Every
- * addressable value therefore gets its own entry rather than being derived
- * from its parent's path.
+ * so a projected topic index need not match its source index. Performance
+ * scores shift the same way: a measure-only `assessedPerformance` entry carries
+ * no score code and is skipped, so `assessedScores[k]` need not come from
+ * `assessedPerformance[k]`. Every addressable value therefore gets its own
+ * entry rather than being derived from its parent's path.
  *
  * Values the validator can point at but the document does not contain are
  * deliberately absent from the map: an unspecified profile, and a criterion
@@ -122,6 +150,12 @@ export function extractDccConformityClaimWithProvenance(
   // pointer on the not-specified warning, where the document has no profile to
   // point at, and an entry here would name a path that is not in it.
   if (profile) sourceMap['/profile'] = '/referenceProfile/id';
+
+  const profileScoreCode = dcc.profileScore?.code;
+  const profileScore = typeof profileScoreCode === 'string' ? { code: profileScoreCode } : undefined;
+  if (profileScore) {
+    sourceMap['/profileScore/code'] = '/profileScore/code';
+  }
 
   const criteria: ConformityClaim['criteria'] = [];
   const assessments: NonNullable<ConformityClaim['assessments']> = [];
@@ -158,20 +192,32 @@ export function extractDccConformityClaimWithProvenance(
     }
     // Every non-null assessment gets an entry, including empty ones, so
     // `/assessments/{i}` warning pointers track the source document's
-    // assessment order. Empty entries are inert: the validator's no-criteria
-    // guard produces no verdict for them.
+    // assessment order. An empty criteria list does not suppress score
+    // membership: the validator checks such scores against scheme and
+    // profile-level frameworks.
     const conformityTopics = recordTopics(
       sourceMap,
       `/assessments/${assessmentClaimIndex}`,
       `${assessmentPath}/conformityTopic`,
       keptTopics(assessment.conformityTopic),
     );
-    assessments.push({ criteria: assessmentCriteriaIds, conformityTopics });
+    const assessedScores = recordScores(
+      sourceMap,
+      `/assessments/${assessmentClaimIndex}/assessedScores`,
+      `${assessmentPath}/assessedPerformance`,
+      assessment.assessedPerformance ?? [],
+    );
+    assessments.push({
+      criteria: assessmentCriteriaIds,
+      conformityTopics,
+      ...(assessedScores.length > 0 && { assessedScores }),
+    });
   }
 
   const claim: ConformityClaim = {
     scheme,
     ...(profile && { profile }),
+    ...(profileScore && { profileScore }),
     criteria,
     ...(assessments.length > 0 && { assessments }),
   };

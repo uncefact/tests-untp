@@ -96,6 +96,7 @@ const { IdrPublishError: RealIdrPublishError } = jest.requireActual('@uncefact/u
 const mockUpdateCredentialPublished = jest.fn();
 const mockGetDidByDid = jest.fn();
 const mockFindConformityScheme = jest.fn();
+const mockResolveConformityReferences = jest.fn();
 const mockClaimIdempotencyKey = jest.fn();
 const mockCompleteIdempotencyKey = jest.fn();
 const mockFindIdempotencyKey = jest.fn();
@@ -104,6 +105,7 @@ jest.mock('@/lib/prisma/repositories', () => ({
   updateCredentialPublished: (...args: unknown[]) => mockUpdateCredentialPublished(...args),
   getDidByDid: (...args: unknown[]) => mockGetDidByDid(...args),
   findConformitySchemeByCanonicalId: (...args: unknown[]) => mockFindConformityScheme(...args),
+  resolveConformityReferences: (...args: unknown[]) => mockResolveConformityReferences(...args),
   CREDENTIAL_ISSUANCE_OPERATION: 'credential.issue',
   claimIdempotencyKey: (...args: unknown[]) => mockClaimIdempotencyKey(...args),
   completeIdempotencyKey: (...args: unknown[]) => mockCompleteIdempotencyKey(...args),
@@ -288,6 +290,7 @@ function setupHappyPath() {
   stubBridge.extractConformityClaimWithProvenance.mockReturnValue(null);
   mockValidateConformityClaim.mockReturnValue([]);
   mockFindConformityScheme.mockResolvedValue(null);
+  mockResolveConformityReferences.mockResolvedValue(new Map());
   mockFindIdempotencyKey.mockResolvedValue({ outcome: 'absent' });
   mockClaimIdempotencyKey.mockResolvedValue({ outcome: 'claimed', claimId: 'claim-1' });
   mockCompleteIdempotencyKey.mockResolvedValue({ applied: true });
@@ -1792,7 +1795,458 @@ describe('POST /api/v1/credentials', () => {
       profile: 'https://example.com/rra/v3.0',
       criteria: [{ criterion: 'https://example.com/rra/v3.0/criterion/26' }],
     };
-    const SCHEME = { canonicalId: 'https://example.com', profiles: [] };
+    const SCHEME = {
+      canonicalId: 'https://example.com',
+      profiles: [{ canonicalId: 'https://example.com/rra/v3.0', criteria: [] }],
+    };
+    const SCHEME_LOOKUP = { scheme: SCHEME, scoringEvidence: 'available' };
+
+    function useRealValidator(): void {
+      const actual = jest.requireActual('@uncefact/untp-utils/conformity-vocabulary') as {
+        validateConformityClaim: (...args: unknown[]) => unknown;
+      };
+      mockValidateConformityClaim.mockImplementation((...args: unknown[]) => actual.validateConformityClaim(...args));
+    }
+
+    function scoreScheme(overrides: Record<string, unknown> = {}) {
+      return {
+        canonicalId: 'https://scheme.example',
+        sourceUrl: 'https://scheme.example/cvc.json',
+        specVersion: '0.7.0',
+        name: 'Example scheme',
+        scoringFramework: { name: 'Scheme score', scores: [{ code: 'A' }, { code: 'B' }] },
+        profiles: [
+          {
+            canonicalId: 'https://scheme.example/profile/1.0.0',
+            name: 'Profile',
+            version: '1.0.0',
+            status: 'active',
+            criteria: [],
+            criterionScoringFrameworks: [{ name: 'Profile score', scores: [{ code: 'X' }] }],
+          },
+        ],
+        ...overrides,
+      };
+    }
+
+    function dccPayload(subject: Record<string, unknown>) {
+      return validBody({ credentialPayload: { ...VALID_PAYLOAD, credentialSubject: subject } });
+    }
+
+    it('issues with the real validator and returns an attestation score warning with a resolving pointer', async () => {
+      const scheme = scoreScheme();
+      const claim = {
+        scheme: 'https://scheme.example',
+        profile: 'https://scheme.example/profile/1.0.0',
+        profileScore: { code: 'Q' },
+        criteria: [],
+      };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: {
+          '/scheme': '/referenceScheme/id',
+          '/profile': '/referenceProfile/id',
+          '/profileScore/code': '/profileScore/code',
+        },
+      });
+      mockFindConformityScheme.mockResolvedValue({ scheme, scoringEvidence: 'available' });
+      useRealValidator();
+
+      const req = createFakeRequest(
+        dccPayload({
+          id: 'urn:example:product:123',
+          referenceScheme: { id: 'https://scheme.example' },
+          referenceProfile: { id: 'https://scheme.example/profile/1.0.0' },
+          profileScore: { code: 'Q' },
+        }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        {
+          code: 'conformity-attestation.score-not-in-framework',
+          message: "Profile score code is not published by scheme https://scheme.example's scoring framework.",
+          received: 'Q',
+          expected: ['A', 'B'],
+          pointer: '/credentialSubject/profileScore/code',
+        },
+      ]);
+    });
+
+    it('issues with the real validator and remaps an assessment score warning', async () => {
+      const scheme = scoreScheme();
+      const claim = {
+        scheme: 'https://scheme.example',
+        profile: 'https://scheme.example/profile/1.0.0',
+        criteria: [],
+        assessments: [{ criteria: [], conformityTopics: [], assessedScores: [{ code: 'Q' }] }],
+      };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: {
+          '/scheme': '/referenceScheme/id',
+          '/profile': '/referenceProfile/id',
+          '/assessments/0/assessedScores/0/code': '/conformityAssessment/0/assessedPerformance/0/score/code',
+        },
+      });
+      mockFindConformityScheme.mockResolvedValue({ scheme, scoringEvidence: 'available' });
+      useRealValidator();
+
+      const req = createFakeRequest(
+        dccPayload({
+          id: 'urn:example:product:123',
+          referenceScheme: { id: 'https://scheme.example' },
+          referenceProfile: { id: 'https://scheme.example/profile/1.0.0' },
+          conformityAssessment: [{ assessedPerformance: [{ score: { code: 'Q' } }] }],
+        }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        {
+          code: 'conformity-assessment.score-not-in-framework',
+          message:
+            'Assessment score code is not published by the scheme, profile or referenced-criterion frameworks that apply to profile https://scheme.example/profile/1.0.0.',
+          received: 'Q',
+          expected: ['A', 'B', 'X'],
+          pointer: '/credentialSubject/conformityAssessment/0/assessedPerformance/0/score/code',
+        },
+      ]);
+    });
+
+    it('issues with a real wrong-tier scheme warning when the resolver finds a profile id', async () => {
+      const profileId = 'https://scheme.example/profile/1.0.0';
+      const claim = { scheme: profileId, criteria: [] };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: { '/scheme': '/referenceScheme/id' },
+      });
+      mockFindConformityScheme.mockResolvedValue(null);
+      mockResolveConformityReferences.mockResolvedValue(
+        new Map([[profileId, [{ tier: 'profile', schemes: ['https://scheme.example'] }]]]),
+      );
+      useRealValidator();
+
+      const req = createFakeRequest(dccPayload({ id: 'urn:example:product:123', referenceScheme: { id: profileId } }));
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        {
+          code: 'conformity-scheme.wrong-tier',
+          message: 'The referenced id is a profile, not a scheme; it belongs to scheme https://scheme.example.',
+          received: profileId,
+          expected: ['https://scheme.example'],
+          pointer: '/credentialSubject/referenceScheme/id',
+        },
+      ]);
+    });
+
+    it('issues with a real wrong-tier profile warning when the resolver finds a scheme id', async () => {
+      const schemeId = 'https://scheme.example';
+      const scheme = scoreScheme();
+      const claim = {
+        scheme: schemeId,
+        profile: schemeId,
+        criteria: [],
+      };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: { '/scheme': '/referenceScheme/id', '/profile': '/referenceProfile/id' },
+      });
+      mockFindConformityScheme.mockResolvedValue({ scheme, scoringEvidence: 'available' });
+      mockResolveConformityReferences.mockResolvedValue(
+        new Map([[schemeId, [{ tier: 'scheme', schemes: [schemeId] }]]]),
+      );
+      useRealValidator();
+
+      const req = createFakeRequest(
+        dccPayload({
+          id: 'urn:example:product:123',
+          referenceScheme: { id: schemeId },
+          referenceProfile: { id: schemeId },
+        }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        {
+          code: 'conformity-profile.wrong-tier',
+          message: 'The referenced id is a scheme, not a profile in the selected scheme.',
+          received: schemeId,
+          expected: ['https://scheme.example/profile/1.0.0'],
+          pointer: '/credentialSubject/referenceProfile/id',
+        },
+      ]);
+    });
+
+    it('keeps graph warnings and adds a targeted advisory when scoring evidence is unparseable', async () => {
+      const scheme = scoreScheme({
+        scoringFramework: undefined,
+        profiles: [
+          {
+            canonicalId: 'https://scheme.example/profile/1.0.0',
+            name: 'Profile',
+            version: '1.0.0',
+            status: 'active',
+            criteria: [
+              {
+                canonicalId: 'https://scheme.example/criterion/1.0.0',
+                name: 'Criterion',
+                version: '1.0.0',
+                status: 'active',
+                topics: [],
+                tags: [],
+              },
+            ],
+          },
+        ],
+      });
+      const unknownCriterion = 'https://scheme.example/criterion/unknown/1.0.0';
+      const claim = {
+        scheme: 'https://scheme.example',
+        profile: 'https://scheme.example/profile/1.0.0',
+        profileScore: { code: 'Q' },
+        criteria: [{ criterion: unknownCriterion }],
+      };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: {
+          '/scheme': '/referenceScheme/id',
+          '/profile': '/referenceProfile/id',
+          '/profileScore/code': '/profileScore/code',
+          '/criteria/0/criterion': '/conformityAssessment/0/assessmentCriteria/0/id',
+        },
+      });
+      mockFindConformityScheme.mockResolvedValue({ scheme, scoringEvidence: 'unparseable-raw-document' });
+      useRealValidator();
+
+      const req = createFakeRequest(
+        dccPayload({
+          id: 'urn:example:product:123',
+          referenceScheme: { id: 'https://scheme.example' },
+          referenceProfile: { id: 'https://scheme.example/profile/1.0.0' },
+          profileScore: { code: 'Q' },
+          conformityAssessment: [{ assessmentCriteria: [{ id: unknownCriterion }] }],
+        }),
+      );
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        {
+          code: 'conformity-criterion.not-in-profile',
+          message:
+            'Criterion URI is not in the criterion list published by profile https://scheme.example/profile/1.0.0.',
+          received: unknownCriterion,
+          expected: ['https://scheme.example/criterion/1.0.0'],
+          pointer: '/credentialSubject/conformityAssessment/0/assessmentCriteria/0/id',
+        },
+        {
+          code: 'conformity-criterion.missing',
+          message:
+            'Profile https://scheme.example/profile/1.0.0 publishes a criterion that the claim does not address.',
+          expected: 'https://scheme.example/criterion/1.0.0',
+        },
+        {
+          code: 'conformity-claim.score-checks-unavailable',
+          message:
+            "Score codes were not checked because the scheme's stored document is unavailable; the applicable scheme, profile, criterion and topic checks still ran.",
+          remediation:
+            'Ask your operator to refresh the scheme in the catalogue, then issue again if you need the score codes checked.',
+        },
+      ]);
+    });
+
+    it('reloads a scheme found by the resolver after the first lookup misses', async () => {
+      const schemeId = 'https://race.example/scheme';
+      const claim = { scheme: schemeId, criteria: [] };
+      const reloadedScheme = { ...scoreScheme(), canonicalId: schemeId };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: { '/scheme': '/referenceScheme/id' },
+      });
+      mockFindConformityScheme
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ scheme: reloadedScheme, scoringEvidence: 'available' });
+      mockResolveConformityReferences.mockResolvedValue(
+        new Map([[schemeId, [{ tier: 'scheme', schemes: [schemeId] }]]]),
+      );
+      mockValidateConformityClaim.mockReturnValue([]);
+
+      const res = await POST(
+        createFakeRequest(dccPayload({ id: 'urn:example:product:123', referenceScheme: { id: schemeId } })),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+
+      expect(res.status).toBe(201);
+      expect(mockFindConformityScheme).toHaveBeenCalledTimes(2);
+      expect(mockValidateConformityClaim).toHaveBeenCalledWith(claim, reloadedScheme, undefined);
+      expect((await res.json()).warnings).toBeUndefined();
+    });
+
+    it('reloads a scheme when the resolver finds the selected profile after the first graph read misses it', async () => {
+      const schemeId = 'https://race.example/profile-scheme';
+      const profileId = `${schemeId}/profile/1.0.0`;
+      const claim = { scheme: schemeId, profile: profileId, criteria: [] };
+      const reloadedScheme = {
+        ...scoreScheme({ canonicalId: schemeId }),
+        profiles: [{ ...scoreScheme().profiles[0], canonicalId: profileId }],
+      };
+      const initialScheme = { ...reloadedScheme, profiles: [] };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: { '/scheme': '/referenceScheme/id', '/profile': '/referenceProfile/id' },
+      });
+      mockFindConformityScheme
+        .mockResolvedValueOnce({ scheme: initialScheme, scoringEvidence: 'available' })
+        .mockResolvedValueOnce({ scheme: reloadedScheme, scoringEvidence: 'available' });
+      mockResolveConformityReferences.mockResolvedValue(
+        new Map([[profileId, [{ tier: 'profile', schemes: [schemeId] }]]]),
+      );
+      mockValidateConformityClaim.mockReturnValue([]);
+
+      const res = await POST(
+        createFakeRequest(
+          dccPayload({
+            id: 'urn:example:product:123',
+            referenceScheme: { id: schemeId },
+            referenceProfile: { id: profileId },
+          }),
+        ),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+
+      expect(res.status).toBe(201);
+      expect(mockFindConformityScheme).toHaveBeenCalledTimes(2);
+      expect(mockValidateConformityClaim).toHaveBeenCalledWith(claim, reloadedScheme, undefined);
+      expect((await res.json()).warnings).toBeUndefined();
+    });
+
+    it('returns only the inconsistent-read advisory when the scheme reload still misses', async () => {
+      const schemeId = 'https://race.example/missing';
+      const claim = { scheme: schemeId, criteria: [] };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: { '/scheme': '/referenceScheme/id' },
+      });
+      mockFindConformityScheme.mockResolvedValue(null);
+      mockResolveConformityReferences.mockResolvedValue(
+        new Map([[schemeId, [{ tier: 'scheme', schemes: [schemeId] }]]]),
+      );
+
+      const res = await POST(
+        createFakeRequest(dccPayload({ id: 'urn:example:product:123', referenceScheme: { id: schemeId } })),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(mockFindConformityScheme).toHaveBeenCalledTimes(2);
+      expect(mockValidateConformityClaim).not.toHaveBeenCalled();
+      expect(json.warnings).toEqual([
+        {
+          code: 'conformity-claim.validation-error',
+          message:
+            'Conformity claim validation could not be completed because the catalogue changed while the claim was checked; the credential was issued, and a later check against the catalogue gives a current verdict.',
+        },
+      ]);
+    });
+
+    it('keeps graph warnings and adds a targeted advisory when the stored scheme document is missing', async () => {
+      const scheme = scoreScheme({
+        scoringFramework: undefined,
+        profiles: [
+          {
+            canonicalId: 'https://scheme.example/profile/1.0.0',
+            name: 'Profile',
+            version: '1.0.0',
+            status: 'active',
+            criteria: [
+              {
+                canonicalId: 'https://scheme.example/criterion/1.0.0',
+                name: 'Criterion',
+                version: '1.0.0',
+                status: 'active',
+                topics: [],
+                tags: [],
+              },
+            ],
+          },
+        ],
+      });
+      const unknownCriterion = 'https://scheme.example/criterion/unknown/1.0.0';
+      const claim = {
+        scheme: 'https://scheme.example',
+        profile: 'https://scheme.example/profile/1.0.0',
+        profileScore: { code: 'Q' },
+        criteria: [{ criterion: unknownCriterion }],
+      };
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim,
+        sourceMap: {
+          '/scheme': '/referenceScheme/id',
+          '/profile': '/referenceProfile/id',
+          '/criteria/0/criterion': '/conformityAssessment/0/assessmentCriteria/0/id',
+        },
+      });
+      mockFindConformityScheme.mockResolvedValue({ scheme, scoringEvidence: 'missing-raw-document' });
+      useRealValidator();
+
+      const res = await POST(
+        createFakeRequest(
+          dccPayload({
+            id: 'urn:example:product:123',
+            referenceScheme: { id: 'https://scheme.example' },
+            referenceProfile: { id: 'https://scheme.example/profile/1.0.0' },
+            profileScore: { code: 'Q' },
+            conformityAssessment: [{ assessmentCriteria: [{ id: unknownCriterion }] }],
+          }),
+        ),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([
+        expect.objectContaining({ code: 'conformity-criterion.not-in-profile' }),
+        expect.objectContaining({ code: 'conformity-criterion.missing' }),
+        {
+          code: 'conformity-claim.score-checks-unavailable',
+          message:
+            "Score codes were not checked because the scheme's stored document is unavailable; the applicable scheme, profile, criterion and topic checks still ran.",
+          remediation:
+            'Ask your operator to refresh the scheme in the catalogue, then issue again if you need the score codes checked.',
+        },
+      ]);
+    });
+
+    it('keeps issuance advisory when reference resolution rejects', async () => {
+      const schemeId = 'https://resolver.example/profile/1.0.0';
+      stubBridge.extractConformityClaimWithProvenance.mockReturnValue({
+        claim: { scheme: schemeId, criteria: [] },
+        sourceMap: { '/scheme': '/referenceScheme/id' },
+      });
+      mockFindConformityScheme.mockResolvedValue(null);
+      mockResolveConformityReferences.mockRejectedValue(new Error('resolver unavailable'));
+
+      const res = await POST(
+        createFakeRequest(dccPayload({ id: 'urn:example:product:123', referenceScheme: { id: schemeId } })),
+        AUTH_CONTEXT as unknown as Parameters<typeof POST>[1],
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([expect.objectContaining({ code: 'conformity-claim.validation-error' })]);
+    });
     // The extractor's map from claim pointers to paths in the submitted
     // credentialSubject; the route substitutes these before responding (#753).
     const SOURCE_MAP = { '/criteria/0/criterion': '/conformityAssessment/0/assessmentCriteria/0/id' };
@@ -1800,7 +2254,7 @@ describe('POST /api/v1/credentials', () => {
 
     it('validates the extracted claim against the resolved scheme and attaches no warnings on a clean match', async () => {
       stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
-      mockFindConformityScheme.mockResolvedValue(SCHEME);
+      mockFindConformityScheme.mockResolvedValue(SCHEME_LOOKUP);
       mockValidateConformityClaim.mockReturnValue([]);
 
       const req = createFakeRequest(validBody());
@@ -1808,14 +2262,16 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(201);
-      expect(mockFindConformityScheme).toHaveBeenCalledWith('https://example.com', 'tenant-1');
-      expect(mockValidateConformityClaim).toHaveBeenCalledWith(CLAIM, SCHEME);
+      expect(mockFindConformityScheme).toHaveBeenCalledWith('https://example.com', 'tenant-1', {
+        projectScores: false,
+      });
+      expect(mockValidateConformityClaim).toHaveBeenCalledWith(CLAIM, SCHEME, undefined);
       expect(json.warnings).toBeUndefined();
     });
 
     it('attaches the validator warnings (with structured detail) to the response', async () => {
       stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
-      mockFindConformityScheme.mockResolvedValue(SCHEME);
+      mockFindConformityScheme.mockResolvedValue(SCHEME_LOOKUP);
       mockValidateConformityClaim.mockReturnValue([
         {
           code: 'conformity-criterion.not-in-profile',
@@ -1858,7 +2314,7 @@ describe('POST /api/v1/credentials', () => {
       // `/criteria` is the missing-criterion warning: its subject is absent
       // from the document, so no pointer can resolve and none is returned.
       stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
-      mockFindConformityScheme.mockResolvedValue(SCHEME);
+      mockFindConformityScheme.mockResolvedValue(SCHEME_LOOKUP);
       mockValidateConformityClaim.mockReturnValue([
         { code: 'conformity-criterion.missing', message: 'Profile criterion is not claimed.', pointer: '/criteria' },
       ]);
@@ -1884,7 +2340,7 @@ describe('POST /api/v1/credentials', () => {
       const json = await res.json();
 
       expect(res.status).toBe(201);
-      expect(mockValidateConformityClaim).toHaveBeenCalledWith(CLAIM, null);
+      expect(mockValidateConformityClaim).toHaveBeenCalledWith(CLAIM, null, { scheme: [] });
       expect(json.warnings[0].code).toBe('conformity-scheme.not-found');
     });
 
@@ -1928,7 +2384,7 @@ describe('POST /api/v1/credentials', () => {
 
     it('never blocks issuance: degrades to an advisory warning when the validator throws', async () => {
       stubBridge.extractConformityClaimWithProvenance.mockReturnValue(EXTRACTED);
-      mockFindConformityScheme.mockResolvedValue(SCHEME);
+      mockFindConformityScheme.mockResolvedValue(SCHEME_LOOKUP);
       mockValidateConformityClaim.mockImplementation(() => {
         throw new Error('validator blew up');
       });

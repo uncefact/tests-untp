@@ -1,18 +1,31 @@
 import { ConformityWarningCode } from './codes.js';
-import type { ConformityClaim, ConformityCriterion, ConformityScheme, ConformityWarning } from './types.js';
+import type {
+  ConformityClaim,
+  ConformityCriterion,
+  ConformityReferenceMatch,
+  ConformityReferenceResolution,
+  ConformityScheme,
+  ConformityWarning,
+} from './types.js';
 
 /**
  * Validates a credential's conformity claim against a parsed scheme.
  *
  * Short-circuits at the first miss:
- * - scheme null or `canonicalId` mismatch → only `conformity-scheme.not-found`.
- * - profile absent on the claim → scheme check plus a
- *   `conformity-profile.not-specified` advisory; criteria are published per
- *   versioned profile, so without one the criterion and topic checks cannot
- *   run, and silence would be indistinguishable from a clean pass.
- * - profile not in scheme → only `conformity-profile.not-found`.
- * - otherwise → criteria-level, criterion-topic, and assessment-topic warnings
- *   accumulate.
+ * - scheme null or `canonicalId` mismatch → only `conformity-scheme.not-found`,
+ *   unless the caller supplied a wrong-tier reference diagnosis.
+ * - attestation `profileScore` outside the codes the scheme's framework
+ *   publishes → `conformity-attestation.score-not-in-framework`. This check
+ *   runs before the profile branches, so its warning can accompany any of them.
+ * - profile absent on the claim → the checks above plus a
+ *   `conformity-profile.not-specified` advisory. Criteria are published per
+ *   versioned profile, so without one the criterion, topic and performance-score
+ *   checks cannot run, and silence would be indistinguishable from a clean pass.
+ * - profile not in scheme → `conformity-profile.not-found` or
+ *   `conformity-profile.wrong-tier`, beside any attestation-score warning
+ *   already raised.
+ * - otherwise → criteria-level, criterion-topic, assessment-topic and
+ *   assessment-score warnings accumulate.
  *
  * Pointers are relative to `claim`. A consumer that holds the document the
  * claim was extracted from re-maps them onto it, and prepending a wrapper path
@@ -23,22 +36,41 @@ import type { ConformityClaim, ConformityCriterion, ConformityScheme, Conformity
  * that filters empty or malformed entries shifts both `/assessments/{i}` and
  * topic indices away from their source positions (#753).
  *
- * @see ADR-033 §3 for warning code definitions.
+ * @see ADR-033 §3 and ADR-058 for warning code definitions.
  */
 export function validateConformityClaim(
   claim: ConformityClaim,
   scheme: ConformityScheme | null,
+  references?: ConformityReferenceResolution,
 ): readonly ConformityWarning[] {
   const warnings: ConformityWarning[] = [];
 
   if (!scheme || scheme.canonicalId !== claim.scheme) {
-    warnings.push({
-      code: ConformityWarningCode.SchemeNotFound,
-      message: 'Scheme URI is not in the known set.',
-      received: claim.scheme,
-      pointer: '/scheme',
-    });
+    const wrongTier = schemeWrongTierWarning(claim.scheme, references?.scheme);
+    warnings.push(
+      wrongTier ?? {
+        code: ConformityWarningCode.SchemeNotFound,
+        message: 'Scheme URI is not in the known set.',
+        received: claim.scheme,
+        pointer: '/scheme',
+      },
+    );
     return warnings;
+  }
+
+  const schemeScoreCodes = uniqueStrings(scheme.scoringFramework?.scores.map((score) => score.code) ?? []);
+  if (
+    claim.profileScore != null &&
+    schemeScoreCodes.length > 0 &&
+    !schemeScoreCodes.includes(claim.profileScore.code)
+  ) {
+    warnings.push({
+      code: ConformityWarningCode.AttestationScoreNotInFramework,
+      message: `Profile score code is not published by scheme ${scheme.canonicalId}'s scoring framework.`,
+      received: claim.profileScore.code,
+      expected: schemeScoreCodes,
+      pointer: '/profileScore/code',
+    });
   }
 
   // `== null` covers undefined and a runtime null from JSON or database rows.
@@ -46,7 +78,7 @@ export function validateConformityClaim(
     warnings.push({
       code: ConformityWarningCode.ProfileNotSpecified,
       message:
-        'The claim references no profile; criterion and topic checks were not performed because criteria are published per profile.',
+        'The claim references no profile; assessment performance scores were not checked, and criterion and topic checks were not performed because criteria are published per profile.',
       pointer: '/profile',
     });
     return warnings;
@@ -54,11 +86,46 @@ export function validateConformityClaim(
 
   const profile = scheme.profiles.find((p) => p.canonicalId === claim.profile);
   if (!profile) {
+    const expected = uniqueSortedStrings(scheme.profiles.map((p) => p.canonicalId));
+    const profileMatch = references?.profile?.find((match) => match.tier === 'profile');
+    if (profileMatch) {
+      warnings.push({
+        code: ConformityWarningCode.ProfileNotFound,
+        message: `Profile URI is not among the selected scheme's published profiles; the id belongs to scheme${
+          profileMatch.schemes.length === 1 ? '' : 's'
+        } ${profileMatch.schemes.join(', ')}.`,
+        received: claim.profile,
+        expected,
+        pointer: '/profile',
+      });
+      return warnings;
+    }
+
+    const wrongTier = references?.profile?.find((match) => match.tier !== 'profile' && match.schemes.length > 0);
+    if (wrongTier) {
+      const message =
+        wrongTier.tier === 'scheme'
+          ? 'The referenced id is a scheme, not a profile in the selected scheme.'
+          : `The referenced id is a criterion of ${
+              wrongTier.profiles?.length === 1 ? 'profile' : 'profiles'
+            } ${uniqueSortedStrings(wrongTier.profiles ?? []).join(', ')} in ${
+              wrongTier.schemes.length === 1 ? 'scheme' : 'schemes'
+            } ${uniqueSortedStrings(wrongTier.schemes).join(', ')}, not a profile in the selected scheme.`;
+      warnings.push({
+        code: ConformityWarningCode.ProfileWrongTier,
+        message,
+        received: claim.profile,
+        expected,
+        pointer: '/profile',
+      });
+      return warnings;
+    }
+
     warnings.push({
       code: ConformityWarningCode.ProfileNotFound,
       message: "Profile URI is not among the scheme's published profiles.",
       received: claim.profile,
-      expected: scheme.profiles.map((p) => p.canonicalId),
+      expected,
       pointer: '/profile',
     });
     return warnings;
@@ -177,5 +244,77 @@ export function validateConformityClaim(
     });
   });
 
+  // assessment-score membership is independent of assessment-topic membership.
+  // The DCC does not identify the framework for a performance score, so the
+  // validator accepts a code published by any applicable framework. An
+  // unresolved criterion suppresses only this assessment's score check because
+  // that criterion could publish the received code.
+  claim.assessments?.forEach((assessment, i) => {
+    if (!assessment.assessedScores || assessment.assessedScores.length === 0) return;
+    const resolvedCriteria = assessment.criteria
+      .map((criterionId) => profileCriteriaById.get(criterionId))
+      .filter((criterion): criterion is ConformityCriterion => criterion !== undefined);
+    if (resolvedCriteria.length !== assessment.criteria.length) return;
+
+    const expected = performanceScoreCodes(scheme, profile, resolvedCriteria);
+    if (expected.length === 0) return;
+    assessment.assessedScores.forEach((score, scoreIndex) => {
+      if (expected.includes(score.code)) return;
+      warnings.push({
+        code: ConformityWarningCode.AssessmentScoreNotInFramework,
+        message: `Assessment score code is not published by the scheme, profile or referenced-criterion frameworks that apply to profile ${profile.canonicalId}.`,
+        received: score.code,
+        expected,
+        pointer: `/assessments/${i}/assessedScores/${scoreIndex}/code`,
+      });
+    });
+  });
+
   return warnings;
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values)];
+}
+
+function uniqueSortedStrings(values: readonly string[]): string[] {
+  return [...new Set(values)].sort();
+}
+
+function schemeWrongTierWarning(
+  received: string,
+  matches: readonly ConformityReferenceMatch[] | undefined,
+): ConformityWarning | undefined {
+  const usableMatches = matches?.filter((match) => match.schemes.length > 0) ?? [];
+  if (usableMatches.length === 0 || usableMatches.some((match) => match.tier === 'scheme')) return undefined;
+  const tiers = uniqueStrings(usableMatches.map((match) => match.tier));
+  const expected = uniqueSortedStrings(usableMatches.flatMap((match) => match.schemes));
+  return {
+    code: ConformityWarningCode.SchemeWrongTier,
+    message: `The referenced id is a ${tiers.join(' or ')}, not a scheme; it belongs to scheme${
+      expected.length === 1 ? '' : 's'
+    } ${expected.join(', ')}.`,
+    received,
+    expected,
+    pointer: '/scheme',
+  };
+}
+
+function performanceScoreCodes(
+  scheme: ConformityScheme,
+  profile: NonNullable<ConformityScheme['profiles']>[number],
+  resolvedCriteria: readonly ConformityCriterion[],
+): string[] {
+  const codes: string[] = [];
+
+  scheme.scoringFramework?.scores.forEach((score) => codes.push(score.code));
+  profile.criterionScoringFrameworks?.forEach((framework) =>
+    framework.scores.forEach((score) => codes.push(score.code)),
+  );
+  resolvedCriteria.forEach((criterion) => {
+    criterion.requiredPerformance?.forEach((performance) => {
+      if (performance.score) codes.push(performance.score.code);
+    });
+  });
+  return uniqueStrings(codes);
 }

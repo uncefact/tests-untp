@@ -13,6 +13,7 @@ import { ConformityFetchStatus, ConformitySchemeSource, Prisma, SeedEntryKind } 
 import { prisma } from '../prisma/prisma';
 import { contextCache } from '../credentials/context-cache';
 import { bundledArtefactsFallback } from '../credentials/schema-loader';
+import { readFetchAllowPrivateUrls } from '../config/credential-fetch.config';
 import { acquireCvcStructuralLock } from './cvc-structural-lock';
 
 export interface IngestConformitySchemeInput {
@@ -21,6 +22,12 @@ export interface IngestConformitySchemeInput {
   tenantId: string;
   conformitySchemaUrl: string;
   schemaLoader: SchemaLoader;
+  /**
+   * Omitted means the process setting `FETCH_ALLOW_PRIVATE_URLS` decides; an
+   * explicit value wins. Exactly `true` permits private, loopback and reserved
+   * destinations for the scheme-document fetch only.
+   */
+  allowPrivateAddresses?: boolean;
   prefetched?: PrefetchedDocument;
   conformityVocabularySpecVersion?: string;
   /**
@@ -72,6 +79,8 @@ export type IngestConformitySchemeResult =
 export async function ingestConformityScheme(
   input: IngestConformitySchemeInput,
 ): Promise<IngestConformitySchemeResult> {
+  const allowPrivateAddresses =
+    input.allowPrivateAddresses === undefined ? readFetchAllowPrivateUrls() : input.allowPrivateAddresses;
   const existing = await prisma.conformityScheme.findUnique({
     where: { sourceUrl_tenantId: { sourceUrl: input.sourceUrl, tenantId: input.tenantId } },
     select: { id: true, etag: true, lastModifiedHeader: true, bodyDigest: true },
@@ -94,6 +103,7 @@ export async function ingestConformityScheme(
     prefetched: input.prefetched,
     cached,
     conformityVocabularySpecVersion: input.conformityVocabularySpecVersion,
+    allowPrivateAddresses,
     // Shared with the issuance path (uncefact/tests-untp#891): a pass over
     // many schemes fetches each remote @context once per TTL, not per scheme.
     contextCache,

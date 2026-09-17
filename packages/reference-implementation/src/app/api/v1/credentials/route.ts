@@ -25,7 +25,6 @@ import { schemaLoader } from '@/lib/credentials/schema-loader';
 import {
   updateCredentialPublished,
   getDidByDid,
-  findConformitySchemeByCanonicalId,
   claimIdempotencyKey,
   completeIdempotencyKey,
   findIdempotencyKey,
@@ -36,10 +35,10 @@ import { resolveVcService } from '@/lib/services/resolve-vc-service';
 import { resolveStorageService } from '@/lib/services/resolve-storage-service';
 import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { resolvePublishTarget } from '@/lib/credentials/resolve-publish-target';
+import { validateConformityClaimAtIssuance } from '@/lib/credentials/validate-conformity-claim-at-issuance';
 import type { PrimaryEntityResult } from '@/lib/entities/resolve-primary-entity';
-import { buildPublishLinks, remapWarningPointers, IdrPublishError } from '@uncefact/untp-ri-services';
+import { buildPublishLinks, IdrPublishError } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs, StorageRecord } from '@uncefact/untp-ri-services';
-import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
 
 type CredentialWarning = {
   code: string;
@@ -604,23 +603,17 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
 
   // ── Step 3.6: Conformity claim validation (advisory) ────────────────────
   // For credentials carrying a conformity claim (the DCC), cross-check the
-  // claim's scheme / profile / criteria URIs against the locally cached
-  // vocabulary. Advisory only per ADR-033 §3: a mismatch never blocks
-  // issuance; it surfaces as `conformity-*` warnings on the response. Reads
-  // only the local projection (no network).
+  // claim's scheme / profile / criteria URIs, its conformity topics and its
+  // score codes against the locally cached vocabulary, and diagnose a
+  // reference that names the wrong catalogue tier. Advisory only per ADR-033
+  // §3 and ADR-058: a mismatch never blocks issuance; it surfaces as
+  // `conformity-*` warnings on the response. Reads only the local projection
+  // (no network).
   try {
     const subject = credentialPayload.credentialSubject as Record<string, unknown>;
-    // The validator's pointers address the extracted claim, which is a
-    // synthesised projection the caller never sees, so they are rewritten onto
-    // the submitted credential using the paths the extractor recorded (#753).
-    // A pointer that cannot be translated is dropped rather than returned.
     const extracted = bridge.extractConformityClaimWithProvenance(subject);
     if (extracted) {
-      const scheme = await findConformitySchemeByCanonicalId(extracted.claim.scheme, tenantId);
-      const claimWarnings = validateConformityClaim(extracted.claim, scheme);
-      warnings.push(
-        ...remapWarningPointers(claimWarnings, extracted.sourceMap, credentialPayload, '/credentialSubject'),
-      );
+      warnings.push(...(await validateConformityClaimAtIssuance(extracted, credentialPayload, tenantId)));
     }
   } catch (error) {
     logger.error({ err: error, credentialType }, 'Conformity claim validation failed');

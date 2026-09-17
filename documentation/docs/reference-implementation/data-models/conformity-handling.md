@@ -43,7 +43,9 @@ The cascading conformity picker UI is not yet implemented. The form-config endpo
 
 ## CVC validation
 
-After extraction, the conformity references can be validated against the locally known conformity schemes (operator-seeded in this release). This validation checks whether the credential's attestations cover all the criteria defined by a given profile.
+After extraction, the conformity references can be validated against the locally known conformity schemes (operator-seeded in this release). This validation compares the scheme, profile, criteria, conformity topics and score codes with the catalogue.
+
+The two kinds of score are checked against different evidence. The attestation's own score is checked against the scheme's scoring framework and nothing else. Each assessment's performance scores are checked against the combined codes of the scheme framework, the selected profile's criterion frameworks, and the required performance of the criteria that assessment references. Score membership runs only when the applicable tiers publish at least one code, so no warning means either a match or nothing to match against. Rank and definition consistency is not checked. An assessment referencing a criterion the profile does not publish is not score-checked. When the scheme's stored document is missing or cannot be read, the response says that score codes were not checked; the applicable scheme, profile, criterion and topic checks still ran.
 
 Currently, CVC validation is implemented for **UNTP v0.7.0 Digital Conformity Credentials only**; earlier DCC versions, and the other credential types above, are issued without it. The extracted criteria are compared against the criteria defined in the matching profile — if any required criteria are missing from the credential, an advisory warning is produced. These warnings are informational; they never prevent the credential from being issued.
 
