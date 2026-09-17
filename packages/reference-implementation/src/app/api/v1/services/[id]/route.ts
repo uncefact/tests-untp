@@ -9,6 +9,7 @@ import {
   updateServiceInstance,
   deleteServiceInstance,
   countServiceInstanceReferences,
+  serviceInstanceConfigChanged,
 } from '@/lib/prisma/repositories';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { readFetchAllowPrivateUrls } from '@/lib/config/credential-fetch.config';
@@ -82,7 +83,14 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  * /services/{id}:
  *   patch:
  *     summary: Update a service instance
- *     description: Updates one or more fields of a service instance. When config is provided it is validated against the adapter's configuration schema before being encrypted and stored.
+ *     description: >-
+ *       Updates one or more fields of a service instance. When config is
+ *       provided it is validated against the adapter's configuration schema
+ *       before being encrypted and stored. The pending-status guard applies
+ *       only when the request changes effective adapter configuration. The
+ *       resolver reads adapterType and config; this PATCH exposes only config
+ *       as an effective configuration field, so name-only and description-only
+ *       PATCH requests remain allowed while status operations are pending.
  *     tags:
  *       - Services
  *     parameters:
@@ -149,6 +157,22 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: >-
+ *           A pending status operation blocks configuration changes on this
+ *           instance. Wait for the pending status operations on credentials
+ *           using this instance to complete, or have an operator reconcile
+ *           them. Name-only and description-only changes remain allowed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ServiceInstanceStatusPendingResponse'
+ *             examples:
+ *               pendingStatusOperation:
+ *                 summary: A pending credential status operation blocks configuration changes
+ *                 value:
+ *                   error: 'Service instance "service-instance-1" has 1 pending credential status operation. Wait for the pending status operations on credentials using this instance to complete, or have an operator reconcile them before changing or deleting the instance.'
+ *                   code: SERVICE_INSTANCE_STATUS_PENDING
  *       500:
  *         description: Server error
  *         content:
@@ -174,6 +198,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
   }
 
   let encryptedConfig: string | undefined;
+  let configChanged: boolean | undefined;
 
   if (hasConfig) {
     logger.info({ serviceInstanceId: id }, 'Decrypting existing config');
@@ -187,6 +212,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
 
     logger.info({ serviceInstanceId: id }, 'Merging config');
     const mergedConfig = { ...existingConfig, ...config };
+    configChanged = serviceInstanceConfigChanged(existingConfig, mergedConfig);
 
     logger.info({ serviceInstanceId: id }, 'Validating merged config against adapter schema');
     const { serviceType, adapterType } = existing;
@@ -229,6 +255,7 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
     ...(hasName && { name }),
     ...(hasDescription && { description }),
     ...(encryptedConfig !== undefined && { config: encryptedConfig }),
+    ...(configChanged !== undefined && { configChanged }),
     ...(hasIsPrimary && { isPrimary }),
   });
 
@@ -249,7 +276,8 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       Permanently deletes a service instance. If the instance is referenced by
  *       DIDs, registrars, or identifier schemes, returns 409 Conflict unless the
  *       `force` query parameter is set to `true`. When forced, references to the instance on related records
- *       (DIDs, registrars, and identifier schemes) are cleared.
+ *       (DIDs, registrars, and identifier schemes) are cleared. `force=true`
+ *       does not bypass the pending status-operation guard.
  *     tags:
  *       - Services
  *     parameters:
@@ -307,11 +335,17 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *       409:
  *         description: >-
  *           Conflict - the caller's own DIDs, registrars or identifier schemes
- *           reference this instance. The counts name only the caller's records
+ *           reference this instance, or pending status operations on
+ *           credentials using it must complete or be reconciled. Wait for the
+ *           pending status operations to complete, or have an operator
+ *           reconcile them. The counts name only the caller's records.
+ *           `force=true` does not bypass the status guard.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *               oneOf:
+ *                 - $ref: '#/components/schemas/ErrorResponse'
+ *                 - $ref: '#/components/schemas/ServiceInstanceStatusPendingResponse'
  *       500:
  *         description: Server error
  *         content:

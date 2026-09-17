@@ -2,8 +2,20 @@ import { z } from 'zod';
 import { AccessRole } from '@uncefact/untp-ri-services';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { bcp47TagSchema, idSchema, nonBlankString } from './shared';
+import { SUPPORTED_STATUS_PURPOSES } from '@/lib/credentials/status-purposes';
 
 const HEX_64 = /^[a-f0-9]{64}$/i;
+
+const statusPurposeSchema = z.enum(SUPPORTED_STATUS_PURPOSES);
+
+const statusPurposesSchema = z
+  .array(statusPurposeSchema)
+  .min(1, 'an empty statusPurposes list is not supported; omit statusPurposes to use the deployment default')
+  .superRefine((values, ctx) => {
+    if (new Set(values).size !== values.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'must contain unique status purposes' });
+    }
+  });
 
 /**
  * Storage service options for POST /credentials. Previously unvalidated at
@@ -83,11 +95,31 @@ export const publishingOptionsSchema = z.object({
  * handler asserts the value to CredentialPayload in one place.
  */
 export const credentialIssueRequestSchema = z.object({
-  credentialPayload: z.record(z.unknown()).describe('The full credential payload to sign'),
+  credentialPayload: z
+    .record(z.unknown())
+    .superRefine((payload, ctx) => {
+      if ('credentialStatus' in payload) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['credentialStatus'],
+          message:
+            "The reference implementation mints and manages the credential's status entries; remove credentialStatus from the payload.",
+          params: { code: 'CREDENTIAL_STATUS_NOT_ACCEPTED' },
+        });
+      }
+    })
+    .describe(
+      'The full credential payload to sign. The reference implementation mints and manages status entries, so do not include credentialStatus.',
+    ),
   credentialType: nonBlankString.describe(
     'Type of credential to issue (e.g. DigitalProductPassport, DigitalLivestockPassport)',
   ),
   version: nonBlankString.describe('Data model version'),
+  statusPurposes: statusPurposesSchema
+    .optional()
+    .describe(
+      "Status-list purposes to mint. When omitted, the deployment's DEFAULT_STATUS_PURPOSES applies; if unset, the built-in default is ['revocation'].",
+    ),
   storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
   publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),
 });

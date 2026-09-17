@@ -73,4 +73,12 @@ describe('decodeCredential', () => {
     expect(() => decodeCredential(mockEnvelopedCredential)).toThrow(VcDecodeError);
     expect(() => decodeCredential(mockEnvelopedCredential)).toThrow('Invalid JWT format');
   });
+
+  it('uses the unknown-error fallback for a non-Error decoder failure', () => {
+    mockedDecodeJwt.mockImplementation(() => {
+      throw 'decoder failed';
+    });
+
+    expect(() => decodeCredential(mockEnvelopedCredential)).toThrow('Unknown error');
+  });
 });

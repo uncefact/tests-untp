@@ -179,6 +179,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   encrypted: true
  *                   hasKey: true
  *                   verification: { generation: 1, state: complete, requestedAt: '2026-07-15T09:00:00.000Z', completedAt: '2026-07-15T09:00:00.000Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: pass, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: verified }
+ *                   status: { capture: PENDING, entries: [] }
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
@@ -206,6 +207,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   encrypted: false
  *                   hasKey: false
  *                   verification: { generation: 1, state: complete, requestedAt: '2026-07-15T09:00:00.000Z', completedAt: '2026-07-15T09:00:00.000Z', checks: { retrieval: not_run, decryption: not_run, digest: not_run, proof: pass, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: verified }
+ *                   status: { capture: PENDING, entries: [] }
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
@@ -233,6 +235,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   encrypted: false
  *                   hasKey: true
  *                   verification: { generation: 1, state: complete, requestedAt: '2026-08-30T10:20:00.000Z', completedAt: '2026-08-30T10:20:04.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
+ *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
@@ -260,6 +263,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   encrypted: true
  *                   hasKey: true
  *                   verification: { generation: 1, state: complete, requestedAt: '2026-08-30T10:20:00.000Z', completedAt: '2026-08-30T10:20:04.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
+ *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
@@ -287,6 +291,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   encrypted: true
  *                   hasKey: false
  *                   verification: { generation: 1, state: failed, requestedAt: '2026-08-30T11:05:00.000Z', completedAt: '2026-08-30T11:05:02.000Z', checks: { retrieval: pass, decryption: fail, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: DECRYPTION_REQUIRED, message: 'The fetched credential is encrypted and this service holds no key that opens it. The copy is kept as fetched. Retry with sourceEncryption.decryptionKey on POST /api/v1/library/{id}/verify.', retryable: true } }
+ *                   status: null
  *                   currencyStatus: unknown
  *                   detailsStatus: EXTRACTION_PENDING
  *                   detailsError: null
@@ -314,6 +319,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   encrypted: null
  *                   hasKey: false
  *                   verification: { generation: 1, state: failed, requestedAt: '2026-08-30T11:40:00.000Z', completedAt: '2026-08-30T11:40:09.000Z', checks: { retrieval: fail, decryption: not_run, digest: not_run, proof: not_run, status: not_run, temporal: not_run, schemaConformance: not_run }, summary: failed, failure: { code: RETRIEVAL_FAILED, message: 'The source could not be reached. Retry via re-verify once the source is reachable.', retryable: true } }
+ *                   status: null
  *                   currencyStatus: unknown
  *                   detailsStatus: EXTRACTION_PENDING
  *                   detailsError: null
@@ -687,6 +693,7 @@ function parseIfVersion(req: Request): number {
  *                   encrypted: false
  *                   hasKey: true
  *                   verification: { generation: 1, state: complete, requestedAt: '2026-08-30T10:20:00.000Z', completedAt: '2026-08-30T10:20:04.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
+ *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null
@@ -711,6 +718,7 @@ function parseIfVersion(req: Request): number {
  *                   encrypted: false
  *                   hasKey: true
  *                   verification: { generation: 1, state: complete, requestedAt: '2026-08-30T10:20:00.000Z', completedAt: '2026-08-30T10:20:04.000Z', checks: { retrieval: pass, decryption: not_run, digest: pass, proof: pass, status: pass, temporal: pass, schemaConformance: pass }, summary: verified }
+ *                   status: null
  *                   currencyStatus: current
  *                   detailsStatus: EXTRACTED
  *                   detailsError: null

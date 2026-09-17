@@ -47,6 +47,7 @@ import {
 import { createRigClient, truncateApplicationTables } from './rig/db';
 import { startFixtureServer, type FixtureServer } from './rig/fixture-server';
 import { insertNativeCredential, seedSystemTenant, SYSTEM_TENANT_ID } from './fixtures';
+import { createVerifierDouble } from './helpers/verifiable-credential-service-double';
 import { PgBossJobQueue } from '../../src/lib/jobs/pg-boss-job-queue';
 import type { JobContext } from '../../src/lib/jobs/types';
 import { LIBRARY_RECONCILE_PENDING_RUNS_JOB } from '../../src/lib/jobs/queue-names';
@@ -752,10 +753,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       checks: { retrieval: 'not_run', decryption: 'not_run', digest: 'not_run' },
     });
 
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     const handler = verificationHandler(verifier);
     const [job] = await jobsFor(native.id);
     await handler(job, context());
@@ -776,10 +774,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     const fallbackUrls = [DPP_070_SCHEMA_URL, VCDM_CONTEXT_URL, UNTP_070_CONTEXT_URL];
     fallbackUrls.forEach((url) => externalFixtureMap.delete(url));
     bundledFallbackFailuresRemaining = 3;
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     const handler = verificationHandler(verifier);
     const envelope = envelopedCredential(DPP_070);
     const body = JSON.stringify(envelope);
@@ -825,10 +820,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
   it('fails a 0.7.0 credential that declares the legacy context at the context pointer', async () => {
     // Fails if schema conformance ignores the credential's declared context
     // contract or reports the legacy-context mismatch as an unavailable host.
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     const handler = verificationHandler(verifier);
     const credential = { ...DPP_070, '@context': [DPP_070['@context'][0], LEGACY_CONTEXT_070] };
     const envelope = envelopedCredential(credential);
@@ -860,10 +852,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
   it('passes a valid remote third context and fails a malformed one as the documented classifier residual', async () => {
     // Fails if extra remote contexts are not expanded, or if the accepted
     // malformed-remote-context classifier residual changes its advisory arm.
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     const cases = [
       {
         name: 'third-valid',
@@ -912,10 +901,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
   it('fails a valid 0.7.0 DPP with a relative private reference without persisting or logging its value', async () => {
     // Fails if the classifier's formatted relative-id detail reaches the
     // persisted advisory or a rendered log line.
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     const handler = verificationHandler(verifier);
     const credential = {
       ...DPP_070,
@@ -963,10 +949,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
   it('keeps a scoped-context fetch failure not_run and logs no URL path', async () => {
     // Fails if a scoped context loader failure is treated as a document fail,
     // or if its diagnostic logs the caller-controlled URL path.
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     const handler = verificationHandler(verifier);
     const credential = {
       ...DPP_070,
@@ -1017,10 +1000,9 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       detailsStatus: CredentialDetailsStatus.EXTRACTION_FAILED,
       detailsError: CredentialDetailsError.UNREADABLE_ENVELOPE,
     });
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: false, error: { type: 'integrity' } }),
-    };
+    const verifier = createVerifierDouble(
+      jest.fn().mockResolvedValue({ verified: false, error: { type: 'integrity' } }),
+    );
     const handler = verificationHandler(verifier);
 
     await reverifyLibraryRecord(native.id, SYSTEM_TENANT_ID, prepareEnqueue);
@@ -1042,7 +1024,9 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
         schemaConformance: 'not_run',
       },
     });
-    expect(verifier.verify).toHaveBeenCalledTimes(1);
+    // Jest's mock method is intentionally inspected after the service call.
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mock verifier method is inspected after the service call
+    expect(verifier.verify as jest.Mock).toHaveBeenCalledTimes(1);
   });
 
   it('settles a conforming 0.7.0 DPP as pass and a missing-name DPP as an advisory fail', async () => {
@@ -1050,10 +1034,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     // row instead of the system schema, or lets the advisory result change
     // the verified summary. The second copy proves the first schema pointer
     // is persisted and projected as the warning's message.
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     const cases = [
       { name: 'conforming', credential: DPP_070, expected: CheckResult.PASS, message: null },
       {
@@ -1200,10 +1181,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     expect(recovered.checkRun).toMatchObject({ state: CheckRunState.PENDING, sourceChanged: null });
     expect(await jobsFor(recordId)).toHaveLength(1);
 
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     await verifyGenerationHandler({
       ...defaultVerifyGenerationDependencies(),
       resolveVerifier: async () => verifier,
@@ -1216,7 +1194,8 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       digest: CheckResult.PASS,
       proof: CheckResult.PASS,
     });
-    expect(verifier.verify).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mock verifier method is inspected after the service call
+    expect(verifier.verify as jest.Mock).toHaveBeenCalledTimes(1);
   });
 
   it('re-fetches a duplicate credential and writes a warning pointer to its current holder', async () => {
@@ -1911,10 +1890,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     const jobs = await jobsFor(recordId);
     expect(jobs).toHaveLength(1);
 
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     await verifyGenerationHandler({ ...defaultVerifyGenerationDependencies(), resolveVerifier: async () => verifier })(
       jobs[0],
       context(),
@@ -2432,10 +2408,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     // The second recovery's own generation is settled by the real worker
     // before the reservation is restored, because the record may hold only
     // one pending run and the restored reservation has to be that one.
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     await verifyGenerationHandler({
       ...defaultVerifyGenerationDependencies(),
       resolveVerifier: async () => verifier,
@@ -2536,10 +2509,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     });
     expect(unavailableRun).toMatchObject({ sourceChanged: null, lastSourceCheckAt: expect.any(Date) });
 
-    const verifier: IVerifiableCredentialService = {
-      sign: jest.fn(),
-      verify: jest.fn().mockResolvedValue({ verified: true }),
-    };
+    const verifier = createVerifierDouble(jest.fn().mockResolvedValue({ verified: true }));
     const handler = verifyGenerationHandler({
       ...defaultVerifyGenerationDependencies(),
       resolveVerifier: async () => verifier,
@@ -2567,7 +2537,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       storageDigest,
     });
     await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
-    const verifier: IVerifiableCredentialService = { sign: jest.fn(), verify: jest.fn() };
+    const verifier = createVerifierDouble(jest.fn());
     await verifyGenerationHandler({
       ...defaultVerifyGenerationDependencies(),
       resolveVerifier: async () => verifier,
@@ -2582,7 +2552,8 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       retrieval: CheckResult.PASS,
       digest: CheckResult.FAIL,
     });
-    expect(verifier.verify).not.toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mock verifier method is checked to prove validation short-circuits it
+    expect(verifier.verify as jest.Mock).not.toHaveBeenCalled();
   });
 
   it('settles a missing protected copy as terminal and leaves custody for the next request', async () => {
@@ -2599,7 +2570,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     });
     const before = await getLibraryRecordById(recordId, SYSTEM_TENANT_ID);
     const created = await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
-    const verifier: IVerifiableCredentialService = { sign: jest.fn(), verify: jest.fn() };
+    const verifier = createVerifierDouble(jest.fn());
     const handler = verifyGenerationHandler({
       ...defaultVerifyGenerationDependencies(),
       resolveVerifier: async () => verifier,
@@ -2761,7 +2732,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
     });
 
     await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
-    const verifier: IVerifiableCredentialService = { sign: jest.fn(), verify: jest.fn() };
+    const verifier = createVerifierDouble(jest.fn());
     await verifyGenerationHandler({
       ...defaultVerifyGenerationDependencies(),
       resolveVerifier: async () => verifier,
@@ -2774,7 +2745,8 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       failureCode: CheckRunFailureCode.STORED_COPY_UNAVAILABLE,
       failureRetryable: true,
     });
-    expect(verifier.verify).not.toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mock verifier method is checked to prove keyless validation short-circuits it
+    expect(verifier.verify as jest.Mock).not.toHaveBeenCalled();
     // The keyless projection still answers, and detail now degrades only the
     // key field rather than losing the record that carries the run result.
     expect(() => toCredentialRecord(settled as never)).not.toThrow();
@@ -2824,7 +2796,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
 
     const created = await reverifyLibraryRecord(recordId, SYSTEM_TENANT_ID, prepareEnqueue);
     expect(created).toMatchObject({ outcome: 'created', generation: 2 });
-    const verifier: IVerifiableCredentialService = { sign: jest.fn(), verify: jest.fn() };
+    const verifier = createVerifierDouble(jest.fn());
     await verifyGenerationHandler({
       ...defaultVerifyGenerationDependencies(),
       resolveVerifier: async () => verifier,
@@ -2840,7 +2812,8 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       // is never asked.
       proof: CheckResult.FAIL,
     });
-    expect(verifier.verify).not.toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mock verifier method is checked to prove invalid stored data short-circuits it
+    expect(verifier.verify as jest.Mock).not.toHaveBeenCalled();
   });
 
   it('settles an abandoned run through the real reconciliation queue, and a late worker attempt changes nothing', async () => {
@@ -2871,7 +2844,7 @@ describe('re-verify a library record through Postgres and pg-boss', () => {
       failureCode: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
       failureRetryable: true,
     });
-    const verifier: IVerifiableCredentialService = { sign: jest.fn(), verify: jest.fn() };
+    const verifier = createVerifierDouble(jest.fn());
     await verifyGenerationHandler({
       ...defaultVerifyGenerationDependencies(),
       resolveVerifier: async () => verifier,

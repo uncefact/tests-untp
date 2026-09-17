@@ -14,6 +14,7 @@ const logger = appLogger.child({ module: 'delete-native-credential' });
 export type DeleteNativeCredentialAndCopyResult =
   | { outcome: 'missing' }
   | { outcome: 'external' }
+  | { outcome: 'status_change_pending'; statusPurposes: string[] }
   | { outcome: 'deleted'; storage: StoredObjectCoordinates; cleanup: RemoveStoredObjectOutcome };
 
 /**
@@ -34,6 +35,11 @@ export type DeleteNativeCredentialAndCopyResult =
  * Deleting a credential does not revoke it. Revocation on delete is planned
  * for a later release; until then a deleted credential that was shared stays
  * verifiable at its status list.
+ *
+ * A `status_change_pending` result is a deliberate refusal: the pending
+ * purposes are returned so the caller can name every operation. The operator
+ * must let them complete or reconcile their uncertain outcomes before
+ * deleting the credential, so the database trigger and this repository agree.
  */
 export async function deleteNativeCredentialAndCopy({
   recordId,

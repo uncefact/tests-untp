@@ -6,9 +6,10 @@ import {
   deleteServiceInstance,
   countServiceInstanceReferences,
   getInstanceByResolution,
+  lockServiceInstanceForUpdate,
 } from './service-instance.repository';
 import { SYSTEM_TENANT_ID } from '../constants';
-import { NotFoundError } from '@/lib/api/errors';
+import { NotFoundError, ServiceInstanceStatusPendingError } from '@/lib/api/errors';
 import { prismaError } from '../db-errors.fixtures';
 import { DEFAULT_PAGE_LIMIT } from '@/lib/api/pagination';
 
@@ -37,11 +38,19 @@ jest.mock('../prisma', () => ({
     did: { count: jest.fn() },
     registrar: { count: jest.fn() },
     identifierScheme: { count: jest.fn() },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    $queryRaw: jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join(' ');
+      if (sql.includes('"ServiceInstance"') && sql.includes('FOR UPDATE')) {
+        return Promise.resolve(values[0] === 'non-existent' || values[1] === 'other-org' ? [] : [{ id: 'instance-1' }]);
+      }
+      if (sql.includes('"CredentialStatusEntry"')) return Promise.resolve([{ count: 0 }]);
+      return Promise.resolve([]);
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the transaction mock accepts the callback shape under test
     $transaction: jest.fn((fn: any) => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- the mock must reuse the mocked Prisma object at call time
       const prismaMock = require('../prisma').prisma;
-      return fn({ serviceInstance: prismaMock.serviceInstance });
+      return fn({ serviceInstance: prismaMock.serviceInstance, $queryRaw: prismaMock.$queryRaw });
     }),
   },
 }));
@@ -158,6 +167,15 @@ describe('service-instance.repository', () => {
           config: 'encrypted',
         }),
       ).rejects.toBe(tenantFkError);
+    });
+  });
+
+  describe('lockServiceInstanceForUpdate', () => {
+    it('returns true for the tenant-owned row and false for a foreign tenant', async () => {
+      await expect(lockServiceInstanceForUpdate(prisma as never, 'instance-1', ORG_ID)).resolves.toBe(true);
+      await expect(lockServiceInstanceForUpdate(prisma as never, 'instance-1', 'other-org')).resolves.toBe(false);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked Prisma method is inspected for dispatch count only
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -386,7 +404,46 @@ describe('service-instance.repository', () => {
         where: { id: 'instance-1' },
         data: { name: 'Updated Name', description: 'New description' },
       });
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked Prisma method is inspected for guard dispatch
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
       expect(result.name).toBe('Updated Name');
+    });
+
+    it('skips pending status checks for an unchanged effective config update', async () => {
+      mockServiceInstance.findFirst.mockResolvedValue(INSTANCE_RECORD);
+      mockServiceInstance.update.mockResolvedValue({ ...INSTANCE_RECORD, config: 'new-config' });
+
+      await expect(
+        updateServiceInstance('instance-1', ORG_ID, { config: 'new-config', configChanged: false }),
+      ).resolves.toMatchObject({
+        config: 'new-config',
+      });
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked Prisma method is inspected for guard dispatch
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('checks pending status entries for a changed effective config', async () => {
+      mockServiceInstance.findFirst.mockResolvedValue(INSTANCE_RECORD);
+      mockServiceInstance.update.mockResolvedValue({ ...INSTANCE_RECORD, config: 'new-config' });
+
+      await expect(
+        updateServiceInstance('instance-1', ORG_ID, { config: 'new-config', configChanged: true }),
+      ).resolves.toMatchObject({
+        config: 'new-config',
+      });
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked Prisma method is inspected for guard dispatch
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+
+    it('refuses an effective config update when the locked instance has pending status entries', async () => {
+      (prisma.$queryRaw as jest.Mock)
+        .mockImplementationOnce(() => Promise.resolve([{ id: 'instance-1' }]))
+        .mockImplementationOnce(() => Promise.resolve([{ count: 1 }]));
+
+      await expect(updateServiceInstance('instance-1', ORG_ID, { config: 'new-config' })).rejects.toBeInstanceOf(
+        ServiceInstanceStatusPendingError,
+      );
+      expect(mockServiceInstance.update).not.toHaveBeenCalled();
     });
 
     // The data build uses `!== undefined` rather than a truthiness check, so
@@ -510,13 +567,16 @@ describe('service-instance.repository', () => {
 
       const result = await countServiceInstanceReferences('instance-1', 'tenant-1');
 
-      expect(prisma.did.count).toHaveBeenCalledWith({
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked count method is inspected for its scoped arguments
+      expect(prisma.did.count as jest.Mock).toHaveBeenCalledWith({
         where: { serviceInstanceId: 'instance-1', tenantId: 'tenant-1' },
       });
-      expect(prisma.registrar.count).toHaveBeenCalledWith({
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked count method is inspected for its scoped arguments
+      expect(prisma.registrar.count as jest.Mock).toHaveBeenCalledWith({
         where: { idrServiceInstanceId: 'instance-1', tenantId: 'tenant-1' },
       });
-      expect(prisma.identifierScheme.count).toHaveBeenCalledWith({
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked count method is inspected for its scoped arguments
+      expect(prisma.identifierScheme.count as jest.Mock).toHaveBeenCalledWith({
         where: { idrServiceInstanceId: 'instance-1', tenantId: 'tenant-1' },
       });
       expect(result).toEqual({ dids: 3, registrars: 1, schemes: 2 });
@@ -532,7 +592,14 @@ describe('service-instance.repository', () => {
 
       await countServiceInstanceReferences('system-instance', 'tenant-b');
 
-      for (const counter of [prisma.did.count, prisma.registrar.count, prisma.identifierScheme.count]) {
+      for (const counter of [
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked count methods are inspected for tenant predicates
+        prisma.did.count as jest.Mock,
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked count methods are inspected for tenant predicates
+        prisma.registrar.count as jest.Mock,
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- the mocked count methods are inspected for tenant predicates
+        prisma.identifierScheme.count as jest.Mock,
+      ]) {
         expect((counter as jest.Mock).mock.calls[0][0].where).toEqual(
           expect.objectContaining({ tenantId: 'tenant-b' }),
         );

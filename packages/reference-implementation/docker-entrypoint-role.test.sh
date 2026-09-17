@@ -15,11 +15,15 @@ fi
 is_maintenance_command node_modules/.bin/tsx scripts/audit-encryption.ts
 is_maintenance_command node_modules/.bin/tsx scripts/backfill-decryption-keys.ts
 is_maintenance_command node_modules/.bin/tsx scripts/backfill-credential-details.ts
+is_maintenance_command node_modules/.bin/tsx scripts/backfill-credential-status-entries.ts
+is_maintenance_command node_modules/.bin/tsx scripts/backfill-credential-status-attribution.ts
 is_maintenance_command node_modules/.bin/tsx scripts/rotate-encryption-key.ts
 is_maintenance_command node_modules/.bin/tsx prisma/backfills/2026-05-19-hex-to-multibase.ts
 is_maintenance_command pnpm audit:encryption
 is_maintenance_command pnpm backfill:decryption-keys
 is_maintenance_command pnpm backfill:credential-details
+is_maintenance_command pnpm backfill:credential-status-entries
+is_maintenance_command pnpm backfill:credential-status-attribution
 is_maintenance_command pnpm rotate:encryption-key
 if is_maintenance_command node scripts/rotate-encryption-key.ts; then
     exit 1

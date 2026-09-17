@@ -61,9 +61,11 @@ describe('VCKitVerifiableCredentialService', () => {
     id: 'https://vckit.example.com/credentials/status/1#0',
     type: 'BitstringStatusListEntry' as const,
     statusPurpose: 'revocation' as const,
-    statusListIndex: 0,
+    statusListIndex: '0',
     statusListCredential: 'https://vckit.example.com/credentials/status/1',
   };
+
+  const issuedCredentialStatus = { ...mockCredentialStatus, statusListIndex: 0 };
 
   const mockEnvelopedCredential: EnvelopedVerifiableCredential = {
     '@context': ['https://www.w3.org/ns/credentials/v2'] as ['https://www.w3.org/ns/credentials/v2'],
@@ -188,7 +190,7 @@ describe('VCKitVerifiableCredentialService', () => {
       // Verify the issue body contains credential with status and correct proof format
       const issueCallArgs = mockFetch.mock.calls[1];
       const issueBody = JSON.parse(issueCallArgs[1].body);
-      expect(issueBody.credential.credentialStatus).toEqual(mockCredentialStatus);
+      expect(issueBody.credential.credentialStatus).toEqual(issuedCredentialStatus);
       expect(issueBody.options.proofFormat).toBe('EnvelopingProofJose');
 
       // Returns the enveloped credential

@@ -13,8 +13,10 @@ export class ServiceError extends Error {
     public readonly statusCode: number,
     /** Optional structured context for logging/debugging */
     public readonly context?: Record<string, unknown>,
+    /** Optional underlying error, retained as the native non-enumerable cause. */
+    cause?: unknown,
   ) {
-    super(message);
+    super(message, { cause });
     this.name = this.constructor.name;
   }
 }

@@ -138,6 +138,9 @@ services:
       # Pass through only when set so startup validation sees an absent override.
       CACHE_MAX_ENTRIES:
       RI_HTTP_USER_AGENT:
+      # Status issuance defaults and the bounded status-list lock acquisition.
+      DEFAULT_STATUS_PURPOSES:
+      STATUS_LOCK_ACQUIRE_MS:
       # System default service instances (used by seed.ts)
       SYSTEM_VC_BASE_URL: http://vckit-api:3332
       SYSTEM_VC_API_KEY: ${SYSTEM_VC_API_KEY:-test123}

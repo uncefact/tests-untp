@@ -39,7 +39,10 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
             return jsonResponse({ error: (e as Error).message }, { status: 404 });
           }
           if (e instanceof ConflictError) {
-            return jsonResponse({ error: (e as Error).message }, { status: 409 });
+            return jsonResponse(
+              { error: (e as Error).message, code: (e as Error & { code?: string }).code },
+              { status: 409 },
+            );
           }
           if (e instanceof ServiceRegistryError) {
             return jsonResponse({ error: (e as Error).message }, { status: 500 });
@@ -72,6 +75,8 @@ jest.mock('@/lib/prisma/repositories', () => ({
     mockUpdateServiceInstance(id, tenantId, input),
   deleteServiceInstance: (id: string, tenantId: string) => mockDeleteServiceInstance(id, tenantId),
   countServiceInstanceReferences: (id: string, tenantId: string) => mockCountServiceInstanceReferences(id, tenantId),
+  serviceInstanceConfigChanged: jest.requireActual('@/lib/prisma/repositories/service-instance.repository')
+    .serviceInstanceConfigChanged,
 }));
 
 // ---------------------------------------------------------------------------
@@ -326,8 +331,30 @@ describe('PATCH /api/v1/services/:id', () => {
     expect(mockEncrypt).toHaveBeenCalledWith(JSON.stringify(mergedConfig), 'aes-256-gcm');
     expect(mockUpdateServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1', {
       config: JSON.stringify(encryptedEnvelope),
+      configChanged: true,
     });
     expect(json.config.baseUrl).toBe('https://new.com');
+  });
+
+  it('marks a re-sent equivalent config as unchanged for the pending-status guard', async () => {
+    const existingPlainConfig = { apiKey: 'old-key', baseUrl: 'https://old.com' };
+    const equivalentConfigPatch = { baseUrl: 'https://old.com' };
+    const encryptedEnvelope = { cipherText: 'same', iv: 'iv', tag: 'tag', type: 'aes-256-gcm' };
+
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+    mockDecrypt.mockReturnValue(JSON.stringify(existingPlainConfig));
+    mockEncrypt.mockReturnValue(encryptedEnvelope);
+    mockUpdateServiceInstance.mockResolvedValue({ ...MOCK_INSTANCE, config: JSON.stringify(encryptedEnvelope) });
+    mockMaskInstanceConfig.mockReturnValue(MOCK_MASKED);
+
+    const req = createFakeRequest({ method: 'PATCH', body: { config: equivalentConfigPatch } });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1', {
+      config: JSON.stringify(encryptedEnvelope),
+      configChanged: false,
+    });
   });
 
   // A stored record can name a serviceType/adapterType pair the registry no
@@ -363,6 +390,25 @@ describe('PATCH /api/v1/services/:id', () => {
     expect(res.status).toBe(200);
     expect(json.isPrimary).toBe(true);
     expect(mockUpdateServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1', { isPrimary: true });
+  });
+
+  it('returns the typed 409 when a pending status operation blocks a config PATCH', async () => {
+    const { ServiceInstanceStatusPendingError } = jest.requireActual(
+      '@/lib/api/errors',
+    ) as typeof import('@/lib/api/errors');
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+    mockDecrypt.mockReturnValue(JSON.stringify({ baseUrl: 'https://old.com', apiKey: 'old-key' }));
+    mockUpdateServiceInstance.mockRejectedValue(new ServiceInstanceStatusPendingError('svc-123', 1));
+
+    const req = createFakeRequest({ method: 'PATCH', body: { config: { baseUrl: 'https://new.com' } } });
+    const res = await PATCH(req, createContext('svc-123') as unknown as Parameters<typeof PATCH>[1]);
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      code: 'SERVICE_INSTANCE_STATUS_PENDING',
+      error:
+        'Service instance "svc-123" has 1 pending credential status operation. Wait for the pending status operations on credentials using this instance to complete, or have an operator reconcile them before changing or deleting the instance.',
+    });
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -567,6 +613,27 @@ describe('DELETE /api/v1/services/:id', () => {
     // Should not check references when force=true
     expect(mockCountServiceInstanceReferences).not.toHaveBeenCalled();
     expect(mockDeleteServiceInstance).toHaveBeenCalledWith('svc-123', 'org-1');
+  });
+
+  it('does not let force=true bypass the pending status guard', async () => {
+    const { ServiceInstanceStatusPendingError } = jest.requireActual(
+      '@/lib/api/errors',
+    ) as typeof import('@/lib/api/errors');
+    mockGetServiceInstanceById.mockResolvedValue(MOCK_INSTANCE);
+    mockDeleteServiceInstance.mockRejectedValue(new ServiceInstanceStatusPendingError('svc-123', 2));
+
+    const req = createFakeRequest({
+      method: 'DELETE',
+      url: 'http://localhost/api/v1/services/svc-123?force=true',
+    });
+    const res = await DELETE(req, createContext('svc-123') as unknown as Parameters<typeof DELETE>[1]);
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      code: 'SERVICE_INSTANCE_STATUS_PENDING',
+      error:
+        'Service instance "svc-123" has 2 pending credential status operations. Wait for the pending status operations on credentials using this instance to complete, or have an operator reconcile them before changing or deleting the instance.',
+    });
   });
 
   // Previously read as `searchParams.get('force') === 'true'`, so these

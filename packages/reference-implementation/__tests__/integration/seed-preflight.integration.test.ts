@@ -2,7 +2,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { createRigClient, truncateApplicationTables } from './rig/db';
 import { startFixtureServer, type FixtureServer } from './rig/fixture-server';
-import { SYSTEM_TENANT_ID } from './fixtures';
+import { insertNativeCredential, SYSTEM_TENANT_ID } from './fixtures';
+import { CredentialStatusCapture, CredentialStatusProvenance } from '../../src/lib/prisma/generated';
+import { SYSTEM_VC_SERVICE_ID } from '../../src/lib/prisma/constants';
 import { main as runSeedMain, prisma as seedPrisma, logger as seedLogger } from '../../prisma/seed';
 import { SeedConfigurationError, type SeedRunSummary } from '../../prisma/seed-preflight';
 
@@ -678,5 +680,56 @@ describe('seed.ts: fails loudly on missing configuration (ADR-045)', () => {
       readFileSyncSpy.mockRestore();
       await fixtures.close();
     }
+  });
+
+  it('allows an unchanged VC re-seed with a pending intent but refuses a changed config', async () => {
+    await withFreshSeedModule(
+      {
+        SEED_ALLOW_PARTIAL: 'true',
+        DATA_ENCRYPTION_KEY: crypto.randomBytes(32).toString('hex'),
+        SYSTEM_VC_ADAPTER_TYPE: 'VCKIT',
+        SYSTEM_VC_BASE_URL: 'https://vckit.example.test',
+        SYSTEM_VC_API_KEY: 'seed-api-key',
+        SYSTEM_VC_API_VERSION: '1.0.0',
+      },
+      async (seedModule) => {
+        await seedModule.main();
+        const credential = await insertNativeCredential(seedModule.prisma, { id: 'seed-pending-credential' });
+        await seedModule.prisma.credential.update({
+          where: { id: credential.id },
+          data: { statusCapture: CredentialStatusCapture.CAPTURED, statusCapturedAt: new Date() },
+        });
+        await seedModule.prisma.credentialStatusEntry.create({
+          data: {
+            credentialId: credential.id,
+            tenantId: SYSTEM_TENANT_ID,
+            type: 'BitstringStatusListEntry',
+            statusPurpose: 'revocation',
+            statusListCredential: 'https://status.example/list/1',
+            statusListIndex: '3',
+            statusListVcIssuer: 'did:web:issuer.example',
+            descriptor: {
+              id: 'https://status.example/list/1#3',
+              type: 'BitstringStatusListEntry',
+              statusPurpose: 'revocation',
+              statusListCredential: 'https://status.example/list/1',
+              statusListIndex: 3,
+              statusSize: 1,
+            },
+            pendingValue: true,
+            pendingSince: new Date(),
+            pendingDeadline: new Date(Date.now() + 60_000),
+            pendingToken: 'seed-pending-token',
+            pendingInstanceId: SYSTEM_VC_SERVICE_ID,
+            pendingConfigDigest: 'seed-pending-digest',
+            provenance: CredentialStatusProvenance.BACKFILL,
+          },
+        });
+
+        await expect(seedModule.main()).resolves.toBeUndefined();
+        process.env.SYSTEM_VC_API_KEY = 'changed-api-key';
+        await expect(seedModule.main()).rejects.toThrow(/pending status operations/);
+      },
+    );
   });
 });

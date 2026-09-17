@@ -12,10 +12,7 @@ export type EnvelopeValidityWindowOutcome = ValidityWindowOutcome | { result: 'n
 
 /**
  * Decodes an enveloped `vc+jwt` credential and judges its `validFrom` and
- * `validUntil` against `now` with the shared claims evaluator. Every
- * verification path in the reference implementation applies this, because
- * the pinned provider does not enforce those claims for this envelope
- * format.
+ * `validUntil` against `now` with the shared claims evaluator.
  */
 export function checkValidityWindow(
   credential: EnvelopedVerifiableCredential,

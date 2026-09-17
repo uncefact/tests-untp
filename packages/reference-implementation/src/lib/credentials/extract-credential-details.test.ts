@@ -4,13 +4,17 @@ import { extractCredentialDetails } from './extract-credential-details';
 const ISSUER = { type: ['Organization'], id: 'did:web:issuer.example', name: 'Issuer Co' };
 const SUBJECT = { type: ['Product'], id: 'https://example.com/p/1', name: 'Widget' };
 
-function stubBridge(summary: SubjectSummary = { id: SUBJECT.id, name: SUBJECT.name }): IDataModelBridge {
+type StubBridge = IDataModelBridge & { extractSubjectSummaryMock: jest.Mock };
+
+function stubBridge(summary: SubjectSummary = { id: SUBJECT.id, name: SUBJECT.name }): StubBridge {
+  const extractSubjectSummaryMock = jest.fn().mockReturnValue(summary);
   return {
     buildSubject: jest.fn(),
     extractRefs: jest.fn(),
     extractConformityClaim: jest.fn(),
     extractConformityClaimWithProvenance: jest.fn(),
-    extractSubjectSummary: jest.fn().mockReturnValue(summary),
+    extractSubjectSummary: extractSubjectSummaryMock,
+    extractSubjectSummaryMock,
   };
 }
 
@@ -26,7 +30,7 @@ function extract(overrides: Record<string, unknown> = {}, bridge: IDataModelBrid
         id: 'https://example.com/status#1',
         type: 'BitstringStatusListEntry',
         statusPurpose: 'revocation',
-        statusListIndex: 0,
+        statusListIndex: '0',
         statusListCredential: 'https://example.com/status',
       },
       ...overrides,
@@ -101,7 +105,7 @@ describe('extractCredentialDetails', () => {
 
       expect(details.subjectId).toBe('https://bridge.example/s');
       expect(details.subjectName).toBe('From the bridge');
-      expect(bridge.extractSubjectSummary).toHaveBeenCalledWith(subject);
+      expect(bridge.extractSubjectSummaryMock).toHaveBeenCalledWith(subject);
     });
 
     it('hands an array subject to the bridge as the credential carries it', () => {
@@ -117,7 +121,7 @@ describe('extractCredentialDetails', () => {
 
       expect(details.subjectId).toBe('https://example.com/p/1');
       expect(details.subjectName).toBe('Widget');
-      expect(bridge.extractSubjectSummary).toHaveBeenCalledWith(credentialSubject);
+      expect(bridge.extractSubjectSummaryMock).toHaveBeenCalledWith(credentialSubject);
     });
 
     it('lets a throwing bridge surface, so the caller can record why the read failed', () => {

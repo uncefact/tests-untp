@@ -3,6 +3,9 @@ import {
   CredentialDetailsError,
   CredentialDetailsStatus,
   LibraryRecordOrigin,
+  CredentialStatusCapture,
+  CredentialStatusProvenance,
+  VcServiceAttribution,
   type CoreCredentialType,
   type Credential,
   type LibraryRecord,
@@ -17,6 +20,8 @@ import type { StoredObjectCoordinates } from '@/lib/library/remove-stored-object
 import { mapDatabaseError } from '@/lib/prisma/db-errors';
 import type { CredentialDetails } from '@/lib/credentials/extract-credential-details';
 import type { ProtectedDecryptionKey } from '@/lib/credentials/decryption-key-protection';
+import { createCredentialStatusEntries } from './credential-status-entry.repository';
+import type { CapturedCredentialStatusEntry } from '@/lib/credentials/capture-credential-status-entries';
 
 /**
  * A native credential as its callers see it: the `Credential` child row
@@ -73,7 +78,49 @@ export type CreateCredentialInput = {
    * again (#954).
    */
   idempotencyClaimId?: string;
-} & CredentialDetailsInput;
+  /** Status facts captured from the signed artefact, persisted with issuance. */
+  statusEntries?: readonly CredentialStatusEntryCaptureInput[];
+} & CredentialDetailsInput &
+  CredentialStatusCaptureInput &
+  CredentialStatusAttributionInput;
+
+export type CredentialStatusEntryCaptureInput = CapturedCredentialStatusEntry;
+
+export type CredentialStatusCaptureInput =
+  | {
+      statusCapture: typeof CredentialStatusCapture.CAPTURED;
+      statusCapturedAt: Date;
+    }
+  | {
+      statusCapture: typeof CredentialStatusCapture.FAILED;
+      statusCaptureError: string;
+      statusCapturedAt: Date;
+    }
+  | {
+      statusCapture?: undefined;
+      statusCaptureError?: undefined;
+      statusCapturedAt?: undefined;
+    };
+
+export type CredentialStatusAttributionInput =
+  | {
+      vcServiceInstanceId: string;
+      vcServiceAttribution: typeof VcServiceAttribution.ISSUANCE;
+      vcServiceAttributedAt: Date;
+      vcServiceAttributionReason?: undefined;
+    }
+  | {
+      vcServiceInstanceId: string;
+      vcServiceAttribution: typeof VcServiceAttribution.OPERATOR;
+      vcServiceAttributedAt: Date;
+      vcServiceAttributionReason: string;
+    }
+  | {
+      vcServiceInstanceId?: undefined;
+      vcServiceAttribution?: undefined;
+      vcServiceAttributedAt?: undefined;
+      vcServiceAttributionReason?: undefined;
+    };
 
 /**
  * The outcome of reading a signed credential's descriptive fields (#952).
@@ -170,6 +217,19 @@ export async function createCredential(
     storageServiceInstanceId: input.storageServiceInstanceId ?? null,
     storageExternalId: input.storageExternalId ?? null,
     storageBucket: input.storageBucket ?? null,
+    ...(input.vcServiceInstanceId !== undefined ? { vcServiceInstanceId: input.vcServiceInstanceId } : {}),
+    ...(input.vcServiceAttribution !== undefined ? { vcServiceAttribution: input.vcServiceAttribution } : {}),
+    ...(input.vcServiceAttributedAt !== undefined ? { vcServiceAttributedAt: input.vcServiceAttributedAt } : {}),
+    ...(input.vcServiceAttributionReason !== undefined
+      ? { vcServiceAttributionReason: input.vcServiceAttributionReason }
+      : {}),
+    ...(input.statusCapture !== undefined
+      ? {
+          statusCapture: input.statusCapture,
+          statusCaptureError: input.statusCapture === CredentialStatusCapture.FAILED ? input.statusCaptureError : null,
+          statusCapturedAt: input.statusCapturedAt,
+        }
+      : {}),
     isPublished: input.isPublished ?? false,
   };
   const linkedChildData = {
@@ -184,6 +244,19 @@ export async function createCredential(
     const credential = await tx.credential.create({
       data: { id: record.id, ...(withLinks ? linkedChildData : childData) },
     });
+    if (input.statusCapture === CredentialStatusCapture.CAPTURED && input.statusEntries !== undefined) {
+      const created = await createCredentialStatusEntries(tx, {
+        credentialId: record.id,
+        tenantId: input.tenantId,
+        entries: input.statusEntries.map((entry) => ({
+          ...entry,
+          provenance: CredentialStatusProvenance.ISSUANCE,
+        })),
+      });
+      if (created.outcome !== 'created') {
+        throw new Error(`Invariant violation: duplicate captured status purpose "${created.purpose}"`);
+      }
+    }
     if (input.idempotencyClaimId) {
       await linkClaimToRecord(tx, input.idempotencyClaimId, record.id, IdempotencyOperation.CREDENTIAL_ISSUE);
     }
@@ -206,6 +279,61 @@ export async function createCredential(
     const credential = await run(false);
     return { credential, entityLinkFailed: true };
   }
+}
+
+export type UpdateCredentialStatusCaptureInput = {
+  credentialId: string;
+  tenantId: string;
+  expectedStatus: CredentialStatusCapture;
+} & CredentialStatusCaptureInput;
+
+export type UpdateCredentialStatusCaptureOutcome = 'updated' | 'status_conflict' | 'missing';
+
+/** A capture update did not satisfy the repository's typed state contract. */
+export class CredentialStatusCaptureInvariantError extends Error {
+  constructor() {
+    super('Credential status capture update requires a concrete capture state');
+    this.name = 'CredentialStatusCaptureInvariantError';
+  }
+}
+
+/**
+ * Advances status capture only from the caller's expected state. A zero-row
+ * conditional update is reported rather than treated as a successful write.
+ */
+export async function updateCredentialStatusCapture(
+  tx: Prisma.TransactionClient,
+  input: UpdateCredentialStatusCaptureInput,
+): Promise<UpdateCredentialStatusCaptureOutcome> {
+  if (
+    input.statusCapture !== CredentialStatusCapture.CAPTURED &&
+    input.statusCapture !== CredentialStatusCapture.FAILED
+  ) {
+    throw new CredentialStatusCaptureInvariantError();
+  }
+  if (!Object.values(CredentialStatusCapture).includes(input.expectedStatus)) {
+    throw new CredentialStatusCaptureInvariantError();
+  }
+  const expectedStatus = input.expectedStatus;
+  const result = await tx.credential.updateMany({
+    where: {
+      id: input.credentialId,
+      tenantId: input.tenantId,
+      statusCapture: expectedStatus,
+    },
+    data: {
+      statusCapture: input.statusCapture,
+      statusCaptureError: input.statusCapture === CredentialStatusCapture.FAILED ? input.statusCaptureError : null,
+      statusCapturedAt: input.statusCapturedAt,
+    },
+  });
+  if (result.count === 1) return 'updated';
+
+  const current = await tx.credential.findFirst({
+    where: { id: input.credentialId, tenantId: input.tenantId },
+    select: { id: true },
+  });
+  return current === null ? 'missing' : 'status_conflict';
 }
 
 /**
@@ -239,6 +367,7 @@ export async function updateCredentialPublished(
 export type DeleteNativeCredentialResult =
   | { outcome: 'missing' }
   | { outcome: 'external' }
+  | { outcome: 'status_change_pending'; statusPurposes: string[] }
   | { outcome: 'deleted'; storage: StoredObjectCoordinates };
 
 /**
@@ -279,6 +408,22 @@ export async function deleteNativeCredential(input: {
         });
         if (record === null) return { outcome: 'missing' as const };
         if (record.origin !== LibraryRecordOrigin.NATIVE) return { outcome: 'external' as const };
+
+        const pendingEntries = await tx.credentialStatusEntry.findMany({
+          where: {
+            credentialId: input.recordId,
+            tenantId: input.tenantId,
+            pendingToken: { not: null },
+          },
+          orderBy: { statusPurpose: 'asc' },
+          select: { statusPurpose: true },
+        });
+        if (pendingEntries.length > 0) {
+          return {
+            outcome: 'status_change_pending' as const,
+            statusPurposes: pendingEntries.map(({ statusPurpose }) => statusPurpose),
+          };
+        }
 
         const storage: StoredObjectCoordinates = {
           storageUri: record.credential?.storageUri ?? null,

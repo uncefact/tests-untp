@@ -4,6 +4,7 @@ import {
   type Credential,
   type ExternalCredential,
   type LibraryRecord,
+  type CredentialStatusEntry,
 } from '../prisma/generated';
 import { StructuredError } from '@uncefact/untp-utils';
 
@@ -30,7 +31,7 @@ export type LibraryRecordWithChildren = LibraryRecord & {
 export type NativeRecordView<TRecord = LibraryRecord> = {
   origin: typeof LibraryRecordOrigin.NATIVE;
   record: TRecord;
-  credential: Credential;
+  credential: Credential & { statusEntries?: CredentialStatusEntry[] };
 };
 export type ExternalRecordView<TRecord = LibraryRecord> = {
   origin: typeof LibraryRecordOrigin.EXTERNAL;

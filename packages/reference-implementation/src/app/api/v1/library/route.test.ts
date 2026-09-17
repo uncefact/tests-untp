@@ -107,6 +107,7 @@ import {
   CheckRunState,
   CoreCredentialType,
   CredentialDetailsStatus,
+  CredentialStatusCapture,
   ExternalContentKind,
   IdempotencyOperation,
   LibraryRecordOrigin,
@@ -358,6 +359,13 @@ function nativeCredential(overrides: Partial<Credential> = {}): Credential {
     createdAt: new Date('2026-09-03T11:00:00.000Z'),
     updatedAt: new Date('2026-09-03T11:00:00.000Z'),
     ...overrides,
+    vcServiceInstanceId: overrides.vcServiceInstanceId ?? null,
+    vcServiceAttribution: overrides.vcServiceAttribution ?? null,
+    vcServiceAttributedAt: overrides.vcServiceAttributedAt ?? null,
+    vcServiceAttributionReason: overrides.vcServiceAttributionReason ?? null,
+    statusCapture: overrides.statusCapture ?? CredentialStatusCapture.PENDING,
+    statusCaptureError: overrides.statusCaptureError ?? null,
+    statusCapturedAt: overrides.statusCapturedAt ?? null,
   };
 }
 

@@ -64,6 +64,77 @@ describe('verifyCredentialRequestSchema', () => {
 });
 
 describe('credentialIssueRequestSchema', () => {
+  it('refuses the unsupported message status purpose', () => {
+    // Catches a regression that expands issuance policy without an ADR-backed decision.
+    const result = credentialIssueRequestSchema.safeParse({
+      credentialPayload: {},
+      credentialType: 'DigitalProductPassport',
+      version: '0.6.1',
+      statusPurposes: ['message'],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.join('.') === 'statusPurposes.0')).toBe(true);
+    }
+  });
+
+  it('refuses an empty statusPurposes list because per-request no-status issuance is not offered', () => {
+    // Catches a regression that exposes an untracked per-request no-status mode instead of the deployment setting.
+    const result = credentialIssueRequestSchema.safeParse({
+      credentialPayload: {},
+      credentialType: 'DigitalProductPassport',
+      version: '0.6.1',
+      statusPurposes: [],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: ['statusPurposes'],
+            message: 'an empty statusPurposes list is not supported; omit statusPurposes to use the deployment default',
+          }),
+        ]),
+      );
+    }
+  });
+
+  it.each([{}, [], null])('refuses a caller-supplied credentialStatus value: %p', (credentialStatus) => {
+    // Catches a regression that lets the adapter silently replace caller-owned status data.
+    const result = credentialIssueRequestSchema.safeParse({
+      credentialPayload: { credentialStatus },
+      credentialType: 'DigitalProductPassport',
+      version: '0.6.1',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: ['credentialPayload', 'credentialStatus'],
+            message:
+              "The reference implementation mints and manages the credential's status entries; remove credentialStatus from the payload.",
+            params: { code: 'CREDENTIAL_STATUS_NOT_ACCEPTED' },
+          }),
+        ]),
+      );
+    }
+  });
+
+  it('accepts a payload without credentialStatus', () => {
+    // Catches a regression that applies the refusal to the normal status-free input shape.
+    const result = credentialIssueRequestSchema.safeParse({
+      credentialPayload: {},
+      credentialType: 'DigitalProductPassport',
+      version: '0.6.1',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it('strips unknown keys rather than rejecting them', () => {
     const result = credentialIssueRequestSchema.safeParse({
       credentialPayload: {},

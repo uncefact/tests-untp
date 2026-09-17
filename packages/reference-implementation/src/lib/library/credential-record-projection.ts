@@ -6,6 +6,7 @@ import {
   CoreCredentialType,
   CredentialDetailsError,
   CredentialDetailsStatus,
+  CredentialStatusCapture,
   LibraryRecordOrigin,
   type CheckRun,
   type LibraryRecord,
@@ -60,6 +61,36 @@ export const verificationChecksSchema = z
   .describe('All seven checks are always present; `not_run` covers both "did not apply" and "did not execute".');
 
 export type VerificationChecks = z.infer<typeof verificationChecksSchema>;
+
+const credentialStatusEntrySchema = z
+  .object({
+    entryId: z.string(),
+    statusPurpose: z.string(),
+    statusListCredential: z.string(),
+    statusListIndex: z.string(),
+    value: z.boolean().nullable(),
+    observedAt: z.string().datetime().nullable(),
+    valueChangedAt: z.string().datetime().nullable(),
+    version: z.number().int().min(1),
+    pending: z
+      .object({
+        value: z.boolean(),
+        since: z.string().datetime(),
+        deadline: z.string().datetime(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+export const credentialStatusFactsSchema = z
+  .object({
+    capture: z.nativeEnum(CredentialStatusCapture),
+    entries: z.array(credentialStatusEntrySchema),
+  })
+  .strict()
+  .describe('Issuer-owned status facts captured from the signed native credential.');
+export type CredentialStatusFacts = z.infer<typeof credentialStatusFactsSchema>;
 
 // Shared check sets are defined beside the roster for the projector and list SQL.
 export { BLOCKING_CHECKS, NATIVE_MASKED_CHECKS } from './check-rules';
@@ -267,6 +298,7 @@ export const credentialRecordSchema = z
     verification: verificationEnvelopeSchema.describe(
       `${verificationEnvelopeDescription} ${nativeIssuanceAssertionNote}`,
     ),
+    status: credentialStatusFactsSchema.nullable().describe('Issuer-owned status facts; null for external records.'),
     currencyStatus: z.enum(['current', 'not_yet_valid', 'expired', 'unknown']),
     detailsStatus: z.nativeEnum(CredentialDetailsStatus),
     detailsError: z.nativeEnum(CredentialDetailsError).nullable(),
@@ -532,6 +564,30 @@ function issuanceAssertionEnvelope(record: LibraryRecord): VerificationEnvelope 
   };
 }
 
+function statusFactsOf(credential: NativeLibraryRecordView['credential']): CredentialStatusFacts {
+  return {
+    capture: credential.statusCapture,
+    entries: (credential.statusEntries ?? []).map((entry) => ({
+      entryId: entry.id,
+      statusPurpose: entry.statusPurpose,
+      statusListCredential: entry.statusListCredential,
+      statusListIndex: entry.statusListIndex,
+      value: entry.value,
+      observedAt: entry.observedAt?.toISOString() ?? null,
+      valueChangedAt: entry.valueChangedAt?.toISOString() ?? null,
+      version: entry.version,
+      pending:
+        entry.pendingValue === null || entry.pendingSince === null || entry.pendingDeadline === null
+          ? null
+          : {
+              value: entry.pendingValue,
+              since: entry.pendingSince.toISOString(),
+              deadline: entry.pendingDeadline.toISOString(),
+            },
+    })),
+  };
+}
+
 /**
  * Projects a native library record onto the keyless CredentialRecord shape.
  * A stored generation 1 is refused where the record is read, so the envelope
@@ -567,6 +623,7 @@ export function toNativeCredentialRecord(
     encrypted: credential.decryptionKey !== null,
     hasKey: credential.decryptionKey !== null,
     verification: checkRun ? envelopeOf(checkRun, { origin: 'native' }) : issuanceAssertionEnvelope(parent),
+    status: statusFactsOf(credential),
     currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, options.now ?? new Date(Date.now())),
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,
@@ -655,6 +712,7 @@ export function toCredentialRecord(
     encrypted: external.encrypted,
     hasKey: external.decryptionKey !== null,
     verification: envelopeOf(checkRun, { origin: 'external' }),
+    status: null,
     currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, now),
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,

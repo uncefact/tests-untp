@@ -41,6 +41,8 @@ const ENV_NAMES = [
   'OTEL_EXPORTER_OTLP_METRICS_PROTOCOL',
   'OTEL_EXPORTER_OTLP_PROTOCOL',
   'RI_PROCESS_ROLE',
+  'DEFAULT_STATUS_PURPOSES',
+  'STATUS_LOCK_ACQUIRE_MS',
 ] as const;
 const savedEnvironment = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 
@@ -52,6 +54,10 @@ function createLogger(): LoggerService {
     error: jest.fn(),
     child: jest.fn(),
   } as unknown as LoggerService;
+}
+
+function getWarn(logger: LoggerService): jest.Mock {
+  return (logger as unknown as { warn: jest.Mock }).warn;
 }
 
 function setWorkerEnvironment(): void {
@@ -79,6 +85,19 @@ describe('runBootPreflight', () => {
       key: KEY,
       deprecatedName: 'absent',
     });
+  });
+
+  it('warns when the deployment deliberately issues credentials without status entries', async () => {
+    // Catches a regression that accepts the no-status setting without warning the operator of its consequence.
+    process.env.RI_APP_URL = 'https://ri.example.com';
+    process.env.DATA_ENCRYPTION_KEY = KEY;
+    process.env.DEFAULT_STATUS_PURPOSES = 'none';
+    const logger = createLogger();
+
+    await expect(runBootPreflight('web', logger)).resolves.toMatchObject({ key: KEY });
+    expect(getWarn(logger)).toHaveBeenCalledWith(
+      'DEFAULT_STATUS_PURPOSES=none: credentials issued without an explicit statusPurposes carry no status entry and can never be revoked or suspended.',
+    );
   });
 
   it('accepts a worker without web-only settings while checking its own required settings', async () => {
@@ -165,7 +184,7 @@ describe('runBootPreflight', () => {
     const logger = createLogger();
 
     await expect(runBootPreflight('web', logger)).resolves.toMatchObject({ key: KEY });
-    expect(logger.warn).toHaveBeenCalledWith(
+    expect(getWarn(logger)).toHaveBeenCalledWith(
       'VERIFY_ALLOW_PRIVATE_URLS was renamed to FETCH_ALLOW_PRIVATE_URLS in v0.5 and will stop being read in v0.6. Rename VERIFY_ALLOW_PRIVATE_URLS to FETCH_ALLOW_PRIVATE_URLS, keeping its value, and restart.',
     );
   });
@@ -182,8 +201,8 @@ describe('runBootPreflight', () => {
 
     const warning =
       'VERIFY_ALLOW_PRIVATE_URLS was renamed to FETCH_ALLOW_PRIVATE_URLS in v0.5 and will stop being read in v0.6. Rename VERIFY_ALLOW_PRIVATE_URLS to FETCH_ALLOW_PRIVATE_URLS, keeping its value, and restart.';
-    expect(preflightLogger.warn).toHaveBeenCalledWith(warning);
-    expect(serverLogger.warn).toHaveBeenCalledWith(warning);
+    expect(getWarn(preflightLogger)).toHaveBeenCalledWith(warning);
+    expect(getWarn(serverLogger)).toHaveBeenCalledWith(warning);
   });
 
   it.each(['web', 'worker'] as const)('rejects an out-of-range worker timeout for the %s role', async (role) => {
@@ -386,10 +405,50 @@ describe('runBootPreflight', () => {
     },
   ] as const;
 
+  const validatorWarningCases = [
+    {
+      name: 'validateStatusSettingsOnBoot for STATUS_LOCK_ACQUIRE_MS',
+      setup: () => {
+        process.env.RI_APP_URL = 'https://ri.example.com';
+        process.env.DATA_ENCRYPTION_KEY = KEY;
+        process.env.STATUS_LOCK_ACQUIRE_MS = 'not-a-duration';
+      },
+      warning: 'STATUS_LOCK_ACQUIRE_MS has invalid value "not-a-duration"; using the default 2000 milliseconds.',
+    },
+    {
+      name: 'validateStatusSettingsOnBoot for non-positive STATUS_LOCK_ACQUIRE_MS',
+      setup: () => {
+        process.env.RI_APP_URL = 'https://ri.example.com';
+        process.env.DATA_ENCRYPTION_KEY = KEY;
+        process.env.STATUS_LOCK_ACQUIRE_MS = '0';
+      },
+      warning: 'STATUS_LOCK_ACQUIRE_MS has invalid value "0"; using the default 2000 milliseconds.',
+    },
+  ] as const;
+
   it.each(validatorRejectionCases)('enforces the $name validator effect', async ({ role, setup, message }) => {
     setup();
 
     await expect(runBootPreflight(role, createLogger())).rejects.toThrow(message);
+  });
+
+  it.each(validatorWarningCases)('enforces the $name validator effect', async ({ setup, warning }) => {
+    setup();
+    const logger = createLogger();
+
+    await expect(runBootPreflight('web', logger)).resolves.toMatchObject({ key: KEY });
+    expect(getWarn(logger)).toHaveBeenCalledTimes(1);
+    expect(getWarn(logger)).toHaveBeenCalledWith(warning);
+  });
+
+  it('keeps an unset STATUS_LOCK_ACQUIRE_MS silent', async () => {
+    // Catches a regression that warns operators when the mutex setting is intentionally absent.
+    process.env.RI_APP_URL = 'https://ri.example.com';
+    process.env.DATA_ENCRYPTION_KEY = KEY;
+    const logger = createLogger();
+
+    await expect(runBootPreflight('web', logger)).resolves.toMatchObject({ key: KEY });
+    expect(getWarn(logger)).not.toHaveBeenCalled();
   });
 
   it('rejects an unrecognised process role instead of treating it as web', () => {

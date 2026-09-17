@@ -37,6 +37,7 @@ import {
   credentialRecordDetailSchema,
   credentialRecordWarningSchema,
   verificationEnvelopeSchema,
+  credentialStatusFactsSchema,
   credentialTypeSchema,
   originSchema,
   verificationSummarySchema,
@@ -72,7 +73,7 @@ export const credentialWarningSchema = z.object({
   code: z
     .string()
     .describe(
-      'Warning code. Publishing codes: `REFS_EXTRACTION_FAILED` (no identifier could be read from the payload), `PUBLISH_REFERENCE_MISSING` (the payload carries no identifier to publish under), `PUBLISH_SCHEME_INCOMPLETE` (the identifier resolved to a scheme missing a primary key or registrar namespace), `PUBLISH_IDENTIFIER_UNKNOWN` (no identifier registered for the value), `PUBLISH_IDENTIFIER_AMBIGUOUS` (the value exists under more than one scheme; set publishingOptions.identifierSchemeId), `PUBLISH_IDR_UNAVAILABLE` (no identity resolver service is configured), `PUBLISH_TARGET_UNRESOLVED` (the identifier lookup itself failed), `IDR_PUBLISH_FAILED` (the resolver rejected the links), `IDR_PUBLISH_UNCONFIRMED` (the resolver could not be reached, so whether the links were registered is unknown), `DB_STATUS_UPDATE_FAILED` (the links are live but the stored status was not saved). `ENTITY_LINK_FAILED` reports that the credential could not be linked to a master-data record, which does not affect publishing. `DETAILS_EXTRACTION_FAILED` means the credential was issued but its descriptive fields could not be read from it. `IDEMPOTENCY_RESPONSE_NOT_RECORDED` reports that the credential was issued and a retry with this key returns it, but the warnings on this response may not be repeated. `IDEMPOTENCY_RESPONSE_UNREADABLE` reports that the credential was issued by an earlier request with this key, but the response recorded for it could not be read, so its warnings are not repeated. Conformity codes, raised only for a Digital Conformity Credential and advisory only: `conformity-scheme.not-found`, `conformity-profile.not-found`, `conformity-profile.not-specified`, `conformity-criterion.not-in-profile`, `conformity-criterion.missing`, `conformity-criterion.topic-mismatch`, `conformity-assessment.topic-mismatch`, `conformity-attestation.score-not-in-framework`, `conformity-assessment.score-not-in-framework`, `conformity-scheme.wrong-tier`, `conformity-profile.wrong-tier`, `conformity-claim.validation-error` and `conformity-claim.score-checks-unavailable`; each is described on the credentials API documentation page.',
+      'Warning code. Publishing codes: `REFS_EXTRACTION_FAILED` (no identifier could be read from the payload), `PUBLISH_REFERENCE_MISSING` (the payload carries no identifier to publish under), `PUBLISH_SCHEME_INCOMPLETE` (the identifier resolved to a scheme missing a primary key or registrar namespace), `PUBLISH_IDENTIFIER_UNKNOWN` (no identifier registered for the value), `PUBLISH_IDENTIFIER_AMBIGUOUS` (the value exists under more than one scheme; set publishingOptions.identifierSchemeId), `PUBLISH_IDR_UNAVAILABLE` (no identity resolver service is configured), `PUBLISH_TARGET_UNRESOLVED` (the identifier lookup itself failed), `IDR_PUBLISH_FAILED` (the resolver rejected the links), `IDR_PUBLISH_UNCONFIRMED` (the resolver could not be reached, so whether the links were registered is unknown), `DB_STATUS_UPDATE_FAILED` (the links are live but the stored status was not saved). `ENTITY_LINK_FAILED` reports that the credential could not be linked to a master-data record, which does not affect publishing. `DETAILS_EXTRACTION_FAILED` means the credential was issued but its descriptive fields could not be read from it. `STATUS_CAPTURE_FAILED` means the credential was issued but its signed status entries could not be recorded. `IDEMPOTENCY_RESPONSE_NOT_RECORDED` reports that the credential was issued and a retry with this key returns it, but the warnings on this response may not be repeated. `IDEMPOTENCY_RESPONSE_UNREADABLE` reports that the credential was issued by an earlier request with this key, but the response recorded for it could not be read, so its warnings are not repeated. Conformity codes, raised only for a Digital Conformity Credential and advisory only: `conformity-scheme.not-found`, `conformity-profile.not-found`, `conformity-profile.not-specified`, `conformity-criterion.not-in-profile`, `conformity-criterion.missing`, `conformity-criterion.topic-mismatch`, `conformity-assessment.topic-mismatch`, `conformity-attestation.score-not-in-framework`, `conformity-assessment.score-not-in-framework`, `conformity-scheme.wrong-tier`, `conformity-profile.wrong-tier`, `conformity-claim.validation-error` and `conformity-claim.score-checks-unavailable`; each is described on the credentials API documentation page.',
     ),
   message: z.string().describe('Human-readable warning message'),
   received: z.unknown().optional().describe('The value that triggered the warning, where one applies'),
@@ -87,7 +88,21 @@ export const credentialWarningSchema = z.object({
 /** Successful credential issue response from POST /credentials. */
 export const credentialIssueResponseSchema = z.object({
   credentialId: z.string().describe('Database ID of the stored credential record'),
+  statusCaptureFailed: z
+    .boolean()
+    .optional()
+    .describe('Whether recording credential-status entries failed after issuance'),
   warnings: z.array(credentialWarningSchema).optional().describe('Advisory warnings (e.g. publishing failures)'),
+});
+
+/** Conflict response when deletion would discard a recoverable status intent. */
+export const credentialDeleteStatusOperationResponseSchema = errorResponseSchema.extend({
+  code: z.literal('STATUS_OPERATION_IN_PROGRESS'),
+});
+
+/** Conflict response when a service instance is pinned by a pending status operation. */
+export const serviceInstanceStatusPendingResponseSchema = errorResponseSchema.extend({
+  code: z.literal('SERVICE_INSTANCE_STATUS_PENDING'),
 });
 
 // ============================================================================
@@ -467,6 +482,8 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
   const schemas: Record<string, z.ZodType> = {
     Did: didResponseSchema,
     ErrorResponse: errorResponseSchema,
+    CredentialDeleteStatusOperationResponse: credentialDeleteStatusOperationResponseSchema,
+    ServiceInstanceStatusPendingResponse: serviceInstanceStatusPendingResponseSchema,
     VerificationResult: verificationResultResponseSchema,
     PaginationMeta: paginationMetaSchema,
     VerificationCheck: verificationCheckSchema,
@@ -505,6 +522,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     CredentialRecordDetail: credentialRecordDetailSchema,
     VerificationEnvelope: verificationEnvelopeSchema,
     CredentialRecordWarning: credentialRecordWarningSchema,
+    CredentialStatus: credentialStatusFactsSchema,
     LibraryReadFailure: libraryReadFailureSchema,
     CredentialType: credentialTypeSchema,
     Origin: originSchema,

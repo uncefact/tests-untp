@@ -185,6 +185,8 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'The identifier scheme has identifiers and cannot be deleted',
   'The registrar has schemes with identifiers and cannot be deleted',
   'This Idempotency-Key was already used with a different request body.',
+  'Cannot delete credential "credential-native-1" while 1 pending status operation remains for purposes: revocation. Wait for the pending status operations to complete, or have an operator reconcile them.',
+  'Service instance "service-instance-1" has 1 pending credential status operation. Wait for the pending status operations on credentials using this instance to complete, or have an operator reconcile them before changing or deleting the instance.',
   // Read from the module that owns them rather than copied, so a reworded
   // refusal cannot leave this allowlist quoting a sentence no code throws.
   SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,

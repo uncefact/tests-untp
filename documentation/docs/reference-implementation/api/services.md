@@ -135,7 +135,7 @@ Updates one or more fields of a service instance owned by the tenant. System def
 
 At least one of `name`, `description`, `config`, or `isPrimary` must be provided. A body with none of them, including one whose only keys are unrecognised, is rejected with a 400 rather than applied as a no-op. Sending `description: null` clears the description. Neither `name` nor `description` may be empty or contain only whitespace, and `name` cannot be cleared.
 
-When `config` is provided, the new fields are **merged** with the existing configuration (shallow merge), the merged result is validated against the adapter's schema, and then encrypted before storage. This means you can update individual config fields without re-sending the entire config object.
+When `config` is provided, the new fields are **merged** with the existing configuration (shallow merge), the merged result is validated against the adapter's schema, and then encrypted before storage. This means you can update individual config fields without re-sending the entire config object. If the effective configuration is unchanged, the update is allowed while status operations are pending. If it changes, the request returns `409 SERVICE_INSTANCE_STATUS_PENDING`; wait for the pending status operations to complete or have an operator reconcile them before retrying. Name-only, description-only and primary-status-only updates remain allowed.
 
 ```mermaid
 sequenceDiagram
@@ -149,6 +149,10 @@ sequenceDiagram
     DB-->>RI: Existing record (encrypted config)
     RI->>RI: Decrypt existing config
     RI->>RI: Merge new fields into existing config
+    RI->>DB: Check for pending status operations when effective config changed
+    alt pending status operation and effective config changed
+        RI-->>Client: 409 Conflict (SERVICE_INSTANCE_STATUS_PENDING)
+    end
     RI->>Registry: Look up adapter schema
     RI->>RI: Validate merged config against schema
     RI->>RI: Validate config URLs are not internal (SSRF protection)
@@ -175,7 +179,7 @@ DELETE /api/v1/services/{id}
 
 Permanently deletes a service instance owned by the tenant. A system default is visible to the tenant (see [Get a service instance](#get-a-service-instance)), but deleting one is rejected with a `403 Forbidden`, before any reference check runs.
 
-If the caller's own DIDs, registrars, or identifier schemes reference the instance, the request is rejected with a `409 Conflict` unless `force=true` is set. The counts in the response cover only the caller's own referencing records. When forced, the foreign keys on referencing records are set to `null`.
+There are two independent `409 Conflict` causes. If the caller's own DIDs, registrars, or identifier schemes reference the instance, the request is rejected unless `force=true` is set. The counts in the response cover only the caller's own referencing records, and forced deletion clears those references. If credentials using the instance have pending status operations, the request returns `409 SERVICE_INSTANCE_STATUS_PENDING`; wait for the operations to complete or have an operator reconcile them. `force=true` does not bypass this status-operation guard.
 
 This check does not cover render templates. A [render template](./render-templates) can store a storage service instance ID for the credentials it renders, but that reference is not counted or protected here. Deleting a storage service instance that a render template depends on succeeds, with or without `force`, and leaves the render template pointing at a storage service instance that no longer exists.
 
@@ -194,6 +198,10 @@ sequenceDiagram
     DB-->>RI: Existing record
     alt instance is a system default
         RI-->>Client: 403 Forbidden
+    end
+    RI->>DB: Check for pending status operations
+    alt pending status operation
+        RI-->>Client: 409 Conflict (SERVICE_INSTANCE_STATUS_PENDING)
     end
     alt force ≠ true
         RI->>DB: Count caller's own references (DIDs, registrars, schemes)

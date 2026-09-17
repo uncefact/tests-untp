@@ -52,13 +52,17 @@ describe('checkValidityWindow', () => {
     expect(
       checkValidityWindow(
         {
-          '@context': [],
+          '@context': ['https://www.w3.org/ns/credentials/v2'],
           type: 'EnvelopedVerifiableCredential',
           id: 'data:application/vc+jwt,not.a.jwt',
         } as unknown as EnvelopedVerifiableCredential,
         NOW,
       ),
     ).toEqual({ result: 'not_run', reason: 'undecodable' });
+    expect(checkValidityWindow(enveloped(null as unknown as Record<string, unknown>), NOW)).toEqual({
+      result: 'not_run',
+      reason: 'undecodable',
+    });
   });
 
   it('fails a bound that is present but cannot be read, and still fails a readable bound that is violated', () => {

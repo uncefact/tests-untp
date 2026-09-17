@@ -5,6 +5,8 @@ import {
   CoreCredentialType,
   CredentialDetailsError,
   CredentialDetailsStatus,
+  CredentialStatusProvenance,
+  CredentialStatusCapture,
   ExternalContentKind,
   LibraryRecordOrigin,
   type CheckRun,
@@ -162,6 +164,13 @@ function nativeCredential(overrides: Partial<Credential> = {}): Credential {
     createdAt: new Date('2026-09-03T11:00:00.000Z'),
     updatedAt: new Date('2026-09-03T11:00:00.000Z'),
     ...overrides,
+    vcServiceInstanceId: overrides.vcServiceInstanceId ?? null,
+    vcServiceAttribution: overrides.vcServiceAttribution ?? null,
+    vcServiceAttributedAt: overrides.vcServiceAttributedAt ?? null,
+    vcServiceAttributionReason: overrides.vcServiceAttributionReason ?? null,
+    statusCapture: overrides.statusCapture ?? CredentialStatusCapture.PENDING,
+    statusCaptureError: overrides.statusCaptureError ?? null,
+    statusCapturedAt: overrides.statusCapturedAt ?? null,
   };
 }
 
@@ -396,6 +405,7 @@ describe('toCredentialRecord', () => {
       productId: null,
       sourceUrl: 'https://supplier.example/credential-a',
       sourceDigest: 'zQmDigest',
+      status: null,
       resolverUri: null,
       issuedAt: '2026-07-22T10:00:00.000Z',
       encrypted: false,
@@ -684,6 +694,59 @@ describe('toCredentialRecord', () => {
 });
 
 describe('toNativeCredentialRecord', () => {
+  it('projects captured status coordinates, observations and pending facts without deriving lifecycle', () => {
+    const view = nativeRecord({ credential: { statusCapture: CredentialStatusCapture.CAPTURED } });
+    view.credential.statusEntries = [
+      {
+        id: 'status-entry-1',
+        credentialId: view.credential.id,
+        tenantId: view.credential.tenantId,
+        originalId: null,
+        type: 'BitstringStatusListEntry',
+        statusPurpose: 'revocation',
+        statusListCredential: 'https://status.example/list/1',
+        statusListIndex: '3',
+        statusListVcIssuer: 'did:web:issuer.example',
+        descriptor: {},
+        value: true,
+        observedAt: new Date('2026-09-17T01:02:03.000Z'),
+        valueChangedAt: new Date('2026-09-17T02:03:04.000Z'),
+        version: 2,
+        pendingValue: false,
+        pendingSince: new Date('2026-09-17T03:04:05.000Z'),
+        pendingDeadline: new Date('2026-09-17T04:05:06.000Z'),
+        pendingToken: null,
+        pendingInstanceId: null,
+        pendingConfigDigest: null,
+        acceptedReplacementDigest: null,
+        provenance: CredentialStatusProvenance.ISSUANCE,
+        createdAt: new Date('2026-09-16T01:02:03.000Z'),
+        updatedAt: new Date('2026-09-17T01:02:03.000Z'),
+      },
+    ];
+
+    expect(toNativeCredentialRecord(view, { now: NOW }).status).toEqual({
+      capture: CredentialStatusCapture.CAPTURED,
+      entries: [
+        {
+          entryId: 'status-entry-1',
+          statusPurpose: 'revocation',
+          statusListCredential: 'https://status.example/list/1',
+          statusListIndex: '3',
+          value: true,
+          observedAt: '2026-09-17T01:02:03.000Z',
+          valueChangedAt: '2026-09-17T02:03:04.000Z',
+          version: 2,
+          pending: {
+            value: false,
+            since: '2026-09-17T03:04:05.000Z',
+            deadline: '2026-09-17T04:05:06.000Z',
+          },
+        },
+      ],
+    });
+  });
+
   /**
    * Every descriptive value is a distinct non-null fixture, and the parent's
    * two timestamps differ from each other and from the credential child's, so
