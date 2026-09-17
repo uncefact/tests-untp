@@ -155,6 +155,7 @@ describe('buildDppSubject (v0.7.0)', () => {
       const party = parties[0].party as Record<string, unknown>;
 
       expect(party).toEqual({
+        type: ['Party'],
         id: 'did:web:example.com:org:1',
         name: 'Test Organisation',
         description: 'A test organisation for unit tests',
