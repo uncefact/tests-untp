@@ -186,75 +186,35 @@ describe.each(versions)('buildDppSubject (%s)', (_version, spec) => {
       expect(facility.type).toEqual(['Facility']);
     });
 
-    it('maps full facility including id, name, description, registeredId, idScheme', () => {
+    it('maps id, name, and registeredId (producedAtFacility is a facility reference, not the full Facility node)', () => {
       const subject = bridge.buildSubject(createBridgeEntities());
       const product = subject.product as Record<string, unknown>;
       const facility = product.producedAtFacility as Record<string, unknown>;
 
-      expect(facility.id).toBe('did:web:example.com:facility:1');
-      expect(facility.name).toBe('Test Facility');
-      expect(facility.description).toBe('A test facility for unit tests');
-      expect(facility.registeredId).toBe('4012345000009');
-      expect(facility.idScheme).toEqual({
-        type: ['IdentifierScheme'],
-        id: 'https://id.gs1.org/414/',
-        name: 'Global Location Number (GLN)',
+      expect(facility).toEqual({
+        type: ['Facility'],
+        id: 'did:web:example.com:facility:1',
+        name: 'Test Facility',
+        registeredId: '4012345000009',
       });
     });
 
-    it('maps locationInformation when geo fields are present', () => {
-      const subject = bridge.buildSubject(createBridgeEntities());
-      const product = subject.product as Record<string, unknown>;
-      const facility = product.producedAtFacility as Record<string, unknown>;
-
-      expect(facility.locationInformation).toEqual({
-        type: ['Location'],
-        plusCode: '4RRH469X+VF',
-        geoLocation: { type: 'Point', coordinates: [151.2093, -33.8688] },
-      });
-    });
-
-    it('maps address when present', () => {
-      const subject = bridge.buildSubject(createBridgeEntities());
-      const product = subject.product as Record<string, unknown>;
-      const facility = product.producedAtFacility as Record<string, unknown>;
-
-      expect(facility.address).toEqual({
-        type: ['Address'],
-        streetAddress: '123 Test Street',
-        postalCode: '2000',
-        addressLocality: 'Sydney',
-        addressRegion: 'NSW',
-        addressCountry: 'AU',
-      });
-    });
-
-    it('omits locationInformation when facility has no geo data', () => {
+    it('omits registeredId when facility has no primaryIdentifier', () => {
       const subject = bridge.buildSubject(
-        createBridgeEntities({
-          facility: createFacility({ location: { address: { streetAddress: '123 Test Street' } } }),
-        }),
+        createBridgeEntities({ facility: createFacility({ primaryIdentifier: null }) }),
       );
       const product = subject.product as Record<string, unknown>;
       const facility = product.producedAtFacility as Record<string, unknown>;
-      expect(facility.locationInformation).toBeUndefined();
+      expect(facility.registeredId).toBeUndefined();
     });
 
-    it('omits address when facility location has no address', () => {
-      const subject = bridge.buildSubject(
-        createBridgeEntities({
-          facility: createFacility({ location: { geoLocation: { type: 'Point', coordinates: [151.2093, -33.8688] } } }),
-        }),
-      );
+    it('does not emit description, idScheme, locationInformation, or address (undeclared at this schema path)', () => {
+      const subject = bridge.buildSubject(createBridgeEntities());
       const product = subject.product as Record<string, unknown>;
       const facility = product.producedAtFacility as Record<string, unknown>;
-      expect(facility.address).toBeUndefined();
-    });
 
-    it('omits both location and address when facility has no location data', () => {
-      const subject = bridge.buildSubject(createBridgeEntities({ facility: createFacility({ location: null }) }));
-      const product = subject.product as Record<string, unknown>;
-      const facility = product.producedAtFacility as Record<string, unknown>;
+      expect(facility.description).toBeUndefined();
+      expect(facility.idScheme).toBeUndefined();
       expect(facility.locationInformation).toBeUndefined();
       expect(facility.address).toBeUndefined();
     });
