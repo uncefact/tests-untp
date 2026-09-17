@@ -433,6 +433,7 @@ function created(record: ExternalCredentialRecord): Response {
  * @swagger
  * /library:
  *   post:
+ *     operationId: registerExternalCredential
  *     summary: Register a credential received from a third party
  *     description: |
  *       Fetches the credential at `sourceUrl` through the guarded fetch stack,
