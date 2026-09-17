@@ -209,5 +209,29 @@ describe('vcdmValidation', () => {
         message: 'must be string',
       });
     });
+
+    it('fails the step when schema validation carries a failure without Ajv payload errors', async () => {
+      const credential = {
+        '@context': [VCDM_CONTEXT_URLS[VCDMVersion.V2]],
+        type: ['VerifiableCredential'],
+      };
+      (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.V2);
+      (validateVcAgainstSchema as jest.Mock).mockResolvedValue({
+        valid: false,
+        errors: [],
+        failure: {
+          class: 'unknown',
+          code: 'schema.validation.dialect',
+          message: 'The schema declares draft-07, which is not carried.',
+          remediation: 'Report these details to the Playground operator.',
+          artefactUrl: 'https://example.test/vcdm.json',
+        },
+      });
+
+      const result = await validateVcdmRules(credential);
+
+      expect(result.valid).toBe(false);
+      expect(result.failure).toMatchObject({ code: 'schema.validation.dialect' });
+    });
   });
 });

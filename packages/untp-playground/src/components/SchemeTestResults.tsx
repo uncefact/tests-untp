@@ -16,6 +16,15 @@ import {
 import { beginRun, commitResult, remove } from '@/lib/artefactCollection';
 import { validateContext } from '@/lib/contextValidation';
 import { newId } from '@/lib/id';
+import {
+  classifySchemaFetchFailure,
+  classifySchemaSelectionFailure,
+  describeArtefactFailure,
+  isUnexpectedFailure,
+  notExecutedFailure,
+  unexpectedFailure,
+  type ArtefactStepFailure,
+} from '@/lib/artefactFailure';
 import { schemeSubtitle, schemeTitle } from '@/lib/schemeCollection';
 import {
   describeUnexpectedSchemeParse,
@@ -27,6 +36,7 @@ import {
 import { SchemaFetchError, SchemaSelectionError, validateSchemeSchema } from '@/lib/schemeValidation';
 import ValidationDetailsSheet from '@/components/ValidationDetailsSheet';
 import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
+import { contextEntries, formatObserved } from '@/lib/schemaValidation';
 import { SUPPORTED_CVC_SPEC_VERSIONS } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { ArtefactSlot, CollectionState, InstanceId, RunId } from '@/types/artefact';
 import type { StoredScheme, TestStep } from '@/types';
@@ -35,6 +45,7 @@ import confetti from 'canvas-confetti';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TestCaseStatus, TestCaseStepId } from '../../constants';
+import { toast } from 'sonner';
 
 type SchemeCollection = CollectionState<StoredScheme, TestStep[]>;
 type SchemeDispatch = <Res extends { state: SchemeCollection }>(transition: (current: SchemeCollection) => Res) => Res;
@@ -147,153 +158,310 @@ async function runSchemePipeline(
 
   // The only write path: commit the whole step list through the run guard. Returns false once the
   // run has been superseded (replaced or removed), so a stale run stops writing.
-  const setStep = (stepId: TestCaseStepId, patch: Partial<TestStep>): boolean => {
-    const index = steps.findIndex((step) => step.id === stepId);
-    if (index !== -1) steps[index] = { ...steps[index], ...patch };
+  const setSteps = (patches: Array<[TestCaseStepId, Partial<TestStep>]>): boolean => {
+    for (const [stepId, patch] of patches) {
+      const index = steps.findIndex((step) => step.id === stepId);
+      if (index !== -1) steps[index] = { ...steps[index], ...patch };
+    }
     const { applied } = dispatch((state) =>
       commitResult(state, { instanceId, runId, result: steps.map((step) => ({ ...step })) }),
     );
     return applied;
   };
+  const setStep = (stepId: TestCaseStepId, patch: Partial<TestStep>): boolean => setSteps([[stepId, patch]]);
 
-  if (!setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.IN_PROGRESS })) return;
-
-  const version = detectVersionFromContext(stored.decoded);
-  if (!version) {
-    const message =
-      'Could not detect a UNTP version from the @context. Add a UNTP context URI (e.g. https://vocabulary.uncefact.org/untp/0.7.0/context/).';
-    setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, {
-      status: TestCaseStatus.FAILURE,
-      details: { errors: [{ message }] },
-    });
-    setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
-      status: TestCaseStatus.FAILURE,
-      details: { errors: [{ message: 'Skipped: version detection failed.' }] },
-    });
-    setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
-      status: TestCaseStatus.FAILURE,
-      details: {
-        errors: [{ message: 'Skipped: version detection failed.' }],
-        diagnostics: [],
-        skipped: true,
-        blockedBy: TestCaseStepId.SCHEME_VERSION_DETECTION,
-      } satisfies SchemeStructuralParseDetails,
-    });
-    setStep(TestCaseStepId.CONTEXT_VALIDATION, {
-      status: TestCaseStatus.FAILURE,
-      details: { errors: [{ message: 'Skipped: version detection failed.' }] },
-    });
-    return;
-  }
-  if (!setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.SUCCESS })) return;
-
-  if (!setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS })) return;
-  let schemaSelectionFailed = false;
   try {
-    const result = await validateSchemeSchema(stored.decoded, version);
-    setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
-      status: result.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-      details: result.valid ? undefined : { errors: result.errors },
-    });
-  } catch (err) {
-    schemaSelectionFailed = err instanceof SchemaSelectionError;
-    setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
-      status: TestCaseStatus.FAILURE,
-      details: { errors: [schemaFetchError(err)] },
-    });
-  }
+    if (!setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.IN_PROGRESS })) return;
 
-  if (!setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, { status: TestCaseStatus.IN_PROGRESS })) return;
-  try {
-    if (schemaSelectionFailed) {
-      setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
-        status: TestCaseStatus.FAILURE,
-        details: {
-          errors: [{ message: buildSchemaSelectionSkipMessage() }],
-          diagnostics: [],
-          skipped: true,
-          blockedBy: TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
-        } satisfies SchemeStructuralParseDetails,
-      });
-    } else if (!SUPPORTED_CVC_SPEC_VERSIONS.some((supportedVersion) => supportedVersion === version)) {
-      // blockedBy records the step that prevented parsing; the no-parser skip has no blocking step.
-      setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
-        status: TestCaseStatus.FAILURE,
-        details: {
-          errors: [
+    const version = detectVersionFromContext(stored.decoded);
+    if (!version) {
+      const observedContexts = contextEntries(stored.decoded);
+      const message =
+        observedContexts.length === 0
+          ? 'The scheme declares no @context entries, so no UNTP version can be detected.'
+          : `The scheme declares @context entries ${formatObserved(
+              observedContexts,
+            )}, but none carries a recognised UNTP version.`;
+      const failure = classifySchemaSelectionFailure({ reason: 'version-not-detected', message }, 'scheme');
+      if (
+        !setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, {
+          status: TestCaseStatus.FAILURE,
+          details: { errors: [{ message }] },
+          failure,
+        })
+      ) {
+        return;
+      }
+      const blockedByVersion = notExecutedFailure(TestCaseStepId.SCHEME_VERSION_DETECTION, 'scheme');
+      if (
+        !setSteps([
+          [
+            TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
             {
-              message: buildUnsupportedParserSkipMessage(version),
+              status: TestCaseStatus.FAILURE,
+              details: { errors: [{ message: 'Skipped: version detection failed.' }] },
+              failure: blockedByVersion,
             },
           ],
-          diagnostics: [],
-          skipped: true,
-        } satisfies SchemeStructuralParseDetails,
-      });
-    } else {
-      const sourceUrl = stored.source?.kind === 'url' ? stored.source.url : `urn:untp-playground:scheme:${instanceId}`;
-      const result = parseSchemeStructure(stored.decoded, { sourceUrl, specVersion: version });
-      switch (result.kind) {
-        case 'parsed':
-          setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, { status: TestCaseStatus.SUCCESS });
-          break;
-        case 'document-failure':
-          setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
-            status: TestCaseStatus.FAILURE,
-            details: toSchemeStructuralParseDetails(result),
-          });
-          break;
-        case 'unsupported-version':
-          setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
-            status: TestCaseStatus.FAILURE,
-            details: toSchemeStructuralParseDetails(result),
-          });
-          break;
-        case 'unexpected':
-          setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
-            status: TestCaseStatus.FAILURE,
-            details: toSchemeStructuralParseDetails(result),
-          });
-          break;
-        default: {
-          const exhaustive: never = result;
-          throw new Error(`Unhandled scheme structure kind: ${JSON.stringify(exhaustive)}`);
-        }
+          [
+            TestCaseStepId.SCHEME_STRUCTURAL_PARSE,
+            {
+              status: TestCaseStatus.FAILURE,
+              details: {
+                errors: [{ message: 'Skipped: version detection failed.' }],
+                diagnostics: [],
+                skipped: true,
+                blockedBy: TestCaseStepId.SCHEME_VERSION_DETECTION,
+              } satisfies SchemeStructuralParseDetails,
+              failure: blockedByVersion,
+            },
+          ],
+          [
+            TestCaseStepId.CONTEXT_VALIDATION,
+            {
+              status: TestCaseStatus.FAILURE,
+              details: { errors: [{ message: 'Skipped: version detection failed.' }] },
+              failure: blockedByVersion,
+            },
+          ],
+        ])
+      ) {
+        return;
+      }
+      return;
+    }
+    if (!setStep(TestCaseStepId.SCHEME_VERSION_DETECTION, { status: TestCaseStatus.SUCCESS, failure: undefined }))
+      return;
+
+    if (!setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, { status: TestCaseStatus.IN_PROGRESS, failure: undefined }))
+      return;
+    let schemaSelectionFailed = false;
+    try {
+      const result = await validateSchemeSchema(stored.decoded, version);
+      if (
+        !setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
+          status: result.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+          details: result.valid ? undefined : { errors: result.errors },
+          failure: result.valid ? undefined : result.failure,
+        })
+      ) {
+        return;
+      }
+    } catch (error) {
+      schemaSelectionFailed = error instanceof SchemaSelectionError || isSchemaSelectionErrorLike(error);
+      const failure = classifySchemePipelineFailure(error, version);
+      if (
+        !setStep(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, {
+          status: TestCaseStatus.FAILURE,
+          details: {
+            errors: [
+              {
+                message: error instanceof Error ? error.message : failure.message,
+                supportable: failure.class === 'unknown',
+              },
+            ],
+          },
+          failure,
+        })
+      ) {
+        return;
+      }
+      if (isUnexpectedFailure(failure)) {
+        toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
       }
     }
-  } catch (err) {
-    setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
-      status: TestCaseStatus.FAILURE,
-      details: {
-        errors: [
-          {
-            message: describeUnexpectedSchemeParse(err),
-            supportable: true,
-          },
-        ],
-        diagnostics: [],
-      } satisfies SchemeStructuralParseDetails,
-    });
-  }
 
-  if (!setStep(TestCaseStepId.CONTEXT_VALIDATION, { status: TestCaseStatus.IN_PROGRESS })) return;
-  try {
-    const contextResult = await validateContext(stored.decoded);
-    setStep(TestCaseStepId.CONTEXT_VALIDATION, {
-      status: contextResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
-      details: contextResult.valid ? undefined : { errors: contextResult.error ? [contextResult.error] : [] },
-    });
-  } catch (err) {
-    setStep(TestCaseStepId.CONTEXT_VALIDATION, {
-      status: TestCaseStatus.FAILURE,
-      details: {
-        errors: [
+    if (!setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, { status: TestCaseStatus.IN_PROGRESS, failure: undefined }))
+      return;
+    try {
+      if (schemaSelectionFailed) {
+        const failure = notExecutedFailure(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, 'scheme');
+        if (
+          !setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+            status: TestCaseStatus.FAILURE,
+            details: {
+              errors: [{ message: buildSchemaSelectionSkipMessage() }],
+              diagnostics: [],
+              skipped: true,
+              blockedBy: TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
+            } satisfies SchemeStructuralParseDetails,
+            failure,
+          })
+        ) {
+          return;
+        }
+      } else if (!SUPPORTED_CVC_SPEC_VERSIONS.some((supportedVersion) => supportedVersion === version)) {
+        const failure = classifySchemaSelectionFailure(
           {
-            message: err instanceof Error ? err.message : 'Failed to validate JSON-LD context.',
-            supportable: true,
+            reason: 'scheme-version-unsupported',
+            message: `The declared Conformity Scheme version "${version}" has no parser in the Playground. Supported versions: ${SUPPORTED_CVC_SPEC_VERSIONS.join(
+              ', ',
+            )}.`,
           },
-        ],
-      },
-    });
+          'scheme',
+        );
+        if (
+          !setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+            status: TestCaseStatus.FAILURE,
+            details: {
+              errors: [{ message: buildUnsupportedParserSkipMessage(version) }],
+              diagnostics: [],
+              skipped: true,
+            } satisfies SchemeStructuralParseDetails,
+            failure,
+          })
+        ) {
+          return;
+        }
+      } else {
+        const sourceUrl =
+          stored.source?.kind === 'url' ? stored.source.url : `urn:untp-playground:scheme:${instanceId}`;
+        const result = parseSchemeStructure(stored.decoded, { sourceUrl, specVersion: version });
+        switch (result.kind) {
+          case 'parsed':
+            if (
+              !setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, { status: TestCaseStatus.SUCCESS, failure: undefined })
+            )
+              return;
+            break;
+          case 'document-failure': {
+            const failure: ArtefactStepFailure = {
+              class: 'credential-invalid',
+              code: 'conformity-scheme.parse-failed',
+              message: 'The Conformity Scheme document failed structural parsing.',
+              remediation: 'Correct the listed fields in the Conformity Scheme document.',
+            };
+            if (
+              !setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+                status: TestCaseStatus.FAILURE,
+                details: toSchemeStructuralParseDetails(result),
+                failure,
+              })
+            ) {
+              return;
+            }
+            break;
+          }
+          case 'unsupported-version': {
+            const failure = classifySchemaSelectionFailure(
+              {
+                reason: 'scheme-version-unsupported',
+                message: `The declared Conformity Scheme version "${
+                  result.received
+                }" is not supported by the Playground. Supported versions: ${SUPPORTED_CVC_SPEC_VERSIONS.join(', ')}.`,
+              },
+              'scheme',
+            );
+            if (
+              !setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+                status: TestCaseStatus.FAILURE,
+                details: toSchemeStructuralParseDetails(result),
+                failure,
+              })
+            ) {
+              return;
+            }
+            break;
+          }
+          case 'unexpected': {
+            const failure = unexpectedFailure('playground.pipeline.step', result.message, 'scheme');
+            if (
+              !setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+                status: TestCaseStatus.FAILURE,
+                details: toSchemeStructuralParseDetails(result),
+                failure,
+              })
+            ) {
+              return;
+            }
+            if (isUnexpectedFailure(failure)) {
+              toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
+            }
+            break;
+          }
+          default: {
+            const exhaustive: never = result;
+            throw new Error(`Unhandled scheme structure kind: ${JSON.stringify(exhaustive)}`);
+          }
+        }
+      }
+    } catch (error) {
+      const failure = classifySchemePipelineFailure(error, version);
+      if (
+        !setStep(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, {
+          status: TestCaseStatus.FAILURE,
+          details: {
+            errors: [
+              {
+                message: describeUnexpectedSchemeParse(error),
+                supportable: true,
+              },
+            ],
+            diagnostics: [],
+          } satisfies SchemeStructuralParseDetails,
+          failure,
+        })
+      ) {
+        return;
+      }
+      if (isUnexpectedFailure(failure)) {
+        toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
+      }
+    }
+
+    if (!setStep(TestCaseStepId.CONTEXT_VALIDATION, { status: TestCaseStatus.IN_PROGRESS, failure: undefined })) return;
+    try {
+      const contextResult = await validateContext(stored.decoded, 'scheme');
+      if (
+        !setStep(TestCaseStepId.CONTEXT_VALIDATION, {
+          status: contextResult.valid ? TestCaseStatus.SUCCESS : TestCaseStatus.FAILURE,
+          details: contextResult.valid ? undefined : { errors: contextResult.error ? [contextResult.error] : [] },
+          failure: contextResult.valid ? undefined : contextResult.failure,
+        })
+      ) {
+        return;
+      }
+    } catch (error) {
+      const failure = classifySchemePipelineFailure(error, version);
+      if (
+        !setStep(TestCaseStepId.CONTEXT_VALIDATION, {
+          status: TestCaseStatus.FAILURE,
+          details: {
+            errors: [
+              {
+                message: error instanceof Error ? error.message : 'Failed to validate JSON-LD context.',
+                supportable: true,
+              },
+            ],
+          },
+          failure,
+        })
+      ) {
+        return;
+      }
+      if (isUnexpectedFailure(failure)) {
+        toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
+      }
+    }
+  } catch (error) {
+    const failure = unexpectedFailure(
+      'playground.pipeline.unexpected',
+      `The Playground could not complete validation for this scheme: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      'scheme',
+    );
+    const unfinished = steps.filter(
+      (step) => step.status === TestCaseStatus.PENDING || step.status === TestCaseStatus.IN_PROGRESS,
+    );
+    if (unfinished.length === 0) {
+      console.error('SchemeTestResults: validation escaped after all steps settled', error);
+      return;
+    }
+    const applied = setSteps(unfinished.map((step) => [step.id, { status: TestCaseStatus.FAILURE, failure }]));
+    if (applied && isUnexpectedFailure(failure)) {
+      toast.error('Validation failed unexpectedly. Report the details to the Playground operator.');
+    }
   }
 }
 
@@ -338,41 +506,46 @@ function schemeMessageDetails(errors: DisplayableError[]) {
   );
 }
 
-function schemaFetchError(err: unknown): DisplayableError {
-  // Selection failed before transport on the scheme's own version, so the uploader can act on it
-  // and support cannot.
-  if (err instanceof SchemaSelectionError) {
-    return {
-      message: `${err.message} Use a Conformity Scheme published for UNTP ${SUPPORTED_CVC_SPEC_VERSIONS.join(', ')}.`,
-      supportable: false,
-    };
+function classifySchemePipelineFailure(error: unknown, declaredVersion?: string): ArtefactStepFailure {
+  if (error instanceof SchemaFetchError || isSchemaFetchErrorLike(error)) {
+    return classifySchemaFetchFailure(error as SchemaFetchError, 'scheme', declaredVersion);
   }
-  if (err instanceof SchemaFetchError) {
-    switch (err.reason) {
-      case 'timeout':
-        return { message: 'The schema service did not respond in time. Please try again.', supportable: true };
-      case 'not-found':
-        return {
-          message: `No schema is published at ${
-            err.schemaUrl
-          }. Use a Conformity Scheme published for UNTP ${SUPPORTED_CVC_SPEC_VERSIONS.join(', ')}.`,
-        };
-      case 'parse':
-        return {
-          message: 'The schema service returned a response that was not valid JSON. Please try again.',
-          supportable: true,
-        };
-      case 'network':
-      default:
-        // The message carries the schema service's own category (upstream
-        // status, could not be loaded), which says more than a generic outage.
-        return { message: `${err.message} Please try again.`, supportable: true };
-    }
+  if (error instanceof SchemaSelectionError || isSchemaSelectionErrorLike(error)) {
+    const candidate = error as { reason: SchemaSelectionError['reason']; message: string };
+    return classifySchemaSelectionFailure(candidate, 'scheme');
   }
-  return {
-    message: err instanceof Error ? err.message : 'Schema validation failed for an unknown reason.',
-    supportable: true,
-  };
+  return unexpectedFailure(
+    'playground.pipeline.step',
+    `The scheme validation step failed unexpectedly: ${error instanceof Error ? error.message : String(error)}`,
+    'scheme',
+  );
+}
+
+function isSchemaFetchErrorLike(error: unknown): error is SchemaFetchError {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as Record<string, unknown>;
+  return (
+    typeof candidate.schemaUrl === 'string' &&
+    typeof candidate.category === 'string' &&
+    typeof candidate.reason === 'string' &&
+    typeof candidate.message === 'string'
+  );
+}
+
+function isSchemaSelectionErrorLike(error: unknown): error is SchemaSelectionError {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as Record<string, unknown>;
+  return (
+    typeof candidate.message === 'string' &&
+    [
+      'version-not-detected',
+      'unknown-type',
+      'unsupported-extension-version',
+      'vcdm-version-unmapped',
+      'scheme-version-unsupported',
+      'builder',
+    ].includes(String(candidate.reason))
+  );
 }
 
 function SchemeCard({ item, onRemove }: { item: SchemeSlot; onRemove: () => void }) {
@@ -436,6 +609,7 @@ function SchemeCard({ item, onRemove }: { item: SchemeSlot; onRemove: () => void
 function SchemeStepItem({ step }: { step: TestStep }) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const errors = stepErrors(step);
+  const failurePresentation = describeArtefactFailure(step.failure, 'scheme');
   const structuralDetails = schemeStructuralParseDetails(step);
   const messageErrors = structuralDetails?.errors ?? errors;
   const ajvErrors = step.details?.errors;
@@ -444,6 +618,8 @@ function SchemeStepItem({ step }: { step: TestStep }) {
     Array.isArray(ajvErrors) &&
     ajvErrors.length > 0 &&
     ajvErrors.every(isAjvError);
+  const usesFailureOnlyDetails =
+    step.failure?.class === 'could-not-fetch' || step.failure?.class === 'unusable-artefact';
 
   return (
     <div className='py-2'>
@@ -451,13 +627,27 @@ function SchemeStepItem({ step }: { step: TestStep }) {
         <div className='flex items-center gap-2'>
           <StatusIcon status={step.status} testId={step.id} />
           <span>{step.name}</span>
+          {failurePresentation && (
+            <span className='text-xs font-medium text-amber-700' data-testid='artefact-failure-class'>
+              {failurePresentation.heading}
+            </span>
+          )}
         </div>
-        {step.status === TestCaseStatus.FAILURE && errors.length > 0 && step.details && (
+        {step.status === TestCaseStatus.FAILURE && (failurePresentation || errors.length > 0) && (
           <ValidationDetailsSheet
             isOpen={isDetailsOpen}
             onOpenChange={setIsDetailsOpen}
-            errors={step.details.errors}
-            content={usesErrorDialog ? undefined : schemeMessageDetails(messageErrors)}
+            errors={usesErrorDialog && Array.isArray(step.details?.errors) ? step.details.errors : []}
+            failure={step.failure}
+            family='scheme'
+            content={
+              usesErrorDialog ||
+              usesFailureOnlyDetails ||
+              messageErrors.length === 0 ||
+              step.failure?.code === 'playground.pipeline.not-executed'
+                ? undefined
+                : schemeMessageDetails(messageErrors)
+            }
             trigger={
               <Button variant='ghost' size='sm' data-testid={`${step.id}-details-trigger`}>
                 View Details

@@ -33,6 +33,7 @@ import {
 } from '@/lib/credentialService';
 import { TestCaseStatus, TestCaseStepId } from '../../constants';
 import type { StoredCredential, TestStep } from '@/types';
+import type { CollectionState } from '@/types/artefact';
 import confetti from 'canvas-confetti';
 import { VCDM_CONTEXT_URLS, VCDMVersion } from '../../constants';
 
@@ -63,14 +64,14 @@ jest.mock('sonner', () => ({
 const untpContext = (version: string) => `https://vocabulary.uncefact.org/untp/dpp/${version}/context.jsonld`;
 
 function makeStored(
-  overrides: { id?: string; type?: string[]; version?: string; issuer?: any } = {},
+  overrides: { id?: string; type?: string[]; version?: string; issuer?: any; context?: string[] } = {},
   source?: StoredCredential['source'],
 ): StoredCredential {
   const version = overrides.version ?? '0.6.0';
   return {
     original: { proof: { type: 'Ed25519Signature2020' } },
     decoded: {
-      '@context': [VCDM_CONTEXT_URLS.v2, untpContext(version)],
+      '@context': overrides.context ?? [VCDM_CONTEXT_URLS.v2, untpContext(version)],
       type: overrides.type ?? ['VerifiableCredential', 'DigitalProductPassport'],
       issuer: overrides.issuer ?? { id: 'did:web:acme.example' },
       ...(overrides.id !== undefined && { id: overrides.id }),
@@ -80,9 +81,16 @@ function makeStored(
 }
 
 // Harness: drives the real collection hook so the pipeline runs and the cards re-render on commit.
-function Harness({ credentials }: { credentials: StoredCredential[] }) {
+function Harness({
+  credentials,
+  throwOnRunnerStart = false,
+}: {
+  credentials: StoredCredential[];
+  throwOnRunnerStart?: boolean;
+}) {
   const collection = useArtefactCollection<StoredCredential, TestStep[]>();
   const seeded = useRef(false);
+  const runnerDispatchCalls = useRef(0);
   useEffect(() => {
     if (seeded.current) return;
     seeded.current = true;
@@ -128,7 +136,21 @@ function Harness({ credentials }: { credentials: StoredCredential[] }) {
       return false;
     }
   };
-  return <TestResults collection={collection.state} dispatch={collection.dispatch} onDecrypted={handleDecrypted} />;
+  const runnerDispatch = <Res extends { state: CollectionState<StoredCredential, TestStep[]> }>(
+    reducer: (state: CollectionState<StoredCredential, TestStep[]>) => Res,
+  ): Res => {
+    runnerDispatchCalls.current += 1;
+    if (throwOnRunnerStart && runnerDispatchCalls.current === 2) throw new Error('late runner failure');
+    return collection.dispatch(reducer);
+  };
+
+  return (
+    <TestResults
+      collection={collection.state}
+      dispatch={throwOnRunnerStart ? runnerDispatch : collection.dispatch}
+      onDecrypted={handleDecrypted}
+    />
+  );
 }
 
 const expandInstance = () => userEvent.click(screen.getByTestId('credential-instance-header'));
@@ -162,12 +184,19 @@ function ReplaceHarness({ first, second }: { first: StoredCredential; second: St
   return (
     <>
       <button onClick={uploadSecond}>Upload second</button>
+      <output data-testid='replacement-vcdm-failure'>
+        {collection.state.items[0]?.result?.find((step) => step.id === TestCaseStepId.VCDM_SCHEMA_VALIDATION)
+          ?.failure === undefined
+          ? 'undefined'
+          : 'present'}
+      </output>
       <TestResults collection={collection.state} dispatch={collection.dispatch} />
     </>
   );
 }
 
 beforeEach(() => {
+  jest.restoreAllMocks();
   jest.clearAllMocks();
   (verifyCredential as jest.Mock).mockResolvedValue({ verified: true });
   (validateCredentialSchema as jest.Mock).mockResolvedValue({ valid: true });
@@ -297,6 +326,71 @@ describe('TestResults removal (#810)', () => {
 });
 
 describe('Credential verification throw regression (#810)', () => {
+  it('settles every step when initial result construction throws', async () => {
+    (detectVcdmVersion as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('detector failed');
+    });
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'initialisation-throw' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('proof-type-status-icon-failure')).toBeInTheDocument();
+      expect(screen.getByTestId('context-status-icon-failure')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('decryption-status-icon-failure')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
+    expect(toast.error).toHaveBeenCalledWith(
+      'Validation could not start. Report the details to the Playground operator.',
+    );
+  });
+
+  it('keeps decryption successful when an encrypted credential fails during initialisation', async () => {
+    (detectVcdmVersion as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('detector failed');
+    });
+    const { toast } = require('sonner');
+    const decrypted: StoredCredential = {
+      ...makeStored({ id: 'encrypted-initialisation-throw' }),
+      decryptedFromEnvelope: true,
+    };
+
+    render(<Harness credentials={[decrypted]} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('decryption-status-icon-success')).toBeInTheDocument();
+      expect(screen.getByTestId('proof-type-status-icon-failure')).toBeInTheDocument();
+      expect(screen.getByTestId('context-status-icon-failure')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('decryption-status-icon-failure')).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
+    const failureMarkers = screen.getAllByTestId('artefact-failure-class');
+    expect(failureMarkers).toHaveLength(6);
+    for (const marker of failureMarkers) {
+      expect(marker).toHaveTextContent('Could not determine the cause');
+    }
+    expect(toast.error).toHaveBeenCalledWith(
+      'Validation could not start. Report the details to the Playground operator.',
+    );
+  });
+
+  it('settles the remaining steps when the runner fails before its inner step catches', async () => {
+    const { toast } = require('sonner');
+
+    render(<Harness credentials={[makeStored({ id: 'outer-catch' })]} throwOnRunnerStart />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('verification-status-icon-failure')).toBeInTheDocument();
+      expect(screen.getByTestId('context-status-icon-failure')).toBeInTheDocument();
+    });
+    expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
+    expect(toast.error).toHaveBeenCalledWith(
+      'Validation failed unexpectedly. Report the details to the Playground operator.',
+    );
+  });
+
   it('fails the verification step, settles every other step, and allows removal when verifyCredential throws', async () => {
     (verifyCredential as jest.Mock).mockRejectedValue(new Error('Service unavailable'));
     const { toast } = require('sonner');
@@ -347,7 +441,9 @@ describe('Credential verification throw regression (#810)', () => {
       expect(screen.getByRole('button', { name: 'Remove dpp-context.json' })).toBeInTheDocument();
     });
 
-    expect(toast.error).toHaveBeenCalledWith('Validation of the JSON-LD context failed. Please try again.');
+    expect(toast.error).toHaveBeenCalledWith(
+      'Validation failed unexpectedly. Report the details to the Playground operator.',
+    );
   });
 });
 
@@ -386,6 +482,37 @@ describe('Credential replace-in-place through the collection (#810)', () => {
       expect(screen.getByTestId('DigitalProductPassport-status-icon-success')).toBeInTheDocument();
     });
   });
+
+  it('clears stale failure metadata when a replacement succeeds', async () => {
+    (validateVcdmRules as jest.Mock)
+      .mockResolvedValueOnce({
+        valid: false,
+        errors: [],
+        failure: {
+          class: 'unknown',
+          code: 'schema.validation.dialect',
+          message: 'old schema diagnostic',
+          remediation: 'Report these details to the Playground operator.',
+        },
+      })
+      .mockResolvedValue({ valid: true, errors: [] });
+    const first = makeStored({ id: 'failure-then-success' }, { kind: 'file', filename: 'dpp-retry.json' });
+    const second = makeStored({ id: 'failure-then-success' }, { kind: 'file', filename: 'dpp-retry.json' });
+
+    render(<ReplaceHarness first={first} second={second} />);
+    await expandInstance();
+    await waitFor(() => {
+      expect(screen.getByTestId('vcdm-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Upload second' }));
+    await waitFor(() => {
+      expect(validateVcdmRules).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId('vcdm-schema-validation-status-icon-success')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('replacement-vcdm-failure')).toHaveTextContent('undefined');
+    expect(screen.queryByTestId('artefact-failure-class')).not.toBeInTheDocument();
+  });
 });
 
 describe('Credential validation pipeline (preserved verbatim from pre-#810)', () => {
@@ -398,6 +525,23 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     await waitFor(() => {
       expect(screen.getByTestId('vcdm-version-status-icon-failure')).toBeInTheDocument();
     });
+    await userEvent.click(screen.getByTestId('vcdm-version-view-details'));
+    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent('Credential invalid');
+  });
+
+  it('states the missing context fact for an unsupported VCDM version', async () => {
+    (detectVcdmVersion as jest.Mock).mockReturnValue(VCDMVersion.UNKNOWN);
+
+    render(<Harness credentials={[makeStored({ id: 'unknown-vcdm-no-context', context: [] })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('vcdm-version-status-icon-failure')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByTestId('vcdm-version-view-details'));
+    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent(
+      'The credential declares no @context entries, so no VCDM version can be detected.',
+    );
   });
 
   it('shows success for valid VCDM schema validation', async () => {
@@ -428,12 +572,34 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     render(<Harness credentials={[makeStored({ id: 'vcdm-fetch-error' })]} />);
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to fetch the VCDM schema. Please contact support.');
+      expect(toast.error).toHaveBeenCalledWith(
+        'Validation failed unexpectedly. Report the details to the Playground operator.',
+      );
     });
     await expandInstance();
     await waitFor(() => {
       expect(screen.getByTestId('vcdm-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
+  });
+
+  it('reports a credential schema URL builder failure as a Playground fault', async () => {
+    (validateCredentialSchema as jest.Mock).mockRejectedValue(
+      new SchemaSelectionError('The Playground could not build a schema URL: invalid version.', 'builder'),
+    );
+
+    render(<Harness credentials={[makeStored({ id: 'untp-builder-error' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
+    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent('Could not determine the cause');
+    expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Playground could not build a schema URL');
+    expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(
+      'Report these details to the Playground operator.',
+    );
+    expect(screen.queryByText(/Use a Conformity Scheme published/)).not.toBeInTheDocument();
   });
 
   it('shows the UNTP schema fetch error with the exact preserved copy and params', async () => {
@@ -444,21 +610,22 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     await expandInstance();
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to fetch schema. Please try again.');
+      expect(toast.error).toHaveBeenCalledWith(
+        'Validation failed unexpectedly. Report the details to the Playground operator.',
+      );
     });
     await waitFor(() => {
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
-    await userEvent.click(await screen.findByText('Fix validation error'));
-    expect(
-      await screen.findByText("Ensure the credential includes the required UNTP context IRIs in the '@context' field."),
-    ).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
+    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent('Could not determine the cause');
   });
 
   it('records schema selection failures without a retry toast, and still settles the later steps', async () => {
-    (validateCredentialSchema as jest.Mock).mockRejectedValue(new SchemaSelectionError('Unsupported version'));
+    (validateCredentialSchema as jest.Mock).mockRejectedValue(
+      new SchemaSelectionError('Unsupported version', 'version-not-detected'),
+    );
     const { toast } = require('sonner');
 
     render(<Harness credentials={[makeStored({ id: 'untp-selection-error' })]} />);
@@ -467,6 +634,7 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     await waitFor(() => {
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('artefact-failure-class')).toHaveTextContent('Credential invalid');
     expect(toast.error).not.toHaveBeenCalled();
 
     // The selection branch must fall through to Context Validation. Returning early there leaves
@@ -476,12 +644,8 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     });
     expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
 
-    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
-    await userEvent.click(await screen.findByText('Fix validation error'));
-    expect(await screen.findAllByText(/Unsupported version/)).toHaveLength(2);
-    expect(
-      await screen.findByText(/Check the credential's type and the UNTP version in its @context/),
-    ).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
+    expect(await screen.findByText(/Unsupported version/)).toBeInTheDocument();
   });
 
   // The ordinary journey behind the same branch: the page admits a permitted type whose @context
@@ -513,36 +677,66 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
     expect(toast.error).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
-    await userEvent.click(await screen.findByText('Fix validation error'));
-    expect(await screen.findAllByText(/Unsupported version/)).toHaveLength(2);
+    await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
+    expect(await screen.findByText(/declares @context entries/)).toBeInTheDocument();
   });
 
   it('blames the schema host, not the credential, when the schema could not be fetched', async () => {
     (validateCredentialSchema as jest.Mock).mockRejectedValue(
-      new SchemaFetchError('Failed to fetch schema: Schema host could not be reached', 502),
+      new SchemaFetchError({
+        code: 'playground.schema.fetch',
+        message: 'Schema host could not be reached.',
+        schemaUrl: untpContext('0.6.0'),
+        category: 'unreachable',
+        serviceStatus: 502,
+        reason: 'network',
+      }),
     );
     const { toast } = require('sonner');
 
     render(<Harness credentials={[makeStored({ id: 'untp-host-down' })]} />);
     await expandInstance();
 
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to fetch schema: Schema host could not be reached');
-    });
+    expect(toast.error).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
-    await userEvent.click(await screen.findByText('Fix validation error'));
-    expect(await screen.findByText(/Retry in a moment/)).toBeInTheDocument();
+    expect(screen.getByTestId('artefact-failure-class')).toHaveTextContent('Could not fetch');
+    await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
+    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent('Could not fetch');
+    expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(/Retry the check/);
     expect(screen.queryByText(/required UNTP context IRIs/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Nothing in the credential/)).not.toBeInTheDocument();
   });
 
-  it('points at the declared type and version when the schema host has nothing at the built URL', async () => {
+  it('keeps a foreign reason-shaped thrown value unknown rather than credential-invalid', async () => {
+    (validateCredentialSchema as jest.Mock).mockRejectedValue({
+      reason: 'unknown-type',
+      message: 'foreign reason-shaped value',
+    });
+
+    render(<Harness credentials={[makeStored({ id: 'foreign-error' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
+    });
+    const headings = screen.getAllByTestId('artefact-failure-class');
+    expect(headings.some((node) => node.textContent?.includes('Could not determine the cause'))).toBe(true);
+    expect(headings.some((node) => node.textContent?.includes('Credential invalid'))).toBe(false);
+  });
+
+  it('classifies a 403 schema response as not published for the declared version', async () => {
     (validateCredentialSchema as jest.Mock).mockRejectedValue(
-      new SchemaFetchError('Failed to fetch schema: Schema host returned status 403', 502, 403),
+      new SchemaFetchError({
+        code: 'playground.schema.fetch',
+        message: 'Schema host returned status 403.',
+        schemaUrl: untpContext('0.6.0'),
+        category: 'upstream-status',
+        serviceStatus: 502,
+        upstreamStatus: 403,
+        reason: 'not-found',
+      }),
     );
 
     render(<Harness credentials={[makeStored({ id: 'untp-schema-404' })]} />);
@@ -551,9 +745,13 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     await waitFor(() => {
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole('button', { name: 'View Details' }));
-    await userEvent.click(await screen.findByText('Fix validation error'));
-    expect(await screen.findByText(/UNTP version in its '@context'/)).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
+    const banner = await screen.findByTestId('artefact-failure-banner');
+    expect(banner).toHaveTextContent('Credential invalid');
+    expect(banner).toHaveTextContent(untpContext('0.6.0'));
+    expect(banner).toHaveTextContent('HTTP status 403');
+    expect(banner).toHaveTextContent('declared version 0.6.0');
+    expect(banner).toHaveTextContent('@context version 0.6.0');
   });
 
   it('blames the extension schema host, not the credential, when that schema could not be fetched', async () => {
@@ -562,39 +760,81 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
       extension: { type: 'DigitalLivestockPassport', version: '0.4.0' },
     });
     (validateExtension as jest.Mock).mockRejectedValue(
-      new SchemaFetchError('Failed to fetch schema: The schema could not be loaded from its host', 502),
+      new SchemaFetchError({
+        code: 'playground.schema.fetch',
+        message: 'The schema could not be loaded from its host.',
+        schemaUrl:
+          'https://aatp.foodagility.com/assets/files/aatp-dlp-schema-0.4.0-9c0ad2b1ca6a9e497dedcfd8b87f35f1.json',
+        category: 'unreachable',
+        serviceStatus: 502,
+        reason: 'network',
+      }),
     );
     const { toast } = require('sonner');
 
     render(<Harness credentials={[makeStored({ id: 'extension-host-down' })]} />);
     await expandInstance();
 
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to fetch schema: The schema could not be loaded from its host');
-    });
+    expect(toast.error).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(screen.getByTestId('extension-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
   });
 
-  it('validates against context and reports failure with the preserved toast copy', async () => {
+  it('uses the context timeout copy in the failure banner, not the raw abort error', async () => {
     (validateContext as jest.Mock).mockResolvedValue({
       valid: false,
-      error: { keyword: 'unknown', message: 'bad context', instancePath: '' },
+      error: {
+        keyword: 'jsonldService',
+        message: "The Playground's context service did not respond within 15s. Retry in a moment.",
+        instancePath: '',
+      },
+      failure: {
+        class: 'could-not-fetch',
+        code: 'context.service',
+        message:
+          "The Playground context service could not be reached: The Playground's context service did not respond within 15s. Retry in a moment.",
+        remediation:
+          'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
+      },
     });
     const { toast } = require('sonner');
 
     render(<Harness credentials={[makeStored({ id: 'context-fail' })]} />);
     await expandInstance();
 
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(
-        'Validation of the JSON-LD context failed. Please check the View Details for more information.',
-      );
-    });
+    expect(toast.error).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(screen.getByTestId('context-status-icon-failure')).toBeInTheDocument();
     });
+    await userEvent.click(screen.getByTestId('context-view-details'));
+    const banner = await screen.findByTestId('artefact-failure-banner');
+    expect(banner).toHaveTextContent('did not respond within 15s');
+    expect(screen.queryByText('The user aborted a request.')).not.toBeInTheDocument();
+  });
+
+  it('opens View Details for a VCDM failure even when it has no Ajv errors', async () => {
+    (validateVcdmRules as jest.Mock).mockResolvedValue({
+      valid: false,
+      errors: [],
+      failure: {
+        class: 'unknown',
+        code: 'schema.validation.dialect',
+        message: 'The VCDM schema declares draft-07.',
+        remediation: 'Report these details to the Playground operator.',
+      },
+    });
+
+    render(<Harness credentials={[makeStored({ id: 'vcdm-details' })]} />);
+    await expandInstance();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('vcdm-schema-validation-status-icon-failure')).toBeInTheDocument();
+      expect(screen.queryByTestId('vcdm-schema-validation-status-icon-success')).not.toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByTestId('vcdm-schema-validation-view-details'));
+    expect(screen.getAllByTestId('artefact-failure-banner')).toHaveLength(1);
+    expect(screen.getAllByText('Report these details to the Playground operator.')).toHaveLength(1);
   });
 
   it('shows a verification failure toast with the underlying error description', async () => {
@@ -624,7 +864,7 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     });
   });
 
-  it('handles extension schema fetch errors with the preserved copy and params', async () => {
+  it('handles unexpected extension schema errors with the operator report copy', async () => {
     (detectExtension as jest.Mock).mockReturnValue({
       core: { type: 'DigitalProductPassport', version: '0.5.0' },
       extension: { type: 'DigitalLivestockPassport', version: '0.4.0' },
@@ -636,7 +876,9 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     await expandInstance();
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to fetch extension schema. Please try again.');
+      expect(toast.error).toHaveBeenCalledWith(
+        'Validation failed unexpectedly. Report the details to the Playground operator.',
+      );
     });
     await waitFor(() => {
       expect(screen.getByTestId('extension-schema-validation-status-icon-failure')).toBeInTheDocument();

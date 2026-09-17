@@ -3,6 +3,7 @@
  */
 
 import { ErrorDialog } from '@/components/ErrorDialog';
+import { classifyJsonLdFailure } from '@/lib/artefactFailure';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 // Mock clipboard API
@@ -26,6 +27,114 @@ describe('ErrorDialog', () => {
     // @ts-ignore - Testing invalid input
     const { container } = render(<ErrorDialog errors={{}} />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('renders a fetch failure without field errors exactly once', () => {
+    render(
+      <ErrorDialog
+        errors={[]}
+        failure={{
+          class: 'could-not-fetch',
+          code: 'schema.fetch.timeout',
+          message: 'The Playground could not fetch the artefact.',
+          remediation: 'Retry the check and report the details if it keeps failing.',
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText('Could not fetch')).toHaveLength(1);
+    expect(screen.getAllByText('Retry the check and report the details if it keeps failing.')).toHaveLength(1);
+    expect(screen.queryByText(/Additional properties found/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps fetched-schema diagnostics separate from credential correction guidance', () => {
+    render(
+      <ErrorDialog
+        errors={[
+          { keyword: 'type', instancePath: '', message: 'must be object', params: { type: 'object' }, data: 17 },
+        ]}
+        failure={{
+          class: 'unusable-artefact',
+          code: 'schema.validation.meta-schema',
+          message: 'The fetched schema is not usable.',
+          remediation: 'Report the schema to its publisher.',
+          artefactUrl: 'https://publisher.example/schema.json',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('These diagnostics describe the fetched schema, not the credential.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /choose from allowed values/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /diagnostic details/i }));
+    expect(screen.queryByText(/Try this instead/i)).not.toBeInTheDocument();
+  });
+
+  it('does not repeat the supported-type subject when no supported types were supplied', () => {
+    render(
+      <ErrorDialog
+        errors={[
+          {
+            keyword: 'unsupportedCredentialType',
+            instancePath: '',
+            message: 'The declared type is not supported.',
+            params: { supportedTypes: [] },
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /fix validation error/i }));
+    expect(screen.getByText(/Add the artefact on its own tab\. The Playground accepts:/i)).toBeInTheDocument();
+    expect(screen.queryByText(/supported UNTP credential types: the supported UNTP types/i)).not.toBeInTheDocument();
+  });
+
+  it('does not show a second speculative causes list for an established fetch failure', () => {
+    render(
+      <ErrorDialog
+        errors={[
+          {
+            keyword: 'jsonldUrl',
+            instancePath: '@context',
+            message: 'Could not load the context. Common causes: a host outage.',
+            params: { code: 'resolver.http-error', url: 'https://publisher.example/context.jsonld' },
+          },
+        ]}
+        failure={{
+          class: 'could-not-fetch',
+          code: 'context.fetch',
+          message: 'The Playground context service answered 503.',
+          remediation: 'Retry the check.',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(
+      'The Playground context service answered 503.',
+    );
+    expect(screen.queryByText(/Common causes:/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps diagnostic causes for an unknown failure because no class was established', () => {
+    render(
+      <ErrorDialog
+        errors={[
+          {
+            keyword: 'jsonldUrl',
+            instancePath: '@context',
+            message: 'Could not load the context. Common causes: a host outage.',
+            params: { code: 'resolver.http-error', url: 'https://publisher.example/context.jsonld' },
+          },
+        ]}
+        failure={{
+          class: 'unknown',
+          code: 'context.document.unknown',
+          message: 'The cause is not established.',
+          remediation: 'Report these details to the Playground operator.',
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/Common causes:/i)).toBeInTheDocument();
   });
 
   it('displays validation errors correctly', () => {
@@ -185,6 +294,34 @@ describe('ErrorDialog', () => {
     ).toBeInTheDocument();
   });
 
+  it('names supported credential types and artefact tabs for an unsupported type', () => {
+    const errors = [
+      {
+        keyword: 'unsupportedCredentialType',
+        instancePath: '',
+        message: 'The declared type is not supported.',
+        params: {
+          supportedTypes: [
+            'DigitalProductPassport',
+            'DigitalConformityCredential',
+            'DigitalFacilityRecord',
+            'DigitalIdentityAnchor',
+            'DigitalTraceabilityEvent',
+          ],
+        },
+      },
+    ] as any;
+
+    render(<ErrorDialog errors={errors} />);
+    fireEvent.click(screen.getByRole('button', { name: /Fix validation error/i }));
+
+    expect(
+      screen.getByText(
+        /Add one of the supported UNTP credential types: DigitalProductPassport, DigitalConformityCredential, DigitalFacilityRecord, DigitalIdentityAnchor, DigitalTraceabilityEvent, or add the artefact on its own tab\. The Playground accepts: Verifiable Credential, Conformity Scheme, Link Set\./i,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('groups multiple errors for the same path', () => {
     const errors = [
       {
@@ -340,7 +477,7 @@ describe('ErrorDialog', () => {
       ] as any;
 
       render(<ErrorDialog errors={errors} />);
-      fireEvent.click(screen.getByRole('button', { name: /use an absolute iri/i }));
+      fireEvent.click(screen.getByRole('button', { name: /diagnostic details json-ld validation/i }));
 
       expect(screen.getByText(/JSON-LD code:/i)).toBeInTheDocument();
       expect(screen.getByText('relative @id reference')).toBeInTheDocument();
@@ -356,10 +493,49 @@ describe('ErrorDialog', () => {
         },
       ] as any;
 
-      render(<ErrorDialog errors={errors} />);
+      render(
+        <ErrorDialog
+          errors={errors}
+          failure={{
+            class: 'credential-invalid',
+            code: 'context.document.invalid-property',
+            message: 'The credential uses property "mediaQuery", but no supplied JSON-LD context defines it.',
+            remediation: 'Add "mediaQuery" to a context, or remove it from the credential.',
+          }}
+          family='context'
+        />,
+      );
       fireEvent.click(screen.getByRole('button', { name: /property not defined in @context/i }));
 
       expect(screen.getByText(/Add "mediaQuery" to a @context, or remove it from the credential/i)).toBeInTheDocument();
+    });
+
+    it('uses default remediation when the invalid property has no term', () => {
+      const failure = classifyJsonLdFailure({
+        kind: 'document',
+        source: 'safe-mode-event',
+        code: 'invalid property',
+        detail: 'A property was not defined.',
+      });
+      render(
+        <ErrorDialog
+          errors={[
+            {
+              keyword: 'jsonldValidation',
+              instancePath: '',
+              message: 'A property was not defined.',
+              params: { code: 'invalid property' },
+            },
+          ]}
+          failure={failure}
+          family='credential'
+        />,
+      );
+
+      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(
+        'Correct the named field or term in the credential.',
+      );
+      expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
     });
 
     it('shows the URL-specific header and tip for invalid context URL errors', () => {
@@ -372,10 +548,23 @@ describe('ErrorDialog', () => {
         },
       ] as any;
 
-      render(<ErrorDialog errors={errors} />);
-      fireEvent.click(screen.getByRole('button', { name: /fix the @context url/i }));
+      render(
+        <ErrorDialog
+          errors={errors}
+          failure={{
+            class: 'could-not-fetch',
+            code: 'context.fetch',
+            message: 'The Playground could not fetch the JSON-LD context at "https://example.invalid/ctx".',
+            remediation:
+              'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
+            artefactUrl: 'https://example.invalid/ctx',
+          }}
+          family='context'
+        />,
+      );
 
-      expect(screen.getByText(/Open the URL in a browser/i)).toBeInTheDocument();
+      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Could not fetch');
+      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(/Retry the check/);
     });
 
     it('shows a host-delivery header and tip when the context host failed after passing the guard', () => {
@@ -388,10 +577,22 @@ describe('ErrorDialog', () => {
         },
       ] as any;
 
-      render(<ErrorDialog errors={errors} />);
-      fireEvent.click(screen.getByRole('button', { name: /remote @context could not be fetched/i }));
+      render(
+        <ErrorDialog
+          errors={errors}
+          failure={{
+            class: 'could-not-fetch',
+            code: 'context.fetch',
+            message: 'The Playground could not fetch the JSON-LD context at "https://example.invalid/ctx".',
+            remediation: 'Retry the check.',
+            artefactUrl: 'https://example.invalid/ctx',
+          }}
+          family='context'
+        />,
+      );
 
-      expect(screen.getByText(/the host may be down/i)).toBeInTheDocument();
+      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Could not fetch');
+      expect(screen.queryByText(/change|rename|use a different/i)).not.toBeInTheDocument();
     });
 
     it('shows an unusable-artefact header and tip for a fetched context that is not a context', () => {
@@ -404,10 +605,22 @@ describe('ErrorDialog', () => {
         },
       ] as any;
 
-      render(<ErrorDialog errors={errors} />);
-      fireEvent.click(screen.getByRole('button', { name: /remote @context is not usable/i }));
+      render(
+        <ErrorDialog
+          errors={errors}
+          failure={{
+            class: 'unusable-artefact',
+            code: 'context.invalid',
+            message: 'The JSON-LD context at "https://example.invalid/ctx" was fetched but is not usable.',
+            remediation: 'Report the artefact URL and these details to its publisher or the Playground operator.',
+            artefactUrl: 'https://example.invalid/ctx',
+          }}
+          family='context'
+        />,
+      );
 
-      expect(screen.getByText(/not with your credential/i)).toBeInTheDocument();
+      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Unusable artefact');
+      expect(screen.queryByText(/change|rename|use a different/i)).not.toBeInTheDocument();
     });
 
     it('shows a service header and tip when the context service itself failed', () => {
@@ -420,10 +633,21 @@ describe('ErrorDialog', () => {
         },
       ] as any;
 
-      render(<ErrorDialog errors={errors} />);
-      fireEvent.click(screen.getByRole('button', { name: /context service unavailable/i }));
+      render(
+        <ErrorDialog
+          errors={errors}
+          failure={{
+            class: 'could-not-fetch',
+            code: 'context.service',
+            message: 'The Playground context service could not be reached.',
+            remediation: 'Retry the check. If it keeps failing, report the details to the Playground operator.',
+          }}
+          family='context'
+        />,
+      );
 
-      expect(screen.getByText(/Your credential was not judged/i)).toBeInTheDocument();
+      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Could not fetch');
+      expect(screen.queryByText(/change|rename|use a different/i)).not.toBeInTheDocument();
     });
   });
 

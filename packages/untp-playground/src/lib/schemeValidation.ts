@@ -1,34 +1,40 @@
-import addFormats from 'ajv-formats';
-import Ajv2020 from 'ajv/dist/2020';
 import { buildUntpArtefactUrls, isV070OrAbove } from '@uncefact/untp-utils/artefacts';
+import type { ArtefactStepFailure } from './artefactFailure';
 import { fetchSchema, SchemaFetchError, SchemaSelectionError } from './schemaFetch';
+import { validateSchemaDocument } from './schemaValidation';
 
-// SchemaSelectionError is the only shared binding: both result components narrow on its identity. The
-// scheme validator re-exports its SchemaFetchError binding from schemaFetch.ts, while
-// schemaValidation.ts defines its own SchemaFetchError.
 export { SchemaFetchError, SchemaSelectionError };
 
-const ajv = new Ajv2020({
-  allErrors: true,
-  strict: false,
-  validateFormats: false,
-  verbose: true,
-});
-addFormats(ajv);
+export interface SchemeSchemaValidationResult {
+  valid: boolean;
+  errors?: any[];
+  schemaUrl: string;
+  failure?: ArtefactStepFailure;
+}
 
 export async function validateSchemeSchema(
   scheme: Record<string, unknown>,
   version: string,
-): Promise<{ valid: boolean; errors?: any[]; schemaUrl: string }> {
+): Promise<SchemeSchemaValidationResult> {
   if (!isV070OrAbove(version)) {
-    throw new SchemaSelectionError(
-      `Conformity Scheme schemas have no legacy layout before UNTP 0.7.0; detected ${version}.`,
+    const error = new SchemaSelectionError(
+      `The scheme declares UNTP version "${version}", but this Playground has schema layouts only for UNTP 0.7.0 and later.`,
+      'scheme-version-unsupported',
     );
+    throw error;
   }
 
-  const schemaUrl = buildUntpArtefactUrls('ConformityScheme', version).schemaUrl;
+  let schemaUrl: string;
+  try {
+    schemaUrl = buildUntpArtefactUrls('ConformityScheme', version).schemaUrl;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new SchemaSelectionError(`The Playground could not build a scheme schema URL: ${error.message}`, 'builder');
+    }
+    throw error;
+  }
+
   const schema = await fetchSchema(schemaUrl);
-  const validate = ajv.compile(schema);
-  const valid = validate(scheme);
-  return { valid, errors: valid ? undefined : validate.errors ?? [], schemaUrl };
+  const result = validateSchemaDocument(schema, scheme, schemaUrl, 'scheme');
+  return { ...result, schemaUrl };
 }

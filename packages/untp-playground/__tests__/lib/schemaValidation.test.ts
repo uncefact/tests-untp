@@ -5,10 +5,10 @@ import {
   schemaCache,
   SchemaFetchError,
   SchemaSelectionError,
-  schemaFetchFailureAdvice,
   validateCredentialSchema,
   validateExtension,
   validateVcAgainstSchema,
+  formatObserved,
 } from '@/lib/schemaValidation';
 import { VCDMVersion } from '../../constants';
 
@@ -74,6 +74,7 @@ describe('schemaValidation', () => {
         `/api/schema?url=${encodeURIComponent(
           'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
         )}`,
+        expect.objectContaining({ signal: expect.any(Object) }),
       );
     });
 
@@ -94,6 +95,7 @@ describe('schemaValidation', () => {
         `/api/schema?url=${encodeURIComponent(
           'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
         )}`,
+        expect.objectContaining({ signal: expect.any(Object) }),
       );
     });
 
@@ -114,6 +116,7 @@ describe('schemaValidation', () => {
         `/api/schema?url=${encodeURIComponent(
           'https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json',
         )}`,
+        expect.objectContaining({ signal: expect.any(Object) }),
       );
     });
 
@@ -142,6 +145,7 @@ describe('schemaValidation', () => {
           `/api/schema?url=${encodeURIComponent(
             'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.6.0.json',
           )}`,
+          expect.objectContaining({ signal: expect.any(Object) }),
         );
       });
 
@@ -162,6 +166,7 @@ describe('schemaValidation', () => {
           `/api/schema?url=${encodeURIComponent(
             'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json',
           )}`,
+          expect.objectContaining({ signal: expect.any(Object) }),
         );
       });
 
@@ -182,6 +187,7 @@ describe('schemaValidation', () => {
           `/api/schema?url=${encodeURIComponent(
             'https://untp.unece.org/artefacts/schema/v0.7.0/dcc/ConformityCredential.json',
           )}`,
+          expect.objectContaining({ signal: expect.any(Object) }),
         );
       });
     });
@@ -212,6 +218,7 @@ describe('schemaValidation', () => {
           `/api/schema?url=${encodeURIComponent(
             `https://untp.unece.org/artefacts/schema/v0.7.0/${short}/${file}.json`,
           )}`,
+          expect.objectContaining({ signal: expect.any(Object) }),
         );
       }
     });
@@ -252,8 +259,22 @@ describe('schemaValidation', () => {
 
       (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
 
-      await expect(validateCredentialSchema(invalidCredential)).rejects.toThrow('Unsupported credential type: Unknown');
-      await expect(validateCredentialSchema(invalidCredential)).rejects.toBeInstanceOf(SchemaSelectionError);
+      const error = await validateCredentialSchema(invalidCredential).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(SchemaSelectionError);
+      expect(error).toMatchObject({
+        reason: 'unknown-type',
+        message:
+          'The credential declares type values ["UnsupportedType"], but none is a UNTP type this Playground validates.',
+      });
+    });
+
+    it('states the missing type fact without a contrastive clause', async () => {
+      (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
+
+      await expect(validateCredentialSchema({ '@context': [] })).rejects.toMatchObject({
+        reason: 'unknown-type',
+        message: 'The credential declares no type values, so the Playground could not select a UNTP schema.',
+      });
     });
 
     it('should throw error for missing version', async () => {
@@ -263,8 +284,34 @@ describe('schemaValidation', () => {
 
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
 
-      await expect(validateCredentialSchema(invalidCredential)).rejects.toBeInstanceOf(SchemaSelectionError);
-      await expect(validateCredentialSchema(invalidCredential)).rejects.toThrow('Unsupported version');
+      const error = await validateCredentialSchema(invalidCredential).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(SchemaSelectionError);
+      expect(error).toMatchObject({
+        reason: 'version-not-detected',
+        message: 'The credential declares no @context entries, so no UNTP version can be detected.',
+      });
+    });
+
+    it('conveys the shared typed fetch failure from validateCredentialSchema', async () => {
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        json: () => Promise.resolve({ error: 'Schema host returned status 503', upstreamStatus: 503 }),
+      });
+
+      await expect(
+        validateCredentialSchema({
+          type: 'DigitalProductPassport',
+          '@context': ['https://test.uncefact.org/vocabulary/untp/dpp/0.6.0/'],
+        }),
+      ).rejects.toMatchObject({
+        name: 'SchemaFetchError',
+        category: 'upstream-status',
+        serviceStatus: 502,
+        upstreamStatus: 503,
+        reason: 'network',
+      });
     });
 
     it('detects a terminal version path and lets the published schema enforce its context string', async () => {
@@ -288,6 +335,7 @@ describe('schemaValidation', () => {
         `/api/schema?url=${encodeURIComponent(
           'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json',
         )}`,
+        expect.objectContaining({ signal: expect.any(Object) }),
       );
       expect(slashlessResult.valid).toBe(false);
       expect(slashlessResult.errors).toEqual(
@@ -447,6 +495,7 @@ describe('schemaValidation', () => {
         `/api/schema?url=${encodeURIComponent(
           'https://untp.unece.org/artefacts/schema/v0.7.0-rc.1/dpp/DigitalProductPassport.json',
         )}`,
+        expect.objectContaining({ signal: expect.any(Object) }),
       );
     });
 
@@ -461,7 +510,10 @@ describe('schemaValidation', () => {
 
         await validateCredentialSchema({ type, '@context': [context] });
 
-        expect(global.fetch).toHaveBeenCalledWith(`/api/schema?url=${encodeURIComponent(schemaUrl)}`);
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/schema?url=${encodeURIComponent(schemaUrl)}`,
+          expect.objectContaining({ signal: expect.any(Object) }),
+        );
       },
     );
   });
@@ -501,8 +553,38 @@ describe('schemaValidation', () => {
 
       (detectCredentialType as jest.Mock).mockReturnValue('UnknownExtension');
 
-      await expect(validateExtension(invalidCredential)).rejects.toThrow('Unknown extension');
+      const error = await validateExtension(invalidCredential).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(SchemaSelectionError);
+      expect(error).toMatchObject({
+        reason: 'unsupported-extension-version',
+        message: 'The credential declares type values ["UnknownExtension"], but no registered extension matches them.',
+      });
     });
+
+    it('states the missing type fact when no extension type is declared', async () => {
+      (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
+
+      await expect(validateExtension({})).rejects.toMatchObject({
+        reason: 'unsupported-extension-version',
+        message: 'The credential declares no type values, so the Playground could not select a registered extension.',
+      });
+    });
+
+    it('states the missing extension context fact when a registered extension type is declared', async () => {
+      (detectCredentialType as jest.Mock).mockReturnValue('DigitalLivestockPassport');
+
+      await expect(validateCredentialSchema({ type: 'DigitalLivestockPassport' })).rejects.toMatchObject({
+        reason: 'unsupported-extension-version',
+        message:
+          'The credential declares no recognised extension context entries, so no registered extension version can be detected.',
+      });
+    });
+  });
+
+  it('caps long document-declared observations', () => {
+    const observed = formatObserved(['x'.repeat(240), 'second value']);
+    expect(observed.length).toBe(200);
+    expect(observed.endsWith('...')).toBe(true);
   });
 
   describe('detectExtension', () => {
@@ -609,7 +691,7 @@ describe('schemaValidation', () => {
       // The type is recognised and the version is not, so the failure names the version, not the
       // type. Falling through to the own-key check would report the supported type as unsupported.
       await expect(validateCredentialSchema(credential)).rejects.toThrow(
-        'Unsupported extension version for DigitalLivestockPassport',
+        'The credential declares extension context ["https://aatp.foodagility.com/9.9.9/context/"], but none matches the registered extension versions',
       );
       expect(global.fetch).not.toHaveBeenCalled();
     });
@@ -627,7 +709,9 @@ describe('schemaValidation', () => {
           type: ['VerifiableCredential'],
           '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
         }),
-      ).rejects.toThrow('Unsupported credential type: Unknown');
+      ).rejects.toThrow(
+        'The credential declares type values ["VerifiableCredential"], but none is a UNTP type this Playground validates.',
+      );
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -651,6 +735,7 @@ describe('schemaValidation', () => {
         `/api/schema?url=${encodeURIComponent(
           'https://test.uncefact.org/vocabulary/untp/dpp/untp-dpp-schema-0.5.0.json',
         )}`,
+        expect.objectContaining({ signal: expect.any(Object) }),
       );
     });
 
@@ -768,6 +853,7 @@ describe('schemaValidation', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        json: async () => ({ error: 'Schema service rejected the request' }),
       });
 
       const credential = {
@@ -776,7 +862,7 @@ describe('schemaValidation', () => {
       };
 
       await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow(
-        'Failed to fetch schema: 404 Not Found',
+        'Schema service rejected the request',
       );
     });
 
@@ -795,16 +881,19 @@ describe('schemaValidation', () => {
 
       await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toMatchObject({
         name: 'SchemaFetchError',
-        status: 502,
+        serviceStatus: 502,
         upstreamStatus: 404,
-        message: 'Failed to fetch schema: Schema host returned status 404',
+        category: 'upstream-status',
+        message: expect.stringContaining('Schema host returned status 404'),
       });
     });
 
     it('rejects a credential whose UNTP version could not be detected before fetching', async () => {
       (detectCredentialType as jest.Mock).mockReturnValue('DigitalProductPassport');
 
-      await expect(validateCredentialSchema({ type: 'DigitalProductPassport' })).rejects.toThrow('Unsupported version');
+      await expect(validateCredentialSchema({ type: 'DigitalProductPassport' })).rejects.toThrow(
+        'The credential declares no @context entries, so no UNTP version can be detected.',
+      );
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -867,7 +956,9 @@ describe('schemaValidation', () => {
         type: ['VerifiableCredential'],
       };
 
-      await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow('Network error');
+      await expect(validateVcAgainstSchema(credential, VCDMVersion.V2)).rejects.toThrow(
+        'The Playground schema service could not be reached',
+      );
     });
 
     it('should throw error when schema URL is not found for version', async () => {
@@ -883,7 +974,7 @@ describe('schemaValidation', () => {
       };
 
       await expect(validateVcAgainstSchema(credential, VCDMVersion.UNKNOWN as any)).rejects.toThrow(
-        'Schema URL for VCDM version: unknown not found.',
+        'The credential declares VCDM context version "unknown", but this Playground has no schema mapped for it.',
       );
     });
   });
@@ -929,7 +1020,12 @@ describe('schemaValidation', () => {
 
     it('does not poison the cache when the first fetch fails', async () => {
       (global.fetch as jest.Mock)
-        .mockResolvedValueOnce({ ok: false, status: 429, statusText: 'Too Many Requests' })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          statusText: 'Too Many Requests',
+          json: async () => ({ error: 'Too many requests' }),
+        })
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
@@ -947,7 +1043,7 @@ describe('schemaValidation', () => {
         version: '0.5.0',
       };
 
-      await expect(validateCredentialSchema(credential)).rejects.toThrow('Failed to fetch schema');
+      await expect(validateCredentialSchema(credential)).rejects.toThrow('Too many requests');
 
       // Second attempt should re-fetch (the failed promise was evicted), not throw the cached error.
       const result = await validateCredentialSchema(credential);
@@ -996,34 +1092,6 @@ describe('schemaValidation', () => {
       expect(cached).toBeDefined();
       expect(cached.properties.type.const).toEqual(['DigitalProductPassport', 'VerifiableCredential']);
       expect(cached.$id).toBe('https://example.com/dpp-0.5.0.json');
-    });
-  });
-
-  describe('schemaFetchFailureAdvice', () => {
-    it.each([404, 403])('points at the declared type and version when the schema host returned %s', (status) => {
-      const advice = schemaFetchFailureAdvice(
-        new SchemaFetchError(`Failed to fetch schema: status ${status}`, 502, status),
-      );
-      expect(advice.solution).toMatch(/UNTP version in its '@context'/);
-      expect(advice.missingValue).toMatch(/has no schema at the URL/);
-    });
-
-    it('does not blame the credential for an upstream 5xx', () => {
-      const advice = schemaFetchFailureAdvice(new SchemaFetchError('Failed to fetch schema: status 503', 502, 503));
-      expect(advice.missingValue).toMatch(/could not determine whether the credential conforms/);
-    });
-
-    it('treats a route rejection of the URL the same way', () => {
-      const advice = schemaFetchFailureAdvice(
-        new SchemaFetchError('Failed to fetch schema: not on the allowlist', 400),
-      );
-      expect(advice.solution).toMatch(/UNTP version in its '@context'/);
-    });
-
-    it('says the credential is unassessed, not cleared, when the host failed', () => {
-      const advice = schemaFetchFailureAdvice(new SchemaFetchError('Failed to fetch schema: could not be loaded', 502));
-      expect(advice.missingValue).toMatch(/could not determine whether the credential conforms/);
-      expect(advice.solution).not.toMatch(/Nothing in the credential/);
     });
   });
 });

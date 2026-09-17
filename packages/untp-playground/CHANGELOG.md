@@ -36,7 +36,12 @@ Resolver Link Sets` section, one block per link set, with the version it
   well as the existing JSON-LD context check, so it is reported twice. Structural
   Parse details mark an unrun check with `skipped`; `blockedBy` names the earlier
   step that prevented it when one exists. Scheme step details now open in the
-  same details view as credential steps.
+  same details view as credential steps. Scheme failures caused by the
+  submitted document are labelled `Scheme invalid`, while schema fetch and
+  unusable-artefact failures use their own class headings. A step an earlier
+  failure prevented from running says `Not executed` and names the blocking
+  step. A detected scheme version with no parser is a fault in the scheme and
+  says `Scheme invalid`.
 
 ### Changed
 
@@ -47,6 +52,48 @@ Resolver Link Sets` section, one block per link set, with the version it
 - **A blank scheme name no longer titles a card.** A Conformity Scheme whose
   `name` is empty or only whitespace is titled by the final path segment of its
   URL, else its filename, else `Conformity Scheme`, in cards and in reports.
+- **Artefact-step failure classes.** Schema, VCDM, extension, conformity
+  scheme, link-set schema and JSON-LD context failures now record whether the
+  artefact could not be fetched, was unusable, the submitted document was
+  invalid, or the cause could not be determined. The card, details view and
+  report carry the same class, URL and status evidence, with remediation that
+  does not blame the credential when the evidence does not do so. The HTML
+  report is the one exception: it renders the class heading on credential,
+  extension and scheme steps, while a link set's schema failure reaches it as
+  the message alone and keeps its class in the JSON report. Schema body reads
+  have a bounded 15-second browser budget. Context retrieval has a 10-second
+  server-side resolver budget and a 15-second browser budget covering the
+  request and response body. Unexpected pipeline throws settle all remaining
+  steps as unknown so a report cannot contain a running step. The JSON report
+  adds an optional failure object on failed steps, and consumers of earlier
+  reports are unaffected.
+
+  Selection outcomes name the declared type or version that did not match and
+  the values the Playground matched against. The link-set schema step's
+  `reason` keeps its existing values and adds `unreadable-response` for a
+  proxy body the browser could not read. Boolean root schemas are accepted on
+  every schema path, and the shared schema cache no longer lets one family
+  receive another family's error.
+
+  The VCDM Version Detection step now records a failure class and offers View
+  Details when the declared VCDM version cannot be mapped. When an upstream
+  host returns HTTP 403, 404 or 410 for a schema or declared context URL and
+  no bundled copy is available, the artefact is reported as not published for
+  the credential's declared version. Other 4xx responses, including 408 and
+  429, remain `could-not-fetch` with retry-or-report remediation. A
+  third-party context URL is named as its own missing `@context` entry without
+  a UNTP version claim. A 403, 404 or 410 for a dependency imported by a
+  declared context remains `could-not-fetch` and names the dependency. When
+  the document declares a single context URL and the declaration walk
+  completes, the report also names the declaring context. Otherwise, including
+  when the document is too large for the Playground to trace fully, it names
+  only the dependency and status without asserting which context imported it.
+  The report directs the dependency's publisher to publish it. Link-set schema
+  fetches are excluded: a 4xx remains `could-not-fetch` and advises picking a
+  UNTP version with a published link-set schema. HTTP 5xx responses, network
+  failures and timeouts remain `could-not-fetch`, and a bundled copy is still
+  used when available.
+
 - **Guarded URL retrieval.** `/api/fetch` now uses the shared resolver with
   one 10 second budget covering DNS, redirects, transport and body reading,
   rather than a separate timer per hop, and a timeout does not promise that

@@ -3,11 +3,14 @@
 import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { ErrorDialog } from './ErrorDialog';
+import type { ArtefactFailureFamily, ArtefactStepFailure } from '@/lib/artefactFailure';
 
 interface ValidationDetailsSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   errors: any[];
+  failure?: ArtefactStepFailure;
+  family?: ArtefactFailureFamily;
   trigger?: React.ReactNode;
   content?: React.ReactNode;
 }
@@ -16,6 +19,8 @@ const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({
   isOpen,
   onOpenChange,
   errors,
+  failure,
+  family = 'credential',
   trigger,
   content,
 }) => {
@@ -27,16 +32,13 @@ const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({
           <SheetTitle>Validation Details</SheetTitle>
         </SheetHeader>
         <div className='mt-4 overflow-y-auto max-h-[calc(100vh-8rem)]'>
+          {failure && content !== undefined && (
+            <ErrorDialog errors={[]} failure={failure} family={family} className='w-full max-w-none' />
+          )}
           {content !== undefined ? (
             content
-          ) : errors && errors.length > 0 ? (
-            <>
-              <ErrorDialog errors={errors} className='w-full max-w-none' />
-            </>
           ) : (
-            <div className='text-yellow-600'>
-              <p>⚠️ Additional properties found in credential</p>
-            </div>
+            <ErrorDialog errors={errors} failure={failure} family={family} className='w-full max-w-none' />
           )}
         </div>
       </SheetContent>

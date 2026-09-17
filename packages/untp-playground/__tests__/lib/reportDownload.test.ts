@@ -1,4 +1,6 @@
 import { downloadHtml } from '@/lib/reportDownload';
+import { classifyJsonLdFailure } from '@/lib/artefactFailure';
+import type { ArtefactStepFailure } from '@/lib/artefactFailure';
 import type {
   PermittedCredentialType,
   TestReport,
@@ -175,6 +177,13 @@ describe('downloadHtml (#814)', () => {
     const stepNames = (article: Element) =>
       Array.from(article.querySelectorAll('.step-name')).map((n) => n.textContent);
     const articles = Array.from(doc.querySelectorAll('article[data-result="credential"]'));
+    const credentialsHeading = Array.from(doc.querySelectorAll('h2.section-h')).find(
+      (heading) => heading.textContent?.includes('Verifiable Credentials'),
+    );
+    expect(credentialsHeading).toBeDefined();
+    expect(
+      credentialsHeading?.parentElement?.querySelector('article[data-result="credential"] .step-name')?.textContent,
+    ).toBe('Proof Type Detection');
     expect(stepNames(articles[2])[0]).toBe('Decryption');
     expect(articles[2].querySelector('li.step')?.className).toContain('success');
     expect(stepNames(articles[0])).not.toContain('Decryption');
@@ -238,6 +247,158 @@ describe('downloadHtml (#814)', () => {
     expect(doc.body.textContent).toContain('/name: scheme.name is required and must be a non-empty string.');
     expect(doc.body.textContent).not.toContain('DO_NOT_RENDER_STRUCTURAL_DIAGNOSTIC');
     expect(article?.querySelector('a')).toBeNull();
+  });
+
+  const schemeFailureCases: Array<{ label: string; failure: ArtefactStepFailure }> = [
+    {
+      label: 'could-not-fetch',
+      failure: {
+        class: 'could-not-fetch',
+        code: 'schema.fetch.upstream-status',
+        message: 'The Playground could not fetch the scheme schema (upstream status 503).',
+        remediation: 'Retry the check and report the URL to the operator if it keeps failing.',
+        artefactUrl: 'https://publisher.example/scheme.json',
+        upstreamStatus: 503,
+      },
+    },
+    {
+      label: 'unusable-artefact',
+      failure: {
+        class: 'unusable-artefact',
+        code: 'schema.fetch.invalid-json',
+        message: 'The scheme schema response was not valid JSON.',
+        remediation: 'Report the scheme schema URL to its publisher.',
+        artefactUrl: 'https://publisher.example/scheme.json',
+      },
+    },
+    {
+      label: 'credential-invalid',
+      failure: {
+        class: 'credential-invalid',
+        code: 'conformity-scheme.parse-failed',
+        message: 'The Conformity Scheme document failed structural parsing.',
+        remediation: 'Correct the listed fields in the Conformity Scheme document.',
+      },
+    },
+    {
+      label: 'unknown',
+      failure: {
+        class: 'unknown',
+        code: 'playground.pipeline.step',
+        message: 'The scheme validation step failed unexpectedly.',
+        remediation: 'Report these details to the Playground operator.',
+      },
+    },
+  ];
+
+  it.each(schemeFailureCases)('renders the $label failure summary on a scheme step', async ({ failure }) => {
+    const entry = scheme('Failed Scheme', 'Failed Scheme');
+    entry.status = TestCaseStatus.FAILURE;
+    entry.steps = [
+      step(TestCaseStepId.SCHEME_VERSION_DETECTION, 'Version Detection', TestCaseStatus.SUCCESS),
+      {
+        ...step(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, 'Structural Parse', TestCaseStatus.FAILURE),
+        failure,
+      },
+    ];
+
+    const doc = await render(report({ pass: false, conformitySchemes: [entry] }));
+    const summary = doc.querySelector('article[data-result="scheme"] [data-failure-summary="true"]')?.textContent ?? '';
+    expect(summary).toContain(
+      failure.class === 'could-not-fetch'
+        ? 'Could not fetch'
+        : failure.class === 'unusable-artefact'
+          ? 'Unusable artefact'
+          : failure.class === 'credential-invalid'
+            ? 'Scheme invalid'
+            : 'Could not determine the cause',
+    );
+    expect(summary).toContain(failure.message);
+    expect(summary).toContain(failure.remediation);
+  });
+
+  it('renders every recorded failure class with its remediation and keeps field errors', async () => {
+    const classes = [
+      {
+        class: 'could-not-fetch' as const,
+        code: 'schema.fetch.upstream-status' as const,
+        message: '<script>alert(1)</script>',
+        remediation: 'Retry the check or report the URL and status.',
+        artefactUrl: 'https://publisher.example/schema.json',
+        serviceStatus: 502,
+        upstreamStatus: 503,
+      },
+      {
+        class: 'unusable-artefact' as const,
+        code: 'schema.fetch.invalid-json' as const,
+        message: 'The artefact was fetched but is not usable.',
+        remediation: 'Report the artefact URL to its publisher.',
+        artefactUrl: 'https://publisher.example/schema.json',
+      },
+      {
+        class: 'credential-invalid' as const,
+        code: 'schema.validation.payload' as const,
+        message: 'The credential failed against the fetched schema.',
+        remediation: 'Correct the named field in the credential.',
+        artefactUrl: 'https://publisher.example/schema.json',
+      },
+      {
+        class: 'unknown' as const,
+        code: 'context.document.unknown' as const,
+        message: 'Diagnostic code: invalid @language value.',
+        remediation: 'Report these details to the Playground operator.',
+      },
+    ];
+    const results = classes.map((failure, index) => {
+      const result = credential('DigitalProductPassport', `failed-${index}.json`);
+      result.status = TestCaseStatus.FAILURE;
+      result.core.steps = [
+        {
+          ...result.core.steps[0],
+          status: TestCaseStatus.FAILURE,
+          failure,
+          ...(failure.class === 'credential-invalid'
+            ? { details: { errors: [{ keyword: 'required', message: 'must have issuer', params: {} }] } }
+            : {}),
+        },
+      ];
+      return result;
+    });
+    const doc = await render(report({ pass: false, verifiableCredentials: results }));
+    const summaries = Array.from(doc.querySelectorAll('[data-failure-summary="true"]')).map((node) => node.textContent);
+    expect(summaries).toHaveLength(4);
+    expect(summaries[0]).toContain('Could not fetch');
+    expect(summaries[0]).toContain('Retry');
+    expect(summaries[1]).toContain('Unusable artefact');
+    expect(summaries[1]).toContain('publisher');
+    expect(summaries[2]).toContain('Credential invalid');
+    expect(summaries[3]).toContain('Could not determine the cause');
+    expect(summaries[0]).not.toMatch(/correct|change|rename|fix/i);
+    expect(summaries[1]).not.toMatch(/correct|change|rename|fix/i);
+    expect(summaries[3]).not.toMatch(/correct|change|rename|fix/i);
+    expect(doc.body.textContent).toContain('must have issuer');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+  });
+
+  it('renders the default remediation for a term-less invalid-property failure', async () => {
+    const failure = classifyJsonLdFailure({
+      kind: 'document',
+      source: 'safe-mode-event',
+      code: 'invalid property',
+      detail: 'A property was not defined.',
+    });
+    const result = credential('DigitalProductPassport', 'term-less.json');
+    result.status = TestCaseStatus.FAILURE;
+    result.core.steps = [
+      {
+        ...result.core.steps[0],
+        status: TestCaseStatus.FAILURE,
+        failure,
+      },
+    ];
+    const doc = await render(report({ pass: false, verifiableCredentials: [result] }));
+    expect(doc.body.textContent).toContain('Correct the named field or term in the credential.');
+    expect(doc.body.textContent).not.toContain('undefined');
   });
 
   it('names the link set a verified credential came from in its caption', async () => {

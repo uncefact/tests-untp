@@ -1,17 +1,25 @@
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020';
-import { API_BASE_PATH, VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
+import type Ajv from 'ajv';
+import type { ValidateFunction } from 'ajv';
+import { VCDM_SCHEMA_URLS, VCDMVersion } from '../../constants';
 import {
   buildUntpArtefactUrls,
   detectVersionFromContext,
   UNTP_SHORT_CREDENTIAL_TYPES,
 } from '@uncefact/untp-utils/artefacts';
 import { detectCredentialType } from './credentialService';
-import { schemaCache, SchemaSelectionError } from './schemaFetch';
+import {
+  classifySchemaCompileFailure,
+  classifySchemaDialectFailure,
+  classifySchemaMetaFailure,
+  classifySchemaPayloadFailure,
+  type ArtefactFailureFamily,
+  type ArtefactStepFailure,
+} from './artefactFailure';
+import { fetchSchema, schemaCache, SchemaFetchError, SchemaSelectionError } from './schemaFetch';
 
-// Re-exported as the same binding: TestResults narrows on `instanceof SchemaSelectionError`
-// through this module, and the scheme validator raises the same class from its own module.
-export { SchemaSelectionError };
+export { SchemaFetchError, SchemaSelectionError, schemaCache };
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -21,79 +29,12 @@ const ajv = new Ajv2020({
 });
 addFormats(ajv);
 
-/**
- * A schema the proxy route could not deliver. `message` carries the route's
- * own category (host unreachable, upstream status, not JSON, host not on the
- * allowlist) so the verifier sees why, not just that it failed. `upstreamStatus`
- * is the schema host's own status when the route reported one.
- */
-export class SchemaFetchError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly upstreamStatus?: number,
-  ) {
-    super(message);
-    this.name = 'SchemaFetchError';
-  }
-}
+const CARRIED_DIALECT = 'https://json-schema.org/draft/2020-12/schema';
 
-/**
- * What the verifier can do about a schema fetch failure. A 4xx from the schema
- * host (or a URL the route refused) means the host has nothing at the URL built
- * from the type and version the credential declares, which the credential's own
- * `@context` may be causing. The published hosts answer 403, not 404, for a
- * missing path, so the whole 4xx range is read that way. Anything else is the
- * host, and the credential is unassessed rather than cleared.
- */
-export function schemaFetchFailureAdvice(error: SchemaFetchError): { missingValue: string; solution: string } {
-  const upstream = error.upstreamStatus;
-  if ((upstream !== undefined && upstream >= 400 && upstream < 500) || error.status === 400) {
-    return {
-      missingValue:
-        'The schema host has no schema at the URL built from the type and UNTP version this credential declares.',
-      solution:
-        "Check the credential's type and the UNTP version in its '@context'. If both are right, the host may be refusing requests: retry in a moment, then report the message above to the Playground operator.",
-    };
-  }
-  return {
-    missingValue: 'The schema could not be loaded, so this check could not determine whether the credential conforms.',
-    solution: 'Retry in a moment. If it keeps failing, report the message above to the Playground operator.',
-  };
-}
-
-// The proxy names the failure category in its body; fall back to the transport
-// status when the body is missing or not the shape this route publishes.
-async function readErrorBody(response: Response): Promise<{ reason: string; upstreamStatus?: number }> {
-  try {
-    const body = await response.json();
-    if (typeof body?.error === 'string') {
-      return {
-        reason: body.error,
-        ...(typeof body.upstreamStatus === 'number' && { upstreamStatus: body.upstreamStatus }),
-      };
-    }
-  } catch {
-    // Fall through to the transport status below.
-  }
-  return { reason: `${response.status} ${response.statusText}` };
-}
-
-// The session cache lives in schemaFetch.ts (the utils TTL cache) so every family shares it; the
-// export stays here for the callers and tests that read it from this module. The cache also
-// de-duplicates concurrent requests for one URL, so this module keeps no in-flight map of its own.
-export { schemaCache };
-
-function fetchSchema(schemaUrl: string): Promise<any> {
-  return schemaCache.get(schemaUrl, async () => {
-    const proxyUrl = `${API_BASE_PATH}/api/schema?url=${encodeURIComponent(schemaUrl)}`;
-    const response = await fetch(proxyUrl);
-    if (!response.ok) {
-      const { reason, upstreamStatus } = await readErrorBody(response);
-      throw new SchemaFetchError(`Failed to fetch schema: ${reason}`, response.status, upstreamStatus);
-    }
-    return response.json();
-  });
+export interface SchemaValidationResult {
+  valid: boolean;
+  errors?: any[];
+  failure?: ArtefactStepFailure;
 }
 
 interface CoreVersion {
@@ -135,51 +76,262 @@ export const EXTENSION_VERSIONS: Record<string, ExtensionConfig> = {
   },
 };
 
-const findExtensionSchemaURL = (type: string, version: string) => {
-  return EXTENSION_VERSIONS[type].versions.find((v) => v.version === version)?.schema;
-};
+function findExtensionSchemaURL(type: string, version: string): string | undefined {
+  return EXTENSION_VERSIONS[type]?.versions.find((entry) => entry.version === version)?.schema;
+}
 
-/**
- * Keeps the DLP filename-shaped context carried by the shipped e2e fixture working while the
- * shared detector handles version-shaped path segments. The fixture
- * invalid-v2-enveloped-dpp-with-extension.json carries
- * `https://aatp.foodagility.com/context/aatp-dlp-context-0.4.0.jsonld`, which the shared detector
- * does not recognise, so that journey needs this path. Evidence that the extension has adopted a
- * version-shaped context would allow the fallback to be removed.
- */
-function detectExtensionVersion(credential: any, domain: string): string | undefined {
+/** Formats an observed value, capping untrusted document-declared output at 200 characters. */
+export function formatObserved(value: unknown): string {
+  if (value === undefined || (Array.isArray(value) && value.length === 0)) return 'nothing';
+  try {
+    const serialised = JSON.stringify(value) ?? String(value);
+    return serialised.length > 200 ? `${serialised.slice(0, 197)}...` : serialised;
+  } catch {
+    const stringValue = String(value);
+    return stringValue.length > 200 ? `${stringValue.slice(0, 197)}...` : stringValue;
+  }
+}
+
+/** Returns the credential @context entries in the form used by selection diagnostics. */
+export function contextEntries(credential: any): unknown[] {
   const context = credential?.['@context'];
-  const candidates = Array.isArray(context) ? context : [context];
-  const extensionContext = candidates.find(
+  return Array.isArray(context) ? context : context === undefined ? [] : [context];
+}
+
+function typeEntries(credential: any): unknown[] {
+  const type = credential?.type;
+  return Array.isArray(type) ? type : type === undefined ? [] : [type];
+}
+
+function extensionVersionObservation(credential: any, extension: ExtensionConfig): string | undefined {
+  const entries = contextEntries(credential).filter(
+    (entry): entry is string => typeof entry === 'string' && entry.includes(extension.domain),
+  );
+  return entries.length > 0 ? formatObserved(entries) : undefined;
+}
+
+function unsupportedExtensionMessage(credential: any, extension: ExtensionConfig): string {
+  const observed = extensionVersionObservation(credential, extension);
+  return observed
+    ? `The credential declares extension context ${observed}, but none matches the registered extension versions ${extension.versions
+        .map((entry) => entry.version)
+        .join(', ')}.`
+    : 'The credential declares no recognised extension context entries, so no registered extension version can be detected.';
+}
+
+/** Keeps filename-shaped extension contexts working alongside the shared detector. */
+function detectExtensionVersion(credential: any, domain: string): string | undefined {
+  const extensionContext = contextEntries(credential).find(
     (entry): entry is string => typeof entry === 'string' && entry.includes(domain),
   );
   if (!extensionContext) return undefined;
 
   const canonicalVersion = detectVersionFromContext({ '@context': [extensionContext] }, { domain });
   if (canonicalVersion) return canonicalVersion;
-
   return extensionContext.match(/(\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/)?.[1];
 }
 
-export async function validateCredentialSchema(credential: any): Promise<{
-  valid: boolean;
-  errors?: any[];
-}> {
+/** Extracts a schema's declared dialect when the root carries one. */
+export function schemaDialect(schema: unknown): string | undefined {
+  return typeof schema === 'object' && schema !== null && !Array.isArray(schema) && '$schema' in schema
+    ? typeof (schema as { $schema?: unknown }).$schema === 'string'
+      ? (schema as { $schema: string }).$schema
+      : undefined
+    : undefined;
+}
+
+function schemaRootError(schema: unknown): any {
+  const type = schema === null ? 'null' : Array.isArray(schema) ? 'array' : typeof schema;
+  return {
+    keyword: 'type',
+    instancePath: '',
+    message: `schema must be an object or boolean, received ${type}`,
+    params: { type: ['object', 'boolean'] },
+    data: schema,
+  };
+}
+
+function isObjectOrBoolean(schema: unknown): schema is Record<string, unknown> | boolean {
+  return typeof schema === 'boolean' || (typeof schema === 'object' && schema !== null && !Array.isArray(schema));
+}
+
+function familyForExtension(extension: boolean): ArtefactFailureFamily {
+  return extension ? 'extension' : 'credential';
+}
+
+/** Applies the root type, carried-dialect and Ajv meta-schema checks before compilation. */
+export function validateSchemaRoot(
+  schema: unknown,
+  schemaUrl: string,
+  family: ArtefactFailureFamily,
+  validator: Ajv = ajv,
+  carriedDialect = CARRIED_DIALECT,
+):
+  | { valid: true; schema: Record<string, unknown> | boolean }
+  | { valid: false; errors: any[]; failure: ArtefactStepFailure } {
+  if (!isObjectOrBoolean(schema)) {
+    const errors = [schemaRootError(schema)];
+    return {
+      valid: false,
+      errors,
+      failure: classifySchemaMetaFailure(schemaUrl, errors[0].message, family),
+    };
+  }
+
+  const dialect = schemaDialect(schema);
+  if (dialect && dialect !== carriedDialect && dialect !== `${carriedDialect}#`) {
+    return {
+      valid: false,
+      errors: [],
+      failure: classifySchemaDialectFailure(schemaUrl, dialect, family),
+    };
+  }
+
+  try {
+    if (!validator.validateSchema(schema)) {
+      const errors = [...(validator.errors ?? [])];
+      const diagnostic =
+        errors.map((error) => error.message ?? error.keyword).join('; ') || 'meta-schema validation failed';
+      return {
+        valid: false,
+        errors,
+        failure: classifySchemaMetaFailure(schemaUrl, diagnostic, family),
+      };
+    }
+  } catch (error) {
+    return {
+      valid: false,
+      errors: [],
+      failure: classifySchemaCompileFailure(
+        schemaUrl,
+        error instanceof Error ? error.message : 'schema pre-check failed for an unknown reason',
+        family,
+      ),
+    };
+  }
+
+  return { valid: true, schema };
+}
+
+/** Converts Ajv payload errors into the single credential-invalid schema outcome. */
+export function payloadFailure(errors: any[], schemaUrl: string, family: ArtefactFailureFamily): ArtefactStepFailure {
+  const first = errors[0];
+  const fieldFree =
+    errors.length === 1 &&
+    first &&
+    first.instancePath === '' &&
+    (first.keyword === 'false schema' || first.keyword === 'not');
+  if (fieldFree) {
+    return classifySchemaPayloadFailure(first.message, family, {
+      artefactUrl: schemaUrl,
+      remediation: first.message,
+    });
+  }
+  return classifySchemaPayloadFailure('The submitted document failed validation against the fetched schema.', family, {
+    artefactUrl: schemaUrl,
+  });
+}
+
+async function validateCredentialOnSchemaUrl(
+  credential: any,
+  schemaUrl: string,
+  family: ArtefactFailureFamily,
+  relaxFunction?: (schema: any) => any,
+): Promise<SchemaValidationResult> {
+  let schema = await fetchSchema(schemaUrl);
+  if (relaxFunction && typeof schema === 'object' && schema !== null && !Array.isArray(schema)) {
+    // Clone before relaxing so the shared cache keeps the published schema unchanged.
+    const clone = JSON.parse(JSON.stringify(schema));
+    delete clone.$id;
+    schema = relaxFunction(clone);
+  }
+
+  return validateSchemaDocument(schema, credential, schemaUrl, family, {
+    downgradeAdditionalProperties: true,
+  });
+}
+
+export interface ValidateSchemaDocumentOptions {
+  /** Treat only additionalProperties errors as a valid result for credential schemas. */
+  downgradeAdditionalProperties?: boolean;
+  /** Reuse a validator compiled for this exact schema object and URL. */
+  compiledValidator?: ValidateFunction;
+  /** Receives a newly compiled validator so the caller can cache it. */
+  onCompiled?: (validate: ValidateFunction) => void;
+}
+
+/** Applies schema pre-checks and validates one document with the supplied Ajv contract. */
+export function validateSchemaDocument(
+  schema: unknown,
+  document: unknown,
+  schemaUrl: string,
+  family: ArtefactFailureFamily,
+  options: ValidateSchemaDocumentOptions = {},
+  validator: Ajv = ajv,
+  carriedDialect = CARRIED_DIALECT,
+): SchemaValidationResult {
+  const root = validateSchemaRoot(schema, schemaUrl, family, validator, carriedDialect);
+  if (!root.valid) return { valid: false, errors: root.errors, failure: root.failure };
+
+  try {
+    const validate = options.compiledValidator ?? validator.compile(root.schema);
+    if (!options.compiledValidator) options.onCompiled?.(validate);
+    const valid = validate(document) === true;
+    const errors = [...(validate.errors ?? [])];
+    const onlyAdditionalPropertiesErrors =
+      errors.length > 0 && errors.every((error) => error.keyword === 'additionalProperties');
+    if (valid || (options.downgradeAdditionalProperties === true && onlyAdditionalPropertiesErrors)) {
+      return { valid: true, errors };
+    }
+    return { valid: false, errors, failure: payloadFailure(errors, schemaUrl, family) };
+  } catch (error) {
+    return {
+      valid: false,
+      errors: [],
+      failure: classifySchemaCompileFailure(
+        schemaUrl,
+        error instanceof Error ? error.message : 'schema compilation failed for an unknown reason',
+        family,
+      ),
+    };
+  }
+}
+
+export async function validateCredentialSchema(credential: any): Promise<SchemaValidationResult> {
   const extension = detectExtension(credential);
   const credentialType = extension ? extension.core.type : detectCredentialType(credential);
 
   if (!extension && Object.hasOwn(EXTENSION_VERSIONS, credentialType)) {
-    throw new SchemaSelectionError(`Unsupported extension version for ${credentialType}`);
+    const extensionConfig = EXTENSION_VERSIONS[credentialType];
+    throw new SchemaSelectionError(
+      unsupportedExtensionMessage(credential, extensionConfig),
+      'unsupported-extension-version',
+    );
   }
 
   if (!Object.hasOwn(UNTP_SHORT_CREDENTIAL_TYPES, credentialType)) {
-    throw new SchemaSelectionError(`Unsupported credential type: ${credentialType}`);
+    const observedTypes = typeEntries(credential);
+    throw new SchemaSelectionError(
+      observedTypes.length === 0
+        ? 'The credential declares no type values, so the Playground could not select a UNTP schema.'
+        : `The credential declares type values ${formatObserved(
+            observedTypes,
+          )}, but none is a UNTP type this Playground validates.`,
+      'unknown-type',
+    );
   }
 
   const version = extension?.core?.version || detectVersionFromContext(credential);
-
   if (!version) {
-    throw new SchemaSelectionError('Unsupported version');
+    const observedContexts = contextEntries(credential);
+    throw new SchemaSelectionError(
+      observedContexts.length === 0
+        ? 'The credential declares no @context entries, so no UNTP version can be detected.'
+        : `The credential declares @context entries ${formatObserved(
+            observedContexts,
+          )}, but none carries a recognised UNTP version.`,
+      'version-not-detected',
+    );
   }
 
   let schemaUrl: string;
@@ -187,7 +339,7 @@ export async function validateCredentialSchema(credential: any): Promise<{
     schemaUrl = buildUntpArtefactUrls(credentialType, version).schemaUrl;
   } catch (error) {
     if (error instanceof Error) {
-      throw new SchemaSelectionError(error.message);
+      throw new SchemaSelectionError(`The Playground could not build a schema URL: ${error.message}`, 'builder');
     }
     throw error;
   }
@@ -200,28 +352,39 @@ export async function validateCredentialSchema(credential: any): Promise<{
       delete schema?.properties?.['@context']?.items?.enum;
       return schema;
     };
-    return validateCredentialOnSchemaUrl(credential, schemaUrl, relaxFunction);
+    return validateCredentialOnSchemaUrl(credential, schemaUrl, familyForExtension(Boolean(extension)), relaxFunction);
   }
 
-  return validateCredentialOnSchemaUrl(credential, schemaUrl);
+  return validateCredentialOnSchemaUrl(credential, schemaUrl, familyForExtension(Boolean(extension)));
 }
 
-export async function validateExtension(credential: any): Promise<{
-  valid: boolean;
-  errors?: any[];
-}> {
+export async function validateExtension(credential: any): Promise<SchemaValidationResult> {
   const extension = detectExtension(credential);
   if (!extension) {
-    throw new Error('Unknown extension');
+    const type = detectCredentialType(credential);
+    const config = EXTENSION_VERSIONS[type];
+    const observedTypes = typeEntries(credential);
+    throw new SchemaSelectionError(
+      config
+        ? unsupportedExtensionMessage(credential, config)
+        : observedTypes.length === 0
+          ? 'The credential declares no type values, so the Playground could not select a registered extension.'
+          : `The credential declares type values ${formatObserved(
+              observedTypes,
+            )}, but no registered extension matches them.`,
+      'unsupported-extension-version',
+    );
   }
 
   const schemaUrl = findExtensionSchemaURL(extension.extension.type, extension.extension.version);
-
   if (!schemaUrl) {
-    throw new Error('Unsupported extension version');
+    throw new SchemaSelectionError(
+      `The credential declares extension version ${extension.extension.version}, but the Playground has no registered schema for it.`,
+      'unsupported-extension-version',
+    );
   }
 
-  return validateCredentialOnSchemaUrl(credential, schemaUrl);
+  return validateCredentialOnSchemaUrl(credential, schemaUrl, 'extension');
 }
 
 export function detectExtension(credential: any):
@@ -232,14 +395,10 @@ export function detectExtension(credential: any):
   | undefined {
   const credentialType = detectCredentialType(credential);
   const extension = EXTENSION_VERSIONS[credentialType];
-  if (!extension) {
-    return undefined;
-  }
+  if (!extension) return undefined;
   const version = detectExtensionVersion(credential, extension.domain);
-  const extensionVersion = extension.versions.find((v) => v.version === version);
-  if (!extensionVersion) {
-    return undefined;
-  }
+  const extensionVersion = extension.versions.find((entry) => entry.version === version);
+  if (!extensionVersion) return undefined;
 
   return {
     core: extensionVersion.core,
@@ -247,50 +406,16 @@ export function detectExtension(credential: any):
   };
 }
 
-async function validateCredentialOnSchemaUrl(credential: any, schemaUrl: string, relaxFunction?: (schema: any) => any) {
-  try {
-    let schema = await fetchSchema(schemaUrl);
-    if (relaxFunction) {
-      // Clone before relaxing so we never mutate the cached schema, and drop $id so
-      // AJV compiles a fresh validator rather than returning the strict one it cached
-      // by $id from an earlier non-relaxed call. JSON.parse/stringify is sufficient
-      // because JSON Schema documents are by definition JSON-serialisable.
-      const clone = JSON.parse(JSON.stringify(schema));
-      delete clone.$id;
-      schema = relaxFunction(clone);
-    }
-
-    const validate = ajv.compile(schema);
-    const isValid = validate(credential);
-    const errors = validate.errors || [];
-
-    console.log('errors', errors);
-
-    // Check if all errors are additionalProperties
-    const onlyAdditionalPropertiesErrors = errors.every((error) => error.keyword === 'additionalProperties');
-
-    return {
-      valid: isValid || onlyAdditionalPropertiesErrors,
-      errors: errors,
-    };
-  } catch (error) {
-    console.log('Schema validation error:', error);
-    throw error;
-  }
-}
-
-/**
- * Validates a VerifiableCredential against the VCDM schema for a specific version.
- * @param credential - The VerifiableCredential to validate.
- * @param version - The VCDM version to use for validation.
- * @returns A Promise that resolves to an object containing the validation result.
- */
-export async function validateVcAgainstSchema(credential: any, version: Extract<VCDMVersion, VCDMVersion.V2>) {
+export async function validateVcAgainstSchema(
+  credential: any,
+  version: Extract<VCDMVersion, VCDMVersion.V2>,
+): Promise<SchemaValidationResult> {
   const schemaUrl = VCDM_SCHEMA_URLS[version];
-
   if (!schemaUrl) {
-    throw new Error(`Schema URL for VCDM version: ${version} not found.`);
+    throw new SchemaSelectionError(
+      `The credential declares VCDM context version "${version}", but this Playground has no schema mapped for it.`,
+      'vcdm-version-unmapped',
+    );
   }
-
-  return validateCredentialOnSchemaUrl(credential, schemaUrl);
+  return validateCredentialOnSchemaUrl(credential, schemaUrl, 'vcdm');
 }

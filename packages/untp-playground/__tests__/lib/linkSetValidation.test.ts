@@ -1,6 +1,7 @@
 // The bundled artefact by path: the utils exports map exposes it only through the bundled-artefacts
 // loader, and the test wants the raw published document, not the loader.
 import linksetSchema from '../../../untp-utils/artefacts/schema/untp/0.7.0/linkset.json';
+import Ajv from 'ajv';
 import {
   linkSetSchemaStepDetails,
   linkSetSchemaUrl,
@@ -8,6 +9,7 @@ import {
   toLinkSetSchemaStepDetails,
   validateLinkSetSchema,
 } from '@/lib/linkSetValidation';
+import { describeArtefactFailure } from '@/lib/artefactFailure';
 import { schemaCache } from '@/lib/schemaFetch';
 import sample from '../../public/samples/sample-link-set.json';
 import { TestCaseStatus, TestCaseStepId } from '../../constants';
@@ -42,8 +44,7 @@ describe('validateLinkSetSchema against the real bundled v0.7.0 schema', () => {
 
   beforeEach(() => {
     schemaCache.clear();
-    // A deep copy per test: the transport caches the parsed body and the validator keys its
-    // compiled form on that object, so tests must not share one mutable instance.
+    // A deep copy per test keeps the fetched schema identity isolated between tests.
     fetchMock = jest.fn().mockImplementation(async () => okResponse(JSON.parse(JSON.stringify(linksetSchema))));
     global.fetch = fetchMock as unknown as typeof fetch;
   });
@@ -55,6 +56,16 @@ describe('validateLinkSetSchema against the real bundled v0.7.0 schema', () => {
     const result = await validateLinkSetSchema(sample, '0.7.0');
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/schema?url=${encodeURIComponent(SCHEMA_URL)}`);
     expect(result).toEqual({ kind: 'document', valid: true, errors: [], version: '0.7.0', schemaUrl: SCHEMA_URL });
+  });
+
+  it('reuses the compiled validator for two validations of the same schema URL', async () => {
+    const compile = jest.spyOn(Ajv.prototype, 'compile');
+
+    await expect(validateLinkSetSchema(sample, '0.7.0')).resolves.toMatchObject({ kind: 'document', valid: true });
+    await expect(validateLinkSetSchema(sample, '0.7.0')).resolves.toMatchObject({ kind: 'document', valid: true });
+
+    expect(compile).toHaveBeenCalledTimes(1);
+    compile.mockRestore();
   });
 
   it('reports a link context with no anchor at its path', async () => {
@@ -97,6 +108,24 @@ describe('validateLinkSetSchema against the real bundled v0.7.0 schema', () => {
         instancePath: '/linkset/0/dpp/0',
         params: { additionalProperty: 'colour' },
       }),
+    ]);
+  });
+
+  it('uses the shared false-schema root result and Ajv remediation', async () => {
+    fetchMock.mockResolvedValue(okResponse(false));
+    const result = await validateLinkSetSchema(sample, '0.7.0');
+    expect(result).toMatchObject({
+      kind: 'document',
+      valid: false,
+      failure: {
+        class: 'credential-invalid',
+        code: 'schema.validation.payload',
+        remediation: 'boolean schema is false',
+      },
+    });
+    if (result.kind !== 'document') throw new Error('unreachable');
+    expect(result.errors).toEqual([
+      expect.objectContaining({ keyword: 'false schema', instancePath: '', message: 'boolean schema is false' }),
     ]);
   });
 
@@ -166,12 +195,60 @@ describe('validateLinkSetSchema against the real bundled v0.7.0 schema', () => {
       status: 502,
       json: async () => ({ error: 'Schema host unreachable' }),
     });
-    await expect(validateLinkSetSchema(sample, '0.7.0')).resolves.toEqual({
+    await expect(validateLinkSetSchema(sample, '0.7.0')).resolves.toMatchObject({
       kind: 'schema-unavailable',
       reason: 'network',
       message: expect.stringContaining('Schema host unreachable'),
       version: '0.7.0',
       schemaUrl: SCHEMA_URL,
+      failure: {
+        class: 'could-not-fetch',
+        artefactUrl: SCHEMA_URL,
+      },
+    });
+  });
+
+  it('keeps a link-set schema 4xx as could-not-fetch with version-selection remediation', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ error: 'Schema host returned status 404', code: 'upstream-status', upstreamStatus: 404 }),
+    });
+
+    const result = await validateLinkSetSchema(sample, '0.7.0');
+    expect(result).toMatchObject({
+      kind: 'schema-unavailable',
+      reason: 'not-found',
+      schemaUrl: SCHEMA_URL,
+      failure: {
+        class: 'could-not-fetch',
+        code: 'schema.fetch.upstream-status',
+        artefactUrl: SCHEMA_URL,
+        upstreamStatus: 404,
+        remediation: 'Pick a UNTP version that has a published link-set schema.',
+      },
+    });
+    expect(describeArtefactFailure(result.failure, 'link-set')).toMatchObject({ heading: 'Could not fetch' });
+    expect(describeArtefactFailure(result.failure, 'link-set')?.heading).not.toBe('Link set invalid');
+    expect(result.failure?.remediation).not.toContain('@context');
+    expect(result.failure?.message).not.toContain('@context');
+  });
+
+  it('preserves an invalid-json route failure as an unusable artefact with its reason and message', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ error: 'The schema host returned invalid JSON', code: 'invalid-json' }),
+    });
+    await expect(validateLinkSetSchema(sample, '0.7.0')).resolves.toMatchObject({
+      kind: 'schema-unavailable',
+      reason: 'parse',
+      message:
+        'The schema host returned invalid JSON (https://untp.unece.org/artefacts/schema/v0.7.0/idr/LinksetSchema.json).',
+      failure: {
+        class: 'unusable-artefact',
+        code: 'schema.fetch.invalid-json',
+      },
     });
   });
 

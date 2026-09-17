@@ -19,6 +19,7 @@ import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import type { StoredScheme, TestStep } from '@/types';
 import type { CollectionState, InstanceId } from '@/types/artefact';
 import confetti from 'canvas-confetti';
+import { toast } from 'sonner';
 import { TestCaseStatus, TestCaseStepId } from '../../constants';
 
 jest.mock('canvas-confetti', () => jest.fn());
@@ -140,14 +141,18 @@ describe('SchemeTestResults', () => {
     expect(await screen.findByRole('heading', { level: 3, name: 'Mining Assurance' })).toBeInTheDocument();
   });
 
-  it('surfaces the unchanged version-detection failure copy and skips the three later steps', async () => {
+  it('classifies version detection and marks the three later steps as not executed', async () => {
     (detectVersionFromContext as jest.Mock).mockReturnValue(undefined);
     render(<Harness schemes={[scheme({ id: 'x', name: 'No Context Scheme' })]} />);
 
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_VERSION_DETECTION}-row`)).toHaveTextContent('Scheme invalid');
 
     await openStepDetails(TestCaseStepId.SCHEME_VERSION_DETECTION);
-    expect(screen.getByText(/Could not detect a UNTP version from the @context/)).toBeInTheDocument();
+    expect(
+      screen.getAllByText('The scheme declares no @context entries, so no UNTP version can be detected.').length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText('Check the scheme @context for a recognised UNTP version.')).toBeInTheDocument();
     await closeStepDetails();
 
     for (const stepId of [
@@ -155,10 +160,33 @@ describe('SchemeTestResults', () => {
       TestCaseStepId.SCHEME_STRUCTURAL_PARSE,
       TestCaseStepId.CONTEXT_VALIDATION,
     ]) {
+      expect(screen.getByTestId(`${stepId}-row`)).toHaveTextContent('Not executed');
       await openStepDetails(stepId);
-      expect(screen.getByText('Skipped: version detection failed.')).toBeInTheDocument();
+      expect(
+        screen.getByText('This scheme step was not executed because step "Version Detection" failed first.'),
+      ).toBeInTheDocument();
       await closeStepDetails();
     }
+  });
+
+  it('names the observed scheme contexts when none carries a recognised version', async () => {
+    (detectVersionFromContext as jest.Mock).mockReturnValue(undefined);
+    render(
+      <Harness
+        schemes={[
+          scheme({ id: 'x', name: 'Unrecognised Context Scheme', '@context': ['https://example.test/context'] }),
+        ]}
+      />,
+    );
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+    await openStepDetails(TestCaseStepId.SCHEME_VERSION_DETECTION);
+    expect(
+      screen.getAllByText(
+        'The scheme declares @context entries ["https://example.test/context"], but none carries a recognised UNTP version.',
+      ).length,
+    ).toBeGreaterThan(0);
+    await closeStepDetails();
   });
 
   // The pre-0.7 prerequisite is a selection failure, not a transport failure: the uploader supplied
@@ -167,7 +195,10 @@ describe('SchemeTestResults', () => {
   it('records the pre-0.7 prerequisite failure with advice and no support link', async () => {
     (detectVersionFromContext as jest.Mock).mockReturnValue('0.6.0');
     (validateSchemeSchema as jest.Mock).mockRejectedValue(
-      new SchemaSelectionError('Conformity Scheme schemas have no legacy layout before UNTP 0.7.0; detected 0.6.0.'),
+      new SchemaSelectionError(
+        'Conformity Scheme schemas have no legacy layout before UNTP 0.7.0; detected 0.6.0.',
+        'scheme-version-unsupported',
+      ),
     );
     render(<Harness schemes={[scheme({ id: 'x', name: 'Legacy Scheme' })]} />);
 
@@ -175,13 +206,15 @@ describe('SchemeTestResults', () => {
 
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
     expect(
-      screen.getByText(
-        /Conformity Scheme schemas have no legacy layout before UNTP 0\.7\.0; detected 0\.6\.0\. Use a Conformity Scheme published for UNTP 0\.7\.0\./,
-      ),
-    ).toBeInTheDocument();
+      screen.getAllByText(/Conformity Scheme schemas have no legacy layout before UNTP 0\.7\.0; detected 0\.6\.0\./)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText(/Check the scheme version in @context/)).toBeInTheDocument();
     await closeStepDetails();
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByText(buildSchemaSelectionSkipMessage())).toBeInTheDocument();
+    expect(
+      screen.getByText('This scheme step was not executed because step "Schema Validation" failed first.'),
+    ).toBeInTheDocument();
     expect(parseSchemeStructure).not.toHaveBeenCalled();
     expect(validateContext).toHaveBeenCalled();
     expect(screen.queryByRole('link', { name: 'report an issue' })).not.toBeInTheDocument();
@@ -211,12 +244,19 @@ describe('SchemeTestResults', () => {
     (validateSchemeSchema as jest.Mock).mockResolvedValue({
       valid: false,
       errors: [{ keyword: 'required', instancePath: '', message: 'must have required property', params: {} }],
+      failure: {
+        class: 'credential-invalid',
+        code: 'schema.validation.payload',
+        message: 'The scheme failed against the fetched schema.',
+        remediation: 'Correct the named field in the scheme.',
+      },
     });
     render(<Harness schemes={[scheme({ id: 'x', name: 'Details Scheme' })]} />);
 
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     expect(await screen.findByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-details-trigger`)).toBeInTheDocument();
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).toHaveTextContent('Scheme invalid');
     expect(screen.queryByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-details-trigger`)).not.toBeInTheDocument();
   });
 
@@ -251,6 +291,7 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-row`)).toHaveTextContent('Scheme invalid');
     expect(screen.getByText('/id: scheme.id is required and must be a non-empty string.')).toBeInTheDocument();
     expect(screen.getByText('/name: scheme.name is required and must be a non-empty string.')).toBeInTheDocument();
     expect(screen.getByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-status-icon-in-progress`)).toBeInTheDocument();
@@ -262,21 +303,64 @@ describe('SchemeTestResults', () => {
     );
   });
 
+  it('shows only the failure banner for a context fetch failure', async () => {
+    const contextUrl = 'https://publisher.example/context.jsonld';
+    const diagnostic = `Couldn't load the @context at "${contextUrl}". Common causes: the URL is unreachable, is not https, resolves to a private address, redirected too many times, or returned a non-JSON-LD response. Reported cause: the context service answered status 503.`;
+    (validateContext as jest.Mock).mockResolvedValue({
+      valid: false,
+      error: { keyword: 'jsonldUrl', message: diagnostic, instancePath: '@context', params: {} },
+      failure: {
+        class: 'could-not-fetch',
+        code: 'context.fetch',
+        message: `The Playground's context service answered 503 while fetching "${contextUrl}".`,
+        remediation:
+          'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
+        artefactUrl: contextUrl,
+        serviceStatus: 503,
+      },
+    });
+    render(<Harness schemes={[scheme({ id: 'x', name: 'Context Failure Scheme' })]} />);
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+    await openStepDetails(TestCaseStepId.CONTEXT_VALIDATION);
+
+    const banner = screen.getByTestId('artefact-failure-banner');
+    expect(screen.getAllByTestId('artefact-failure-banner')).toHaveLength(1);
+    expect(banner).toHaveTextContent('Could not fetch');
+    expect(banner).toHaveTextContent(contextUrl);
+    expect(banner).toHaveTextContent(
+      'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
+    );
+    expect(screen.queryByText(/Common causes:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Reported cause:/)).not.toBeInTheDocument();
+    await closeStepDetails();
+  });
+
   it('records an unsupported parser version as a failed skip and still validates context', async () => {
     (detectVersionFromContext as jest.Mock).mockReturnValue('0.7.1');
     (validateSchemeSchema as jest.Mock).mockRejectedValue(
-      new SchemaFetchError(
-        'https://untp.unece.org/artefacts/schema/v0.7.1/cvc/ConformityScheme.json',
-        'not-found',
-        'No schema published at https://untp.unece.org/artefacts/schema/v0.7.1/cvc/ConformityScheme.json (status 404).',
-      ),
+      new SchemaFetchError({
+        code: 'playground.schema.fetch',
+        message:
+          'No schema published at https://untp.unece.org/artefacts/schema/v0.7.1/cvc/ConformityScheme.json (status 404).',
+        schemaUrl: 'https://untp.unece.org/artefacts/schema/v0.7.1/cvc/ConformityScheme.json',
+        category: 'upstream-status',
+        reason: 'not-found',
+        serviceStatus: 502,
+        upstreamStatus: 404,
+      }),
     );
     render(<Harness schemes={[scheme({ id: 'x', name: 'Future Scheme' })]} />);
 
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
+    await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).toHaveTextContent('Scheme invalid');
+    expect(screen.getByText(/No schema published at/)).toBeInTheDocument();
+    await closeStepDetails();
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByText(buildUnsupportedParserSkipMessage('0.7.1'))).toBeInTheDocument();
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-row`)).toHaveTextContent('Scheme invalid');
+    expect(screen.getByText(/The declared Conformity Scheme version "0\.7\.1" has no parser/)).toBeInTheDocument();
     expect(parseSchemeStructure).not.toHaveBeenCalled();
     expect(validateContext).toHaveBeenCalled();
     await closeStepDetails();
@@ -299,6 +383,45 @@ describe('SchemeTestResults', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-status-icon-success`)).toBeInTheDocument();
     await closeStepDetails();
+  });
+
+  it('settles every unfinished step when the outer runner throws during a state commit', async () => {
+    let latestState: SchemeCollection | undefined;
+    let throwOnce = true;
+    const onState = (state: SchemeCollection) => {
+      latestState = state;
+      const firstStep = state.items[0]?.result?.[0];
+      if (throwOnce && firstStep?.status === TestCaseStatus.IN_PROGRESS) {
+        throwOnce = false;
+        throw new Error('state commit failed');
+      }
+    };
+    const toastSpy = jest.spyOn(toast, 'error').mockImplementation(() => undefined as never);
+
+    render(<RecordingHarness scheme={scheme({ id: 'x', name: 'Outer Failure Scheme' })} onState={onState} />);
+
+    await waitFor(() => {
+      const steps = latestState?.items[0]?.result;
+      expect(steps).toHaveLength(4);
+      expect(steps?.every((step) => step.status === TestCaseStatus.FAILURE)).toBe(true);
+    });
+    const steps = latestState?.items[0]?.result ?? [];
+    expect(steps).toEqual(
+      expect.arrayContaining(
+        steps.map((step) =>
+          expect.objectContaining({
+            id: step.id,
+            status: TestCaseStatus.FAILURE,
+            failure: expect.objectContaining({
+              class: 'unknown',
+              code: 'playground.pipeline.unexpected',
+            }),
+          }),
+        ),
+      ),
+    );
+    expect(toastSpy).toHaveBeenCalledTimes(1);
+    toastSpy.mockRestore();
   });
 
   it('records unsupported-version diagnostics on the structural step', async () => {
@@ -422,21 +545,67 @@ describe('SchemeTestResults', () => {
     await waitFor(() => expect(parseSchemeStructure).not.toHaveBeenCalled());
   });
 
-  it('shows the schema service category when the schema could not be fetched', async () => {
+  it('reports a scheme schema URL builder failure as a Playground fault with support', async () => {
     (validateSchemeSchema as jest.Mock).mockRejectedValue(
-      new SchemaFetchError(
-        'https://untp.unece.org/x.json',
-        'network',
-        'Schema host returned status 503 (https://untp.unece.org/x.json).',
-      ),
+      new SchemaSelectionError('The Playground could not build a scheme schema URL: invalid version.', 'builder'),
+    );
+    render(<Harness schemes={[scheme({ id: 'x', name: 'Builder Failure Scheme' })]} />);
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+    await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
+
+    expect(
+      (await screen.findAllByText(/The Playground could not build a scheme schema URL: invalid version/)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: 'report an issue' })).toBeInTheDocument();
+    expect(screen.queryByText(/Use a Conformity Scheme published/)).not.toBeInTheDocument();
+    await closeStepDetails();
+  });
+
+  it('shows the schema fetch failure banner without a second diagnostic list', async () => {
+    (validateSchemeSchema as jest.Mock).mockRejectedValue(
+      new SchemaFetchError({
+        code: 'playground.schema.fetch',
+        message: 'Schema host returned status 503 (https://untp.unece.org/x.json).',
+        schemaUrl: 'https://untp.unece.org/x.json',
+        category: 'upstream-status',
+        reason: 'network',
+        serviceStatus: 503,
+      }),
     );
     render(<Harness schemes={[scheme({ id: 'x', name: 'Host Down Scheme' })]} />);
 
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
-    expect(screen.getByText(/Schema host returned status 503/)).toBeInTheDocument();
-    expect(screen.queryByText(/We could not reach the schema service/)).not.toBeInTheDocument();
+    const banner = screen.getByTestId('artefact-failure-banner');
+    expect(banner).toHaveTextContent('The Playground could not fetch the artefact');
+    expect(banner).toHaveTextContent('https://untp.unece.org/x.json');
+    expect(banner).toHaveTextContent('Retry the check');
+    await closeStepDetails();
+  });
+
+  it('classifies a schema timeout as Could not fetch without showing an unexpected-failure toast', async () => {
+    (validateSchemeSchema as jest.Mock).mockRejectedValue(
+      new SchemaFetchError({
+        code: 'playground.schema.fetch',
+        message: 'Schema fetch timed out after 15s.',
+        schemaUrl: 'https://untp.unece.org/x.json',
+        category: 'uncoded',
+        reason: 'timeout',
+        browserSide: true,
+      }),
+    );
+    const toastSpy = jest.spyOn(toast, 'error').mockImplementation(() => undefined as never);
+    render(<Harness schemes={[scheme({ id: 'x', name: 'Timed Out Scheme' })]} />);
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+    await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
+
+    expect(screen.getByText(/The Playground could not fetch the artefact/)).toBeInTheDocument();
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).toHaveTextContent('Could not fetch');
+    expect(toastSpy).not.toHaveBeenCalled();
+    toastSpy.mockRestore();
     await closeStepDetails();
   });
 

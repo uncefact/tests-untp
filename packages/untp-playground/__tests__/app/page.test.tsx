@@ -176,9 +176,16 @@ describe('Home Component', () => {
   });
 
   it('handles unknown credential type', async () => {
+    const unsupportedCredential = {
+      ...mockCredential,
+      verifiableCredential: {
+        ...mockCredential.verifiableCredential,
+        type: ['VerifiableCredential', 'UnsupportedType'],
+      },
+    };
     (ArtefactUploader as jest.Mock).mockImplementation(
       ({ onArtefactUpload }: { onArtefactUpload: (credential: { verifiableCredential: any }) => void }) => (
-        <button data-testid='mock-uploader' onClick={() => onArtefactUpload(mockCredential)}>
+        <button data-testid='mock-uploader' onClick={() => onArtefactUpload(unsupportedCredential)}>
           Upload
         </button>
       ),
@@ -195,19 +202,17 @@ describe('Home Component', () => {
 
     await waitFor(() => {
       expect(mockDispatchError).toHaveBeenCalledWith([
-        {
-          keyword: 'required',
-          instancePath: '/type',
-          params: {
-            missingProperty: `type array with a supported types:  ${permittedCredentialTypes.join(', ')}`,
-            receivedValue: mockCredential.verifiableCredential,
-            allowedValue: { type: ['VerifiableCredential', 'DigitalProductPassport'] },
-            solution:
-              "Add a valid UNTP credential type (e.g., 'DigitalProductPassport', 'ConformityCredential'), or add the artefact on its own tab. The Playground accepts: Verifiable Credential, Conformity Scheme, Link Set.",
-          },
-          message: `The credential type is missing or invalid. The Playground accepts: Verifiable Credential, Conformity Scheme, Link Set.`,
-        },
+        expect.objectContaining({
+          keyword: 'unsupportedCredentialType',
+          instancePath: '',
+          message: `The declared type(s) "VerifiableCredential", "UnsupportedType" are not a UNTP credential type the Playground validates. Supported types: ${permittedCredentialTypes.join(
+            ', ',
+          )}.`,
+        }),
       ]);
+      const [error] = mockDispatchError.mock.calls.at(-1)?.[0] ?? [];
+      expect(error).not.toHaveProperty('params.missingProperty');
+      expect(error).not.toHaveProperty('instancePath', '/type');
     });
   });
 
@@ -941,7 +946,7 @@ describe('Link Sets family (#811, tab-intent routing #676)', () => {
 
   it('validates a scheme document as a credential when dropped on the Credentials tab, without switching', async () => {
     // AC (#676): a Conformity Scheme document on the Credentials tab fails the credential
-    // pipeline there, with no auto-switch, no scheme card, and the widened family-naming error.
+    // pipeline there, with no auto-switch, no scheme card, and the declared type in the error.
     (isEnvelopedProof as jest.Mock).mockReturnValue(false);
     (detectCredentialType as jest.Mock).mockReturnValue('Unknown');
     (detectExtension as jest.Mock).mockReturnValue(undefined);
@@ -952,7 +957,7 @@ describe('Link Sets family (#811, tab-intent routing #676)', () => {
     await waitFor(() => {
       expect(mockDispatchError).toHaveBeenCalledWith([
         expect.objectContaining({
-          message: expect.stringContaining('Verifiable Credential, Conformity Scheme, Link Set'),
+          message: expect.stringContaining('The declared type(s) "ConformityScheme"'),
         }),
       ]);
     });

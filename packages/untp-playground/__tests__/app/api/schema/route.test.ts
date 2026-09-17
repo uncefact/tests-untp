@@ -1,16 +1,16 @@
 /**
  * @jest-environment node
  */
-import type { SchemaLoader } from '@uncefact/untp-utils/loaders';
+const mockResolveJsonDocument = jest.fn();
 
-const mockLoad = jest.fn<Promise<object>, [string]>();
+jest.mock('@uncefact/untp-utils/resolvers', () => {
+  const actual = jest.requireActual('@uncefact/untp-utils/resolvers');
+  return { ...actual, resolveJsonDocument: (...args: unknown[]) => mockResolveJsonDocument(...args) };
+});
 
 jest.mock('@uncefact/untp-utils/loaders', () => {
   const actual = jest.requireActual('@uncefact/untp-utils/loaders');
-  return {
-    ...actual,
-    createSchemaLoader: jest.fn((): SchemaLoader => ({ load: (url) => mockLoad(url) })),
-  };
+  return { ...actual, createSchemaLoader: jest.fn(actual.createSchemaLoader) };
 });
 
 jest.mock('@uncefact/untp-utils/cache', () => {
@@ -18,14 +18,13 @@ jest.mock('@uncefact/untp-utils/cache', () => {
   return { ...actual, createInMemoryTtlCache: jest.fn(actual.createInMemoryTtlCache) };
 });
 
-import {
-  SchemaLoaderHttpError,
-  SchemaLoaderInvalidJsonError,
-  SchemaLoaderNetworkError,
-} from '@uncefact/untp-utils/loaders';
+import { findBundledArtefact } from '@uncefact/untp-utils/bundled-artefacts';
+import { ResolverHttpError, ResolverInvalidJsonError, ResolverNetworkError } from '@uncefact/untp-utils/resolvers';
 import { GET } from '@/app/api/schema/route';
+import { validateSchemaDocument } from '@/lib/schemaValidation';
 
 const SCHEMA_URL = 'https://untp.unece.org/artefacts/schema/v0.7.0/dpp/DigitalProductPassport.json';
+const FETCHED_SCHEMA_URL = 'https://schemas.example.org/fetched-schema.json';
 
 function makeRequest(url?: string): Request {
   const target = new URL('http://localhost/api/schema');
@@ -37,7 +36,7 @@ describe('GET /api/schema', () => {
   let consoleError: jest.SpyInstance;
 
   beforeEach(() => {
-    mockLoad.mockReset();
+    mockResolveJsonDocument.mockReset();
     consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -82,11 +81,53 @@ describe('GET /api/schema', () => {
   });
 
   it('returns the schema the loader fetched', async () => {
-    mockLoad.mockResolvedValueOnce({ $id: SCHEMA_URL, type: 'object' });
-    const response = await GET(makeRequest(SCHEMA_URL));
+    mockResolveJsonDocument.mockResolvedValueOnce({
+      json: { $id: FETCHED_SCHEMA_URL, type: 'object' },
+      finalUrl: FETCHED_SCHEMA_URL,
+    });
+    const response = await GET(makeRequest(FETCHED_SCHEMA_URL));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ $id: SCHEMA_URL, type: 'object' });
-    expect(mockLoad).toHaveBeenCalledWith(SCHEMA_URL);
+    expect(await response.json()).toEqual({ $id: FETCHED_SCHEMA_URL, type: 'object' });
+    expect(mockResolveJsonDocument).toHaveBeenCalledWith(
+      FETCHED_SCHEMA_URL,
+      expect.objectContaining({ accept: expect.any(String), totalTimeoutMs: 10_000 }),
+    );
+  });
+
+  it('serves the bundled schema after an upstream 404 without adding a client failure', async () => {
+    const bundledSchema = await findBundledArtefact(SCHEMA_URL);
+    if (bundledSchema === undefined) throw new Error(`The test bundle does not carry ${SCHEMA_URL}.`);
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverHttpError(SCHEMA_URL, 404));
+
+    const response = await GET(makeRequest(SCHEMA_URL));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(bundledSchema);
+
+    const result = validateSchemaDocument(
+      bundledSchema,
+      {
+        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+        type: ['VerifiableCredential', 'DigitalProductPassport'],
+        id: 'https://example.com/dpp/1',
+        issuer: { id: 'did:web:example.com', name: 'Example' },
+        validFrom: '2024-01-01T00:00:00Z',
+        name: 'Example',
+        credentialSubject: {
+          id: 'https://example.com/product/1',
+          name: 'Widget',
+          idScheme: { id: 'https://id.example/scheme', name: 'Example scheme' },
+          idGranularity: 'batch',
+          productCategory: [{ code: '123', name: 'Widget', schemeId: 'https://scheme.example', schemeName: 'Example' }],
+          producedAtFacility: { id: 'https://example.com/facility/1', name: 'Facility' },
+          countryOfProduction: { countryCode: 'AU' },
+        },
+      },
+      SCHEMA_URL,
+      'credential',
+    );
+    expect(result).toMatchObject({ valid: true });
+    expect(result.failure).toBeUndefined();
   });
 
   it.each([
@@ -97,24 +138,28 @@ describe('GET /api/schema', () => {
     const response = await GET(makeRequest(url));
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: message });
-    expect(mockLoad).not.toHaveBeenCalled();
+    expect(mockResolveJsonDocument).not.toHaveBeenCalled();
   });
 
   it('hands any public https host to the loader rather than keeping an allowlist', async () => {
-    mockLoad.mockResolvedValue({ type: 'object' });
+    mockResolveJsonDocument.mockResolvedValue({ json: { type: 'object' }, finalUrl: SCHEMA_URL });
     for (const url of [
       'https://aatp.foodagility.com/schema/aatp-dlp-schema-0.4.1-beta1.json',
       'https://schemas.example.org/some-future-extension.json',
     ]) {
       const response = await GET(makeRequest(url));
       expect(response.status).toBe(200);
-      expect(mockLoad).toHaveBeenCalledWith(url);
+      expect(mockResolveJsonDocument).toHaveBeenCalledWith(
+        url,
+        expect.objectContaining({ accept: expect.any(String), totalTimeoutMs: 10_000 }),
+      );
     }
   });
 
   it('reports an upstream HTTP failure as 502 naming the status', async () => {
-    mockLoad.mockRejectedValueOnce(new SchemaLoaderHttpError(SCHEMA_URL, 404));
-    const response = await GET(makeRequest(SCHEMA_URL));
+    const url = 'https://schemas.example.org/upstream-status.json';
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverHttpError(url, 404));
+    const response = await GET(makeRequest(url));
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
       error: 'Schema host returned status 404',
@@ -124,8 +169,9 @@ describe('GET /api/schema', () => {
   });
 
   it('reports an unparseable upstream body as 502', async () => {
-    mockLoad.mockRejectedValueOnce(new SchemaLoaderInvalidJsonError(SCHEMA_URL, new SyntaxError('bad json')));
-    const response = await GET(makeRequest(SCHEMA_URL));
+    const url = 'https://schemas.example.org/invalid-json.json';
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverInvalidJsonError(url, new SyntaxError('bad json')));
+    const response = await GET(makeRequest(url));
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
       error: 'Schema host returned a body that is not valid JSON',
@@ -134,16 +180,17 @@ describe('GET /api/schema', () => {
   });
 
   it('reports a failed load as 502 without the transport detail', async () => {
+    const url = 'https://schemas.example.org/network-error.json';
     const cause = new Error('getaddrinfo ENOTFOUND');
-    mockLoad.mockRejectedValueOnce(new SchemaLoaderNetworkError(SCHEMA_URL, cause));
-    const response = await GET(makeRequest(SCHEMA_URL));
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverNetworkError(url, cause));
+    const response = await GET(makeRequest(url));
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
       error: 'The schema could not be loaded from its host',
       code: 'unreachable',
     });
     expect(consoleError).toHaveBeenCalledWith('Schema fetch failed', {
-      url: SCHEMA_URL,
+      url,
       code: 'schema-loader.network-error',
       causeCode: undefined,
       cause,
@@ -151,9 +198,10 @@ describe('GET /api/schema', () => {
   });
 
   it('logs the guard rejection code when the loader refused a private address', async () => {
+    const url = 'https://schemas.example.org/private-address.json';
     const guardRejection = Object.assign(new Error('resolves to a private address'), { code: 'url.private-address' });
-    mockLoad.mockRejectedValueOnce(new SchemaLoaderNetworkError(SCHEMA_URL, guardRejection));
-    const response = await GET(makeRequest(SCHEMA_URL));
+    mockResolveJsonDocument.mockRejectedValueOnce(new ResolverNetworkError(url, guardRejection));
+    const response = await GET(makeRequest(url));
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
       error: 'The schema could not be loaded from its host',
@@ -161,16 +209,23 @@ describe('GET /api/schema', () => {
     });
     expect(consoleError).toHaveBeenCalledWith(
       'Schema fetch failed',
-      expect.objectContaining({ url: SCHEMA_URL, causeCode: 'url.private-address' }),
+      expect.objectContaining({ url, causeCode: 'url.private-address' }),
     );
   });
 
-  it('reports any other failure as 500', async () => {
+  it('reports an untyped resolver failure as an unreachable upstream load', async () => {
+    const url = 'https://schemas.example.org/unexpected.json';
     const error = new Error('boom');
-    mockLoad.mockRejectedValueOnce(error);
-    const response = await GET(makeRequest(SCHEMA_URL));
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: 'Failed to fetch schema' });
-    expect(consoleError).toHaveBeenCalledWith('Unexpected schema loader failure', { url: SCHEMA_URL, error });
+    mockResolveJsonDocument.mockRejectedValueOnce(error);
+    const response = await GET(makeRequest(url));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      error: 'The schema could not be loaded from its host',
+      code: 'unreachable',
+    });
+    expect(consoleError).toHaveBeenCalledWith(
+      'Schema fetch failed',
+      expect.objectContaining({ url, code: 'schema-loader.network-error' }),
+    );
   });
 });

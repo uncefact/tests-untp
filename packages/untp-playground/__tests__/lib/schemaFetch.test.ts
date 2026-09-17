@@ -1,6 +1,14 @@
 import { fetchSchema, schemaCache, SchemaFetchError } from '@/lib/schemaFetch';
 import { schemaCache as credentialSchemaCache } from '@/lib/schemaValidation';
-import { SchemaFetchError as SchemeSchemaFetchError } from '@/lib/schemeValidation';
+import { validateCredentialSchema } from '@/lib/schemaValidation';
+import { SchemaFetchError as SchemeSchemaFetchError, validateSchemeSchema } from '@/lib/schemeValidation';
+import { classifySchemaFetchFailure } from '@/lib/artefactFailure';
+import { buildUntpArtefactUrls } from '@uncefact/untp-utils/artefacts';
+
+jest.mock('@uncefact/untp-utils/artefacts', () => {
+  const actual = jest.requireActual('@uncefact/untp-utils/artefacts');
+  return { ...actual, buildUntpArtefactUrls: jest.fn(actual.buildUntpArtefactUrls) };
+});
 
 const URL_A = 'https://untp.unece.org/artefacts/schema/v0.7.0/idr/LinksetSchema.json';
 const URL_B = 'https://untp.unece.org/artefacts/schema/v0.7.1/idr/LinksetSchema.json';
@@ -14,6 +22,7 @@ describe('schemaFetch', () => {
   afterEach(async () => {
     global.fetch = originalFetch;
     await schemaCache.clear();
+    jest.restoreAllMocks();
   });
 
   it('shares one cache and one error class with the scheme and credential validators', () => {
@@ -88,7 +97,7 @@ describe('schemaFetch', () => {
           throw new SyntaxError('bad');
         },
       },
-      'parse',
+      'unreadable-response',
     ],
   ])('maps the proxy answer %#: reason %s', async (response, reason) => {
     global.fetch = jest.fn().mockResolvedValue(response) as unknown as typeof fetch;
@@ -128,5 +137,80 @@ describe('schemaFetch', () => {
       },
     }) as unknown as typeof fetch;
     await expect(fetchSchema(URL_A)).rejects.toMatchObject({ name: 'SchemaFetchError', reason: 'timeout' });
+  });
+
+  it.each([
+    [200, true],
+    [502, false],
+  ])('times out a body read after a %s response', async (status, ok) => {
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn().mockImplementation((_url: string, init: RequestInit) =>
+        Promise.resolve({
+          ok,
+          status,
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () =>
+                reject(Object.assign(new Error('body read aborted'), { name: 'AbortError' })),
+              );
+            }),
+        }),
+      ) as unknown as typeof fetch;
+
+      const pending = fetchSchema(`${URL_A}-${status}`);
+      await Promise.resolve();
+      await Promise.resolve();
+      jest.advanceTimersByTime(15_000);
+      const error = await pending.catch((caught: unknown) => caught);
+      expect(error).toMatchObject({
+        name: 'SchemaFetchError',
+        reason: 'timeout',
+        serviceStatus: status,
+      });
+      expect(classifySchemaFetchFailure(error as SchemaFetchError)).toMatchObject({
+        class: 'could-not-fetch',
+        code: 'schema.fetch.timeout',
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['scheme', 'credential'],
+    ['credential', 'scheme'],
+  ])('shares one rejected SchemaFetchError instance when %s arrives first', async (first, second) => {
+    const sharedUrl = 'https://example.test/shared-schema.json';
+    (buildUntpArtefactUrls as jest.Mock).mockReturnValue({
+      schemaUrl: sharedUrl,
+      contextUrl: 'https://example.test/context.jsonld',
+    } as any);
+    let rejectFetch: (reason?: unknown) => void = () => {};
+    global.fetch = jest.fn().mockReturnValue(
+      new Promise<Response>((_resolve, reject) => {
+        rejectFetch = reject;
+      }),
+    ) as unknown as typeof fetch;
+
+    const calls = {
+      scheme: () => validateSchemeSchema({}, '0.7.0').catch((error: unknown) => error),
+      credential: () =>
+        validateCredentialSchema({
+          '@context': ['https://vocabulary.uncefact.org/untp/dpp/0.7.0/context/'],
+          type: ['VerifiableCredential', 'DigitalProductPassport'],
+        }).catch((error: unknown) => error),
+    };
+    const firstError = calls[first as 'scheme' | 'credential']();
+    const secondError = calls[second as 'scheme' | 'credential']();
+    rejectFetch(new Error('shared network failure'));
+
+    const [left, right] = await Promise.all([firstError, secondError]);
+    expect(left).toBe(right);
+    expect(left).toMatchObject({
+      name: 'SchemaFetchError',
+      category: 'uncoded',
+      reason: 'network',
+    });
   });
 });
