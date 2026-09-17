@@ -74,6 +74,10 @@ describe('schemeTitle', () => {
     expect(schemeTitle(scheme({}, { kind: 'file', filename: 'my-scheme.json' }))).toBe('my-scheme.json');
   });
 
+  it('uses the filename when the scheme name contains only whitespace', () => {
+    expect(schemeTitle(scheme({ name: '   ' }, { kind: 'file', filename: 'my-scheme.json' }))).toBe('my-scheme.json');
+  });
+
   it('falls back to the family label when there is no name or source', () => {
     expect(schemeTitle(scheme({}))).toBe('Conformity Scheme');
   });

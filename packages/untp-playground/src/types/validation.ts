@@ -19,3 +19,9 @@ export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
 }
+
+/** An error shown against a test step. `supportable` offers the support link, so it stays false for faults the uploader can correct in their own document. */
+export interface DisplayableError {
+  message: string;
+  supportable?: boolean;
+}

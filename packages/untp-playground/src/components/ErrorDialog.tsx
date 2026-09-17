@@ -1,4 +1,5 @@
 import { ValidationError } from '@/types';
+import { formatValidationError } from '@/lib/formatValidationErrors';
 import { AlertCircle, Check, ChevronRight, Copy } from 'lucide-react';
 import { useState } from 'react';
 
@@ -195,15 +196,152 @@ const getTipMessage = (mainError: ValidationError) => {
   }
 };
 
+interface ErrorDetailsProps {
+  error: ValidationError;
+  copied: boolean;
+  onCopy: (text: string) => void;
+}
+
+const ErrorDetails: React.FC<ErrorDetailsProps> = ({ error, copied, onCopy }) => {
+  const value = error.params?.allowedValue || error.params?.allowedValues;
+  const fixExample = value ? safeStringify(value, true) : null;
+
+  return (
+    <div className='border-t border-gray-200 pt-4 first:border-t-0 first:pt-0'>
+      {error.message && <p>Issue: {error.message}</p>}
+      <br />
+      {(() => {
+        // For `required` errors AJV's `data` is the parent object, not the
+        // missing field itself, so dumping it is noisy. The field line below
+        // already names the offending property.
+        if (error.keyword === 'required') return null;
+        const received = error.params?.receivedValue !== undefined ? error.params.receivedValue : error.data;
+        if (received === undefined) return null;
+        return (
+          <>
+            <p>Received value ({jsType(received)}):</p>
+            <br />
+            <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
+              <code className='text-green-600 block py-4'>{safeStringify(received, true)}</code>
+            </pre>
+          </>
+        );
+      })()}
+      <br />
+      {error.keyword === 'const' && (
+        <div className='flex flex-col gap-2'>
+          <p>
+            Incorrect value: <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.instancePath}</code>
+          </p>
+        </div>
+      )}
+      {error.keyword === 'required' && (
+        <p>
+          Missing field: <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.missingProperty}</code>
+        </p>
+      )}
+      {error.keyword === 'enum' && (
+        <p>
+          Must be one of:{' '}
+          <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.allowedValues?.join(', ')}</code>
+        </p>
+      )}
+      {error.keyword === 'type' && (
+        <>
+          <p>
+            <b>Expected type: </b>
+            <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.type}</code>
+          </p>
+          {(() => {
+            const example = correctiveExample(error);
+            return example ? (
+              <div className='mt-2'>
+                <p>Try this instead:</p>
+                <pre className='bg-white p-3 rounded border text-sm overflow-x-auto mt-1'>
+                  <code className='text-blue-700 block py-2'>{example}</code>
+                </pre>
+              </div>
+            ) : null;
+          })()}
+        </>
+      )}
+      {error.keyword === 'missingValue' && <p>{error.message}</p>}
+      {error.keyword === 'minItems' && (
+        <p>
+          Expected minimum number of items:{' '}
+          <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.minItems}</code>
+        </p>
+      )}
+      {error.keyword === 'conflictingProperties' && (
+        <div className='flex flex-col gap-2'>
+          <p>
+            Conflicting field:{' '}
+            <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.conflictingProperty}</code>
+          </p>
+        </div>
+      )}
+      {error.keyword === 'schema' && (
+        <div className='flex flex-col gap-2'>
+          <p>
+            Error message:
+            <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params?.missingValue}</code>
+          </p>
+        </div>
+      )}
+      {isJsonLdKeyword(error.keyword) && error.params?.code && (
+        <p className='text-xs text-gray-500 mt-2'>
+          JSON-LD code: <code className='px-1 py-0.5 bg-gray-100 rounded'>{error.params.code}</code>
+        </p>
+      )}
+
+      {fixExample && (
+        <div className='relative mt-2'>
+          <p className='text-sm'>Example: </p>
+          <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
+            <code className='text-green-600 block py-4'>{fixExample}</code>
+          </pre>
+          <button
+            onClick={() => onCopy(fixExample)}
+            className='absolute top-2 right-2 mb-2 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 bg-white px-2 py-1 rounded border'
+          >
+            {copied ? (
+              <>
+                <Check className='h-4 w-4' />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className='h-4 w-4' />
+                Copy
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      <div className='mt-3 text-sm text-blue-800 bg-blue-50 p-3 rounded'>
+        <strong>Tip: </strong>
+        {getTipMessage(error)}
+      </div>
+    </div>
+  );
+};
+
 export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className = '' }) => {
   const [expandedError, setExpandedError] = useState<number | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedError, setCopiedError] = useState<{ groupIndex: number; errorIndex: number } | null>(null);
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (groupIndex: number, errorIndex: number, text: string) => {
     if (text) {
       navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedError({ groupIndex, errorIndex });
+      setTimeout(
+        () =>
+          setCopiedError((current) =>
+            current?.groupIndex === groupIndex && current.errorIndex === errorIndex ? null : current,
+          ),
+        2000,
+      );
     }
   };
 
@@ -212,6 +350,7 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
   }
 
   const { issues, warnings } = groupErrors(errors);
+  const issueCount = issues.reduce((count, group) => count + group.errors.length, 0);
   const hasIssues = issues.length > 0;
   const hasWarnings = warnings.length > 0;
 
@@ -222,7 +361,7 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
           <div className='flex items-center gap-2 mb-4'>
             <AlertCircle className='h-5 w-5 text-amber-500' />
             <h3 className='text-lg font-semibold'>
-              We Found {issues.length} {issues.length === 1 ? 'Issue' : 'Issues'}
+              We Found {issueCount} {issueCount === 1 ? 'Issue' : 'Issues'}
             </h3>
           </div>
 
@@ -231,8 +370,6 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
               const mainError = group.errors[0];
               const isExpanded = expandedError === index;
               const isAdditionalProp = mainError.keyword === 'additionalProperties';
-              const value = mainError.params?.allowedValue || mainError.params?.allowedValues;
-              const fixExample = value ? safeStringify(value, true) : null;
 
               return (
                 <div key={index} className='rounded-lg border bg-white'>
@@ -281,6 +418,13 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                               Location: {getFriendlyPath(mainError.instancePath)}
                             </p>
                           )}
+                          <div className='mt-2 space-y-1'>
+                            {group.errors.map((error, errorIndex) => (
+                              <p key={errorIndex} className='text-sm text-gray-600'>
+                                {formatValidationError(error)}
+                              </p>
+                            ))}
+                          </div>
                         </div>
                         <ChevronRight
                           className={`h-5 w-5 text-gray-400 transform transition-transform ${
@@ -292,135 +436,14 @@ export const ErrorDialog: React.FC<ErrorDialogProps> = ({ errors = [], className
                       {isExpanded && (
                         <div className='p-4 border-t bg-gray-50'>
                           <div className='mb-3 text-sm overflow-y-scroll'>
-                            {mainError?.message && <p>Issue: {mainError.message}</p>}
-                            <br />
-                            {(() => {
-                              // For `required` errors AJV's `data` is the parent object, not the
-                              // missing field itself, so dumping it is noisy. The "Missing field" line
-                              // below already names the offending property.
-                              if (mainError.keyword === 'required') return null;
-                              const received =
-                                mainError.params?.receivedValue !== undefined
-                                  ? mainError.params.receivedValue
-                                  : mainError.data;
-                              if (received === undefined) return null;
-                              return (
-                                <>
-                                  <p>Received value ({jsType(received)}):</p>
-                                  <br />
-                                  <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
-                                    <code className='text-green-600 block py-4'>{safeStringify(received, true)}</code>
-                                  </pre>
-                                </>
-                              );
-                            })()}
-                            <br />
-                            {mainError.keyword === 'const' && (
-                              <div className='flex flex-col gap-2'>
-                                <p>
-                                  Incorrect value:{' '}
-                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.instancePath}</code>
-                                </p>
-                              </div>
-                            )}
-                            {mainError.keyword === 'required' && (
-                              <p>
-                                Missing field:{' '}
-                                <code className='px-1 py-0.5 bg-gray-100 rounded'>
-                                  {mainError.params.missingProperty}
-                                </code>
-                              </p>
-                            )}
-                            {mainError.keyword === 'enum' && (
-                              <p>
-                                Must be one of:{' '}
-                                <code className='px-1 py-0.5 bg-gray-100 rounded'>
-                                  {mainError.params.allowedValues.join(', ')}
-                                </code>
-                              </p>
-                            )}
-                            {mainError.keyword === 'type' && (
-                              <>
-                                <p>
-                                  <b>Expected type: </b>
-                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.params.type}</code>
-                                </p>
-                                {(() => {
-                                  const example = correctiveExample(mainError);
-                                  return example ? (
-                                    <div className='mt-2'>
-                                      <p>Try this instead:</p>
-                                      <pre className='bg-white p-3 rounded border text-sm overflow-x-auto mt-1'>
-                                        <code className='text-blue-700 block py-2'>{example}</code>
-                                      </pre>
-                                    </div>
-                                  ) : null;
-                                })()}
-                              </>
-                            )}
-                            {mainError.keyword === 'missingValue' && <p>{mainError?.message}</p>}
-                            {mainError.keyword === 'minItems' && (
-                              <p>
-                                Expected minimum number of items:{' '}
-                                <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.params.minItems}</code>
-                              </p>
-                            )}
-                            {mainError.keyword === 'conflictingProperties' && (
-                              <div className='flex flex-col gap-2'>
-                                <p>
-                                  Conflicting field:{' '}
-                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>
-                                    {mainError.params.conflictingProperty}
-                                  </code>
-                                </p>
-                              </div>
-                            )}
-                            {mainError.keyword === 'schema' && (
-                              <div className='flex flex-col gap-2'>
-                                <p>
-                                  Error message:
-                                  <code className='px-1 py-0.5 bg-gray-100 rounded'>
-                                    {mainError.params.missingValue}
-                                  </code>
-                                </p>
-                              </div>
-                            )}
-                            {isJsonLdKeyword(mainError.keyword) && mainError.params?.code && (
-                              <p className='text-xs text-gray-500 mt-2'>
-                                JSON-LD code:{' '}
-                                <code className='px-1 py-0.5 bg-gray-100 rounded'>{mainError.params.code}</code>
-                              </p>
-                            )}
-                          </div>
-
-                          {fixExample && (
-                            <div className='relative mt-2'>
-                              <p className='text-sm'>Example: </p>
-                              <pre className='bg-white p-3 rounded border text-sm overflow-x-auto'>
-                                <code className='text-green-600 block py-4'>{fixExample}</code>
-                              </pre>
-                              <button
-                                onClick={() => handleCopy(fixExample)}
-                                className='absolute top-2 right-2 mb-2 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 bg-white px-2 py-1 rounded border'
-                              >
-                                {copied ? (
-                                  <>
-                                    <Check className='h-4 w-4' />
-                                    Copied!
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className='h-4 w-4' />
-                                    Copy
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
-
-                          <div className='mt-3 text-sm text-blue-800 bg-blue-50 p-3 rounded'>
-                            <strong>Tip: </strong>
-                            {getTipMessage(mainError)}
+                            {group.errors.map((error, errorIndex) => (
+                              <ErrorDetails
+                                key={errorIndex}
+                                error={error}
+                                copied={copiedError?.groupIndex === index && copiedError.errorIndex === errorIndex}
+                                onCopy={(text) => handleCopy(index, errorIndex, text)}
+                              />
+                            ))}
                           </div>
                         </div>
                       )}

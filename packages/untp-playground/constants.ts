@@ -82,6 +82,7 @@ export enum TestCaseStepId {
   CONTEXT_VALIDATION = 'context',
   SCHEME_VERSION_DETECTION = 'scheme-version-detection',
   SCHEME_SCHEMA_VALIDATION = 'scheme-schema-validation',
+  SCHEME_STRUCTURAL_PARSE = 'scheme-structural-parse',
   LINKSET_SCHEMA_VALIDATION = 'linkset-schema-validation',
   LINKSET_LINK_TYPE_COVERAGE = 'linkset-link-type-coverage',
 }

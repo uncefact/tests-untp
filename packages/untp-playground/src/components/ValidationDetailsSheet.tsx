@@ -9,9 +9,16 @@ interface ValidationDetailsSheetProps {
   onOpenChange: (isOpen: boolean) => void;
   errors: any[];
   trigger?: React.ReactNode;
+  content?: React.ReactNode;
 }
 
-const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({ isOpen, onOpenChange, errors, trigger }) => {
+const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({
+  isOpen,
+  onOpenChange,
+  errors,
+  trigger,
+  content,
+}) => {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
@@ -20,7 +27,9 @@ const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({ isOpen,
           <SheetTitle>Validation Details</SheetTitle>
         </SheetHeader>
         <div className='mt-4 overflow-y-auto max-h-[calc(100vh-8rem)]'>
-          {errors && errors.length > 0 ? (
+          {content !== undefined ? (
+            content
+          ) : errors && errors.length > 0 ? (
             <>
               <ErrorDialog errors={errors} className='w-full max-w-none' />
             </>

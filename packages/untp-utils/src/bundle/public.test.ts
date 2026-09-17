@@ -42,6 +42,18 @@ describe('bundled-artefacts public entry', () => {
     await expect(bundledSchema('NotAType', '0.7.0')).rejects.toThrow(/Unknown UNTP artefact type/);
   });
 
+  it('throws when a bundled ConformityScheme schema is requested before UNTP 0.7.0', async () => {
+    await expect(bundledSchema('ConformityScheme', '0.6.0')).rejects.toThrow(
+      'ConformityScheme has no artefacts for versions before UNTP 0.7.0 and "0.6.0" is not a UNTP 0.7.0 or later version.',
+    );
+  });
+
+  it('throws when a bundled ConformityScheme context is requested before UNTP 0.7.0', async () => {
+    await expect(bundledContext('ConformityScheme', '0.6.0')).rejects.toThrow(
+      'ConformityScheme has no artefacts for versions before UNTP 0.7.0 and "0.6.0" is not a UNTP 0.7.0 or later version.',
+    );
+  });
+
   it('returns the link set schema and the VCDM pair by version', async () => {
     expect(await bundledLinkSetSchema('0.7.0')).toBeDefined();
     expect(await bundledLinkSetSchema('0.6.0')).toBeUndefined();

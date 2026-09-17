@@ -20,9 +20,33 @@ Resolver Link Sets` section, one block per link set, with the version it
   scheme or link set) is titled the way its card is. The JSON report gains a
   `title` on every entry, and a credential verified from a link set records
   that link set's resolver URL or filename on its `source.linkSet`.
+- **Structural Conformity Scheme parsing.** Scheme verification now runs four
+  checks in order: `Version Detection`, `Schema Validation`, `Structural Parse`
+  and `JSON-LD Document Expansion and Context Validation`. The new parser-backed check checks the root `id`
+  and `name`, plus `id`, `name`, `version` and `status` on each profile and
+  criterion. It reports failures with their pointers, retains structured
+  diagnostics in the JSON report, and contributes to the overall verdict.
+  Parser normalisation is transient, so the uploaded document and its source
+  provenance remain unchanged. A scheme with a version the Playground cannot
+  parse is recorded as a failed check with a skipped explanation. A scheme
+  whose detected version is below 0.7.0 keeps the schema selection diagnosis,
+  while the new check records that schema selection prevented parsing. The
+  schema and JSON-LD checks remain independent, and failed version detection
+  now records three skipped later checks. A blank `id` now fails this check as
+  well as the existing JSON-LD context check, so it is reported twice. Structural
+  Parse details mark an unrun check with `skipped`; `blockedBy` names the earlier
+  step that prevented it when one exists. Scheme step details now open in the
+  same details view as credential steps.
 
 ### Changed
 
+- **Every error in a group is listed.** The validation details view lists each
+  error in a group rather than only the first, and the heading counts errors
+  rather than groups, so a group holding several faults no longer hides all but
+  one. This applies to credentials, conformity schemes and link sets alike.
+- **A blank scheme name no longer titles a card.** A Conformity Scheme whose
+  `name` is empty or only whitespace is titled by the final path segment of its
+  URL, else its filename, else `Conformity Scheme`, in cards and in reports.
 - **Guarded URL retrieval.** `/api/fetch` now uses the shared resolver with
   one 10 second budget covering DNS, redirects, transport and body reading,
   rather than a separate timer per hop, and a timeout does not promise that

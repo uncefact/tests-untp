@@ -200,6 +200,46 @@ describe('downloadHtml (#814)', () => {
     expect(doc.querySelector('article[data-result="scheme"] .result-sub')?.textContent).toContain('vunknown');
   });
 
+  it('renders all four scheme steps and structural messages in the HTML report', async () => {
+    const entry = scheme('Structural Failure', 'Structural Failure');
+    entry.status = TestCaseStatus.FAILURE;
+    entry.steps = [
+      step(TestCaseStepId.SCHEME_VERSION_DETECTION, 'Version Detection', TestCaseStatus.SUCCESS),
+      step(TestCaseStepId.SCHEME_SCHEMA_VALIDATION, 'Schema Validation', TestCaseStatus.SUCCESS),
+      step(TestCaseStepId.SCHEME_STRUCTURAL_PARSE, 'Structural Parse', TestCaseStatus.FAILURE, {
+        errors: [
+          { message: '/id: scheme.id is required and must be a non-empty string.', supportable: false },
+          { message: '/name: scheme.name is required and must be a non-empty string.', supportable: false },
+        ],
+        diagnostics: [
+          {
+            code: 'conformity-scheme.missing-required-field',
+            message: 'DO_NOT_RENDER_STRUCTURAL_DIAGNOSTIC',
+            pointer: '/name',
+          },
+        ],
+      }),
+      step(
+        TestCaseStepId.CONTEXT_VALIDATION,
+        'JSON-LD Document Expansion and Context Validation',
+        TestCaseStatus.SUCCESS,
+      ),
+    ];
+
+    const doc = await render(report({ pass: false, conformitySchemes: [entry] }));
+    const article = doc.querySelector('article[data-result="scheme"]');
+    expect(Array.from(article?.querySelectorAll('.step-name') ?? []).map((node) => node.textContent)).toEqual([
+      'Version Detection',
+      'Schema Validation',
+      'Structural Parse',
+      'JSON-LD Document Expansion and Context Validation',
+    ]);
+    expect(doc.body.textContent).toContain('/id: scheme.id is required and must be a non-empty string.');
+    expect(doc.body.textContent).toContain('/name: scheme.name is required and must be a non-empty string.');
+    expect(doc.body.textContent).not.toContain('DO_NOT_RENDER_STRUCTURAL_DIAGNOSTIC');
+    expect(article?.querySelector('a')).toBeNull();
+  });
+
   it('names the link set a verified credential came from in its caption', async () => {
     const fromLinkSet = credential('DigitalProductPassport', 'dpp.json', { url: 'https://c.example.org/dpp.json' });
     fromLinkSet.source = {

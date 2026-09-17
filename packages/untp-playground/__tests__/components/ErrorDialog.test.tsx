@@ -48,7 +48,7 @@ describe('ErrorDialog', () => {
     expect(screen.getByText(/we found 2 issues/i)).toBeInTheDocument();
 
     // Check if error locations are displayed
-    expect(screen.getByText(/data → field1/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/data → field1/i)).toHaveLength(2);
     expect(screen.getByText(/wrong type/i)).toBeInTheDocument();
     expect(screen.getByText(/missing field/i)).toBeInTheDocument();
   });
@@ -85,7 +85,7 @@ describe('ErrorDialog', () => {
 
     // Check if expanded content is visible
     expect(screen.getByText(/must be one of:/i)).toBeInTheDocument();
-    expect(screen.getByText(/active, inactive/i)).toBeInTheDocument();
+    expect(screen.getByText('active, inactive', { exact: true })).toBeInTheDocument();
   });
 
   it('handles copy functionality', async () => {
@@ -112,6 +112,35 @@ describe('ErrorDialog', () => {
 
     // Verify "Copied!" text appears
     expect(screen.getByText(/copied!/i)).toBeInTheDocument();
+  });
+
+  it('marks only the copied example when indexed errors share a group', () => {
+    const errors = [
+      {
+        keyword: 'enum',
+        instancePath: '/items/0',
+        params: { allowedValues: ['first'] },
+      },
+      {
+        keyword: 'enum',
+        instancePath: '/items/1',
+        params: { allowedValues: ['second'] },
+      },
+    ] as any;
+
+    render(<ErrorDialog errors={errors} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /choose from allowed values/i }));
+
+    const copyButtons = screen.getAllByRole('button', { name: /^Copy$/ });
+    expect(copyButtons).toHaveLength(2);
+    fireEvent.click(copyButtons[0]);
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('[\n  "first"\n]');
+    expect(copyButtons[0]).toHaveTextContent('Copied!');
+    expect(copyButtons[1]).toHaveTextContent('Copy');
+    expect(screen.getAllByRole('button', { name: /^Copied!$/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Copy$/ })).toHaveLength(1);
   });
 
   it('displays correct tips based on error type "const"', () => {
@@ -172,9 +201,39 @@ describe('ErrorDialog', () => {
 
     render(<ErrorDialog errors={errors} />);
 
-    // Should show only one group for '/data/field1'
-    expect(screen.getByText(/we found 1 issue/i)).toBeInTheDocument();
-    expect(screen.getByText(/data → field1/i)).toBeInTheDocument();
+    // The heading counts errors, while the body keeps one location group for '/data/field1'.
+    expect(screen.getByText(/we found 2 issues/i)).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.textContent === 'Location: data → field1')).toBeInTheDocument();
+  });
+
+  it('renders every root required error in the collapsed summary and expanded details', () => {
+    const errors = [
+      {
+        keyword: 'required',
+        instancePath: '',
+        message: "must have required property 'owner'",
+        params: { missingProperty: 'owner' },
+      },
+      {
+        keyword: 'required',
+        instancePath: '',
+        message: "must have required property 'documentation'",
+        params: { missingProperty: 'documentation' },
+      },
+    ] as any;
+
+    render(<ErrorDialog errors={errors} />);
+
+    expect(screen.getByText('Missing required field: owner')).toBeInTheDocument();
+    expect(screen.getByText('Missing required field: documentation')).toBeInTheDocument();
+    expect(screen.getByText(/we found 2 issues/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /fix validation error/i }));
+
+    expect(screen.getByText((_, element) => element?.textContent === 'Missing field: owner')).toBeInTheDocument();
+    expect(
+      screen.getByText((_, element) => element?.textContent === 'Missing field: documentation'),
+    ).toBeInTheDocument();
   });
 
   it('applies custom className when provided', () => {

@@ -27,10 +27,10 @@ export function schemeIsTerminal(steps: TestStep[]): boolean {
   );
 }
 
-/** Card title: the scheme name, else a URL's final path segment, else the filename, else the family label. Never the raw URL. */
+/** Card title: the scheme name when it carries non-blank text, else a URL's final path segment, else the filename, else the family label. Never the raw URL. */
 export function schemeTitle(scheme: StoredScheme): string {
   const name = scheme.decoded?.name;
-  if (typeof name === 'string' && name.length > 0) return name;
+  if (typeof name === 'string' && name.trim().length > 0) return name;
 
   const source = scheme.source;
   if (source?.kind === 'url') {

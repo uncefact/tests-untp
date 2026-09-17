@@ -135,7 +135,8 @@ export interface UntpArtefactUrls {
  *   `ConformityScheme`). Must be a recognised type.
  * @param version - Semantic version of the artefact (e.g. `0.7.0`).
  * @returns The {@link UntpArtefactUrls} appropriate for the version.
- * @throws {Error} When `type` is not a recognised UNTP artefact type.
+ * @throws {Error} When `type` is not a recognised UNTP artefact type, or when `type` is
+ * `ConformityScheme` and `version` is before 0.7.0.
  */
 export function buildUntpArtefactUrls(type: string, version: string): UntpArtefactUrls {
   if (!Object.hasOwn(UNTP_SHORT_CREDENTIAL_TYPES, type)) {
@@ -145,6 +146,12 @@ export function buildUntpArtefactUrls(type: string, version: string): UntpArtefa
   }
 
   const shortCode = UNTP_SHORT_CREDENTIAL_TYPES[type];
+
+  if (type === 'ConformityScheme' && !isV070OrAbove(version)) {
+    throw new Error(
+      `ConformityScheme has no artefacts for versions before UNTP 0.7.0 and "${version}" is not a UNTP 0.7.0 or later version.`,
+    );
+  }
 
   if (isV070OrAbove(version)) {
     const fileName = UNTP_CORE_SCHEMA_FILENAMES[type];

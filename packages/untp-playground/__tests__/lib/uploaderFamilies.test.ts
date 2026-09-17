@@ -27,7 +27,7 @@ describe('UPLOADER_FAMILIES (#676 contract table)', () => {
       // Deliberately not the ticket's draft sentence ("Duplicate ids replace the existing card"):
       // scheme identity is the content hash per ADR-041, and the helper states that behaviour.
       helper:
-        'Validated as a Conformity Scheme: version detection, schema validation and JSON-LD context checks. Re-uploading the same document replaces the existing card.',
+        'Validated as a Conformity Scheme: version detection, schema validation, structural parse and JSON-LD context checks. Re-uploading the same document replaces the existing card.',
     });
   });
 
