@@ -264,6 +264,21 @@ export function credentialBatchIssueHandler(
         return;
       }
 
+      if (claimed.outcome !== 'claimed') {
+        if (claimed.outcome === 'cancelled') {
+          const settlement = await deps.transaction((tx) =>
+            deps.settle(tx, { batchId: payload.batchId, tenantId: payload.tenantId, token }),
+          );
+          logger.info(
+            { ...logFields(payload), settlement: settlement.outcome },
+            'Credential batch cancellation checked',
+          );
+        } else {
+          logger.info({ ...logFields(payload), outcome: claimed.outcome }, 'Credential batch claim stopped');
+        }
+        return;
+      }
+
       const { index, request } = claimed.item;
       const itemStartedAt = deps.now();
       let issueDispatched = false;

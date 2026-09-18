@@ -34,6 +34,8 @@ export type CredentialBatchSummary = Prisma.CredentialBatchGetPayload<{
     issuedCount: true;
     failedCount: true;
     unknownCount: true;
+    cancelledCount: true;
+    cancelRequestedAt: true;
     idempotencyKey: true;
     bodyDigest: true;
     createdAt: true;
@@ -94,6 +96,7 @@ type CredentialBatchResolutionBatch = {
   issuedCount: number;
   failedCount: number;
   unknownCount: number;
+  cancelledCount: number;
   version: number;
   createdAt: Date;
   settledAt: Date | null;
@@ -119,6 +122,7 @@ export type CredentialBatchResolutionSnapshot = {
     issued: number;
     failed: number;
     unknown: number;
+    cancelled: number;
   };
   itemState: CredentialBatchItemState | null;
   credentialId: string | null;
@@ -229,6 +233,8 @@ export async function findCredentialBatchSubmission(
       issuedCount: true,
       failedCount: true,
       unknownCount: true,
+      cancelledCount: true,
+      cancelRequestedAt: true,
       idempotencyKey: true,
       bodyDigest: true,
       createdAt: true,
@@ -303,6 +309,77 @@ export async function getCredentialBatchById(
     where: { id: batchId, tenantId },
     include: BATCH_WITH_ITEMS_INCLUDE,
   });
+}
+
+/** The caller must keep this lock until all dependent item and counter writes commit (ADR-060). */
+async function lockCredentialBatchForUpdate(tx: PrismaTypes.TransactionClient, batchId: string, tenantId: string) {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "CredentialBatch"
+    WHERE "id" = ${batchId} AND "tenantId" = ${tenantId}
+    FOR UPDATE
+  `;
+  if (rows.length === 0) return null;
+  return tx.credentialBatch.findFirst({ where: { id: batchId, tenantId } });
+}
+
+export type CancelCredentialBatchResult =
+  | { outcome: 'missing' }
+  | { outcome: 'expired' | 'not-cancellable' | 'already-requested' | 'applied'; batch: CredentialBatchWithItems };
+
+/** Classifies terminal states before active retries, as required by #1080. */
+export function classifyBatchCancellation(
+  batch: Pick<CredentialBatchSummary, 'state' | 'cancelRequestedAt'>,
+): 'expired' | 'not-cancellable' | 'already-requested' | 'cancellable' {
+  if (batch.state === CredentialBatchState.EXPIRED) return 'expired';
+  if (batch.state !== CredentialBatchState.QUEUED && batch.state !== CredentialBatchState.RUNNING) {
+    return 'not-cancellable';
+  }
+  return batch.cancelRequestedAt === null ? 'cancellable' : 'already-requested';
+}
+
+/**
+ * Cancels queued items, including deferred retries, in the caller's transaction (#1080).
+ * Processing items keep their attempt. Rejected and repeated requests leave rows unchanged.
+ * Database failures must roll back the transaction, including item and counter changes.
+ */
+export async function cancelCredentialBatch(
+  tx: PrismaTypes.TransactionClient,
+  input: { batchId: string; tenantId: string },
+): Promise<CancelCredentialBatchResult> {
+  const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
+  if (batch === null) return { outcome: 'missing' };
+  const classification = classifyBatchCancellation(batch);
+  if (classification !== 'cancellable') {
+    const view = await tx.credentialBatch.findFirstOrThrow({
+      where: { id: input.batchId, tenantId: input.tenantId },
+      include: BATCH_WITH_ITEMS_INCLUDE,
+    });
+    return { outcome: classification, batch: view };
+  }
+  const now = new Date(Date.now());
+  const cancelled = await tx.credentialBatchItem.updateMany({
+    where: { batchId: input.batchId, tenantId: input.tenantId, state: CredentialBatchItemState.QUEUED },
+    data: { state: CredentialBatchItemState.CANCELLED, attemptToken: null, nextAttemptAt: null },
+  });
+  if (cancelled.count !== batch.queuedCount)
+    throw new Error('Credential batch queued items disagree with its counters');
+  const updated = await tx.credentialBatch.update({
+    where: { id: input.batchId, tenantId: input.tenantId },
+    data: {
+      cancelRequestedAt: now,
+      queuedCount: { decrement: cancelled.count },
+      cancelledCount: { increment: cancelled.count },
+      version: { increment: 1 },
+    },
+  });
+  if (updated.processingCount === 0) await settleLockedBatch(tx, updated, updated.attemptToken);
+  return {
+    outcome: 'applied',
+    batch: await tx.credentialBatch.findFirstOrThrow({
+      where: { id: input.batchId, tenantId: input.tenantId },
+      include: BATCH_WITH_ITEMS_INCLUDE,
+    }),
+  };
 }
 
 /** Reads one tenant-owned item for the audited maintenance inspection command. */
@@ -393,6 +470,7 @@ function resolutionSnapshot(
       issued: batch?.issuedCount ?? 0,
       failed: batch?.failedCount ?? 0,
       unknown: batch?.unknownCount ?? 0,
+      cancelled: batch?.cancelledCount ?? 0,
     },
     itemState: item?.state ?? null,
     credentialId: item?.credentialId ?? null,
@@ -412,23 +490,7 @@ export async function resolveUnknownBatchItem(
   input: ResolveUnknownBatchItemInput,
 ): Promise<ResolveUnknownBatchItemResult> {
   const audit = buildCredentialBatchResolutionAudit(input);
-  const batch = await tx.credentialBatch.findFirst({
-    where: { id: input.batchId, tenantId: input.tenantId },
-    select: {
-      state: true,
-      itemCount: true,
-      queuedCount: true,
-      processingCount: true,
-      issuedCount: true,
-      failedCount: true,
-      unknownCount: true,
-      version: true,
-      createdAt: true,
-      settledAt: true,
-      resolvedAt: true,
-      expiresAt: true,
-    },
-  });
+  const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   if (batch === null) return { outcome: 'missing', audit };
 
   const item = await tx.credentialBatchItem.findFirst({
@@ -472,7 +534,7 @@ export async function resolveUnknownBatchItem(
 
   const now = new Date(Date.now());
   const lastUnknown = batch.unknownCount === 1;
-  const nextState = lastUnknown ? CredentialBatchState.COMPLETED : CredentialBatchState.NEEDS_ATTENTION;
+  const nextState = settledBatchState(lastUnknown ? 0 : batch.unknownCount - 1, batch.cancelledCount);
   const nextExpiresAt = lastUnknown ? new Date(now.getTime() + readBatchRetentionDays() * 24 * 60 * 60 * 1_000) : null;
   const updatedBatch = await tx.credentialBatch.updateMany({
     where: {
@@ -615,6 +677,7 @@ export async function markItemIssued(
     warning?: PrismaTypes.JsonValue | null;
   },
 ): Promise<BatchMutationOutcome> {
+  await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
     where: {
@@ -665,6 +728,7 @@ export async function markItemFailed(
     errorMessage: string;
   },
 ): Promise<BatchMutationOutcome> {
+  await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
     where: {
@@ -702,11 +766,14 @@ export async function markItemFailed(
   return { outcome: 'applied' };
 }
 
-/** Re-queues a processing item when no external issuance call was dispatched. */
+/** Finishes a pre-dispatch fault as failed, cancelled or queued for retry (#1080). */
 export async function markItemQueued(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; index: number; token: string; errorMessage: string },
 ): Promise<BatchMutationOutcome> {
+  const currentBatch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
+  if (currentBatch === null) return { outcome: 'missing' };
+  if (currentBatch.attemptToken !== input.token) return { outcome: 'superseded' };
   const now = new Date(Date.now());
   const current = await tx.credentialBatchItem.findFirst({
     where: {
@@ -721,6 +788,7 @@ export async function markItemQueued(
   if (current === null) return itemNotApplied(tx, input);
   const attemptCount = current.attemptCount + 1;
   const exhausted = attemptCount >= CREDENTIAL_BATCH_ITEM_ATTEMPT_LIMIT;
+  const cancelled = !exhausted && currentBatch.cancelRequestedAt !== null;
   const item = await tx.credentialBatchItem.updateMany({
     where: {
       batchId: input.batchId,
@@ -731,15 +799,20 @@ export async function markItemQueued(
       attemptCount: current.attemptCount,
     },
     data: {
-      state: exhausted ? CredentialBatchItemState.FAILED : CredentialBatchItemState.QUEUED,
+      state: exhausted
+        ? CredentialBatchItemState.FAILED
+        : cancelled
+          ? CredentialBatchItemState.CANCELLED
+          : CredentialBatchItemState.QUEUED,
       attemptToken: null,
       warning: Prisma.JsonNull,
       errorClass: exhausted ? 'ITEM_ATTEMPTS_EXHAUSTED' : null,
       errorMessage: exhausted ? input.errorMessage : null,
       attemptCount,
-      nextAttemptAt: exhausted
-        ? null
-        : new Date(now.getTime() + credentialBatchItemBackoffSeconds(attemptCount) * 1_000),
+      nextAttemptAt:
+        exhausted || cancelled
+          ? null
+          : new Date(now.getTime() + credentialBatchItemBackoffSeconds(attemptCount) * 1_000),
       updatedAt: now,
     },
   });
@@ -754,7 +827,11 @@ export async function markItemQueued(
     },
     data: {
       processingCount: { decrement: 1 },
-      ...(exhausted ? { failedCount: { increment: 1 } } : { queuedCount: { increment: 1 } }),
+      ...(exhausted
+        ? { failedCount: { increment: 1 } }
+        : cancelled
+          ? { cancelledCount: { increment: 1 } }
+          : { queuedCount: { increment: 1 } }),
       version: { increment: 1 },
       lastProgressAt: now,
     },
@@ -768,6 +845,7 @@ export async function recordKnownCredentialId(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; index: number; credentialId: string },
 ): Promise<{ applied: boolean }> {
+  await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const updated = await tx.credentialBatchItem.updateMany({
     where: {
@@ -801,6 +879,7 @@ export async function markItemOutcomeUnknown(
     credentialId?: string;
   },
 ): Promise<BatchMutationOutcome> {
+  await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
     where: {
@@ -844,8 +923,17 @@ export async function claimNextBatchItem(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; token: string },
 ): Promise<
-  { outcome: 'claimed'; item: { index: number; request: string } } | { outcome: 'empty'; nextAttemptAt?: Date }
+  | { outcome: 'claimed'; item: { index: number; request: string } }
+  | { outcome: 'empty'; nextAttemptAt?: Date }
+  | { outcome: 'cancelled' }
+  | { outcome: 'missing' | 'superseded' }
 > {
+  const current = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
+  if (current === null) return { outcome: 'missing' };
+  if (current.cancelRequestedAt !== null) return { outcome: 'cancelled' };
+  if (current.state !== CredentialBatchState.RUNNING || current.attemptToken !== input.token) {
+    return { outcome: 'superseded' };
+  }
   for (;;) {
     const now = new Date(Date.now());
     const item = await tx.credentialBatchItem.findFirst({
@@ -908,27 +996,40 @@ export async function settleBatchIfFinished(
   tx: Prisma.TransactionClient,
   input: { batchId: string; tenantId: string; token: string },
 ): Promise<BatchSettlementOutcome> {
-  const batch = await tx.credentialBatch.findFirst({ where: { id: input.batchId, tenantId: input.tenantId } });
+  const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   if (batch === null) return { outcome: 'missing' };
+  return settleLockedBatch(tx, batch, input.token);
+}
+
+function settledBatchState(unknownCount: number, cancelledCount: number): CredentialBatchState {
+  if (unknownCount > 0) return CredentialBatchState.NEEDS_ATTENTION;
+  return cancelledCount > 0 ? CredentialBatchState.CANCELLED : CredentialBatchState.COMPLETED;
+}
+
+async function settleLockedBatch(
+  tx: PrismaTypes.TransactionClient,
+  batch: NonNullable<Awaited<ReturnType<typeof lockCredentialBatchForUpdate>>>,
+  token: string | null,
+): Promise<BatchSettlementOutcome> {
   if (batch.state !== CredentialBatchState.QUEUED && batch.state !== CredentialBatchState.RUNNING) {
     return { outcome: 'already-settled' };
   }
   if (batch.queuedCount !== 0 || batch.processingCount !== 0) return { outcome: 'not-ready' };
-  if (batch.issuedCount + batch.failedCount + batch.unknownCount !== batch.itemCount) {
+  if (batch.issuedCount + batch.failedCount + batch.unknownCount + batch.cancelledCount !== batch.itemCount) {
     return { outcome: 'not-ready' };
   }
   const settledAt = new Date(Date.now());
-  const state = batch.unknownCount > 0 ? CredentialBatchState.NEEDS_ATTENTION : CredentialBatchState.COMPLETED;
+  const state = settledBatchState(batch.unknownCount, batch.cancelledCount);
   const expiresAt =
-    state === CredentialBatchState.COMPLETED
+    state !== CredentialBatchState.NEEDS_ATTENTION
       ? new Date(settledAt.getTime() + readBatchRetentionDays() * 24 * 60 * 60 * 1_000)
       : null;
   const updated = await tx.credentialBatch.updateMany({
     where: {
-      id: input.batchId,
-      tenantId: input.tenantId,
+      id: batch.id,
+      tenantId: batch.tenantId,
       state: { in: [CredentialBatchState.QUEUED, CredentialBatchState.RUNNING] },
-      attemptToken: input.token,
+      attemptToken: token,
       version: batch.version,
       queuedCount: 0,
       processingCount: 0,
@@ -958,12 +1059,10 @@ export async function claimBatchAttempt(
   },
 ): Promise<{ applied: boolean }> {
   const now = new Date(Date.now());
-  const current = await tx.credentialBatch.findFirst({
-    where: { id: input.batchId, tenantId: input.tenantId, version: input.expectedVersion },
-    select: { state: true, attemptToken: true, lastProgressAt: true },
-  });
+  const current = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   if (
     current === null ||
+    current.version !== input.expectedVersion ||
     (current.state !== CredentialBatchState.QUEUED && current.state !== CredentialBatchState.RUNNING)
   ) {
     return { applied: false };
