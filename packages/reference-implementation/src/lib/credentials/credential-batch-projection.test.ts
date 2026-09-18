@@ -14,7 +14,7 @@ describe('projectCredentialBatch', () => {
       failedCount: 1,
       unknownCount: 0,
       cancelledCount: 1,
-      cancelRequestedAt: null,
+      cancelRequestedAt: new Date('2026-09-17T01:02:30.000Z'),
       idempotencyKey: 'key-1',
       bodyDigest: 'digest-1',
       createdAt: new Date('2026-09-17T01:02:03.000Z'),
@@ -88,6 +88,7 @@ describe('projectCredentialBatch', () => {
       id: 'batch-1',
       state: 'CANCELLED',
       counts: { total: 3, queued: 0, processing: 0, issued: 1, failed: 1, unknown: 0, cancelled: 1 },
+      cancelRequestedAt: '2026-09-17T01:02:30.000Z',
       createdAt: '2026-09-17T01:02:03.000Z',
       settledAt: '2026-09-17T01:03:03.000Z',
       items: [
@@ -154,6 +155,7 @@ describe('projectCredentialBatch', () => {
       ],
     });
 
+    expect(result.cancelRequestedAt).toBeNull();
     expect(result.items).toEqual([
       {
         index: 0,

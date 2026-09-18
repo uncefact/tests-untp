@@ -19,6 +19,7 @@ export function projectCredentialBatch(batch: CredentialBatchWithItems) {
       unknown: batch.unknownCount,
       cancelled: batch.cancelledCount,
     },
+    cancelRequestedAt: batch.cancelRequestedAt?.toISOString() ?? null,
     createdAt: batch.createdAt.toISOString(),
     settledAt: batch.settledAt?.toISOString() ?? null,
     items: batch.items.map((item) => {
