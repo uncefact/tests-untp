@@ -1,10 +1,19 @@
-import type { PrismaClient } from '../../../src/lib/prisma/generated/index.js';
+import type { Prisma, PrismaClient } from '../../../src/lib/prisma/generated/index.js';
+import { createRigClient } from './db';
 
 export type LockTarget =
   | { table: 'LibraryRecord'; id: string; tenantId: string }
   | { table: 'CheckRun'; id: string; tenantId: string };
 
 export type LockHolder = { pid: number; release: () => void; done: Promise<void> };
+
+export function barrier(): { promise: Promise<void>; release: () => void } {
+  let release!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
 
 /**
  * Holds one known row lock until the caller releases it. The caller owns the
@@ -86,5 +95,51 @@ export async function waitForQueueBehind(
       throw new Error(`only ${row.count} backends are queued behind ${holderPid}, expected ${expected}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+/** Runs two transactions against one row and proves that the second waits for the first. */
+export async function contend<A, B>(
+  client: PrismaClient,
+  first: (tx: Prisma.TransactionClient) => Promise<A>,
+  second: (tx: Prisma.TransactionClient) => Promise<B>,
+): Promise<[A, B]> {
+  const other = createRigClient();
+  const firstReady = barrier();
+  const secondReady = barrier();
+  const commitFirst = barrier();
+  let firstPid = 0;
+  const firstRun = client.$transaction(
+    async (tx) => {
+      const [session] = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+      firstPid = session.pid;
+      const result = await first(tx);
+      firstReady.release();
+      await commitFirst.promise;
+      return result;
+    },
+    { timeout: 15_000 },
+  );
+  const secondRun = other.$transaction(
+    async (tx) => {
+      await firstReady.promise;
+      secondReady.release();
+      return second(tx);
+    },
+    { timeout: 15_000 },
+  );
+  const completed = Promise.all([firstRun, secondRun]);
+  const drained = completed.catch(() => undefined);
+  try {
+    await Promise.race([secondReady.promise, completed]);
+    await waitForQueueBehind(client, firstPid, 1);
+    commitFirst.release();
+    return await completed;
+  } finally {
+    firstReady.release();
+    secondReady.release();
+    commitFirst.release();
+    await drained;
+    await other.$disconnect();
   }
 }

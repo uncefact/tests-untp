@@ -8,6 +8,7 @@ import { getApiDocs } from './swagger';
 import { CredentialBatchItemState, CredentialBatchState } from '@/lib/prisma/generated';
 import {
   CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
+  CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE,
   CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
 } from '@/lib/credentials/credential-batch-error';
 
@@ -95,7 +96,7 @@ describe('published batch cancellation contract', () => {
       message: CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
     });
     expect(operation.responses['400'].content!['application/json']!.examples!.bodyNotAllowed.value).toEqual({
-      error: 'Send this request without a body.',
+      error: CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE,
     });
     expect(operation.responses['404'].content!['application/json']!.examples!.notFound.value).toEqual({
       error: 'Credential batch not found.',

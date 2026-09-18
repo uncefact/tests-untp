@@ -348,7 +348,7 @@ describe('credential batch item retry scheduling', () => {
           queue: { enqueueWithin } as never,
           startAfter,
         }),
-      ).resolves.toEqual({ applied: true });
+      ).resolves.toEqual({ outcome: 'checkpointed' });
     });
     expect(enqueueWithin).toHaveBeenCalledWith(
       expect.anything(),

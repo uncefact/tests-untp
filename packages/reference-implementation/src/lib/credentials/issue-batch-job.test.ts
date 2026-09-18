@@ -128,7 +128,7 @@ function dependencies(overrides: Partial<CredentialBatchIssueDependencies> = {})
     recordKnownCredentialId: jest.fn(async () => ({ applied: true })),
     releaseAttempt: jest.fn(async () => ({ applied: true })),
     settle: jest.fn(async () => ({ outcome: 'applied' as const, state: 'COMPLETED' as never })),
-    checkpoint: jest.fn(async () => ({ applied: true })),
+    checkpoint: jest.fn(async () => ({ outcome: 'checkpointed' as const })),
     now: () => new Date(0),
     queue,
     ...overrides,
@@ -661,6 +661,35 @@ describe('credential batch issue handler', () => {
     }
   });
 
+  it.each(['budget', 'deferred'] as const)(
+    'warns and releases on a non-applied %s checkpoint settlement',
+    async (path) => {
+      // Regression: a drifted cancellation must not leave the worker fence held when settlement is not ready.
+      loggerCalls.warn.mockClear();
+      const checkpoint = jest.fn(async () => ({ outcome: 'not-ready' as const }));
+      const deps = dependencies({
+        checkpoint,
+        ...(path === 'deferred'
+          ? { claimNextItem: jest.fn(async () => ({ outcome: 'empty' as const, nextAttemptAt: new Date(1_000) })) }
+          : {}),
+      });
+
+      await expect(
+        credentialBatchIssueHandler(deps)(payload, context(path === 'budget' ? 5 : 60)),
+      ).resolves.toBeUndefined();
+
+      expect(checkpoint).toHaveBeenCalledTimes(1);
+      expect(deps.releaseAttempt).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ ...payload, token: expect.any(String) }),
+      );
+      expect(loggerCalls.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, settlement: 'not-ready' }),
+        'Credential batch cancellation could not settle',
+      );
+    },
+  );
+
   it('records a definitive refusal and continues after a pre-dispatch fault', async () => {
     // Regression: a client refusal is an item outcome, while a pre-dispatch fault is retried per item in this job.
     const refusal = dependencies({
@@ -1178,7 +1207,7 @@ describe('credential batch issue handler', () => {
       })(),
       checkpoint: jest.fn(async () => {
         state.checkpointed = true;
-        return { applied: true };
+        return { outcome: 'checkpointed' as const };
       }),
       settle: jest.fn(async () => {
         state.settled = true;

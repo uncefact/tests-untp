@@ -29,6 +29,7 @@ import {
   decryptCredentialBatchItemRequest,
   releaseBatchAttempt,
   settleBatchIfFinished,
+  type BatchCheckpointOutcome,
   type CredentialBatchWithItems,
 } from '@/lib/prisma/repositories/credential-batch.repository';
 import { interruptedBatchItemMessage } from '@/lib/credentials/credential-batch-projection';
@@ -104,6 +105,52 @@ function itemLogFields(batch: CredentialBatchWithItems, index: number, itemCorre
 
 function missingBatchLogFields(payload: CredentialBatchIssuePayload) {
   return { correlationId: getRequestContext()?.correlationId ?? null, batchId: payload.batchId, tenantId: payload.tenantId };
+}
+
+async function handleCheckpointOutcome(
+  deps: CredentialBatchIssueDependencies,
+  batch: CredentialBatchWithItems,
+  payload: CredentialBatchIssuePayload,
+  token: string,
+  checkpoint: BatchCheckpointOutcome,
+  startAfter?: Date,
+): Promise<void> {
+  const fields = batchLogFields(batch);
+  if (checkpoint.outcome === 'checkpointed') {
+    logger.info(
+      { ...fields, checkpointed: true, ...(startAfter === undefined ? {} : { startAfter }) },
+      startAfter === undefined
+        ? 'Credential batch continuation checkpointed'
+        : 'Credential batch deferred continuation checkpointed',
+    );
+    return;
+  }
+  if (checkpoint.outcome === 'superseded') {
+    logger.info({ ...fields, outcome: checkpoint.outcome }, 'Credential batch checkpoint stopped');
+    return;
+  }
+  if (checkpoint.outcome === 'applied') {
+    logger.info({ ...fields, settlement: checkpoint.outcome }, 'Credential batch cancellation checked');
+    return;
+  }
+
+  logger.warn(
+    { ...fields, settlement: checkpoint.outcome },
+    'Credential batch cancellation could not settle',
+  );
+  const released = await deps.transaction((tx) =>
+    deps.releaseAttempt(tx, {
+      batchId: payload.batchId,
+      tenantId: payload.tenantId,
+      token,
+    }),
+  );
+  if (!released.applied) {
+    logger.warn(
+      { ...fields, settlement: checkpoint.outcome },
+      'Credential batch cancellation settlement could not release the fence held by this worker',
+    );
+  }
 }
 
 /**
@@ -264,10 +311,7 @@ export function credentialBatchIssueHandler(
               queue: deps.queue,
             }),
           );
-          logger.info(
-            { ...batchLogFields(batch), checkpointed: checkpoint.applied },
-            'Credential batch continuation checkpointed',
-          );
+          await handleCheckpointOutcome(deps, batch, payload, token, checkpoint);
           return;
         }
 
@@ -288,10 +332,7 @@ export function credentialBatchIssueHandler(
                 startAfter,
               }),
             );
-            logger.info(
-              { ...batchLogFields(batch), checkpointed: checkpoint.applied, startAfter },
-              'Credential batch deferred continuation checkpointed',
-            );
+            await handleCheckpointOutcome(deps, batch, payload, token, checkpoint, startAfter);
             return;
           }
           const settlement = await deps.transaction((tx) =>

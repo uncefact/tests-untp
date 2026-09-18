@@ -13,6 +13,7 @@ import { ValidationError } from '@/lib/api/validation';
 export type CredentialBatchErrorOutcome = { code?: string; message: string };
 
 export const BATCH_EXPIRED_MESSAGE = 'This credential batch has expired. Its credentials were not deleted.';
+export const CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE = 'Send this request without a body.';
 export const CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE =
   'Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.';
 export const CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE =
@@ -36,6 +37,13 @@ export function buildCredentialBatchExpiredBody(batchId?: string) {
     error: BATCH_EXPIRED_MESSAGE,
     code: 'BATCH_EXPIRED' as const,
     ...(batchId === undefined ? {} : { batchId }),
+  };
+}
+
+export function credentialBatchExpiredResponse(projection: object) {
+  return {
+    body: { ...projection, ...buildCredentialBatchExpiredBody() },
+    init: { status: 410 as const, headers: { 'Cache-Control': 'no-store' } },
   };
 }
 
