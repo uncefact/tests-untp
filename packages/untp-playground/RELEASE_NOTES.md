@@ -4,71 +4,174 @@ These are the user-facing release notes for the UNTP Playground. They focus
 on what's new for you, the person using the playground, not on the internal
 mechanics. For a technical, per-change log see [CHANGELOG.md](./CHANGELOG.md).
 
-## Unreleased
+## 0.4.0 - 2026-09-18
 
-### Safer URL retrieval
+The 0.4.0 release gives the UNTP Playground a tabbed workspace for
+credentials, Conformity Schemes and Identity Resolver link sets. It validates
+each loaded family in one session, makes failure causes visible, and produces
+reports that include every loaded and validated family.
 
-URLs you paste into the Playground are now retrieved through a shared,
-hardened fetch path. One 10-second budget covers looking up the address,
-following redirects and reading the document, where each redirect hop
-previously got a fresh timer of its own. Each redirect is checked before it is
-requested, and the connection uses the address that was checked, so a URL
-cannot be switched to an internal host part-way through.
+- Technical changelog: [CHANGELOG.md § 0.4.0](./CHANGELOG.md#040---2026-09-18)
+- Container image: [ghcr.io/uncefact/tests-untp/untp-playground](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Funtp-playground) (`:0.4.0`, `:latest`)
 
-The range of addresses and hostnames the Playground refuses is wider:
-internal-looking suffixes such as `.internal` and `.local`, carrier-grade and
-other reserved address space, and further non-public ranges. Error messages no
-longer show the address a hostname resolved to. A URL that names a bare IPv6
-address now works when that address is public, and is refused with a clear
-message when it is not. Before, every such URL failed as a lookup error.
+### Breaking changes
 
-Two cases are now refused outright. A `304 Not Modified` is reported as a
-failure instead of being followed as a redirect, and a hostname whose lookup
-returns no address is reported as a failure instead of being tried. Messages
-for connection failures are now fixed, safe text rather than the underlying
-network error. If a site labels its response with an unusual content type, the
-Playground may tell you the address did not return valid JSON instead of
-pointing out that it is a web page.
+**Update JSON report consumers.** The scheme array is now `conformitySchemes`
+instead of `conformitySchemeResults`. The duplicate `overallStatus` field has
+been removed from every entry; use `status`. The `verifiableCredentials`,
+`conformitySchemes` and `linkSets` arrays are always present, including when
+one family is empty.
 
-### More precise UNTP version and schema checks
+The HTML report heads a scheme block with the card's title instead of the type
+and version. Validation outcomes can also change after upgrading: Conformity
+Schemes now undergo Structural Parse, and a verification-service success is
+overridden when the credential is expired, not yet valid, or has a validity
+bound the Playground cannot read.
 
-The Playground now recognises a UNTP context wherever it appears in a credential's `@context`, so a credential that carries its UNTP context somewhere other than the second entry is recognised instead of being reported as an unsupported version, and its schema is checked. A context whose version is the last part of the address with no trailing slash, such as one ending `/dpp/0.5.0`, is read as its version, and schema validation then reports the exact context string the published schema requires. A complete prerelease version such as `0.7.0-rc.1` is preserved for the core credential, while a Digital Livestock Passport version read from a context filename keeps only the first part of a dotted prerelease, so `0.4.1-beta1.2` is read as `0.4.1-beta1` and is recognised only when that shorter version is one the Playground knows. Published schema addresses are unchanged for supported credential types and versions, and Digital Livestock Passport extension contexts continue to work. A missing version and an unsupported credential type are reported before any schema is fetched, with advice to check the type and `@context`, and no retry is offered; a Digital Livestock Passport whose version the Playground does not know is reported the same way, as an unsupported extension version. A Conformity Scheme older than UNTP 0.7.0 is reported as having no published schema layout, and the validation advice tells you to use a Conformity Scheme published for UNTP 0.7.0. Cards and reports keep their existing labels where no version can be detected.
+### A tabbed artefact workspace
+
+**Three tabs.** Credentials, Conformity Schemes and Link Sets each have their
+own upload and URL controls. Each tab keeps validating its loaded artefacts
+in the background when another tab is selected. A tab shows its loaded
+instance count and a failure marker when an instance has failed. The
+Credentials tab also shows a spinner while a credential is being verified.
+Empty tabs show no marker.
+
+### Link sets as a first-class artefact
+
+**Load from a resolver or file.** On the Link Sets tab, resolve an identity
+resolver URL or upload a link set JSON file. Resolver requests include
+`?linkType=all` unless the URL already supplies a `linkType` value. The card
+lists credential links, secondary resolver links and a count of other links.
+
+**Validate the selected version.** Choose the UNTP spec version before adding
+the link set. The Playground validates it against that version's published
+Identity Resolver linkset schema and records the selected version on the card
+and in the report. The current selector offers v0.7.0.
+
+The Link Sets tab also offers a `Test Link Set` sample.
+
+**Check link type coverage.** The second step compares each verified
+credential's detected type with its `dpp`, `dcc`, `dfr` or `dte` relation. It
+shows how many relation links have been checked and lists mismatches. Coverage
+can remain pending while linked credentials have not been verified.
+
+### Verify linked credentials and secondary resolvers
+
+**Verify credential links.** Use Verify on a listed credential link to fetch
+the target and run it through the Credentials tab pipeline. The link-set row
+tracks the same credential instance's verifying or verified state, and the
+report records that the credential was reached through the link set.
+
+**Follow secondary resolvers.** A secondary resolver link is listed with a
+Resolve action. Selecting it loads the target link set as its own card, using
+the same URL resolution flow as the Link Sets tab.
+
+### Decrypt encrypted credentials in the browser
+
+**Supported storage envelopes.** Credentials using the reference storage
+service's AES-256-GCM envelope can be decrypted in the browser with the
+matching 64-character hexadecimal key. The decrypted credential then runs
+through the normal validation pipeline. The key is used in the browser only,
+and is not stored, logged or sent anywhere. Unsupported encrypted formats stay
+locked with an explanation. Read [Decrypting encrypted credentials](../../documentation/docs-playground/decrypting-encrypted-credentials.md)
+for the supported format and the recovery path for other formats.
+
+### Multiple schemes and credential instances
+
+**Keep each instance.** Load and validate more than one Conformity Scheme in
+the same session. Multiple credentials of one type remain separate instances
+and appear under a shared type heading with a count. The HTML report titles
+each block the way its card is titled.
 
 ### A structural check for Conformity Schemes
 
-A Conformity Scheme now goes through four checks instead of three: Version Detection, Schema Validation, the new Structural Parse, and JSON-LD Document Expansion and Context Validation. The new check reads the document the way the rest of the toolchain does, so a scheme the published JSON Schema accepts but the parser cannot read is now reported on the card rather than only failing later.
+**Four checks.** Conformity Scheme validation now runs Version Detection,
+Schema Validation, Structural Parse and JSON-LD Document Expansion and Context
+Validation. Structural Parse checks the scheme's root `id` and `name`, plus
+`id`, `name`, `version` and `status` on every profile and criterion. It lists
+the fields that fail and contributes to the scheme's overall verdict.
 
-Structural Parse checks the scheme's own `id` and `name`, and the `id`, `name`, `version` and `status` of every profile and criterion. Each failure names the field it is about, so a blank required value is caught even where the published schema allows an empty string. A failure here changes the scheme's overall verdict. Reading the document for this check never alters the document you uploaded or where it came from.
+**Independent outcomes.** A step blocked by an earlier failure is shown as
+Not executed and names that step. A scheme version without a Playground parser
+is labelled Scheme invalid. Schema Validation and the JSON-LD check remain
+independent, so a document can report a structural failure and a context
+failure separately.
 
-A step an earlier failure prevented from running is still shown as a failure, labelled `Not executed` and naming the blocking step. A scheme whose declared version has no parser in the Playground is a fault in the scheme and is labelled `Scheme invalid`. A scheme published before UNTP 0.7.0 keeps its schema-selection diagnosis, while its context check still runs independently. The structural check records that schema selection prevented it from running. When version detection fails, the three later checks all report that they were skipped. Schema Validation and the JSON-LD check still run independently of each other, so a scheme with a blank `id` is reported by both the structural check and the JSON-LD check.
+### Clearer failure reasons
 
-Scheme step details now open in the same details view as credential step details. That view lists every error in a group rather than only the first, and its heading counts errors rather than groups, for credentials and link sets as well as schemes.
+**Four evidence classes.** Failed schema, VCDM, extension, Conformity Scheme,
+link-set schema and JSON-LD context steps now say whether the artefact could
+not be fetched, was fetched but unusable, the submitted document was invalid,
+or the cause is unknown. Cards and validation details show the class and
+diagnostic details. The JSON report carries the structured failure object. HTML
+reports include its class label and explanation, including within the
+schema-step message for link sets.
 
-A Conformity Scheme whose `name` is blank or only spaces is now titled by the final part of its URL, else its filename, rather than by an empty heading.
+### More precise UNTP version and schema checks
 
-### Link sets in your report
+**Recognise the UNTP context wherever it appears.** The Playground now detects
+a credential's UNTP version from a matching context URL at any position in its
+`@context` array, including the second entry. Context versions at
+the end of an address without a trailing slash are read correctly, core
+prerelease versions are preserved, and supported published schema URLs remain
+unchanged. Missing versions, unsupported types and unregistered extension
+versions fail schema selection before a schema is fetched with details about
+what was observed.
 
-A generated report now includes every link set you loaded, with the UNTP version it was checked against, the schema result, and how many of its credential links you verified and whether each was the kind of credential its link claimed. You can generate a report from a link set alone, and you do not have to verify every link first: the coverage line records what you checked.
+### Safer URL retrieval
 
-### Credentials grouped by type
+**One bounded fetch budget.** URLs pasted into the Playground are retrieved
+through the shared guarded resolver. One 10-second budget covers DNS,
+redirects, transport and body reading. Each redirect is checked before it is
+requested, and the connection uses the address that was checked.
 
-The HTML report lists credentials under a heading per type, with a count, and titles each block the way its card is titled: a credential by its filename or the last part of its URL, a scheme by its name, a link set by the resolver address.
+**Safer failures.** Private and reserved address ranges and internal-looking
+hostnames are refused. Public IPv6 literals are fetched, private IPv6
+literals are refused, and a 304 response is not followed. Network errors are
+reported with safe messages rather than raw Node error details.
 
-### One JSON field renamed
+### Guarded schema and context loading
 
-The JSON report's scheme array is now `conformitySchemes` (it was `conformitySchemeResults`), and the `linkSets` array joins it. All three family arrays are always present, and every entry now carries one `status` field (the duplicate `overallStatus` is gone). If a tool of yours reads the old names, update it.
+**Shared loaders.** Schema requests and JSON-LD context expansion use the
+shared guarded `untp-utils` loaders. Bundled copies are used when available if
+a publisher's host does not deliver the artefact. Schema body reads and
+browser context retrieval have a 15-second budget, while the server-side
+resolver uses a 10-second budget for context retrieval.
 
-### Clearer failure reasons in validation steps
+### Credential validity windows
 
-Failed schema, VCDM, extension, conformity scheme, link-set schema and JSON-LD context steps now say what happened: the artefact could not be fetched, the artefact was fetched but is unusable, the submitted document failed against a usable artefact, or the cause could not be determined. The card, View Details and the downloadable report carry the same class and diagnostic details. The one exception is a link set's schema step, whose class appears on the card, in View Details and in the JSON report, while the HTML report shows its message alone. A pop-up message now appears only when something unexpected breaks. A fetch failure, an unusable artefact or a document fault is shown on the step itself instead.
+**Use the credential's claims.** When the verification service reports a
+credential as verified, the Playground now checks `validFrom` and `validUntil`
+from the credential claims. An expired or not-yet-valid credential, or one with
+a present validity bound the Playground cannot read, fails the Verification
+step.
 
-The JSON report records the additive `failure` object on failed steps, including the class, diagnostic code, message, remediation, artefact URL and service or upstream status when available. The field is optional, so anything already reading earlier reports is unaffected. Schema body reads include a 15-second browser timeout, and an unexpected pipeline error settles the remaining steps instead of leaving the run in progress.
+### Reports for every loaded family
 
-A credential whose `@context` carries no version the Playground recognises, or whose `type` is not a UNTP type it validates, or whose extension version is not registered, is now reported as a fault in the submitted document. The message names the values it saw and the versions or types it matched them against. When the Playground cannot determine a cause it says so and still shows the diagnostic code, the artefact URL and any status it observed, so the details can be passed on.
+**Link sets and grouped credentials.** The generated report includes every
+loaded link set with its validation version, Schema Validation result and Link
+Type Coverage details. Credentials are grouped by type in HTML, while the
+JSON report carries the three family arrays, titles and link-set provenance
+for credentials verified from a link set. A link set can be reported before
+every linked credential has been checked, so coverage records the work done
+at generation time.
 
-The VCDM Version Detection step now records a failure class and offers View Details when the declared VCDM version cannot be mapped. If an upstream host returns HTTP 403, 404 or 410 for a schema or declared context URL and no bundled copy exists, the artefact is reported as not published for the declared version. Other 4xx responses, including 408 and 429, remain fetch failures with retry-or-report remediation. A third-party context URL is named as its own missing `@context` entry without a UNTP version claim. A missing dependency imported by a declared context remains a fetch failure and names the dependency. When the document declares a single context URL and the declaration walk completes, the report also names the declaring context. Otherwise, including when the document is too large for the Playground to trace fully, it names only the dependency and status without asserting which context imported it. The report directs the dependency's publisher to publish it. Link-set schema fetches are excluded: a 4xx remains a fetch failure and advises picking a UNTP version with a published link-set schema. HTTP 5xx responses, network failures and timeouts remain fetch failures, and an available bundled copy is still used.
+Encrypted credentials stay off the report until they are decrypted and
+validated.
 
-When a publisher's host fails, validation continues against a bundled copy of the published artefact where one exists, so a host outage does not stop the check. Context retrieval has two budgets on both the credential and Conformity Scheme pipelines: the server-side resolver gives up after 10 seconds, while the browser allows up to 15 seconds across the request and response body. A context that has no bundled fallback and exceeds either budget ends as a fetch failure. Schemas written as `true` or `false`, which JSON Schema allows, are accepted wherever a schema is loaded.
+**Fresh report state.** Adding, replacing or removing an artefact, verifying a
+linked credential or changing a URL binding discards the generated report.
+
+### New environment variables
+
+**Configurable documentation links.** Set
+`NEXT_PUBLIC_DECRYPTION_DOCS_URL` to change the encryption support link on
+locked credential cards. Set `NEXT_PUBLIC_LINK_SET_VALIDATION_DOCS_URL` to
+change the link-set validation documentation link on link set cards. Set
+`NEXT_PUBLIC_CREDENTIAL_LINKS_DOCS_URL` to change the link explaining how
+credential links are identified in a link set. All three default to the
+corresponding Playground documentation pages in the repository.
 
 ## 0.3.0 — 2026-05-15
 
@@ -78,7 +181,7 @@ support for validating ConformityScheme artefacts as defined in the
 [Conformity Vocabulary Catalog specification](https://untp.unece.org/docs/specification/ConformityVocabularyCatalog).
 
 - Technical changelog: [CHANGELOG.md § 0.3.0](./CHANGELOG.md#030---2026-05-15)
-- Container image: [ghcr.io/uncefact/tests-untp/untp-playground](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Funtp-playground) (`:0.3.0`, `:0.3`, `:0`, `:latest`)
+- Container image: [ghcr.io/uncefact/tests-untp/untp-playground](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Funtp-playground) (`:0.3.0`, `:latest`)
 
 ### Test ConformityScheme documents, not just credentials
 

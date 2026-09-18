@@ -5,160 +5,43 @@ format is loosely based on [Keep a Changelog](https://keepachangelog.com/)
 and the version numbers follow semantic versioning. Production releases are
 shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 
-## [Unreleased]
+## [0.4.0] - 2026-09-18
+
+### ⚠ BREAKING CHANGES
+
+- **`conformitySchemeResults` is now `conformitySchemes`** in the JSON report, and the three family arrays (`verifiableCredentials`, `conformitySchemes`, `linkSets`) are always present, empty when nothing of that family is loaded. The HTML report heads a scheme block with the card's title instead of falling back to the type and version; the JSON `name` field is unchanged. Every entry drops the duplicate `overallStatus` field; `status` remains. The report also records link sets, groups credentials by type with instance counts, and carries link-set provenance for credentials verified from a link set. ([#1021](https://github.com/uncefact/tests-untp/pull/1021)) ([4a42e50](https://github.com/uncefact/tests-untp/commit/4a42e502a9b1e3f1e17fc5cb336358292f3767a5))
 
 ### Added
 
-- **Link sets in the report.** The generated report gains an `Identity
-Resolver Link Sets` section, one block per link set, with the version it
-  was validated against, its `Schema Validation` outcome and errors, and its
-  `Link Type Coverage` count and mismatches. A link set alone can generate a
-  report once its schema step has settled; coverage may be recorded as
-  pending. The JSON report gains a `linkSets` array.
-- **Credentials grouped by type.** The HTML report groups credential blocks
-  under a heading per type with an instance count, and every block (credential,
-  scheme or link set) is titled the way its card is. The JSON report gains a
-  `title` on every entry, and a credential verified from a link set records
-  that link set's resolver URL or filename on its `source.linkSet`.
-- **Structural Conformity Scheme parsing.** Scheme verification now runs four
-  checks in order: `Version Detection`, `Schema Validation`, `Structural Parse`
-  and `JSON-LD Document Expansion and Context Validation`. The new parser-backed check checks the root `id`
-  and `name`, plus `id`, `name`, `version` and `status` on each profile and
-  criterion. It reports failures with their pointers, retains structured
-  diagnostics in the JSON report, and contributes to the overall verdict.
-  Parser normalisation is transient, so the uploaded document and its source
-  provenance remain unchanged. A scheme with a version the Playground cannot
-  parse is recorded as a failed check with a skipped explanation. A scheme
-  whose detected version is below 0.7.0 keeps the schema selection diagnosis,
-  while the new check records that schema selection prevented parsing. The
-  schema and JSON-LD checks remain independent, and failed version detection
-  now records three skipped later checks. A blank `id` now fails this check as
-  well as the existing JSON-LD context check, so it is reported twice. Structural
-  Parse details mark an unrun check with `skipped`; `blockedBy` names the earlier
-  step that prevented it when one exists. Scheme step details now open in the
-  same details view as credential steps. Scheme failures caused by the
-  submitted document are labelled `Scheme invalid`, while schema fetch and
-  unusable-artefact failures use their own class headings. A step an earlier
-  failure prevented from running says `Not executed` and names the blocking
-  step. A detected scheme version with no parser is a fault in the scheme and
-  says `Scheme invalid`.
+- **Structural Conformity Scheme parsing.** Scheme verification now runs `Version Detection`, `Schema Validation`, `Structural Parse` and `JSON-LD Document Expansion and Context Validation`; the parser-backed step checks required root, profile and criterion fields and records skipped or blocked steps in the result. ([#1075](https://github.com/uncefact/tests-untp/pull/1075)) ([b38b2b9](https://github.com/uncefact/tests-untp/commit/b38b2b947c70bcb189f39c2f979885394bfb1395))
+- **Relation-aware link type coverage.** Check linked credentials against the `dpp`, `dcc`, `dfr` or `dte` relation under which each was published, recording pending, matching and mismatching outcomes. ([#1020](https://github.com/uncefact/tests-untp/pull/1020)) ([8aa0af1](https://github.com/uncefact/tests-untp/commit/8aa0af1709b35f177a4a3f438b6797b6159b2432))
+- **Selected-version link set validation.** Validate link sets against the UNTP Identity Resolver schema for the spec version selected when they are added. ([#1019](https://github.com/uncefact/tests-untp/pull/1019)) ([9a64cda](https://github.com/uncefact/tests-untp/commit/9a64cda83a8251b780a73b3da4e9e072c6e9eebb))
+- **Browser decryption for supported encrypted credentials.** Decrypt the reference storage service's AES-256-GCM envelope in the browser before running the normal credential pipeline. ([#978](https://github.com/uncefact/tests-untp/pull/978)) ([4cb399d](https://github.com/uncefact/tests-untp/commit/4cb399d04c9f42d33272e69c155da278ff4cd850))
+- **Secondary resolver actions.** Resolve secondary identity resolver links from link set cards as additional link set instances. ([#977](https://github.com/uncefact/tests-untp/pull/977)) ([c5c6524](https://github.com/uncefact/tests-untp/commit/c5c6524482e77f01d4bb1a5a929b7e1d608b9467))
+- **Linked credential verification.** Fetch credential targets from resolved link set cards through the credential validation pipeline. ([#975](https://github.com/uncefact/tests-untp/pull/975)) ([b5e0976](https://github.com/uncefact/tests-untp/commit/b5e0976fc3d3bc054ecf3ba06b6a161d3461fe3c))
+- **Tab-scoped upload controls.** Scope the uploader sidebar and sample downloads to the active Credentials, Conformity Schemes or Link Sets tab. ([#971](https://github.com/uncefact/tests-untp/pull/971)) ([f721554](https://github.com/uncefact/tests-untp/commit/f721554c95cae396b22614d2a68500e37f0f3def))
+- **Identity Resolver link sets.** Add link set uploads, resolver URL resolution, credential-link cards and link set samples to the Playground. ([#970](https://github.com/uncefact/tests-untp/pull/970)) ([257194e](https://github.com/uncefact/tests-untp/commit/257194e10663554e95a975affa067edc4dced1bd))
+- **Tab status metadata.** Show loaded instance counts, failure markers and credential verification progress in the tab labels. ([#967](https://github.com/uncefact/tests-untp/pull/967)) ([2df2da9](https://github.com/uncefact/tests-untp/commit/2df2da9a9758a2564bdc63bdb331bb66800fdeaa))
+- **Multiple credential instances.** Keep multiple credentials of the same type as separate instances and group them under shared type headings. ([#861](https://github.com/uncefact/tests-untp/pull/861)) ([f6bca21](https://github.com/uncefact/tests-untp/commit/f6bca2160dd0feca188a01dc7c4fa4f47e47e158))
+- **Multiple Conformity Scheme instances.** Support loading and validating more than one Conformity Scheme in the same session. ([dd6ad31](https://github.com/uncefact/tests-untp/commit/dd6ad31b6a5e8cd7056e0bf4efd969077465c743))
+- **Tabbed artefact surface.** Add separate Credentials, Conformity Schemes and Link Sets tabs. ([a56dcd6](https://github.com/uncefact/tests-untp/commit/a56dcd653134532f77428505f05261f00a2ca5be))
 
 ### Changed
 
-- **Every error in a group is listed.** The validation details view lists each
-  error in a group rather than only the first, and the heading counts errors
-  rather than groups, so a group holding several faults no longer hides all but
-  one. This applies to credentials, conformity schemes and link sets alike.
-- **A blank scheme name no longer titles a card.** A Conformity Scheme whose
-  `name` is empty or only whitespace is titled by the final path segment of its
-  URL, else its filename, else `Conformity Scheme`, in cards and in reports.
-- **Artefact-step failure classes.** Schema, VCDM, extension, conformity
-  scheme, link-set schema and JSON-LD context failures now record whether the
-  artefact could not be fetched, was unusable, the submitted document was
-  invalid, or the cause could not be determined. The card, details view and
-  report carry the same class, URL and status evidence, with remediation that
-  does not blame the credential when the evidence does not do so. The HTML
-  report is the one exception: it renders the class heading on credential,
-  extension and scheme steps, while a link set's schema failure reaches it as
-  the message alone and keeps its class in the JSON report. Schema body reads
-  have a bounded 15-second browser budget. Context retrieval has a 10-second
-  server-side resolver budget and a 15-second browser budget covering the
-  request and response body. Unexpected pipeline throws settle all remaining
-  steps as unknown so a report cannot contain a running step. The JSON report
-  adds an optional failure object on failed steps, and consumers of earlier
-  reports are unaffected.
+- **Artefact-step failure classes.** Carry `could-not-fetch`, `unusable-artefact`, `credential-invalid` or `unknown` classifications, diagnostics and remediation through validation steps, cards, details and JSON reports; bound schema and context reads and settle unexpected pipeline throws. ([#1076](https://github.com/uncefact/tests-untp/pull/1076)) ([ea05e27](https://github.com/uncefact/tests-untp/commit/ea05e27a349a0c3d2d8410443eeea228ef61a4d1))
+- **Shared UNTP artefact detection.** Use `untp-utils` artefact detection and URL builders for version detection, context scanning and schema selection while preserving supported published schema URLs. ([#1067](https://github.com/uncefact/tests-untp/pull/1067)) ([fcf6847](https://github.com/uncefact/tests-untp/commit/fcf6847abf46b952f61cd95bae23b1f609166513))
+- **Guarded JSON-LD context loading.** Expand contexts through the shared `untp-utils` guarded loader and carry its structured failure details into validation results. ([#1014](https://github.com/uncefact/tests-untp/pull/1014)) ([3ee4397](https://github.com/uncefact/tests-untp/commit/3ee4397e8165baf398fbce6ba1239555d7f44be1))
+- **Guarded schema loading.** Fetch schemas through the shared `untp-utils` guarded loader and preserve bundled fallback and structured schema failures. ([#1010](https://github.com/uncefact/tests-untp/pull/1010)) ([b4de0b2](https://github.com/uncefact/tests-untp/commit/b4de0b2fd405f0553db871d5c1f296e1651632e7))
+- **Package licence metadata.** Align the Playground package licence with its distribution model. ([#635](https://github.com/uncefact/tests-untp/pull/635)) ([90b553f](https://github.com/uncefact/tests-untp/commit/90b553f6490d20c53d52f91f993105e5bd39b84f))
 
-  Selection outcomes name the declared type or version that did not match and
-  the values the Playground matched against. The link-set schema step's
-  `reason` keeps its existing values and adds `unreadable-response` for a
-  proxy body the browser could not read. Boolean root schemas are accepted on
-  every schema path, and the shared schema cache no longer lets one family
-  receive another family's error.
+### Fixed
 
-  The VCDM Version Detection step now records a failure class and offers View
-  Details when the declared VCDM version cannot be mapped. When an upstream
-  host returns HTTP 403, 404 or 410 for a schema or declared context URL and
-  no bundled copy is available, the artefact is reported as not published for
-  the credential's declared version. Other 4xx responses, including 408 and
-  429, remain `could-not-fetch` with retry-or-report remediation. A
-  third-party context URL is named as its own missing `@context` entry without
-  a UNTP version claim. A 403, 404 or 410 for a dependency imported by a
-  declared context remains `could-not-fetch` and names the dependency. When
-  the document declares a single context URL and the declaration walk
-  completes, the report also names the declaring context. Otherwise, including
-  when the document is too large for the Playground to trace fully, it names
-  only the dependency and status without asserting which context imported it.
-  The report directs the dependency's publisher to publish it. Link-set schema
-  fetches are excluded: a 4xx remains `could-not-fetch` and advises picking a
-  UNTP version with a published link-set schema. HTTP 5xx responses, network
-  failures and timeouts remain `could-not-fetch`, and a bundled copy is still
-  used when available.
+- **Guarded URL retrieval.** Route `/api/fetch` through the shared `untp-utils` resolver with one bounded budget across DNS, redirects, transport and body reading, with validated redirect destinations and sanitised failures. ([#1066](https://github.com/uncefact/tests-untp/pull/1066)) ([e345892](https://github.com/uncefact/tests-untp/commit/e34589280de37eba949772b0d556c5bf658fe26d))
+- **Credential validity windows.** After the verification service reports success, judge `validFrom` and `validUntil` from the credential claims and fail expired or not-yet-valid credentials. ([#1055](https://github.com/uncefact/tests-untp/pull/1055)) ([9595660](https://github.com/uncefact/tests-untp/commit/95956608f2b11dbc86e34c7cbfc742aa86df89b5))
 
-- **Guarded URL retrieval.** `/api/fetch` now uses the shared resolver with
-  one 10 second budget covering DNS, redirects, transport and body reading,
-  rather than a separate timer per hop, and a timeout does not promise that
-  the route responds at exactly 10 seconds. Private-address rejections no
-  longer disclose the resolved IP to the browser, while the canonical policy
-  also blocks `.internal`, `.local`, `.lan`, `.corp`, `.home`, `.intranet` and
-  `.private` hostnames, and CGNAT including the cloud metadata address
-  `100.100.100.200`. IPv6 literals are now classified instead of sent to DNS:
-  the bracketed form never matched the old literal check, so every IPv6
-  literal, private or public, failed as `network` 502. A private IPv6 literal,
-  including an IPv4-mapped private one, now answers `blocked` 400, and a
-  public IPv6 literal is fetched. Each hop connects to the addresses that were
-  validated for it, closing the rebinding window between validation and
-  connection. The wider canonical address policy, including TEST-NET,
-  multicast, reserved, 6to4, documentation and other non-unicast ranges plus
-  trailing-dot hostname handling, is defined in
-  `packages/untp-utils/src/node/is-private-ip.ts`. The resolver adds its
-  default `User-Agent` at request time unless `RI_HTTP_USER_AGENT` is set to a
-  non-empty value. A `304` response is refused instead of followed, including
-  when it carries `Location`. Resolver `Content-Type` parsing preserves common
-  values such as `text/html; charset=utf-8` but returns `null` for values it
-  rejects, including valid HTTP forms using horizontal tab whitespace or
-  quoted-pair syntax. A JSON `null` request body returns `invalid-url` with
-  status 400, an empty DNS answer returns `network` with status 502, and
-  transport failures return sanitised `Could not fetch ...` text instead of
-  raw Node error details. Several message texts changed while their codes and
-  statuses did not: a blocked IPv4 literal reads
-  `Hostname <address> is in a blocked range.`, a DNS failure reads
-  `DNS resolution failed for <host>.`, a redirect without a usable `Location`
-  names the hop it came from, and the timeout message records that the budget
-  covers redirects and names the URL that was posted, where the old route
-  named the normalised redirect hop that ran out of time.
-- **Canonical UNTP artefact detection.** The Playground now uses the shared
-  artefact detector and URL builder, scans every `@context` entry, and keeps
-  the published schema URLs byte-identical for supported credential types. A
-  credential carrying its UNTP context at a position other than the second is
-  now detected, so its schema validation step runs where it previously failed
-  as an unsupported version. A core context whose version is the terminal path
-  segment without a trailing slash, such as one ending `/dpp/0.5.0`, is read as
-  its version, and schema validation then reports the exact context string the
-  published schema requires. Core detection preserves full prerelease versions.
-  Filename-shaped Digital Livestock Passport extension contexts remain supported,
-  and a dotted prerelease in one is read as its first prerelease segment, so
-  `0.4.1-beta1.2`
-  is read as `0.4.1-beta1` and matches the registry only when that shorter form
-  is itself a registered extension version. A missing version and an
-  unsupported credential type fail schema selection before fetch with
-  actionable details, as does a Digital Livestock Passport whose detected
-  version is not registered, reported as an unsupported extension version for
-  its type rather than as an unsupported type. Cards and reports retain their
-  `unknown version`, `unknown`, and `vunknown` fallbacks.
-  Conformity Schemes below 0.7.0 now fail schema selection before URL
-  construction because that schema has no published layout before UNTP 0.7.0.
-- **`conformitySchemeResults` is now `conformitySchemes`** in the JSON report,
-  and the three family arrays (`verifiableCredentials`, `conformitySchemes`,
-  `linkSets`) are always present, empty when nothing of that family is loaded.
-  The HTML report heads a scheme block with `title` (the scheme's name, else
-  the final path segment of its URL, else its filename) instead of falling
-  back to the type and version; the JSON `name` field is unchanged. Every
-  entry drops the duplicate `overallStatus` field; `status` remains.
-- A generated report is also discarded when a link set or a URL binding changes,
-  so verifying a linked credential from a link set card invalidates it. Credential
-  and scheme changes already did.
-- Generate Report's disabled-state hint names link sets, and the dialog's
-  confirm button follows readiness while it is open.
+### Documentation
+
+- **Playground README.** Correct the Playground README after the v0.4 arc. ([#945](https://github.com/uncefact/tests-untp/pull/945)) ([0ff22d7](https://github.com/uncefact/tests-untp/commit/0ff22d7c881681feb38683449324d002d00a591e))
 
 ## [0.3.0] - 2026-05-15
 
@@ -224,4 +107,5 @@ Resolver Link Sets` section, one block per link set, with the version it
 - Dedupe concurrent schema fetches for the same URL.
 - JSON-LD and schema validation errors render with actionable context.
 
+[0.4.0]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.0
 [0.3.0]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.3.0
