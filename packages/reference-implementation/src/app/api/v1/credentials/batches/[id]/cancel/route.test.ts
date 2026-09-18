@@ -1,0 +1,252 @@
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: (body: unknown, init?: { status?: number; headers?: Record<string, string> }) => ({
+      status: init?.status ?? 200,
+      headers: new Headers(init?.headers),
+      json: async () => body,
+    }),
+  },
+}));
+
+jest.mock('@/lib/api/with-tenant-auth', () => {
+  const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
+  return {
+    withTenantAuth:
+      (handler: (req: unknown, context: unknown) => Promise<unknown>) => async (req: unknown, context: unknown) => {
+        try {
+          return await handler(req, context);
+        } catch (error) {
+          return handleRouteError(error);
+        }
+      },
+  };
+});
+jest.mock('@/lib/prisma/prisma', () => ({ prisma: { $transaction: jest.fn() } }));
+jest.mock('@/lib/prisma/repositories/credential-batch.repository', () => ({
+  cancelCredentialBatch: jest.fn(),
+  getCredentialBatchById: jest.fn(),
+}));
+
+import { POST } from './route';
+import { GET } from '../route';
+import { prisma } from '@/lib/prisma/prisma';
+import { cancelCredentialBatch, getCredentialBatchById } from '@/lib/prisma/repositories/credential-batch.repository';
+
+const cancel = jest.mocked(cancelCredentialBatch);
+const getBatch = jest.mocked(getCredentialBatchById);
+const transaction = jest.mocked(prisma.$transaction);
+const tx = Object.freeze({});
+const context = { tenantId: 'tenant-1', params: Promise.resolve({ id: 'batch-1' }) };
+const message =
+  'Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.';
+
+function batch(state = 'RUNNING') {
+  return {
+    id: 'batch-1',
+    tenantId: 'tenant-1',
+    version: 7,
+    state,
+    itemCount: 5,
+    queuedCount: 0,
+    processingCount: state === 'RUNNING' ? 1 : 0,
+    issuedCount: state === 'RUNNING' ? 0 : 1,
+    failedCount: 0,
+    unknownCount: 0,
+    cancelledCount: 4,
+    cancelRequestedAt: new Date('2026-09-18T00:01:00.000Z'),
+    createdAt: new Date('2026-09-18T00:00:00.000Z'),
+    settledAt: state === 'RUNNING' ? null : new Date('2026-09-18T00:02:00.000Z'),
+    items:
+      state === 'EXPIRED'
+        ? []
+        : [0, 1, 2, 3, 4].map((index) => ({
+            index,
+            state: index === 0 ? (state === 'RUNNING' ? 'PROCESSING' : 'ISSUED') : 'CANCELLED',
+            credentialId: index === 0 && state !== 'RUNNING' ? 'credential-1' : null,
+            warning: null,
+            errorClass: null,
+            errorMessage: null,
+          })),
+  };
+}
+
+function request(body?: string, contentLength?: string): Request {
+  let delivered = false;
+  return {
+    headers: new Headers(contentLength === undefined ? {} : { 'Content-Length': contentLength }),
+    body:
+      body === undefined
+        ? null
+        : {
+            getReader: () => ({
+              read: async () => {
+                if (delivered) return { done: true, value: undefined };
+                delivered = true;
+                return { done: false, value: new Uint8Array(Buffer.from(body)) };
+              },
+              cancel: async () => undefined,
+            }),
+          },
+  } as Request;
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  transaction.mockImplementation(async (callback) => (callback as (client: unknown) => Promise<unknown>)(tx));
+});
+
+describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
+  it.each(['RUNNING', 'CANCELLED'])(
+    'returns 202 with the repository projection after applied cancellation: %s',
+    async (state) => {
+      const stored = batch(state);
+      cancel.mockResolvedValue({ outcome: 'applied', batch: stored } as never);
+      const response = await POST(request(undefined, '0'), context as never);
+      const body = await response.json();
+      expect(response.status).toBe(202);
+      expect(body).toEqual({
+        id: 'batch-1',
+        state,
+        counts: {
+          total: 5,
+          queued: 0,
+          processing: state === 'RUNNING' ? 1 : 0,
+          issued: state === 'RUNNING' ? 0 : 1,
+          failed: 0,
+          unknown: 0,
+          cancelled: 4,
+        },
+        createdAt: '2026-09-18T00:00:00.000Z',
+        settledAt: state === 'RUNNING' ? null : '2026-09-18T00:02:00.000Z',
+        cancelRequestedAt: '2026-09-18T00:01:00.000Z',
+        items: [
+          state === 'RUNNING'
+            ? { index: 0, state: 'PROCESSING' }
+            : { index: 0, state: 'ISSUED', credentialId: 'credential-1' },
+          ...[1, 2, 3, 4].map((index) => ({ index, state: 'CANCELLED' })),
+        ],
+        message,
+      });
+      expect(body.code).toBeUndefined();
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(cancel).toHaveBeenCalledWith(tx, { batchId: 'batch-1', tenantId: 'tenant-1' });
+    },
+  );
+
+  it.each(['RUNNING', 'QUEUED'])('returns an unchanged 202 for an already-requested %s batch', async (state) => {
+    const stored = batch(state);
+    const before = JSON.stringify(stored);
+    cancel.mockResolvedValue({ outcome: 'already-requested', batch: stored } as never);
+    getBatch.mockResolvedValue(stored as never);
+    const current = await GET(request(), context as never);
+    const first = await POST(request(), context as never);
+    const repeat = await POST(request(), context as never);
+    expect(first.status).toBe(202);
+    expect(repeat.status).toBe(202);
+    expect(await first.json()).toEqual({ ...(await current.json()), message });
+    expect(await repeat.json()).toEqual(await first.json());
+    expect((await repeat.json()).code).toBeUndefined();
+    expect(stored.version).toBe(7);
+    expect(JSON.stringify(stored)).toBe(before);
+    expect(transaction).toHaveBeenCalledTimes(2);
+    expect(cancel).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['{}', ' ', 'null', '{'])('rejects non-empty body %j before a transaction', async (body) => {
+    const stored = batch();
+    cancel.mockResolvedValue({ outcome: 'applied', batch: stored } as never);
+    const response = await POST(request(body), context as never);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Send this request without a body.' });
+    expect(stored.version).toBe(7);
+    expect(transaction).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('preserves the bounded reader unreadable-body refusal', async () => {
+    const req = request();
+    Object.defineProperty(req, 'body', {
+      value: {
+        getReader: () => {
+          throw new Error('connection lost');
+        },
+      },
+    });
+    const response = await POST(req, context as never);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Could not read the request body' });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('preserves the bounded reader oversized-body refusal', async () => {
+    const { readMaxRequestBodyBytes } = await import('@/lib/config/request-body-limit.config');
+    const limit = readMaxRequestBodyBytes();
+    const response = await POST(request(undefined, String(limit + 1)), context as never);
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({
+      error: `The request body exceeds the maximum of ${limit} bytes.`,
+      code: 'REQUEST_BODY_TOO_LARGE',
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it.each(['tenant-1', 'foreign-tenant'])('matches GET for an id missing from tenant %s', async (tenantId) => {
+    const scoped = { ...context, tenantId };
+    cancel.mockResolvedValue({ outcome: 'missing' });
+    getBatch.mockResolvedValue(null);
+    const response = await POST(request(), scoped as never);
+    const read = await GET(request(), scoped as never);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Credential batch not found.' });
+    expect(await response.json()).toEqual(await read.json());
+    expect(cancel).toHaveBeenCalledWith(tx, { batchId: 'batch-1', tenantId });
+    expect(transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['COMPLETED', 'NEEDS_ATTENTION', 'CANCELLED'])(
+    'refuses settled %s with 409 without changing the version',
+    async (state) => {
+      const stored = batch(state);
+      const before = JSON.stringify(stored);
+      cancel.mockResolvedValue({ outcome: 'not-cancellable', batch: stored } as never);
+      const response = await POST(request(), context as never);
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({
+        error: 'This credential batch cannot be cancelled because it has already settled.',
+        code: 'BATCH_NOT_CANCELLABLE',
+      });
+      expect(stored.version).toBe(7);
+      expect(JSON.stringify(stored)).toBe(before);
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('returns the same 410 tombstone as GET without changing the version', async () => {
+    const stored = batch('EXPIRED');
+    const before = JSON.stringify(stored);
+    cancel.mockResolvedValue({ outcome: 'expired', batch: stored } as never);
+    getBatch.mockResolvedValue(stored as never);
+    const response = await POST(request(), context as never);
+    const read = await GET(request(), context as never);
+    expect(response.status).toBe(410);
+    expect(await response.json()).toEqual({
+      id: 'batch-1',
+      state: 'EXPIRED',
+      counts: { total: 5, queued: 0, processing: 0, issued: 1, failed: 0, unknown: 0, cancelled: 4 },
+      createdAt: '2026-09-18T00:00:00.000Z',
+      settledAt: '2026-09-18T00:02:00.000Z',
+      cancelRequestedAt: '2026-09-18T00:01:00.000Z',
+      items: [],
+      error: 'This credential batch has expired. Its credentials were not deleted.',
+      code: 'BATCH_EXPIRED',
+    });
+    expect(await response.json()).toEqual(await read.json());
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(stored.version).toBe(7);
+    expect(JSON.stringify(stored)).toBe(before);
+    expect(transaction).toHaveBeenCalledTimes(1);
+  });
+});

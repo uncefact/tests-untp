@@ -214,6 +214,7 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   serviceInstanceStatusPendingMessage('service-instance-1', 1),
   'Service instance not found: service-instance-1',
   'Credential batch not found.',
+  'This credential batch cannot be cancelled because it has already settled.',
   IDEMPOTENCY_KEY_MISMATCH_MESSAGE,
   BATCH_EXPIRED_MESSAGE,
   SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,

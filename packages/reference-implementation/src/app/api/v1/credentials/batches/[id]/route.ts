@@ -15,10 +15,14 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
  *     summary: Read credential batch progress and item outcomes
  *     description: |
  *       Reads the durable batch projection for the authenticated tenant. A
- *       batch runs to completion because cancellation is not supported. A
+ *       cancellation request sets `cancelRequestedAt` and `counts.cancelled`.
+ *       The batch remains `RUNNING` while an item is processing. It settles as
+ *       `CANCELLED` when cancelled items remain and no outcome is unknown. A
  *       `NEEDS_ATTENTION` response is a deliberate hold: no item remains
  *       queued, but one or more external issuance outcomes are unknown and
- *       require operator resolution before the batch can become completed. A
+ *       require operator resolution before the batch can become `CANCELLED`
+ *       or `COMPLETED`. Cancellation with zero cancelled items can still end
+ *       `COMPLETED`. Cancellation never revokes credentials (ADR-060). A
  *       settled batch is retained until BATCH_RETENTION_DAYS after settlement;
  *       the expired tombstone keeps the idempotency key and counts but removes
  *       encrypted item requests and outcomes. Ordering is promised within the
@@ -48,6 +52,22 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/CredentialBatchStatus'
+ *             examples:
+ *               cancelled:
+ *                 summary: The current attempt issued and four queued items were cancelled
+ *                 value:
+ *                   id: batch-1
+ *                   state: CANCELLED
+ *                   counts: { total: 5, queued: 0, processing: 0, issued: 1, failed: 0, unknown: 0, cancelled: 4 }
+ *                   createdAt: '2026-09-18T00:00:00.000Z'
+ *                   settledAt: '2026-09-18T00:02:00.000Z'
+ *                   cancelRequestedAt: '2026-09-18T00:01:00.000Z'
+ *                   items:
+ *                     - { index: 0, state: ISSUED, credentialId: credential-1 }
+ *                     - { index: 1, state: CANCELLED }
+ *                     - { index: 2, state: CANCELLED }
+ *                     - { index: 3, state: CANCELLED }
+ *                     - { index: 4, state: CANCELLED }
  *       404:
  *         description: The batch is unknown or belongs to another tenant.
  *         content:

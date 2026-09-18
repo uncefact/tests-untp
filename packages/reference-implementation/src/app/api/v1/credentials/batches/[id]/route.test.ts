@@ -72,6 +72,8 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
       issuedCount: 2,
       failedCount: 1,
       unknownCount: 0,
+      cancelledCount: 0,
+      cancelRequestedAt: null,
       createdAt: new Date('2026-09-17T00:00:00.000Z'),
       settledAt: new Date('2026-09-17T01:00:00.000Z'),
       items: [],
@@ -85,7 +87,8 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
     expect(await response.json()).toEqual({
       id: 'batch-expired',
       state: 'EXPIRED',
-      counts: { total: 3, queued: 0, processing: 0, issued: 2, failed: 1, unknown: 0 },
+      counts: { total: 3, queued: 0, processing: 0, issued: 2, failed: 1, unknown: 0, cancelled: 0 },
+      cancelRequestedAt: null,
       createdAt: '2026-09-17T00:00:00.000Z',
       settledAt: '2026-09-17T01:00:00.000Z',
       items: [],
@@ -103,6 +106,8 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
       issuedCount: 1,
       failedCount: 1,
       unknownCount: 0,
+      cancelledCount: 0,
+      cancelRequestedAt: null,
       createdAt: new Date('2026-09-17T00:00:00.000Z'),
       settledAt: new Date('2026-09-17T01:00:00.000Z'),
       items: [
@@ -134,7 +139,8 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
     expect(await response.json()).toEqual({
       id: 'batch-complete',
       state: 'COMPLETED',
-      counts: { total: 2, queued: 0, processing: 0, issued: 1, failed: 1, unknown: 0 },
+      counts: { total: 2, queued: 0, processing: 0, issued: 1, failed: 1, unknown: 0, cancelled: 0 },
+      cancelRequestedAt: null,
       createdAt: '2026-09-17T00:00:00.000Z',
       settledAt: '2026-09-17T01:00:00.000Z',
       items: [

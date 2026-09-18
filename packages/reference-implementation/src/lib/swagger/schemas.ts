@@ -134,6 +134,7 @@ export const credentialBatchCountsSchema = z.object({
   issued: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
   unknown: z.number().int().nonnegative(),
+  cancelled: z.number().int().nonnegative(),
 });
 
 export const credentialBatchItemErrorSchema = z.object({
@@ -164,7 +165,12 @@ export const credentialBatchStatusSchema = z.object({
   counts: credentialBatchCountsSchema,
   createdAt: z.string().describe('ISO 8601 timestamp'),
   settledAt: z.string().nullable().describe('ISO 8601 timestamp, or null while active'),
+  cancelRequestedAt: z.string().nullable().describe('First cancellation request as an ISO 8601 timestamp, or null'),
   items: z.array(credentialBatchItemStatusSchema),
+});
+
+export const credentialBatchCancelAcceptedResponseSchema = credentialBatchStatusSchema.extend({
+  message: z.string(),
 });
 
 export const credentialBatchExpiredResponseSchema = credentialBatchStatusSchema.extend({
@@ -560,6 +566,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     CredentialBatchRequest: credentialBatchRequestSchema,
     CredentialBatchAcceptedResponse: credentialBatchAcceptedResponseSchema,
     CredentialBatchStatus: credentialBatchStatusSchema,
+    CredentialBatchCancelAcceptedResponse: credentialBatchCancelAcceptedResponseSchema,
     CredentialBatchExpiredResponse: credentialBatchExpiredResponseSchema,
     CredentialWarning: credentialWarningSchema,
     Registrar: registrarSchema,
