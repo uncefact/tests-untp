@@ -438,8 +438,8 @@ model CredentialStatusEntry {
  * Durable state for an ordered batch of ordinary credential issuance requests
  * (ADR-060). Counts are updated with each item transition, rather than derived
  * by a status read. `bodyDigest` is the raw request-body digest used by the
- * batch-owned idempotency key. `expiresAt` is populated after settlement only
- * for COMPLETED batches; an unresolved NEEDS_ATTENTION batch is held until
+ * batch-owned idempotency key. `expiresAt` is populated after settlement for
+ * COMPLETED and CANCELLED batches; NEEDS_ATTENTION holds no expiry until
  * operator resolution. Expiry removes confidential item requests and leaves
  * this tombstone.
  * The API's `error.code` and `error.message` fields are stored in item

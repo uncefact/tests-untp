@@ -148,6 +148,26 @@ describe('credential batch issue handler', () => {
     expect(deps.releaseAttempt).not.toHaveBeenCalled();
   });
 
+  it('treats an already-settled cancelled claim as success without releasing or warning', async () => {
+    // Regression: a cancellation settled by another path must not warn or try to release its cleared fence.
+    loggerCalls.info.mockClear();
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({
+      claimNextItem: jest.fn().mockResolvedValue({ outcome: 'cancelled' }),
+      settle: jest.fn().mockResolvedValue({ outcome: 'already-settled' as const }),
+    });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+
+    expect(deps.releaseAttempt).not.toHaveBeenCalled();
+    expect(loggerCalls.info).toHaveBeenCalledTimes(1);
+    expect(loggerCalls.info).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, settlement: 'already-settled' }),
+      'Credential batch cancellation already settled',
+    );
+    expect(loggerCalls.warn).not.toHaveBeenCalled();
+  });
+
   it('warns and releases when a cancelled claim cannot settle', async () => {
     // Regression: a not-ready cancellation must warn with identity and release an owned fence.
     loggerCalls.warn.mockClear();

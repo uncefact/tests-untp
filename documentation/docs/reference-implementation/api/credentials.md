@@ -360,7 +360,7 @@ Every queued item, including a deferred retry, is cancelled in one transaction. 
 
 > Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.
 
-If the batch's stored counts disagree with its items, cancellation is refused with `500` and issuance may continue until an operator repairs the counts.
+If the batch's stored queued count disagrees with the number of queued items, cancellation is refused with `500`.
 
 For example, cancelling five items while the first is processing returns `state: RUNNING`, `counts.processing: 1`, `counts.cancelled: 4` and a non-null `cancelRequestedAt`. Once that attempt issues, GET reports `CANCELLED`, issued 1 and cancelled 4, with the retained credential id on the issued item. The six item counts always sum to `total`.
 
