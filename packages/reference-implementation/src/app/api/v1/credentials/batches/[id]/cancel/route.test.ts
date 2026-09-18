@@ -21,6 +21,7 @@ jest.mock('@/lib/api/with-tenant-auth', () => {
       },
   };
 });
+jest.mock('@/lib/api/logger');
 jest.mock('@/lib/prisma/prisma', () => ({ prisma: { $transaction: jest.fn() } }));
 jest.mock('@/lib/prisma/repositories/credential-batch.repository', () => ({
   cancelCredentialBatch: jest.fn(),
@@ -39,6 +40,7 @@ import {
 const cancel = jest.mocked(cancelCredentialBatch);
 const getBatch = jest.mocked(getCredentialBatchById);
 const transaction = jest.mocked(prisma.$transaction);
+const logger = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
 const tx = Object.freeze({});
 const context = { tenantId: 'tenant-1', params: Promise.resolve({ id: 'batch-1' }) };
 const message = CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE;
@@ -146,8 +148,33 @@ describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
       expect(transaction).toHaveBeenCalledTimes(1);
       expect(cancel).toHaveBeenCalledTimes(1);
       expect(cancel).toHaveBeenCalledWith(tx, { batchId: 'batch-1', tenantId: 'tenant-1' });
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'cancel',
+          batchId: 'batch-1',
+          tenantId: 'tenant-1',
+          cancelledCount: 4,
+          outcome: 'applied',
+          at: expect.any(String),
+        }),
+        'Credential batch operator audit',
+      );
+      expect((logger.warn.mock.calls[0] as unknown[])[0]).not.toHaveProperty('actor');
     },
   );
+
+  it.each(['\0', 'abc\0def', '\0abc'])('returns 404 for a batch id containing a NUL byte: %j', async (id) => {
+    const response = await POST(request(), {
+      tenantId: 'tenant-1',
+      params: Promise.resolve({ id }),
+    } as never);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Credential batch not found.' });
+    expect(transaction).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+  });
 
   it.each(['RUNNING', 'QUEUED'])('returns an unchanged 202 for an already-requested %s batch', async (state) => {
     const stored = batch(state);
@@ -166,6 +193,7 @@ describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
     expect(JSON.stringify(stored)).toBe(before);
     expect(transaction).toHaveBeenCalledTimes(2);
     expect(cancel).toHaveBeenCalledTimes(2);
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it.each(['{}', ' ', 'null', '{'])('rejects non-empty body %j before a transaction', async (body) => {
@@ -235,6 +263,7 @@ describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
       expect(JSON.stringify(stored)).toBe(before);
       expect(transaction).toHaveBeenCalledTimes(1);
       expect(cancel).toHaveBeenCalledTimes(1);
+      expect(logger.warn.mock.calls.filter((call) => call[1] === 'Credential batch operator audit')).toHaveLength(0);
     },
   );
 

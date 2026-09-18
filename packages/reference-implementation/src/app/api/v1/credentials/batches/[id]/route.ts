@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
+import { containsNulByte } from '@/lib/api/route-id';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getCredentialBatchById } from '@/lib/prisma/repositories/credential-batch.repository';
 import { credentialBatchExpiredResponse } from '@/lib/credentials/credential-batch-error';
@@ -105,6 +106,7 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
+  if (containsNulByte(id)) throw new NotFoundError('Credential batch not found.');
   const batch = await getCredentialBatchById(id, tenantId);
   if (batch === null) throw new NotFoundError('Credential batch not found.');
 

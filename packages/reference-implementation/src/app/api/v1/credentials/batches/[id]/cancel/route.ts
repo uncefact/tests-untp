@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { readRequestBytes } from '@/lib/api/request-body';
+import { appLogger } from '@/lib/api/logger';
+import { containsNulByte } from '@/lib/api/route-id';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { prisma } from '@/lib/prisma/prisma';
 import { cancelCredentialBatch } from '@/lib/prisma/repositories/credential-batch.repository';
@@ -131,10 +133,25 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   if (bytes.byteLength !== 0) throw new ValidationError(CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE);
 
   const { id } = await params;
+  if (containsNulByte(id)) throw new NotFoundError('Credential batch not found.');
   const result = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId }));
   if (result.outcome === 'missing') throw new NotFoundError('Credential batch not found.');
   if (result.outcome === 'not-cancellable') {
     throw new ConflictError(CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE, 'BATCH_NOT_CANCELLABLE');
+  }
+
+  if (result.outcome === 'applied') {
+    appLogger.warn(
+      {
+        action: 'cancel',
+        tenantId,
+        batchId: id,
+        cancelledCount: result.batch.cancelledCount,
+        outcome: result.outcome,
+        at: new Date().toISOString(),
+      },
+      'Credential batch operator audit',
+    );
   }
 
   const projection = projectCredentialBatch(result.batch);
