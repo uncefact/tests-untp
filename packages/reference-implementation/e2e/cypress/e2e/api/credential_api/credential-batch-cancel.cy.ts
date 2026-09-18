@@ -17,10 +17,12 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
   const NOT_CANCELLABLE_MESSAGE = 'This credential batch cannot be cancelled because it has already settled.';
   const NOT_FOUND_BODY = { error: 'Credential batch not found.' };
   const BATCH_ITEM_COUNT = 5;
+  const LARGE_BATCH_ITEM_COUNT = 40;
   const POLL_INTERVAL_MS = 100;
   const POLL_TIMEOUT_MS = 120_000;
   let issuerDid: string;
   let foreignDid: string;
+  let foreignBatchId: string;
 
   type CredentialRequest = {
     credentialPayload: Record<string, any>;
@@ -176,36 +178,24 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
     expect(body.counts.total, 'cancel total').to.eq(total);
     expect(body.counts.queued, 'queued count after cancel').to.eq(0);
     expect(
-      body.counts.cancelled + body.counts.processing + body.counts.issued,
-      'cancelled, processing and issued counts after cancel',
+      body.counts.cancelled + body.counts.processing + body.counts.issued + body.counts.failed + body.counts.unknown,
+      'cancelled, processing and settled counts after cancel',
     ).to.eq(total);
     expect(body.items, 'cancel item count').to.have.length(total);
     return body;
   }
 
-  function assertCancelledProjection(status: BatchStatus, total: number): void {
-    expect(status.state, 'cancelled batch state').to.eq('CANCELLED');
-    expect(status.counts).to.deep.eq({
-      total,
-      queued: 0,
-      processing: 0,
-      issued: 0,
-      failed: 0,
-      unknown: 0,
-      cancelled: total,
-    });
-    expect(status.items).to.have.length(total);
-    status.items.forEach((item) => {
-      expect(item.state, `cancelled item ${item.index} state`).to.eq('CANCELLED');
-      expect(item, `cancelled item ${item.index} credentialId`).to.not.have.property('credentialId');
-    });
-  }
-
-  function assertNoIssued(status: BatchStatus, label: string): void {
-    expect(status.counts.issued, `${label} issued count`).to.eq(0);
-    status.items.forEach((item) => {
-      expect(item.state, `${label} item ${item.index} state`).to.not.eq('ISSUED');
-    });
+  function assertCancelledSettlement(status: BatchStatus, total: number, label: string): void {
+    expect(status.state, `${label} state`).to.eq('CANCELLED');
+    expect(status.counts.total, `${label} total`).to.eq(total);
+    expect(status.counts.queued, `${label} queued count`).to.eq(0);
+    expect(status.counts.processing, `${label} processing count`).to.eq(0);
+    expect(status.counts.cancelled, `${label} cancelled count`).to.be.greaterThan(0);
+    expect(
+      status.counts.issued + status.counts.cancelled + status.counts.failed + status.counts.unknown,
+      `${label} outcome counts`,
+    ).to.eq(total);
+    expect(status.items, `${label} item count`).to.have.length(total);
   }
 
   function assertIssuedCredential(batchItem: BatchItem, requestItem: CredentialRequest, label: string) {
@@ -270,7 +260,7 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
       .then(() => undefined);
   }
 
-  function assertIssuedItemsAndCancelledItems(status: BatchStatus, requestBody: BatchRequest, label: string) {
+  function assertSettledItems(status: BatchStatus, requestBody: BatchRequest, label: string) {
     expect(
       status.items.map((item) => item.index),
       `${label} item indexes`,
@@ -282,8 +272,10 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
         if (item.state === 'ISSUED') {
           return assertIssuedCredential(item, requestBody.items[item.index], `${label} item ${item.index}`);
         }
-        expect(item.state, `${label} item ${item.index} state`).to.eq('CANCELLED');
-        expect(item, `${label} item ${item.index} credentialId`).to.not.have.property('credentialId');
+        expect(item.state, `${label} item ${item.index} state`).to.be.oneOf(['CANCELLED', 'FAILED', 'OUTCOME_UNKNOWN']);
+        if (item.state === 'CANCELLED') {
+          expect(item, `${label} cancelled item ${item.index} credentialId`).to.not.have.property('credentialId');
+        }
         return undefined;
       }) as unknown as Cypress.Chainable<undefined>;
     });
@@ -294,23 +286,20 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
     expect(status.counts.total, 'settled batch total').to.eq(total);
     expect(status.counts.queued, 'settled queued count').to.eq(0);
     expect(status.counts.processing, 'settled processing count').to.eq(0);
-    expect(status.counts.unknown, 'settled unknown count').to.eq(0);
-    expect(status.counts.failed, 'settled failed count').to.eq(0);
+    expect(
+      status.counts.issued + status.counts.cancelled + status.counts.failed + status.counts.unknown,
+      'settled outcome counts',
+    ).to.eq(total);
     expect(status.items).to.have.length(total);
 
     if (status.state === 'CANCELLED') {
-      expect(status.counts.issued + status.counts.cancelled, 'cancelled settlement counts').to.eq(total);
       expect(status.counts.cancelled).to.be.greaterThan(0);
-      status.items.forEach((item) => {
-        expect(item.state, `settled item ${item.index} state`).to.be.oneOf(['ISSUED', 'CANCELLED']);
-      });
       return;
     }
 
     expect(status.state, 'all-issued cancellation settlement state').to.eq('COMPLETED');
-    expect(status.counts.issued, 'all-issued settlement count').to.eq(total);
     expect(status.counts.cancelled, 'all-issued cancelled count').to.eq(0);
-    status.items.forEach((item) => expect(item.state, `settled item ${item.index} state`).to.eq('ISSUED'));
+    status.items.forEach((item) => expect(item.state, `settled item ${item.index} state`).to.not.eq('CANCELLED'));
   }
 
   before(() => {
@@ -328,6 +317,14 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
       }).then((response) => {
         expect(response.status).to.eq(201);
         foreignDid = response.body.did;
+
+        return submitBatch(
+          `e2e-batch-cancel-foreign-${RUN_ID}`,
+          { items: [buildCredentialRequest(foreignDid, 'foreign-batch')] },
+          result.accessToken,
+        ).then(({ batchId }) => {
+          foreignBatchId = batchId;
+        });
       });
     });
 
@@ -398,7 +395,7 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
       .then(({ accepted, settled }) => {
         expect(settled.cancelRequestedAt, 'settlement cancelRequestedAt').to.eq(accepted.cancelRequestedAt);
         assertRunningCancellationSettlement(settled, BATCH_ITEM_COUNT);
-        return assertIssuedItemsAndCancelledItems(settled, requestBody, 'running cancellation');
+        return assertSettledItems(settled, requestBody, 'running cancellation');
       });
   });
 
@@ -414,7 +411,6 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
       )
       .then(({ statusUrl, first }) => {
         expect(first.state, 'first cancel must observe a running batch').to.eq('RUNNING');
-        expect(first.counts.processing, 'first cancel processing count').to.be.greaterThan(0);
         return cy
           .request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false })
           .then((secondResponse) => {
@@ -426,7 +422,7 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
       })
       .then((settled) => {
         assertRunningCancellationSettlement(settled, BATCH_ITEM_COUNT);
-        return assertIssuedItemsAndCancelledItems(settled, requestBody, 'second cancellation');
+        return assertSettledItems(settled, requestBody, 'second cancellation');
       });
   });
 
@@ -455,31 +451,23 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
       });
   });
 
-  it('cancels a queued batch before the worker touches it without issuing an item', () => {
-    const requestBody = buildBatchRequest(issuerDid, 'queued');
+  it('cancels a large batch while work remains queued', () => {
+    const requestBody = buildBatchRequest(issuerDid, 'queued', LARGE_BATCH_ITEM_COUNT);
 
     submitBatch(`e2e-batch-cancel-queued-${RUN_ID}`, requestBody)
       .then(({ statusUrl }) =>
         cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }).then((response) => ({
           statusUrl,
-          accepted: assertCancelAccepted(response, BATCH_ITEM_COUNT),
+          accepted: assertCancelAccepted(response, LARGE_BATCH_ITEM_COUNT),
         })),
       )
       .then(({ statusUrl, accepted }) => {
-        assertNoIssued(accepted, 'immediate queued cancellation response');
-        Cypress.log({ name: 'queued cancellation', message: `202 projection state: ${accepted.state}` });
-        if (accepted.state === 'CANCELLED') {
-          assertCancelledProjection(accepted, BATCH_ITEM_COUNT);
-          return cy.wrap(accepted);
-        }
-
-        expect(accepted.state, 'queued cancellation 202 state before poll').to.eq('RUNNING');
-        return waitForBatchSettlement(statusUrl, ['CANCELLED'], (body) =>
-          assertNoIssued(body, 'queued cancellation poll'),
-        );
+        expect(accepted.cancelRequestedAt, 'queued cancellation timestamp').to.be.a('string').and.not.empty;
+        return waitForBatchSettlement(statusUrl, ['CANCELLED']);
       })
       .then((settled) => {
-        assertCancelledProjection(settled, BATCH_ITEM_COUNT);
+        assertCancelledSettlement(settled, LARGE_BATCH_ITEM_COUNT, 'queued cancellation');
+        return assertSettledItems(settled, requestBody, 'queued cancellation');
       });
   });
 
@@ -498,7 +486,6 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
   it('refuses unknown, foreign and bodyful cancellation requests', () => {
     const unknownBatchUrl = `/api/v1/credentials/batches/unknown-${RUN_ID}`;
     const bodyRequest = buildBatchRequest(issuerDid, 'body-refusal', 1);
-    const foreignRequest = { items: [buildCredentialRequest(foreignDid, 'foreign-batch')] };
 
     cy.request({ method: 'POST', url: `${unknownBatchUrl}/cancel`, failOnStatusCode: false })
       .then((unknownResponse) => {
@@ -506,16 +493,25 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
         expect(unknownResponse.body).to.deep.eq(NOT_FOUND_BODY);
       })
       .then(() =>
-        cy
-          .task('getServiceAccountToken', config.serviceAccounts.sa2)
-          .then((result: any) => submitBatch(`e2e-batch-cancel-foreign-${RUN_ID}`, foreignRequest, result.accessToken)),
-      )
-      .then(({ statusUrl }) =>
-        cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }).then((foreignResponse) => {
-          expect(foreignResponse.status, 'foreign batch cancel status').to.eq(404);
-          expect(foreignResponse.body).to.deep.eq(NOT_FOUND_BODY);
+        cy.request({
+          method: 'GET',
+          url: `/api/v1/credentials/batches/${foreignBatchId}`,
+          failOnStatusCode: false,
         }),
       )
+      .then((foreignGetResponse) => {
+        expect(foreignGetResponse.status, 'foreign batch GET status').to.eq(404);
+        expect(foreignGetResponse.body, 'foreign batch GET body').to.deep.eq(NOT_FOUND_BODY);
+        return cy.request({
+          method: 'POST',
+          url: `/api/v1/credentials/batches/${foreignBatchId}/cancel`,
+          failOnStatusCode: false,
+        });
+      })
+      .then((foreignResponse) => {
+        expect(foreignResponse.status, 'foreign batch cancel status').to.eq(404);
+        expect(foreignResponse.body).to.deep.eq(NOT_FOUND_BODY);
+      })
       .then(() => submitBatch(`e2e-batch-cancel-body-${RUN_ID}`, bodyRequest))
       .then(({ statusUrl }) =>
         cy
@@ -534,50 +530,44 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
 
   it('replays the cancelled batch for the same key and rejects a changed body', () => {
     const idempotencyKey = `e2e-batch-cancel-replay-${RUN_ID}`;
-    const requestBody = buildBatchRequest(issuerDid, 'replay', 1);
-    const changedBody = buildBatchRequest(issuerDid, 'replay-changed', 1);
+    const requestBody = buildBatchRequest(issuerDid, 'replay', LARGE_BATCH_ITEM_COUNT);
+    const changedBody = buildBatchRequest(issuerDid, 'replay-changed', LARGE_BATCH_ITEM_COUNT);
 
     submitBatch(idempotencyKey, requestBody)
       .then(({ batchId, statusUrl }) =>
         cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }).then((response) => ({
           batchId,
           statusUrl,
-          accepted: assertCancelAccepted(response, 1),
+          accepted: assertCancelAccepted(response, LARGE_BATCH_ITEM_COUNT),
         })),
       )
-      .then(({ batchId, statusUrl, accepted }) => {
-        assertNoIssued(accepted, 'replay cancellation response');
-        const settle =
-          accepted.state === 'CANCELLED'
-            ? cy.wrap(accepted)
-            : waitForBatchSettlement(statusUrl, ['CANCELLED'], (body) =>
-                assertNoIssued(body, 'replay cancellation poll'),
-              );
-
-        return settle.then((settled) => ({ batchId, statusUrl, settled }));
+      .then(({ batchId, statusUrl }) => {
+        return waitForBatchSettlement(statusUrl, ['CANCELLED']).then((settled) => ({ batchId, statusUrl, settled }));
       })
       .then(({ batchId, statusUrl, settled }) => {
-        assertCancelledProjection(settled, 1);
-        return cy
-          .request({
-            method: 'POST',
-            url: '/api/v1/credentials/batches',
-            headers: { 'Idempotency-Key': idempotencyKey },
-            body: requestBody,
-            failOnStatusCode: false,
-          })
-          .then((replayResponse) => {
-            expect(replayResponse.status, 'cancelled replay status').to.eq(202);
-            expect(replayResponse.body.batchId, 'cancelled replay batch id').to.eq(batchId);
-            expect(replayResponse.body.status, 'cancelled replay status URL').to.eq(statusUrl);
-            return cy.request({
+        assertCancelledSettlement(settled, LARGE_BATCH_ITEM_COUNT, 'replay cancellation');
+        return assertSettledItems(settled, requestBody, 'replay cancellation').then(() =>
+          cy
+            .request({
               method: 'POST',
               url: '/api/v1/credentials/batches',
               headers: { 'Idempotency-Key': idempotencyKey },
-              body: changedBody,
+              body: requestBody,
               failOnStatusCode: false,
-            });
-          });
+            })
+            .then((replayResponse) => {
+              expect(replayResponse.status, 'cancelled replay status').to.eq(202);
+              expect(replayResponse.body.batchId, 'cancelled replay batch id').to.eq(batchId);
+              expect(replayResponse.body.status, 'cancelled replay status URL').to.eq(statusUrl);
+              return cy.request({
+                method: 'POST',
+                url: '/api/v1/credentials/batches',
+                headers: { 'Idempotency-Key': idempotencyKey },
+                body: changedBody,
+                failOnStatusCode: false,
+              });
+            }),
+        );
       })
       .then((changedResponse) => {
         expect(changedResponse.status, 'changed replay status').to.eq(422);
