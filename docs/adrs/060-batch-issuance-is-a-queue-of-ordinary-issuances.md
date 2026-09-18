@@ -3,6 +3,8 @@
 - **Date:** 2026-09-17
 - **Status:** proposed
 
+Update 2026-09-18: Decisions 4 to 7 now include cancellation (#1080). A tenant-authenticated bodyless cancel request atomically cancels queued items and returns 202 with the projection and a non-revocation warning; the current attempt may still issue. Claims and continuation checkpoints respect cancellation, and recovery settles without enqueueing issuance. Settlement gives unknown outcomes NEEDS_ATTENTION, then positive cancelled counts CANCELLED, otherwise COMPLETED; resolution uses the same rule. CANCELLED follows completed-batch retention and expiry. GET includes counts.cancelled and cancelRequestedAt. Settled batches refuse cancellation with 409 BATCH_NOT_CANCELLABLE, expired batches with 410 and missing or foreign batches with 404. Workers must be upgraded before the route is exposed.
+
 Update 2026-09-17: `NEEDS_ATTENTION` batches are held until each unknown item is resolved through the audited operator command; resolution is fenced by the batch version, never enqueues issuance, and starts a fresh retention window only when the last unknown is resolved. The audited item inspection command exposes identifiers by default and requires explicit `--disclose-request` before it prints the decrypted request.
 
 Update 2026-09-17: Decision 3's per-item recovery wording is replaced by attempt-token fencing. A previous `PROCESSING` item whose progress is older than the job budget becomes `OUTCOME_UNKNOWN` and is never re-issued automatically; the worker does not promise that an external issuance was completed without repetition.

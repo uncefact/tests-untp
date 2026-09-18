@@ -7,6 +7,7 @@ import { isUniqueConstraintViolation } from '../db-errors';
 import { getEncryptionService } from '@/lib/encryption/encryption';
 import { readBatchRetentionDays } from '@/lib/config/credential-batch.config';
 import { OPERATOR_CONFIRMED_FAILURE_CODE } from '@/lib/credentials/credential-batch-projection';
+import { appLogger } from '@/lib/api/logger';
 import { prismaSqlExecutor } from '@/lib/jobs/prisma-sql-executor';
 import type { JobQueue } from '@/lib/jobs/types';
 import { CREDENTIAL_BATCH_ISSUE_JOB } from '@/lib/jobs/queue-names';
@@ -19,6 +20,7 @@ export const CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS = {
 const BATCH_WITH_ITEMS_INCLUDE = {
   items: { orderBy: { index: 'asc' as const } },
 } as const;
+const logger = appLogger.child({ module: 'credential-batch-repository' });
 
 export type CredentialBatchWithItems = Prisma.CredentialBatchGetPayload<{
   include: typeof BATCH_WITH_ITEMS_INCLUDE;
@@ -34,6 +36,8 @@ export type CredentialBatchSummary = Prisma.CredentialBatchGetPayload<{
     issuedCount: true;
     failedCount: true;
     unknownCount: true;
+    cancelledCount: true;
+    cancelRequestedAt: true;
     idempotencyKey: true;
     bodyDigest: true;
     createdAt: true;
@@ -83,6 +87,8 @@ export type BatchSettlementOutcome =
   | { outcome: 'superseded' }
   | { outcome: 'already-settled' };
 
+export type BatchCheckpointOutcome = { outcome: 'checkpointed' } | BatchSettlementOutcome;
+
 export const INTERRUPTED_BATCH_ITEM_MESSAGE =
   'A previous attempt was interrupted after it may have issued this item; check the library for a credential matching this request before re-submitting';
 
@@ -94,6 +100,7 @@ type CredentialBatchResolutionBatch = {
   issuedCount: number;
   failedCount: number;
   unknownCount: number;
+  cancelledCount: number;
   version: number;
   createdAt: Date;
   settledAt: Date | null;
@@ -119,6 +126,7 @@ export type CredentialBatchResolutionSnapshot = {
     issued: number;
     failed: number;
     unknown: number;
+    cancelled: number;
   };
   itemState: CredentialBatchItemState | null;
   credentialId: string | null;
@@ -229,6 +237,8 @@ export async function findCredentialBatchSubmission(
       issuedCount: true,
       failedCount: true,
       unknownCount: true,
+      cancelledCount: true,
+      cancelRequestedAt: true,
       idempotencyKey: true,
       bodyDigest: true,
       createdAt: true,
@@ -303,6 +313,90 @@ export async function getCredentialBatchById(
     where: { id: batchId, tenantId },
     include: BATCH_WITH_ITEMS_INCLUDE,
   });
+}
+
+/** The caller must keep this lock until all dependent item and counter writes commit (ADR-060). */
+async function lockCredentialBatchForUpdate(tx: PrismaTypes.TransactionClient, batchId: string, tenantId: string) {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "CredentialBatch"
+    WHERE "id" = ${batchId} AND "tenantId" = ${tenantId}
+    FOR UPDATE
+  `;
+  if (rows.length === 0) return null;
+  return tx.credentialBatch.findFirst({ where: { id: batchId, tenantId } });
+}
+
+export type BatchCancellationClassification = 'expired' | 'not-cancellable' | 'already-requested' | 'cancellable';
+
+export type CancelCredentialBatchResult =
+  | { outcome: 'missing' }
+  | { outcome: Exclude<BatchCancellationClassification, 'cancellable'> | 'applied'; batch: CredentialBatchWithItems };
+
+/** Classifies expiry first, then settled states, active repeats and finally cancellable batches. */
+export function classifyBatchCancellation(
+  batch: Pick<CredentialBatchSummary, 'state' | 'cancelRequestedAt'>,
+): BatchCancellationClassification {
+  if (batch.state === CredentialBatchState.EXPIRED) return 'expired';
+  if (batch.state !== CredentialBatchState.QUEUED && batch.state !== CredentialBatchState.RUNNING) {
+    return 'not-cancellable';
+  }
+  return batch.cancelRequestedAt === null ? 'cancellable' : 'already-requested';
+}
+
+/**
+ * Cancels queued items, including deferred retries, in the caller's transaction.
+ * Processing items keep their attempt. Rejected and repeated requests leave rows unchanged.
+ * Database failures must roll back the transaction, including item and counter changes.
+ */
+export async function cancelCredentialBatch(
+  tx: PrismaTypes.TransactionClient,
+  input: { batchId: string; tenantId: string },
+): Promise<CancelCredentialBatchResult> {
+  const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
+  if (batch === null) return { outcome: 'missing' };
+  const classification = classifyBatchCancellation(batch);
+  if (classification !== 'cancellable') {
+    const view = await tx.credentialBatch.findFirstOrThrow({
+      where: { id: input.batchId, tenantId: input.tenantId },
+      include: BATCH_WITH_ITEMS_INCLUDE,
+    });
+    return { outcome: classification, batch: view };
+  }
+  const now = new Date(Date.now());
+  const cancelled = await tx.credentialBatchItem.updateMany({
+    where: { batchId: input.batchId, tenantId: input.tenantId, state: CredentialBatchItemState.QUEUED },
+    data: { state: CredentialBatchItemState.CANCELLED, attemptToken: null, nextAttemptAt: null },
+  });
+  if (cancelled.count !== batch.queuedCount) {
+    throw new Error(
+      `Credential batch queued items disagree with its counters: batchId=${input.batchId}, tenantId=${input.tenantId}, cancelledRows=${cancelled.count}, queuedCount=${batch.queuedCount}`,
+    );
+  }
+  const updated = await tx.credentialBatch.update({
+    where: { id: input.batchId, tenantId: input.tenantId },
+    data: {
+      cancelRequestedAt: now,
+      queuedCount: { decrement: cancelled.count },
+      cancelledCount: { increment: cancelled.count },
+      version: { increment: 1 },
+    },
+  });
+  if (updated.processingCount === 0) {
+    const settlement = await settleLockedBatch(tx, updated, updated.attemptToken);
+    if (settlement.outcome !== 'applied') {
+      logger.warn(
+        { batchId: input.batchId, tenantId: input.tenantId, settlement: settlement.outcome },
+        'Credential batch cancellation could not settle',
+      );
+    }
+  }
+  return {
+    outcome: 'applied',
+    batch: await tx.credentialBatch.findFirstOrThrow({
+      where: { id: input.batchId, tenantId: input.tenantId },
+      include: BATCH_WITH_ITEMS_INCLUDE,
+    }),
+  };
 }
 
 /** Reads one tenant-owned item for the audited maintenance inspection command. */
@@ -393,6 +487,7 @@ function resolutionSnapshot(
       issued: batch?.issuedCount ?? 0,
       failed: batch?.failedCount ?? 0,
       unknown: batch?.unknownCount ?? 0,
+      cancelled: batch?.cancelledCount ?? 0,
     },
     itemState: item?.state ?? null,
     credentialId: item?.credentialId ?? null,
@@ -412,23 +507,7 @@ export async function resolveUnknownBatchItem(
   input: ResolveUnknownBatchItemInput,
 ): Promise<ResolveUnknownBatchItemResult> {
   const audit = buildCredentialBatchResolutionAudit(input);
-  const batch = await tx.credentialBatch.findFirst({
-    where: { id: input.batchId, tenantId: input.tenantId },
-    select: {
-      state: true,
-      itemCount: true,
-      queuedCount: true,
-      processingCount: true,
-      issuedCount: true,
-      failedCount: true,
-      unknownCount: true,
-      version: true,
-      createdAt: true,
-      settledAt: true,
-      resolvedAt: true,
-      expiresAt: true,
-    },
-  });
+  const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   if (batch === null) return { outcome: 'missing', audit };
 
   const item = await tx.credentialBatchItem.findFirst({
@@ -472,7 +551,7 @@ export async function resolveUnknownBatchItem(
 
   const now = new Date(Date.now());
   const lastUnknown = batch.unknownCount === 1;
-  const nextState = lastUnknown ? CredentialBatchState.COMPLETED : CredentialBatchState.NEEDS_ATTENTION;
+  const nextState = settledBatchState(lastUnknown ? 0 : batch.unknownCount - 1, batch.cancelledCount);
   const nextExpiresAt = lastUnknown ? new Date(now.getTime() + readBatchRetentionDays() * 24 * 60 * 60 * 1_000) : null;
   const updatedBatch = await tx.credentialBatch.updateMany({
     where: {
@@ -554,7 +633,7 @@ export async function expireDueCredentialBatches(now: Date = new Date(Date.now()
         const dueBatches = await tx.credentialBatch.findMany({
           where: {
             expiresAt: { lte: now },
-            state: CredentialBatchState.COMPLETED,
+            state: { in: [CredentialBatchState.COMPLETED, CredentialBatchState.CANCELLED] },
           },
           orderBy: { expiresAt: 'asc' },
           take: EXPIRY_SWEEP_LIMIT,
@@ -566,7 +645,7 @@ export async function expireDueCredentialBatches(now: Date = new Date(Date.now()
             where: {
               id: batch.id,
               expiresAt: { lte: now },
-              state: CredentialBatchState.COMPLETED,
+              state: { in: [CredentialBatchState.COMPLETED, CredentialBatchState.CANCELLED] },
             },
             data: { state: CredentialBatchState.EXPIRED },
           });
@@ -615,6 +694,7 @@ export async function markItemIssued(
     warning?: PrismaTypes.JsonValue | null;
   },
 ): Promise<BatchMutationOutcome> {
+  await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
     where: {
@@ -665,6 +745,7 @@ export async function markItemFailed(
     errorMessage: string;
   },
 ): Promise<BatchMutationOutcome> {
+  await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
     where: {
@@ -702,11 +783,14 @@ export async function markItemFailed(
   return { outcome: 'applied' };
 }
 
-/** Re-queues a processing item when no external issuance call was dispatched. */
+/** Finishes a pre-dispatch fault as failed, cancelled or queued for retry (#1080). */
 export async function markItemQueued(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; index: number; token: string; errorMessage: string },
 ): Promise<BatchMutationOutcome> {
+  const currentBatch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
+  if (currentBatch === null) return { outcome: 'missing' };
+  if (currentBatch.attemptToken !== input.token) return { outcome: 'superseded' };
   const now = new Date(Date.now());
   const current = await tx.credentialBatchItem.findFirst({
     where: {
@@ -721,6 +805,7 @@ export async function markItemQueued(
   if (current === null) return itemNotApplied(tx, input);
   const attemptCount = current.attemptCount + 1;
   const exhausted = attemptCount >= CREDENTIAL_BATCH_ITEM_ATTEMPT_LIMIT;
+  const cancelled = !exhausted && currentBatch.cancelRequestedAt !== null;
   const item = await tx.credentialBatchItem.updateMany({
     where: {
       batchId: input.batchId,
@@ -731,15 +816,20 @@ export async function markItemQueued(
       attemptCount: current.attemptCount,
     },
     data: {
-      state: exhausted ? CredentialBatchItemState.FAILED : CredentialBatchItemState.QUEUED,
+      state: exhausted
+        ? CredentialBatchItemState.FAILED
+        : cancelled
+          ? CredentialBatchItemState.CANCELLED
+          : CredentialBatchItemState.QUEUED,
       attemptToken: null,
       warning: Prisma.JsonNull,
       errorClass: exhausted ? 'ITEM_ATTEMPTS_EXHAUSTED' : null,
       errorMessage: exhausted ? input.errorMessage : null,
       attemptCount,
-      nextAttemptAt: exhausted
-        ? null
-        : new Date(now.getTime() + credentialBatchItemBackoffSeconds(attemptCount) * 1_000),
+      nextAttemptAt:
+        exhausted || cancelled
+          ? null
+          : new Date(now.getTime() + credentialBatchItemBackoffSeconds(attemptCount) * 1_000),
       updatedAt: now,
     },
   });
@@ -754,7 +844,11 @@ export async function markItemQueued(
     },
     data: {
       processingCount: { decrement: 1 },
-      ...(exhausted ? { failedCount: { increment: 1 } } : { queuedCount: { increment: 1 } }),
+      ...(exhausted
+        ? { failedCount: { increment: 1 } }
+        : cancelled
+          ? { cancelledCount: { increment: 1 } }
+          : { queuedCount: { increment: 1 } }),
       version: { increment: 1 },
       lastProgressAt: now,
     },
@@ -768,6 +862,7 @@ export async function recordKnownCredentialId(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; index: number; credentialId: string },
 ): Promise<{ applied: boolean }> {
+  await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const updated = await tx.credentialBatchItem.updateMany({
     where: {
@@ -801,6 +896,7 @@ export async function markItemOutcomeUnknown(
     credentialId?: string;
   },
 ): Promise<BatchMutationOutcome> {
+  await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
     where: {
@@ -844,8 +940,17 @@ export async function claimNextBatchItem(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; token: string },
 ): Promise<
-  { outcome: 'claimed'; item: { index: number; request: string } } | { outcome: 'empty'; nextAttemptAt?: Date }
+  | { outcome: 'claimed'; item: { index: number; request: string } }
+  | { outcome: 'empty'; nextAttemptAt?: Date }
+  | { outcome: 'cancelled' }
+  | { outcome: 'missing' | 'superseded' }
 > {
+  const current = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
+  if (current === null) return { outcome: 'missing' };
+  if (current.cancelRequestedAt !== null) return { outcome: 'cancelled' };
+  if (current.state !== CredentialBatchState.RUNNING || current.attemptToken !== input.token) {
+    return { outcome: 'superseded' };
+  }
   for (;;) {
     const now = new Date(Date.now());
     const item = await tx.credentialBatchItem.findFirst({
@@ -908,27 +1013,40 @@ export async function settleBatchIfFinished(
   tx: Prisma.TransactionClient,
   input: { batchId: string; tenantId: string; token: string },
 ): Promise<BatchSettlementOutcome> {
-  const batch = await tx.credentialBatch.findFirst({ where: { id: input.batchId, tenantId: input.tenantId } });
+  const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   if (batch === null) return { outcome: 'missing' };
+  return settleLockedBatch(tx, batch, input.token);
+}
+
+function settledBatchState(unknownCount: number, cancelledCount: number): CredentialBatchState {
+  if (unknownCount > 0) return CredentialBatchState.NEEDS_ATTENTION;
+  return cancelledCount > 0 ? CredentialBatchState.CANCELLED : CredentialBatchState.COMPLETED;
+}
+
+async function settleLockedBatch(
+  tx: PrismaTypes.TransactionClient,
+  batch: NonNullable<Awaited<ReturnType<typeof lockCredentialBatchForUpdate>>>,
+  token: string | null,
+): Promise<BatchSettlementOutcome> {
   if (batch.state !== CredentialBatchState.QUEUED && batch.state !== CredentialBatchState.RUNNING) {
     return { outcome: 'already-settled' };
   }
   if (batch.queuedCount !== 0 || batch.processingCount !== 0) return { outcome: 'not-ready' };
-  if (batch.issuedCount + batch.failedCount + batch.unknownCount !== batch.itemCount) {
+  if (batch.issuedCount + batch.failedCount + batch.unknownCount + batch.cancelledCount !== batch.itemCount) {
     return { outcome: 'not-ready' };
   }
   const settledAt = new Date(Date.now());
-  const state = batch.unknownCount > 0 ? CredentialBatchState.NEEDS_ATTENTION : CredentialBatchState.COMPLETED;
+  const state = settledBatchState(batch.unknownCount, batch.cancelledCount);
   const expiresAt =
-    state === CredentialBatchState.COMPLETED
+    state !== CredentialBatchState.NEEDS_ATTENTION
       ? new Date(settledAt.getTime() + readBatchRetentionDays() * 24 * 60 * 60 * 1_000)
       : null;
   const updated = await tx.credentialBatch.updateMany({
     where: {
-      id: input.batchId,
-      tenantId: input.tenantId,
+      id: batch.id,
+      tenantId: batch.tenantId,
       state: { in: [CredentialBatchState.QUEUED, CredentialBatchState.RUNNING] },
-      attemptToken: input.token,
+      attemptToken: token,
       version: batch.version,
       queuedCount: 0,
       processingCount: 0,
@@ -958,12 +1076,10 @@ export async function claimBatchAttempt(
   },
 ): Promise<{ applied: boolean }> {
   const now = new Date(Date.now());
-  const current = await tx.credentialBatch.findFirst({
-    where: { id: input.batchId, tenantId: input.tenantId, version: input.expectedVersion },
-    select: { state: true, attemptToken: true, lastProgressAt: true },
-  });
+  const current = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   if (
     current === null ||
+    current.version !== input.expectedVersion ||
     (current.state !== CredentialBatchState.QUEUED && current.state !== CredentialBatchState.RUNNING)
   ) {
     return { applied: false };
@@ -1040,7 +1156,11 @@ export async function claimBatchAttempt(
   return { applied: updated.count === 1 };
 }
 
-/** Claims a stalled batch for reconciliation, then leaves the fresh job free to claim it. */
+/**
+ * Recovers a stalled attempt in the caller's transaction (#1080).
+ * Settles cancellation under ownership; otherwise releases it for a fresh job.
+ * A lost fence throws so item recovery rolls back with the batch write.
+ */
 export async function claimBatchAttemptAndRelease(
   tx: PrismaTypes.TransactionClient,
   input: {
@@ -1050,9 +1170,32 @@ export async function claimBatchAttemptAndRelease(
     expectedVersion: number;
     staleBefore?: Date;
   },
-): Promise<{ applied: boolean }> {
+): Promise<
+  | { applied: false }
+  | { applied: true; settled: true }
+  | { applied: true; settled: false; settlement?: never }
+  | { applied: true; settled: false; settlement: Exclude<BatchSettlementOutcome['outcome'], 'applied'> }
+> {
   const claimed = await claimBatchAttempt(tx, input);
-  if (!claimed.applied) return claimed;
+  if (!claimed.applied) return { applied: false };
+  // claimBatchAttempt holds the batch lock until this transaction commits.
+  const batch = await tx.credentialBatch.findFirstOrThrow({
+    where: { id: input.batchId, tenantId: input.tenantId },
+  });
+  if (batch.cancelRequestedAt !== null) {
+    const settlement = await settleLockedBatch(tx, batch, input.token);
+    if (settlement.outcome !== 'applied') {
+      const released = await releaseBatchAttempt(tx, {
+        batchId: input.batchId,
+        tenantId: input.tenantId,
+        token: input.token,
+        lastProgressAt: input.staleBefore,
+      });
+      if (!released.applied) throw new CredentialBatchAttemptFenceLostError();
+      return { applied: true, settled: false, settlement: settlement.outcome };
+    }
+    return { applied: true, settled: true };
+  }
   const released = await tx.credentialBatch.updateMany({
     where: {
       id: input.batchId,
@@ -1063,14 +1206,25 @@ export async function claimBatchAttemptAndRelease(
     data: { attemptToken: null, attemptStartedAt: null, version: { increment: 1 } },
   });
   if (released.count !== 1) throw new CredentialBatchAttemptFenceLostError();
-  return { applied: true };
+  return { applied: true, settled: false };
 }
 
-/** Checkpoints a normal continuation and atomically places its next job. */
+/**
+ * In the caller's transaction, settles cancellation or checkpoints and enqueues (#1080).
+ * Missing or superseded ownership makes no change. Cancellation with processing
+ * still present retains ownership and enqueues nothing.
+ */
 export async function checkpointBatchContinuation(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; token: string; queue: JobQueue; startAfter?: Date },
-): Promise<{ applied: boolean }> {
+): Promise<BatchCheckpointOutcome> {
+  const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
+  if (batch === null || batch.state !== CredentialBatchState.RUNNING || batch.attemptToken !== input.token) {
+    return { outcome: 'superseded' };
+  }
+  if (batch.cancelRequestedAt !== null) {
+    return settleLockedBatch(tx, batch, input.token);
+  }
   const now = new Date(Date.now());
   const updated = await tx.credentialBatch.updateMany({
     where: {
@@ -1086,7 +1240,7 @@ export async function checkpointBatchContinuation(
       version: { increment: 1 },
     },
   });
-  if (updated.count !== 1) return { applied: false };
+  if (updated.count !== 1) return { outcome: 'superseded' };
   await input.queue.enqueueWithin(
     prismaSqlExecutor(tx),
     CREDENTIAL_BATCH_ISSUE_JOB,
@@ -1095,7 +1249,7 @@ export async function checkpointBatchContinuation(
       ? CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS
       : { ...CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS, startAfter: input.startAfter },
   );
-  return { applied: true };
+  return { outcome: 'checkpointed' };
 }
 
 export type StalledCredentialBatch = Prisma.CredentialBatchGetPayload<{
@@ -1140,7 +1294,7 @@ export async function findStalledCredentialBatches(staleBefore: Date, take = 100
 /** Releases a still-owned attempt so reconciliation or retry can claim it. */
 export async function releaseBatchAttempt(
   tx: PrismaTypes.TransactionClient,
-  input: { batchId: string; tenantId: string; token: string },
+  input: { batchId: string; tenantId: string; token: string; lastProgressAt?: Date },
 ): Promise<{ applied: boolean }> {
   const now = new Date(Date.now());
   const updated = await tx.credentialBatch.updateMany({
@@ -1150,7 +1304,12 @@ export async function releaseBatchAttempt(
       state: CredentialBatchState.RUNNING,
       attemptToken: input.token,
     },
-    data: { attemptToken: null, attemptStartedAt: null, lastProgressAt: now, version: { increment: 1 } },
+    data: {
+      attemptToken: null,
+      attemptStartedAt: null,
+      lastProgressAt: input.lastProgressAt ?? now,
+      version: { increment: 1 },
+    },
   });
   return { applied: updated.count === 1 };
 }

@@ -5,7 +5,7 @@ title: Credentials
 
 # Credentials API
 
-Credentials are the core output of the Reference Implementation. Everything else in the system — [DIDs](./dids), [services](./services), [data models](./data-models), [identifiers](./identifiers), and [master data](./organisations) — exists to support one goal: **issuing trusted, verifiable digital documents about products, facilities, organisations, and supply chain events**.
+Credentials are the core output of the Reference Implementation. Everything else in the system ([DIDs](./dids), [services](./services), [data models](./data-models), [identifiers](./identifiers), and [master data](./organisations)) exists to support one goal: **issuing trusted, verifiable digital documents about products, facilities, organisations, and supply chain events**.
 
 A credential is a digitally signed statement. A company issues a credential that says "this product was made sustainably" or "this facility passed a conformity assessment". Because the credential is cryptographically signed, anyone who receives it can verify that the statement hasn't been tampered with and that it really came from the company that claims to have issued it, without needing to contact the issuer directly.
 
@@ -25,15 +25,15 @@ The Reference Implementation includes a Swagger UI at [`/api-docs`](http://local
 
 Every credential issued by the Reference Implementation follows the [W3C Verifiable Credentials Data Model](https://www.w3.org/TR/vc-data-model-2.0/) and the [UNTP Verifiable Credential profile](https://untp.unece.org/docs/specification/VerifiableCredentials). In plain terms, a credential contains:
 
-- **Who issued it** — the issuer's [DID](./dids) (a cryptographic identity)
-- **What it says** — the credential subject (e.g., product sustainability data, conformity assessment results)
-- **When it was issued** — a timestamp
-- **A digital signature** — proof that the issuer really signed it and that nobody changed it afterwards
+- **Who issued it**: the issuer's [DID](./dids) (a cryptographic identity)
+- **What it says**: the credential subject (e.g., product sustainability data, conformity assessment results)
+- **When it was issued**: a timestamp
+- **A digital signature**: proof that the issuer really signed it and that nobody changed it afterwards
 - **A credential status**: unless the deployment sets `CREDENTIAL_STATUS_DEFAULT_PURPOSES=none`, every issued credential carries the deployment's default status entries. See [the `CREDENTIAL_STATUS_DEFAULT_PURPOSES` setting](#issue-a-credential) for the default and override behaviour (managed via [BitstringStatusList](https://www.w3.org/TR/vc-bitstring-status-list/) by the [VC service](../services/verifiable-credential-service))
 
 ### How Credentials Are Packaged
 
-UNTP credentials use the [**enveloped** form](https://www.w3.org/TR/vc-data-model-2.0/#enveloped-verifiable-credentials): the credential payload is signed as a [JWT (JSON Web Token)](https://datatracker.ietf.org/doc/html/rfc7519), and the JWT is wrapped inside a [JSON-LD](https://www.w3.org/TR/json-ld11/) envelope. This means you get the best of both worlds — compact, efficient JWT signatures with the semantic richness of linked data.
+UNTP credentials use the [**enveloped** form](https://www.w3.org/TR/vc-data-model-2.0/#enveloped-verifiable-credentials): the credential payload is signed as a [JWT (JSON Web Token)](https://datatracker.ietf.org/doc/html/rfc7519), and the JWT is wrapped inside a [JSON-LD](https://www.w3.org/TR/json-ld11/) envelope. This means you get the best of both worlds: compact, efficient JWT signatures with the semantic richness of linked data.
 
 When the Reference Implementation issues a credential, the result is an `EnvelopedVerifiableCredential` that looks like this:
 
@@ -49,7 +49,7 @@ The `id` field contains the actual JWT. The verification endpoint knows how to u
 
 ### Credential Types
 
-The type of credential determines what kind of data it contains and which schema is used to validate it. Credential types are defined by [data models](./data-models) — see the [Data Models API](./data-models) for the full list of core UNTP types and how extension data models work.
+The type of credential determines what kind of data it contains and which schema is used to validate it. Credential types are defined by [data models](./data-models). See the [Data Models API](./data-models) for the full list of core UNTP types and how extension data models work.
 
 ### Encryption and Privacy
 
@@ -66,11 +66,11 @@ This matters for privacy: a credential about a product's supply chain might cont
 
 ### Integrity Hashing
 
-Every stored credential has a **content hash** — a fingerprint computed from the credential's contents. If even one character changes, the hash changes. This allows anyone to detect that the credential at a storage URI hasn't been swapped or modified after being stored. During [verification](#verify-a-credential), the computed hash is compared against the expected hash.
+Every stored credential has a **content hash**: a fingerprint computed from the credential's contents. If even one character changes, the hash changes. This allows anyone to detect that the credential at a storage URI hasn't been swapped or modified after being stored. During [verification](#verify-a-credential), the computed hash is compared against the expected hash.
 
 ### Discoverability via the Identity Resolver
 
-A credential on its own is just a file at a URL. To make it useful, it needs to be **discoverable** — someone who knows a product's identifier should be able to find the credential. This is the role of the [UNTP Identity Resolver](https://untp.unece.org/docs/specification/IdentityResolver) and [Decentralised Access Control](https://untp.unece.org/docs/specification/DecentralisedAccessControl) specifications.
+A credential on its own is just a file at a URL. To make it useful, it needs to be **discoverable**: someone who knows a product's identifier should be able to find the credential. This is the role of the [UNTP Identity Resolver](https://untp.unece.org/docs/specification/IdentityResolver) and [Decentralised Access Control](https://untp.unece.org/docs/specification/DecentralisedAccessControl) specifications.
 
 This is where the [Identity Resolver](./identifiers#what-are-links) comes in. When a credential is published, the Reference Implementation registers a link with the Identity Resolver that connects the entity's identifier (e.g., a GS1 GTIN) to the credential's storage URL. Now anyone who resolves that identifier can find the credential.
 
@@ -80,7 +80,7 @@ Publishing is optional and resolves from the credential's own identifier, which 
 
 For UNTP v0.7.0 [Digital Conformity Credentials](./data-models), the issuance pipeline performs an extra advisory check: it compares the conformity scheme, profile, and criteria referenced in the credential against the locally known [Conformity Vocabulary Catalogue (CVC)](https://untp.unece.org/docs/specification/ConformityVocabularyCatalog) schemes. Earlier DCC versions are issued without this check. This helps catch mistakes like referencing a non-existent scheme or omitting a required criterion. See [Conformity Vocabulary Catalogue](../data-models/conformity-vocabulary-catalogue) for where those schemes come from, and the [Conformity Vocabulary Catalogue API](./conformity-vocabulary-catalogue) for browsing them.
 
-CVC validation is **advisory only** — it never blocks issuance. If issues are found, the credential is still issued but the response includes warnings.
+CVC validation is **advisory only**: it never blocks issuance. If issues are found, the credential is still issued but the response includes warnings.
 
 ### The Issuance Pipeline
 
@@ -192,13 +192,13 @@ The assessment-level topic check runs only when the assessment references at lea
 The `issuer.id` field in the credential payload must contain a [DID](./dids) that the authenticated tenant is authorised to use. The Reference Implementation looks up the DID and verifies that it either:
 
 - belongs to the authenticated tenant, or
-- is a [system default DID](./dids#system-dids-vs-tenant-dids) — available to all tenants as part of the [incremental adoption ramp](../overview#incremental-adoption)
+- is a [system default DID](./dids#system-dids-vs-tenant-dids), available to all tenants as part of the [incremental adoption ramp](../overview#incremental-adoption)
 
 **If the DID is not registered to the tenant and is not a system default DID, the request is rejected with HTTP 400.** A tenant cannot issue credentials using a DID that belongs to another tenant.
 
 #### Stage 5: DID Service Association Check
 
-The issuer DID must have an associated [VC service instance](./services) — this is the service that holds the DID's key material and will perform signing. If the DID has no association (e.g., the service instance was [force-deleted](./services#delete-a-service-instance)), the request is rejected with HTTP 400. The DID must be re-imported or re-created to restore the association.
+The issuer DID must have an associated [VC service instance](./services). This is the service that holds the DID's key material and will perform signing. If the DID has no association (e.g., the service instance was [force-deleted](./services#delete-a-service-instance)), the request is rejected with HTTP 400. The DID must be re-imported or re-created to restore the association.
 
 #### Stage 6: Service Resolution
 
@@ -338,17 +338,48 @@ For an issuer that needs to issue several credentials, `POST /api/v1/credentials
 
 `Idempotency-Key` is required, and a submission without one is refused with `400 IDEMPOTENCY_KEY_REQUIRED`. A successful submission returns `202` with `{ "batchId": "...", "status": "/api/v1/credentials/batches/..." }` and a matching `Location` header. The batch and its encrypted item requests are committed with one `credentials.issue-batch` job. Repeating the same key with the same raw request body returns the same `202` and batch id. Reusing the key with a different body returns `422 IDEMPOTENCY_KEY_MISMATCH`; replaying an expired batch returns `410 BATCH_EXPIRED`.
 
-Poll `GET /api/v1/credentials/batches/{id}`. It returns the batch state, stored counts (`total`, `queued`, `processing`, `issued`, `failed` and `unknown`) and zero-based items in submission order. An issued item includes its `credentialId` and any warning. An outcome-unknown item includes an `{ "code": "...", "message": "..." }` error and includes `credentialId` when the worker learned it before losing ownership. A failed item never includes `credentialId`. An operator-confirmed failed item uses `error.code` `OPERATOR_CONFIRMED_FAILED` and the fixed `error.message` `An operator confirmed this item was not issued.` The evidence submitted during resolution is retained on the item record and shown to operators through inspection, not returned to the tenant. `COMPLETED` means every item is issued or failed, including an all-failed batch. `NEEDS_ATTENTION` means no work remains but at least one outcome is unknown.
+Poll `GET /api/v1/credentials/batches/{id}`. It returns the batch state, stored counts (`total`, `queued`, `processing`, `issued`, `failed`, `unknown` and `cancelled`) and zero-based items in submission order. An issued item includes its retained `credentialId` and any warning; deleting that credential later clears the id. A cancelled item has state `CANCELLED` and no cancellation error. The batch includes `createdAt`, `settledAt` and `cancelRequestedAt` as ISO 8601 timestamps, with null for settlement or cancellation that has not happened. An outcome-unknown item includes an `{ "code": "...", "message": "..." }` error and includes `credentialId` when the worker learned it before losing ownership. A failed item never includes `credentialId`. An operator-confirmed failed item uses `error.code` `OPERATOR_CONFIRMED_FAILED` and the fixed `error.message` `An operator confirmed this item was not issued.` The evidence submitted during resolution is retained on the item record and shown to operators through inspection, not returned to the tenant. `COMPLETED` means every item is issued or failed, including an all-failed batch. `NEEDS_ATTENTION` means no work remains but at least one outcome is unknown.
 
 Items are claimed in index order; an item that faults before dispatch goes to the back behind items not yet tried and retries with backoff. The worker checks its budget between items, so an item already in flight can run past the budget; that item is recorded as `ISSUED` when its write succeeds or `OUTCOME_UNKNOWN` when the external effect cannot be confirmed. It commits `lastProgressAt` and the counts, and enqueues a continuation of the same batch with the same four-fault-retry policy in that checkpoint transaction. A continuation is normal progress, not a retry. Queue retries are reserved for faults such as an unavailable database or provider. A refusal that can be projected as a normal API 4xx settles that item as `FAILED` and the worker continues.
 
 If a worker stops after claiming an item but before its outcome is durably recorded, a later attempt does not issue that item again. Once the batch progress is older than the job budget, the item becomes `OUTCOME_UNKNOWN` with an instruction to check the library for a credential matching the request before re-submitting. The batch then settles as `NEEDS_ATTENTION` when no other work remains. The operator should search the library using the request's issuer and subject identifiers, compare the credential payload and issuance time, and decide whether to retain the credential, handle any external publication, or submit a new batch. There is no automatic retry or cancellation for an unknown outcome.
 
-The maximum item count is `MAX_BATCH_ITEMS` (default `500`). Each item's serialised JSON must be no larger than `MAX_REQUEST_BODY_BYTES`; the first item over that bound refuses the batch with `400 VALIDATION_FAILED` and a pointer such as `items[17]`. The whole raw batch body uses `MAX_BATCH_REQUEST_BODY_BYTES` (default `52428800`, 50 MiB), which must not be smaller than `MAX_REQUEST_BODY_BYTES`; an over-limit body returns `413 REQUEST_BODY_TOO_LARGE` and names the batch setting. More items than the item count refuses the batch with `400 BATCH_TOO_LARGE`, and the message names the limit in force. An item shape error, including `credentialPayload.credentialStatus`, also refuses the whole batch with `400`, and array paths use `items[<index>].<field>`, for example `items[17].credentialPayload`. Per-item refusals have stable error codes where the cause is known, such as `ISSUER_DID_NOT_REGISTERED`. A batch does not support cancellation and runs to settlement. Ordering is promised within one batch only; separate batches may run independently.
+The maximum item count is `MAX_BATCH_ITEMS` (default `500`). Each item's serialised JSON must be no larger than `MAX_REQUEST_BODY_BYTES`; the first item over that bound refuses the batch with `400 VALIDATION_FAILED` and a pointer such as `items[17]`. The whole raw batch body uses `MAX_BATCH_REQUEST_BODY_BYTES` (default `52428800`, 50 MiB), which must not be smaller than `MAX_REQUEST_BODY_BYTES`; an over-limit body returns `413 REQUEST_BODY_TOO_LARGE` and names the batch setting. More items than the item count refuses the batch with `400 BATCH_TOO_LARGE`, and the message names the limit in force. An item shape error, including `credentialPayload.credentialStatus`, also refuses the whole batch with `400`, and array paths use `items[<index>].<field>`, for example `items[17].credentialPayload`. Per-item refusals have stable error codes where the cause is known, such as `ISSUER_DID_NOT_REGISTERED`. Ordering is promised within one batch only; separate batches may run independently.
 
 An unexpected pre-dispatch fault is requeued for that item with the existing 30-second doubling ladder, capped at 600 seconds. Never-attempted items run before deferred retries, and the worker continues with every claimable item in the same job. Once an item reaches the ladder's limit, it is marked `FAILED` with error code `ITEM_ATTEMPTS_EXHAUSTED` and the last projected error message; the batch can then settle normally. A post-dispatch fault still makes the outcome unknown and throws for queue recovery. Data-model schema and JSON-LD context fetch failures are not retried by the batch worker after the request has been resolved, so submit the item again once the referenced artefact is reachable.
 
-Ordinarily completed batches are retained for `BATCH_RETENTION_DAYS` (default `30`) from `settledAt`. A `NEEDS_ATTENTION` batch has no expiry deadline while an item remains unknown. After the final unknown item is resolved, retention starts from `resolvedAt`. Expiry removes encrypted request bodies and item outcomes while retaining a tombstone with the key, digest and counts. The expired status resource answers `410` and issued credentials remain unaffected. Operators running a deployment should read the [batch issuance runbook](../operations/batch-issuance).
+`COMPLETED` and `CANCELLED` batches are retained for `BATCH_RETENTION_DAYS` (default `30`) from `settledAt`. A `NEEDS_ATTENTION` batch has no expiry deadline while an item remains unknown. After the final unknown item is resolved, retention starts from `resolvedAt`. Expiry removes encrypted request bodies and item outcomes while retaining a tombstone with the key, digest and counts. The expired status resource answers `410` and issued credentials remain unaffected. Operators running a deployment should read the [batch issuance runbook](../operations/batch-issuance).
+
+#### Cancel a batch
+
+Send `POST /api/v1/credentials/batches/{id}/cancel` with no body. Even `{}` or whitespace is rejected. The request uses the same tenant authentication as the status resource and does not require an `Idempotency-Key`.
+
+Every queued item, including a deferred retry, is cancelled in one transaction. The item already processing finishes its current attempt, and issued items remain issued. A successful response is `202`, including when the batch settles immediately. This guarantee holds only where every worker runs this release or later; follow the [migration guide rollout order](../../migration-guides/ri-v0.6#batch-cancellation) before exposing the route. It contains the same projection as GET, plus this exact `message`:
+
+> Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.
+
+If the batch's stored queued count disagrees with the number of queued items, cancellation is refused with `500`.
+
+For example, cancelling five items while the first is processing returns `state: RUNNING`, `counts.processing: 1`, `counts.cancelled: 4` and a non-null `cancelRequestedAt`. Once that attempt issues, GET reports `CANCELLED`, issued 1 and cancelled 4, with the retained credential id on the issued item. The six item counts always sum to `total`.
+
+A credential issued before or during cancellation should be revoked through its [issuer status entry](#issuer-status).
+
+A batch settles as `NEEDS_ATTENTION` while any outcome is unknown, then as `CANCELLED` after the final unknown is resolved if cancelled items remain. If the only remaining item was already processing and issues, cancellation can end as `COMPLETED` with cancelled 0. The cancellation timestamp records the request, not a promise that any item was cancelled.
+
+| Request or batch condition                                        | Response                                                                                                                               |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Queued or running batch                                           | `202` with the projection and message above                                                                                            |
+| Cancellation already requested, batch still `QUEUED` or `RUNNING` | `202` with the current projection and the same message; no writes and the first cancellation timestamp is preserved                    |
+| Non-empty body within the size limit                              | `400`, no code, `Send this request without a body.`                                                                                    |
+| Unreadable body                                                   | `400`, no code, `Could not read the request body`                                                                                      |
+| Body exceeds the request size limit                               | `413 REQUEST_BODY_TOO_LARGE`; the message names the limit in bytes                                                                     |
+| Unknown id or another tenant's id                                 | `404`, no code, `Credential batch not found.`                                                                                          |
+| `COMPLETED`, `NEEDS_ATTENTION` or settled `CANCELLED`             | `409 BATCH_NOT_CANCELLABLE`, `This credential batch cannot be cancelled because it has already settled.`                               |
+| `EXPIRED`                                                         | `410 BATCH_EXPIRED`, `This credential batch has expired. Its credentials were not deleted.`, with the same tombstone projection as GET |
+
+Refusals do not change the batch. If the response is lost, poll GET: an active repeat is accepted unchanged, but a repeat after settlement is refused. After cancellation no further item is started. If processing stalls, the batch is settled without issuing anything more. The [operations page](../operations/batch-issuance#cancellation) explains investigation and retention.
+
+Resubmitting the same `Idempotency-Key` and body after cancellation replays the cancelled batch id and issues nothing; a fresh batch needs a new key.
 
 ## Verification Endpoint
 

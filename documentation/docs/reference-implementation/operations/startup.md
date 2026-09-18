@@ -196,7 +196,7 @@ The first batch job is enqueued by the web process and continuations are enqueue
 
 Retention runs from `settledAt`, so a long-running batch is not shortened by the time it was submitted. A batch that settles as `NEEDS_ATTENTION` has no deadline at all until its last unknown item is resolved, and then counts from that resolution. The worker owns the expiry sweep. The [batch issuance runbook](./batch-issuance) covers monitoring and the recovery commands.
 
-The worker also schedules `credentials.reconcile-batches` on the same cadence as the pending verification reconciliation. It re-enqueues only a `QUEUED` or `RUNNING` batch whose `lastProgressAt` is older than twice `WORKER_JOB_TIMEOUT_SECONDS` and has no active, retrying or scheduled issuance job. It never fails remaining items merely because a queue job disappeared.
+The worker also schedules `credentials.reconcile-batches` on the same cadence as the pending verification reconciliation. It recovers only a `QUEUED` or `RUNNING` batch whose `lastProgressAt` is older than twice `WORKER_JOB_TIMEOUT_SECONDS` and has no active, retrying or scheduled issuance job. An ordinary batch is re-enqueued. A batch whose cancellation has been requested is settled instead, without enqueueing any further issuance. It never fails remaining items merely because a queue job disappeared.
 
 ### Credential Fetch Settings
 
