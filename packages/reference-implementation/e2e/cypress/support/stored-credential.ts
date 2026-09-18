@@ -70,3 +70,77 @@ export function decodeStoredCredential(stored: unknown): Record<string, any> {
   }
   return decoded as Record<string, any>;
 }
+
+type EncryptedStoredCopy = {
+  cipherText: string;
+  iv: string;
+  tag: string;
+  type: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = window.atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function decodeHex(value: string): Uint8Array {
+  if (!/^[0-9a-f]{64}$/i.test(value)) {
+    throw new Error(`Expected a 32-byte hexadecimal decryption key, got ${value.length} characters`);
+  }
+
+  const bytes = new Uint8Array(value.length / 2);
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+function asArrayBuffer(value: Uint8Array): ArrayBuffer {
+  return value.slice().buffer as ArrayBuffer;
+}
+
+export async function decryptStoredCopy(stored: unknown, decryptionKey: string): Promise<unknown> {
+  if (!isRecord(stored)) {
+    throw new Error('Expected the storage service to return an encrypted object');
+  }
+
+  const envelope = stored as unknown as EncryptedStoredCopy;
+  if (
+    typeof envelope.cipherText !== 'string' ||
+    typeof envelope.iv !== 'string' ||
+    typeof envelope.tag !== 'string' ||
+    envelope.type !== 'aes-256-gcm'
+  ) {
+    throw new Error(`Unexpected encrypted stored-copy envelope: ${JSON.stringify(stored)}`);
+  }
+
+  const cipherText = decodeBase64(envelope.cipherText);
+  const iv = decodeBase64(envelope.iv);
+  const tag = decodeBase64(envelope.tag);
+  if (iv.length !== 12 || tag.length !== 16) {
+    throw new Error(`Unexpected AES-GCM envelope lengths: iv=${iv.length}, tag=${tag.length}`);
+  }
+
+  const cipherTextWithTag = new Uint8Array(cipherText.length + tag.length);
+  cipherTextWithTag.set(cipherText);
+  cipherTextWithTag.set(tag, cipherText.length);
+
+  const key = await window.crypto.subtle.importKey(
+    'raw',
+    asArrayBuffer(decodeHex(decryptionKey)),
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt'],
+  );
+  const plaintext = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: asArrayBuffer(iv), tagLength: 128 },
+    key,
+    asArrayBuffer(cipherTextWithTag),
+  );
+
+  return JSON.parse(new TextDecoder().decode(plaintext));
+}
