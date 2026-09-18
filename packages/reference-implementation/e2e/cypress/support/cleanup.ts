@@ -13,6 +13,8 @@ export type CleanupOptions = {
   baseUrl: string;
   tag: string;
   actors: CleanupActor[];
+  statusReconcileGraceMs: number;
+  statusCleanupTimeoutMs: number;
 };
 
 export type CleanupResult = {
@@ -134,6 +136,10 @@ function apiUrl(baseUrl: string, path: string, offset?: number): string {
 async function responseDescription(response: Response): Promise<string> {
   const body = await response.text();
   return body ? `${response.status} ${body.slice(0, 500)}` : String(response.status);
+}
+
+function formatDeleteFailureDescription(path: string, status: number, body: string): string {
+  return `DELETE ${path} returned ${status}${body ? ` ${body.slice(0, 500)}` : ''}`;
 }
 
 type ListingContext = Map<string, Record<string, unknown>[]>;
@@ -259,19 +265,89 @@ function rowsInDeleteOrder(collection: Collection, rows: Record<string, unknown>
   );
 }
 
+type StatusApiError = { code?: unknown; error?: unknown };
+
+type PendingStatusEntry = {
+  purpose: string;
+  version: number;
+  deadlineAt: number;
+};
+
+function statusEntriesOf(row: Record<string, unknown>): Array<Record<string, unknown>> {
+  const status = row.status;
+  if (status === null || typeof status !== 'object' || Array.isArray(status)) return [];
+  const entries = (status as Record<string, unknown>).entries;
+  return Array.isArray(entries)
+    ? entries.filter(
+        (entry): entry is Record<string, unknown> =>
+          entry !== null && typeof entry === 'object' && !Array.isArray(entry),
+      )
+    : [];
+}
+
+function pendingStatusEntryOf(entry: Record<string, unknown>): PendingStatusEntry | undefined {
+  const pending = entry.pending;
+  if (pending === null || pending === undefined) return undefined;
+  if (
+    typeof entry.statusPurpose !== 'string' ||
+    typeof entry.version !== 'number' ||
+    !Number.isInteger(entry.version) ||
+    pending === null ||
+    typeof pending !== 'object' ||
+    Array.isArray(pending)
+  ) {
+    return undefined;
+  }
+  const pendingRecord = pending as Record<string, unknown>;
+  if (
+    typeof pendingRecord.value !== 'boolean' ||
+    typeof pendingRecord.since !== 'string' ||
+    !Number.isFinite(Date.parse(pendingRecord.since))
+  ) {
+    return undefined;
+  }
+  const deadline = pendingRecord.deadline;
+  if (typeof deadline !== 'string') return undefined;
+  const deadlineAt = Date.parse(deadline);
+  if (!Number.isFinite(deadlineAt)) return undefined;
+  return { purpose: entry.statusPurpose, version: entry.version, deadlineAt };
+}
+
+function pendingPurposeNamesFromError(error: string): string[] {
+  return (
+    error
+      .match(/for purposes:\s*(.+?)\.\s+Wait/i)?.[1]
+      ?.split(',')
+      .map((purpose) => purpose.trim())
+      .filter(Boolean) ?? []
+  );
+}
+
+async function readResponseBody(response: Response): Promise<{ body: string; parsed: StatusApiError }> {
+  const body = await response.text();
+  try {
+    return { body, parsed: JSON.parse(body) as StatusApiError };
+  } catch {
+    return { body, parsed: {} };
+  }
+}
+
 async function deleteRow(
   options: CleanupOptions,
   actor: CleanupActor,
   collection: Collection,
   id: string,
   row: Record<string, unknown>,
-): Promise<CleanupFailure | undefined> {
+  cleanupDeadline: number,
+): Promise<CleanupFailure[]> {
   if (!collection.deletePath) {
-    return {
-      actor: actor.name,
-      collection: collection.name,
-      message: `Row ${id} carries ${options.tag}, but the RI exposes no delete route for ${collection.name}`,
-    };
+    return [
+      {
+        actor: actor.name,
+        collection: collection.name,
+        message: `Row ${id} carries ${options.tag}, but the RI exposes no delete route for ${collection.name}`,
+      },
+    ];
   }
 
   if (collection.beforeDelete) await collection.beforeDelete(options, actor, id, row);
@@ -280,13 +356,306 @@ async function deleteRow(
     method: 'DELETE',
     headers: actor.headers,
   });
-  if (response.ok || response.status === 404) return undefined;
+  if (response.ok || response.status === 404) return [];
 
-  return {
-    actor: actor.name,
-    collection: collection.name,
-    message: `DELETE ${path} for row ${id} returned ${await responseDescription(response)}`,
-  };
+  const initialResponse = await readResponseBody(response);
+  const responseBody = initialResponse.body;
+  const parsedBody = initialResponse.parsed;
+
+  if (
+    response.status === 409 &&
+    parsedBody.code === 'STATUS_OPERATION_IN_PROGRESS' &&
+    collection.name === 'library records'
+  ) {
+    const pendingError = typeof parsedBody.error === 'string' ? parsedBody.error : responseBody;
+    const entries = statusEntriesOf(row);
+    const structuralPendingEntries = entries.filter((entry) => entry.pending !== null && entry.pending !== undefined);
+    const pendingEntries = structuralPendingEntries.map(pendingStatusEntryOf);
+    const pendingPurposes = pendingEntries
+      .filter((entry): entry is PendingStatusEntry => entry !== undefined)
+      .map((entry) => entry.purpose);
+    const namedPurposes = structuralPendingEntries.length === 0 ? pendingPurposeNamesFromError(pendingError) : [];
+    const purposes = [...new Set([...pendingPurposes, ...namedPurposes])];
+    const failures: CleanupFailure[] = [];
+    const deleteDescription = formatDeleteFailureDescription(path, response.status, responseBody);
+    const purposesDescription = purposes.join(', ') || '(unknown)';
+    const failure = (message: string): CleanupFailure => ({
+      actor: actor.name,
+      collection: collection.name,
+      message: `${message} for row ${id}; purposes: ${purposesDescription}`,
+    });
+
+    if (structuralPendingEntries.length > 0) {
+      const immediateRetry = await fetch(apiUrl(options.baseUrl, path), {
+        method: 'DELETE',
+        headers: actor.headers,
+      });
+      if (immediateRetry.ok || immediateRetry.status === 404) return [];
+      const immediateRetryResponse = await readResponseBody(immediateRetry);
+      if (immediateRetry.status !== 409 || immediateRetryResponse.parsed.code !== 'STATUS_OPERATION_IN_PROGRESS') {
+        failures.push(
+          failure(
+            `${formatDeleteFailureDescription(
+              path,
+              immediateRetry.status,
+              immediateRetryResponse.body,
+            )}; last response`,
+          ),
+        );
+        return failures;
+      }
+
+      if (pendingEntries.some((entry) => entry === undefined) || purposes.length === 0) {
+        failures.push(failure(`${deleteDescription}, but the structural pending status was invalid`));
+        return failures;
+      }
+
+      const pendingDeadline = Math.max(...pendingEntries.map((entry) => (entry as PendingStatusEntry).deadlineAt));
+      const resumeAt = pendingDeadline + options.statusReconcileGraceMs;
+      const cappedResumeAt = Math.min(resumeAt, cleanupDeadline);
+      if (Date.now() < cappedResumeAt) {
+        console.info(
+          `E2E status cleanup waiting: row ${id}; purposes: ${purposesDescription}; deadline: ${new Date(
+            pendingDeadline,
+          ).toISOString()}; resume: ${new Date(cappedResumeAt).toISOString()}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, cappedResumeAt - Date.now()));
+      }
+      if (Date.now() >= cleanupDeadline) {
+        failures.push(
+          failure(
+            `Status cleanup budget exhausted; last response: ${formatDeleteFailureDescription(
+              path,
+              immediateRetry.status,
+              immediateRetryResponse.body,
+            )}`,
+          ),
+        );
+        return failures;
+      }
+
+      const currentResponse = await fetch(apiUrl(options.baseUrl, `/api/v1/library/${encodeURIComponent(id)}`), {
+        headers: actor.headers,
+      });
+      if (!currentResponse.ok) {
+        const currentBody = await readResponseBody(currentResponse);
+        failures.push(
+          failure(
+            `Could not read the current library row; last response: ${formatDeleteFailureDescription(
+              `/api/v1/library/${encodeURIComponent(id)}`,
+              currentResponse.status,
+              currentBody.body,
+            )}`,
+          ),
+        );
+        return failures;
+      }
+      const currentRowResponse = await readResponseBody(currentResponse);
+      let currentRow: Record<string, unknown>;
+      try {
+        currentRow = JSON.parse(currentRowResponse.body) as Record<string, unknown>;
+      } catch {
+        failures.push(failure(`The current library row was not valid JSON; last response: ${currentRowResponse.body}`));
+        return failures;
+      }
+      const currentEntries = statusEntriesOf(currentRow);
+      const entriesToReconcile = currentEntries.filter(
+        (entry) =>
+          purposes.includes(entry.statusPurpose as string) && entry.pending !== null && entry.pending !== undefined,
+      );
+      const invalidCurrentEntries = entriesToReconcile.filter((entry) => pendingStatusEntryOf(entry) === undefined);
+      if (invalidCurrentEntries.length > 0) {
+        failures.push(failure(`The current library row has invalid pending status metadata`));
+        return failures;
+      }
+
+      for (const entry of entriesToReconcile) {
+        const purpose = entry.statusPurpose as string;
+        let version = (entry.version as number) ?? undefined;
+        if (typeof version !== 'number' || !Number.isInteger(version)) {
+          failures.push(failure(`The current library row has no version for status purpose "${purpose}"`));
+          continue;
+        }
+        if (Date.now() >= cleanupDeadline) {
+          failures.push(failure(`Status cleanup budget exhausted before reconciling purpose "${purpose}"`));
+          continue;
+        }
+        const reconcilePath = `/api/v1/credentials/${encodeURIComponent(id)}/status/${encodeURIComponent(
+          purpose,
+        )}/reconcile`;
+        const reconcile = async (entryVersion: number) => {
+          const reconcileResponse = await fetch(apiUrl(options.baseUrl, reconcilePath), {
+            method: 'POST',
+            headers: {
+              ...actor.headers,
+              'Content-Type': 'application/json',
+              'If-Version': String(entryVersion),
+            },
+            body: JSON.stringify({}),
+          });
+          return { response: reconcileResponse, body: await readResponseBody(reconcileResponse) };
+        };
+        let reconcileResult = await reconcile(version);
+        if (!reconcileResult.response.ok && reconcileResult.body.parsed.code === 'VERSION_CONFLICT') {
+          const rereadResponse = await fetch(apiUrl(options.baseUrl, `/api/v1/library/${encodeURIComponent(id)}`), {
+            headers: actor.headers,
+          });
+          if (!rereadResponse.ok) {
+            const rereadBody = await readResponseBody(rereadResponse);
+            failures.push(
+              failure(
+                `Could not re-read the current version for status purpose "${purpose}"; last response: ${formatDeleteFailureDescription(
+                  `/api/v1/library/${encodeURIComponent(id)}`,
+                  rereadResponse.status,
+                  rereadBody.body,
+                )}`,
+              ),
+            );
+            continue;
+          }
+          const rereadBody = await readResponseBody(rereadResponse);
+          let rereadRow: Record<string, unknown>;
+          try {
+            rereadRow = JSON.parse(rereadBody.body) as Record<string, unknown>;
+          } catch {
+            failures.push(failure(`The re-read library row was not valid JSON for status purpose "${purpose}"`));
+            continue;
+          }
+          const rereadEntry = statusEntriesOf(rereadRow).find((candidate) => candidate.statusPurpose === purpose);
+          const rereadVersion = rereadEntry?.version;
+          if (!rereadEntry) {
+            failures.push(failure(`The re-read library row had no status entry for purpose "${purpose}"`));
+            continue;
+          }
+          if (rereadEntry.pending === null || rereadEntry.pending === undefined) continue;
+          if (
+            typeof rereadVersion !== 'number' ||
+            !Number.isInteger(rereadVersion) ||
+            pendingStatusEntryOf(rereadEntry) === undefined
+          ) {
+            failures.push(failure(`The re-read library row had invalid status metadata for purpose "${purpose}"`));
+            continue;
+          }
+          version = rereadVersion;
+          reconcileResult = await reconcile(version);
+        }
+        if (!reconcileResult.response.ok) {
+          failures.push(
+            failure(
+              `POST ${reconcilePath} returned ${reconcileResult.response.status}; last response: ${
+                reconcileResult.body.body || String(reconcileResult.response.status)
+              }`,
+            ),
+          );
+        }
+      }
+      if (failures.length > 0) return failures;
+    } else {
+      const versionedEntries = entries.filter(
+        (entry) =>
+          typeof entry.statusPurpose === 'string' &&
+          typeof entry.version === 'number' &&
+          Number.isInteger(entry.version),
+      );
+      if (purposes.length === 0) {
+        failures.push(
+          failure(`${deleteDescription}, but no status purpose was available to reconcile: ${pendingError}`),
+        );
+        return failures;
+      }
+
+      for (const purpose of purposes) {
+        const entry = versionedEntries.find((candidate) => candidate.statusPurpose === purpose);
+        if (!entry) {
+          failures.push(failure(`No current status entry version was available for purpose "${purpose}"`));
+          continue;
+        }
+        const reconcilePath = `/api/v1/credentials/${encodeURIComponent(id)}/status/${encodeURIComponent(
+          purpose,
+        )}/reconcile`;
+        const reconcile = async (entryVersion: number) => {
+          const reconcileResponse = await fetch(apiUrl(options.baseUrl, reconcilePath), {
+            method: 'POST',
+            headers: {
+              ...actor.headers,
+              'Content-Type': 'application/json',
+              'If-Version': String(entryVersion),
+            },
+            body: JSON.stringify({}),
+          });
+          return { response: reconcileResponse, body: await readResponseBody(reconcileResponse) };
+        };
+        let reconcileResult = await reconcile(entry.version as number);
+        if (!reconcileResult.response.ok && reconcileResult.body.parsed.code === 'VERSION_CONFLICT') {
+          if (Date.now() >= cleanupDeadline) {
+            failures.push(failure(`Status cleanup budget exhausted before retrying purpose "${purpose}"`));
+            continue;
+          }
+          const rereadResponse = await fetch(apiUrl(options.baseUrl, `/api/v1/library/${encodeURIComponent(id)}`), {
+            headers: actor.headers,
+          });
+          if (!rereadResponse.ok) {
+            const rereadBody = await readResponseBody(rereadResponse);
+            failures.push(
+              failure(
+                `Could not re-read the current version for status purpose "${purpose}"; last response: ${formatDeleteFailureDescription(
+                  `/api/v1/library/${encodeURIComponent(id)}`,
+                  rereadResponse.status,
+                  rereadBody.body,
+                )}`,
+              ),
+            );
+            continue;
+          }
+          const rereadBody = await readResponseBody(rereadResponse);
+          let rereadRow: Record<string, unknown>;
+          try {
+            rereadRow = JSON.parse(rereadBody.body) as Record<string, unknown>;
+          } catch {
+            failures.push(failure(`The re-read library row was not valid JSON for status purpose "${purpose}"`));
+            continue;
+          }
+          const rereadEntry = statusEntriesOf(rereadRow).find((candidate) => candidate.statusPurpose === purpose);
+          const rereadVersion = rereadEntry?.version;
+          if (!rereadEntry || typeof rereadVersion !== 'number' || !Number.isInteger(rereadVersion)) {
+            failures.push(failure(`The re-read library row had no current version for status purpose "${purpose}"`));
+            continue;
+          }
+          reconcileResult = await reconcile(rereadVersion);
+        }
+        if (!reconcileResult.response.ok) {
+          failures.push(
+            failure(
+              `POST ${reconcilePath} returned ${reconcileResult.response.status}; last response: ${
+                reconcileResult.body.body || String(reconcileResult.response.status)
+              }`,
+            ),
+          );
+        }
+      }
+      if (failures.length > 0) return failures;
+    }
+
+    const retryResponse = await fetch(apiUrl(options.baseUrl, path), {
+      method: 'DELETE',
+      headers: actor.headers,
+    });
+    if (!retryResponse.ok && retryResponse.status !== 404) {
+      const retryBody = await readResponseBody(retryResponse);
+      failures.push(
+        failure(`${formatDeleteFailureDescription(path, retryResponse.status, retryBody.body)}; last response`),
+      );
+    }
+    return failures;
+  }
+
+  return [
+    {
+      actor: actor.name,
+      collection: collection.name,
+      message: `${formatDeleteFailureDescription(path, response.status, responseBody)} for row ${id}`,
+    },
+  ];
 }
 
 /** The error's message with its cause chain, so a wrapped fetch failure names what actually failed. */
@@ -304,6 +673,7 @@ function describeError(error: unknown): string {
 export async function cleanupRunData(options: CleanupOptions): Promise<CleanupResult> {
   const failures: CleanupFailure[] = [];
   let matchedRows = 0;
+  const cleanupDeadline = Date.now() + options.statusCleanupTimeoutMs;
 
   for (const actor of options.actors) {
     const context: ListingContext = new Map();
@@ -336,8 +706,7 @@ export async function cleanupRunData(options: CleanupOptions): Promise<CleanupRe
         }
 
         try {
-          const failure = await deleteRow(options, actor, collection, id, row);
-          if (failure) failures.push(failure);
+          failures.push(...(await deleteRow(options, actor, collection, id, row, cleanupDeadline)));
         } catch (error) {
           failures.push({
             actor: actor.name,

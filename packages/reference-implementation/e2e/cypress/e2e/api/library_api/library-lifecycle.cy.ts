@@ -170,9 +170,23 @@ describe('Library API lifecycle', { testIsolation: false }, () => {
       .then(() => waitForGeneration(targetRecordId, token, 1))
       .then((record) => {
         expect(record.origin).to.eq('external');
+        expect(record.status).to.be.null;
+        expect(record.lifecycle).to.be.null;
+        expect(record.capabilities.statusManageable).to.eq(false);
         expect(record.hasKey).to.eq(true);
         expect(record.decryptionKey).to.be.a('string');
         expectVerified(record, 1);
+        return cy
+          .request({
+            method: 'GET',
+            url: `/api/v1/credentials/${targetRecordId}/status`,
+            headers: { Authorization: `Bearer ${token}` },
+            failOnStatusCode: false,
+          })
+          .then((statusResponse) => {
+            expect(statusResponse.status).to.eq(403);
+            expect(statusResponse.body.code).to.eq('EXTERNAL_CREDENTIAL_STATUS_NOT_MANAGEABLE');
+          });
       })
       .then(() =>
         cy.request({

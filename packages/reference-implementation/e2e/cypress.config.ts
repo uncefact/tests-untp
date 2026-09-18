@@ -40,6 +40,124 @@ const harnessEnv: Record<string, string | undefined> = {
 
 const APPLICATION_PRIVATE_URL_NAMES = ['FETCH_ALLOW_PRIVATE_URLS', 'VERIFY_ALLOW_PRIVATE_URLS'] as const;
 
+function readCredentialStatusMutationEnabledIfSet(env: Record<string, string | undefined>): boolean | undefined {
+  const value = env.CREDENTIAL_STATUS_MUTATION_ENABLED;
+  if (value === undefined || value === '') return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(
+    'CREDENTIAL_STATUS_MUTATION_ENABLED must be the literal true or false when supplied to the e2e harness.',
+  );
+}
+
+const DEFAULT_STATUS_PURPOSES = ['revocation'] as const;
+const SUPPORTED_STATUS_PURPOSES = ['revocation', 'suspension'] as const;
+
+function readDefaultStatusPurposes(env: Record<string, string | undefined>): string[] {
+  const raw = env.CREDENTIAL_STATUS_DEFAULT_PURPOSES;
+  if (raw === undefined || raw.trim() === '') return [...DEFAULT_STATUS_PURPOSES];
+  if (raw.trim().toLowerCase() === 'none') return [];
+  const purposes = raw
+    .split(',')
+    .map((purpose) => purpose.trim())
+    .filter((purpose) => purpose !== '');
+  if (purposes.length === 0) {
+    throw new Error(
+      `CREDENTIAL_STATUS_DEFAULT_PURPOSES has invalid value "${raw}" (the list must contain at least one purpose). Accepted values: ${SUPPORTED_STATUS_PURPOSES.join(
+        ', ',
+      )}.`,
+    );
+  }
+  const seen = new Set<string>();
+  for (const purpose of purposes) {
+    if (purpose.toLowerCase() === 'none') {
+      throw new Error(
+        `CREDENTIAL_STATUS_DEFAULT_PURPOSES has invalid value "${raw}" (none must be the only value). Accepted values: ${SUPPORTED_STATUS_PURPOSES.join(
+          ', ',
+        )}.`,
+      );
+    }
+    if (!SUPPORTED_STATUS_PURPOSES.includes(purpose as (typeof SUPPORTED_STATUS_PURPOSES)[number])) {
+      throw new Error(
+        `CREDENTIAL_STATUS_DEFAULT_PURPOSES has invalid value "${raw}" (unsupported purpose "${purpose}"). Accepted values: ${SUPPORTED_STATUS_PURPOSES.join(
+          ', ',
+        )}.`,
+      );
+    }
+    if (seen.has(purpose)) {
+      throw new Error(
+        `CREDENTIAL_STATUS_DEFAULT_PURPOSES has invalid value "${raw}" (duplicate purpose "${purpose}"). Accepted values: ${SUPPORTED_STATUS_PURPOSES.join(
+          ', ',
+        )}.`,
+      );
+    }
+    seen.add(purpose);
+  }
+  return purposes;
+}
+
+function readStatusMultiplePurposesEnabled(env: Record<string, string | undefined>): boolean {
+  const raw = env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+  if (raw === undefined || raw === '') return false;
+  if (raw !== 'true' && raw !== 'false') {
+    throw new Error('CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED must be true or false.');
+  }
+  return raw === 'true';
+}
+
+function readCredentialStatusDefaultPurposesIfSet(env: Record<string, string | undefined>): string[] | undefined {
+  const raw = env.CREDENTIAL_STATUS_DEFAULT_PURPOSES;
+  if (raw === undefined || raw.trim() === '') return undefined;
+  return [...readDefaultStatusPurposes(env)];
+}
+
+function readCredentialStatusMultiplePurposesEnabledIfSet(
+  env: Record<string, string | undefined>,
+): boolean | undefined {
+  const raw = env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+  if (raw === undefined || raw === '') return undefined;
+  return readStatusMultiplePurposesEnabled(env);
+}
+
+function parseDuration(name: string, fallback: number, env: Record<string, string | undefined>): number {
+  const raw = env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const value = Number(raw);
+  if (!/^[0-9]+$/.test(raw.trim()) || !Number.isSafeInteger(value) || value < 1 || value > 2_147_483_647) {
+    throw new Error(`${name} must be an integer between 1 and 2147483647 milliseconds.`);
+  }
+  return value;
+}
+
+function serialiseDefaultPurposes(purposes: readonly string[]): string {
+  return purposes.length === 0 ? 'none' : purposes.join(',');
+}
+
+function parseResolvedDefaultPurposes(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return [...readDefaultStatusPurposes({ CREDENTIAL_STATUS_DEFAULT_PURPOSES: value })];
+  }
+  if (Array.isArray(value) && value.every((purpose) => typeof purpose === 'string')) {
+    const raw = value.length === 0 ? 'none' : value.join(',');
+    return [...readDefaultStatusPurposes({ CREDENTIAL_STATUS_DEFAULT_PURPOSES: raw })];
+  }
+  throw new Error('The harness capability key CREDENTIAL_STATUS_DEFAULT_PURPOSES must resolve to a valid setting.');
+}
+
+function requireResolvedPurposesToMatchApplicationSetting(resolvedValue: readonly string[]): void {
+  const applicationSetting = readCredentialStatusDefaultPurposesIfSet(harnessEnv);
+  if (applicationSetting === undefined) return;
+  if (
+    resolvedValue.length === applicationSetting.length &&
+    resolvedValue.every((purpose, index) => purpose === applicationSetting[index])
+  ) {
+    return;
+  }
+  throw new Error(
+    'The harness capability key CREDENTIAL_STATUS_DEFAULT_PURPOSES was overridden after the Cypress config file computed it from the application setting. Cypress merges cypress.env.json, CYPRESS_ or cypress_ prefixed process variables and --env over the config file, and one of those supplied a different value. Remove the override, or make it the same setting as the application.',
+  );
+}
+
 // The environment files are read with `dotenv.parse`, which returns each value
 // exactly as written. Compose, which interpolates the same root `.env` when it
 // starts the app container, does expand `${VAR:-default}` and `$VAR`. An
@@ -79,6 +197,12 @@ refuseExpressionsInPrivateUrlNames(harnessEnv);
 // the value the specs will read, and that is where the agreement check lives.
 const harnessAllowsPrivateUrls =
   readFetchAllowPrivateUrlsIfSet(harnessEnv) ?? (harnessEnv.CYPRESS_VERIFY_ALLOW_PRIVATE_URLS ?? 'true') === 'true';
+const harnessAllowsStatusMutation = readCredentialStatusMutationEnabledIfSet(harnessEnv) ?? true;
+const harnessStatusDefaultPurposes = readCredentialStatusDefaultPurposesIfSet(harnessEnv) ?? ['revocation'];
+const harnessStatusMultiplePurposesEnabled = readCredentialStatusMultiplePurposesEnabledIfSet(harnessEnv) ?? false;
+const statusReconcileGraceMs = parseDuration('CREDENTIAL_STATUS_RECONCILE_GRACE_MS', 5_000, harnessEnv);
+const statusCleanupTimeoutMs = parseDuration('E2E_STATUS_CLEANUP_TIMEOUT_MS', 60_000, harnessEnv);
+const cleanupTaskTimeoutMs = Math.max(60_000, statusCleanupTimeoutMs + 10_000);
 
 /**
  * Refuses a run whose resolved capability key disagrees with the application
@@ -90,13 +214,21 @@ const harnessAllowsPrivateUrls =
  * made. The message names the sources rather than the values, because the
  * disagreement is about which input should be believed.
  */
-function requireResolvedKeyToMatchApplicationSetting(resolvedValue: unknown): void {
-  const applicationSetting = readFetchAllowPrivateUrlsIfSet(harnessEnv);
+function requireResolvedKeyToMatchApplicationSetting(
+  resolvedValue: unknown,
+  options: {
+    keyName: string;
+    read: (env: Record<string, string | undefined>) => boolean | undefined;
+    message: string;
+  },
+): void {
+  if (typeof resolvedValue !== 'boolean') {
+    throw new Error(`The harness capability key ${options.keyName} must resolve to a boolean.`);
+  }
+  const applicationSetting = options.read(harnessEnv);
   if (applicationSetting === undefined) return;
   if (resolvedValue === applicationSetting) return;
-  throw new Error(
-    'The harness capability key VERIFY_ALLOW_PRIVATE_URLS was overridden after the Cypress config file computed it from the application setting (FETCH_ALLOW_PRIVATE_URLS or VERIFY_ALLOW_PRIVATE_URLS). Cypress merges cypress.env.json, CYPRESS_ or cypress_ prefixed process variables and --env over the config file, and one of those supplied a different value. Remove the override, or make it the same boolean as the application setting.',
-  );
+  throw new Error(options.message);
 }
 
 const execPromise = util.promisify(exec);
@@ -248,6 +380,9 @@ async function cleanupIdentityResolverNamespace(namespace: string): Promise<stri
 export default defineConfig({
   env: {
     VERIFY_ALLOW_PRIVATE_URLS: harnessAllowsPrivateUrls,
+    CREDENTIAL_STATUS_MUTATION_ENABLED: harnessAllowsStatusMutation,
+    CREDENTIAL_STATUS_DEFAULT_PURPOSES: serialiseDefaultPurposes(harnessStatusDefaultPurposes),
+    CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED: harnessStatusMultiplePurposesEnabled,
 
     // Identity provider
     IDP_PROVIDER: process.env.E2E_IDP_PROVIDER || 'keycloak',
@@ -271,6 +406,7 @@ export default defineConfig({
 
     // RI-internal services
     VCKIT_BASE_URL: process.env.E2E_VCKIT_BASE_URL || 'https://vckit.e2e.internal',
+    VCKIT_PUBLIC_BASE_URL: process.env.E2E_VCKIT_PUBLIC_BASE_URL || 'http://localhost:3332',
     VCKIT_API_KEY: process.env.E2E_VCKIT_API_KEY || 'test123',
     VCKIT_DID_WEB_RESOLVABLE: (process.env.E2E_VCKIT_DID_WEB_RESOLVABLE ?? 'true') === 'true',
     STORAGE_BASE_URL: process.env.E2E_STORAGE_BASE_URL || 'http://storage-service:3334',
@@ -313,9 +449,32 @@ export default defineConfig({
       openMode: 0, // No retries in interactive mode
     },
     defaultCommandTimeout: 10000,
+    taskTimeout: cleanupTaskTimeoutMs,
     defaultBrowser: 'chrome',
     setupNodeEvents(on, config) {
-      requireResolvedKeyToMatchApplicationSetting(config.env.VERIFY_ALLOW_PRIVATE_URLS);
+      requireResolvedKeyToMatchApplicationSetting(config.env.VERIFY_ALLOW_PRIVATE_URLS, {
+        keyName: 'VERIFY_ALLOW_PRIVATE_URLS',
+        read: readFetchAllowPrivateUrlsIfSet,
+        message:
+          'The harness capability key VERIFY_ALLOW_PRIVATE_URLS was overridden after the Cypress config file computed it from the application setting (FETCH_ALLOW_PRIVATE_URLS or VERIFY_ALLOW_PRIVATE_URLS). Cypress merges cypress.env.json, CYPRESS_ or cypress_ prefixed process variables and --env over the config file, and one of those supplied a different value. Remove the override, or make it the same boolean as the application setting.',
+      });
+      requireResolvedKeyToMatchApplicationSetting(config.env.CREDENTIAL_STATUS_MUTATION_ENABLED, {
+        keyName: 'CREDENTIAL_STATUS_MUTATION_ENABLED',
+        read: readCredentialStatusMutationEnabledIfSet,
+        message:
+          'The harness capability key CREDENTIAL_STATUS_MUTATION_ENABLED was overridden after the Cypress config file computed it from the application setting. Cypress merges cypress.env.json, CYPRESS_ or cypress_ prefixed process variables and --env over the config file, and one of those supplied a different boolean. Remove the override, or make it the same boolean as the application setting.',
+      });
+      const resolvedStatusDefaultPurposes = parseResolvedDefaultPurposes(config.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES);
+      requireResolvedPurposesToMatchApplicationSetting(resolvedStatusDefaultPurposes);
+      const resolvedStatusMultiplePurposesEnabled = config.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED;
+      requireResolvedKeyToMatchApplicationSetting(resolvedStatusMultiplePurposesEnabled, {
+        keyName: 'CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED',
+        read: readCredentialStatusMultiplePurposesEnabledIfSet,
+        message:
+          'The harness capability key CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED was overridden after the Cypress config file computed it from the application setting. Cypress merges cypress.env.json, CYPRESS_ or cypress_ prefixed process variables and --env over the config file, and one of those supplied a different boolean. Remove the override, or make it the same boolean as the application setting.',
+      });
+      config.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES = serialiseDefaultPurposes(resolvedStatusDefaultPurposes);
+      config.env.CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED = resolvedStatusMultiplePurposesEnabled;
       const cleanupBaseUrl = config.baseUrl ?? 'http://localhost:3003';
 
       on('after:run', async () => {
@@ -335,6 +494,8 @@ export default defineConfig({
           baseUrl: cleanupBaseUrl,
           tag: RUN_TAG,
           actors,
+          statusReconcileGraceMs,
+          statusCleanupTimeoutMs,
         };
         const apiCleanup = await cleanupRunData(cleanupOptions);
         for (const failure of apiCleanup.failures) {
@@ -402,6 +563,8 @@ export default defineConfig({
             baseUrl: cleanupBaseUrl,
             tag: RUN_TAG,
             actors: [...registeredActors.values()],
+            statusReconcileGraceMs,
+            statusCleanupTimeoutMs,
           });
           for (const failure of result.failures) {
             console.error(
@@ -436,6 +599,8 @@ export default defineConfig({
             baseUrl: cleanupBaseUrl,
             tag: RUN_TAG,
             actors: [...registeredActors.values()],
+            statusReconcileGraceMs,
+            statusCleanupTimeoutMs,
           };
           const residue = await findTaggedRows(options, (tags) => tags.some((tag) => tag !== RUN_TAG));
           const failures = formatCleanupFailures(residue.failures);

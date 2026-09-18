@@ -480,6 +480,72 @@ describe('Credential API', { testIsolation: false }, () => {
       });
     });
 
+    it('issues a DCC whose scheme is not in the catalogue and keeps the warning advisory', () => {
+      // The scheme id is unique to this run, so no catalogue can hold it and
+      // the not-found warning is the route's contract rather than an
+      // instance's seed state. The warning is advisory: the credential is
+      // still issued with 201.
+      cy.readFile('../src/templates/v0.7.0/digital_conformity_credential/example-data.json').then((fixture) => {
+        const payload = JSON.parse(JSON.stringify(fixture));
+        const uniqueSuffix = `${RUN_ID}-${Math.random().toString(36).slice(2, 8)}`;
+        payload.id = `urn:uuid:e2e-v070-dcc-${uniqueSuffix}`;
+        payload.issuer.id = defaultDidValue;
+        payload.name = `E2E v0.7.0 DCC ${uniqueSuffix}`;
+        payload.credentialSubject.id = `https://example.com/e2e-v070/attestation/${uniqueSuffix}`;
+        const schemeId = `https://example.com/e2e-v070/scheme/${uniqueSuffix}`;
+        payload.credentialSubject.referenceScheme.id = schemeId;
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/credentials',
+          body: {
+            credentialPayload: payload,
+            credentialType: 'DigitalConformityCredential',
+            version: '0.7.0',
+          },
+        }).then((response) => {
+          expect(response.status).to.eq(201);
+          expect(response.body.credentialId).to.be.a('string').and.not.empty;
+          expect(response.body.warnings).to.be.an('array');
+          const schemeWarning = response.body.warnings.find(
+            (warning: { code?: string }) => warning.code === 'conformity-scheme.not-found',
+          );
+          expect(schemeWarning, 'scheme not-found advisory warning').to.exist;
+          expect(schemeWarning.pointer, 'warning pointer').to.eq('/credentialSubject/referenceScheme/id');
+          expect(schemeWarning.received, 'warning received value').to.eq(schemeId);
+          return cy.request(`/api/v1/library/${response.body.credentialId}`).then((libraryResponse) => {
+            expect(libraryResponse.status).to.eq(200);
+            expect(libraryResponse.body.credential.name).to.eq(payload.name);
+          });
+        });
+      });
+    });
+
+    it('POST /api/v1/credentials: rejects a caller-supplied credentialStatus member', () => {
+      const payload = {
+        ...buildCredentialPayload(defaultDidValue),
+        credentialStatus: {
+          type: 'BitstringStatusListEntry',
+          statusPurpose: 'revocation',
+          statusListIndex: 0,
+          statusListCredential: 'https://example.com/status-list',
+        },
+      };
+
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload: payload,
+          credentialType: 'DigitalProductPassport',
+          version: '0.6.1',
+        },
+        failOnStatusCode: false,
+      }).then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.code).to.eq('CREDENTIAL_STATUS_NOT_ACCEPTED');
+      });
+    });
+
     it('returns 400 when requesting a nonexistent version', () => {
       cy.request({
         method: 'POST',
