@@ -13,6 +13,7 @@ import {
   CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS,
   CredentialBatchAttemptFenceLostError,
   claimBatchAttempt,
+  claimBatchAttemptAndRelease,
   checkpointBatchContinuation,
   cancelCredentialBatch,
   markItemQueued,
@@ -858,6 +859,51 @@ describe('credential batch persistence and progression', () => {
     ).resolves.toMatchObject({ outcome: 'applied', state: CredentialBatchState.COMPLETED });
   });
 
+  it('returns a non-applied cancellation settlement to reconciliation without calling it fence loss', async () => {
+    // Regression: a not-ready settlement must reach reconciliation as its own outcome.
+    const created = await submit('settle-cancel-not-ready-key', 'digest-settle-cancel-not-ready', [ITEM, ITEM]);
+    const batchId = createdBatchId(created);
+    await prisma.$transaction(async (tx) => {
+      await claimBatchAttempt(tx, { batchId, tenantId: 'tenant-1', token: 'old-attempt', expectedVersion: 0 });
+      await claimNextBatchItem(tx, { batchId, tenantId: 'tenant-1', token: 'old-attempt' });
+    });
+    await prisma.$executeRaw`
+      UPDATE "CredentialBatchItem"
+      SET state = 'PROCESSING', "attemptToken" = 'other-attempt'
+      WHERE "batchId" = ${batchId} AND index = 1
+    `;
+    await prisma.$executeRaw`
+      UPDATE "CredentialBatch"
+      SET "queuedCount" = 0, "processingCount" = 2
+      WHERE id = ${batchId}
+    `;
+    const cancelled = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId, tenantId: 'tenant-1' }));
+    if (cancelled.outcome !== 'applied') throw new Error('expected cancellation to apply');
+
+    await expect(
+      prisma.$transaction((tx) =>
+        claimBatchAttemptAndRelease(tx, {
+          batchId,
+          tenantId: 'tenant-1',
+          token: 'recovery-attempt',
+          expectedVersion: cancelled.batch.version,
+          staleBefore: new Date(Date.now() + 1_000),
+        }),
+      ),
+    ).resolves.toEqual({ applied: true, settled: false, settlement: 'not-ready' });
+    await expect(
+      prisma.credentialBatch.findUnique({ where: { id: batchId }, include: { items: true } }),
+    ).resolves.toMatchObject({
+      attemptToken: 'recovery-attempt',
+      processingCount: 1,
+      unknownCount: 1,
+      items: expect.arrayContaining([
+        expect.objectContaining({ state: CredentialBatchItemState.OUTCOME_UNKNOWN }),
+        expect.objectContaining({ state: CredentialBatchItemState.PROCESSING, attemptToken: 'other-attempt' }),
+      ]),
+    });
+  });
+
   it('returns tenant-fenced missing or zero-row outcomes without changing a row', async () => {
     const queued = await submit('foreign-queued-key', 'digest-foreign-queued');
     const issued = await submit('foreign-issued-key', 'digest-foreign-issued');
@@ -1332,6 +1378,27 @@ describe('credential batch persistence and progression', () => {
     expect(await getCredentialBatchById(input.batchId, input.tenantId)).toEqual(before);
   });
 
+  it('rejects a queued-row counter mismatch with its batch identity and leaves every row unchanged', async () => {
+    // Regression: a counter mismatch must roll back every batch and item row.
+    const batchId = createdBatchId(await submit('cancel-counter-drift', 'cancel-counter-drift', [ITEM, ITEM]));
+    await prisma.$executeRaw`
+      UPDATE "CredentialBatch"
+      SET "queuedCount" = "queuedCount" + 1, "itemCount" = "itemCount" + 1
+      WHERE id = ${batchId}
+    `;
+    const beforeBatch = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: batchId } });
+    const beforeItems = await prisma.credentialBatchItem.findMany({ where: { batchId }, orderBy: { index: 'asc' } });
+
+    await expect(
+      prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId, tenantId: 'tenant-1' })),
+    ).rejects.toThrow(`batchId=${batchId}, tenantId=tenant-1, cancelledRows=2, queuedCount=3`);
+
+    await expect(prisma.credentialBatch.findUniqueOrThrow({ where: { id: batchId } })).resolves.toEqual(beforeBatch);
+    await expect(
+      prisma.credentialBatchItem.findMany({ where: { batchId }, orderBy: { index: 'asc' } }),
+    ).resolves.toEqual(beforeItems);
+  });
+
   it('settles queued cancellation immediately and returns tenant-scoped refusal outcomes without writes', async () => {
     const batchId = createdBatchId(await submit('cancel-queued', 'cancel-queued', [ITEM, ITEM]));
     const input = { batchId, tenantId: 'tenant-1' };
@@ -1679,6 +1746,37 @@ describe('credential batch persistence and progression', () => {
     },
   );
 
+  it.each(['first-session', 'second-session'] as const)(
+    'serialises two cancellation requests with the %s session first',
+    async (firstSession) => {
+      // Regression: concurrent cancellation must apply once and preserve the first request timestamp.
+      const input = await runningBatch(`race-cancel-cancel-${firstSession}`, 2);
+      const before = await getCredentialBatchById(input.batchId, input.tenantId);
+      const firstCancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
+      const secondCancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
+      const results =
+        firstSession === 'first-session'
+          ? await contend(firstCancel, secondCancel)
+          : await contend(secondCancel, firstCancel);
+
+      expect(results[0]).toMatchObject({ outcome: 'applied', batch: { cancelRequestedAt: expect.any(Date) } });
+      expect(results[1]).toMatchObject({ outcome: 'already-requested' });
+      if (results[0].outcome !== 'applied' || results[1].outcome !== 'already-requested') {
+        throw new Error('expected the first cancellation to apply and the second to join it');
+      }
+      expect(results[1].batch.cancelRequestedAt).toEqual(results[0].batch.cancelRequestedAt);
+      const after = await getCredentialBatchById(input.batchId, input.tenantId);
+      expect(after).toMatchObject({
+        queuedCount: 0,
+        processingCount: 1,
+        cancelledCount: 1,
+        state: CredentialBatchState.RUNNING,
+        version: (before?.version ?? 0) + 1,
+      });
+      expect(after?.items.map((item) => item.state)).toEqual(['PROCESSING', 'CANCELLED']);
+    },
+  );
+
   it.each(['cancel', 'fault'] as const)('serialises cancel versus pre-dispatch fault with %s first', async (first) => {
     const input = await runningBatch(`race-fault-${first}`, 2);
     const cancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
@@ -1824,6 +1922,7 @@ describe('credential batch cancellation migration on populated tables', () => {
   });
 
   it('deploys over existing batches, preserves their meaning and enforces both revised count constraints', async () => {
+    // Regression: the migrated sum constraint must retain failed, processing and unknown work in the total.
     const target = new URL(process.env.RI_DATABASE_URL as string);
     target.searchParams.set('schema', schema);
     url = target.toString();
@@ -1841,14 +1940,18 @@ describe('credential batch cancellation migration on populated tables', () => {
     expect(columnsBefore.map((column) => column.column_name)).not.toContain('cancelledCount');
     await upgrade.$executeRaw`INSERT INTO "Tenant" (id, name, "updatedAt") VALUES ('upgrade-tenant', 'Upgrade tenant', now())`;
     await upgrade.$executeRaw`
-      INSERT INTO "CredentialBatch" (id, "tenantId", state, "itemCount", "queuedCount", "issuedCount", "idempotencyKey", "bodyDigest", "updatedAt")
-      VALUES ('upgrade-queued', 'upgrade-tenant', 'QUEUED', 2, 2, 0, 'upgrade-key', 'upgrade-digest', now()),
-             ('upgrade-completed', 'upgrade-tenant', 'COMPLETED', 1, 0, 1, 'completed-key', 'completed-digest', now())
+      INSERT INTO "CredentialBatch" (id, "tenantId", state, "itemCount", "queuedCount", "processingCount", "issuedCount", "failedCount", "unknownCount", "idempotencyKey", "bodyDigest", "updatedAt")
+      VALUES ('upgrade-queued', 'upgrade-tenant', 'QUEUED', 2, 2, 0, 0, 0, 0, 'upgrade-key', 'upgrade-digest', now()),
+             ('upgrade-completed', 'upgrade-tenant', 'COMPLETED', 1, 0, 0, 1, 0, 0, 'completed-key', 'completed-digest', now()),
+             ('upgrade-attention', 'upgrade-tenant', 'NEEDS_ATTENTION', 3, 0, 1, 0, 1, 1, 'attention-key', 'attention-digest', now())
     `;
     await upgrade.$executeRaw`
       INSERT INTO "CredentialBatchItem" (id, "batchId", "tenantId", "index", state, request, "updatedAt")
       VALUES ('upgrade-item-0', 'upgrade-queued', 'upgrade-tenant', 0, 'QUEUED', 'retained envelope zero', now()),
-             ('upgrade-item-1', 'upgrade-queued', 'upgrade-tenant', 1, 'QUEUED', 'retained envelope one', now())
+             ('upgrade-item-1', 'upgrade-queued', 'upgrade-tenant', 1, 'QUEUED', 'retained envelope one', now()),
+             ('upgrade-attention-item-0', 'upgrade-attention', 'upgrade-tenant', 0, 'FAILED', 'failed envelope', now()),
+             ('upgrade-attention-item-1', 'upgrade-attention', 'upgrade-tenant', 1, 'PROCESSING', 'processing envelope', now()),
+             ('upgrade-attention-item-2', 'upgrade-attention', 'upgrade-tenant', 2, 'OUTCOME_UNKNOWN', 'unknown envelope', now())
     `;
     const before = await upgrade.$queryRaw<Array<Record<string, unknown>>>`SELECT * FROM "CredentialBatch" ORDER BY id`;
     const itemsBefore = await upgrade.$queryRaw<
@@ -1880,6 +1983,10 @@ describe('credential batch cancellation migration on populated tables', () => {
     await expect(
       upgrade.$executeRaw`UPDATE "CredentialBatch" SET "cancelledCount" = -1, "queuedCount" = 3 WHERE id = 'upgrade-queued'`,
     ).rejects.toThrow('CredentialBatch_counts_non_negative_check');
+    // Regression: the new sum constraint must still count unknown work when failed and processing work exist.
+    await expect(
+      upgrade.$executeRaw`UPDATE "CredentialBatch" SET "unknownCount" = 0 WHERE id = 'upgrade-attention'`,
+    ).rejects.toThrow('CredentialBatch_counts_sum_check');
     expect(await upgrade.credentialBatch.findUnique({ where: { id: 'upgrade-queued' } })).toMatchObject({
       queuedCount: 0,
       cancelledCount: 2,

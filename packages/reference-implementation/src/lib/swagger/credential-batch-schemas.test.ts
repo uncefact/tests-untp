@@ -6,6 +6,10 @@ import {
 } from './schemas';
 import { getApiDocs } from './swagger';
 import { CredentialBatchItemState, CredentialBatchState } from '@/lib/prisma/generated';
+import {
+  CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
+  CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
+} from '@/lib/credentials/credential-batch-error';
 
 describe('credential batch OpenAPI components', () => {
   it('documents the request and all durable status states', () => {
@@ -72,8 +76,7 @@ describe('published batch cancellation contract', () => {
       state: 'RUNNING',
       counts: { processing: 1, cancelled: 4 },
       cancelRequestedAt: '2026-09-18T00:01:00.000Z',
-      message:
-        'Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.',
+      message: CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
     });
     expect(operation.responses['400'].content!['application/json']!.examples!.bodyNotAllowed.value).toEqual({
       error: 'Send this request without a body.',
@@ -82,7 +85,7 @@ describe('published batch cancellation contract', () => {
       error: 'Credential batch not found.',
     });
     expect(operation.responses['409'].content!['application/json']!.examples!.notCancellable.value).toEqual({
-      error: 'This credential batch cannot be cancelled because it has already settled.',
+      error: CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
       code: 'BATCH_NOT_CANCELLABLE',
     });
     const expired = operation.responses['410'].content!['application/json']!.examples!.expired.value;
@@ -126,5 +129,8 @@ describe('published batch cancellation contract', () => {
         { index: 4, state: 'CANCELLED' },
       ]),
     });
+    const expired =
+      paths['/credentials/batches/{id}'].get!.responses['410'].content!['application/json']!.examples!.expired.value;
+    expect(credentialBatchExpiredResponseSchema.safeParse(expired).success).toBe(true);
   });
 });

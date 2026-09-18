@@ -101,7 +101,7 @@ Inspection and resolution audit lines are emitted at `warn`, so keep `LOG_LEVEL=
 
 A fault affecting every item, such as an unusable data encryption key, no longer fails the job; each item is retried up to the attempt limit with backoff and the batch settles with those items `FAILED`, so an operator watching for failed jobs should watch the batch counts instead. A batch parked at the top of the backoff ladder is protected from the reconciliation sweep only by its pending delayed job.
 
-An unknown item is never replayed automatically. After cancellation, a pre-dispatch fault becomes `CANCELLED` instead of retrying, unless the attempt limit was exhausted, in which case it remains `FAILED`. Do not edit counters or item state by hand, because that breaks the attempt-token fence and the audit trail.
+An unknown item is never replayed automatically. An item that reached its attempt limit was already written `FAILED` with `ITEM_ATTEMPTS_EXHAUSTED` before cancellation; a later pre-dispatch fault becomes `CANCELLED` instead of retrying. Do not edit counters or item state by hand, because that breaks the attempt-token fence and the audit trail.
 
 ## Retention
 

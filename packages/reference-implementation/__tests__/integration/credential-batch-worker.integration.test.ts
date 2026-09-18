@@ -9,6 +9,7 @@ import {
   claimNextBatchItem,
   createCredentialBatch,
   getCredentialBatchById,
+  markItemIssued,
   type BatchSubmissionResult,
 } from '../../src/lib/prisma/repositories/credential-batch.repository';
 import {
@@ -295,6 +296,57 @@ describe('credential batch worker and reconciliation', () => {
     });
     expect(await jobsFor(id)).toEqual([]);
     expect(await prisma.libraryRecord.count()).toBe(0);
+  });
+
+  it('marks a stale worker outcome superseded without changing the live takeover owner', async () => {
+    // Regression: an old worker must not write an issued outcome after a newer attempt takes ownership.
+    await queue.stop();
+    const id = await submit('cancel-stale-worker', [ITEM(0), ITEM(1)], noOpQueue);
+    await prisma.$transaction(async (tx) => {
+      await claimBatchAttempt(tx, { batchId: id, tenantId: 'tenant-1', token: 'old-worker', expectedVersion: 0 });
+      await claimNextBatchItem(tx, { batchId: id, tenantId: 'tenant-1', token: 'old-worker' });
+      await cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' });
+    });
+    const oldSnapshot = await getCredentialBatchById(id, 'tenant-1');
+    expect(oldSnapshot).toMatchObject({ attemptToken: 'old-worker', processingCount: 1, cancelledCount: 1 });
+    await prisma.$transaction(async (tx) => {
+      expect(
+        await claimBatchAttempt(tx, {
+          batchId: id,
+          tenantId: 'tenant-1',
+          token: 'new-worker',
+          expectedVersion: oldSnapshot!.version,
+          staleBefore: new Date(Date.now() + 1_000),
+        }),
+      ).toEqual({ applied: true });
+    });
+    const liveBefore = await getCredentialBatchById(id, 'tenant-1');
+    expect(liveBefore).toMatchObject({
+      attemptToken: 'new-worker',
+      processingCount: 0,
+      unknownCount: 1,
+      cancelledCount: 1,
+    });
+
+    let observedOutcome: string | undefined;
+    const deps = defaultCredentialBatchIssueDependencies(idleQueue);
+    deps.getBatch = async () => oldSnapshot;
+    deps.claimAttempt = async () => ({ applied: true });
+    deps.claimNextItem = async () => ({
+      outcome: 'claimed' as const,
+      item: { index: 0, request: oldSnapshot!.items[0].request },
+    });
+    deps.issue = async () => ({ status: 201 as const, body: { credentialId: 'stale-worker-credential' } });
+    deps.markIssued = async (tx, input) => {
+      const result = await markItemIssued(tx, input);
+      observedOutcome = result.outcome;
+      return result;
+    };
+    deps.recordKnownCredentialId = async () => ({ applied: false });
+    await credentialBatchIssueHandler(deps)({ batchId: id, tenantId: 'tenant-1' }, context());
+
+    expect(observedOutcome).toBe('superseded');
+    expect(await getCredentialBatchById(id, 'tenant-1')).toEqual(liveBefore);
   });
 
   it('serialises cancellation against a post-dispatch fault and makes retry harmless', async () => {

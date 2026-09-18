@@ -89,6 +89,13 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
  *               expired:
  *                 summary: The retained batch data has expired
  *                 value:
+ *                   id: batch-1
+ *                   state: EXPIRED
+ *                   counts: { total: 5, queued: 0, processing: 0, issued: 1, failed: 0, unknown: 0, cancelled: 4 }
+ *                   createdAt: '2026-09-18T00:00:00.000Z'
+ *                   settledAt: '2026-09-18T00:02:00.000Z'
+ *                   cancelRequestedAt: '2026-09-18T00:01:00.000Z'
+ *                   items: []
  *                   error: This credential batch has expired. Its credentials were not deleted.
  *                   code: BATCH_EXPIRED
  *       500:

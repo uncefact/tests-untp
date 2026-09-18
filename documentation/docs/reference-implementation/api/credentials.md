@@ -375,6 +375,8 @@ A batch settles as `NEEDS_ATTENTION` while any outcome is unknown, then as `CANC
 
 Refusals do not change the batch. If the response is lost, poll GET: an active repeat is accepted unchanged, but a repeat after settlement is refused. Cancellation prevents further item claims and continuations. Recovery can still settle abandoned work without enqueueing issuance. The [operations page](../operations/batch-issuance#cancellation) explains investigation and retention.
 
+Resubmitting the same `Idempotency-Key` and body after cancellation replays the cancelled batch id and issues nothing; a fresh batch needs a new key.
+
 ## Verification Endpoint
 
 ### Verify a Credential

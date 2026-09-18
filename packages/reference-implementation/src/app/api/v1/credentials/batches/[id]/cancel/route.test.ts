@@ -31,16 +31,22 @@ import { POST } from './route';
 import { GET } from '../route';
 import { prisma } from '@/lib/prisma/prisma';
 import { cancelCredentialBatch, getCredentialBatchById } from '@/lib/prisma/repositories/credential-batch.repository';
+import {
+  CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
+  CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
+} from '@/lib/credentials/credential-batch-error';
 
 const cancel = jest.mocked(cancelCredentialBatch);
 const getBatch = jest.mocked(getCredentialBatchById);
 const transaction = jest.mocked(prisma.$transaction);
 const tx = Object.freeze({});
 const context = { tenantId: 'tenant-1', params: Promise.resolve({ id: 'batch-1' }) };
-const message =
-  'Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.';
+const message = CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE;
 
 function batch(state = 'RUNNING') {
+  const isQueued = state === 'QUEUED';
+  const isRunning = state === 'RUNNING';
+  const isExpired = state === 'EXPIRED';
   return {
     id: 'batch-1',
     tenantId: 'tenant-1',
@@ -48,21 +54,29 @@ function batch(state = 'RUNNING') {
     state,
     itemCount: 5,
     queuedCount: 0,
-    processingCount: state === 'RUNNING' ? 1 : 0,
-    issuedCount: state === 'RUNNING' ? 0 : 1,
+    processingCount: isRunning ? 1 : 0,
+    issuedCount: isRunning || isQueued ? 0 : 1,
     failedCount: 0,
     unknownCount: 0,
-    cancelledCount: 4,
+    cancelledCount: isQueued ? 5 : 4,
     cancelRequestedAt: new Date('2026-09-18T00:01:00.000Z'),
     createdAt: new Date('2026-09-18T00:00:00.000Z'),
-    settledAt: state === 'RUNNING' ? null : new Date('2026-09-18T00:02:00.000Z'),
-    items:
-      state === 'EXPIRED'
-        ? []
+    settledAt: isRunning || isQueued ? null : new Date('2026-09-18T00:02:00.000Z'),
+    items: isExpired
+      ? []
+      : isQueued
+        ? [0, 1, 2, 3, 4].map((index) => ({
+            index,
+            state: 'CANCELLED',
+            credentialId: null,
+            warning: null,
+            errorClass: null,
+            errorMessage: null,
+          }))
         : [0, 1, 2, 3, 4].map((index) => ({
             index,
-            state: index === 0 ? (state === 'RUNNING' ? 'PROCESSING' : 'ISSUED') : 'CANCELLED',
-            credentialId: index === 0 && state !== 'RUNNING' ? 'credential-1' : null,
+            state: index === 0 ? (isRunning ? 'PROCESSING' : 'ISSUED') : 'CANCELLED',
+            credentialId: index === 0 && !isRunning ? 'credential-1' : null,
             warning: null,
             errorClass: null,
             errorMessage: null,
@@ -214,7 +228,7 @@ describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
       const response = await POST(request(), context as never);
       expect(response.status).toBe(409);
       expect(await response.json()).toEqual({
-        error: 'This credential batch cannot be cancelled because it has already settled.',
+        error: CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
         code: 'BATCH_NOT_CANCELLABLE',
       });
       expect(stored.version).toBe(7);

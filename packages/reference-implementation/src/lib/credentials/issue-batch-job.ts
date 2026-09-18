@@ -88,7 +88,12 @@ function correlationId(payload: CredentialBatchIssuePayload): string | null {
 }
 
 function logFields(payload: CredentialBatchIssuePayload, index?: number) {
-  return { correlationId: correlationId(payload), batchId: payload.batchId, ...(index === undefined ? {} : { index }) };
+  return {
+    correlationId: correlationId(payload),
+    batchId: payload.batchId,
+    tenantId: payload.tenantId,
+    ...(index === undefined ? {} : { index }),
+  };
 }
 
 /**
@@ -269,12 +274,33 @@ export function credentialBatchIssueHandler(
           const settlement = await deps.transaction((tx) =>
             deps.settle(tx, { batchId: payload.batchId, tenantId: payload.tenantId, token }),
           );
-          logger.info(
-            { ...logFields(payload), settlement: settlement.outcome },
-            'Credential batch cancellation checked',
-          );
+          if (settlement.outcome === 'applied') {
+            logger.info(
+              { ...logFields(payload), settlement: settlement.outcome },
+              'Credential batch cancellation checked',
+            );
+          } else {
+            logger.warn(
+              { ...logFields(payload), settlement: settlement.outcome },
+              'Credential batch cancellation could not settle',
+            );
+            const released = await deps.transaction((tx) =>
+              deps.releaseAttempt(tx, {
+                batchId: payload.batchId,
+                tenantId: payload.tenantId,
+                token,
+              }),
+            );
+            if (!released.applied) {
+              logger.warn(
+                { ...logFields(payload), settlement: settlement.outcome },
+                'Credential batch cancellation could not release its ownership fence',
+              );
+            }
+          }
         } else {
-          logger.info({ ...logFields(payload), outcome: claimed.outcome }, 'Credential batch claim stopped');
+          const level = claimed.outcome === 'missing' ? 'warn' : 'info';
+          logger[level]({ ...logFields(payload), outcome: claimed.outcome }, 'Credential batch claim stopped');
         }
         return;
       }
@@ -359,7 +385,10 @@ export function credentialBatchIssueHandler(
                 tenantId: payload.tenantId,
                 token,
               });
-              if (settlement.outcome === 'applied') return { item, released: null };
+              if (settlement.outcome === 'applied') {
+                // Settlement already took the fence, so no release is due.
+                return { item, released: null };
+              }
               const released = await deps.releaseAttempt(tx, {
                 batchId: payload.batchId,
                 tenantId: payload.tenantId,
