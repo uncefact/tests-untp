@@ -37,7 +37,7 @@ A repeated cancellation while the batch remains `QUEUED` or `RUNNING` returns `2
 
 ### Counter-drift refusal
 
-If cancellation is refused with `500` because the batch's stored counts disagree with its items, quiesce the workers. Inspect the batch and each item with the existing `pnpm batch:inspect-item -- --tenant TENANT --batch BATCH --index INDEX --reason TICKET` command. Repair the counts under the batch lock from the item rows, restart the workers, then cancel the batch again. Counts are not rebuilt automatically because the drift may mean rows are missing.
+If cancellation is refused with `500` because the batch's stored counts disagree with its items, quiesce the workers. Inspect the batch and each item with the existing `pnpm batch:inspect-item -- --tenant TENANT --batch BATCH --index INDEX --reason TICKET` command. Repair the counts under the batch lock from the item rows, cancel the batch again and confirm the `202` response, then restart the workers. Counts are not rebuilt automatically because the drift may mean rows are missing.
 
 The worker claims no further item and queues no continuation after cancellation. Reconciliation still recovers cancellation-requested `QUEUED` or `RUNNING` batches whose job vanished. It records an abandoned processing item as unknown, then settles without enqueueing issuance. A duplicate delivery cannot resume cancelled work.
 
@@ -107,7 +107,7 @@ Inspection and resolution audit lines are emitted at `warn`, so keep `LOG_LEVEL=
 
 A fault affecting every item, such as an unusable data encryption key, no longer fails the job; each item is retried up to the attempt limit with backoff and the batch settles with those items `FAILED`, so an operator watching for failed jobs should watch the batch counts instead. A batch parked at the top of the backoff ladder is protected from the reconciliation sweep only by its pending delayed job.
 
-An unknown item is never replayed automatically. An item that reached its attempt limit was already written `FAILED` with `ITEM_ATTEMPTS_EXHAUSTED` before cancellation; a later pre-dispatch fault becomes `CANCELLED` instead of retrying. Do not edit counters or item state by hand, because that breaks the attempt-token fence and the audit trail.
+An unknown item is never replayed automatically. A retryable, non-exhausted pre-dispatch fault on a cancel-requested batch becomes `CANCELLED`; an attempt that exhausts its retries becomes `FAILED` whether the exhaustion happens before or after cancellation was requested. Do not edit counters or item state by hand, because that breaks the attempt-token fence and the audit trail.
 
 ## Retention
 

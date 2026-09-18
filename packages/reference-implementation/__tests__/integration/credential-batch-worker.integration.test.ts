@@ -1,3 +1,5 @@
+jest.mock('@/lib/api/logger');
+
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { ValidationError } from '../../src/lib/api/validation';
@@ -25,12 +27,14 @@ import { CREDENTIAL_BATCH_ISSUE_JOB } from '../../src/lib/jobs/queue-names';
 import { PgBossJobQueue } from '../../src/lib/jobs/pg-boss-job-queue';
 import type { JobContext, JobQueue } from '../../src/lib/jobs/types';
 import { createRigClient, truncateApplicationTables } from './rig/db';
+import { barrier } from './rig/locks';
 
 process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
 process.env.BATCH_RETENTION_DAYS = '1';
 process.env.WORKER_JOB_TIMEOUT_SECONDS = '30';
 
 const prisma = createRigClient();
+const loggerCalls = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
 const ITEM = (index: number) => ({
   credentialPayload: { issuer: { id: 'did:web:issuer.example' }, index },
   credentialType: 'DigitalProductPassport',
@@ -198,14 +202,6 @@ describe('credential batch worker and reconciliation', () => {
     }
   }
 
-  function barrier() {
-    let release!: () => void;
-    const promise = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    return { promise, release };
-  }
-
   async function jobsFor(id: string) {
     return prisma.$queryRaw<Array<{ id: string; state: string }>>`
       SELECT id::text, state::text FROM pgboss.job
@@ -347,6 +343,97 @@ describe('credential batch worker and reconciliation', () => {
 
     expect(observedOutcome).toBe('superseded');
     expect(await getCredentialBatchById(id, 'tenant-1')).toEqual(liveBefore);
+  });
+
+  it('handles a stale worker claim after live takeover and cancellation without touching the settled owner', async () => {
+    // Regression: a stale worker must treat an already-settled cancellation as success and leave no warning or fence release.
+    await queue.stop();
+    const id = await submit('cancel-stale-claim', [ITEM(0)], noOpQueue);
+    const claimEntered = barrier();
+    const allowClaim = barrier();
+    let staleToken: string | undefined;
+    let staleClaimToken: string | undefined;
+    const deps = defaultCredentialBatchIssueDependencies(noOpQueue);
+    deps.claimAttempt = async (tx, input) => {
+      staleToken = input.token;
+      return claimBatchAttempt(tx, input);
+    };
+    deps.claimNextItem = async (tx, input) => {
+      claimEntered.release();
+      await allowClaim.promise;
+      staleClaimToken = input.token;
+      const result = await claimNextBatchItem(tx, input);
+      expect(result).toEqual({ outcome: 'cancelled' });
+      return result;
+    };
+
+    const staleWorker = credentialBatchIssueHandler(deps)({ batchId: id, tenantId: 'tenant-1' }, context());
+    try {
+      await claimEntered.promise;
+      const held = await getCredentialBatchById(id, 'tenant-1');
+      expect(staleToken).toEqual(expect.any(String));
+      expect(held).toMatchObject({ state: CredentialBatchState.RUNNING, attemptToken: staleToken, queuedCount: 1 });
+
+      expect(
+        await prisma.$transaction((tx) =>
+          claimBatchAttempt(tx, {
+            batchId: id,
+            tenantId: 'tenant-1',
+            token: 'live-worker',
+            expectedVersion: held!.version,
+            staleBefore: new Date(Date.now() + 1_000),
+          }),
+        ),
+      ).toEqual({ applied: true });
+      expect(await getCredentialBatchById(id, 'tenant-1')).toMatchObject({
+        state: CredentialBatchState.RUNNING,
+        attemptToken: 'live-worker',
+      });
+
+      const cancellation = await prisma.$transaction((tx) =>
+        cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' }),
+      );
+      expect(cancellation).toMatchObject({
+        outcome: 'applied',
+        batch: {
+          state: CredentialBatchState.CANCELLED,
+          settledAt: expect.any(Date),
+          attemptToken: null,
+          queuedCount: 0,
+          processingCount: 0,
+          cancelledCount: 1,
+        },
+      });
+      const settledBeforeStaleClaim = await getCredentialBatchById(id, 'tenant-1');
+      expect(settledBeforeStaleClaim).toMatchObject({
+        state: CredentialBatchState.CANCELLED,
+        attemptToken: null,
+        queuedCount: 0,
+        processingCount: 0,
+        cancelledCount: 1,
+      });
+
+      loggerCalls.info.mockClear();
+      loggerCalls.warn.mockClear();
+      allowClaim.release();
+      await expect(staleWorker).resolves.toBeUndefined();
+
+      expect(await getCredentialBatchById(id, 'tenant-1')).toMatchObject({
+        state: settledBeforeStaleClaim!.state,
+        attemptToken: settledBeforeStaleClaim!.attemptToken,
+        lastProgressAt: settledBeforeStaleClaim!.lastProgressAt,
+      });
+      expect(staleClaimToken).toBe(staleToken);
+      expect(loggerCalls.info).toHaveBeenCalledTimes(1);
+      expect(loggerCalls.info).toHaveBeenCalledWith(
+        expect.objectContaining({ batchId: id, tenantId: 'tenant-1', settlement: 'already-settled' }),
+        'Credential batch cancellation already settled',
+      );
+      expect(loggerCalls.warn).not.toHaveBeenCalled();
+    } finally {
+      allowClaim.release();
+      await staleWorker;
+    }
   });
 
   it('serialises cancellation against a post-dispatch fault and makes retry harmless', async () => {

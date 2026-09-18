@@ -1,5 +1,11 @@
-import { config, runTag, runnerReachableUri } from '../../../support/config';
-import { decodeStoredCredential, decryptStoredCopy, expectStatusListIndex } from '../../../support/stored-credential';
+import { config, runTag } from '../../../support/config';
+import {
+  assertIssuedCredential,
+  buildCredentialRequest,
+  type BatchItem,
+  type CredentialRequest,
+  type CredentialRequestFixture,
+} from '../../../support/credential-batch';
 
 /**
  * Batch rows are left by design. The existing run-tag cleanup removes the
@@ -24,23 +30,19 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
   let foreignDid: string;
   let foreignBatchId: string;
 
-  type CredentialRequest = {
-    credentialPayload: Record<string, any>;
-    credentialType: string;
-    version: string;
-    statusPurposes: string[];
+  const credentialFixture: CredentialRequestFixture = {
+    runId: RUN_ID,
+    context: ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
+    credentialType: CREDENTIAL_TYPE,
+    version: CREDENTIAL_VERSION,
+    statusPurposes: STATUS_PURPOSES,
+    credentialIdPrefix: 'e2e-batch-cancel',
+    issuerNamePrefix: 'E2E Batch Cancellation Issuer',
+    subjectIdPrefix: 'e2e-batch-cancel',
   };
 
   type BatchRequest = {
     items: CredentialRequest[];
-  };
-
-  type BatchItem = {
-    index: number;
-    state: string;
-    credentialId?: string;
-    warning?: unknown;
-    error?: { code?: string; message?: string };
   };
 
   type BatchStatus = {
@@ -65,30 +67,12 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
     statusUrl: string;
   };
 
-  function buildCredentialRequest(issuer: string, label: string): CredentialRequest {
-    return {
-      credentialPayload: {
-        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
-        id: `urn:uuid:e2e-batch-cancel-${label}-${RUN_ID}`,
-        type: ['DigitalProductPassport', 'VerifiableCredential'],
-        issuer: {
-          type: ['CredentialIssuer'],
-          id: issuer,
-          name: `E2E Batch Cancellation Issuer ${RUN_ID}`,
-        },
-        credentialSubject: {
-          type: ['ProductPassport'],
-          id: `https://example.com/products/e2e-batch-cancel-${label}-${RUN_ID}`,
-        },
-      },
-      credentialType: CREDENTIAL_TYPE,
-      version: CREDENTIAL_VERSION,
-      statusPurposes: STATUS_PURPOSES,
-    };
-  }
-
   function buildBatchRequest(issuer: string, label: string, count = BATCH_ITEM_COUNT): BatchRequest {
-    return { items: Array.from({ length: count }, (_, index) => buildCredentialRequest(issuer, `${label}-${index}`)) };
+    return {
+      items: Array.from({ length: count }, (_, index) =>
+        buildCredentialRequest(credentialFixture, issuer, `${label}-${index}`),
+      ),
+    };
   }
 
   function submitBatch(
@@ -198,68 +182,6 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
     expect(status.items, `${label} item count`).to.have.length(total);
   }
 
-  function assertIssuedCredential(batchItem: BatchItem, requestItem: CredentialRequest, label: string) {
-    expect(batchItem.credentialId, `${label} batch credentialId`).to.be.a('string').and.not.empty;
-    const credentialId = batchItem.credentialId as string;
-
-    return cy
-      .request(`/api/v1/library/${credentialId}`)
-      .then((libraryResponse) => {
-        expect(libraryResponse.status, `${label} library status`).to.eq(200);
-        expect(libraryResponse.body.id, `${label} library id`).to.eq(credentialId);
-        expect(libraryResponse.body.origin, `${label} library origin`).to.eq('native');
-        expect(libraryResponse.body.storageUri, `${label} storage URI`).to.be.a('string').and.not.empty;
-        expect(libraryResponse.body.decryptionKey, `${label} library decryption key`).to.be.a('string').and.not.empty;
-        expect(libraryResponse.body.warnings, `${label} library warnings`).to.be.an('array');
-
-        const status = libraryResponse.body.status;
-        expect(status, `${label} library status projection`).to.be.an('object');
-        expect(status.capture, `${label} status capture`).to.eq('CAPTURED');
-        expect(status.statusCaptureError, `${label} status capture error`).to.be.null;
-        expect(status.entries, `${label} status entries`).to.be.an('array').and.have.length(STATUS_PURPOSES.length);
-        expect(
-          status.entries.map((entry: Record<string, any>) => entry.statusPurpose),
-          `${label} status purposes`,
-        ).to.deep.eq(STATUS_PURPOSES);
-
-        status.entries.forEach((entry: Record<string, any>) => {
-          expect(entry.entryId, `${label} status entry id`).to.be.a('string').and.not.empty;
-          expect(entry.value, `${label} status value`).to.be.null;
-          expect(entry.observedAt, `${label} status observedAt`).to.be.null;
-          expect(entry.valueChangedAt, `${label} status valueChangedAt`).to.be.null;
-          expect(entry.version, `${label} status version`).to.be.a('number').and.greaterThan(0);
-          expectStatusListIndex(entry.statusListIndex, `${label} status-list index`, 'stored');
-          expect(entry.statusListCredential, `${label} status-list credential`).to.be.a('string').and.not.empty;
-          expect(entry.pending, `${label} pending status`).to.be.null;
-        });
-
-        expect(batchItem.warning ?? [], `${label} batch warnings`).to.deep.eq(libraryResponse.body.warnings);
-
-        return cy
-          .request({ method: 'GET', url: runnerReachableUri(libraryResponse.body.storageUri) })
-          .then((storedResponse) => {
-            expect(storedResponse.status, `${label} stored copy status`).to.eq(200);
-            expect(storedResponse.body.type, `${label} stored envelope type`).to.eq('aes-256-gcm');
-            expect(storedResponse.body.cipherText, `${label} stored envelope cipherText`).to.be.a('string').and.not
-              .empty;
-            expect(storedResponse.body.iv, `${label} stored envelope iv`).to.be.a('string').and.not.empty;
-            expect(storedResponse.body.tag, `${label} stored envelope tag`).to.be.a('string').and.not.empty;
-
-            return decryptStoredCopy(storedResponse.body, libraryResponse.body.decryptionKey).then((decryptedCopy) => {
-              const storedCredential = decodeStoredCredential(decryptedCopy);
-              expect(storedCredential.credentialSubject.id, `${label} stored credential subject id`).to.eq(
-                requestItem.credentialPayload.credentialSubject.id,
-              );
-
-              const storedIssuer =
-                typeof storedCredential.issuer === 'string' ? storedCredential.issuer : storedCredential.issuer?.id;
-              expect(storedIssuer, `${label} stored credential issuer`).to.eq(issuerDid);
-            });
-          });
-      })
-      .then(() => undefined);
-  }
-
   function assertSettledItems(status: BatchStatus, requestBody: BatchRequest, label: string) {
     expect(
       status.items.map((item) => item.index),
@@ -270,7 +192,11 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
     status.items.forEach((item) => {
       chain = chain.then(() => {
         if (item.state === 'ISSUED') {
-          return assertIssuedCredential(item, requestBody.items[item.index], `${label} item ${item.index}`);
+          return assertIssuedCredential(item, requestBody.items[item.index], {
+            label: `${label} item ${item.index}`,
+            expectedIssuer: issuerDid,
+            statusPurposes: STATUS_PURPOSES,
+          });
         }
         expect(item.state, `${label} item ${item.index} state`).to.be.oneOf(['CANCELLED', 'FAILED', 'OUTCOME_UNKNOWN']);
         if (item.state === 'CANCELLED') {
@@ -320,7 +246,7 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
 
         return submitBatch(
           `e2e-batch-cancel-foreign-${RUN_ID}`,
-          { items: [buildCredentialRequest(foreignDid, 'foreign-batch')] },
+          { items: [buildCredentialRequest(credentialFixture, foreignDid, 'foreign-batch')] },
           result.accessToken,
         ).then(({ batchId }) => {
           foreignBatchId = batchId;

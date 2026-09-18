@@ -1689,6 +1689,31 @@ describe('credential batch persistence and progression', () => {
     },
   );
 
+  it('returns cancelled before checking a non-owner token and preserves the live owner', async () => {
+    // Regression: moving the cancellation check below the token fence would return superseded here.
+    const input = await runningBatch('cancel-non-owner-claim', 2);
+    await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+    const before = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(before).toMatchObject({
+      state: CredentialBatchState.RUNNING,
+      attemptToken: input.token,
+      processingCount: 1,
+      cancelledCount: 1,
+    });
+
+    expect(await prisma.$transaction((tx) => claimNextBatchItem(tx, { ...input, token: 'non-owner-token' }))).toEqual({
+      outcome: 'cancelled',
+    });
+    const after = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(after).toMatchObject({
+      state: before!.state,
+      attemptToken: before!.attemptToken,
+      lastProgressAt: before!.lastProgressAt,
+      processingCount: before!.processingCount,
+      cancelledCount: before!.cancelledCount,
+    });
+  });
+
   it.each(['first-session', 'second-session'] as const)(
     'serialises two cancellation requests with the %s session first',
     async (firstSession) => {

@@ -318,6 +318,11 @@ export function credentialBatchIssueHandler(
               { ...logFields(payload), settlement: settlement.outcome },
               'Credential batch cancellation checked',
             );
+          } else if (settlement.outcome === 'already-settled') {
+            logger.info(
+              { ...logFields(payload), settlement: settlement.outcome },
+              'Credential batch cancellation already settled',
+            );
           } else {
             logger.warn(
               { ...logFields(payload), settlement: settlement.outcome },
