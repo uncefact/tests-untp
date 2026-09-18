@@ -44,6 +44,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
       issued: number;
       failed: number;
       unknown: number;
+      cancelled: number;
     };
     items: BatchItem[];
   };
@@ -263,6 +264,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
           issued: 3,
           failed: 0,
           unknown: 0,
+          cancelled: 0,
         });
         expect(status.items).to.have.length(3);
         expect(status.items.map((item) => item.index)).to.deep.eq([0, 1, 2]);
@@ -353,6 +355,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
           issued: 1,
           failed: 1,
           unknown: 0,
+          cancelled: 0,
         });
         expect(status.items).to.have.length(2);
         expect(status.items.map((item) => item.index)).to.deep.eq([0, 1]);
