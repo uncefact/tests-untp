@@ -36,6 +36,7 @@ jest.mock('@/lib/prisma/repositories/credential-batch.repository', () => {
 });
 
 import { POST } from './route';
+import { CredentialBatchState } from '@/lib/prisma/generated';
 
 const repository = jest.requireMock('@/lib/prisma/repositories/credential-batch.repository') as {
   classifySubmission: jest.Mock;
@@ -67,10 +68,19 @@ const item = {
   credentialPayload: { issuer: { id: 'did:web:issuer.example' } },
 };
 
+const oversizedItem = {
+  ...item,
+  credentialPayload: {
+    ...item.credentialPayload,
+    oversized: 'x'.repeat(3000),
+  },
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.MAX_BATCH_ITEMS;
   delete process.env.MAX_BATCH_REQUEST_BODY_BYTES;
+  delete process.env.MAX_REQUEST_BODY_BYTES;
   repository.findCredentialBatchSubmission.mockResolvedValue(null);
   repository.createCredentialBatch.mockResolvedValue({ outcome: 'created', batchId: 'batch-1' });
 });
@@ -123,6 +133,106 @@ describe('POST /api/v1/credentials/batches', () => {
     const response = await POST(request({ items: [item] }, 'key-1'), { tenantId: 'tenant-1' } as never);
 
     expect(response.status).toBe(422);
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a batch over MAX_BATCH_ITEMS before checking item sizes', async () => {
+    // Regression: BATCH_TOO_LARGE must win over an oversized item instead of exposing the wrong refusal.
+    process.env.MAX_BATCH_ITEMS = '2';
+    process.env.MAX_REQUEST_BODY_BYTES = '2048';
+
+    const response = await POST(request({ items: [item, oversizedItem, item] }, 'key-1'), {
+      tenantId: 'tenant-1',
+    } as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({
+      error: 'items: batch contains 3 items but MAX_BATCH_ITEMS is 2.',
+      code: 'BATCH_TOO_LARGE',
+    });
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized item with its zero-based item pointer', async () => {
+    // Regression: an implementation that reports the first item would hide which item breached the cap.
+    process.env.MAX_REQUEST_BODY_BYTES = '2048';
+
+    const response = await POST(request({ items: [item, oversizedItem] }, 'key-1'), { tenantId: 'tenant-1' } as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({
+      error: 'items[1]: item is 3139 bytes but MAX_REQUEST_BODY_BYTES is 2048.',
+      code: 'VALIDATION_FAILED',
+    });
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a streamed raw body over MAX_BATCH_REQUEST_BODY_BYTES before parsing it', async () => {
+    // Regression: a route that parses or buffers the body before applying the batch cap can miss the 413 boundary.
+    process.env.MAX_REQUEST_BODY_BYTES = '1024';
+    process.env.MAX_BATCH_REQUEST_BODY_BYTES = '1024';
+
+    const response = await POST(request({ items: [oversizedItem] }, 'key-1'), { tenantId: 'tenant-1' } as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(413);
+    expect(body).toEqual({
+      error: 'The request body exceeds MAX_BATCH_REQUEST_BODY_BYTES of 1024 bytes.',
+      code: 'REQUEST_BODY_TOO_LARGE',
+    });
+    expect(repository.findCredentialBatchSubmission).not.toHaveBeenCalled();
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('rewrites an item schema failure to bracket notation without changing its message', async () => {
+    // Regression: a dotted Zod path would not identify the consumer's third item as items[2].
+    const response = await POST(
+      request(
+        {
+          items: [item, item, { ...item, credentialPayload: 'not-an-object' }],
+        },
+        'key-1',
+      ),
+      { tenantId: 'tenant-1' } as never,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('items[2].credentialPayload: Expected object, received string');
+    expect(body.code).toBeUndefined();
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('leaves a top-level batch schema failure at its top-level pointer', async () => {
+    // Regression: applying item-pointer rewriting to a top-level failure would publish a false item location.
+    const response = await POST(request({ items: [] }, 'key-1'), { tenantId: 'tenant-1' } as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('items: must contain at least one item');
+    expect(body.code).toBeUndefined();
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('returns the expired batch body before checking a replay digest mismatch', async () => {
+    // Regression: an expired replay must not become 422 or create a second batch when its body has changed.
+    repository.findCredentialBatchSubmission.mockResolvedValue({
+      id: 'batch-expired',
+      state: CredentialBatchState.EXPIRED,
+      bodyDigest: 'different',
+    });
+
+    const response = await POST(request({ items: [item] }, 'key-1'), { tenantId: 'tenant-1' } as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(410);
+    expect(body).toEqual({
+      error: 'This credential batch has expired. Its credentials were not deleted.',
+      code: 'BATCH_EXPIRED',
+      batchId: 'batch-expired',
+    });
     expect(repository.createCredentialBatch).not.toHaveBeenCalled();
   });
 });

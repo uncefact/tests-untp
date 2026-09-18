@@ -131,12 +131,17 @@ describe('credential batch worker and reconciliation', () => {
   });
 
   beforeEach(async () => {
-    // Drain the polling queues before truncating: a truncate that races a pg-boss fetch deadlocks (40P01).
+    // Stop the polling worker before truncating, then drain the queue rows. A
+    // continuation the previous test committed can already be fetched and mid-write
+    // when cleanup runs, and deleting waiting rows does not wait for that handler,
+    // so the truncate deadlocks against it (40P01). A graceful stop does wait.
+    await queue.stop();
     await clearJobs();
     await truncateApplicationTables(prisma);
     await prisma.tenant.create({ data: { id: 'tenant-1', name: 'Tenant One' } });
     issuedNumber = 0;
     issueCalls = [];
+    await queue.start();
   });
 
   afterEach(async () => {
