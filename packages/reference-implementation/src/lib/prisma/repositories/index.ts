@@ -16,3 +16,4 @@ export * from './product.repository';
 export * from './data-model.repository';
 export * from './render-template.repository';
 export * from './conformity-scheme.repository';
+export * from './credential-batch.repository';

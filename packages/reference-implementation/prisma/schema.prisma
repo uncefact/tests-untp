@@ -177,6 +177,22 @@ enum RenderMethodType {
   WebRenderingTemplate2022
 }
 
+enum CredentialBatchState {
+  QUEUED
+  RUNNING
+  COMPLETED
+  NEEDS_ATTENTION
+  EXPIRED
+}
+
+enum CredentialBatchItemState {
+  QUEUED
+  PROCESSING
+  ISSUED
+  FAILED
+  OUTCOME_UNKNOWN
+}
+
 /**
  * Auth.js + Prisma adapter tables for OAuth + JWT sessions
  */
@@ -241,6 +257,7 @@ model Tenant {
   dataModels          DataModel[]
   renderTemplates     RenderTemplate[]
   conformitySchemes   ConformityScheme[]
+  credentialBatches   CredentialBatch[]
 
   @@map("Tenant")
 }
@@ -363,10 +380,11 @@ model Credential {
   /// The status-entry composite foreign key targets `(id, tenantId)` safely
   /// because this child is database-pinned to the NATIVE origin, so every
   /// matching credential id and tenant identifies this native child.
-  @@unique([id, tenantId])
+  batchItems   CredentialBatchItem[]
   /// Prisma requires the defining side of a one-to-one relation to be unique
   /// over the relation's fields; the primary key already makes it so.
   @@unique([id, tenantId, origin])
+  @@unique([id, tenantId])
   @@index([organisationId])
   @@index([facilityId])
   @@index([productId])
@@ -411,6 +429,82 @@ model CredentialStatusEntry {
 
   @@unique([credentialId, statusPurpose])
   @@index([tenantId, statusPurpose, value])
+}
+
+/**
+ * Durable state for an ordered batch of ordinary credential issuance requests
+ * (ADR-059). Counts are updated with each item transition, rather than derived
+ * by a status read. `bodyDigest` is the raw request-body digest used by the
+ * batch-owned idempotency key. `expiresAt` is populated after settlement only
+ * for COMPLETED batches; an unresolved NEEDS_ATTENTION batch is held until
+ * operator resolution. Expiry removes confidential item requests and leaves
+ * this tombstone.
+ * The API's `error.code` and `error.message` fields are stored in item
+ * `errorClass` and `errorMessage`, respectively.
+ */
+model CredentialBatch {
+  id               String               @id @default(cuid())
+  tenantId         String
+  state            CredentialBatchState @default(QUEUED)
+  itemCount        Int
+  queuedCount      Int                  @default(0)
+  processingCount  Int                  @default(0)
+  issuedCount      Int                  @default(0)
+  failedCount      Int                  @default(0)
+  unknownCount     Int                  @default(0)
+  idempotencyKey   String
+  bodyDigest       String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  settledAt        DateTime?
+  resolvedAt       DateTime?
+  expiresAt        DateTime?
+  attemptToken     String?
+  attemptStartedAt DateTime?
+  version          Int                  @default(0)
+  lastProgressAt   DateTime             @default(now())
+
+  tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  CredentialBatchItem[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, createdAt])
+  @@index([state, lastProgressAt])
+  @@index([expiresAt])
+}
+
+/**
+ * One validated request and its durable outcome. The request is encrypted
+ * under DATA_ENCRYPTION_KEY because it is tenant data stored like a queued job
+ * payload. It is deleted with the batch at retention. The composite credential
+ * relation keeps a deleted credential from making an ISSUED item executable.
+ */
+model CredentialBatchItem {
+  id           String                   @id @default(cuid())
+  batchId      String
+  tenantId     String
+  index        Int
+  state        CredentialBatchItemState @default(QUEUED)
+  /// @encryptedAtRest AES-256-GCM envelope of the validated issuance request.
+  request      String
+  credentialId String?
+  warning      Json?
+  errorClass   String?
+  errorMessage String?
+  resolutionReason String?
+  resolvedAt   DateTime?
+  attemptCount Int                  @default(0)
+  nextAttemptAt DateTime?
+  attemptToken String?
+  updatedAt    DateTime                 @updatedAt
+
+  batch      CredentialBatch @relation(fields: [batchId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  credential Credential?     @relation(fields: [credentialId, tenantId], references: [id, tenantId], onDelete: SetNull)
+
+  @@unique([batchId, index])
+  @@index([batchId, state, index])
+  @@index([batchId, state, nextAttemptAt, attemptCount, index], map: "batch_item_retry_schedule_idx")
 }
 
 /**

@@ -92,6 +92,8 @@ The log level is controlled by the `LOG_LEVEL` environment variable. Only messag
 | ----------- | ------------------------------------------------------------ | ------- |
 | `LOG_LEVEL` | Minimum log level to emit (`debug`, `info`, `warn`, `error`) | `info`  |
 
+Batch item inspection and resolution audit lines are emitted at `warn`. Set `LOG_LEVEL` to `warn`, `info` or `debug` before using `--disclose-request`; disclosure refuses to print plaintext at `error` because that level would filter the audit line.
+
 ## Library storage lines that need an operator
 
 Some library storage outcomes cannot be reported to the caller, because the caller cannot act on them. They are recorded as log lines instead, and these are the ones an operator has to watch for. Each carries `recordId` and `tenantId` alongside the fields named below, except the last: the store path it is written from is shared with registration, which has no record id yet, so that line carries `tenantId` and the storage coordinates only.

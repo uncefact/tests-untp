@@ -1,5 +1,7 @@
 import { requestBodyTooLargeMessage } from '@/lib/api/request-body';
+import { IDEMPOTENCY_KEY_MISMATCH_MESSAGE } from '@/lib/api/idempotency';
 import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config';
+import { BATCH_EXPIRED_MESSAGE } from '@/lib/credentials/credential-batch-error';
 import {
   credentialDeleteStatusOperationMessage,
   STATUS_METADATA_UNAVAILABLE_MESSAGE,
@@ -197,8 +199,6 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'The identifier scheme has identifiers and cannot be deleted',
   'The registrar has schemes with identifiers and cannot be deleted',
   'This Idempotency-Key was already used with a different request body.',
-  // Read from the module that owns them rather than copied, so a reworded
-  // refusal cannot leave this allowlist quoting a sentence no code throws.
   STATUS_METADATA_UNAVAILABLE_MESSAGE,
   STATUS_PURPOSE_UNSUPPORTED_MESSAGE,
   statusOperationInProgressMessage('revocation', true),
@@ -210,6 +210,12 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   statusInvalidObservationMessage(true),
   credentialDeleteStatusOperationMessage('credential-native-1', ['revocation']),
   serviceInstanceStatusPendingMessage('service-instance-1', 1),
+  'Service instance not found: service-instance-1',
+  'Credential batch not found.',
+  IDEMPOTENCY_KEY_MISMATCH_MESSAGE,
+  BATCH_EXPIRED_MESSAGE,
+  // Read from the module that owns them rather than copied, so a reworded
+  // refusal cannot leave this allowlist quoting a sentence no code throws.
   SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,
   VERIFICATION_IN_PROGRESS_MESSAGE,
   VERIFICATION_RACE_LOST_MESSAGE,

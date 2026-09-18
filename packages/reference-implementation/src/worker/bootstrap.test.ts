@@ -5,6 +5,9 @@ jest.mock('@/lib/api/logger');
 // cannot resolve under jest; the boot's own order is what is under test.
 jest.mock('@/lib/library/verify-generation-job', () => ({ registerLibraryJobs: jest.fn() }));
 jest.mock('@/lib/library/reconcile-pending-runs-job', () => ({ registerPendingRunReconciliation: jest.fn() }));
+jest.mock('@/lib/credentials/credential-batch-expiry-job', () => ({ registerCredentialBatchExpiry: jest.fn() }));
+jest.mock('@/lib/credentials/issue-batch-job', () => ({ registerCredentialBatchIssue: jest.fn() }));
+jest.mock('@/lib/credentials/reconcile-batches-job', () => ({ registerCredentialBatchReconciliation: jest.fn() }));
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: { $queryRawUnsafe: jest.fn(async () => []), $disconnect: jest.fn() },
 }));

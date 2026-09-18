@@ -31,6 +31,7 @@ jest.mock('pg-boss', () => {
     send: jest.fn(async () => 'job-id'),
     schedule: jest.fn(async () => undefined),
     unschedule: jest.fn(async () => undefined),
+    findJobs: jest.fn(async () => []),
     work: jest.fn(async () => 'worker-id'),
     createQueue: jest.fn(async () => undefined),
     getQueue: jest.fn(async () => null),
@@ -581,6 +582,32 @@ describe('queue policy', () => {
     const queue = makeQueue();
     bossMock.createQueue.mockImplementationOnce(async () => undefined);
     await expect(queue.enqueue('issue', {})).rejects.toThrow("queue 'issue' was not found after creating it");
+  });
+});
+
+describe('active job probe', () => {
+  it('recognises every active pg-boss state and rejects completed states', async () => {
+    // Regression: reconciliation must treat created, retry and active jobs as
+    // live work, while completed, failed, cancelled and empty results are not
+    // evidence that a delivery still exists.
+    const queue = makeQueue();
+    const cases = [
+      ['created', true],
+      ['retry', true],
+      ['active', true],
+      ['completed', false],
+      ['failed', false],
+      ['cancelled', false],
+      [undefined, false],
+    ] as const;
+
+    for (const [state, expected] of cases) {
+      bossMock.findJobs.mockResolvedValueOnce(state === undefined ? [] : [{ state }]);
+      await expect(queue.hasActiveJob('issue', 'batch-1')).resolves.toBe(expected);
+    }
+
+    expect(bossMock.findJobs).toHaveBeenCalledTimes(cases.length);
+    expect(bossMock.findJobs).toHaveBeenNthCalledWith(1, 'issue', { data: { batchId: 'batch-1' } });
   });
 });
 

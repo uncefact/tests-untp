@@ -16,6 +16,10 @@ const ENV_NAMES = [
   'BUNDLED_ARTEFACTS_FALLBACK',
   'IDEMPOTENCY_STALE_CLAIM_MINUTES',
   'MAX_REQUEST_BODY_BYTES',
+  'MAX_BATCH_REQUEST_BODY_BYTES',
+  'MAX_BATCH_ITEMS',
+  'BATCH_RETENTION_DAYS',
+  'BATCH_EXPIRY_SWEEP_MINUTES',
   'FETCH_ALLOW_PRIVATE_URLS',
   'VERIFY_ALLOW_PRIVATE_URLS',
   'FETCH_MAX_RESPONSE_SIZE',
@@ -26,6 +30,7 @@ const ENV_NAMES = [
   'DATA_ENCRYPTION_KEY',
   'SERVICE_ENCRYPTION_KEY',
   'WORKER_JOB_TIMEOUT_SECONDS',
+  'BATCH_JOB_CONCURRENCY',
   'LIBRARY_RECONCILE_PENDING_RUNS_CRON',
   'LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE',
   'LOG_REDACT_PATHS',
@@ -108,12 +113,18 @@ describe('runBootPreflight', () => {
     setWorkerEnvironment();
     process.env.RI_APP_URL = 'not a url';
     process.env.MAX_REQUEST_BODY_BYTES = '100';
+    process.env.MAX_BATCH_REQUEST_BODY_BYTES = '0';
     process.env.IDEMPOTENCY_STALE_CLAIM_MINUTES = '0';
 
     await expect(runBootPreflight('worker', createLogger())).resolves.toEqual({
       key: KEY,
       deprecatedName: 'absent',
-      workerConfiguration: { reconciliationCron: '*/10 * * * *', jobTimeoutSeconds: 300 },
+      workerConfiguration: {
+        reconciliationCron: '*/10 * * * *',
+        batchExpirySweepCron: '0 * * * *',
+        jobTimeoutSeconds: 300,
+        batchJobConcurrency: 1,
+      },
     });
   });
 
@@ -323,6 +334,25 @@ describe('runBootPreflight', () => {
         process.env.MAX_REQUEST_BODY_BYTES = '100';
       },
       message: 'MAX_REQUEST_BODY_BYTES must be an integer of at least 1024 when set',
+    },
+    {
+      name: 'validateCredentialBatchRequestBodySettingsOnWebBoot',
+      role: 'web' as const,
+      setup: () => {
+        process.env.RI_APP_URL = 'https://ri.example.com';
+        process.env.MAX_REQUEST_BODY_BYTES = '2048';
+        process.env.MAX_BATCH_REQUEST_BODY_BYTES = '1024';
+      },
+      message: 'MAX_BATCH_REQUEST_BODY_BYTES must be at least MAX_REQUEST_BODY_BYTES (2048)',
+    },
+    {
+      name: 'validateCredentialBatchSettingsOnBoot',
+      role: 'worker' as const,
+      setup: () => {
+        setWorkerEnvironment();
+        process.env.BATCH_EXPIRY_SWEEP_MINUTES = '0';
+      },
+      message: 'BATCH_EXPIRY_SWEEP_MINUTES must be a positive integer when set',
     },
     {
       name: 'validateHttpUserAgentOnBoot for worker',

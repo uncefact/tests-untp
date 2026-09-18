@@ -1,0 +1,145 @@
+import { CredentialBatchItemState, CredentialBatchState } from '@/lib/prisma/generated';
+import { projectCredentialBatch } from './credential-batch-projection';
+
+describe('projectCredentialBatch', () => {
+  it('projects counts and stable refusal codes in item order without the encrypted request', () => {
+    const result = projectCredentialBatch({
+      id: 'batch-1',
+      tenantId: 'tenant-1',
+      state: CredentialBatchState.COMPLETED,
+      itemCount: 2,
+      queuedCount: 0,
+      processingCount: 0,
+      issuedCount: 1,
+      failedCount: 1,
+      unknownCount: 0,
+      idempotencyKey: 'key-1',
+      bodyDigest: 'digest-1',
+      createdAt: new Date('2026-09-17T01:02:03.000Z'),
+      updatedAt: new Date('2026-09-17T01:03:03.000Z'),
+      settledAt: new Date('2026-09-17T01:03:03.000Z'),
+      resolvedAt: null,
+      expiresAt: new Date('2026-10-17T01:03:03.000Z'),
+      attemptToken: null,
+      attemptStartedAt: null,
+      version: 2,
+      lastProgressAt: new Date('2026-09-17T01:03:03.000Z'),
+      items: [
+        {
+          id: 'item-1',
+          batchId: 'batch-1',
+          tenantId: 'tenant-1',
+          index: 1,
+          state: CredentialBatchItemState.FAILED,
+          request: 'encrypted request',
+          credentialId: 'cred-1',
+          warning: null,
+          errorClass: 'SERVICE_INSTANCE_NOT_FOUND',
+          errorMessage: 'Service instance not found: storage-missing',
+          resolvedAt: null,
+          resolutionReason: null,
+          attemptCount: 0,
+          nextAttemptAt: null,
+          attemptToken: null,
+          updatedAt: new Date('2026-09-17T01:03:00.000Z'),
+        },
+        {
+          id: 'item-0',
+          batchId: 'batch-1',
+          tenantId: 'tenant-1',
+          index: 0,
+          state: CredentialBatchItemState.ISSUED,
+          request: 'encrypted request',
+          credentialId: 'cred-0',
+          warning: { code: 'DETAILS_EXTRACTION_FAILED', message: 'warning' },
+          errorClass: null,
+          errorMessage: null,
+          resolvedAt: null,
+          resolutionReason: null,
+          attemptCount: 0,
+          nextAttemptAt: null,
+          attemptToken: null,
+          updatedAt: new Date('2026-09-17T01:03:00.000Z'),
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      id: 'batch-1',
+      state: 'COMPLETED',
+      counts: { total: 2, queued: 0, processing: 0, issued: 1, failed: 1, unknown: 0 },
+      createdAt: '2026-09-17T01:02:03.000Z',
+      settledAt: '2026-09-17T01:03:03.000Z',
+      items: [
+        {
+          index: 1,
+          state: 'FAILED',
+          error: { code: 'SERVICE_INSTANCE_NOT_FOUND', message: 'Service instance not found: storage-missing' },
+        },
+        {
+          index: 0,
+          state: 'ISSUED',
+          credentialId: 'cred-0',
+          warning: { code: 'DETAILS_EXTRACTION_FAILED', message: 'warning' },
+        },
+      ],
+    });
+  });
+
+  it('replaces operator failure evidence with the fixed tenant-facing message', () => {
+    // Regression: operator evidence is an audit detail and must not be returned to the tenant.
+    const result = projectCredentialBatch({
+      id: 'batch-operator-failure',
+      tenantId: 'tenant-1',
+      state: CredentialBatchState.COMPLETED,
+      itemCount: 1,
+      queuedCount: 0,
+      processingCount: 0,
+      issuedCount: 0,
+      failedCount: 1,
+      unknownCount: 0,
+      idempotencyKey: 'key-operator-failure',
+      bodyDigest: 'digest-operator-failure',
+      createdAt: new Date('2026-09-17T01:02:03.000Z'),
+      updatedAt: new Date('2026-09-17T01:03:03.000Z'),
+      settledAt: new Date('2026-09-17T01:03:03.000Z'),
+      resolvedAt: new Date('2026-09-17T01:03:04.000Z'),
+      expiresAt: new Date('2026-10-17T01:03:04.000Z'),
+      attemptToken: null,
+      attemptStartedAt: null,
+      version: 2,
+      lastProgressAt: new Date('2026-09-17T01:03:04.000Z'),
+      items: [
+        {
+          id: 'item-operator-failure',
+          batchId: 'batch-operator-failure',
+          tenantId: 'tenant-1',
+          index: 0,
+          state: CredentialBatchItemState.FAILED,
+          request: 'encrypted request',
+          credentialId: null,
+          warning: null,
+          errorClass: 'OPERATOR_CONFIRMED_FAILED',
+          errorMessage: 'internal ticket reference and investigation notes',
+          resolvedAt: null,
+          resolutionReason: null,
+          attemptCount: 0,
+          nextAttemptAt: null,
+          attemptToken: null,
+          updatedAt: new Date('2026-09-17T01:03:04.000Z'),
+        },
+      ],
+    });
+
+    expect(result.items).toEqual([
+      {
+        index: 0,
+        state: 'FAILED',
+        error: {
+          code: 'OPERATOR_CONFIRMED_FAILED',
+          message: 'An operator confirmed this item was not issued.',
+        },
+      },
+    ]);
+  });
+});

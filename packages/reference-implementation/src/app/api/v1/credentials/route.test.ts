@@ -1928,12 +1928,14 @@ describe('POST /api/v1/credentials', () => {
   describe('error propagation', () => {
     it('returns 404 when an explicitly requested service instance no longer exists', async () => {
       const { ServiceInstanceNotFoundError } = jest.requireActual('@/lib/api/errors');
-      mockResolveStorageService.mockRejectedValue(new ServiceInstanceNotFoundError('STORAGE', 'missing-instance'));
+      mockResolveStorageService.mockRejectedValue(new ServiceInstanceNotFoundError('missing-instance'));
 
       const req = createFakeRequest(validBody({ storageOptions: { serviceInstanceId: 'missing-instance' } }));
       const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
 
       expect(res.status).toBe(404);
+      expect(json).toEqual(expect.objectContaining({ code: 'SERVICE_INSTANCE_NOT_FOUND' }));
     });
 
     it('returns 500 when issueCredential throws', async () => {
@@ -2911,6 +2913,24 @@ describe('POST /api/v1/credentials', () => {
       expect(mockReleaseIdempotencyKey).not.toHaveBeenCalled();
       expect(mockIssueCredential).toHaveBeenCalledTimes(1);
       expect(json.warnings).toEqual([expect.objectContaining({ code: 'ENTITY_LINK_FAILED' }), RESPONSE_NOT_RECORDED]);
+    });
+
+    it('returns the completion warning when issuance started without prior warnings', async () => {
+      // Regression: completion mutates a detached fallback array when result.body.warnings was absent.
+      mockIssueCredential.mockResolvedValue({
+        credentialId: 'cred-1',
+        storageResponse: STORAGE_RESPONSE,
+        primaryEntity: {},
+        entityLinkFailed: false,
+      });
+      mockCompleteIdempotencyKey.mockRejectedValueOnce(new Error('transient database error'));
+
+      const req = createFakeRequest(validBody(), KEY_HEADER);
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(json.warnings).toEqual([RESPONSE_NOT_RECORDED]);
     });
 
     it('passes publish-step warnings to complete unchanged', async () => {

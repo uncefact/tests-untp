@@ -177,12 +177,13 @@ describe('startJobQueue', () => {
     await startJobQueue();
 
     expect(constructed[0].declareQueue).toHaveBeenCalledWith('library.verify-generation');
-    expect(constructed[0].declareQueue).toHaveBeenCalledTimes(1);
+    expect(constructed[0].declareQueue).toHaveBeenCalledWith('credentials.issue-batch');
+    expect(constructed[0].declareQueue).toHaveBeenCalledTimes(2);
     expect(constructed[0].declareQueue.mock.invocationCallOrder[0]).toBeGreaterThan(
       constructed[0].start.mock.invocationCallOrder[0],
     );
     expect(logInfo).toHaveBeenCalledWith(
-      { queues: ['library.verify-generation'] },
+      { queues: ['library.verify-generation', 'credentials.issue-batch'] },
       'Job queue started; sending queues declared',
     );
   });
@@ -203,7 +204,7 @@ describe('startJobQueue', () => {
 
     expect(constructed).toHaveLength(1);
     expect(constructed[0].start).toHaveBeenCalledTimes(2);
-    expect(constructed[0].declareQueue).toHaveBeenCalledTimes(2);
+    expect(constructed[0].declareQueue).toHaveBeenCalledTimes(3);
   });
 
   it('logs the reported error name and message, and never its cause chain', async () => {

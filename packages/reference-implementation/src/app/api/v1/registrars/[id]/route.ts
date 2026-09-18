@@ -128,6 +128,12 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               serviceInstanceNotFound:
+ *                 summary: The requested service instance was not found
+ *                 value:
+ *                   error: 'Service instance not found: service-instance-1'
+ *                   code: SERVICE_INSTANCE_NOT_FOUND
  *       500:
  *         description: Server error
  *         content:

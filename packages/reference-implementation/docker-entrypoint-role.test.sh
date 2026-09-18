@@ -29,6 +29,10 @@ is_maintenance_command pnpm run services:repair-config
 is_maintenance_command node_modules/.bin/tsx scripts/services-repair-config.ts
 is_maintenance_command npx tsx scripts/services-repair-config.ts
 is_maintenance_command pnpm rotate:encryption-key
+is_maintenance_command pnpm batch:resolve-item
+is_maintenance_command pnpm batch:inspect-item
+is_maintenance_command node_modules/.bin/tsx scripts/resolve-credential-batch-item.ts
+is_maintenance_command node_modules/.bin/tsx scripts/inspect-credential-batch-item.ts
 if is_maintenance_command node scripts/rotate-encryption-key.ts; then
     exit 1
 fi

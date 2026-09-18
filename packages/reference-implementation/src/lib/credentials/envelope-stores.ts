@@ -23,6 +23,7 @@ export const ENVELOPE_STORE_IDS = [
   'credentials',
   'externalCredentials',
   'idempotencyResponses',
+  'credentialBatchItems',
 ] as const;
 
 export type EnvelopeStoreId = (typeof ENVELOPE_STORE_IDS)[number];
@@ -109,6 +110,14 @@ export const ENVELOPE_STORE_INFO: Record<EnvelopeStoreId, EnvelopeStoreInfo> = {
     discardable: true,
     remedy:
       'clear the replay body of the affected claims and keep the claims themselves (a retry is then answered with the recorded credential alone)',
+  },
+  credentialBatchItems: {
+    heading: 'Credential batch item requests:',
+    rowName: 'credential batch item',
+    valueName: 'issuance request',
+    logIdField: 'batchItemId',
+    plaintextAllowed: false,
+    discardable: false,
   },
 };
 

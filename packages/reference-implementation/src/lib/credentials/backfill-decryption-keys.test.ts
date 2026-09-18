@@ -20,6 +20,7 @@ type Row = { id: string; decryptionKey: string | null };
 type ServiceInstanceRow = { id: string; config: string };
 
 type ReplayRow = { id: string; responseBody: string | null };
+type BatchItemRow = { id: string; request: string };
 
 /**
  * An in-memory table for one encrypted column. `findMany` applies the
@@ -81,6 +82,7 @@ function createFakeClient(rows: Row[], serviceInstances: ServiceInstanceRow[] = 
     },
     externalCredential: fakeTable([] as Row[], 'decryptionKey'),
     idempotencyKey: fakeTable(replayRows, 'responseBody'),
+    credentialBatchItem: fakeTable([] as BatchItemRow[], 'request'),
   };
 }
 

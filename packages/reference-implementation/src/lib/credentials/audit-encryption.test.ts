@@ -66,6 +66,7 @@ describe('auditEncryption', () => {
         credentials: { ...clean, okCount: 1 },
         externalCredentials: { ...clean, okCount: 0 },
         idempotencyResponses: { ...clean, okCount: 0 },
+        credentialBatchItems: { ...clean, okCount: 0 },
       },
     });
     expect(auditFoundProblems(result)).toBe(false);
@@ -221,6 +222,7 @@ describe('auditEncryption', () => {
           credentials: store(),
           externalCredentials: store(),
           idempotencyResponses: store(),
+          credentialBatchItems: store(),
         },
       };
     }

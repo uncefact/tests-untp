@@ -9,7 +9,9 @@ export class WorkerBootError extends Error {
       | 'worker.schema-not-ready'
       | 'worker.migrations-unreadable'
       | 'worker.configuration-invalid'
-      | 'worker.reconciliation-schedule-failed',
+      | 'worker.reconciliation-schedule-failed'
+      | 'worker.batch-expiry-schedule-failed'
+      | 'worker.batch-reconciliation-schedule-failed',
     message: string,
     cause?: unknown,
   ) {

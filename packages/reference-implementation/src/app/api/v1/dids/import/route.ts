@@ -75,6 +75,12 @@ const logger = apiLogger.child({ route: '/api/v1/dids/import' });
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               serviceInstanceNotFound:
+ *                 summary: The requested service instance was not found
+ *                 value:
+ *                   error: 'Service instance not found: service-instance-1'
+ *                   code: SERVICE_INSTANCE_NOT_FOUND
  *       409:
  *         description: A DID record with this DID already exists
  *         content:

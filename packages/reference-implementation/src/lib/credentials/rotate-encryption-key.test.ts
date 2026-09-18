@@ -30,6 +30,7 @@ async function services() {
 }
 
 import { fakeStores as sharedFakeStores } from './envelope-stores.fake';
+import type { IEncryptionService } from '@uncefact/untp-ri-services/encryption';
 
 /** This suite's row order: credentials first, then service instances, then replay bodies. */
 function fakeStores(
@@ -598,7 +599,7 @@ describe('validateRotationKeys', () => {
   it('returns working adapters: the active service round-trips what the outgoing service wrote', async () => {
     const result = await validate({ DATA_ENCRYPTION_KEY: ACTIVE_KEY, OUTGOING_DATA_ENCRYPTION_KEY: OUTGOING_KEY });
     expect(result.ok).toBe(true);
-    const { services } = result as { services: { activeService: { encrypt: Function; decrypt: Function } } };
+    const { services } = result as { services: { activeService: IEncryptionService } };
     const { EncryptionAlgorithm } = await import('@uncefact/untp-ri-services/encryption');
     const envelope = services.activeService.encrypt('round-trip', EncryptionAlgorithm.AES_256_GCM);
     expect(services.activeService.decrypt(envelope)).toBe('round-trip');
@@ -629,6 +630,7 @@ describe('buildRotationReport', () => {
         credentials: store(),
         externalCredentials: store(),
         idempotencyResponses: store(),
+        credentialBatchItems: store(),
       },
     };
   }
