@@ -12,6 +12,7 @@ import {
 import {
   CredentialBatchAttemptFenceLostError,
   claimBatchAttempt,
+  checkpointBatchContinuation,
   cancelCredentialBatch,
   markItemQueued,
   claimNextBatchItem,
@@ -1742,6 +1743,120 @@ describe('credential batch persistence and progression', () => {
         expect.objectContaining({ state: 'CANCELLED' }),
       ],
     });
+  });
+
+  it.each([
+    ['budget', 'cancel'],
+    ['budget', 'checkpoint'],
+    ['deferred', 'cancel'],
+    ['deferred', 'checkpoint'],
+  ] as const)('serialises the %s checkpoint with %s first', async (path, first) => {
+    const input = await runningBatch(`checkpoint-${path}-${first}`, path === 'budget' ? 5 : 1);
+    await clearBatchJobs();
+    const startAfter = new Date(Date.now() + 30_000);
+    if (path === 'budget') await nativeCredential('checkpoint-issued');
+    const cancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
+    await prisma.$transaction(async (tx) => {
+      if (path === 'budget') {
+        expect(await markItemIssued(tx, { ...input, index: 0, credentialId: 'checkpoint-issued' })).toEqual({
+          outcome: 'applied',
+        });
+      } else {
+        expect(await markItemQueued(tx, { ...input, index: 0, errorMessage: 'pre-dispatch fault' })).toEqual({
+          outcome: 'applied',
+        });
+      }
+    });
+    const checkpoint = (tx: Parameters<typeof checkpointBatchContinuation>[0]) =>
+      checkpointBatchContinuation(tx, { ...input, queue, ...(path === 'deferred' ? { startAfter } : {}) });
+    const results = first === 'cancel' ? await contend(cancel, checkpoint) : await contend(checkpoint, cancel);
+    expect(results[first === 'cancel' ? 1 : 0]).toEqual({ applied: first === 'checkpoint' });
+    expect(results[first === 'cancel' ? 0 : 1]).toMatchObject({ outcome: 'applied' });
+    const batch = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(batch).toMatchObject({
+      state: 'CANCELLED',
+      queuedCount: 0,
+      processingCount: 0,
+      issuedCount: path === 'budget' ? 1 : 0,
+      cancelledCount: path === 'budget' ? 4 : 1,
+      attemptToken: null,
+    });
+    const jobs = await prisma.$queryRaw<Array<{ start_after: Date }>>`
+      SELECT start_after FROM pgboss.job WHERE name = ${CREDENTIAL_BATCH_ISSUE_JOB} AND data->>'batchId' = ${input.batchId}
+    `;
+    expect(jobs).toHaveLength(first === 'checkpoint' ? 1 : 0);
+    if (first === 'checkpoint' && path === 'deferred') expect(jobs[0].start_after).toEqual(startAfter);
+    expect(await prisma.$transaction((tx) => claimNextBatchItem(tx, input))).toEqual({ outcome: 'cancelled' });
+  });
+
+  it.each(['budget', 'deferred'] as const)(
+    'settles cancellation at the %s checkpoint after the held attempt finishes',
+    async (path) => {
+      const input = await runningBatch(`cancel-held-checkpoint-${path}`, 2);
+      await clearBatchJobs();
+      await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+      await prisma.$transaction((tx) => markItemQueued(tx, { ...input, index: 0, errorMessage: 'pre-dispatch fault' }));
+      const before = await getCredentialBatchById(input.batchId, input.tenantId);
+      expect(before).toMatchObject({
+        state: 'RUNNING',
+        cancelledCount: 2,
+        processingCount: 0,
+        attemptToken: input.token,
+      });
+      expect(
+        await prisma.$transaction((tx) => checkpointBatchContinuation(tx, { ...input, token: 'stale', queue })),
+      ).toEqual({ applied: false });
+      expect(await getCredentialBatchById(input.batchId, input.tenantId)).toEqual(before);
+      expect(
+        await prisma.$transaction((tx) =>
+          checkpointBatchContinuation(tx, {
+            ...input,
+            queue,
+            ...(path === 'deferred' ? { startAfter: new Date(Date.now() + 30_000) } : {}),
+          }),
+        ),
+      ).toEqual({ applied: true });
+      expect(await getCredentialBatchById(input.batchId, input.tenantId)).toMatchObject({
+        state: 'CANCELLED',
+        cancelledCount: 2,
+        attemptToken: null,
+      });
+      const jobs = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM pgboss.job WHERE name = ${CREDENTIAL_BATCH_ISSUE_JOB} AND data->>'batchId' = ${input.batchId}
+    `;
+      expect(jobs).toEqual([]);
+    },
+  );
+
+  it('expires cancelled items while retaining tombstone counts and held unknown evidence', async () => {
+    const cancelled = await runningBatch('expiry-cancelled', 2, false);
+    await prisma.$transaction((tx) => cancelCredentialBatch(tx, cancelled));
+    const held = await runningBatch('expiry-cancelled-held', 2);
+    await prisma.$transaction(async (tx) => {
+      await cancelCredentialBatch(tx, held);
+      await markItemOutcomeUnknown(tx, {
+        ...held,
+        index: 0,
+        errorClass: 'OUTCOME_UNKNOWN',
+        errorMessage: 'lost response',
+      });
+      await settleBatchIfFinished(tx, held);
+    });
+    const before = await getCredentialBatchById(cancelled.batchId, cancelled.tenantId);
+    expect(before?.expiresAt).toBeInstanceOf(Date);
+    const deadline = new Date(before!.expiresAt!.getTime() + 1);
+    // A stale deadline must not make held investigation evidence eligible for expiry.
+    await prisma.credentialBatch.update({ where: { id: held.batchId }, data: { expiresAt: new Date(0) } });
+    const heldBefore = await getCredentialBatchById(held.batchId, held.tenantId);
+    expect(await expireDueCredentialBatches(deadline)).toBe(1);
+    expect(await getCredentialBatchById(cancelled.batchId, cancelled.tenantId)).toEqual({
+      ...before,
+      state: 'EXPIRED',
+      items: [],
+      updatedAt: expect.any(Date),
+    });
+    expect(await getCredentialBatchById(held.batchId, held.tenantId)).toEqual(heldBefore);
+    expect(await expireDueCredentialBatches(deadline)).toBe(0);
   });
 
   function barrier() {

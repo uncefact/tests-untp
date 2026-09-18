@@ -416,6 +416,12 @@ export function credentialBatchIssueHandler(
                     errorMessage: interruptedBatchItemMessage({ itemCorrelationId }),
                     ...(issuedCredentialId === undefined ? {} : { credentialId: issuedCredentialId }),
                   });
+                  const settlement = await deps.settle(tx, {
+                    batchId: payload.batchId,
+                    tenantId: payload.tenantId,
+                    token,
+                  });
+                  if (settlement.outcome === 'applied') return { item, released: null };
                   const released = await deps.releaseAttempt(tx, {
                     batchId: payload.batchId,
                     tenantId: payload.tenantId,
@@ -433,7 +439,7 @@ export function credentialBatchIssueHandler(
                     'Credential batch fault item transition was superseded',
                   );
                 }
-                if (!resolution.released.applied) {
+                if (resolution.released !== null && !resolution.released.applied) {
                   logger.warn(
                     { ...itemLogFields(batch, index, itemCorrelationId), token },
                     'Credential batch fault could not release its ownership fence',

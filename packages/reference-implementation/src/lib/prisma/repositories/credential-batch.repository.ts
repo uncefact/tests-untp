@@ -627,7 +627,7 @@ export async function expireDueCredentialBatches(now: Date = new Date(Date.now()
         const dueBatches = await tx.credentialBatch.findMany({
           where: {
             expiresAt: { lte: now },
-            state: CredentialBatchState.COMPLETED,
+            state: { in: [CredentialBatchState.COMPLETED, CredentialBatchState.CANCELLED] },
           },
           orderBy: { expiresAt: 'asc' },
           take: EXPIRY_SWEEP_LIMIT,
@@ -639,7 +639,7 @@ export async function expireDueCredentialBatches(now: Date = new Date(Date.now()
             where: {
               id: batch.id,
               expiresAt: { lte: now },
-              state: CredentialBatchState.COMPLETED,
+              state: { in: [CredentialBatchState.COMPLETED, CredentialBatchState.CANCELLED] },
             },
             data: { state: CredentialBatchState.EXPIRED },
           });
@@ -1168,7 +1168,11 @@ async function markInterruptedItems(
   return count;
 }
 
-/** Claims a stalled batch for reconciliation, then leaves the fresh job free to claim it. */
+/**
+ * Recovers a stalled attempt in the caller's transaction (#1080).
+ * Settles cancellation under ownership; otherwise releases it for a fresh job.
+ * A lost fence throws so item recovery rolls back with the batch write.
+ */
 export async function claimBatchAttemptAndRelease(
   tx: PrismaTypes.TransactionClient,
   input: {
@@ -1178,9 +1182,18 @@ export async function claimBatchAttemptAndRelease(
     expectedVersion: number;
     staleBefore?: Date;
   },
-): Promise<{ applied: boolean }> {
+): Promise<{ applied: false } | { applied: true; settled: boolean }> {
   const claimed = await claimBatchAttempt(tx, input);
-  if (!claimed.applied) return claimed;
+  if (!claimed.applied) return { applied: false };
+  // claimBatchAttempt holds the batch lock until this transaction commits.
+  const batch = await tx.credentialBatch.findFirstOrThrow({
+    where: { id: input.batchId, tenantId: input.tenantId },
+  });
+  if (batch.cancelRequestedAt !== null) {
+    const settlement = await settleLockedBatch(tx, batch, input.token);
+    if (settlement.outcome !== 'applied') throw new CredentialBatchAttemptFenceLostError();
+    return { applied: true, settled: true };
+  }
   const released = await tx.credentialBatch.updateMany({
     where: {
       id: input.batchId,
@@ -1191,10 +1204,14 @@ export async function claimBatchAttemptAndRelease(
     data: { attemptToken: null, attemptStartedAt: null, version: { increment: 1 } },
   });
   if (released.count !== 1) throw new CredentialBatchAttemptFenceLostError();
-  return { applied: true };
+  return { applied: true, settled: false };
 }
 
-/** Checkpoints a normal continuation and atomically places its next job. */
+/**
+ * In the caller's transaction, settles cancellation or checkpoints and enqueues (#1080).
+ * Missing or superseded ownership makes no change. Cancellation with processing
+ * still present retains ownership and enqueues nothing.
+ */
 export async function checkpointBatchContinuation(
   tx: PrismaTypes.TransactionClient,
   input: {
@@ -1206,6 +1223,14 @@ export async function checkpointBatchContinuation(
     startAfter?: Date;
   },
 ): Promise<{ applied: boolean }> {
+  const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
+  if (batch === null || batch.state !== CredentialBatchState.RUNNING || batch.attemptToken !== input.token) {
+    return { applied: false };
+  }
+  if (batch.cancelRequestedAt !== null) {
+    const settlement = await settleLockedBatch(tx, batch, input.token);
+    return { applied: settlement.outcome === 'applied' };
+  }
   const now = new Date(Date.now());
   const updated = await tx.credentialBatch.updateMany({
     where: {
