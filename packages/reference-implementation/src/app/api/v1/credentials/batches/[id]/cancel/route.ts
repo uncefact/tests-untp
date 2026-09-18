@@ -5,7 +5,11 @@ import { readRequestBytes } from '@/lib/api/request-body';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { prisma } from '@/lib/prisma/prisma';
 import { cancelCredentialBatch } from '@/lib/prisma/repositories/credential-batch.repository';
-import { buildCredentialBatchExpiredBody } from '@/lib/credentials/credential-batch-error';
+import {
+  buildCredentialBatchExpiredBody,
+  CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
+  CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
+} from '@/lib/credentials/credential-batch-error';
 import { projectCredentialBatch } from '@/lib/credentials/credential-batch-projection';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
@@ -94,6 +98,10 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
  *                 value: { error: 'This credential batch cannot be cancelled because it has already settled.', code: BATCH_NOT_CANCELLABLE }
  *       410:
  *         description: The retained item data has expired. The response includes the tombstone projection.
+ *         headers:
+ *           Cache-Control:
+ *             description: This expired response is never cached.
+ *             schema: { type: string, enum: [no-store] }
  *         content:
  *           application/json:
  *             schema:
@@ -127,10 +135,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const result = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId }));
   if (result.outcome === 'missing') throw new NotFoundError('Credential batch not found.');
   if (result.outcome === 'not-cancellable') {
-    throw new ConflictError(
-      'This credential batch cannot be cancelled because it has already settled.',
-      'BATCH_NOT_CANCELLABLE',
-    );
+    throw new ConflictError(CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE, 'BATCH_NOT_CANCELLABLE');
   }
 
   const projection = projectCredentialBatch(result.batch);
@@ -143,8 +148,7 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   return NextResponse.json(
     {
       ...projection,
-      message:
-        'Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.',
+      message: CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
     },
     { status: 202, headers: NO_STORE_HEADERS },
   );

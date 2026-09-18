@@ -88,6 +88,7 @@ function batchLogFields(batch: CredentialBatchWithItems) {
     correlationId: batch.correlationId,
     batchCorrelationId: batch.correlationId,
     batchId: batch.id,
+    tenantId: batch.tenantId,
   };
 }
 
@@ -96,12 +97,13 @@ function itemLogFields(batch: CredentialBatchWithItems, index: number, itemCorre
     correlationId: itemCorrelationId,
     batchCorrelationId: batch.correlationId,
     batchId: batch.id,
+    tenantId: batch.tenantId,
     index,
   };
 }
 
 function missingBatchLogFields(payload: CredentialBatchIssuePayload) {
-  return { correlationId: getRequestContext()?.correlationId ?? null, batchId: payload.batchId };
+  return { correlationId: getRequestContext()?.correlationId ?? null, batchId: payload.batchId, tenantId: payload.tenantId };
 }
 
 /**
@@ -305,16 +307,36 @@ export function credentialBatchIssueHandler(
           const settlement = await deps.transaction((tx) =>
             deps.settle(tx, { batchId: payload.batchId, tenantId: payload.tenantId, token }),
           );
-          logger.info(
-            { ...batchLogFields(batch), settlement: settlement.outcome },
-            'Credential batch cancellation checked',
-          );
-          return;
+          if (settlement.outcome === 'applied') {
+            logger.info(
+              { ...batchLogFields(batch), settlement: settlement.outcome },
+              'Credential batch cancellation checked',
+            );
+          } else {
+            logger.warn(
+              { ...batchLogFields(batch), settlement: settlement.outcome },
+              'Credential batch cancellation could not settle',
+            );
+            const released = await deps.transaction((tx) =>
+              deps.releaseAttempt(tx, {
+                batchId: payload.batchId,
+                tenantId: payload.tenantId,
+                token,
+              }),
+            );
+            if (!released.applied) {
+              logger.warn(
+                { ...batchLogFields(batch), settlement: settlement.outcome },
+                'Credential batch cancellation could not release its ownership fence',
+              );
+            }
+          }
+        } else if (claimed.outcome !== 'claimed') {
+          const level = claimed.outcome === 'missing' ? 'warn' : 'info';
+          logger[level]({ ...batchLogFields(batch), outcome: claimed.outcome }, 'Credential batch claim stopped');
         }
-        if (claimed.outcome !== 'claimed') {
-          logger.info({ ...batchLogFields(batch), outcome: claimed.outcome }, 'Credential batch claim stopped');
-          return;
-        }
+        return;
+      }
 
         const { index, request } = claimed.item;
         itemsAttempted += 1;

@@ -13,6 +13,10 @@ import { ValidationError } from '@/lib/api/validation';
 export type CredentialBatchErrorOutcome = { code?: string; message: string };
 
 export const BATCH_EXPIRED_MESSAGE = 'This credential batch has expired. Its credentials were not deleted.';
+export const CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE =
+  'Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.';
+export const CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE =
+  'This credential batch cannot be cancelled because it has already settled.';
 
 function isTenantSafeRouteError(error: unknown): boolean {
   return (

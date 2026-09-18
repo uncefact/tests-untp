@@ -104,14 +104,21 @@ describe('credential batch reconciliation', () => {
   });
 });
 
-it('reports settled cancellations separately from requeued, superseded and failed recovery', async () => {
+it('reports unsettled cancellations separately from requeued, superseded and failed recovery', async () => {
+  // Regression: a non-applied settlement must be warned and counted separately from superseded recovery.
   const recover = jest
     .fn()
     .mockResolvedValueOnce('settled')
     .mockResolvedValueOnce('superseded')
+    .mockResolvedValueOnce({ outcome: 'unsettled', settlement: 'not-ready' } as const)
     .mockRejectedValueOnce(new Error('database unavailable'));
   const deps: CredentialBatchReconciliationDependencies = {
-    findStalled: jest.fn(async () => [batch, { ...batch, id: 'batch-2' }, { ...batch, id: 'batch-3' }]),
+    findStalled: jest.fn(async () => [
+      batch,
+      { ...batch, id: 'batch-2' },
+      { ...batch, id: 'batch-3' },
+      { ...batch, id: 'batch-4' },
+    ]),
     hasActiveJob: jest.fn(async () => false),
     recover,
     now: () => new Date(60_000),
@@ -124,11 +131,15 @@ it('reports settled cancellations separately from requeued, superseded and faile
     signal: new AbortController().signal,
   });
   expect(appLogger.info).toHaveBeenCalledWith(
-    { selected: 3, requeued: 0, settled: 1, superseded: 1, active: 0, failed: 1 },
+    { selected: 4, requeued: 0, settled: 1, superseded: 1, unsettled: 1, active: 0, failed: 1 },
     'Credential batch reconciliation finished',
   );
+  expect(appLogger.warn).toHaveBeenCalledWith(
+    { batchId: 'batch-3', tenantId: 'tenant-1', settlement: 'not-ready' },
+    'Credential batch settlement did not apply during recovery',
+  );
   expect(appLogger.error).toHaveBeenCalledWith(
-    expect.objectContaining({ batchId: 'batch-3', err: expect.any(Error) }),
+    expect.objectContaining({ batchId: 'batch-4', tenantId: 'tenant-1', err: expect.any(Error) }),
     'Credential batch recovery failed',
   );
 });

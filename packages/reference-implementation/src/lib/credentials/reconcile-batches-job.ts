@@ -12,19 +12,22 @@ import {
   claimBatchAttemptAndRelease,
   findStalledCredentialBatches,
   type StalledCredentialBatch,
+  type BatchSettlementOutcome,
 } from '@/lib/prisma/repositories/credential-batch.repository';
 import { prisma } from '@/lib/prisma/prisma';
 
 const logger = appLogger.child({ module: 'reconcile-credential-batches-job' });
 
+type CredentialBatchRecoveryOutcome =
+  | 'requeued'
+  | 'settled'
+  | 'superseded'
+  | { outcome: 'unsettled'; settlement: BatchSettlementOutcome['outcome'] };
+
 export type CredentialBatchReconciliationDependencies = {
   findStalled: (staleBefore: Date) => Promise<StalledCredentialBatch[]>;
   hasActiveJob: (batchId: string) => Promise<boolean>;
-  recover: (
-    batch: StalledCredentialBatch,
-    token: string,
-    staleBefore: Date,
-  ) => Promise<'requeued' | 'settled' | 'superseded'>;
+  recover: (batch: StalledCredentialBatch, token: string, staleBefore: Date) => Promise<CredentialBatchRecoveryOutcome>;
   now: () => Date;
 };
 
@@ -53,6 +56,9 @@ export function defaultCredentialBatchReconciliationDependencies(
           });
           if (!claimed.applied) return 'superseded';
           if (claimed.settled) return 'settled';
+          if (claimed.settlement !== undefined) {
+            return { outcome: 'unsettled', settlement: claimed.settlement };
+          }
           await queue.enqueueWithin(
             prismaSqlExecutor(tx),
             CREDENTIAL_BATCH_ISSUE_JOB,
@@ -80,6 +86,7 @@ export function credentialBatchReconciliationHandler(
     let requeued = 0;
     let settled = 0;
     let superseded = 0;
+    let unsettled = 0;
     let active = 0;
     let failed = 0;
     for (const batch of batches) {
@@ -101,7 +108,20 @@ export function credentialBatchReconciliationHandler(
           const outcome = await deps.recover(batch, randomUUID(), staleBefore);
           if (outcome === 'requeued') requeued += 1;
           else if (outcome === 'settled') settled += 1;
-          else superseded += 1;
+          else if (outcome === 'superseded') superseded += 1;
+          else {
+            unsettled += 1;
+            logger.warn(
+              {
+                correlationId: batch.correlationId,
+                batchCorrelationId: batch.correlationId,
+                batchId: batch.id,
+                tenantId: batch.tenantId,
+                settlement: outcome.settlement,
+              },
+              'Credential batch settlement did not apply during recovery',
+            );
+          }
         } catch (error) {
           failed += 1;
           logger.error(
@@ -118,7 +138,7 @@ export function credentialBatchReconciliationHandler(
       });
     }
     logger.info(
-      { selected: batches.length, requeued, settled, superseded, active, failed },
+      { selected: batches.length, requeued, settled, superseded, unsettled, active, failed },
       'Credential batch reconciliation finished',
     );
   };

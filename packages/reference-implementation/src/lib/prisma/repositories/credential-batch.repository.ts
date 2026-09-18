@@ -18,6 +18,7 @@ import {
 } from '@/lib/credentials/credential-batch-projection';
 import { credentialBatchItemCorrelationId } from '@/lib/credentials/credential-batch-correlation';
 import type { CredentialBatchItemRequest } from '@/lib/api/request-schemas/credential-batch';
+import { appLogger } from '@/lib/api/logger';
 import { prismaSqlExecutor } from '@/lib/jobs/prisma-sql-executor';
 import type { JobQueue } from '@/lib/jobs/types';
 import { CREDENTIAL_BATCH_ISSUE_JOB } from '@/lib/jobs/queue-names';
@@ -25,6 +26,7 @@ import { CREDENTIAL_BATCH_ISSUE_JOB } from '@/lib/jobs/queue-names';
 const BATCH_WITH_ITEMS_INCLUDE = {
   items: { orderBy: { index: 'asc' as const } },
 } as const;
+const logger = appLogger.child({ module: 'credential-batch-repository' });
 
 export type CredentialBatchWithItems = Prisma.CredentialBatchGetPayload<{
   include: typeof BATCH_WITH_ITEMS_INCLUDE;
@@ -325,14 +327,16 @@ async function lockCredentialBatchForUpdate(tx: PrismaTypes.TransactionClient, b
   return tx.credentialBatch.findFirst({ where: { id: batchId, tenantId } });
 }
 
+export type BatchCancellationClassification = 'expired' | 'not-cancellable' | 'already-requested' | 'cancellable';
+
 export type CancelCredentialBatchResult =
   | { outcome: 'missing' }
-  | { outcome: 'expired' | 'not-cancellable' | 'already-requested' | 'applied'; batch: CredentialBatchWithItems };
+  | { outcome: Exclude<BatchCancellationClassification, 'cancellable'> | 'applied'; batch: CredentialBatchWithItems };
 
-/** Classifies terminal states before active retries, as required by #1080. */
+/** Classifies expiry first, then settled states, active repeats and finally cancellable batches. */
 export function classifyBatchCancellation(
   batch: Pick<CredentialBatchSummary, 'state' | 'cancelRequestedAt'>,
-): 'expired' | 'not-cancellable' | 'already-requested' | 'cancellable' {
+): BatchCancellationClassification {
   if (batch.state === CredentialBatchState.EXPIRED) return 'expired';
   if (batch.state !== CredentialBatchState.QUEUED && batch.state !== CredentialBatchState.RUNNING) {
     return 'not-cancellable';
@@ -341,7 +345,7 @@ export function classifyBatchCancellation(
 }
 
 /**
- * Cancels queued items, including deferred retries, in the caller's transaction (#1080).
+ * Cancels queued items, including deferred retries, in the caller's transaction.
  * Processing items keep their attempt. Rejected and repeated requests leave rows unchanged.
  * Database failures must roll back the transaction, including item and counter changes.
  */
@@ -364,8 +368,11 @@ export async function cancelCredentialBatch(
     where: { batchId: input.batchId, tenantId: input.tenantId, state: CredentialBatchItemState.QUEUED },
     data: { state: CredentialBatchItemState.CANCELLED, attemptToken: null, nextAttemptAt: null },
   });
-  if (cancelled.count !== batch.queuedCount)
-    throw new Error('Credential batch queued items disagree with its counters');
+  if (cancelled.count !== batch.queuedCount) {
+    throw new Error(
+      `Credential batch queued items disagree with its counters: batchId=${input.batchId}, tenantId=${input.tenantId}, cancelledRows=${cancelled.count}, queuedCount=${batch.queuedCount}`,
+    );
+  }
   const updated = await tx.credentialBatch.update({
     where: { id: input.batchId, tenantId: input.tenantId },
     data: {
@@ -375,7 +382,15 @@ export async function cancelCredentialBatch(
       version: { increment: 1 },
     },
   });
-  if (updated.processingCount === 0) await settleLockedBatch(tx, updated, updated.attemptToken);
+  if (updated.processingCount === 0) {
+    const settlement = await settleLockedBatch(tx, updated, updated.attemptToken);
+    if (settlement.outcome !== 'applied') {
+      logger.warn(
+        { batchId: input.batchId, tenantId: input.tenantId, settlement: settlement.outcome },
+        'Credential batch cancellation could not settle',
+      );
+    }
+  }
   return {
     outcome: 'applied',
     batch: await tx.credentialBatch.findFirstOrThrow({
@@ -1182,7 +1197,12 @@ export async function claimBatchAttemptAndRelease(
     expectedVersion: number;
     staleBefore?: Date;
   },
-): Promise<{ applied: false } | { applied: true; settled: boolean }> {
+): Promise<
+  | { applied: false }
+  | { applied: true; settled: true }
+  | { applied: true; settled: false; settlement?: never }
+  | { applied: true; settled: false; settlement: Exclude<BatchSettlementOutcome['outcome'], 'applied'> }
+> {
   const claimed = await claimBatchAttempt(tx, input);
   if (!claimed.applied) return { applied: false };
   // claimBatchAttempt holds the batch lock until this transaction commits.
@@ -1191,7 +1211,7 @@ export async function claimBatchAttemptAndRelease(
   });
   if (batch.cancelRequestedAt !== null) {
     const settlement = await settleLockedBatch(tx, batch, input.token);
-    if (settlement.outcome !== 'applied') throw new CredentialBatchAttemptFenceLostError();
+    if (settlement.outcome !== 'applied') return { applied: true, settled: false, settlement: settlement.outcome };
     return { applied: true, settled: true };
   }
   const released = await tx.credentialBatch.updateMany({

@@ -124,7 +124,7 @@ A fault affecting every item, such as an unusable data encryption key, no longer
 
 A status-list mint failure is a pre-dispatch fault: the item ladder retries it and settles the item as `FAILED`, never `OUTCOME_UNKNOWN`.
 
-An unknown item is never replayed automatically. After cancellation, a pre-dispatch fault becomes `CANCELLED` instead of retrying, unless the attempt limit was exhausted, in which case it remains `FAILED`. Do not edit counters or item state by hand, because that breaks the attempt-token fence and the audit trail.
+An unknown item is never replayed automatically. An item that reached its attempt limit was already written `FAILED` with `ITEM_ATTEMPTS_EXHAUSTED` before cancellation; a later pre-dispatch fault becomes `CANCELLED` instead of retrying. Do not edit counters or item state by hand, because that breaks the attempt-token fence and the audit trail.
 
 ## Retention
 

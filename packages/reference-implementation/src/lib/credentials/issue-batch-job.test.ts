@@ -148,6 +148,47 @@ describe('credential batch issue handler', () => {
     expect(deps.releaseAttempt).not.toHaveBeenCalled();
   });
 
+  it('warns and releases when a cancelled claim cannot settle', async () => {
+    // Regression: a not-ready cancellation must warn with identity and release an owned fence.
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({
+      claimNextItem: jest.fn().mockResolvedValue({ outcome: 'cancelled' }),
+      settle: jest.fn().mockResolvedValue({ outcome: 'not-ready' }),
+    });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+    expect(deps.releaseAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ...payload, token: expect.any(String) }),
+    );
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, settlement: 'not-ready' }),
+      'Credential batch cancellation could not settle',
+    );
+  });
+
+  it.each([
+    ['missing', 'warn'],
+    ['superseded', 'info'],
+  ] as const)('logs a %s claim outcome at %s and does not settle', async (outcome, level) => {
+    // Regression: missing claims warn while superseded claims remain informational and neither settles.
+    loggerCalls.warn.mockClear();
+    loggerCalls.info.mockClear();
+    const deps = dependencies({ claimNextItem: jest.fn().mockResolvedValue({ outcome }) });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+
+    expect(deps.settle).not.toHaveBeenCalled();
+    expect(loggerCalls[level]).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, outcome }),
+      'Credential batch claim stopped',
+    );
+    expect(loggerCalls[level === 'warn' ? 'info' : 'warn']).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'Credential batch claim stopped',
+    );
+  });
+
   it('persists post-dispatch uncertainty and settles while ownership is held', async () => {
     const events: string[] = [];
     const deps = dependencies({
