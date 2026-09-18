@@ -202,7 +202,6 @@ describe('published error response examples', () => {
     expect(bare).toEqual([
       'delete /identifiers/{id}/links/{linkId} 404',
       'delete /services/{id} 404',
-      'delete /services/{id} 409',
       'get /dids/{id}/document 404',
       'get /dids/{id}/document 502',
       'get /identifiers/{id}/links/{linkId} 404',
@@ -245,7 +244,7 @@ describe('published error response examples', () => {
     // route reaches by more than one route, such as an Idempotency-Key that is
     // in flight or held elsewhere) quotes one of the verified messages, since
     // no single description can be all of them verbatim.
-    const quoted = errorResponses(spec).filter((r) => ['404', '409'].includes(r.status));
+    const quoted = errorResponses(spec).filter((r) => ['404', '409', '422', '502'].includes(r.status));
 
     for (const { id, status, response } of quoted) {
       const examples = response.content?.['application/json']?.examples;

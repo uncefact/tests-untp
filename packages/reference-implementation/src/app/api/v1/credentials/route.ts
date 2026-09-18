@@ -359,7 +359,7 @@ async function publishIssuedCredential({
             } catch (error) {
               logger.error(
                 { err: error, credentialId },
-                'Failed to update published status — credential was published to IDR but DB record is stale',
+                'Failed to update published status; credential was published to IDR but DB record is stale',
               );
               warnings.push({
                 code: 'DB_STATUS_UPDATE_FAILED' as const,
@@ -665,7 +665,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   // claim's scheme / profile / criteria URIs, its conformity topics and its
   // score codes against the locally cached vocabulary, and diagnose a
   // reference that names the wrong catalogue tier. Advisory only per ADR-033
-  // §3 and ADR-058: a mismatch never blocks issuance; it surfaces as
+  // §3 and ADR-059: a mismatch never blocks issuance; it surfaces as
   // `conformity-*` warnings on the response. Reads only the local projection
   // (no network).
   try {

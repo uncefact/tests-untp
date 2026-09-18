@@ -1,6 +1,18 @@
 import { requestBodyTooLargeMessage } from '@/lib/api/request-body';
 import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config';
 import {
+  credentialDeleteStatusOperationMessage,
+  STATUS_METADATA_UNAVAILABLE_MESSAGE,
+  STATUS_PURPOSE_UNSUPPORTED_MESSAGE,
+  STATUS_RECONCILIATION_IN_PROGRESS_MESSAGE,
+  statusEntryNotFoundMessage,
+  statusEntryUnsupportedMessage,
+  statusInvalidObservationMessage,
+  statusOperationInProgressMessage,
+  statusRecoveryRequiredMessage,
+} from '@/lib/credentials/credential-status-messages';
+import { serviceInstanceStatusPendingMessage } from '@/lib/api/errors';
+import {
   DECRYPTION_REQUIRED_MESSAGE,
   SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,
   VERIFICATION_IN_PROGRESS_MESSAGE,
@@ -185,17 +197,19 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   'The identifier scheme has identifiers and cannot be deleted',
   'The registrar has schemes with identifiers and cannot be deleted',
   'This Idempotency-Key was already used with a different request body.',
-  'Status metadata is unavailable. Ask the operator to run pnpm backfill:credential-status-entries, using --retry-failed for a retryable capture failure.',
-  'A status change for purpose "revocation" is in progress. The requested operation to set it to true must wait for it to complete.',
-  'A status change for purpose "revocation" remains unconfirmed. The requested operation to set it to true must be reconciled before another change.',
-  'The credential has no status entry for purpose "suspension".',
-  'The status operation and its recovery grace window have not ended. Retry reconciliation later.',
-  'The status entry cannot be represented by this service. The pending intent is unchanged and retrying will not help.',
-  'The status service returned an invalid observation. No status change was confirmed. The pending intent is unchanged and retrying will not help.',
-  'Cannot delete credential "credential-native-1" while 1 pending status operation remains for purposes: revocation. Wait for the pending status operations to complete, or have an operator reconcile them.',
-  'Service instance "service-instance-1" has 1 pending credential status operation. Wait for the pending status operations on credentials using this instance to complete, or have an operator reconcile them before changing or deleting the instance.',
   // Read from the module that owns them rather than copied, so a reworded
   // refusal cannot leave this allowlist quoting a sentence no code throws.
+  STATUS_METADATA_UNAVAILABLE_MESSAGE,
+  STATUS_PURPOSE_UNSUPPORTED_MESSAGE,
+  statusOperationInProgressMessage('revocation', true),
+  statusRecoveryRequiredMessage('revocation', true),
+  statusEntryNotFoundMessage('suspension'),
+  STATUS_RECONCILIATION_IN_PROGRESS_MESSAGE,
+  statusEntryUnsupportedMessage(true),
+  statusInvalidObservationMessage(false),
+  statusInvalidObservationMessage(true),
+  credentialDeleteStatusOperationMessage('credential-native-1', ['revocation']),
+  serviceInstanceStatusPendingMessage('service-instance-1', 1),
   SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,
   VERIFICATION_IN_PROGRESS_MESSAGE,
   VERIFICATION_RACE_LOST_MESSAGE,

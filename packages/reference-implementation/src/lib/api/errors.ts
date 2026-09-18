@@ -57,14 +57,15 @@ export class ConflictError extends Error {
 /** A VC service instance cannot change while it owns an unresolved status intent. */
 export class ServiceInstanceStatusPendingError extends ConflictError {
   constructor(instanceId: string, pendingCount?: number) {
-    const operationCount = pendingCount ?? 'a';
-    const operationNoun = pendingCount === undefined || pendingCount === 1 ? 'operation' : 'operations';
-    super(
-      `Service instance "${instanceId}" has ${operationCount} pending credential status ${operationNoun}. Wait for the pending status operations on credentials using this instance to complete, or have an operator reconcile them before changing or deleting the instance.`,
-      'SERVICE_INSTANCE_STATUS_PENDING',
-    );
+    super(serviceInstanceStatusPendingMessage(instanceId, pendingCount), 'SERVICE_INSTANCE_STATUS_PENDING');
     this.name = 'ServiceInstanceStatusPendingError';
   }
+}
+
+export function serviceInstanceStatusPendingMessage(instanceId: string, pendingCount?: number): string {
+  const operationCount = pendingCount ?? 'a';
+  const operationNoun = pendingCount === undefined || pendingCount === 1 ? 'operation' : 'operations';
+  return `Service instance "${instanceId}" has ${operationCount} pending credential status ${operationNoun}. Wait for the pending status operations on credentials using this instance to complete, or have an operator reconcile them before changing or deleting the instance.`;
 }
 
 export class UnprocessableError extends Error {

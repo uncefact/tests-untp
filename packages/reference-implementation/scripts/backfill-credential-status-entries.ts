@@ -1,15 +1,20 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { parseOperatorArgs } from './parse-operator-args.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-const dryRun = process.argv.includes('--dry-run');
-const retryFailed = process.argv.includes('--retry-failed');
-const tenantOptionIndex = process.argv.indexOf('--tenant');
-const tenantId = tenantOptionIndex === -1 ? undefined : process.argv[tenantOptionIndex + 1];
-if (tenantOptionIndex !== -1 && (!tenantId || tenantId.trim() === '')) {
+const { values } = parseOperatorArgs(process.argv.slice(2), {
+  'dry-run': { type: 'boolean', default: false },
+  'retry-failed': { type: 'boolean', default: false },
+  tenant: { type: 'string' },
+});
+const dryRun = values['dry-run'] === true;
+const retryFailed = values['retry-failed'] === true;
+const tenantId = typeof values.tenant === 'string' ? values.tenant : undefined;
+if (typeof values.tenant === 'string' && values.tenant.trim() === '') {
   throw new Error('--tenant requires a non-blank tenant id');
 }
 const { databaseUrlFromEnvParts } = await import('../src/lib/prisma/database-url.js');

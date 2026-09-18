@@ -70,6 +70,21 @@ export function readDefaultStatusPurposes(
   return [first as SupportedStatusPurpose, ...(rest as SupportedStatusPurpose[])];
 }
 
+export function readStatusMutationEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.CREDENTIAL_STATUS_MUTATION_ENABLED === 'true';
+}
+
+export function readStatusLockAcquireMs(
+  env: Record<string, string | undefined> = process.env,
+  onInvalid?: (raw: string) => void,
+): number {
+  const raw = env[CREDENTIAL_STATUS_LOCK_ACQUIRE_ENV_NAME];
+  const parsed = Number.parseInt(raw ?? '', 10);
+  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  if (raw !== undefined && raw.trim() !== '') onInvalid?.(raw);
+  return CREDENTIAL_STATUS_DEFAULT_LOCK_ACQUIRE_MS;
+}
+
 /** Validates status-related deployment settings during web boot. */
 export function validateStatusSettingsOnBoot(
   env: Record<string, string | undefined> = process.env,
@@ -92,15 +107,13 @@ export function validateStatusSettingsOnBoot(
   if (purposes.length === 0 && env[CREDENTIAL_STATUS_DEFAULT_PURPOSES_ENV_NAME]?.trim().toLowerCase() === 'none') {
     logger?.warn(NO_STATUS_WARNING);
   }
-  const rawAcquireMs = env[CREDENTIAL_STATUS_LOCK_ACQUIRE_ENV_NAME];
-  if (rawAcquireMs === undefined || rawAcquireMs.trim() === '') return;
-  // Same parse as the mutex (`Number.parseInt`), so this warning fires exactly when the mutex falls back.
-  const acquireMs = Number.parseInt(rawAcquireMs, 10);
-  if (!Number.isInteger(acquireMs) || acquireMs <= 0) {
-    logger?.warn(
-      `${CREDENTIAL_STATUS_LOCK_ACQUIRE_ENV_NAME} has invalid value "${rawAcquireMs}"; using the default ${CREDENTIAL_STATUS_DEFAULT_LOCK_ACQUIRE_MS} milliseconds.`,
-    );
-  }
+  readStatusLockAcquireMs(
+    env,
+    (raw) =>
+      logger?.warn(
+        `${CREDENTIAL_STATUS_LOCK_ACQUIRE_ENV_NAME} has invalid value "${raw}"; using the default ${CREDENTIAL_STATUS_DEFAULT_LOCK_ACQUIRE_MS} milliseconds.`,
+      ),
+  );
 }
 
 const DEFAULT_CREDENTIAL_STATUS_OPERATION_BUDGET_MS = 30_000;

@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma/prisma';
 import { appLogger } from '@/lib/api/logger';
+import { isPoolWaitError } from '@/lib/prisma/db-errors';
+import { readStatusLockAcquireMs } from '@/lib/config/credential-status.config';
 
-import { CREDENTIAL_STATUS_DEFAULT_LOCK_ACQUIRE_MS as DEFAULT_ACQUIRE_MS } from '../config/credential-status.config';
 const DEFAULT_POLL_MS = 25;
 const SETTLEMENT_ALLOWANCE_MS = 1_000;
 const CALLBACK_ERROR_UNSET = Symbol('callback error unset');
@@ -33,11 +34,6 @@ export class StatusListLockLostError extends Error {
   }
 }
 
-function integerEnv(name: string, fallback: number): number {
-  const parsed = Number.parseInt(process.env[name] ?? '', 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
 function abortError(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error('Status-list mutex acquisition was aborted');
 }
@@ -65,16 +61,6 @@ function wait(signal: AbortSignal, delayMs: number): Promise<void> {
   });
 }
 
-function isPoolWaitError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const candidate = error as { code?: unknown; message?: unknown };
-  if (candidate.code === 'P2024') return true;
-  if (typeof candidate.message !== 'string') return false;
-  if (candidate.code === 'P2028' && /Unable to start a transaction in the given time/i.test(candidate.message))
-    return true;
-  return /connection pool|timed out fetching a new connection|maxwait/i.test(candidate.message);
-}
-
 /**
  * Holds a transaction-scoped PostgreSQL advisory lock while the callback
  * rewrites one provider-side status list. The shared Prisma client keeps the
@@ -92,10 +78,7 @@ export async function withStatusListMutex<T>(
   const hash = createHash('sha256').update(key).digest();
   const keyHigh = hash.readInt32BE(0);
   const keyLow = hash.readInt32BE(4);
-  const acquireDeadline = Math.min(
-    options.deadlineAt,
-    Date.now() + integerEnv('CREDENTIAL_STATUS_LOCK_ACQUIRE_MS', DEFAULT_ACQUIRE_MS),
-  );
+  const acquireDeadline = Math.min(options.deadlineAt, Date.now() + readStatusLockAcquireMs());
   const maxWait = Math.max(0, acquireDeadline - Date.now());
   const timeout = Math.max(0, options.deadlineAt - Date.now()) + SETTLEMENT_ALLOWANCE_MS;
   let callbackPromise: Promise<T> | undefined;

@@ -7,6 +7,7 @@ import {
   isForeignKeyViolationOn,
   isRecordNotFound,
   isTransactionDeadlock,
+  isPoolWaitError,
   isDatabaseError,
   mapDatabaseError,
 } from './db-errors';
@@ -131,6 +132,20 @@ describe('isTransactionDeadlock', () => {
   it('rejects a non-Prisma error carrying a matching code property', () => {
     const impostor = Object.assign(new Error('not from the ORM'), { code: 'P2034' });
     expect(isTransactionDeadlock(impostor)).toBe(false);
+  });
+});
+
+describe('isPoolWaitError', () => {
+  it('matches pool exhaustion and Prisma transaction-start timeout messages', () => {
+    // Catches a regression that leaves pool-capacity classification in a caller or drops one supported Prisma form.
+    expect(isPoolWaitError({ code: 'P2024' })).toBe(true);
+    expect(isPoolWaitError({ code: 'P2028', message: 'Unable to start a transaction in the given time' })).toBe(true);
+    expect(isPoolWaitError(new Error('Timed out fetching a new connection from the connection pool'))).toBe(true);
+  });
+
+  it('does not classify a post-dispatch transaction-closed error as pool exhaustion', () => {
+    // Catches a regression that retries an already-dispatched transaction as though it never acquired capacity.
+    expect(isPoolWaitError({ code: 'P2028', message: 'Transaction already closed' })).toBe(false);
   });
 });
 

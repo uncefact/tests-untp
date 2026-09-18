@@ -1,5 +1,12 @@
 import { findBundledArtefact, normaliseArtefactUrl } from './lookup.js';
 
+// The refresh script is plain ESM JavaScript outside `src/`, so it is loaded
+// at runtime rather than imported statically (tsc's rootDir is `src`).
+const scriptUrl = new URL('../../scripts/refresh-artefacts.mjs', import.meta.url).href;
+const { canonicalise } = (await import(scriptUrl)) as {
+  canonicalise: (value: unknown) => unknown;
+};
+
 describe('normaliseArtefactUrl', () => {
   it.each([
     ['https://vocabulary.uncefact.org/untp/0.7.0/context/', 'https://vocabulary.uncefact.org/untp/0.7.0/context'],
@@ -69,28 +76,22 @@ describe('findBundledArtefact', () => {
 });
 
 describe('bundle integrity', () => {
+  it('uses the producer serialisation for integer-like keys so checker ordering cannot drift', () => {
+    expect(JSON.stringify(canonicalise({ '2': 'two', '10': 'ten' }))).toBe('{"2":"two","10":"ten"}');
+  });
+
   it('serves every artefact with the content hash the manifest records', async () => {
     const { readFile } = await import('node:fs/promises');
     const { createHash } = await import('node:crypto');
     const manifest = JSON.parse(await readFile(new URL('../../artefacts/manifest.json', import.meta.url), 'utf8')) as {
       artefacts: { url: string; sha256: string }[];
     };
-    const sortKeys = (value: unknown): unknown =>
-      Array.isArray(value)
-        ? value.map(sortKeys)
-        : value !== null && typeof value === 'object'
-          ? Object.fromEntries(
-              Object.keys(value as object)
-                .sort()
-                .map((key) => [key, sortKeys((value as Record<string, unknown>)[key])]),
-            )
-          : value;
     for (const { url, sha256 } of manifest.artefacts) {
       const served = await findBundledArtefact(url);
       expect(served).toBeDefined();
       expect(
         createHash('sha256')
-          .update(JSON.stringify(sortKeys(served)))
+          .update(JSON.stringify(canonicalise(served)))
           .digest('hex'),
       ).toBe(sha256);
     }

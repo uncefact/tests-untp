@@ -8,6 +8,22 @@ version numbers follow semantic versioning. The package ships via the
 
 ## [Unreleased]
 
+### ⚠ BREAKING CHANGES
+
+- **verifiable-credential:** `CredentialStatus` now admits one entry or an
+  ordered collection of entries. The VCKit adapter emits a single object when
+  one status purpose is minted and an array only when several purposes are
+  minted. Issued credentials carry `statusListIndex`
+  as an integer to match the published UNTP v0.7.0 schemas, although the W3C
+  Bitstring Status List specification requires a string in base 10. Parsing,
+  capture and stored `CredentialStatusEntry` rows retain the canonical decimal-string
+  index. Revert the issued value to a string when the UNTP schema is corrected
+  upstream.
+  `statusPurpose` is an open string rather than the literal `revocation`,
+  because the specification leaves the value open and each provider decides
+  what it can mint. A consumer that read the index as a number, or narrowed the
+  purpose to `revocation`, must be updated.
+
 ### Added
 
 - **cvc:** the scheme-document ingest input accepts `allowPrivateAddresses` and forwards it to the guarded fetch.
@@ -45,18 +61,6 @@ version numbers follow semantic versioning. The package ships via the
 
 ### Changed
 
-- **verifiable-credential:** `CredentialStatus` is now one entry or an ordered
-  collection of them, rather than a single object, because a credential can
-  carry one entry per status purpose. Issued credentials carry `statusListIndex`
-  as an integer to match the published UNTP v0.7.0 schemas, although the W3C
-  Bitstring Status List specification requires a string in base 10. Parsing, capture
-  and stored `CredentialStatusEntry` rows retain the canonical decimal-string
-  index. Revert the issued value to a string when the UNTP schema is corrected
-  upstream.
-  `statusPurpose` is an open string rather than the literal `revocation`,
-  because the specification leaves the value open and each provider decides
-  what it can mint. A consumer that read the index as a number, or narrowed
-  the purpose to `revocation`, must be updated.
 - **verifiable-credential:** `credentialStatus` on
   `UNTPVerifiableCredential` is optional, because a credential can be issued
   with no status entries. A consumer that assumed it was always present must

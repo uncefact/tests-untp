@@ -7,8 +7,8 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
-import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { parseOperatorArgs } from './parse-operator-args.js';
 
 const DOCS_URL =
   'https://uncefact.github.io/tests-untp/docs/next/reference-implementation/operations/credential-status-recovery';
@@ -21,31 +21,20 @@ const { prisma } = await import('../src/lib/prisma/prisma.js');
 const { repairServiceConfig } = await import('../src/lib/services/repair-config.js');
 try {
   const args = process.argv.slice(2);
-  if (args[0] === '--') args.shift();
-  const { values, tokens } = parseArgs({
-    args,
-    tokens: true,
-    options: {
-      instance: { type: 'string' },
-      config: { type: 'string' },
-      'allow-pending': { type: 'boolean', default: false },
-    },
-    strict: true,
-    allowPositionals: false,
+  const { values } = parseOperatorArgs(args, {
+    instance: { type: 'string' },
+    config: { type: 'string' },
+    'allow-pending': { type: 'boolean', default: false },
   });
-  const seen = new Set<string>();
-  for (const token of tokens) {
-    if (token.kind !== 'option') continue;
-    if (seen.has(token.name)) throw new Error(`--${token.name} must be supplied only once.`);
-    seen.add(token.name);
-  }
-  if (!values.instance?.trim() || !values.config?.trim())
+  const instanceId = typeof values.instance === 'string' ? values.instance : undefined;
+  const configPath = typeof values.config === 'string' ? values.config : undefined;
+  if (!instanceId?.trim() || !configPath?.trim())
     throw new Error('--instance <id> and --config <json-file> are required.');
-  const config: unknown = JSON.parse(await readFile(values.config, 'utf8'));
+  const config: unknown = JSON.parse(await readFile(configPath, 'utf8'));
   const result = await repairServiceConfig({
-    instanceId: values.instance,
+    instanceId,
     config,
-    allowPending: values['allow-pending'],
+    allowPending: values['allow-pending'] === true,
   });
   console.log(
     `Repaired instance ${result.instanceId}; recorded replacement digest ${result.replacementDigest} on ${result.pendingEntries} pending entry(s). Tokens, original configuration pins and attribution are unchanged. Reconcile each affected entry with acceptProviderChange: true.`,

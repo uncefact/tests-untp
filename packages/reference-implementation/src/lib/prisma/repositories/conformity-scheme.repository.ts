@@ -17,6 +17,7 @@ import { prisma } from '../prisma';
 import { SYSTEM_TENANT_ID } from '../constants';
 import { appLogger } from '@/lib/api/logger';
 import { createHash } from 'node:crypto';
+import { canonicalJson } from '@uncefact/untp-utils/common';
 
 const logger = appLogger.child({ module: 'conformity-scheme.repository' });
 const MAX_UNREADABLE_DOCUMENT_LOG_KEYS = 256;
@@ -108,9 +109,7 @@ function rememberUnreadableDocument(
   failureClass: string,
   rawDocument: unknown,
 ): boolean {
-  const bodyDigest = createHash('sha256')
-    .update(JSON.stringify(rawDocument) ?? String(rawDocument))
-    .digest('hex');
+  const bodyDigest = createHash('sha256').update(canonicalJson(rawDocument)).digest('hex');
   const key = `${rowId}|${specVersion}|${failureClass}|${bodyDigest}`;
   if (loggedUnreadableDocumentKeys.has(key)) return false;
   if (loggedUnreadableDocumentKeys.size >= MAX_UNREADABLE_DOCUMENT_LOG_KEYS) {

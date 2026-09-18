@@ -66,6 +66,8 @@ Prepare a JSON file containing the complete replacement configuration for the in
 
 Run from `packages/reference-implementation`:
 
+The repair command accepts each option at most once. Options that take a value must have one. Unknown options and extra words are refused.
+
 ```bash
 pnpm services:repair-config --instance <service-instance-id> \
   --config /secure/replacement-vc-config.json --allow-pending
