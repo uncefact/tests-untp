@@ -21,6 +21,8 @@ A growing `credentials.issue-batch` queue means work is arriving faster than the
 
 The reconciliation sweep looks at batches that are still `QUEUED` or `RUNNING` and whose last progress is older than twice `WORKER_JOB_TIMEOUT_SECONDS`. Before it acts it asks the queue whether an issuance job for that batch is still active, retrying or scheduled. Only when there is none does it take the ownership fence. For an ordinary batch it queues a continuation. For a cancellation-requested batch it converts abandoned processing to `OUTCOME_UNKNOWN` and settles without enqueueing issuance. It never fails an item merely because a queue job disappeared.
 
+The reconciliation summary counts `settled` batches that reached a terminal state, `requeued` batches given a new issuance job, `superseded` batches whose ownership had changed, and `unsettled` batches whose settlement did not apply; `unsettled` is the outcome that needs a human.
+
 ## Cancellation
 
 Upgrade every worker before exposing `POST /api/v1/credentials/batches/{id}/cancel`. An old worker does not check cancellation between items. Apply the migration and rollout order in the [v0.6 migration guide](../../migration-guides/ri-v0.6#batch-cancellation).

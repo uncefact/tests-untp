@@ -28,6 +28,7 @@ import {
   decryptCredentialBatchItemRequest,
   releaseBatchAttempt,
   settleBatchIfFinished,
+  type BatchCheckpointOutcome,
   type CredentialBatchWithItems,
   INTERRUPTED_BATCH_ITEM_MESSAGE,
 } from '@/lib/prisma/repositories/credential-batch.repository';
@@ -94,6 +95,50 @@ function logFields(payload: CredentialBatchIssuePayload, index?: number) {
     tenantId: payload.tenantId,
     ...(index === undefined ? {} : { index }),
   };
+}
+
+async function handleCheckpointOutcome(
+  deps: CredentialBatchIssueDependencies,
+  payload: CredentialBatchIssuePayload,
+  token: string,
+  checkpoint: BatchCheckpointOutcome,
+  startAfter?: Date,
+): Promise<void> {
+  if (checkpoint.outcome === 'checkpointed') {
+    logger.info(
+      { ...logFields(payload), checkpointed: true, ...(startAfter === undefined ? {} : { startAfter }) },
+      startAfter === undefined
+        ? 'Credential batch continuation checkpointed'
+        : 'Credential batch deferred continuation checkpointed',
+    );
+    return;
+  }
+  if (checkpoint.outcome === 'superseded') {
+    logger.info({ ...logFields(payload), outcome: checkpoint.outcome }, 'Credential batch checkpoint stopped');
+    return;
+  }
+  if (checkpoint.outcome === 'applied') {
+    logger.info({ ...logFields(payload), settlement: checkpoint.outcome }, 'Credential batch cancellation checked');
+    return;
+  }
+
+  logger.warn(
+    { ...logFields(payload), settlement: checkpoint.outcome },
+    'Credential batch cancellation could not settle',
+  );
+  const released = await deps.transaction((tx) =>
+    deps.releaseAttempt(tx, {
+      batchId: payload.batchId,
+      tenantId: payload.tenantId,
+      token,
+    }),
+  );
+  if (!released.applied) {
+    logger.warn(
+      { ...logFields(payload), settlement: checkpoint.outcome },
+      'Credential batch cancellation settlement could not release the fence held by this worker',
+    );
+  }
 }
 
 /**
@@ -233,10 +278,7 @@ export function credentialBatchIssueHandler(
             queue: deps.queue,
           }),
         );
-        logger.info(
-          { ...logFields(payload), checkpointed: checkpoint.applied },
-          'Credential batch continuation checkpointed',
-        );
+        await handleCheckpointOutcome(deps, payload, token, checkpoint);
         return;
       }
 
@@ -256,10 +298,7 @@ export function credentialBatchIssueHandler(
               startAfter,
             }),
           );
-          logger.info(
-            { ...logFields(payload), checkpointed: checkpoint.applied, startAfter },
-            'Credential batch deferred continuation checkpointed',
-          );
+          await handleCheckpointOutcome(deps, payload, token, checkpoint, startAfter);
           return;
         }
         const settlement = await deps.transaction((tx) =>

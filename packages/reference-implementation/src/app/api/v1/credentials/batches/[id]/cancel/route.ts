@@ -6,13 +6,12 @@ import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { prisma } from '@/lib/prisma/prisma';
 import { cancelCredentialBatch } from '@/lib/prisma/repositories/credential-batch.repository';
 import {
-  buildCredentialBatchExpiredBody,
+  credentialBatchExpiredResponse,
+  CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE,
   CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
   CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
 } from '@/lib/credentials/credential-batch-error';
 import { projectCredentialBatch } from '@/lib/credentials/credential-batch-projection';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
 
 /**
  * @swagger
@@ -95,7 +94,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               notCancellable:
- *                 value: { error: 'This credential batch cannot be cancelled because it has already settled.', code: BATCH_NOT_CANCELLABLE }
+ *                 value: { error: 'This credential batch cannot be cancelled because it has already settled.', code: 'BATCH_NOT_CANCELLABLE' }
  *       410:
  *         description: The retained item data has expired. The response includes the tombstone projection.
  *         headers:
@@ -129,7 +128,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
  */
 export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const bytes = await readRequestBytes(req);
-  if (bytes.byteLength !== 0) throw new ValidationError('Send this request without a body.');
+  if (bytes.byteLength !== 0) throw new ValidationError(CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE);
 
   const { id } = await params;
   const result = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId }));
@@ -140,16 +139,14 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
 
   const projection = projectCredentialBatch(result.batch);
   if (result.outcome === 'expired') {
-    return NextResponse.json(
-      { ...projection, ...buildCredentialBatchExpiredBody() },
-      { status: 410, headers: NO_STORE_HEADERS },
-    );
+    const expired = credentialBatchExpiredResponse(projection);
+    return NextResponse.json(expired.body, expired.init);
   }
   return NextResponse.json(
     {
       ...projection,
       message: CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
     },
-    { status: 202, headers: NO_STORE_HEADERS },
+    { status: 202, headers: { 'Cache-Control': 'no-store' } },
   );
 });

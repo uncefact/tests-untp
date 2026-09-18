@@ -354,11 +354,13 @@ An unexpected pre-dispatch fault is requeued for that item with the existing 30-
 
 Send `POST /api/v1/credentials/batches/{id}/cancel` with no body. Even `{}` or whitespace is rejected. The request uses the same tenant authentication as the status resource and does not require an `Idempotency-Key`.
 
-Every queued item, including a deferred retry, is cancelled in one transaction. The item already processing finishes its current attempt, and issued items remain issued. A successful response is `202`, including when the batch settles immediately. It contains the same projection as GET, plus this exact `message`:
+Every queued item, including a deferred retry, is cancelled in one transaction. The item already processing finishes its current attempt, and issued items remain issued. A successful response is `202`, including when the batch settles immediately. This guarantee holds only where every worker runs this release or later; follow the [migration guide rollout order](../../migration-guides/ri-v0.6#batch-cancellation) before exposing the route. It contains the same projection as GET, plus this exact `message`:
 
 > Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.
 
 For example, cancelling five items while the first is processing returns `state: RUNNING`, `counts.processing: 1`, `counts.cancelled: 4` and a non-null `cancelRequestedAt`. Once that attempt issues, GET reports `CANCELLED`, issued 1 and cancelled 4, with the retained credential id on the issued item. The six item counts always sum to `total`.
+
+A credential issued before or during cancellation should be revoked through its [issuer status entry](#issuer-status).
 
 A batch settles as `NEEDS_ATTENTION` while any outcome is unknown, then as `CANCELLED` after the final unknown is resolved if cancelled items remain. If the only remaining item was already processing and issues, cancellation can end as `COMPLETED` with cancelled 0. The cancellation timestamp records the request, not a promise that any item was cancelled.
 
@@ -373,7 +375,7 @@ A batch settles as `NEEDS_ATTENTION` while any outcome is unknown, then as `CANC
 | `COMPLETED`, `NEEDS_ATTENTION` or settled `CANCELLED`             | `409 BATCH_NOT_CANCELLABLE`, `This credential batch cannot be cancelled because it has already settled.`                               |
 | `EXPIRED`                                                         | `410 BATCH_EXPIRED`, `This credential batch has expired. Its credentials were not deleted.`, with the same tombstone projection as GET |
 
-Refusals do not change the batch. If the response is lost, poll GET: an active repeat is accepted unchanged, but a repeat after settlement is refused. Cancellation prevents further item claims and continuations. Recovery can still settle abandoned work without enqueueing issuance. The [operations page](../operations/batch-issuance#cancellation) explains investigation and retention.
+Refusals do not change the batch. If the response is lost, poll GET: an active repeat is accepted unchanged, but a repeat after settlement is refused. After cancellation no further item is started. If processing stalls, the batch is settled without issuing anything more. The [operations page](../operations/batch-issuance#cancellation) explains investigation and retention.
 
 Resubmitting the same `Idempotency-Key` and body after cancellation replays the cancelled batch id and issues nothing; a fresh batch needs a new key.
 

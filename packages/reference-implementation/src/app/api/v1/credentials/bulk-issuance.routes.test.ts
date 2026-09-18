@@ -286,7 +286,7 @@ describe('bulk issuance end-to-end route journey', () => {
         batch.attemptToken = null;
         return { outcome: 'applied' as const, state: CredentialBatchState.COMPLETED };
       },
-      checkpoint: async () => ({ applied: false }),
+      checkpoint: async () => ({ outcome: 'superseded' as const }),
       now: () => new Date('2026-09-17T00:00:00.000Z'),
       queue: {} as never,
     } as unknown as CredentialBatchIssueDependencies;

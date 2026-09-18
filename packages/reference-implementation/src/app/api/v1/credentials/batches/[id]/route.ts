@@ -2,10 +2,8 @@ import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getCredentialBatchById } from '@/lib/prisma/repositories/credential-batch.repository';
-import { buildCredentialBatchExpiredBody } from '@/lib/credentials/credential-batch-error';
+import { credentialBatchExpiredResponse } from '@/lib/credentials/credential-batch-error';
 import { projectCredentialBatch } from '@/lib/credentials/credential-batch-projection';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
 
 /**
  * @swagger
@@ -112,10 +110,8 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
 
   const projection = projectCredentialBatch(batch);
   if (batch.state === 'EXPIRED') {
-    return NextResponse.json(
-      { ...projection, ...buildCredentialBatchExpiredBody() },
-      { status: 410, headers: NO_STORE_HEADERS },
-    );
+    const expired = credentialBatchExpiredResponse(projection);
+    return NextResponse.json(expired.body, expired.init);
   }
-  return NextResponse.json(projection, { status: 200, headers: NO_STORE_HEADERS });
+  return NextResponse.json(projection, { status: 200, headers: { 'Cache-Control': 'no-store' } });
 });
