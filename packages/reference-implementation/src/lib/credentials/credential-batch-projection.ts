@@ -35,6 +35,7 @@ export function projectCredentialBatch(batch: CredentialBatchWithItems) {
       issued: batch.issuedCount,
       failed: batch.failedCount,
       unknown: batch.unknownCount,
+      cancelled: batch.cancelledCount,
     },
     createdAt: batch.createdAt.toISOString(),
     settledAt: batch.settledAt?.toISOString() ?? null,

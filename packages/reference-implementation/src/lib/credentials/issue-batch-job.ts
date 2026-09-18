@@ -301,6 +301,20 @@ export function credentialBatchIssueHandler(
           );
           return;
         }
+        if (claimed.outcome === 'cancelled') {
+          const settlement = await deps.transaction((tx) =>
+            deps.settle(tx, { batchId: payload.batchId, tenantId: payload.tenantId, token }),
+          );
+          logger.info(
+            { ...batchLogFields(batch), settlement: settlement.outcome },
+            'Credential batch cancellation checked',
+          );
+          return;
+        }
+        if (claimed.outcome !== 'claimed') {
+          logger.info({ ...batchLogFields(batch), outcome: claimed.outcome }, 'Credential batch claim stopped');
+          return;
+        }
 
         const { index, request } = claimed.item;
         itemsAttempted += 1;

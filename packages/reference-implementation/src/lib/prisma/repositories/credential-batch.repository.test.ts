@@ -11,6 +11,7 @@ import { CredentialBatchItemState, CredentialBatchState } from '../generated';
 import {
   claimBatchAttempt,
   claimNextBatchItem,
+  classifyBatchCancellation,
   checkpointBatchContinuation,
   createCredentialBatch,
   decryptCredentialBatchItemRequest,
@@ -92,8 +93,16 @@ describe('markItemIssued', () => {
     const itemUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const batchUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
       credentialBatchItem: { updateMany: itemUpdateMany },
-      credentialBatch: { updateMany: batchUpdateMany },
+      credentialBatch: {
+        findFirst: jest.fn().mockResolvedValue({
+          state: CredentialBatchState.RUNNING,
+          attemptToken: 'attempt-token',
+          cancelRequestedAt: null,
+        }),
+        updateMany: batchUpdateMany,
+      },
     } as never;
 
     await markItemIssued(tx, {
@@ -190,6 +199,7 @@ describe('resolveUnknownBatchItem', () => {
     const itemUpdateMany = jest.fn();
     const credentialFindFirst = jest.fn();
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
       credentialBatch: {
         findFirst: jest.fn().mockResolvedValue({
           state: CredentialBatchState.NEEDS_ATTENTION,
@@ -260,8 +270,16 @@ describe('credential batch item retry scheduling', () => {
   it('orders claimable items by attempt count and then index, with never-attempted items first', async () => {
     const itemFindFirst = jest.fn().mockResolvedValue({ index: 2, request: 'encrypted-request' });
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
       credentialBatchItem: { findFirst: itemFindFirst, updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-      credentialBatch: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      credentialBatch: {
+        findFirst: jest.fn().mockResolvedValue({
+          state: CredentialBatchState.RUNNING,
+          attemptToken: 'attempt-token',
+          cancelRequestedAt: null,
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
     } as never;
 
     await expect(
@@ -281,7 +299,17 @@ describe('credential batch item retry scheduling', () => {
   it('skips deferred items and returns the earliest retry time when none is due', async () => {
     const nextAttemptAt = new Date(Date.now() + 60_000);
     const itemFindFirst = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ nextAttemptAt });
-    const tx = { credentialBatchItem: { findFirst: itemFindFirst } } as never;
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
+      credentialBatch: {
+        findFirst: jest.fn().mockResolvedValue({
+          state: CredentialBatchState.RUNNING,
+          attemptToken: 'attempt-token',
+          cancelRequestedAt: null,
+        }),
+      },
+      credentialBatchItem: { findFirst: itemFindFirst },
+    } as never;
 
     await expect(
       claimNextBatchItem(tx, { batchId: 'batch-1', tenantId: 'tenant-1', token: 'attempt-token' }),
@@ -299,7 +327,15 @@ describe('credential batch item retry scheduling', () => {
     const startAfter = new Date(Date.now() + 60_000);
     const enqueueWithin = jest.fn().mockResolvedValue(undefined);
     const tx = {
-      credentialBatch: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
+      credentialBatch: {
+        findFirst: jest.fn().mockResolvedValue({
+          state: CredentialBatchState.RUNNING,
+          attemptToken: 'attempt-token',
+          cancelRequestedAt: null,
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
     } as never;
 
     await runWithRequestContext('caller-correlation', async () => {
@@ -404,11 +440,19 @@ describe('credential batch item retry scheduling', () => {
     const itemUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const batchUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
       credentialBatchItem: {
         findFirst: jest.fn().mockResolvedValue({ attemptCount: 1 }),
         updateMany: itemUpdateMany,
       },
-      credentialBatch: { updateMany: batchUpdateMany },
+      credentialBatch: {
+        findFirst: jest.fn().mockResolvedValue({
+          state: CredentialBatchState.RUNNING,
+          attemptToken: 'attempt-token',
+          cancelRequestedAt: null,
+        }),
+        updateMany: batchUpdateMany,
+      },
     } as never;
     const before = Date.now();
 
@@ -430,11 +474,19 @@ describe('credential batch item retry scheduling', () => {
   it('stores the projected cause when the fourth fault exhausts the item', async () => {
     const itemUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
       credentialBatchItem: {
         findFirst: jest.fn().mockResolvedValue({ attemptCount: 3 }),
         updateMany: itemUpdateMany,
       },
-      credentialBatch: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      credentialBatch: {
+        findFirst: jest.fn().mockResolvedValue({
+          state: CredentialBatchState.RUNNING,
+          attemptToken: 'attempt-token',
+          cancelRequestedAt: null,
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
     } as never;
 
     await expect(
@@ -532,5 +584,20 @@ describe('credential batch item retry scheduling', () => {
       if (previousValues.max === undefined) delete process.env.BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS;
       else process.env.BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS = previousValues.max;
     }
+  });
+});
+
+describe('classifyBatchCancellation', () => {
+  it.each([
+    [CredentialBatchState.QUEUED, null, 'cancellable'],
+    [CredentialBatchState.RUNNING, null, 'cancellable'],
+    [CredentialBatchState.QUEUED, new Date(0), 'already-requested'],
+    [CredentialBatchState.RUNNING, new Date(0), 'already-requested'],
+    [CredentialBatchState.COMPLETED, null, 'not-cancellable'],
+    [CredentialBatchState.NEEDS_ATTENTION, new Date(0), 'not-cancellable'],
+    [CredentialBatchState.CANCELLED, new Date(0), 'not-cancellable'],
+    [CredentialBatchState.EXPIRED, new Date(0), 'expired'],
+  ])('classifies %s with cancellation timestamp %s as %s', (state, cancelRequestedAt, expected) => {
+    expect(classifyBatchCancellation({ state, cancelRequestedAt })).toBe(expected);
   });
 });

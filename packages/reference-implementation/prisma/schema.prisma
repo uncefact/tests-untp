@@ -183,6 +183,7 @@ enum CredentialBatchState {
   COMPLETED
   NEEDS_ATTENTION
   EXPIRED
+  CANCELLED
 }
 
 enum CredentialBatchItemState {
@@ -191,6 +192,7 @@ enum CredentialBatchItemState {
   ISSUED
   FAILED
   OUTCOME_UNKNOWN
+  CANCELLED
 }
 
 /**
@@ -444,27 +446,29 @@ model CredentialStatusEntry {
  * `errorClass` and `errorMessage`, respectively.
  */
 model CredentialBatch {
-  id               String               @id @default(cuid())
-  tenantId         String
-  correlationId    String
-  state            CredentialBatchState @default(QUEUED)
-  itemCount        Int
-  queuedCount      Int                  @default(0)
-  processingCount  Int                  @default(0)
-  issuedCount      Int                  @default(0)
-  failedCount      Int                  @default(0)
-  unknownCount     Int                  @default(0)
-  idempotencyKey   String
-  bodyDigest       String
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  settledAt        DateTime?
-  resolvedAt       DateTime?
-  expiresAt        DateTime?
-  attemptToken     String?
-  attemptStartedAt DateTime?
-  version          Int                  @default(0)
-  lastProgressAt   DateTime             @default(now())
+  id                String               @id @default(cuid())
+  tenantId          String
+  correlationId     String
+  state             CredentialBatchState @default(QUEUED)
+  itemCount         Int
+  queuedCount       Int                  @default(0)
+  processingCount   Int                  @default(0)
+  issuedCount       Int                  @default(0)
+  failedCount       Int                  @default(0)
+  unknownCount      Int                  @default(0)
+  cancelledCount    Int                  @default(0)
+  cancelRequestedAt DateTime?
+  idempotencyKey    String
+  bodyDigest        String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  settledAt         DateTime?
+  resolvedAt        DateTime?
+  expiresAt         DateTime?
+  attemptToken      String?
+  attemptStartedAt  DateTime?
+  version           Int                  @default(0)
+  lastProgressAt    DateTime             @default(now())
 
   tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items  CredentialBatchItem[]
