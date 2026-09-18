@@ -40,7 +40,7 @@ The Playground identifies credential links from bare names, CURIEs and URI-quali
 
 ## When the schema cannot be loaded
 
-If the schema service does not answer in time or cannot be reached, `Schema Validation` fails with a message saying the schema could not be loaded and the document was not assessed. Resolve or upload the link set again to retry. If the service answers with an error or a body that is not a schema, the message names what was reported and asks you to report it to the Playground operator with the schema URL if it keeps happening. If the schema loads but cannot be used, the message says so and asks you to report it, because a retry gives the same answer. The card stays removable in every case.
+If the schema service does not answer in time or cannot be reached, `Schema Validation` fails with a message saying the schema could not be loaded and the document was not assessed. Resolve or upload the link set again to retry. If the service answers with an error or a body that is not a schema, the message names what was reported and asks you to report it to the Playground operator with the schema URL if it keeps happening. If the schema loads but cannot be used, the message says so and asks you to report it, because a retry gives the same answer. The card stays removable in every case. A failed `Schema Validation` step records whether the schema could not be fetched, was fetched but unusable, the link set document was at fault, or the cause was unknown; the card and JSON report carry that reason.
 
 ## What the schema step does not check
 
