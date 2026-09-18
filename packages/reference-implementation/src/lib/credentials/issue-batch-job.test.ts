@@ -130,6 +130,68 @@ function dependencies(overrides: Partial<CredentialBatchIssueDependencies> = {})
 }
 
 describe('credential batch issue handler', () => {
+  it('settles a cancelled claim boundary without dispatching or checkpointing', async () => {
+    const deps = dependencies({ claimNextItem: jest.fn().mockResolvedValue({ outcome: 'cancelled' }) });
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+    expect(deps.settle).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ...payload, token: expect.any(String) }),
+    );
+    expect(deps.issue).not.toHaveBeenCalled();
+    expect(deps.checkpoint).not.toHaveBeenCalled();
+    expect(deps.releaseAttempt).not.toHaveBeenCalled();
+  });
+
+  it('persists post-dispatch uncertainty and settles while ownership is held', async () => {
+    const events: string[] = [];
+    const deps = dependencies({
+      issue: jest.fn(async ({ onDispatch }) => {
+        onDispatch?.();
+        throw new Error('lost response');
+      }),
+      markOutcomeUnknown: jest.fn(async () => {
+        events.push('unknown');
+        return { outcome: 'applied' as const };
+      }),
+      settle: jest.fn(async () => {
+        events.push('settle');
+        return { outcome: 'applied' as const, state: 'NEEDS_ATTENTION' as const };
+      }),
+      releaseAttempt: jest.fn(async () => {
+        events.push('release');
+        return { applied: true };
+      }),
+    });
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toThrow('lost response');
+    expect(events).toEqual(['unknown', 'settle']);
+    expect(deps.checkpoint).not.toHaveBeenCalled();
+    expect(deps.markQueued).not.toHaveBeenCalled();
+  });
+
+  it('releases a post-dispatch fault only after settlement finds work remaining', async () => {
+    const events: string[] = [];
+    const deps = dependencies({
+      issue: jest.fn(async ({ onDispatch }) => {
+        onDispatch?.();
+        throw new Error('lost response');
+      }),
+      markOutcomeUnknown: jest.fn(async () => {
+        events.push('unknown');
+        return { outcome: 'applied' as const };
+      }),
+      settle: jest.fn(async () => {
+        events.push('settle');
+        return { outcome: 'not-ready' as const };
+      }),
+      releaseAttempt: jest.fn(async () => {
+        events.push('release');
+        return { applied: true };
+      }),
+    });
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toThrow('lost response');
+    expect(events).toEqual(['unknown', 'settle', 'release']);
+  });
+
   it('issues items sequentially by index and settles after the queue is empty', async () => {
     // Regression: a batch must not issue item 1 before item 0 or leave a fully processed batch unsettled.
     const deps = dependencies();
@@ -536,6 +598,10 @@ describe('credential batch issue handler', () => {
         .mockResolvedValueOnce({ outcome: 'claimed', item: { index: 1, request: JSON.stringify(request) } })
         .mockResolvedValueOnce({ outcome: 'empty' }),
       issue,
+      settle: jest
+        .fn()
+        .mockResolvedValueOnce({ outcome: 'not-ready' })
+        .mockResolvedValue({ outcome: 'applied', state: 'NEEDS_ATTENTION' }),
     });
 
     await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toThrow('provider unavailable');

@@ -1,3 +1,5 @@
+jest.mock('@/lib/api/logger');
+import { appLogger } from '@/lib/api/logger';
 import type { StalledCredentialBatch } from '@/lib/prisma/repositories/credential-batch.repository';
 import {
   credentialBatchReconciliationCutoff,
@@ -25,7 +27,7 @@ describe('credential batch reconciliation', () => {
     const deps: CredentialBatchReconciliationDependencies = {
       findStalled: jest.fn(async () => [batch, { ...batch, id: 'batch-2' }]),
       hasActiveJob: jest.fn(async (batchId) => batchId === 'batch-2'),
-      claimAndEnqueue: jest.fn(async () => true),
+      recover: jest.fn(async () => 'requeued' as const),
       now: () => new Date(60_000),
     };
 
@@ -37,8 +39,37 @@ describe('credential batch reconciliation', () => {
       signal: new AbortController().signal,
     });
 
-    expect(deps.claimAndEnqueue).toHaveBeenCalledTimes(1);
-    expect(deps.claimAndEnqueue).toHaveBeenCalledWith(batch, expect.any(String), new Date(-540_000));
+    expect(deps.recover).toHaveBeenCalledTimes(1);
+    expect(deps.recover).toHaveBeenCalledWith(batch, expect.any(String), new Date(-540_000));
     expect(deps.hasActiveJob).toHaveBeenCalledWith('batch-2');
   });
+});
+
+it('reports settled cancellations separately from requeued, superseded and failed recovery', async () => {
+  const recover = jest
+    .fn()
+    .mockResolvedValueOnce('settled')
+    .mockResolvedValueOnce('superseded')
+    .mockRejectedValueOnce(new Error('database unavailable'));
+  const deps: CredentialBatchReconciliationDependencies = {
+    findStalled: jest.fn(async () => [batch, { ...batch, id: 'batch-2' }, { ...batch, id: 'batch-3' }]),
+    hasActiveJob: jest.fn(async () => false),
+    recover,
+    now: () => new Date(60_000),
+  };
+  await credentialBatchReconciliationHandler(deps)({} as never, {
+    jobId: 'job',
+    attempt: 1,
+    isFinalAttempt: false,
+    expireSeconds: 300,
+    signal: new AbortController().signal,
+  });
+  expect(appLogger.info).toHaveBeenCalledWith(
+    { selected: 3, requeued: 0, settled: 1, superseded: 1, active: 0, failed: 1 },
+    'Credential batch reconciliation finished',
+  );
+  expect(appLogger.error).toHaveBeenCalledWith(
+    expect.objectContaining({ batchId: 'batch-3', err: expect.any(Error) }),
+    'Credential batch recovery failed',
+  );
 });
