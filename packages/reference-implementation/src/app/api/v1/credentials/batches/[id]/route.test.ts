@@ -50,11 +50,10 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
     expect(repository.getCredentialBatchById).toHaveBeenCalledWith('batch-1', 'tenant-1');
   });
 
-  it('returns the same 404 for a NUL id without querying the repository', async () => {
-    // Regression: a NUL in the path must be treated as an unknown batch before PostgreSQL sees the parameter.
+  it.each(['\0', 'abc\0def', '\0abc'])('returns 404 for a batch id containing a NUL byte: %j', async (id) => {
     const response = (await GET(
-      { url: 'http://localhost/api/v1/credentials/batches/batch-%00-invalid' } as Request,
-      { tenantId: 'tenant-1', params: Promise.resolve({ id: 'batch-\0-invalid' }) } as never,
+      { url: 'http://localhost/api/v1/credentials/batches/batch-with-nul' } as Request,
+      { tenantId: 'tenant-1', params: Promise.resolve({ id }) } as never,
     )) as unknown as { status: number; json: () => Promise<unknown> };
 
     expect(response.status).toBe(404);

@@ -39,6 +39,10 @@ Poll GET for `counts.cancelled`, `cancelRequestedAt` and the ordered item outcom
 
 A repeated cancellation while the batch remains `QUEUED` or `RUNNING` returns `202` without another write. `COMPLETED`, `NEEDS_ATTENTION` and settled `CANCELLED` return `409 BATCH_NOT_CANCELLABLE`. Expired batches return `410 BATCH_EXPIRED` with the tombstone; unknown or foreign ids return `404`. The [API refusal table](../api/credentials#cancel-a-batch) gives the exact messages and body validation responses.
 
+### Counter-drift refusal
+
+If cancellation is refused with `500` because the batch's stored counts disagree with its items, quiesce the workers. Inspect the batch and each item with the existing `pnpm batch:inspect-item -- --tenant TENANT --batch BATCH --index INDEX --reason TICKET` command. Repair the counts under the batch lock from the item rows, restart the workers, then cancel the batch again. Counts are not rebuilt automatically because the drift may mean rows are missing.
+
 The worker claims no further item and queues no continuation after cancellation. Reconciliation still recovers cancellation-requested `QUEUED` or `RUNNING` batches whose job vanished. It records an abandoned processing item as unknown, then settles without enqueueing issuance. A duplicate delivery cannot resume cancelled work.
 
 Resolve a held unknown item using the commands below. Cancellation does not resolve uncertainty about an external effect. Resolving the last unknown produces `CANCELLED` when cancelled items remain, otherwise `COMPLETED`; it never queues issuance.

@@ -7,6 +7,7 @@ import {
   PayloadTooLargeError,
   unexpectedErrorMessage,
 } from '@/lib/api/errors';
+import { containsNulByte } from '@/lib/api/route-id';
 import { apiLogger } from '@/lib/api/logger';
 import { safeError } from '@/lib/api/safe-error';
 import { parseRequestBody, definedFields, ValidationError } from '@/lib/api/validation';
@@ -408,7 +409,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   // Postgres refuses a NUL byte inside a text value (SQLSTATE 22021), so an
   // id carrying one can match no stored record and must not reach the query,
   // where it would surface as an unhandled database error rather than a miss.
-  if (id.includes('\0')) {
+  if (containsNulByte(id)) {
     throw new NotFoundError('No such credential record.', 'NOT_FOUND');
   }
   let view;

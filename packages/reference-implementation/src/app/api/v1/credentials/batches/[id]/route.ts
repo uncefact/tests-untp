@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NotFoundError } from '@/lib/api/errors';
+import { containsNulByte } from '@/lib/api/route-id';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getCredentialBatchById } from '@/lib/prisma/repositories/credential-batch.repository';
 import { credentialBatchExpiredResponse } from '@/lib/credentials/credential-batch-error';
@@ -105,12 +106,7 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  // Postgres refuses a NUL byte inside a text value (SQLSTATE 22021), so an
-  // id carrying one can match no stored batch and must not reach the query,
-  // where it would surface as an unhandled database error rather than a miss.
-  if (id.includes('\0')) {
-    throw new NotFoundError('Credential batch not found.');
-  }
+  if (containsNulByte(id)) throw new NotFoundError('Credential batch not found.');
   const batch = await getCredentialBatchById(id, tenantId);
   if (batch === null) throw new NotFoundError('Credential batch not found.');
 
