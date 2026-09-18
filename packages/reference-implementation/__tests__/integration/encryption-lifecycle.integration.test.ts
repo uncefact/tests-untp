@@ -89,6 +89,25 @@ async function seedOneEnvelopePerStore(): Promise<void> {
       responseBody: envelopeUnder(OUTGOING_KEY, '["warning"]'),
     },
   });
+  // One queued batch item whose issuance request is held under the outgoing key.
+  // The batch counts must satisfy the item-count invariant the database enforces.
+  await prisma.credentialBatch.create({
+    data: {
+      id: 'batch-1',
+      tenantId: SYSTEM_TENANT_ID,
+      itemCount: 1,
+      queuedCount: 1,
+      idempotencyKey: 'batch-k1',
+      bodyDigest: 'zBatch',
+      items: {
+        create: {
+          id: 'batch-item-1',
+          index: 0,
+          request: envelopeUnder(OUTGOING_KEY, '{"credentialType":"DPP"}'),
+        },
+      },
+    },
+  });
 }
 
 describe('encryption key lifecycle across every registered store', () => {
@@ -135,7 +154,7 @@ describe('encryption key lifecycle across every registered store', () => {
 
     // The plaintexts survive the rotation in every store.
     const revealed = async (
-      id: 'serviceInstances' | 'credentials' | 'externalCredentials' | 'idempotencyResponses',
+      id: 'serviceInstances' | 'credentials' | 'externalCredentials' | 'idempotencyResponses' | 'credentialBatchItems',
     ) => {
       const rows: string[] = [];
       for await (const row of stores[id].rows()) {
@@ -147,6 +166,7 @@ describe('encryption key lifecycle across every registered store', () => {
     await expect(revealed('credentials')).resolves.toEqual(['native-key']);
     await expect(revealed('externalCredentials')).resolves.toEqual(['external-key']);
     await expect(revealed('idempotencyResponses')).resolves.toEqual(['["warning"]']);
+    await expect(revealed('credentialBatchItems')).resolves.toEqual(['{"credentialType":"DPP"}']);
 
     // A re-run converges: everything is already under the active key.
     const again = await rotateEncryptionKey(stores, {
@@ -215,10 +235,19 @@ describe('encryption key lifecycle across every registered store', () => {
       id: 'ext-1',
     });
 
+    // With every credential gone, a queued batch item's issuance request is the
+    // next sample: it is not discardable, so it proves the key like a credential does.
+    await prisma.libraryRecord.deleteMany();
+    await expect(validateEncryptionKeyAtStartup(stores, adapter(OUTGOING_KEY))).resolves.toEqual({
+      validated: true,
+      source: 'credentialBatchItems',
+      id: 'batch-item-1',
+    });
+
     // Deleting the library records cascades their claims, so leave one replay
     // body that opens under the key with no record behind it: it is never
-    // sampled, so there is nothing left to validate against.
-    await prisma.libraryRecord.deleteMany();
+    // sampled, so once the batch is gone there is nothing left to validate against.
+    await prisma.credentialBatch.deleteMany();
     await prisma.idempotencyKey.create({
       data: {
         id: 'claim-orphan',
