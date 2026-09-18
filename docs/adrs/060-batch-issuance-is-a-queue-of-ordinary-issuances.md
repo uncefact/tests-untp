@@ -1,4 +1,4 @@
-# ADR-059: Batch issuance is a queue of ordinary issuances
+# ADR-060: Batch issuance is a queue of ordinary issuances
 
 - **Date:** 2026-09-17
 - **Status:** proposed
@@ -55,4 +55,4 @@ The additional tables, stored counters and fencing fields require migration and 
 - ADR-037
 - ADR-051
 - ADR-054
-- ADR-059 planning artefacts: bulk issuance epic and stories B and C
+- ADR-060 planning artefacts: bulk issuance epic and stories B and C

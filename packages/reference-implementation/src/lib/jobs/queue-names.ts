@@ -14,7 +14,7 @@ export const LIBRARY_RECONCILE_PENDING_RUNS_JOB = 'library.reconcile-pending-run
 /** Scheduled deletion of retained credential batch item data. */
 export const CREDENTIAL_BATCH_EXPIRY_JOB = 'credentials.expire-batches';
 
-/** Sequential issuance of the items in one credential batch (#663, ADR-059). */
+/** Sequential issuance of the items in one credential batch (#663, ADR-060). */
 export const CREDENTIAL_BATCH_ISSUE_JOB = 'credentials.issue-batch';
 
 /** Scheduled recovery of unfinished credential batches whose queue job vanished. */

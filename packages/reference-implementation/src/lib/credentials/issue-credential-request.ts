@@ -37,7 +37,10 @@ export type IssueCredentialRequestInput = {
   tenantId: string;
   body: CredentialIssueRequest;
   idempotencyClaimId?: string;
-  /** Called immediately before the external credential issuance effect begins. */
+  /**
+   * Runs immediately before the external credential issuance effect begins, after request, issuer and service checks.
+   * It is a checkpoint boundary for callers and must not perform issuance or alter the request result.
+   */
   onDispatch?: () => void;
 };
 
@@ -48,6 +51,12 @@ export type IssueCredentialRequestResult = {
 
 const logger = apiLogger.child({ module: 'issue-credential-request' });
 
+/**
+ * The core credential type a resolved data model stands for. That name is
+ * always one the bridge registry knows today, so a miss means the registry
+ * and the core-type vocabulary have drifted apart. The record is still
+ * written, with its core kind unknown, and the operator is told why.
+ */
 function resolveCoreCredentialType(coreDataModelType: string): CoreCredentialType | null {
   const coreCredentialType = coreCredentialTypeOf(coreDataModelType);
   if (coreCredentialType === undefined) {
@@ -60,6 +69,11 @@ function resolveCoreCredentialType(coreDataModelType: string): CoreCredentialTyp
   return coreCredentialType;
 }
 
+/**
+ * Default human verification link: this RI's own verify page, built from the
+ * boot-validated RI_APP_URL (see instrumentation.node.ts). Used when a caller
+ * requests publishing without an explicit publishingOptions.humanVerificationUrl.
+ */
 function defaultHumanVerificationUrl(): string {
   return buildVerifyUrl(resolveAppUrl());
 }
@@ -91,6 +105,13 @@ async function publishIssuedCredential({
 }: PublishIssuedCredentialInput): Promise<void> {
   if (publishingOptions.publish !== true || !refs) return;
 
+  // Publishing resolves its target from the credential's own identifier
+  // (ADR-044): the scheme, registrar and IDR instance all hang off
+  // Identifier, so a missing master-data record no longer decides whether a
+  // credential is discoverable. Every failure below names the unmet
+  // prerequisite and what the caller does about it, and nothing throws: the
+  // credential exists by this point, so a caller who loses the response
+  // loses the id of a credential that was signed and stored.
   let resolution: Awaited<ReturnType<typeof resolvePublishTarget>>;
   try {
     resolution = await resolvePublishTarget(refs, tenantId, publishingOptions.identifierSchemeId);
@@ -191,10 +212,23 @@ async function publishIssuedCredential({
       );
       published = true;
     } catch (error) {
+      // The upstream error carries the resolver's raw response body, which
+      // is operator detail: it goes to the log, not to the caller.
       logger.error(
         { err: error, credentialId, scheme: target.schemePrimaryKey },
         'Failed to publish credential to IDR',
       );
+      // A rejection the resolver stated is distinguishable from one where
+      // the call itself failed: the second may have committed upstream, so it
+      // must not invite a blind retry (the resolver is append-only).
+      // A 4xx is the resolver stating it did not accept the links. A 5xx,
+      // or a failure of the call itself, may still have committed upstream,
+      // so it is reported as unknown rather than as a refusal.
+      // The upstream status rides on ServiceError's `context`, which is
+      // where IdrPublishError puts it; the error's own statusCode is this
+      // service's 502 for any upstream failure. Read it through an
+      // instanceof rather than a cast, so a future rename of the field
+      // fails the build instead of silently reclassifying every failure.
       const status = error instanceof IdrPublishError ? error.context?.httpStatus : undefined;
       const rejected = typeof status === 'number' && status >= 400 && status < 500;
       warnings.push(
@@ -250,6 +284,19 @@ export async function issueCredentialRequest(
   const storageOptions = body.storageOptions ?? {};
   const publishingOptions = body.publishingOptions ?? {};
 
+  // ── Verification URL validation ───────────────────────────────────────
+  // Caller-supplied verification URLs are always validated as well-formed,
+  // absolute, userinfo-free http(s) URLs before issuance, so a malformed,
+  // non-http(s), or credential-bearing value is rejected up front rather than
+  // published or failing later during link construction. assertHttpUrl returns
+  // the WHATWG-canonical URL, and the canonical `href` (not the raw caller
+  // string) is what is SSRF-checked and published downstream. Validating and
+  // publishing the same canonical form closes a parser-differential SSRF gap:
+  // a value like `https://1.1.1.1\@127.0.0.1/` that this parser reads as host
+  // `1.1.1.1` cannot be re-read as `127.0.0.1` by a different parser once the
+  // canonical `href` (`https://1.1.1.1/@127.0.0.1/`) is what leaves the route.
+  // The private-address / DNS SSRF check is additionally applied unless
+  // FETCH_ALLOW_PRIVATE_URLS relaxes it for local development.
   const machineVerificationUrl = publishingOptions.machineVerificationUrl
     ? assertHttpUrl(publishingOptions.machineVerificationUrl, 'publishingOptions.machineVerificationUrl').href
     : undefined;
@@ -288,6 +335,14 @@ export async function issueCredentialRequest(
     }
   }
 
+  // ── Step 3.6: Conformity claim validation (advisory) ────────────────────
+  // For credentials carrying a conformity claim (the DCC), cross-check the
+  // claim's scheme / profile / criteria URIs, its conformity topics and its
+  // score codes against the locally cached vocabulary, and diagnose a
+  // reference that names the wrong catalogue tier. Advisory only per ADR-033
+  // §3 and ADR-059: a mismatch never blocks issuance; it surfaces as
+  // `conformity-*` warnings on the response. Reads only the local projection
+  // (no network).
   try {
     const extracted = bridge.extractConformityClaimWithProvenance(
       credentialPayload.credentialSubject as Record<string, unknown>,
