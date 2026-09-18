@@ -368,7 +368,7 @@ export function credentialBatchIssueHandler(
             if (!released.applied) {
               logger.warn(
                 { ...batchLogFields(batch), settlement: settlement.outcome },
-                'Credential batch cancellation could not release its ownership fence',
+                'Credential batch cancellation settlement in the claim branch could not release the fence this worker holds',
               );
             }
           }
