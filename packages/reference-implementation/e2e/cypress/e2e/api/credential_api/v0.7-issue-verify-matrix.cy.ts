@@ -25,6 +25,8 @@
  */
 
 import { config, runnerReachableUri, runTag } from '../../../support/config';
+import { waitForGeneration } from '../../../support/library';
+import { decodeStoredCredential, expectStatusListIndex } from '../../../support/stored-credential';
 
 const PLAYGROUND_BASE_URL = Cypress.env('PLAYGROUND_BASE_URL') || 'http://localhost:4000';
 
@@ -94,6 +96,7 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
             credentialPayload,
             credentialType: entry.credentialType,
             version: '0.7.0',
+            statusPurposes: ['revocation'],
             storageOptions: { encrypt: false },
           },
         }).then((issueResponse) => {
@@ -110,6 +113,23 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
             cy.request({ method: 'GET', url: storageUri }).then((vcResponse) => {
               expect(vcResponse.status).to.eq(200);
               const envelopedVc = vcResponse.body;
+              const issuedCredential = decodeStoredCredential(envelopedVc);
+              expect(issuedCredential.credentialStatus, `${entry.credentialType} credentialStatus shape`).to.be.an(
+                'object',
+              );
+              expect(
+                Array.isArray(issuedCredential.credentialStatus),
+                `${entry.credentialType} credentialStatus array`,
+              ).to.eq(false);
+              const revocationStatus = issuedCredential.credentialStatus;
+              expect(revocationStatus?.statusPurpose, `${entry.credentialType} revocation status entry`).to.eq(
+                'revocation',
+              );
+              expectStatusListIndex(
+                revocationStatus.statusListIndex,
+                `${entry.credentialType} statusListIndex`,
+                'signed',
+              );
 
               cy.origin(
                 PLAYGROUND_BASE_URL,
@@ -126,17 +146,14 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
                     { force: true },
                   );
 
-                  // The credential-type group opens expanded and shows its
-                  // single instance row; the row's header carries that
-                  // instance's roll-up icon (`StatusIcon` in `TestResults.tsx`,
-                  // testId = instance id), which is `success` only when every
-                  // validation step passes (proof type, VCDM version + schema,
-                  // credential verification, UNTP schema, JSON-LD context).
-                  // The group-level icon only renders while the group is
-                  // collapsed, so it is not what a fresh upload shows. The
-                  // verification step calls the configured VC service, so the
-                  // timeout allows for that network round-trip. `should('exist')`
-                  // retries until then.
+                  // Each visit uploads exactly one credential, so the single
+                  // instance row's header carries that instance's roll-up icon
+                  // (`StatusIcon` in `TestResults.tsx`, testId = instance id),
+                  // which is `success` only when every validation step passes
+                  // (proof type, VCDM version + schema, credential verification,
+                  // UNTP schema, JSON-LD context). The verification step calls
+                  // the configured VC service, so the timeout allows for that
+                  // network round-trip. `should('exist')` retries until then.
                   cy.get(`[data-testid="${credentialType}-group-header"]`, { timeout: 60000 })
                     .parent()
                     .find('[data-testid="credential-instance-header"] [data-testid$="-status-icon-success"]', {
@@ -145,6 +162,69 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
                     .should('exist');
                 },
               );
+            });
+          });
+        });
+      });
+    });
+  });
+
+  it("fails the Reference Implementation's verification after revocation", function () {
+    if (!config.capabilities.statusMutationEnabled) this.skip();
+
+    cy.readFile('../src/templates/v0.7.0/digital_product_passport/example-data.json').then((source) => {
+      const credentialPayload = JSON.parse(JSON.stringify(source)) as Record<string, any>;
+      credentialPayload.id = `urn:uuid:e2e-v070-revoked-${runTag()}`;
+      credentialPayload.name = `E2E revoked DPP ${runTag()}`;
+      credentialPayload.issuer.id = defaultDidValue;
+      credentialPayload.validFrom = VALID_FROM;
+      credentialPayload.validUntil = VALID_UNTIL;
+
+      cy.request({
+        method: 'POST',
+        url: '/api/v1/credentials',
+        body: {
+          credentialPayload,
+          credentialType: 'DigitalProductPassport',
+          version: '0.7.0',
+          statusPurposes: ['revocation'],
+          storageOptions: { encrypt: false },
+        },
+      }).then((issueResponse) => {
+        expect(issueResponse.status).to.eq(201);
+        const credentialId = issueResponse.body.credentialId as string;
+        cy.request({ method: 'GET', url: `/api/v1/credentials/${credentialId}/status` }).then((statusResponse) => {
+          const version = statusResponse.body.entries.find(
+            (entry: any) => entry.statusPurpose === 'revocation',
+          ).version;
+          cy.request({
+            method: 'PUT',
+            url: `/api/v1/credentials/${credentialId}/status/revocation`,
+            headers: { 'If-Version': String(version) },
+            body: { value: true },
+          }).then((revokeResponse) => {
+            expect(revokeResponse.status).to.eq(200);
+            cy.request({ method: 'GET', url: `/api/v1/library/${credentialId}` }).then((libraryResponse) => {
+              expect(libraryResponse.status).to.eq(200);
+              const nextGeneration = libraryResponse.body.verification.generation + 1;
+              cy.request({
+                method: 'POST',
+                url: `/api/v1/library/${credentialId}/verify`,
+              })
+                .then((verifyResponse) => {
+                  expect(verifyResponse.status).to.eq(202);
+                  return waitForGeneration(credentialId, undefined, nextGeneration);
+                })
+                .then((record) => {
+                  expect(record.verification.state).to.eq('complete');
+                  expect(record.verification.summary).to.eq('not_conformant');
+                  // The blocking status failure is the contract under test.
+                  // Whether proof still reports once status fails is the
+                  // verifier's choice, so proof is not asserted here.
+                  expect(record.verification.checks).to.include({
+                    status: 'fail',
+                  });
+                });
             });
           });
         });

@@ -1,3 +1,5 @@
+import { TestCaseStepId } from '../../../../constants';
+
 // Command to upload a credential file (object data or fixture path)
 Cypress.Commands.add('uploadCredential', (credential: object | string) => {
   cy.get('[data-testid="credential-upload"]').should('be.visible');
@@ -43,11 +45,31 @@ Cypress.Commands.add('expandGroup', () => {
   cy.get('[data-testid="credential-instance-header"]').click();
 });
 
-// Command to validate that a specific step shows the expected status icon
+const STEP_TEST_IDS: Record<string, TestCaseStepId[]> = {
+  Decryption: [TestCaseStepId.DECRYPTION],
+  'Proof Type Detection': [TestCaseStepId.PROOF_TYPE],
+  'VCDM Version Detection': [TestCaseStepId.VCDM_VERSION],
+  'VCDM Schema Validation': [TestCaseStepId.VCDM_SCHEMA_VALIDATION],
+  'Credential Verification': [TestCaseStepId.VERIFICATION],
+  'UNTP Schema Validation': [TestCaseStepId.UNTP_SCHEMA_VALIDATION],
+  'Extension Schema Validation': [TestCaseStepId.EXTENSION_SCHEMA_VALIDATION],
+  'JSON-LD Document Expansion and Context Validation': [TestCaseStepId.CONTEXT_VALIDATION],
+  'Version Detection': [TestCaseStepId.SCHEME_VERSION_DETECTION],
+  'Schema Validation': [TestCaseStepId.SCHEME_SCHEMA_VALIDATION, TestCaseStepId.LINKSET_SCHEMA_VALIDATION],
+  'Structural Parse': [TestCaseStepId.SCHEME_STRUCTURAL_PARSE],
+  'Link Type Coverage': [TestCaseStepId.LINKSET_LINK_TYPE_COVERAGE],
+};
+
+// Command to validate that a specific step shows the expected status icon.
 Cypress.Commands.add(
   'checkValidationStatus',
   (stepName: string, status: 'success' | 'failure' | 'in progress' | 'missing') => {
-    cy.contains(stepName).parent().find(`[data-testid$="status-icon-${status}"]`).should('be.visible');
+    const stepIds = STEP_TEST_IDS[stepName];
+    if (!stepIds) throw new Error(`No status test id is registered for Playground step "${stepName}".`);
+    const statusSuffix = status === 'in progress' ? 'in-progress' : status === 'missing' ? 'pending' : status;
+    cy.get(stepIds.map((stepId) => `[data-testid="${stepId}-status-icon-${statusSuffix}"]`).join(', '))
+      .filter(':visible')
+      .should('have.length.at.least', 1);
   },
 );
 
@@ -63,7 +85,23 @@ Cypress.Commands.add('openErrorDetails', () => {
 
 // Command to open error details for a specific step
 Cypress.Commands.add('openErrorDetailsByStepName', (stepName: string) => {
-  cy.contains(stepName).parent().parent().contains('View Details').should('be.visible').click();
+  const detailsTestIds: Partial<Record<string, TestCaseStepId>> = {
+    'Schema Validation': TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
+    'Structural Parse': TestCaseStepId.SCHEME_STRUCTURAL_PARSE,
+  };
+  const detailsTestId = detailsTestIds[stepName];
+  if (detailsTestId) {
+    cy.get(`[data-testid="${detailsTestId}-details-trigger"]`).should('be.visible').click();
+  } else {
+    const stepId = STEP_TEST_IDS[stepName]?.[0];
+    if (!stepId) throw new Error(`No status test id is registered for Playground step "${stepName}".`);
+    cy.get(`[data-testid="${stepId}-status-icon-failure"]`)
+      .closest('div.py-2')
+      .find('button')
+      .contains('View Details')
+      .should('be.visible')
+      .click();
+  }
   // Wait for the sheet content to be visible after animation
   cy.contains('Validation Details', { timeout: 15000 }).should('be.visible');
 });

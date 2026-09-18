@@ -1,3 +1,4 @@
+import { TestCaseStatus } from '../../../constants';
 import { config } from '../support/config';
 import { CONFORMITY_SCHEME_E2E_VERSIONS } from '../fixtures/conformity-schemes-e2e/registry';
 
@@ -34,6 +35,27 @@ CONFORMITY_SCHEME_E2E_VERSIONS.forEach((spec) => {
       cy.checkValidationStatus('Schema Validation', 'success');
       cy.checkValidationStatus('Structural Parse', 'success');
       cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'success');
+    });
+
+    it('includes the Structural Parse failure in a generated report', () => {
+      const structuralParseCase = spec.invalidCases.find((invalidCase) => invalidCase.failsAt === 'Structural Parse');
+      expect(structuralParseCase, 'registry contains a Structural Parse case').to.exist;
+      const malformed = structuralParseCase!.mutate(JSON.parse(JSON.stringify(spec.validSample)));
+      const implementationName = `Structural Parse Report ${spec.version}`;
+
+      openSchemesTab();
+      cy.uploadCredential(malformed);
+      cy.get(`[data-testid="${SCHEME_GROUP_HEADER}"]`).click();
+      cy.checkValidationStatus('Structural Parse', 'failure');
+
+      cy.generateReport(implementationName);
+      cy.downloadAndVerifyReport(implementationName, false).then((report) => {
+        const structuralParseStep = report.conformitySchemes[0].steps.find(
+          (step: { name: string }) => step.name === 'Structural Parse',
+        );
+        expect(structuralParseStep).to.exist;
+        expect(structuralParseStep.status).to.eq(TestCaseStatus.FAILURE);
+      });
     });
 
     spec.invalidCases.forEach((invalidCase) => {

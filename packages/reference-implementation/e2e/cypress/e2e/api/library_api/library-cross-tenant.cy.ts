@@ -158,6 +158,30 @@ describe('Library API cross-tenant journey', { testIsolation: false }, () => {
       })
       .then((response) => {
         expect(response.status).to.eq(404);
+        return cy
+          .request({
+            method: 'GET',
+            url: `/api/v1/credentials/${nativeCredentialId}/status`,
+            headers: { Authorization: `Bearer ${tokenB}` },
+            failOnStatusCode: false,
+          })
+          .then((statusResponse) => {
+            expect(statusResponse.status).to.eq(404);
+            expect(statusResponse.body.code).to.eq('NOT_FOUND');
+            expect(statusResponse.body.error).to.eq('No such credential record.');
+            return cy.request({
+              method: 'PUT',
+              url: `/api/v1/credentials/${nativeCredentialId}/status/revocation`,
+              headers: { Authorization: `Bearer ${tokenB}`, 'If-Version': '1' },
+              body: { value: true },
+              failOnStatusCode: false,
+            });
+          });
+      })
+      .then((response) => {
+        expect(response.status).to.eq(404);
+        expect(response.body.code).to.eq('NOT_FOUND');
+        expect(response.body.error).to.eq('No such credential record.');
         return cy.request({
           method: 'GET',
           url: '/api/v1/library',

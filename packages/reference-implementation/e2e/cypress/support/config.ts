@@ -7,6 +7,14 @@
  */
 export { runTag, runnerReachableUri } from './instance-contract';
 
+const configuredStatusPurposes = Cypress.env('CREDENTIAL_STATUS_DEFAULT_PURPOSES');
+const statusDefaultPurposes =
+  configuredStatusPurposes === 'none'
+    ? []
+    : String(configuredStatusPurposes ?? 'revocation')
+        .split(',')
+        .filter((purpose) => purpose.length > 0);
+
 export const config = {
   idp: {
     provider: Cypress.env('IDP_PROVIDER') as 'keycloak' | 'zitadel',
@@ -37,6 +45,7 @@ export const config = {
   services: {
     vckit: {
       baseUrl: Cypress.env('VCKIT_BASE_URL') as string,
+      publicBaseUrl: Cypress.env('VCKIT_PUBLIC_BASE_URL') as string,
       apiKey: Cypress.env('VCKIT_API_KEY') as string,
       didWebResolvable: Cypress.env('VCKIT_DID_WEB_RESOLVABLE') as boolean,
     },
@@ -54,6 +63,11 @@ export const config = {
       publicBaseUrl: Cypress.env('IDR_PUBLIC_BASE_URL') as string,
       apiKey: Cypress.env('IDR_API_KEY') as string,
     },
+  },
+  capabilities: {
+    statusMutationEnabled: Cypress.env('CREDENTIAL_STATUS_MUTATION_ENABLED') as boolean,
+    statusDefaultPurposes,
+    statusMultiplePurposesEnabled: Cypress.env('CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED') as boolean,
   },
   tenantMode: (Cypress.env('TENANT_MODE') || 'open') as 'open' | 'closed',
   groups: {

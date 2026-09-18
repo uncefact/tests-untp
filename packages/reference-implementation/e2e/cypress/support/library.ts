@@ -5,7 +5,7 @@
  */
 export function waitForGeneration(
   id: string,
-  token: string,
+  token: string | undefined,
   generation: number,
   timeoutMs = 90_000,
 ): Cypress.Chainable<Record<string, any>> {
@@ -16,7 +16,7 @@ export function waitForGeneration(
       .request({
         method: 'GET',
         url: `/api/v1/library/${id}`,
-        headers: { Authorization: `Bearer ${token}` },
+        ...(token === undefined ? {} : { headers: { Authorization: `Bearer ${token}` } }),
       })
       .then((response) => {
         const body = response.body as Record<string, any>;
