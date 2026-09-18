@@ -1,7 +1,8 @@
-# ADR-058: Conformity score membership and catalogue tier diagnosis
+# ADR-059: Conformity score membership and catalogue tier diagnosis
 
 - **Date:** 2026-09-17
 - **Status:** accepted
+- **Update (2026-09-18):** Renumbered from ADR-058 to ADR-059; the decision and body are unchanged.
 - **Update (2026-09-17):** Scheme graph and stored scoring-document reads now use one Prisma repeatable-read snapshot, so reload-on-disagreement handling starts from a coherent read window. Ingest records malformed scoring content as `SCHEMA_INVALID` after the schema check, while the parser's stricter direct-consumer failures remain `PARSE_FAILED`; a scheme contradiction that survives reload returns only the validation advisory, while a profile contradiction returns the reloaded graph's warnings beside it.
 
 ## Context

@@ -13,7 +13,7 @@ type IssuanceConformityWarning = StructuredWarning;
  * the validator cannot raise because their cause is the catalogue rather than
  * the claim.
  *
- * Validation is advisory (ADR-058 decision 1), so this runs inside the route's
+ * Validation is advisory (ADR-059 decision 1), so this runs inside the route's
  * step 3.6 boundary and a warning never blocks the credential response.
  * Scoring evidence comes from the selected scheme's stored document (decision
  * 9). The applicable scheme, profile, criterion and topic checks still run

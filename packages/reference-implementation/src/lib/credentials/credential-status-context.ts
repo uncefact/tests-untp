@@ -15,6 +15,11 @@ import {
   readPendingToken,
 } from '@/lib/prisma/repositories/credential-status-entry.repository';
 import { resolveServiceInstance } from '@/lib/services/resolve-service';
+import {
+  STATUS_METADATA_UNAVAILABLE_MESSAGE,
+  statusEntryNotFoundMessage,
+  statusInvalidObservationMessage,
+} from './credential-status-messages';
 import { CredentialStatusError, statusReadFailure } from './credential-status-error';
 
 /** Reads only tenant-owned records, including the origin needed to refuse external management. */
@@ -45,14 +50,10 @@ export type StatusRecord = Awaited<ReturnType<typeof loadStatusRecord>>;
 /** Capture and entry selection precede transition policy and version validation (ADR-058). */
 export function selectStatusEntry(record: StatusRecord, purpose: string): CredentialStatusEntry {
   if (record.statusCapture !== 'CAPTURED') {
-    throw new ConflictError(
-      'Status metadata is unavailable. Ask the operator to run pnpm backfill:credential-status-entries, using --retry-failed for a retryable capture failure.',
-      'STATUS_METADATA_UNAVAILABLE',
-    );
+    throw new ConflictError(STATUS_METADATA_UNAVAILABLE_MESSAGE, 'STATUS_METADATA_UNAVAILABLE');
   }
   const entry = record.statusEntries.find((candidate) => candidate.statusPurpose === purpose);
-  if (!entry)
-    throw new NotFoundError(`The credential has no status entry for purpose "${purpose}".`, 'STATUS_ENTRY_NOT_FOUND');
+  if (!entry) throw new NotFoundError(statusEntryNotFoundMessage(purpose), 'STATUS_ENTRY_NOT_FOUND');
   return entry;
 }
 
@@ -214,11 +215,7 @@ export function checkedStatusObservation(
     observation.statusListCredential !== entry.statusListCredential ||
     observation.statusListIndex !== entry.statusListIndex
   ) {
-    throw new CredentialStatusError(
-      'VC_STATUS_RESPONSE_INVALID',
-      'The status service returned an invalid observation. No status change was confirmed.',
-      502,
-    );
+    throw new CredentialStatusError('VC_STATUS_RESPONSE_INVALID', statusInvalidObservationMessage(), 502);
   }
   return observation;
 }

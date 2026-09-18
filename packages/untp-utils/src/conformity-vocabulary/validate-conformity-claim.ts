@@ -36,7 +36,7 @@ import type {
  * that filters empty or malformed entries shifts both `/assessments/{i}` and
  * topic indices away from their source positions (#753).
  *
- * @see ADR-033 §3 and ADR-058 for warning code definitions.
+ * @see ADR-033 §3 and ADR-059 for warning code definitions.
  */
 export function validateConformityClaim(
   claim: ConformityClaim,

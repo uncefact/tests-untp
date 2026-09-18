@@ -1,5 +1,10 @@
 import { ServiceError, VcStatusEntryUnsupportedError, VcStatusResponseInvalidError } from '@uncefact/untp-ri-services';
 import { UnprocessableError } from '@/lib/api/errors';
+import {
+  STATUS_PENDING_READ_NOTICE,
+  statusEntryUnsupportedMessage,
+  statusInvalidObservationMessage,
+} from './credential-status-messages';
 
 /** Sanitised status-operation failure. The cause stays in the operator log. */
 export class CredentialStatusError extends ServiceError {
@@ -15,7 +20,6 @@ export class CredentialStatusError extends ServiceError {
   }
 }
 
-const PENDING_READ_NOTICE = 'The pending intent is unchanged and retrying will not help.';
 const CLEAR_FAILURE_NOTICE =
   'The reservation could not be cleared. Read the stored status and reconcile if it remains pending.';
 
@@ -42,7 +46,7 @@ export function statusReadFailure(
     if (!clearAttempted && !(pendingKept && error.code === 'VC_STATUS_RESPONSE_INVALID')) return error;
     const message =
       pendingKept && error.code === 'VC_STATUS_RESPONSE_INVALID'
-        ? `${error.message} ${PENDING_READ_NOTICE}`
+        ? `${error.message} ${STATUS_PENDING_READ_NOTICE}`
         : error.message;
     return new CredentialStatusError(
       error.code,
@@ -56,7 +60,7 @@ export function statusReadFailure(
   if (error instanceof UnprocessableError) {
     const translated = new UnprocessableError(
       statusFailureMessage(
-        pendingKept ? `${error.message} ${PENDING_READ_NOTICE}` : error.message,
+        pendingKept ? `${error.message} ${STATUS_PENDING_READ_NOTICE}` : error.message,
         clearFailure,
         clearAttempted,
       ),
@@ -81,13 +85,7 @@ export function statusReadFailure(
     }
     return withClearFailure(
       new UnprocessableError(
-        statusFailureMessage(
-          pendingKept
-            ? `The status entry cannot be represented by this service. ${PENDING_READ_NOTICE}`
-            : 'The status entry cannot be represented by this service.',
-          clearFailure,
-          clearAttempted,
-        ),
+        statusFailureMessage(statusEntryUnsupportedMessage(pendingKept), clearFailure, clearAttempted),
         'STATUS_ENTRY_UNSUPPORTED',
       ),
       clearFailure,
@@ -97,13 +95,7 @@ export function statusReadFailure(
   if (error instanceof VcStatusResponseInvalidError) {
     return new CredentialStatusError(
       'VC_STATUS_RESPONSE_INVALID',
-      statusFailureMessage(
-        pendingKept
-          ? `The status service returned an invalid observation. No status change was confirmed. ${PENDING_READ_NOTICE}`
-          : 'The status service returned an invalid observation. No status change was confirmed.',
-        clearFailure,
-        clearAttempted,
-      ),
+      statusFailureMessage(statusInvalidObservationMessage(pendingKept), clearFailure, clearAttempted),
       502,
       error,
       undefined,

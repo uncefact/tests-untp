@@ -355,6 +355,12 @@ export const PATCH = withTenantAuth(async (req, { tenantId, params }) => {
  *               oneOf:
  *                 - $ref: '#/components/schemas/ErrorResponse'
  *                 - $ref: '#/components/schemas/ServiceInstanceStatusPendingResponse'
+ *             examples:
+ *               pendingStatusOperation:
+ *                 summary: A pending credential status operation blocks service-instance deletion
+ *                 value:
+ *                   error: 'Service instance "service-instance-1" has 1 pending credential status operation. Wait for the pending status operations on credentials using this instance to complete, or have an operator reconcile them before changing or deleting the instance.'
+ *                   code: SERVICE_INSTANCE_STATUS_PENDING
  *       500:
  *         description: Server error
  *         content:

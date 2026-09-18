@@ -9,6 +9,8 @@ Run this operator job after upgrading a database that contains native credential
 
 Run the `pnpm` forms from `packages/reference-implementation`; the packaged `docker compose` form needs no working directory.
 
+The command accepts each option at most once. Options that take a value must have one. Unknown options and extra words are refused.
+
 ```bash
 pnpm backfill:credential-status-entries
 ```

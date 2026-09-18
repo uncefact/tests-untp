@@ -1,6 +1,8 @@
 import {
   readDefaultStatusPurposes,
+  readStatusLockAcquireMs,
   readStatusMultiplePurposesEnabled,
+  readStatusMutationEnabled,
   validateStatusSettingsOnBoot,
 } from './credential-status.config';
 
@@ -145,5 +147,21 @@ describe('status operation durations', () => {
     );
     expect(() => validateStatusSettingsOnBoot({ CREDENTIAL_STATUS_MUTATION_ENABLED: 'true' })).not.toThrow();
     expect(() => validateStatusSettingsOnBoot({ CREDENTIAL_STATUS_MUTATION_ENABLED: 'false' })).not.toThrow();
+  });
+});
+
+describe('status operation enablement and lock acquisition', () => {
+  it.each([undefined, '', 'false', 'TRUE'])('only enables mutation for literal true (%p)', (raw) => {
+    // Catches a regression that enables mutation for an unrecognised spelling instead of the boot-validated literal.
+    const env = raw === undefined ? {} : { CREDENTIAL_STATUS_MUTATION_ENABLED: raw };
+    expect(readStatusMutationEnabled(env)).toBe(false);
+  });
+
+  it('uses the lenient lock fallback semantics for the mutex', () => {
+    // Catches a regression that makes the mutex and boot warning use different fallback or parsing rules.
+    expect(readStatusMutationEnabled({ CREDENTIAL_STATUS_MUTATION_ENABLED: 'true' })).toBe(true);
+    expect(readStatusLockAcquireMs({})).toBe(2_000);
+    expect(readStatusLockAcquireMs({ CREDENTIAL_STATUS_LOCK_ACQUIRE_MS: '40' })).toBe(40);
+    expect(readStatusLockAcquireMs({ CREDENTIAL_STATUS_LOCK_ACQUIRE_MS: 'invalid' })).toBe(2_000);
   });
 });

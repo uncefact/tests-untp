@@ -1,6 +1,7 @@
 import { ConflictError } from '@/lib/api/errors';
 import { prisma } from '@/lib/prisma/prisma';
 import { isTransactionDeadlock } from '@/lib/prisma/db-errors';
+import { STATUS_RECONCILIATION_IN_PROGRESS_MESSAGE } from './credential-status-messages';
 import { lockLibraryRecordForUpdate } from '@/lib/prisma/repositories/library-record.repository';
 import {
   finaliseStatusChange,
@@ -62,10 +63,7 @@ export async function reconcileCredentialStatus(input: ReconcileCredentialStatus
           500,
         );
       if (clock.now.getTime() < entry.pendingDeadline.getTime() + readStatusReconcileGraceMs()) {
-        throw new ConflictError(
-          'The status operation and its recovery grace window have not ended. Retry reconciliation later.',
-          'STATUS_OPERATION_IN_PROGRESS',
-        );
+        throw new ConflictError(STATUS_RECONCILIATION_IN_PROGRESS_MESSAGE, 'STATUS_OPERATION_IN_PROGRESS');
       }
     }
     const provider = await lockStatusProvider(tx, instanceId, input.tenantId);

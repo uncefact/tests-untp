@@ -17,8 +17,13 @@ import {
   StatusListMutexTimeoutError,
   withStatusListMutex,
 } from '@/lib/services/status-list-mutex';
-import { readStatusOperationBudgetMs } from '@/lib/config/credential-status.config';
+import { readStatusMutationEnabled, readStatusOperationBudgetMs } from '@/lib/config/credential-status.config';
 import { SUPPORTED_STATUS_PURPOSES } from './status-purposes';
+import {
+  STATUS_PURPOSE_UNSUPPORTED_MESSAGE,
+  statusOperationInProgressMessage,
+  statusRecoveryRequiredMessage,
+} from './credential-status-messages';
 import { CredentialStatusError, statusFailureMessage, statusReadFailure } from './credential-status-error';
 import {
   assertPendingToken,
@@ -51,10 +56,7 @@ export type SetCredentialStatusRequest = {
 
 function assertTransition(entry: CredentialStatusEntry, value: boolean): void {
   if (!(SUPPORTED_STATUS_PURPOSES as readonly string[]).includes(entry.statusPurpose)) {
-    throw new UnprocessableError(
-      'This status purpose cannot be changed by this service.',
-      'STATUS_PURPOSE_UNSUPPORTED',
-    );
+    throw new UnprocessableError(STATUS_PURPOSE_UNSUPPORTED_MESSAGE, 'STATUS_PURPOSE_UNSUPPORTED');
   }
   const descriptor = entry.descriptor;
   if (
@@ -93,7 +95,7 @@ function prepare(record: StatusRecord, input: SetCredentialStatusRequest) {
  */
 export async function setCredentialStatus(input: SetCredentialStatusRequest) {
   prepare(await loadStatusRecord(input.recordId, input.tenantId), input);
-  if (process.env.CREDENTIAL_STATUS_MUTATION_ENABLED !== 'true') {
+  if (!readStatusMutationEnabled()) {
     throw new CredentialStatusError(
       'STATUS_MUTATION_DISABLED',
       'Status changes are not enabled on this deployment. Contact the operator.',
@@ -126,8 +128,8 @@ export async function setCredentialStatus(input: SetCredentialStatusRequest) {
       if (result === 'pending_exists' || result === 'pending_expired')
         throw new ConflictError(
           result === 'pending_exists'
-            ? `A status change for purpose "${prepared.entry.statusPurpose}" is in progress. The requested operation to set it to ${input.value} must wait for it to complete.`
-            : `A status change for purpose "${prepared.entry.statusPurpose}" remains unconfirmed. The requested operation to set it to ${input.value} must be reconciled before another change.`,
+            ? statusOperationInProgressMessage(prepared.entry.statusPurpose, input.value)
+            : statusRecoveryRequiredMessage(prepared.entry.statusPurpose, input.value),
           result === 'pending_exists' ? 'STATUS_OPERATION_IN_PROGRESS' : 'STATUS_RECOVERY_REQUIRED',
         );
       throw new CredentialStatusError(

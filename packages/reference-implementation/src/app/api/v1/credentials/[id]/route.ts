@@ -7,6 +7,7 @@ import { retiredRoute } from '@/lib/api/retired-route';
 import { deleteNativeCredentialAndCopy } from '@/lib/credentials/delete-native-credential';
 import { isDatabaseError } from '@/lib/prisma/db-errors';
 import { getRequestContext } from '@uncefact/untp-ri-services/logging';
+import { credentialDeleteStatusOperationMessage } from '@/lib/credentials/credential-status-messages';
 
 const logger = appLogger.child({ module: 'credentials-id-route' });
 
@@ -179,12 +180,8 @@ export const DELETE = withTenantAuth(async (_req, { tenantId, params }) => {
     throw new ForbiddenError(EXTERNAL_DELETE_MESSAGE, 'EXTERNAL_RECORD_NOT_DELETABLE_HERE');
   }
   if (result.outcome === 'status_change_pending') {
-    const count = result.statusPurposes.length;
-    const purposes = result.statusPurposes.join(', ');
     throw new ConflictError(
-      `Cannot delete credential "${id}" while ${count} pending status operation${count === 1 ? '' : 's'} ${
-        count === 1 ? 'remains' : 'remain'
-      } for purposes: ${purposes}. Wait for the pending status operations to complete, or have an operator reconcile them.`,
+      credentialDeleteStatusOperationMessage(id, result.statusPurposes),
       'STATUS_OPERATION_IN_PROGRESS',
     );
   }

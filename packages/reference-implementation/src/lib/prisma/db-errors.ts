@@ -63,6 +63,17 @@ export function isTransactionDeadlock(error: unknown): boolean {
   return meta?.code === '40P01';
 }
 
+/** Recognises Prisma and pool messages that mean transaction capacity was unavailable. */
+export function isPoolWaitError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  if (candidate.code === 'P2024') return true;
+  if (typeof candidate.message !== 'string') return false;
+  if (candidate.code === 'P2028' && /Unable to start a transaction in the given time/i.test(candidate.message))
+    return true;
+  return /connection pool|timed out fetching a new connection|maxwait/i.test(candidate.message);
+}
+
 /**
  * P2003 scoped to a specific foreign-key column, for writes that carry more
  * than one foreign key: a bare isForeignKeyViolation check on such a write
