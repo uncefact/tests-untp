@@ -1,5 +1,4 @@
-import { config, runnerReachableUri, runTag } from '../../../support/config';
-import { decodeStoredCredential, decryptStoredCopy, expectStatusListIndex } from '../../../support/stored-credential';
+import { config, runTag } from '../../../support/config';
 import { readV070CredentialPayload } from '../../../support/v0.7-credential-payload';
 import { assertIssuedCredential } from '../../../support/credential-batch';
 
@@ -21,7 +20,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
   let foreignDid: string;
 
   type CredentialRequest = {
-    credentialPayload: Record<string, any>;
+    credentialPayload: Record<string, unknown>;
     credentialType: string;
     version: string;
     statusPurposes: string[];
@@ -117,11 +116,12 @@ describe('Credential batch API', { testIsolation: false }, () => {
   }
 
   before(() => {
-    cy.task('getServiceAccountToken', config.serviceAccounts.sa2).then((result: any) => {
+    cy.task('getServiceAccountToken', config.serviceAccounts.sa2).then((result) => {
+      const { accessToken } = result as { accessToken: string };
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
-        headers: { Authorization: `Bearer ${result.accessToken}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
         body: {
           type: 'MANAGED',
           method: 'DID_WEB',
@@ -177,7 +177,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
 
     cy.request('/api/v1/dids').then((response) => {
       expect(response.status).to.eq(200);
-      const defaultDid = response.body.data.find((did: Record<string, any>) => did.isDefault === true);
+      const defaultDid = response.body.data.find((did: { did: string; isDefault?: boolean }) => did.isDefault === true);
       expect(defaultDid, 'A default DID must be configured for the batch issuer').to.exist;
       issuerDid = defaultDid.did;
     });

@@ -135,7 +135,13 @@ it('reports unsettled cancellations separately from requeued, superseded and fai
     'Credential batch reconciliation finished',
   );
   expect(appLogger.warn).toHaveBeenCalledWith(
-    { batchId: 'batch-3', tenantId: 'tenant-1', settlement: 'not-ready' },
+    {
+      correlationId: 'batch-correlation',
+      batchCorrelationId: 'batch-correlation',
+      batchId: 'batch-3',
+      tenantId: 'tenant-1',
+      settlement: 'not-ready',
+    },
     'Credential batch settlement did not apply during recovery',
   );
   expect(appLogger.error).toHaveBeenCalledWith(

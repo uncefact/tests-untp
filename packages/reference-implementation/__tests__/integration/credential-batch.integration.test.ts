@@ -1574,7 +1574,9 @@ describe('credential batch persistence and progression', () => {
         Array.from({ length: count }, () => ITEM),
       ),
     );
-    const input = { batchId, tenantId: 'tenant-1', token: 'cancel-attempt' };
+    const batch = await getCredentialBatchById(batchId, 'tenant-1');
+    if (batch === null) throw new Error('expected the running batch fixture to exist');
+    const input = { batchId, tenantId: 'tenant-1', token: 'cancel-attempt', correlationId: batch.correlationId };
     await prisma.$transaction(async (tx) => {
       expect(await claimBatchAttempt(tx, { ...input, expectedVersion: 0 })).toEqual({ applied: true });
       if (processing)

@@ -362,9 +362,11 @@ describe('credential batch item retry scheduling', () => {
     // Regression: takeover must preserve an operator-searchable item id instead of restoring the old generic message.
     const itemUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
       credentialBatch: {
         findFirst: jest.fn().mockResolvedValue({
           state: CredentialBatchState.RUNNING,
+          version: 2,
           attemptToken: 'old-token',
           lastProgressAt: new Date(0),
           correlationId: 'batch-correlation',
@@ -402,9 +404,11 @@ describe('credential batch item retry scheduling', () => {
     const batchCorrelationId = 'b'.repeat(128);
     const itemUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
       credentialBatch: {
         findFirst: jest.fn().mockResolvedValue({
           state: CredentialBatchState.RUNNING,
+          version: 2,
           attemptToken: 'old-token',
           lastProgressAt: new Date(0),
           correlationId: batchCorrelationId,
@@ -559,7 +563,17 @@ describe('credential batch item retry scheduling', () => {
 
       const continuationQueue = { enqueueWithin: jest.fn().mockResolvedValue(undefined) };
       await repository.checkpointBatchContinuation(
-        { credentialBatch: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } } as never,
+        {
+          $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-configured' }]),
+          credentialBatch: {
+            findFirst: jest.fn().mockResolvedValue({
+              state: CredentialBatchState.RUNNING,
+              attemptToken: 'attempt-token',
+              cancelRequestedAt: null,
+            }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+        } as never,
         {
           batchId: 'batch-configured',
           tenantId: 'tenant-1',

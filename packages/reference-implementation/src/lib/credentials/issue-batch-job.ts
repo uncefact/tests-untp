@@ -104,7 +104,11 @@ function itemLogFields(batch: CredentialBatchWithItems, index: number, itemCorre
 }
 
 function missingBatchLogFields(payload: CredentialBatchIssuePayload) {
-  return { correlationId: getRequestContext()?.correlationId ?? null, batchId: payload.batchId, tenantId: payload.tenantId };
+  return {
+    correlationId: getRequestContext()?.correlationId ?? null,
+    batchId: payload.batchId,
+    tenantId: payload.tenantId,
+  };
 }
 
 async function handleCheckpointOutcome(
@@ -134,10 +138,7 @@ async function handleCheckpointOutcome(
     return;
   }
 
-  logger.warn(
-    { ...fields, settlement: checkpoint.outcome },
-    'Credential batch cancellation could not settle',
-  );
+  logger.warn({ ...fields, settlement: checkpoint.outcome }, 'Credential batch cancellation could not settle');
   const released = await deps.transaction((tx) =>
     deps.releaseAttempt(tx, {
       batchId: payload.batchId,
@@ -355,7 +356,7 @@ export function credentialBatchIssueHandler(
             );
           } else if (settlement.outcome === 'already-settled') {
             logger.info(
-              { ...logFields(payload), settlement: settlement.outcome },
+              { ...batchLogFields(batch), settlement: settlement.outcome },
               'Credential batch cancellation already settled',
             );
           } else {
@@ -377,12 +378,13 @@ export function credentialBatchIssueHandler(
               );
             }
           }
-        } else if (claimed.outcome !== 'claimed') {
+          return;
+        }
+        if (claimed.outcome !== 'claimed') {
           const level = claimed.outcome === 'missing' ? 'warn' : 'info';
           logger[level]({ ...batchLogFields(batch), outcome: claimed.outcome }, 'Credential batch claim stopped');
+          return;
         }
-        return;
-      }
 
         const { index, request } = claimed.item;
         itemsAttempted += 1;
