@@ -56,17 +56,19 @@ export function fakeStore<Column extends string, R extends { id: string } & Reco
   };
 }
 
-/** The four stores over their row arrays, in the port's shape. */
+/** The five stores over their row arrays, in the port's shape. */
 export function fakeStores(
   serviceInstances: ServiceInstanceRow[] = [],
   credentials: KeyRow[] = [],
   replayRows: ReplayRow[] = [],
   externalCredentials: KeyRow[] = [],
+  batchItemRows: { id: string; request: string | null }[] = [],
 ): EnvelopeStores & Record<keyof EnvelopeStores, FakeEnvelopeStore> {
   return {
     serviceInstances: fakeStore(serviceInstances, 'config', false),
     credentials: fakeStore(credentials, 'decryptionKey', true),
     externalCredentials: fakeStore(externalCredentials, 'decryptionKey', false),
     idempotencyResponses: fakeStore(replayRows, 'responseBody', false),
+    credentialBatchItems: fakeStore(batchItemRows, 'request', false),
   };
 }

@@ -49,6 +49,8 @@
     "services:repair-config": "npx tsx scripts/services-repair-config.ts",
     "backfill:credential-status-attribution": "npx tsx scripts/backfill-credential-status-attribution.ts",
     "rotate:encryption-key": "npx tsx scripts/rotate-encryption-key.ts",
+    "batch:resolve-item": "npx tsx scripts/resolve-credential-batch-item.ts",
+    "batch:inspect-item": "npx tsx scripts/inspect-credential-batch-item.ts",
     "test:integration": "prisma generate && jest --config jest.integration.config.mjs"
   },
   "browserslist": {

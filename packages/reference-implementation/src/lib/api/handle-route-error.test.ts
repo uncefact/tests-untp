@@ -10,6 +10,7 @@ jest.mock('next/server', () => ({
 jest.mock('@/lib/api/logger');
 const mockLogger = jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>;
 
+import { CredentialStatusError } from '@/lib/credentials/credential-status-error';
 import {
   NotFoundError,
   ForbiddenError,
@@ -27,7 +28,7 @@ import { ServiceError } from '@uncefact/untp-ri-services';
 import { handleRouteError } from './handle-route-error';
 
 interface MockResponse {
-  json: () => Promise<{ error: string; code?: string }>;
+  json: () => Promise<{ error: string; code?: string; observed?: { value: boolean; observedAt: string } }>;
 }
 
 beforeEach(() => {
@@ -142,11 +143,43 @@ describe('handleRouteError', () => {
   // --- ServiceRegistryError sub-types ---
 
   it('maps ServiceInstanceNotFoundError to 404', async () => {
-    const res = handleRouteError(new ServiceInstanceNotFoundError('inst-42'));
+    const error = new ServiceInstanceNotFoundError('inst-42');
+    const res = handleRouteError(error);
 
     expect(res.status).toBe(404);
     const body = await (res as unknown as MockResponse).json();
-    expect(body).toEqual({ error: 'Service instance not found: inst-42' });
+    expect(body).toEqual({ error: 'Service instance not found: inst-42', code: 'SERVICE_INSTANCE_NOT_FOUND' });
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    expect(mockLogger.error).toHaveBeenCalledWith({ err: error }, 'Service registry error');
+    expect(mockLogger.error).not.toHaveBeenCalledWith(expect.anything(), 'Unexpected error');
+  });
+
+  it('maps CredentialStatusError with its observed value and logs it once', async () => {
+    const error = new CredentialStatusError(
+      'VC_STATUS_RESPONSE_INVALID',
+      'The status response was invalid.',
+      502,
+      undefined,
+      {
+        value: true,
+        observedAt: '2026-09-18T02:28:00.000Z',
+      },
+    );
+    const res = handleRouteError(error);
+
+    expect(res.status).toBe(502);
+    const body = await (res as unknown as MockResponse).json();
+    expect(body).toEqual({
+      error: 'The status response was invalid.',
+      code: 'VC_STATUS_RESPONSE_INVALID',
+      observed: { value: true, observedAt: '2026-09-18T02:28:00.000Z' },
+    });
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      { err: error, code: 'VC_STATUS_RESPONSE_INVALID', status: 502 },
+      'Credential status operation failed',
+    );
+    expect(mockLogger.error).not.toHaveBeenCalledWith(expect.anything(), 'Unexpected error');
   });
 
   it('maps ServiceResolutionError to 500', async () => {

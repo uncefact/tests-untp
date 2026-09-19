@@ -49,16 +49,25 @@ describe('withStatusListMutex', () => {
   });
 
   it('fails on acquisition expiry before calling the callback', async () => {
-    // Catches a regression that invokes the provider after the lock budget expires.
-    mockQueryRaw.mockResolvedValue([{ acquired: false }]);
+    // Catches a regression that invokes the provider after the lock budget expires or wraps an existing timeout.
     const callback = jest.fn();
 
-    await expect(
-      withStatusListMutex('status-list:origin:busy', callback, {
+    const timeoutError = new StatusListMutexTimeoutError('status-list:origin:busy');
+    mockQueryRaw.mockRejectedValueOnce(timeoutError);
+    const phrase = 'Timed out acquiring the status-list mutex for status-list:origin:busy';
+    let error: unknown;
+    try {
+      await withStatusListMutex('status-list:origin:busy', callback, {
         signal: new AbortController().signal,
-        deadlineAt: Date.now() + 100,
-      }),
-    ).rejects.toBeInstanceOf(StatusListMutexTimeoutError);
+        deadlineAt: Date.now() + 1_000,
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBe(timeoutError);
+    expect(error).toBeInstanceOf(StatusListMutexTimeoutError);
+    expect((error as Error).message.split(phrase).length - 1).toBe(1);
 
     expect(callback).not.toHaveBeenCalled();
   });

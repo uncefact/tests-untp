@@ -186,6 +186,11 @@ export class PgBossJobQueue implements JobQueue<SqlExecutor> {
     await this.assertInserted(jobId, name, options);
   }
 
+  async hasActiveJob(name: string, batchId: string): Promise<boolean> {
+    const jobs = await this.boss.findJobs(name, { data: { batchId } });
+    return jobs.some((job) => job.state === 'created' || job.state === 'retry' || job.state === 'active');
+  }
+
   async declareQueue(name: string, options?: Pick<RegisterOptions, 'dedupeWaiting'>): Promise<void> {
     await this.ensureQueue(name, options?.dedupeWaiting ? 'short' : 'standard');
   }

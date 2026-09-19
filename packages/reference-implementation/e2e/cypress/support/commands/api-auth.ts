@@ -7,7 +7,7 @@ import { config } from '../config';
  * fills in credentials, and validates the session on a quiet test page.
  * Subsequent cy.request() calls automatically include the session cookie.
  */
-Cypress.Commands.add('apiLogin', (username?: string, password?: string) => {
+Cypress.Commands.add('apiLogin', (username?: string, password?: string, options: { cleanupActor?: boolean } = {}) => {
   const user = username ?? config.user.email;
   const pass = password ?? config.user.password;
   const provider = config.idp.provider || 'keycloak';
@@ -66,6 +66,7 @@ Cypress.Commands.add('apiLogin', (username?: string, password?: string) => {
   cy.request('/api/auth/session').then(({ body }) => {
     expect(body?.user?.id, 'authenticated session user ID').to.be.a('string').and.not.be.empty;
     expect(body.error, 'session authentication error').to.be.undefined;
+    if (options.cleanupActor === false) return;
     return cy.getAllCookies().then((cookies) => cy.task('captureSessionCookies', { cookies, user }));
   });
 });

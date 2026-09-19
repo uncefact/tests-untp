@@ -29,6 +29,15 @@ jest.mock('@/lib/library/verify-generation-job', () => ({ registerLibraryJobs: j
 jest.mock('@/lib/library/reconcile-pending-runs-job', () => ({
   registerPendingRunReconciliation: jest.fn(),
 }));
+jest.mock('@/lib/credentials/credential-batch-expiry-job', () => ({
+  registerCredentialBatchExpiry: jest.fn(),
+}));
+jest.mock('@/lib/credentials/issue-batch-job', () => ({
+  registerCredentialBatchIssue: jest.fn(),
+}));
+jest.mock('@/lib/credentials/reconcile-batches-job', () => ({
+  registerCredentialBatchReconciliation: jest.fn(),
+}));
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: { $queryRawUnsafe: jest.fn(async () => []), $disconnect: jest.fn(async () => undefined) },
 }));
@@ -48,7 +57,12 @@ jest.mock('@/lib/jobs/app-job-queue', () => ({
 // NodeSDK's Node-only dependency graph out of this handler-focused jsdom suite.
 jest.mock('../lib/observability/start-sdk', () => ({ buildNodeSdk: jest.fn() }));
 
-import { LIBRARY_RECONCILE_PENDING_RUNS_JOB } from '@/lib/jobs/queue-names';
+import {
+  CREDENTIAL_BATCH_EXPIRY_JOB,
+  CREDENTIAL_BATCH_RECONCILE_JOB,
+  LIBRARY_RECONCILE_PENDING_RUNS_JOB,
+} from '@/lib/jobs/queue-names';
+import { registerCredentialBatchIssue } from '@/lib/credentials/issue-batch-job';
 import { runWorker } from './bootstrap';
 import { WorkerBootError } from './errors';
 
@@ -59,6 +73,10 @@ beforeEach(() => {
   process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
   delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_CRON;
   delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE;
+  delete process.env.BATCH_EXPIRY_SWEEP_MINUTES;
+  delete process.env.BATCH_RETENTION_DAYS;
+  delete process.env.BATCH_SETTLEMENT_ALLOWANCE_MS;
+  delete process.env.BATCH_MINIMUM_ITEM_COST_MS;
   delete process.env.WORKER_JOB_TIMEOUT_SECONDS;
   fakeQueue.start.mockImplementation(async () => undefined);
   fakeQueue.schedule.mockImplementation(async () => undefined);
@@ -68,8 +86,27 @@ describe('the reconciliation schedule at worker boot', () => {
   it('is recorded on a queue that started cleanly', () => {
     return runWorker(OPTIONS).then(() => {
       expect(fakeQueue.schedule).toHaveBeenCalledWith(LIBRARY_RECONCILE_PENDING_RUNS_JOB, '*/10 * * * *');
+      expect(fakeQueue.schedule).toHaveBeenCalledWith(CREDENTIAL_BATCH_EXPIRY_JOB, '0 * * * *');
+      expect(fakeQueue.schedule).toHaveBeenCalledWith(CREDENTIAL_BATCH_RECONCILE_JOB, '*/10 * * * *');
+      expect(registerCredentialBatchIssue).toHaveBeenCalledWith(fakeQueue, undefined, 1, {
+        settlementAllowanceMs: 5_000,
+        minimumItemCostMs: 2_000,
+      });
       expect(startHeartbeat).toHaveBeenCalledTimes(1);
       expect(startHeartbeat).toHaveBeenCalledWith(expect.objectContaining({ maxJobMs: 360_000 }));
+    });
+  });
+
+  it('passes the resolved batch budget to the issue handler registration', async () => {
+    // Regression: the handler must use the boot-resolved budget rather than reading environment values again later.
+    process.env.BATCH_SETTLEMENT_ALLOWANCE_MS = '7000';
+    process.env.BATCH_MINIMUM_ITEM_COST_MS = '3000';
+
+    await runWorker(OPTIONS);
+
+    expect(registerCredentialBatchIssue).toHaveBeenCalledWith(fakeQueue, undefined, 1, {
+      settlementAllowanceMs: 7_000,
+      minimumItemCostMs: 3_000,
     });
   });
 
@@ -89,6 +126,14 @@ describe('the reconciliation schedule at worker boot', () => {
     await expect(runWorker(OPTIONS)).resolves.toBeUndefined();
 
     expect(fakeQueue.schedule).toHaveBeenCalledWith(LIBRARY_RECONCILE_PENDING_RUNS_JOB, '*/5 * * * *');
+  });
+
+  it('is recorded on the cadence BATCH_EXPIRY_SWEEP_MINUTES sets', async () => {
+    process.env.BATCH_EXPIRY_SWEEP_MINUTES = '15';
+
+    await expect(runWorker(OPTIONS)).resolves.toBeUndefined();
+
+    expect(fakeQueue.schedule).toHaveBeenCalledWith(CREDENTIAL_BATCH_EXPIRY_JOB, '*/15 * * * *');
   });
 
   it('fails the boot, naming the variable, before the queue exists when the cadence is malformed', async () => {
@@ -118,12 +163,37 @@ describe('the reconciliation schedule at worker boot', () => {
     expect(fakeQueue.start).not.toHaveBeenCalled();
   });
 
+  it('fails the boot, naming the variable, when batch retention is malformed', async () => {
+    // Regression: retention is worker-owned and must be checked before the queue starts.
+    process.env.BATCH_RETENTION_DAYS = '1.5';
+
+    await expect(runWorker(OPTIONS)).rejects.toMatchObject({
+      code: 'worker.configuration-invalid',
+      message: expect.stringContaining('BATCH_RETENTION_DAYS'),
+    });
+
+    expect(fakeQueue.start).not.toHaveBeenCalled();
+  });
+
   it('fails the boot, naming the variable, when the worker job timeout is malformed', async () => {
+    // Regression: worker timeout failures must be wrapped by the worker configuration owner.
     process.env.WORKER_JOB_TIMEOUT_SECONDS = '10s';
 
     await expect(runWorker(OPTIONS)).rejects.toMatchObject({
       code: 'worker.configuration-invalid',
       message: expect.stringContaining('WORKER_JOB_TIMEOUT_SECONDS'),
+    });
+
+    expect(fakeQueue.start).not.toHaveBeenCalled();
+  });
+
+  it('fails the boot, naming the variable, when the worker batch settlement allowance is malformed', async () => {
+    // Regression: budget failures must keep the stable boot code and prevent the queue from starting.
+    process.env.BATCH_SETTLEMENT_ALLOWANCE_MS = 'abc';
+
+    await expect(runWorker(OPTIONS)).rejects.toMatchObject({
+      code: 'worker.configuration-invalid',
+      message: expect.stringContaining('BATCH_SETTLEMENT_ALLOWANCE_MS'),
     });
 
     expect(fakeQueue.start).not.toHaveBeenCalled();

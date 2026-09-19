@@ -153,6 +153,9 @@ export interface JobQueue<Tx = SqlExecutor> {
   /** Enqueue in its own transaction. */
   enqueue<P extends object>(name: string, payload: P, options?: EnqueueOptions): Promise<void>;
 
+  /** Return whether a queued, retrying or active job carries the batch id. */
+  hasActiveJob(name: string, batchId: string): Promise<boolean>;
+
   /**
    * Run `name` on a cron schedule. However many worker replicas run, each
    * tick dispatches once. Ticks are dispatched without a dedupe key, so a

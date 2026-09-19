@@ -43,12 +43,14 @@ function client(
   credentials: KeyRow[] = [],
   replays: { id: string; responseBody: string | null }[] = [],
   externals: KeyRow[] = [],
+  batchItems: { id: string; request: string }[] = [],
 ) {
   return {
     serviceInstance: fakeDelegate(serviceInstances, 'config'),
     credential: fakeDelegate(credentials, 'decryptionKey'),
     externalCredential: fakeDelegate(externals, 'decryptionKey'),
     idempotencyKey: fakeDelegate(replays, 'responseBody'),
+    credentialBatchItem: fakeDelegate(batchItems, 'request'),
   } satisfies PrismaEnvelopeStoresClient;
 }
 
@@ -143,6 +145,32 @@ describe('Prisma envelope stores (the adapter)', () => {
     await expect(stores.externalCredentials.readCurrent('ext-1')).resolves.toEqual({ kind: 'present', value: 'next' });
     await expect(stores.externalCredentials.readCurrent('ext-null')).resolves.toEqual({ kind: 'cleared' });
     await expect(stores.externalCredentials.readCurrent('nope')).resolves.toEqual({ kind: 'missing' });
+  });
+
+  it('walks and samples every credential batch item request', async () => {
+    const batchItems = Array.from({ length: 101 }, (_, i) => ({
+      id: `batch-item-${String(i).padStart(3, '0')}`,
+      request: `envelope-${i}`,
+    }));
+    const c = client([], [], [], [], batchItems);
+    const stores = prismaEnvelopeStores(c);
+
+    await expect(ids(stores.credentialBatchItems.rows())).resolves.toHaveLength(101);
+    await expect(ids(stores.credentialBatchItems.candidates())).resolves.toHaveLength(101);
+    expect(c.credentialBatchItem.findMany).toHaveBeenNthCalledWith(1, {
+      where: {},
+      select: { id: true, request: true },
+      orderBy: { id: 'asc' },
+      take: 100,
+    });
+    expect(c.credentialBatchItem.findMany.mock.calls[1][0].where).toEqual({
+      id: { gt: 'batch-item-099' },
+    });
+    await expect(stores.credentialBatchItems.casWrite('batch-item-000', 'envelope-0', 'rotated')).resolves.toBe(true);
+    await expect(stores.credentialBatchItems.readCurrent('batch-item-000')).resolves.toEqual({
+      kind: 'present',
+      value: 'rotated',
+    });
   });
 
   it('samples every stored replay body, since that store never holds plaintext', async () => {

@@ -55,6 +55,21 @@ jest.mock('@/lib/library/reconcile-pending-runs-job', () => ({
     order.push('reconcile-register');
   }),
 }));
+jest.mock('@/lib/credentials/credential-batch-expiry-job', () => ({
+  registerCredentialBatchExpiry: jest.fn(() => {
+    order.push('batch-expiry-register');
+  }),
+}));
+jest.mock('@/lib/credentials/issue-batch-job', () => ({
+  registerCredentialBatchIssue: jest.fn(() => {
+    order.push('batch-issue-register');
+  }),
+}));
+jest.mock('@/lib/credentials/reconcile-batches-job', () => ({
+  registerCredentialBatchReconciliation: jest.fn(() => {
+    order.push('batch-reconcile-register');
+  }),
+}));
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: { $queryRawUnsafe: jest.fn(async () => []), $disconnect: jest.fn(async () => undefined) },
 }));
@@ -109,7 +124,12 @@ describe('the shutdown steps runWorker wires', () => {
       'construct',
       'register',
       'reconcile-register',
+      'batch-expiry-register',
+      'batch-issue-register',
+      'batch-reconcile-register',
       'start',
+      'schedule',
+      'schedule',
       'schedule',
     ]);
   });

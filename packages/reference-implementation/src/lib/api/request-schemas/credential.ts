@@ -17,6 +17,9 @@ const statusPurposesSchema = z
     }
   });
 
+export const CREDENTIAL_STATUS_NOT_ACCEPTED_MESSAGE =
+  "The reference implementation mints and manages the credential's status entries; remove credentialStatus from the payload.";
+
 /**
  * Storage service options for POST /credentials. Previously unvalidated at
  * the boundary, so a mistyped value (e.g. `encrypt: "false"`, which the
@@ -94,23 +97,23 @@ export const publishingOptionsSchema = z.object({
  * boundary only asserts "an object was sent". After that pass succeeds the
  * handler asserts the value to CredentialPayload in one place.
  */
-export const credentialIssueRequestSchema = z.object({
-  credentialPayload: z
-    .record(z.unknown())
-    .superRefine((payload, ctx) => {
-      if ('credentialStatus' in payload) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['credentialStatus'],
-          message:
-            "The reference implementation mints and manages the credential's status entries; remove credentialStatus from the payload.",
-          params: { code: 'CREDENTIAL_STATUS_NOT_ACCEPTED' },
-        });
-      }
-    })
-    .describe(
-      'The full credential payload to sign. The reference implementation mints and manages status entries, so do not include credentialStatus.',
-    ),
+const credentialPayloadSchema = z.record(z.unknown());
+const credentialPayloadForSingleIssuanceSchema = credentialPayloadSchema
+  .superRefine((payload, ctx) => {
+    if ('credentialStatus' in payload) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['credentialStatus'],
+        message: CREDENTIAL_STATUS_NOT_ACCEPTED_MESSAGE,
+        params: { code: 'CREDENTIAL_STATUS_NOT_ACCEPTED' },
+      });
+    }
+  })
+  .describe(
+    'The full credential payload to sign. The reference implementation mints and manages status entries, so do not include credentialStatus.',
+  );
+
+const credentialIssueRequestFields = {
   credentialType: nonBlankString.describe(
     'Type of credential to issue (e.g. DigitalProductPassport, DigitalLivestockPassport)',
   ),
@@ -122,8 +125,25 @@ export const credentialIssueRequestSchema = z.object({
     ),
   storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
   publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),
+};
+
+export const credentialIssueRequestSchema = z.object({
+  credentialPayload: credentialPayloadForSingleIssuanceSchema,
+  ...credentialIssueRequestFields,
 });
 
+/** A batch item extends the single-issuance request with its issuer-owned correlation reference. */
+export const credentialBatchItemRequestSchema = credentialIssueRequestSchema.extend({
+  reference: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[^\u0000-\u001F\u007F-\u009F]*$/, 'must not contain control characters')
+    .optional()
+    .describe('Issuer-supplied item reference, echoed on batch status responses when provided'),
+});
+
+export type CredentialIssueRequest = z.infer<typeof credentialIssueRequestSchema>;
 /**
  * Request body for POST /credentials/verify, porting the route's previous
  * hand-rolled checks with the same semantics. Refines that wrap throwing

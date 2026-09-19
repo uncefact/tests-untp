@@ -121,7 +121,29 @@ describe('published error response examples', () => {
     }
   });
 
-  it('documents 413 on every operation that accepts a request body, by reference', () => {
+  it('publishes the coded missing-service example on every affected route', () => {
+    const expected = {
+      error: 'Service instance not found: service-instance-1',
+      code: 'SERVICE_INSTANCE_NOT_FOUND',
+    };
+    const routes = [
+      ['post', '/schemes'],
+      ['patch', '/schemes/{id}'],
+      ['post', '/registrars'],
+      ['patch', '/registrars/{id}'],
+      ['post', '/dids/import'],
+    ] as const;
+
+    for (const [method, route] of routes) {
+      expect(spec.paths?.[route]?.[method]?.responses?.['404']?.content?.['application/json']?.examples).toEqual(
+        expect.objectContaining({
+          serviceInstanceNotFound: expect.objectContaining({ value: expected }),
+        }),
+      );
+    }
+  });
+
+  it('documents 413 on every operation that accepts a request body', () => {
     const operationsWithBody = Object.entries(spec.paths ?? {}).flatMap(([route, pathItem]) =>
       HTTP_METHODS.flatMap((method) => {
         const operation = pathItem[method];
@@ -133,7 +155,11 @@ describe('published error response examples', () => {
     const without413 = operationsWithBody.filter((id) => {
       const [method, ...routeParts] = id.split(' ');
       const route = routeParts.join(' ');
-      return spec.paths?.[route]?.[method]?.responses?.['413']?.$ref !== PAYLOAD_TOO_LARGE_RESPONSE_REF;
+      const response = spec.paths?.[route]?.[method]?.responses?.['413'];
+      return (
+        response?.$ref !== PAYLOAD_TOO_LARGE_RESPONSE_REF &&
+        response?.content?.['application/json']?.examples === undefined
+      );
     });
 
     expect(operationsWithBody.length).toBeGreaterThan(0);
@@ -213,27 +239,21 @@ describe('published error response examples', () => {
       'patch /organisations/{id} 404',
       'patch /organisations/{id} 409',
       'patch /products/{id} 409',
-      'patch /registrars/{id} 404',
       'patch /render-templates/{id} 404',
-      'patch /schemes/{id} 404',
       'patch /schemes/{id} 409',
       'patch /services/{id} 404',
-      'post /credentials 404',
       'post /credentials/verify 422',
       'post /credentials/verify 502',
       'post /dids 404',
       'post /dids 409',
       'post /dids 502',
-      'post /dids/import 404',
       'post /dids/{id}/verify 404',
       'post /facilities 404',
       'post /identifiers 404',
       'post /library/{id}/verify 404',
       'post /organisations 404',
       'post /products 404',
-      'post /registrars 404',
       'post /render-templates 404',
-      'post /schemes 404',
     ]);
   });
 

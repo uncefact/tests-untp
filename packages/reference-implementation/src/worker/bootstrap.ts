@@ -18,7 +18,16 @@ import { validateConfiguredEncryptionKey } from '../lib/encryption/encryption-ke
 import { resolveDataEncryptionKey } from '../lib/encryption/resolve-data-encryption-key';
 import { createJobQueue, resolveQueueConnectionString } from '../lib/jobs/app-job-queue';
 import type { JobQueue } from '../lib/jobs/types';
-import { LIBRARY_RECONCILE_PENDING_RUNS_JOB, LIBRARY_VERIFY_JOB } from '../lib/jobs/queue-names';
+import {
+  CREDENTIAL_BATCH_EXPIRY_JOB,
+  CREDENTIAL_BATCH_ISSUE_JOB,
+  CREDENTIAL_BATCH_RECONCILE_JOB,
+  LIBRARY_RECONCILE_PENDING_RUNS_JOB,
+  LIBRARY_VERIFY_JOB,
+} from '../lib/jobs/queue-names';
+import { registerCredentialBatchExpiry } from '../lib/credentials/credential-batch-expiry-job';
+import { registerCredentialBatchIssue } from '../lib/credentials/issue-batch-job';
+import { registerCredentialBatchReconciliation } from '../lib/credentials/reconcile-batches-job';
 import { registerPendingRunReconciliation } from '../lib/library/reconcile-pending-runs-job';
 import { registerLibraryJobs } from '../lib/library/verify-generation-job';
 import { prisma } from '../lib/prisma/prisma';
@@ -65,6 +74,30 @@ async function scheduleReconciliation(queue: JobQueue, cron: string): Promise<vo
   }
 }
 
+async function scheduleBatchExpiry(queue: JobQueue, cron: string): Promise<void> {
+  try {
+    await queue.schedule(CREDENTIAL_BATCH_EXPIRY_JOB, cron);
+  } catch (error) {
+    throw new WorkerBootError(
+      'worker.batch-expiry-schedule-failed',
+      `The ${CREDENTIAL_BATCH_EXPIRY_JOB} schedule (${cron}) could not be recorded, so expired credential batch data would be retained indefinitely`,
+      error,
+    );
+  }
+}
+
+async function scheduleBatchReconciliation(queue: JobQueue, cron: string): Promise<void> {
+  try {
+    await queue.schedule(CREDENTIAL_BATCH_RECONCILE_JOB, cron);
+  } catch (error) {
+    throw new WorkerBootError(
+      'worker.batch-reconciliation-schedule-failed',
+      `The ${CREDENTIAL_BATCH_RECONCILE_JOB} schedule (${cron}) could not be recorded, so vanished credential batch jobs would not be recovered`,
+      error,
+    );
+  }
+}
+
 export async function runWorker(options: RunWorkerOptions): Promise<void> {
   const logger = appLogger.child({ module: 'worker' });
 
@@ -88,11 +121,15 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
 
   await assertSchemaReady(prismaMigrationRows(prisma), imageMigrations);
   await requireEncryptionKeyOnBoot();
-  const { reconciliationCron, jobTimeoutSeconds } = workerConfiguration;
+  const { reconciliationCron, batchExpirySweepCron, jobTimeoutSeconds, batchJobConcurrency, batchBudgetSettings } =
+    workerConfiguration;
 
   const queue = createJobQueue();
   registerLibraryJobs(queue);
   registerPendingRunReconciliation(queue);
+  registerCredentialBatchExpiry(queue);
+  registerCredentialBatchIssue(queue, undefined, batchJobConcurrency, batchBudgetSettings);
+  registerCredentialBatchReconciliation(queue);
 
   let heartbeat: Heartbeat | undefined;
   let shuttingDown = false;
@@ -131,6 +168,12 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
     await scheduleReconciliation(queue, reconciliationCron);
   }
   if (!shuttingDown) {
+    await scheduleBatchExpiry(queue, batchExpirySweepCron);
+  }
+  if (!shuttingDown) {
+    await scheduleBatchReconciliation(queue, reconciliationCron);
+  }
+  if (!shuttingDown) {
     heartbeat = startHeartbeat({
       logger,
       probe: () => queue.probe(),
@@ -142,8 +185,15 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
 
   logger.info(
     {
-      queues: [LIBRARY_VERIFY_JOB, LIBRARY_RECONCILE_PENDING_RUNS_JOB],
+      queues: [
+        LIBRARY_VERIFY_JOB,
+        LIBRARY_RECONCILE_PENDING_RUNS_JOB,
+        CREDENTIAL_BATCH_EXPIRY_JOB,
+        CREDENTIAL_BATCH_ISSUE_JOB,
+        CREDENTIAL_BATCH_RECONCILE_JOB,
+      ],
       reconciliationCron,
+      batchExpirySweepCron,
       heartbeat: heartbeat !== undefined,
     },
     heartbeat === undefined

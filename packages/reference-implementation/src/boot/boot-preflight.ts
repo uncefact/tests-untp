@@ -13,6 +13,10 @@ import { resolveRefreshIntervalHours } from '../lib/config/cvc-refresh-interval.
 import { resolveServiceName } from '../lib/observability/resource';
 import { readWorkerJobTimeoutSeconds } from '../lib/config/worker-job-timeout.config';
 import {
+  validateCredentialBatchRequestBodySettingsOnWebBoot,
+  validateCredentialBatchSettingsOnBoot,
+} from '../lib/config/credential-batch.config';
+import {
   resolveDataEncryptionKey,
   type ResolvedDataEncryptionKey,
 } from '../lib/encryption/resolve-data-encryption-key';
@@ -56,9 +60,11 @@ export async function runBootPreflight(
   validateHttpUserAgentOnBoot();
   validateCacheMaxEntriesOnBoot();
   validateBundledArtefactsFallbackOnBoot();
+  validateCredentialBatchSettingsOnBoot();
   if (role === 'web') {
     validateStaleClaimOnBoot();
     validateMaxRequestBodyBytesOnBoot();
+    validateCredentialBatchRequestBodySettingsOnWebBoot();
     validateFetchSettingsOnBoot(logger);
     validateStatusSettingsOnBoot(process.env, logger);
   }

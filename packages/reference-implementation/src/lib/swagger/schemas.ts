@@ -32,6 +32,7 @@ import {
 } from '@uncefact/untp-ri-services';
 import { paginationMetaSchema } from '@/lib/api/pagination';
 import { credentialIssueRequestSchema } from '@/lib/api/request-schemas/credential';
+import { credentialBatchRequestSchema } from '@/lib/api/request-schemas/credential-batch';
 import {
   batchGetLibraryRequestSchema,
   registerExternalCredentialRequestSchema,
@@ -49,8 +50,13 @@ import {
   originSchema,
   verificationSummarySchema,
 } from '@/lib/library/credential-record-projection';
+import {
+  OPERATOR_CONFIRMED_FAILURE_CODE,
+  OPERATOR_CONFIRMED_FAILURE_MESSAGE,
+} from '@/lib/credentials/credential-batch-projection';
 import { libraryReadFailureSchema } from '@/lib/library/library-read-errors';
 import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
+import { CredentialBatchItemState, CredentialBatchState } from '@/lib/prisma/generated';
 import {
   conformitySchemeSummarySchema,
   conformityProfileSummarySchema,
@@ -110,6 +116,60 @@ export const credentialDeleteStatusOperationResponseSchema = errorResponseSchema
 /** Conflict response when a service instance is pinned by a pending status operation. */
 export const serviceInstanceStatusPendingResponseSchema = errorResponseSchema.extend({
   code: z.literal('SERVICE_INSTANCE_STATUS_PENDING'),
+});
+
+/** Accepted response returned by POST /credentials/batches. */
+export const credentialBatchAcceptedResponseSchema = z.object({
+  batchId: z.string(),
+  status: z.string().describe('Relative status URL for the batch'),
+});
+
+const credentialBatchStateSchema = z.nativeEnum(CredentialBatchState);
+const credentialBatchItemStateSchema = z.nativeEnum(CredentialBatchItemState);
+
+export const credentialBatchCountsSchema = z.object({
+  total: z.number().int().nonnegative(),
+  queued: z.number().int().nonnegative(),
+  processing: z.number().int().nonnegative(),
+  issued: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  unknown: z.number().int().nonnegative(),
+});
+
+export const credentialBatchItemErrorSchema = z.object({
+  code: z
+    .string()
+    .describe(
+      `Error code. ${OPERATOR_CONFIRMED_FAILURE_CODE} means an operator confirmed that no credential was issued; ITEM_ATTEMPTS_EXHAUSTED means the bounded pre-dispatch retry limit was reached.`,
+    ),
+  message: z
+    .string()
+    .describe(
+      `Human-readable error message. For ${OPERATOR_CONFIRMED_FAILURE_CODE}, this is always "${OPERATOR_CONFIRMED_FAILURE_MESSAGE}".`,
+    ),
+});
+
+export const credentialBatchItemStatusSchema = z.object({
+  index: z.number().int().nonnegative(),
+  reference: z.string().optional().describe('Issuer-supplied item reference, present when supplied at submission'),
+  state: credentialBatchItemStateSchema,
+  credentialId: z.string().optional(),
+  warning: z.unknown().optional(),
+  error: credentialBatchItemErrorSchema.optional(),
+});
+
+export const credentialBatchStatusSchema = z.object({
+  id: z.string(),
+  state: credentialBatchStateSchema,
+  counts: credentialBatchCountsSchema,
+  createdAt: z.string().describe('ISO 8601 timestamp'),
+  settledAt: z.string().nullable().describe('ISO 8601 timestamp, or null while active'),
+  items: z.array(credentialBatchItemStatusSchema),
+});
+
+export const credentialBatchExpiredResponseSchema = credentialBatchStatusSchema.extend({
+  error: z.string(),
+  code: z.literal('BATCH_EXPIRED'),
 });
 
 // ============================================================================
@@ -497,6 +557,10 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     DidDocument: didDocumentResponseSchema,
     CredentialIssueRequest: credentialIssueRequestSchema,
     CredentialIssueResponse: credentialIssueResponseSchema,
+    CredentialBatchRequest: credentialBatchRequestSchema,
+    CredentialBatchAcceptedResponse: credentialBatchAcceptedResponseSchema,
+    CredentialBatchStatus: credentialBatchStatusSchema,
+    CredentialBatchExpiredResponse: credentialBatchExpiredResponseSchema,
     CredentialWarning: credentialWarningSchema,
     Registrar: registrarSchema,
     SchemeQualifier: schemeQualifierSchema,
@@ -566,6 +630,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     // components keep it: their shapes are server-produced and closed.
     if (
       name === 'CredentialIssueRequest' ||
+      name === 'CredentialBatchRequest' ||
       name === 'RegisterExternalCredentialRequest' ||
       name === 'UpdateLibraryAnnotationsRequest' ||
       name === 'BatchGetLibraryRequest' ||

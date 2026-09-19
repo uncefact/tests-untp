@@ -35,6 +35,7 @@ export const PRISMA_STORE_COLUMNS: Record<EnvelopeStoreId, string> = {
   credentials: 'Credential.decryptionKey',
   externalCredentials: 'ExternalCredential.decryptionKey',
   idempotencyResponses: 'IdempotencyKey.responseBody',
+  credentialBatchItems: 'CredentialBatchItem.request',
 };
 
 type Cursor = { id?: { gt: string } };
@@ -97,6 +98,16 @@ export type PrismaEnvelopeStoresClient = {
       where: { id: string };
       select: { id: true; responseBody: true };
     }): Promise<{ id: string; responseBody: string | null } | null>;
+  };
+  credentialBatchItem: {
+    findMany(
+      args: { where: Cursor; select: { id: true; request: true } } & Page,
+    ): Promise<Array<{ id: string; request: string }>>;
+    updateMany(args: { where: { id: string; request: string }; data: { request: string } }): Promise<{ count: number }>;
+    findUnique(args: {
+      where: { id: string };
+      select: { id: true; request: true };
+    }): Promise<{ id: string; request: string } | null>;
   };
 };
 
@@ -252,6 +263,41 @@ function idempotencyResponses(client: PrismaEnvelopeStoresClient): EnvelopeStore
   };
 }
 
+function credentialBatchItems(client: PrismaEnvelopeStoresClient): EnvelopeStore {
+  const delegate = client.credentialBatchItem;
+  const rows = (): AsyncGenerator<StoredValue> =>
+    eachPage(async (cursor) =>
+      (
+        await delegate.findMany({
+          where: after(cursor),
+          select: { id: true, request: true },
+          ...page,
+        })
+      ).map((row) => ({ id: row.id, value: row.request })),
+    );
+  return {
+    rows,
+    candidates: rows,
+    async casWrite(id, expected, next) {
+      const { count } = await delegate.updateMany({
+        where: { id, request: expected },
+        data: { request: next },
+      });
+      return count === 1;
+    },
+    async discard() {
+      throw new Error('A credential batch item request is never discarded independently of its batch');
+    },
+    async readCurrent(id) {
+      const row = await delegate.findUnique({
+        where: { id },
+        select: { id: true, request: true },
+      });
+      return current(row?.request);
+    },
+  };
+}
+
 /** Every store, bound to the given client. A store listed in the port without an adapter here fails to compile. */
 export function prismaEnvelopeStores(client: PrismaEnvelopeStoresClient): EnvelopeStores {
   return {
@@ -259,5 +305,6 @@ export function prismaEnvelopeStores(client: PrismaEnvelopeStoresClient): Envelo
     credentials: credentials(client),
     externalCredentials: externalCredentials(client),
     idempotencyResponses: idempotencyResponses(client),
+    credentialBatchItems: credentialBatchItems(client),
   };
 }

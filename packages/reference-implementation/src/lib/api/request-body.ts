@@ -1,29 +1,35 @@
 import { PayloadTooLargeError, RequestBodyUnreadableError } from '@/lib/api/errors';
 import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config';
 
-export function requestBodyTooLargeMessage(maxBytes: number): string {
-  return `The request body exceeds the maximum of ${maxBytes} bytes.`;
+export function requestBodyTooLargeMessage(maxBytes: number, settingName?: string): string {
+  return settingName === undefined
+    ? `The request body exceeds the maximum of ${maxBytes} bytes.`
+    : `The request body exceeds ${settingName} of ${maxBytes} bytes.`;
 }
 
-function throwRequestBodyTooLarge(maxBytes: number): never {
-  throw new PayloadTooLargeError(requestBodyTooLargeMessage(maxBytes), 'REQUEST_BODY_TOO_LARGE');
+function throwRequestBodyTooLarge(maxBytes: number, settingName?: string): never {
+  throw new PayloadTooLargeError(requestBodyTooLargeMessage(maxBytes, settingName), 'REQUEST_BODY_TOO_LARGE');
 }
 
 /**
- * Reads the raw request bytes, bounded by `MAX_REQUEST_BODY_BYTES`. A
- * `Content-Length` that already exceeds the cap is rejected before any
- * bytes are buffered. Otherwise the body is read in chunks and rejected as
- * soon as the accumulated length exceeds the cap, so a lying or absent
- * `Content-Length` still cannot make the process hold more than one chunk
- * beyond the bound. A request with no body yields an empty byte array.
+ * Reads the raw request bytes with the supplied bound, or
+ * `MAX_REQUEST_BODY_BYTES` when no bound is supplied. A `Content-Length` that
+ * already exceeds the cap is rejected before any bytes are buffered.
+ * Otherwise the body is read in chunks and rejected as soon as the accumulated
+ * length exceeds the cap, so a lying or absent `Content-Length` still cannot
+ * make the process hold more than one chunk beyond the bound. A request with
+ * no body yields an empty byte array.
  */
-export async function readRequestBytes(req: Request): Promise<Uint8Array> {
-  const maxBytes = readMaxRequestBodyBytes();
+export async function readRequestBytes(
+  req: Request,
+  maxBytes = readMaxRequestBodyBytes(),
+  settingName?: string,
+): Promise<Uint8Array> {
   const contentLengthHeader = req.headers.get('content-length');
   if (contentLengthHeader !== null) {
     const contentLength = Number(contentLengthHeader);
     if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-      throwRequestBodyTooLarge(maxBytes);
+      throwRequestBodyTooLarge(maxBytes, settingName);
     }
   }
 
@@ -46,7 +52,7 @@ export async function readRequestBytes(req: Request): Promise<Uint8Array> {
         } catch {
           // The size rejection is what the caller acts on.
         }
-        throwRequestBodyTooLarge(maxBytes);
+        throwRequestBodyTooLarge(maxBytes, settingName);
       }
       chunks.push(value);
     }

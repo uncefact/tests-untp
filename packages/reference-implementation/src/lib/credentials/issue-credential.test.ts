@@ -165,6 +165,7 @@ function buildInput(overrides: Partial<IssueCredentialInput> = {}): IssueCredent
     storageService: stubStorageService as unknown as IssueCredentialInput['storageService'],
     storageOptions: { encrypt: true },
     bridge: stubBridge as unknown as IssueCredentialInput['bridge'],
+    onDispatch: () => undefined,
     ...overrides,
   };
 }
@@ -192,11 +193,17 @@ describe('issueCredential', () => {
   });
 
   it('signs the credential payload', async () => {
-    await issueCredential(buildInput());
+    // Regression: the external-effect checkpoint must reach the VC service's sign options.
+    const onDispatch = jest.fn();
+    await issueCredential(buildInput({ onDispatch }));
 
     expect(stubVcService.service.sign).toHaveBeenCalledWith(
       PAYLOAD,
-      expect.objectContaining({ statusPurposes: ['revocation'], serialise: expect.any(Function) }),
+      expect.objectContaining({
+        statusPurposes: ['revocation'],
+        serialise: expect.any(Function),
+        onDispatch,
+      }),
     );
   });
 

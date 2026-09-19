@@ -184,6 +184,16 @@ services:
       # Read by this process as well as app-worker. Keep the value the same
       # across both services so one background-work budget is in force.
       - WORKER_JOB_TIMEOUT_SECONDS
+      - MAX_BATCH_ITEMS
+      - MAX_BATCH_REQUEST_BODY_BYTES
+      - BATCH_RETENTION_DAYS
+      - BATCH_EXPIRY_SWEEP_MINUTES
+      - BATCH_JOB_RETRY_LIMIT
+      - BATCH_JOB_RETRY_BACKOFF_SECONDS
+      - BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS
+      - BATCH_SETTLEMENT_ALLOWANCE_MS
+      - BATCH_MINIMUM_ITEM_COST_MS
+      - BATCH_JOB_CONCURRENCY
       # Tenant mode (default: open; override to "closed" for closed mode tests)
       - TENANT_MODE=${TENANT_MODE:-open}
       - TENANT_CLAIM_NAME=${TENANT_CLAIM_NAME:-groups}
@@ -251,6 +261,15 @@ services:
       - LIBRARY_RECONCILE_PENDING_RUNS_CRON=${LIBRARY_RECONCILE_PENDING_RUNS_CRON:-}
       - LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE=${LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE:-}
       - WORKER_JOB_TIMEOUT_SECONDS
+      - MAX_BATCH_ITEMS
+      - BATCH_RETENTION_DAYS
+      - BATCH_EXPIRY_SWEEP_MINUTES
+      - BATCH_JOB_RETRY_LIMIT
+      - BATCH_JOB_RETRY_BACKOFF_SECONDS
+      - BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS
+      - BATCH_SETTLEMENT_ALLOWANCE_MS
+      - BATCH_MINIMUM_ITEM_COST_MS
+      - BATCH_JOB_CONCURRENCY
     extra_hosts:
       - 'localhost:host-gateway'
     volumes:

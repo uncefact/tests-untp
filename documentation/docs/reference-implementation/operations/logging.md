@@ -13,6 +13,8 @@ Every API request is logged on entry and completion. The entry log records the H
 
 In between, individual operations log what they are doing, including creating a credential, resolving a DID, uploading to storage, and so on. Each log entry carries the context of the request it belongs to, so you can follow the full lifecycle of any operation.
 
+A client that reuses one `x-correlation-id` across batches makes item ids collide across those batches, and a batch id near the length limit makes the worker mint item ids instead; both cases are visible in the log.
+
 ### Library read degradation
 
 The library list and batch-get routes return `200` when an individual stored row cannot be represented, so HTTP 5xx monitoring does not detect that condition. Watch for the error-level `Library record read degraded` event instead. The detail route emits the same event when it returns a `DECRYPTION_KEY_UNAVAILABLE` warning.
@@ -67,6 +69,9 @@ The correlation ID is also returned in the `x-correlation-id` response header, s
 
 The correlation ID is also the `correlation.id` attribute on the active route-handler span. A worker job carries the enqueuing request's correlation id, so its job log lines carry the same `correlationId` even though the worker job runs in a separate trace.
 
+A batch item's calls run under `<batch correlation id>_<index>`. Searching for the batch correlation id prefix finds the whole batch, while searching for the exact item id finds one item's logs and traces. The underscore separator is used because the shared validator accepts it and rejects a dot.
+When supplied, the inbound `x-correlation-id` becomes the batch's durable identity and the operator's log key; the reconciliation sweep runs each re-enqueued batch under the batch's id rather than the sweep's own.
+
 When a request fails with an error that has no specific mapping, the response body's `error` message includes the correlation ID, reading `An unexpected error has occurred. If the issue persists, please contact support and quote correlation id "<id>".` This gives a caller who cannot inspect server logs the identifier to quote in a support request. A failure that occurs before a route handler runs, such as a fault during authentication or tenant resolution, is reported with this same message rather than the underlying error text.
 
 ### Service Names
@@ -91,6 +96,8 @@ The log level is controlled by the `LOG_LEVEL` environment variable. Only messag
 | Variable    | Description                                                  | Default |
 | ----------- | ------------------------------------------------------------ | ------- |
 | `LOG_LEVEL` | Minimum log level to emit (`debug`, `info`, `warn`, `error`) | `info`  |
+
+Batch item inspection and resolution audit lines are emitted at `warn`. Set `LOG_LEVEL` to `warn`, `info` or `debug` before using `--disclose-request`; disclosure refuses to print plaintext at `error` because that level would filter the audit line.
 
 ## Library storage lines that need an operator
 

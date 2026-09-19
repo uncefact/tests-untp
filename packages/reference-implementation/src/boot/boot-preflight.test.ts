@@ -16,6 +16,15 @@ const ENV_NAMES = [
   'BUNDLED_ARTEFACTS_FALLBACK',
   'IDEMPOTENCY_STALE_CLAIM_MINUTES',
   'MAX_REQUEST_BODY_BYTES',
+  'MAX_BATCH_REQUEST_BODY_BYTES',
+  'MAX_BATCH_ITEMS',
+  'BATCH_RETENTION_DAYS',
+  'BATCH_EXPIRY_SWEEP_MINUTES',
+  'BATCH_JOB_RETRY_LIMIT',
+  'BATCH_JOB_RETRY_BACKOFF_SECONDS',
+  'BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS',
+  'BATCH_SETTLEMENT_ALLOWANCE_MS',
+  'BATCH_MINIMUM_ITEM_COST_MS',
   'FETCH_ALLOW_PRIVATE_URLS',
   'VERIFY_ALLOW_PRIVATE_URLS',
   'FETCH_MAX_RESPONSE_SIZE',
@@ -26,6 +35,7 @@ const ENV_NAMES = [
   'DATA_ENCRYPTION_KEY',
   'SERVICE_ENCRYPTION_KEY',
   'WORKER_JOB_TIMEOUT_SECONDS',
+  'BATCH_JOB_CONCURRENCY',
   'LIBRARY_RECONCILE_PENDING_RUNS_CRON',
   'LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE',
   'LOG_REDACT_PATHS',
@@ -108,13 +118,43 @@ describe('runBootPreflight', () => {
     setWorkerEnvironment();
     process.env.RI_APP_URL = 'not a url';
     process.env.MAX_REQUEST_BODY_BYTES = '100';
+    process.env.MAX_BATCH_REQUEST_BODY_BYTES = '0';
     process.env.IDEMPOTENCY_STALE_CLAIM_MINUTES = '0';
 
     await expect(runBootPreflight('worker', createLogger())).resolves.toEqual({
       key: KEY,
       deprecatedName: 'absent',
-      workerConfiguration: { reconciliationCron: '*/10 * * * *', jobTimeoutSeconds: 300 },
+      workerConfiguration: {
+        reconciliationCron: '*/10 * * * *',
+        batchExpirySweepCron: '0 * * * *',
+        jobTimeoutSeconds: 300,
+        batchJobConcurrency: 1,
+        batchBudgetSettings: {
+          settlementAllowanceMs: 5_000,
+          minimumItemCostMs: 2_000,
+        },
+      },
     });
+  });
+
+  it('does not read worker-only batch budget settings for the web role', async () => {
+    // Regression: a web boot must not reject settings that only the worker owns.
+    process.env.RI_APP_URL = 'https://ri.example.com';
+    process.env.DATA_ENCRYPTION_KEY = KEY;
+    process.env.BATCH_SETTLEMENT_ALLOWANCE_MS = 'not-an-integer';
+    process.env.BATCH_MINIMUM_ITEM_COST_MS = '0';
+
+    await expect(runBootPreflight('web', createLogger())).resolves.toMatchObject({ key: KEY });
+  });
+
+  it('does not reject worker-only expiry and retention settings for the web role', async () => {
+    // Regression: the web role must not own worker sweep configuration that it never reads.
+    process.env.RI_APP_URL = 'https://ri.example.com';
+    process.env.DATA_ENCRYPTION_KEY = KEY;
+    process.env.BATCH_EXPIRY_SWEEP_MINUTES = 'not-an-integer';
+    process.env.BATCH_RETENTION_DAYS = '1.5';
+
+    await expect(runBootPreflight('web', createLogger())).resolves.toMatchObject({ key: KEY });
   });
 
   it('rejects a fetch-setting name conflict for the web role', async () => {
@@ -256,7 +296,13 @@ describe('runBootPreflight', () => {
     await expect(runBootPreflight('web')).rejects.toThrow(/LOG_REDACT_PATHS/);
   });
 
-  const validatorRejectionCases = [
+  const validatorRejectionCases: Array<{
+    name: string;
+    role: 'web' | 'worker';
+    setup: () => void;
+    message: string;
+    code?: 'worker.configuration-invalid';
+  }> = [
     ...[
       'CREDENTIAL_STATUS_OPERATION_BUDGET_MS',
       'CREDENTIAL_STATUS_RECONCILE_GRACE_MS',
@@ -323,6 +369,83 @@ describe('runBootPreflight', () => {
         process.env.MAX_REQUEST_BODY_BYTES = '100';
       },
       message: 'MAX_REQUEST_BODY_BYTES must be an integer of at least 1024 when set',
+    },
+    {
+      name: 'validateCredentialBatchRequestBodySettingsOnWebBoot',
+      role: 'web' as const,
+      setup: () => {
+        process.env.RI_APP_URL = 'https://ri.example.com';
+        process.env.MAX_REQUEST_BODY_BYTES = '2048';
+        process.env.MAX_BATCH_REQUEST_BODY_BYTES = '1024';
+      },
+      message: 'MAX_BATCH_REQUEST_BODY_BYTES must be at least MAX_REQUEST_BODY_BYTES (2048)',
+    },
+    {
+      name: 'resolveWorkerConfiguration for BATCH_EXPIRY_SWEEP_MINUTES',
+      role: 'worker' as const,
+      setup: () => {
+        setWorkerEnvironment();
+        process.env.BATCH_EXPIRY_SWEEP_MINUTES = '0';
+      },
+      message: 'BATCH_EXPIRY_SWEEP_MINUTES must be a positive integer when set',
+    },
+    {
+      name: 'validateCredentialBatchSettingsOnBoot for web retry limit',
+      role: 'web' as const,
+      setup: () => {
+        // Regression: the web role enqueues the first job and must reject a non-retryable batch policy.
+        process.env.RI_APP_URL = 'https://ri.example.com';
+        process.env.BATCH_JOB_RETRY_LIMIT = '0';
+      },
+      message: 'BATCH_JOB_RETRY_LIMIT must be a positive integer when set',
+    },
+    {
+      name: 'validateCredentialBatchSettingsOnBoot for worker retry maximum',
+      role: 'worker' as const,
+      setup: () => {
+        // Regression: the worker must reject a queue backoff maximum below its base before registering jobs.
+        setWorkerEnvironment();
+        process.env.BATCH_JOB_RETRY_BACKOFF_SECONDS = '30';
+        process.env.BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS = '10';
+      },
+      message:
+        'BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS must be at least BATCH_JOB_RETRY_BACKOFF_SECONDS (30) when set; fix or unset it (unset uses 600).',
+    },
+    {
+      name: 'resolveWorkerConfiguration for settlement allowance',
+      role: 'worker' as const,
+      setup: () => {
+        // Regression: a malformed worker budget must keep the stable boot code.
+        setWorkerEnvironment();
+        process.env.BATCH_SETTLEMENT_ALLOWANCE_MS = 'abc';
+      },
+      message: 'BATCH_SETTLEMENT_ALLOWANCE_MS must be a positive integer when set',
+      code: 'worker.configuration-invalid',
+    },
+    {
+      name: 'resolveWorkerConfiguration for minimum item cost',
+      role: 'worker' as const,
+      setup: () => {
+        // Regression: a malformed worker budget must keep the stable boot code.
+        setWorkerEnvironment();
+        process.env.BATCH_MINIMUM_ITEM_COST_MS = '0';
+      },
+      message: 'BATCH_MINIMUM_ITEM_COST_MS must be a positive integer when set',
+      code: 'worker.configuration-invalid',
+    },
+    {
+      name: 'resolveWorkerConfiguration for allowance budget',
+      role: 'worker' as const,
+      setup: () => {
+        // Regression: an invalid relationship between worker budgets must keep the stable boot code.
+        setWorkerEnvironment();
+        process.env.WORKER_JOB_TIMEOUT_SECONDS = '30';
+        process.env.BATCH_MINIMUM_ITEM_COST_MS = '2000';
+        process.env.BATCH_SETTLEMENT_ALLOWANCE_MS = '29000';
+      },
+      message:
+        'BATCH_SETTLEMENT_ALLOWANCE_MS must be less than WORKER_JOB_TIMEOUT_SECONDS * 1000 - BATCH_MINIMUM_ITEM_COST_MS (30 * 1000 - 2000 = 28000) when set; the allowance must leave more than one minimum item cost inside the job timeout, otherwise every job attempts a single item and re-enqueues.',
+      code: 'worker.configuration-invalid',
     },
     {
       name: 'validateHttpUserAgentOnBoot for worker',
@@ -445,10 +568,18 @@ describe('runBootPreflight', () => {
     },
   ] as const;
 
-  it.each(validatorRejectionCases)('enforces the $name validator effect', async ({ role, setup, message }) => {
+  it.each(validatorRejectionCases)('enforces the $name validator effect', async ({ role, setup, message, code }) => {
     setup();
 
-    await expect(runBootPreflight(role, createLogger())).rejects.toThrow(message);
+    if (code === undefined) {
+      await expect(runBootPreflight(role, createLogger())).rejects.toThrow(message);
+      return;
+    }
+
+    await expect(runBootPreflight(role, createLogger())).rejects.toMatchObject({
+      code,
+      message: expect.stringContaining(message),
+    });
   });
 
   it.each(validatorWarningCases)('enforces the $name validator effect', async ({ setup, warning }) => {
