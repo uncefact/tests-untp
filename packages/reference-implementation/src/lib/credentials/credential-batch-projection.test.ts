@@ -1,11 +1,78 @@
 import { CredentialBatchItemState, CredentialBatchState } from '@/lib/prisma/generated';
-import { projectCredentialBatch } from './credential-batch-projection';
+import { interruptedBatchItemMessage, projectCredentialBatch } from './credential-batch-projection';
+
+it('formats an interrupted item message with the item correlation id', () => {
+  // Regression: takeover and worker fault paths must share one tenant-facing message format.
+  expect(interruptedBatchItemMessage({ itemCorrelationId: 'batch-correlation_3' })).toBe(
+    'A previous attempt was interrupted after it may have issued this item; check the library for a credential matching this request before re-submitting. Search the logs for correlation id batch-correlation_3.',
+  );
+});
+
+it('formats an interrupted item message with the batch correlation id and index when the item id is unusable', () => {
+  // Regression: the fallback form must produce the exact same wording, sourced from the single helper.
+  expect(interruptedBatchItemMessage({ batchCorrelationId: 'batch-correlation', index: 17 })).toBe(
+    'A previous attempt was interrupted after it may have issued this item; check the library for a credential matching this request before re-submitting. Search the logs for batch correlation id batch-correlation, item 17.',
+  );
+});
 
 describe('projectCredentialBatch', () => {
-  it('projects counts and stable refusal codes in item order without the encrypted request', () => {
+  it('projects the stored pre-dispatch fault message unchanged', () => {
+    // Regression: the durable tenant projection must preserve the stored fault code and message exactly.
+    const message =
+      'The item could not be issued because the issuing service faulted; ask your operator to search the logs for correlation id batch-correlation_0.';
+    const result = projectCredentialBatch({
+      id: 'batch-fault',
+      tenantId: 'tenant-1',
+      correlationId: 'batch-correlation',
+      state: CredentialBatchState.COMPLETED,
+      itemCount: 1,
+      queuedCount: 0,
+      processingCount: 0,
+      issuedCount: 0,
+      failedCount: 1,
+      unknownCount: 0,
+      idempotencyKey: 'key-fault',
+      bodyDigest: 'digest-fault',
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      settledAt: new Date(0),
+      resolvedAt: null,
+      expiresAt: new Date(1),
+      attemptToken: null,
+      attemptStartedAt: null,
+      version: 1,
+      lastProgressAt: new Date(0),
+      items: [
+        {
+          id: 'item-fault',
+          batchId: 'batch-fault',
+          tenantId: 'tenant-1',
+          index: 0,
+          reference: null,
+          state: CredentialBatchItemState.FAILED,
+          request: 'encrypted request',
+          credentialId: null,
+          warning: null,
+          errorClass: 'UNEXPECTED',
+          errorMessage: message,
+          resolvedAt: null,
+          resolutionReason: null,
+          attemptCount: 4,
+          nextAttemptAt: null,
+          attemptToken: null,
+          updatedAt: new Date(0),
+        },
+      ],
+    });
+
+    expect(result.items[0].error).toEqual({ code: 'UNEXPECTED', message });
+  });
+
+  it('projects counts, references and stable refusal codes in item order without the encrypted request', () => {
     const result = projectCredentialBatch({
       id: 'batch-1',
       tenantId: 'tenant-1',
+      correlationId: 'batch-correlation',
       state: CredentialBatchState.COMPLETED,
       itemCount: 2,
       queuedCount: 0,
@@ -30,6 +97,7 @@ describe('projectCredentialBatch', () => {
           batchId: 'batch-1',
           tenantId: 'tenant-1',
           index: 1,
+          reference: 'PO-1',
           state: CredentialBatchItemState.FAILED,
           request: 'encrypted request',
           credentialId: 'cred-1',
@@ -48,6 +116,7 @@ describe('projectCredentialBatch', () => {
           batchId: 'batch-1',
           tenantId: 'tenant-1',
           index: 0,
+          reference: 'PO-0',
           state: CredentialBatchItemState.ISSUED,
           request: 'encrypted request',
           credentialId: 'cred-0',
@@ -73,11 +142,13 @@ describe('projectCredentialBatch', () => {
       items: [
         {
           index: 1,
+          reference: 'PO-1',
           state: 'FAILED',
           error: { code: 'SERVICE_INSTANCE_NOT_FOUND', message: 'Service instance not found: storage-missing' },
         },
         {
           index: 0,
+          reference: 'PO-0',
           state: 'ISSUED',
           credentialId: 'cred-0',
           warning: { code: 'DETAILS_EXTRACTION_FAILED', message: 'warning' },
@@ -91,6 +162,7 @@ describe('projectCredentialBatch', () => {
     const result = projectCredentialBatch({
       id: 'batch-operator-failure',
       tenantId: 'tenant-1',
+      correlationId: 'batch-operator-failure-correlation',
       state: CredentialBatchState.COMPLETED,
       itemCount: 1,
       queuedCount: 0,
@@ -115,6 +187,7 @@ describe('projectCredentialBatch', () => {
           batchId: 'batch-operator-failure',
           tenantId: 'tenant-1',
           index: 0,
+          reference: null,
           state: CredentialBatchItemState.FAILED,
           request: 'encrypted request',
           credentialId: null,

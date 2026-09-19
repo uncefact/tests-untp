@@ -9,6 +9,7 @@ import {
   type IVerifiableCredentialService,
   type IStorageService,
   type StorageRecord,
+  type SignOptions,
 } from '@uncefact/untp-ri-services';
 import type { SupportedStatusPurpose } from './status-purposes';
 import type { ResolvedService } from '@/lib/services/resolve-service';
@@ -51,6 +52,8 @@ export type IssueCredentialInput = {
   bridge: IDataModelBridge;
   idempotencyClaimId?: string;
   statusPurposes?: readonly SupportedStatusPurpose[];
+  /** Passed through to the VC service immediately before its credential request is sent. */
+  onDispatch: () => void;
   signal?: AbortSignal;
 };
 
@@ -154,11 +157,17 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
   logger.info({ tenantId, vcInstanceId: vcService.instanceId }, 'Signing credential');
   let signedCredential: EnvelopedVerifiableCredential;
   try {
-    signedCredential = await vcService.service.sign(credentialPayload, {
-      statusPurposes,
-      serialise: (key, fn, hookSignal) => withStatusListMutex(key, fn, { signal: hookSignal ?? signal, deadlineAt }),
-      signal,
-    });
+    const serialise: NonNullable<SignOptions['serialise']> = (key, fn, hookSignal) =>
+      withStatusListMutex(key, fn, { signal: hookSignal ?? signal, deadlineAt });
+    const signOptions: SignOptions = Object.assign(
+      {
+        statusPurposes,
+        serialise,
+        signal,
+      },
+      { onDispatch: input.onDispatch },
+    );
+    signedCredential = await vcService.service.sign(credentialPayload, signOptions);
   } catch (error) {
     if (error instanceof StatusListLockLostError) {
       const result = error.callbackResult;

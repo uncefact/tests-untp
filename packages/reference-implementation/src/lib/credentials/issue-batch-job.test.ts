@@ -45,7 +45,12 @@ jest.mock('./capture-credential-status-entries', () => {
 
 import { ValidationError } from '@/lib/api/validation';
 import { ServiceInstanceNotFoundError } from '@/lib/api/errors';
-import { StorageStoreError, VcSignError } from '@uncefact/untp-ri-services';
+import { StorageStoreError, VcCredentialStatusError, VcSignError } from '@uncefact/untp-ri-services';
+import {
+  getOrMintCorrelationId,
+  isValidCorrelationId,
+  runWithRequestContext,
+} from '@uncefact/untp-ri-services/logging';
 import type { JobContext, JobQueue } from '@/lib/jobs/types';
 import type { CredentialBatchIssueDependencies } from './issue-batch-job';
 import { credentialBatchIssueHandler } from './issue-batch-job';
@@ -64,6 +69,7 @@ const statusRequest = {
 const batch = {
   id: payload.batchId,
   tenantId: payload.tenantId,
+  correlationId: 'batch-correlation',
   state: 'QUEUED',
   itemCount: 2,
   queuedCount: 2,
@@ -159,6 +165,74 @@ describe('credential batch issue handler', () => {
     expect(deps.checkpoint).not.toHaveBeenCalled();
   });
 
+  it('runs each item under its derived correlation context for outbound service calls and logs', async () => {
+    // Regression: storage, identity resolver and VCKit calls must receive the item id, not the job or caller id.
+    const observedCorrelationIds: string[] = [];
+    const deps = dependencies({
+      claimNextItem: jest
+        .fn()
+        .mockResolvedValueOnce({ outcome: 'claimed', item: { index: 17, request: JSON.stringify(request) } })
+        .mockResolvedValueOnce({ outcome: 'empty' }),
+      issue: jest.fn(async ({ onDispatch }: { onDispatch?: () => void }) => {
+        onDispatch?.();
+        observedCorrelationIds.push(getOrMintCorrelationId());
+        return { status: 201 as const, body: { credentialId: 'credential-17' } };
+      }),
+    });
+
+    loggerCalls.info.mockClear();
+    loggerCalls.warn.mockClear();
+    await runWithRequestContext('caller-correlation', () => credentialBatchIssueHandler(deps)(payload, context()));
+
+    expect(observedCorrelationIds).toEqual(['batch-correlation_17']);
+    expect(loggerCalls.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: 'batch-correlation_17',
+        batchCorrelationId: 'batch-correlation',
+        index: 17,
+      }),
+      'Credential batch item processed',
+    );
+    expect(loggerCalls.warn).not.toHaveBeenCalled();
+  });
+
+  it('mints and logs a replacement when a derived item correlation id is too long', async () => {
+    // Regression: a full-length inbound batch id must not put an invalid item id in request context or outbound logs.
+    const longBatchCorrelationId = 'b'.repeat(126);
+    const longBatch = Object.assign({}, batch as object, { correlationId: longBatchCorrelationId }) as never;
+    const observedCorrelationIds: string[] = [];
+    const deps = dependencies({
+      getBatch: jest.fn(async () => longBatch),
+      claimNextItem: jest
+        .fn()
+        .mockResolvedValueOnce({ outcome: 'claimed', item: { index: 17, request: JSON.stringify(request) } })
+        .mockResolvedValueOnce({ outcome: 'empty' }),
+      issue: jest.fn(async ({ onDispatch }: { onDispatch?: () => void }) => {
+        onDispatch?.();
+        observedCorrelationIds.push(getOrMintCorrelationId());
+        return { status: 201 as const, body: { credentialId: 'credential-17' } };
+      }),
+    });
+
+    loggerCalls.warn.mockClear();
+    await credentialBatchIssueHandler(deps)(payload, context());
+
+    const [mintedCorrelationId] = observedCorrelationIds;
+    const rejectedCorrelationId = `${longBatchCorrelationId}_17`;
+    expect(mintedCorrelationId).toBeDefined();
+    expect(mintedCorrelationId).not.toBe(rejectedCorrelationId);
+    expect(isValidCorrelationId(mintedCorrelationId)).toBe(true);
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      {
+        batchCorrelationId: longBatchCorrelationId,
+        index: 17,
+        rejectedCorrelationId,
+        mintedCorrelationId,
+      },
+      'Credential batch item correlation id was invalid; minted a replacement',
+    );
+  });
+
   it('projects a credentialStatus item refusal and continues the batch', async () => {
     // Regression: a credentialStatus supplied by a batch item must be refused with the same code and pointer as the API route.
     const refusedRequest = {
@@ -213,7 +287,7 @@ describe('credential batch issue handler', () => {
       dataModel: { name: 'Status model' },
       bridge,
       schemaUrls: [],
-      coreDataModelVersion: '0.6.1',
+      coreDataModelVersion: '0.7.0',
       coreDataModelType: 'DigitalProductPassport',
     });
     mockValidateCredentialPayload.mockResolvedValue(undefined);
@@ -272,7 +346,7 @@ describe('credential batch issue handler', () => {
         dataModel: { name: 'Service model' },
         bridge,
         schemaUrls: [],
-        coreDataModelVersion: '0.6.1',
+        coreDataModelVersion: '0.7.0',
         coreDataModelType: 'DigitalProductPassport',
       });
       mockValidateCredentialPayload.mockResolvedValue(undefined);
@@ -315,7 +389,7 @@ describe('credential batch issue handler', () => {
       dataModel: { name: 'Validation model' },
       bridge,
       schemaUrls: [],
-      coreDataModelVersion: '0.6.1',
+      coreDataModelVersion: '0.7.0',
       coreDataModelType: 'DigitalProductPassport',
     });
     mockValidateCredentialPayload.mockRejectedValue(
@@ -352,7 +426,7 @@ describe('credential batch issue handler', () => {
       dataModel: { name: 'DID model' },
       bridge,
       schemaUrls: [],
-      coreDataModelVersion: '0.6.1',
+      coreDataModelVersion: '0.7.0',
       coreDataModelType: 'DigitalProductPassport',
     });
     mockValidateCredentialPayload.mockResolvedValue(undefined);
@@ -386,13 +460,18 @@ describe('credential batch issue handler', () => {
       dataModel: { name: 'Dispatch model' },
       bridge,
       schemaUrls: [],
-      coreDataModelVersion: '0.6.1',
+      coreDataModelVersion: '0.7.0',
       coreDataModelType: 'DigitalProductPassport',
     });
     mockValidateCredentialPayload.mockResolvedValue(undefined);
     mockResolveVcService.mockResolvedValue({
       instanceId: 'vc-1',
-      service: { sign: jest.fn().mockRejectedValue(failure) },
+      service: {
+        sign: jest.fn(async (_payload, options: { onDispatch?: () => void }) => {
+          options.onDispatch?.();
+          throw failure;
+        }),
+      },
     });
     mockResolveStorageService.mockResolvedValue({ instanceId: 'storage-1', service: { store: jest.fn() } });
     const deps = dependencies({
@@ -407,22 +486,76 @@ describe('credential batch issue handler', () => {
     await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toBe(failure);
     expect(deps.markOutcomeUnknown).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ index: 0, errorClass: 'OUTCOME_UNKNOWN' }),
+      expect.objectContaining({
+        index: 0,
+        errorClass: 'OUTCOME_UNKNOWN',
+        errorMessage:
+          'A previous attempt was interrupted after it may have issued this item; check the library for a credential matching this request before re-submitting. Search the logs for correlation id batch-correlation_0.',
+      }),
     );
     expect(deps.markFailed).not.toHaveBeenCalled();
   });
 
-  it('checkpoints and enqueues a continuation before the settlement allowance is exhausted', async () => {
-    // Regression: a handler must return a normal continuation before expiry, not rely on a pg-boss fault retry.
+  it('attempts the first item before checkpointing an already exhausted budget', async () => {
+    // Regression: an allowance mismatch must process one item per job instead of checkpointing for ever without progress.
     const deps = dependencies();
 
     await credentialBatchIssueHandler(deps)(payload, context(5));
 
     expect(deps.checkpoint).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, queue: deps.queue }),
+      expect.objectContaining({
+        batchId: payload.batchId,
+        tenantId: payload.tenantId,
+        correlationId: 'batch-correlation',
+        queue: deps.queue,
+      }),
     );
-    expect(deps.issue).not.toHaveBeenCalled();
+    expect(deps.issue).toHaveBeenCalledTimes(1);
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ expireSeconds: 5, settlementAllowanceMs: 5_000, minimumItemCostMs: 2_000 }),
+      'Credential batch job entered with an exhausted pre-item budget; the first item will still be attempted',
+    );
+  });
+
+  it('uses the configured allowance when deciding whether to claim another item', async () => {
+    // Regression: changing the allowance must move the checkpoint boundary without changing item processing order.
+    const previousValues = {
+      allowance: process.env.BATCH_SETTLEMENT_ALLOWANCE_MS,
+      minimumCost: process.env.BATCH_MINIMUM_ITEM_COST_MS,
+      timeout: process.env.WORKER_JOB_TIMEOUT_SECONDS,
+    };
+    const restoreEnvironment = (): void => {
+      if (previousValues.allowance === undefined) delete process.env.BATCH_SETTLEMENT_ALLOWANCE_MS;
+      else process.env.BATCH_SETTLEMENT_ALLOWANCE_MS = previousValues.allowance;
+      if (previousValues.minimumCost === undefined) delete process.env.BATCH_MINIMUM_ITEM_COST_MS;
+      else process.env.BATCH_MINIMUM_ITEM_COST_MS = previousValues.minimumCost;
+      if (previousValues.timeout === undefined) delete process.env.WORKER_JOB_TIMEOUT_SECONDS;
+      else process.env.WORKER_JOB_TIMEOUT_SECONDS = previousValues.timeout;
+    };
+    const clock = (): jest.Mock<Date, []> => {
+      let calls = 0;
+      return jest.fn(() => new Date(calls++ === 0 ? 0 : 4_000));
+    };
+
+    try {
+      process.env.BATCH_MINIMUM_ITEM_COST_MS = '2000';
+      process.env.WORKER_JOB_TIMEOUT_SECONDS = '60';
+
+      process.env.BATCH_SETTLEMENT_ALLOWANCE_MS = '5000';
+      const largerAllowance = dependencies({ now: clock() });
+      await credentialBatchIssueHandler(largerAllowance)(payload, context(10));
+      expect(largerAllowance.checkpoint).toHaveBeenCalledTimes(1);
+      expect(largerAllowance.issue).toHaveBeenCalledTimes(1);
+
+      process.env.BATCH_SETTLEMENT_ALLOWANCE_MS = '3000';
+      const smallerAllowance = dependencies({ now: clock() });
+      await credentialBatchIssueHandler(smallerAllowance)(payload, context(10));
+      expect(smallerAllowance.checkpoint).not.toHaveBeenCalled();
+      expect(smallerAllowance.issue).toHaveBeenCalledTimes(2);
+    } finally {
+      restoreEnvironment();
+    }
   });
 
   it('records a definitive refusal and continues after a pre-dispatch fault', async () => {
@@ -443,7 +576,7 @@ describe('credential batch issue handler', () => {
       expect.objectContaining({ index: 0, errorMessage: 'payload refused' }),
     );
 
-    const faultError = new Error('provider unavailable');
+    const faultError = new VcCredentialStatusError('status-list mint unavailable at provider.example.test', 500);
     const fault = dependencies({
       claimNextItem: jest
         .fn()
@@ -452,7 +585,9 @@ describe('credential batch issue handler', () => {
         .mockResolvedValueOnce({ outcome: 'empty' }),
       issue: jest
         .fn()
-        .mockRejectedValueOnce(faultError)
+        .mockImplementationOnce(async () => {
+          throw faultError;
+        })
         .mockImplementation(async ({ onDispatch }: { onDispatch?: () => void }) => {
           onDispatch?.();
           return { status: 201 as const, body: { credentialId: 'credential-after-fault' } };
@@ -462,16 +597,23 @@ describe('credential batch issue handler', () => {
     expect(fault.markFailed).not.toHaveBeenCalled();
     expect(fault.markQueued).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ index: 0, errorMessage: 'provider unavailable' }),
+      expect.objectContaining({
+        index: 0,
+        errorMessage:
+          'The item could not be issued because the issuing service faulted; ask your operator to search the logs for correlation id batch-correlation_0.',
+      }),
     );
+    expect(fault.markOutcomeUnknown).not.toHaveBeenCalled();
     expect(fault.releaseAttempt).not.toHaveBeenCalled();
     expect(fault.issue).toHaveBeenCalledTimes(2);
-    expect(loggerCalls.error).toHaveBeenCalledWith(
+    const faultLog = loggerCalls.error.mock.calls.find(
+      ([fields, message]) =>
+        message === 'Credential batch item faulted; continuing with the next claimable item' && fields.fault === true,
+    );
+    expect(faultLog?.[0]).toEqual(
       expect.objectContaining({
-        err: expect.objectContaining({ message: 'provider unavailable' }),
-        fault: true,
+        err: expect.objectContaining({ message: expect.stringContaining('status-list mint unavailable') }),
       }),
-      'Credential batch item faulted; continuing with the next claimable item',
     );
     expect(loggerCalls.error.mock.calls.at(-1)?.[0]).not.toHaveProperty('request');
   });
@@ -634,10 +776,16 @@ describe('credential batch issue handler', () => {
 
     expect(deps.markQueued).toHaveBeenLastCalledWith(
       expect.anything(),
-      expect.objectContaining({ errorMessage: 'decrypt failed permanently' }),
+      expect.objectContaining({
+        errorMessage:
+          'The item could not be issued because the issuing service faulted; ask your operator to search the logs for correlation id batch-correlation_0.',
+      }),
     );
     expect(loggerCalls.error).toHaveBeenCalledWith(
-      expect.objectContaining({ errorCode: 'ITEM_ATTEMPTS_EXHAUSTED' }),
+      expect.objectContaining({
+        errorCode: 'ITEM_ATTEMPTS_EXHAUSTED',
+        err: expect.objectContaining({ message: 'decrypt failed permanently' }),
+      }),
       'Credential batch item reached its retry limit and was marked failed',
     );
     expect(deps.settle).toHaveBeenCalled();

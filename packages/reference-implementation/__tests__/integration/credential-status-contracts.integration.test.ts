@@ -114,6 +114,7 @@ async function issueThroughVerifier(statusPurposes: readonly ('revocation' | 'su
     },
     storageOptions: { encrypt: false },
     bridge: { extractSubjectSummary: () => ({ id: undefined, name: undefined }) } as never,
+    onDispatch: () => undefined,
     statusPurposes,
   });
 }

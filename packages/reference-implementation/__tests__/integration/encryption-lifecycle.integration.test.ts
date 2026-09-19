@@ -95,6 +95,7 @@ async function seedOneEnvelopePerStore(): Promise<void> {
     data: {
       id: 'batch-1',
       tenantId: SYSTEM_TENANT_ID,
+      correlationId: 'batch-correlation',
       itemCount: 1,
       queuedCount: 1,
       idempotencyKey: 'batch-k1',

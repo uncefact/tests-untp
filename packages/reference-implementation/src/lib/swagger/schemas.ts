@@ -151,6 +151,7 @@ export const credentialBatchItemErrorSchema = z.object({
 
 export const credentialBatchItemStatusSchema = z.object({
   index: z.number().int().nonnegative(),
+  reference: z.string().optional().describe('Issuer-supplied item reference, present when supplied at submission'),
   state: credentialBatchItemStateSchema,
   credentialId: z.string().optional(),
   warning: z.unknown().optional(),

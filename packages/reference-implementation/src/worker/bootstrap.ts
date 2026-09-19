@@ -121,13 +121,14 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
 
   await assertSchemaReady(prismaMigrationRows(prisma), imageMigrations);
   await requireEncryptionKeyOnBoot();
-  const { reconciliationCron, batchExpirySweepCron, jobTimeoutSeconds, batchJobConcurrency } = workerConfiguration;
+  const { reconciliationCron, batchExpirySweepCron, jobTimeoutSeconds, batchJobConcurrency, batchBudgetSettings } =
+    workerConfiguration;
 
   const queue = createJobQueue();
   registerLibraryJobs(queue);
   registerPendingRunReconciliation(queue);
   registerCredentialBatchExpiry(queue);
-  registerCredentialBatchIssue(queue, undefined, batchJobConcurrency);
+  registerCredentialBatchIssue(queue, undefined, batchJobConcurrency, batchBudgetSettings);
   registerCredentialBatchReconciliation(queue);
 
   let heartbeat: Heartbeat | undefined;

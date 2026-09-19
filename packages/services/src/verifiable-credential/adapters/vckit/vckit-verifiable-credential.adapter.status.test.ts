@@ -72,8 +72,8 @@ describe('VCKit status contract', () => {
     mockWarn.mockClear();
   });
 
-  it('mints an ordered entry for each requested purpose and gives the caller the serialisation key', async () => {
-    // Catches a regression that changes the key between purposes or emits a string index in the signed credential.
+  it('mints ordered entries, then dispatches exactly once before the issue request', async () => {
+    // Catches a regression that dispatches before status minting, dispatches more than once, or emits a string index in the signed credential.
     const providerMinted = [
       {
         ...entry(),
@@ -90,18 +90,22 @@ describe('VCKit status contract', () => {
         id: 'http://localhost:3332/credentials/status/bitstring-status-list/2#8',
       } as unknown as Record<string, unknown>,
     ];
-    mockedHttpFetch
-      .mockResolvedValueOnce(response(providerMinted[0]))
-      .mockResolvedValueOnce(response(providerMinted[1]))
-      .mockResolvedValueOnce(
-        response({
-          verifiableCredential: {
-            '@context': ['https://www.w3.org/ns/credentials/v2'],
-            id: 'signed',
-            type: 'EnvelopedVerifiableCredential',
-          },
-        }),
-      );
+    const requestEvents: string[] = [];
+    const providerResponses = [
+      response(providerMinted[0]),
+      response(providerMinted[1]),
+      response({
+        verifiableCredential: {
+          '@context': ['https://www.w3.org/ns/credentials/v2'],
+          id: 'signed',
+          type: 'EnvelopedVerifiableCredential',
+        },
+      }),
+    ];
+    mockedHttpFetch.mockImplementation(async (input) => {
+      requestEvents.push(String(input).endsWith('/issue') ? 'issue' : 'mint');
+      return providerResponses.shift() as Response;
+    });
     const serialiseMock = jest.fn(
       (key: string, fn: () => Promise<CredentialStatusEntry>, signal?: AbortSignal): Promise<CredentialStatusEntry> => {
         expect(key).toBe('status-list:https://vckit.example.com:did:web:issuer.example');
@@ -110,10 +114,13 @@ describe('VCKit status contract', () => {
       },
     );
     const serialise = serialiseMock as NonNullable<SignOptions['serialise']>;
+    const onDispatch = jest.fn(() => requestEvents.push('dispatch'));
     const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
 
-    await adapter.sign(payload, { statusPurposes: ['revocation', 'suspension'], serialise });
+    await adapter.sign(payload, { statusPurposes: ['revocation', 'suspension'], serialise, onDispatch });
 
+    expect(requestEvents).toEqual(['mint', 'mint', 'dispatch', 'issue']);
+    expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(serialiseMock).toHaveBeenCalledTimes(2);
     expect(serialiseMock.mock.calls[0][0]).toBe('status-list:https://vckit.example.com:did:web:issuer.example');
     expect(JSON.parse(mockedHttpFetch.mock.calls[0][1]?.body as string)).toEqual({
@@ -251,10 +258,12 @@ describe('VCKit status contract', () => {
       .mockResolvedValueOnce(response(first))
       .mockResolvedValueOnce(response({ message: 'status mint failed' }, 500, 'Failure'));
     const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+    const mintFailureDispatch = jest.fn();
 
-    await expect(adapter.sign(payload, { statusPurposes: ['revocation', 'suspension'] })).rejects.toBeInstanceOf(
-      VcCredentialStatusError,
-    );
+    await expect(
+      adapter.sign(payload, { statusPurposes: ['revocation', 'suspension'], onDispatch: mintFailureDispatch }),
+    ).rejects.toBeInstanceOf(VcCredentialStatusError);
+    expect(mintFailureDispatch).not.toHaveBeenCalled();
     expect(mockWarn).toHaveBeenCalledWith(
       {
         issuerDid: 'did:web:issuer.example',
@@ -269,10 +278,15 @@ describe('VCKit status contract', () => {
     );
 
     mockWarn.mockClear();
+    const issueFailureEvents: string[] = [];
+    mockWarn.mockImplementationOnce(() => issueFailureEvents.push('warn'));
     mockedHttpFetch
       .mockResolvedValueOnce(response(first))
       .mockResolvedValueOnce(response({ message: 'issue failed' }, 500, 'Failure'));
-    await expect(adapter.sign(payload)).rejects.toBeInstanceOf(VcSignError);
+    const issueFailureDispatch = jest.fn(() => issueFailureEvents.push('dispatch'));
+    await expect(adapter.sign(payload, { onDispatch: issueFailureDispatch })).rejects.toBeInstanceOf(VcSignError);
+    expect(issueFailureDispatch).toHaveBeenCalledTimes(1);
+    expect(issueFailureEvents).toEqual(['dispatch', 'warn']);
     expect(mockWarn).toHaveBeenCalledWith(
       expect.objectContaining({
         issuerDid: 'did:web:issuer.example',
@@ -883,13 +897,33 @@ describe('VCKit status contract', () => {
     const reason = new Error('cancelled before mint');
     controller.abort(reason);
     const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+    const onDispatch = jest.fn();
 
-    await expect(adapter.sign(payload, { signal: controller.signal })).rejects.toMatchObject({
+    await expect(adapter.sign(payload, { signal: controller.signal, onDispatch })).rejects.toMatchObject({
       constructor: VcCredentialStatusError,
       cause: reason,
       message: expect.stringContaining('Failed to issue credential status'),
     });
+    expect(onDispatch).not.toHaveBeenCalled();
     expect(mockedHttpFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch when the status-list mint request is aborted', async () => {
+    // Catches a regression that treats an aborted status-list request as proof that the credential request was sent.
+    const controller = new AbortController();
+    const reason = new Error('cancelled during mint');
+    mockedHttpFetch.mockImplementationOnce(async () => {
+      controller.abort(reason);
+      throw reason;
+    });
+    const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+    const onDispatch = jest.fn();
+
+    await expect(adapter.sign(payload, { signal: controller.signal, onDispatch })).rejects.toMatchObject({
+      constructor: VcCredentialStatusError,
+      cause: reason,
+    });
+    expect(onDispatch).not.toHaveBeenCalled();
   });
 
   it('accepts a string issuer when minting status entries', async () => {

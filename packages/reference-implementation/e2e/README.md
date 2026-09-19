@@ -109,7 +109,7 @@ The suite targets any instance of the RI and its dependent services using config
 
 2. **Identity-provider accounts** the suite signs in with. The compose stack imports `cypress/fixtures/keycloak-realm-e2e.json`, which defines all of them; a deployment provides its own:
 
-   - Two users with passwords. In open mode each user's first sign-in provisions that user's own tenant, so nothing has to exist before the run. In closed mode both users belong to the same group.
+   - Three users with passwords. In open mode each user's first sign-in provisions that user's own tenant, so nothing has to exist before the run. In closed mode `e2e-admin@test.local` and `e2e-user@test.local` belong to the same group, while `e2e-orphan@test.local` has no group membership and is used to assert the no-group-assignment 403 on protected routes. `e2e-orphan@test.local` reuses `E2E_USER_PASSWORD`.
    - Two service-account clients with client credentials. In open mode each resolves to its own tenant; in closed mode one belongs to the first group and the other to a second group.
    - Redirect URIs configured for the RI under test.
    - For Zitadel, `E2E_IDP_AUDIENCE` must identify the project used by the service-account clients.
@@ -141,6 +141,7 @@ Each Cypress run has one tag, `e2e-<RUN_ID>`. `runTag()` exposes that value to s
 #### What tests clean up
 
 - **Per-spec API cleanup**: the support hook lists every RI collection for every authenticated actor used by the run (both signed-in users and both service accounts) and deletes only rows containing that run's tag, in dependency order. Credentials the RI issued go through `DELETE /api/v1/credentials/{id}` and external library records through `DELETE /api/v1/library/{id}`; a run-owned DID still flagged default has the flag cleared first. Deleting is idempotent, so a row that has already gone is not a failure. The RI removes a deleted credential's stored copy on a best-effort basis (see the [credentials API](../../../documentation/docs/reference-implementation/api/credentials.md#delete-a-credential)); the proof below covers RI records, and a copy the RI could not remove is reported in the RI's own log, not by the suite.
+- An API login can pass `{ cleanupActor: false }` when its principal cannot own rows, so that session is not registered as a cleanup actor.
 - **Final API cleanup and proof**: the harness `after:run` repeats the tagged deletion, retires the one Identity Resolver namespace the publishing spec registered (`e2e-pub-<tag>`, through the resolver's own API), then lists every collection again. Any leftover id or listing failure fails the run and is reported.
 - **Residue check**: before the first spec, the harness lists every collection and refuses to start when a row carries an `e2e-<other-run-id>` tag from an earlier run (`E2E_RESIDUE_POLICY=fail`, the default). `E2E_RESIDUE_POLICY=clean` runs the same tag-scoped API cleanup for those tags first and fails if it cannot converge. A run killed before its final cleanup leaves tagged rows behind; the next run's residue check finds them, and `clean` is the recovery. The Identity Resolver namespace the publishing spec registers is recorded in `.e2e-run-state/resolver-namespaces.json` before registration; a run retires its own namespace at the end and any namespace an earlier run left there at the start, through the resolver's API, and refuses to start if that fails.
 
@@ -161,7 +162,7 @@ The following inputs are the complete configuration surface used by the RI e2e h
 
 - RI: `CYPRESS_BASE_URL`
 - Identity provider: `E2E_IDP_PROVIDER`, `E2E_IDP_BASE_URL`, `E2E_IDP_REALM`, `E2E_IDP_CLIENT_ID`, `E2E_IDP_CLIENT_SECRET`, `E2E_IDP_AUDIENCE`
-- Human accounts: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`, `E2E_USER2_EMAIL`, `E2E_USER2_PASSWORD`
+- Human accounts: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`, `E2E_USER2_EMAIL`, `E2E_USER2_PASSWORD`; the realm fixture is shared by both modes, and the closed-mode suite is what uses `e2e-orphan@test.local` for the no-group-assignment refusal case. That fixture user reuses `E2E_USER_PASSWORD`.
 - Service accounts: `E2E_SA1_CLIENT_ID`, `E2E_SA1_CLIENT_SECRET`, `E2E_SA2_CLIENT_ID`, `E2E_SA2_CLIENT_SECRET`
 - VCKit: `E2E_VCKIT_BASE_URL`, `E2E_VCKIT_PUBLIC_BASE_URL` (the same VCKit service as the test runner reaches it; specs that fetch a published status list rewrite the RI's internal origin to this one), `E2E_VCKIT_API_KEY`, `E2E_VCKIT_DID_WEB_RESOLVABLE`
 - Storage: `E2E_STORAGE_BASE_URL` (as the RI reaches it), `E2E_STORAGE_PUBLIC_BASE_URL` (the same service as the test runner reaches it; specs that fetch a stored copy rewrite the RI's prefix to this one), `E2E_STORAGE_API_KEY`, `E2E_STORAGE_API_VERSION`, `E2E_STORAGE_PUBLIC_BUCKET`, `E2E_STORAGE_PRIVATE_BUCKET`

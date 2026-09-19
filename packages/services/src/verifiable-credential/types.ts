@@ -297,6 +297,14 @@ export type SignOptions = {
     fn: () => Promise<CredentialStatusEntry>,
     signal?: AbortSignal,
   ) => Promise<CredentialStatusEntry>;
+  /**
+   * Called once, immediately before the request that creates the credential
+   * is sent. Nothing before it has issued the requested credential, so a
+   * throw before the hook is safe to retry for that credential. The
+   * status-list mint before the hook has allocated a status entry with the
+   * provider, and that allocation is not reclaimed on retry.
+   */
+  onDispatch?: () => void;
   signal?: AbortSignal;
 };
 
@@ -386,7 +394,13 @@ export const VC_SERVICE_TYPE = 'VC' as const;
  * Implementations use enveloping proofs (JOSE/JWT) as required by the UNTP VCDM profile.
  */
 export interface IVerifiableCredentialService {
-  /** Signs a credential payload and returns an enveloped (JWT-wrapped) credential. */
+  /**
+   * Signs a credential payload and returns an enveloped (JWT-wrapped) credential.
+   * When options.onDispatch is supplied, an implementation must call it exactly
+   * once immediately before sending the request that creates the credential,
+   * and must not call it when the operation fails before that request. Callers
+   * treat a throw without this hook as meaning that no credential exists.
+   */
   sign(payload: CredentialPayload, options?: SignOptions): Promise<EnvelopedVerifiableCredential>;
 
   /**

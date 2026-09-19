@@ -30,6 +30,8 @@ function inspectOptions(overrides: Partial<InspectCredentialBatchItemOptions> = 
 const item = {
   tenantId: 'tenant-1',
   batchId: 'batch-1',
+  batchCorrelationId: 'batch-correlation',
+  itemCorrelationId: 'batch-correlation_0',
   index: 0,
   batchState: CredentialBatchState.NEEDS_ATTENTION,
   batchVersion: 7,
@@ -44,6 +46,7 @@ const item = {
   errorMessage: 'check the library',
   resolutionReason: null,
   itemResolvedAt: null,
+  reference: 'PO-1',
   encryptedRequest: 'encrypted-request',
 };
 
@@ -66,7 +69,10 @@ it('prints the minimal inspection shape and audits before metadata output', asyn
   expect(printed).toEqual({
     tenantId: 'tenant-1',
     batchId: 'batch-1',
+    batchCorrelationId: 'batch-correlation',
+    itemCorrelationId: 'batch-correlation_0',
     index: 0,
+    reference: 'PO-1',
     batchState: 'NEEDS_ATTENTION',
     batchVersion: 7,
     itemState: 'OUTCOME_UNKNOWN',
@@ -93,6 +99,34 @@ it('prints the minimal inspection shape and audits before metadata output', asyn
   );
   const audit = (logger.warn.mock.calls[0] as unknown[])[0];
   expect(audit).not.toHaveProperty('operator');
+});
+
+it('prints the explicit fallback when an item correlation id is not derivable', async () => {
+  // Regression: an operator must be directed to the batch id and index when no worker log has an item id.
+  const { events, output } = outputRecorder();
+  const logger = { info: jest.fn(), warn: jest.fn(() => events.push('audit:warn')) };
+  const getItem = jest.fn().mockResolvedValue({
+    ...item,
+    batchCorrelationId: 'b'.repeat(128),
+    itemCorrelationId: '(not derivable; search by batchCorrelationId and index)',
+    index: 17,
+  });
+
+  await expect(
+    runInspectCredentialBatchItem(inspectOptions({ index: 17 }), {
+      getItem,
+      logger,
+      output,
+      now: () => new Date('2026-09-17T02:00:00.000Z'),
+    }),
+  ).resolves.toBe(0);
+
+  const printed = JSON.parse(events[1].slice('print:'.length)) as Record<string, unknown>;
+  expect(printed).toMatchObject({
+    batchCorrelationId: 'b'.repeat(128),
+    itemCorrelationId: '(not derivable; search by batchCorrelationId and index)',
+    index: 17,
+  });
 });
 
 it('audits before printing the decrypted request and never sends plaintext to the logger', async () => {
@@ -227,6 +261,60 @@ it('prints transactional resolution before and after states', async () => {
   expect(events[0]).toBe('audit:warn');
   expect(events[1]).toContain('before:');
   expect(events[2]).toContain('after:');
+});
+
+it.each([
+  'missing',
+  'not-settled',
+  'version-mismatch',
+  'item-missing',
+  'not-unknown',
+  'credential-recorded',
+  'credential-not-found',
+  'reason-missing',
+  'evidence-missing',
+] as const)('prints the repository refusal outcome %s and exits non-zero', async (outcome) => {
+  // Regression: every repository refusal must be visible to the operator and must not report success.
+  const { events, output } = outputRecorder();
+  const logger = { info: jest.fn(), warn: jest.fn(() => events.push('audit:warn')) };
+  const options: ResolveCredentialBatchItemOptions = {
+    tenantId: 'tenant-1',
+    batchId: 'batch-1',
+    index: 0,
+    expectedVersion: 7,
+    resolution: { state: 'FAILED', evidence: 'evidence-1' },
+    reason: 'INC-123',
+    dryRun: false,
+  };
+  const result = {
+    outcome,
+    audit: {
+      action: 'resolve' as const,
+      tenantId: 'tenant-1',
+      batchId: 'batch-1',
+      index: 0,
+      version: 7,
+      resolution: 'FAILED' as const,
+      reason: 'INC-123',
+      evidence: 'evidence-1',
+    },
+  };
+  const resolve = jest.fn().mockResolvedValue(result);
+
+  await expect(
+    runResolveCredentialBatchItem(options, {
+      transaction: async (callback) => callback({} as never),
+      resolve,
+      logger,
+      output,
+      now: () => new Date('2026-09-17T02:00:00.000Z'),
+    }),
+  ).resolves.toBe(1);
+
+  expect(events.filter((event) => event.startsWith('print:')).map((event) => event.slice('print:'.length))).toEqual([
+    `outcome: ${outcome}`,
+  ]);
+  expect(events.filter((event) => event.startsWith('error:'))).toEqual([]);
 });
 
 it('refuses request disclosure when warn audit output would be filtered', async () => {

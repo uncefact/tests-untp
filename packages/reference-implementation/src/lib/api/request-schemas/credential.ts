@@ -132,8 +132,16 @@ export const credentialIssueRequestSchema = z.object({
   ...credentialIssueRequestFields,
 });
 
-/** A batch item has the exact single-issuance request shape, including its refusal rules. */
-export const credentialBatchItemRequestSchema = credentialIssueRequestSchema;
+/** A batch item extends the single-issuance request with its issuer-owned correlation reference. */
+export const credentialBatchItemRequestSchema = credentialIssueRequestSchema.extend({
+  reference: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[^\u0000-\u001F\u007F-\u009F]*$/, 'must not contain control characters')
+    .optional()
+    .describe('Issuer-supplied item reference, echoed on batch status responses when provided'),
+});
 
 export type CredentialIssueRequest = z.infer<typeof credentialIssueRequestSchema>;
 /**

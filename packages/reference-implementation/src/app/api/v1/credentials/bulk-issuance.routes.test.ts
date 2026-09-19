@@ -51,7 +51,7 @@ import { POST as submitBatch } from './batches/route';
 const item = (index: number) => ({
   credentialPayload: { issuer: { id: 'did:web:issuer.example' }, index },
   credentialType: 'DigitalProductPassport',
-  version: '0.6.0',
+  version: '0.7.0',
 });
 
 function libraryRecordView(credentialId: string) {
@@ -71,7 +71,7 @@ function libraryRecordView(credentialId: string) {
       validUntil: null,
       credentialType: 'DigitalProductPassport',
       coreCredentialType: CoreCredentialType.DPP,
-      coreDataModelVersion: '0.6.0',
+      coreDataModelVersion: '0.7.0',
       detailsStatus: CredentialDetailsStatus.EXTRACTED,
       detailsError: null,
       createdAt,
@@ -115,6 +115,7 @@ type JourneyItem = {
 type JourneyBatch = {
   id: string;
   tenantId: string;
+  correlationId: string;
   state: CredentialBatchState;
   itemCount: number;
   queuedCount: number;
@@ -189,6 +190,7 @@ describe('bulk issuance end-to-end route journey', () => {
     batch = {
       id: 'batch-e2e',
       tenantId: 'tenant-1',
+      correlationId: 'batch-e2e-correlation',
       state: CredentialBatchState.QUEUED,
       itemCount: 2,
       queuedCount: 2,

@@ -922,6 +922,7 @@ describe('POST /api/v1/credentials', () => {
         vcService,
         storageService,
         storageOptions: {},
+        onDispatch: expect.any(Function),
         bridge: stubBridge,
       });
     });

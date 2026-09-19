@@ -38,8 +38,9 @@ export type IssueCredentialRequestInput = {
   body: CredentialIssueRequest;
   idempotencyClaimId?: string;
   /**
-   * Runs immediately before the external credential issuance effect begins, after request, issuer and service checks.
-   * It is a checkpoint boundary for callers and must not perform issuance or alter the request result.
+   * Passed through to the VC service and called immediately before its
+   * credential request is sent. It is a checkpoint boundary for callers and
+   * must not perform issuance or alter the request result.
    */
   onDispatch?: () => void;
 };
@@ -269,6 +270,7 @@ export async function issueCredentialRequest(
   input: IssueCredentialRequestInput,
 ): Promise<IssueCredentialRequestResult> {
   const { tenantId, body, idempotencyClaimId, onDispatch } = input;
+  const dispatchHook = onDispatch ?? (() => undefined);
   const { credentialType, version } = body;
   if ('credentialStatus' in body.credentialPayload) {
     throw new ValidationError(`credentialPayload.credentialStatus: ${CREDENTIAL_STATUS_NOT_ACCEPTED_MESSAGE}`, {
@@ -380,7 +382,6 @@ export async function issueCredentialRequest(
 
   const vcService = await resolveVcService(tenantId, didRecord.serviceInstanceId);
   const storageService = await resolveStorageService(tenantId, storageOptions.serviceInstanceId);
-  onDispatch?.();
   const issued = await issueCredential({
     tenantId,
     credentialPayload,
@@ -394,6 +395,7 @@ export async function issueCredentialRequest(
     coreCredentialType: resolveCoreCredentialType(coreDataModelType),
     ...(body.statusPurposes !== undefined ? { statusPurposes: body.statusPurposes } : {}),
     ...(idempotencyClaimId !== undefined ? { idempotencyClaimId } : {}),
+    onDispatch: dispatchHook,
   });
 
   const {

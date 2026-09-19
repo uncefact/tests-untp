@@ -136,6 +136,7 @@ export async function withStatusListMutex<T>(
       { maxWait, timeout },
     );
   } catch (transactionError) {
+    if (transactionError instanceof StatusListMutexTimeoutError) throw transactionError;
     if (!callbackPromise) {
       if (!callbackDispatched && isPoolWaitError(transactionError)) {
         throw new StatusListMutexBusyError(key, transactionError);

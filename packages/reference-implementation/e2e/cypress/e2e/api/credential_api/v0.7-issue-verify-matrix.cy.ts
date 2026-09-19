@@ -27,6 +27,7 @@
 import { config, runnerReachableUri, runTag } from '../../../support/config';
 import { waitForGeneration } from '../../../support/library';
 import { decodeStoredCredential, expectStatusListIndex } from '../../../support/stored-credential';
+import { readV070CredentialPayload } from '../../../support/v0.7-credential-payload';
 
 const PLAYGROUND_BASE_URL = Cypress.env('PLAYGROUND_BASE_URL') || 'http://localhost:4000';
 
@@ -76,19 +77,14 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
 
   MATRIX.forEach((entry) => {
     it(`issues a v0.7.0 ${entry.credentialType} via the RI and verifies it via the Playground`, () => {
-      // The canonical example payloads live alongside the render templates.
-      // Resolved relative to the Cypress project root (packages/.../e2e).
-      cy.readFile(`../src/templates/v0.7.0/${entry.templateDir}/example-data.json`).then((credentialPayload) => {
-        // The template is the issued credential. Override only the fields the
-        // test owns: a unique id and name, the tenant's default issuer DID,
-        // and a current validity window. `cy.readFile` re-parses per test,
-        // so mutating it in place is safe.
-        credentialPayload.id = `urn:uuid:e2e-v070-${entry.credentialType}-${RUN_ID}`;
-        credentialPayload.name = `E2E ${entry.credentialType} ${RUN_ID}`;
-        credentialPayload.issuer.id = defaultDidValue;
-        credentialPayload.validFrom = VALID_FROM;
-        credentialPayload.validUntil = VALID_UNTIL;
-
+      readV070CredentialPayload({
+        templateDir: entry.templateDir,
+        credentialId: `urn:uuid:e2e-v070-${entry.credentialType}-${RUN_ID}`,
+        credentialName: `E2E ${entry.credentialType} ${RUN_ID}`,
+        issuerDid: defaultDidValue,
+        validFrom: VALID_FROM,
+        validUntil: VALID_UNTIL,
+      }).then((credentialPayload) => {
         cy.request({
           method: 'POST',
           url: '/api/v1/credentials',
@@ -172,14 +168,15 @@ describe('UNTP v0.7.0 issue and verify matrix', { testIsolation: false }, () => 
   it("fails the Reference Implementation's verification after revocation", function () {
     if (!config.capabilities.statusMutationEnabled) this.skip();
 
-    cy.readFile('../src/templates/v0.7.0/digital_product_passport/example-data.json').then((source) => {
-      const credentialPayload = JSON.parse(JSON.stringify(source)) as Record<string, any>;
-      credentialPayload.id = `urn:uuid:e2e-v070-revoked-${runTag()}`;
-      credentialPayload.name = `E2E revoked DPP ${runTag()}`;
-      credentialPayload.issuer.id = defaultDidValue;
-      credentialPayload.validFrom = VALID_FROM;
-      credentialPayload.validUntil = VALID_UNTIL;
-
+    const revokedRunId = runTag();
+    readV070CredentialPayload({
+      templateDir: 'digital_product_passport',
+      credentialId: `urn:uuid:e2e-v070-revoked-${revokedRunId}`,
+      credentialName: `E2E revoked DPP ${revokedRunId}`,
+      issuerDid: defaultDidValue,
+      validFrom: VALID_FROM,
+      validUntil: VALID_UNTIL,
+    }).then((credentialPayload) => {
       cy.request({
         method: 'POST',
         url: '/api/v1/credentials',

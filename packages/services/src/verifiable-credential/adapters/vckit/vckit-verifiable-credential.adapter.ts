@@ -299,6 +299,7 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
       );
 
       this.logger.debug('Issuing verifiable credential');
+      options?.onDispatch?.();
       return await this.issueVerifiableCredential(vc, options?.signal);
     } catch (error) {
       if (credentialStatuses.length > 0) {

@@ -1,7 +1,6 @@
 import { createRigClient, truncateApplicationTables } from './rig/db';
 import { CredentialBatchItemState, CredentialBatchState, LibraryRecordOrigin } from '../../src/lib/prisma/generated';
 import {
-  CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS,
   CredentialBatchAttemptFenceLostError,
   claimBatchAttempt,
   claimNextBatchItem,
@@ -12,6 +11,7 @@ import {
   getCredentialBatchItemForInspection,
   markItemFailed,
   markItemIssued,
+  markItemQueued,
   markItemOutcomeUnknown,
   recordKnownCredentialId,
   releaseBatchAttempt,
@@ -20,8 +20,9 @@ import {
   type BatchSubmissionResult,
 } from '../../src/lib/prisma/repositories/credential-batch.repository';
 import { projectCredentialBatch } from '../../src/lib/credentials/credential-batch-projection';
+import { runResolveCredentialBatchItem } from '../../src/lib/credentials/credential-batch-operator';
 import { CREDENTIAL_BATCH_ISSUE_JOB } from '../../src/lib/jobs/queue-names';
-import type { JobQueue } from '../../src/lib/jobs/types';
+import type { EnqueueOptions, JobQueue } from '../../src/lib/jobs/types';
 import { PgBossJobQueue } from '../../src/lib/jobs/pg-boss-job-queue';
 import { getEncryptionService } from '../../src/lib/encryption/encryption';
 
@@ -40,8 +41,9 @@ const quiet = {
 const ITEM = {
   credentialPayload: { issuer: { id: 'did:web:issuer.example' } },
   credentialType: 'DigitalProductPassport',
-  version: '0.6.0',
+  version: '0.7.0',
 };
+const REFERENCED_ITEM = { ...ITEM, reference: 'PO-1' };
 
 describe('credential batch persistence and progression', () => {
   const queueErrors: Error[] = [];
@@ -147,8 +149,8 @@ describe('credential batch persistence and progression', () => {
     await prisma.$disconnect();
   });
 
-  it('commits the batch, encrypted items and one job together, and rolls all back together', async () => {
-    const created = await submit('atomic-key', 'digest-atomic', [ITEM, ITEM]);
+  it('commits the batch, references, encrypted items and one job together, and rolls all back together', async () => {
+    const created = await submit('atomic-key', 'digest-atomic', [REFERENCED_ITEM, ITEM]);
     expect(created).toEqual({ outcome: 'created', batchId: expect.any(String) });
     const batchId = created.outcome === 'created' ? created.batchId : '';
 
@@ -166,8 +168,10 @@ describe('credential batch persistence and progression', () => {
     });
     expect(batch?.items).toHaveLength(2);
     expect(batch?.items.map((item) => item.index)).toEqual([0, 1]);
+    expect(batch?.items.map((item) => item.reference)).toEqual(['PO-1', null]);
     expect(batch?.items[0].request).not.toContain(JSON.stringify(ITEM));
     expect(JSON.parse(getEncryptionService().decrypt(JSON.parse(batch?.items[0].request as string)))).toEqual(ITEM);
+    expect(JSON.parse(getEncryptionService().decrypt(JSON.parse(batch?.items[1].request as string)))).toEqual(ITEM);
 
     const jobs = await prisma.$queryRawUnsafe<{ data: Record<string, unknown> }[]>(
       'SELECT data FROM pgboss.job WHERE name = $1',
@@ -181,7 +185,7 @@ describe('credential batch persistence and progression', () => {
         tx: Parameters<NonNullable<JobQueue['enqueueWithin']>>[0],
         name: string,
         payload: { batchId: string; tenantId: string },
-        options: typeof CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS,
+        options: EnqueueOptions,
       ) => {
         await queue.enqueueWithin(tx, name, payload, options);
         throw new Error('rollback after queue insertion');
@@ -608,6 +612,58 @@ describe('credential batch persistence and progression', () => {
     await expect(prisma.credentialBatchItem.count({ where: { batchId: held.batchId } })).resolves.toBe(1);
   });
 
+  it('rolls back a dry-run resolution without changing the item, counters or version', async () => {
+    // Regression: a dry run must show the proposed resolution while leaving every persisted batch value unchanged.
+    const unknown = await unknownBatch('resolve-dry-run-key');
+    const beforeItem = await prisma.credentialBatchItem.findFirstOrThrow({
+      where: { batchId: unknown.batchId, index: 0 },
+    });
+    const beforeBatch = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: unknown.batchId } });
+    const printed: string[] = [];
+    const audits: Record<string, unknown>[] = [];
+
+    await expect(
+      runResolveCredentialBatchItem(
+        {
+          tenantId: 'tenant-1',
+          batchId: unknown.batchId,
+          index: 0,
+          expectedVersion: beforeBatch.version,
+          resolution: { state: 'FAILED', evidence: 'dry-run evidence' },
+          reason: 'dry-run check',
+          dryRun: true,
+        },
+        {
+          logger: {
+            info: () => undefined,
+            warn: (fields) => audits.push(fields as Record<string, unknown>),
+          },
+          output: {
+            print: (line) => printed.push(line),
+            printError: (line) => printed.push(`error: ${line}`),
+          },
+          now: () => new Date('2026-09-17T02:00:00.000Z'),
+        },
+      ),
+    ).resolves.toBe(0);
+
+    await expect(
+      prisma.credentialBatchItem.findFirstOrThrow({ where: { batchId: unknown.batchId, index: 0 } }),
+    ).resolves.toEqual(beforeItem);
+    await expect(prisma.credentialBatch.findUniqueOrThrow({ where: { id: unknown.batchId } })).resolves.toMatchObject({
+      queuedCount: beforeBatch.queuedCount,
+      processingCount: beforeBatch.processingCount,
+      issuedCount: beforeBatch.issuedCount,
+      failedCount: beforeBatch.failedCount,
+      unknownCount: beforeBatch.unknownCount,
+      version: beforeBatch.version,
+    });
+    expect(printed).toHaveLength(2);
+    expect(printed[0]).toMatch(/^before: /);
+    expect(printed[1]).toMatch(/^after: /);
+    expect(audits).toEqual([expect.objectContaining({ outcome: 'dry-run', dryRun: true })]);
+  });
+
   it('reads found, missing and foreign items through the tenant-scoped inspection store', async () => {
     const created = await submit('inspection-store-key', 'digest-inspection-store');
     const batchId = createdBatchId(created);
@@ -620,6 +676,7 @@ describe('credential batch persistence and progression', () => {
       batchVersion: 0,
       requestDigest: 'digest-inspection-store',
       itemState: CredentialBatchItemState.QUEUED,
+      reference: null,
     });
     expect(found?.encryptedRequest).not.toContain(JSON.stringify(ITEM));
     await expect(getCredentialBatchItemForInspection(batchId, 'tenant-2', 0)).resolves.toBeNull();
@@ -740,6 +797,7 @@ describe('credential batch persistence and progression', () => {
       data: Array.from({ length: 150 }, (_, index) => ({
         id: `expiry-bounded-${index}`,
         tenantId: 'tenant-1',
+        correlationId: `expiry-bounded-correlation-${index}`,
         state: CredentialBatchState.COMPLETED,
         itemCount: 0,
         idempotencyKey: `expiry-bounded-key-${index}`,
@@ -1044,6 +1102,7 @@ describe('credential batch persistence and progression', () => {
             updateMany: tx.credentialBatch.updateMany.bind(tx.credentialBatch),
           },
           credentialBatchItem: {
+            findMany: tx.credentialBatchItem.findMany.bind(tx.credentialBatchItem),
             updateMany: async (...args: Parameters<typeof tx.credentialBatchItem.updateMany>) => {
               const result = await tx.credentialBatchItem.updateMany(...args);
               if (result.count === 1) {
@@ -1258,5 +1317,220 @@ describe('credential batch persistence and progression', () => {
       failedCount: 0,
       unknownCount: 1,
     });
+  });
+
+  it('stores absent warnings as SQL NULL, preserves warning arrays, and clears stale warnings', async () => {
+    // Regression: every repository path that clears a warning must write SQL NULL, not an empty JSON value.
+    const created = await submit('warning-storage-key', 'digest-warning-storage', [ITEM, ITEM, ITEM, ITEM, ITEM, ITEM]);
+    if (created.outcome !== 'created') throw new Error('expected a newly created warning-storage batch');
+    const batchId = created.batchId;
+    const noWarningCredentialId = 'warning-storage-no-warning';
+    const recordedWarningCredentialId = 'warning-storage-recorded';
+    const warning = [{ code: 'DETAILS_EXTRACTION_FAILED', message: 'warning persisted' }];
+
+    const warningCount = async (targetBatchId: string, index: number): Promise<number> => {
+      const rows = await prisma.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(*)::int AS count
+        FROM "CredentialBatchItem"
+        WHERE "batchId" = ${targetBatchId}
+          AND "index" = ${index}
+          AND "warning" IS NOT NULL
+      `;
+      return rows[0].count;
+    };
+
+    await nativeCredential(noWarningCredentialId);
+    await nativeCredential(recordedWarningCredentialId);
+
+    await prisma.$transaction(async (tx) => {
+      expect(
+        await claimBatchAttempt(tx, { batchId, tenantId: 'tenant-1', token: 'warning-attempt', expectedVersion: 0 }),
+      ).toEqual({ applied: true });
+      expect(await claimNextBatchItem(tx, { batchId, tenantId: 'tenant-1', token: 'warning-attempt' })).toMatchObject({
+        outcome: 'claimed',
+        item: { index: 0 },
+      });
+      expect(
+        await markItemIssued(tx, {
+          batchId,
+          tenantId: 'tenant-1',
+          index: 0,
+          token: 'warning-attempt',
+          credentialId: noWarningCredentialId,
+          warning: null,
+        }),
+      ).toEqual({ outcome: 'applied' });
+    });
+    await expect(warningCount(batchId, 0)).resolves.toBe(0);
+
+    await prisma.$transaction(async (tx) => {
+      expect(await claimNextBatchItem(tx, { batchId, tenantId: 'tenant-1', token: 'warning-attempt' })).toMatchObject({
+        outcome: 'claimed',
+        item: { index: 1 },
+      });
+      expect(
+        await markItemIssued(tx, {
+          batchId,
+          tenantId: 'tenant-1',
+          index: 1,
+          token: 'warning-attempt',
+          credentialId: recordedWarningCredentialId,
+          warning,
+        }),
+      ).toEqual({ outcome: 'applied' });
+    });
+    await expect(warningCount(batchId, 1)).resolves.toBe(1);
+
+    await prisma.$transaction(async (tx) => {
+      expect(await claimNextBatchItem(tx, { batchId, tenantId: 'tenant-1', token: 'warning-attempt' })).toMatchObject({
+        outcome: 'claimed',
+        item: { index: 2 },
+      });
+      expect(
+        await tx.credentialBatchItem.updateMany({
+          where: {
+            batchId,
+            tenantId: 'tenant-1',
+            index: 2,
+            state: CredentialBatchItemState.PROCESSING,
+            attemptToken: 'warning-attempt',
+          },
+          data: { warning },
+        }),
+      ).toEqual({ count: 1 });
+      expect(
+        await markItemFailed(tx, {
+          batchId,
+          tenantId: 'tenant-1',
+          index: 2,
+          token: 'warning-attempt',
+          errorClass: 'VALIDATION_ERROR',
+          errorMessage: 'item rejected',
+        }),
+      ).toEqual({ outcome: 'applied' });
+    });
+    await expect(warningCount(batchId, 2)).resolves.toBe(0);
+
+    await prisma.$transaction(async (tx) => {
+      expect(await claimNextBatchItem(tx, { batchId, tenantId: 'tenant-1', token: 'warning-attempt' })).toMatchObject({
+        outcome: 'claimed',
+        item: { index: 3 },
+      });
+      expect(
+        await tx.credentialBatchItem.updateMany({
+          where: {
+            batchId,
+            tenantId: 'tenant-1',
+            index: 3,
+            state: CredentialBatchItemState.PROCESSING,
+            attemptToken: 'warning-attempt',
+          },
+          data: { warning },
+        }),
+      ).toEqual({ count: 1 });
+      expect(
+        await markItemQueued(tx, {
+          batchId,
+          tenantId: 'tenant-1',
+          index: 3,
+          token: 'warning-attempt',
+          errorMessage: 'item retried',
+        }),
+      ).toEqual({ outcome: 'applied' });
+    });
+    await expect(warningCount(batchId, 3)).resolves.toBe(0);
+
+    await prisma.$transaction(async (tx) => {
+      expect(await claimNextBatchItem(tx, { batchId, tenantId: 'tenant-1', token: 'warning-attempt' })).toMatchObject({
+        outcome: 'claimed',
+        item: { index: 4 },
+      });
+      expect(
+        await tx.credentialBatchItem.updateMany({
+          where: {
+            batchId,
+            tenantId: 'tenant-1',
+            index: 4,
+            state: CredentialBatchItemState.PROCESSING,
+            attemptToken: 'warning-attempt',
+          },
+          data: { warning },
+        }),
+      ).toEqual({ count: 1 });
+      expect(
+        await markItemOutcomeUnknown(tx, {
+          batchId,
+          tenantId: 'tenant-1',
+          index: 4,
+          token: 'warning-attempt',
+          errorClass: 'OUTCOME_UNKNOWN',
+          errorMessage: 'item outcome is uncertain',
+        }),
+      ).toEqual({ outcome: 'applied' });
+    });
+    await expect(warningCount(batchId, 4)).resolves.toBe(0);
+
+    await prisma.$transaction(async (tx) => {
+      expect(await claimNextBatchItem(tx, { batchId, tenantId: 'tenant-1', token: 'warning-attempt' })).toMatchObject({
+        outcome: 'claimed',
+        item: { index: 5 },
+      });
+      expect(
+        await tx.credentialBatchItem.updateMany({
+          where: {
+            batchId,
+            tenantId: 'tenant-1',
+            index: 5,
+            state: CredentialBatchItemState.PROCESSING,
+            attemptToken: 'warning-attempt',
+          },
+          data: { warning },
+        }),
+      ).toEqual({ count: 1 });
+    });
+    await expect(warningCount(batchId, 5)).resolves.toBe(1);
+
+    const current = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: batchId } });
+    await expect(
+      prisma.$transaction((tx) =>
+        claimBatchAttempt(tx, {
+          batchId,
+          tenantId: 'tenant-1',
+          token: 'takeover-attempt',
+          expectedVersion: current.version,
+          staleBefore: new Date(Date.now() + 1_000),
+        }),
+      ),
+    ).resolves.toEqual({ applied: true });
+    await expect(warningCount(batchId, 5)).resolves.toBe(0);
+
+    const resolved = await unknownBatch('warning-resolution-key');
+    await prisma.credentialBatchItem.updateMany({
+      where: { batchId: resolved.batchId, index: 0 },
+      data: { warning },
+    });
+    await expect(warningCount(resolved.batchId, 0)).resolves.toBe(1);
+    await expect(
+      prisma.$transaction((tx) =>
+        resolveUnknownBatchItem(tx, {
+          tenantId: 'tenant-1',
+          batchId: resolved.batchId,
+          index: 0,
+          expectedVersion: 7,
+          resolution: { state: 'FAILED', evidence: 'no credential was issued' },
+          reason: 'warning clearing check',
+        }),
+      ),
+    ).resolves.toMatchObject({ outcome: 'applied' });
+
+    await expect(warningCount(resolved.batchId, 0)).resolves.toBe(0);
+
+    const storedWarning = await prisma.$queryRaw<{ warning: unknown }[]>`
+      SELECT "warning"
+      FROM "CredentialBatchItem"
+      WHERE "batchId" = ${batchId}
+        AND "index" = 1
+    `;
+    expect(storedWarning).toEqual([{ warning }]);
   });
 });

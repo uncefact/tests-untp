@@ -86,7 +86,7 @@ services:
     ports:
       - '3003:3003'
     environment:
-      # Database (docker internal networking — host/port differ from .env)
+      # Database (docker internal networking: host/port differ from .env)
       RI_POSTGRES_USER: ${RI_POSTGRES_USER:-ri-postgres}
       RI_POSTGRES_PASSWORD: ${RI_POSTGRES_PASSWORD:-changeme}
       RI_POSTGRES_DB: ${RI_POSTGRES_DB:-ri}
@@ -190,6 +190,9 @@ services:
       MAX_BATCH_REQUEST_BODY_BYTES:
       BATCH_RETENTION_DAYS:
       BATCH_EXPIRY_SWEEP_MINUTES:
+      BATCH_JOB_RETRY_LIMIT:
+      BATCH_JOB_RETRY_BACKOFF_SECONDS:
+      BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS:
       BATCH_JOB_CONCURRENCY:
       # OpenTelemetry - see docs/observability.md
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-agent:4317}
@@ -264,6 +267,11 @@ services:
       MAX_BATCH_ITEMS:
       BATCH_RETENTION_DAYS:
       BATCH_EXPIRY_SWEEP_MINUTES:
+      BATCH_JOB_RETRY_LIMIT:
+      BATCH_JOB_RETRY_BACKOFF_SECONDS:
+      BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS:
+      BATCH_SETTLEMENT_ALLOWANCE_MS:
+      BATCH_MINIMUM_ITEM_COST_MS:
       BATCH_JOB_CONCURRENCY:
       # These settings pass through only when set.
       # Controls bundled artefact fallback.

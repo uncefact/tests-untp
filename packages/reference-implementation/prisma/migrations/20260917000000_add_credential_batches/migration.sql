@@ -7,6 +7,7 @@ CREATE TYPE "CredentialBatchItemState" AS ENUM ('QUEUED', 'PROCESSING', 'ISSUED'
 CREATE TABLE "CredentialBatch" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
+    "correlationId" TEXT NOT NULL,
     "state" "CredentialBatchState" NOT NULL DEFAULT 'QUEUED',
     "itemCount" INTEGER NOT NULL,
     "queuedCount" INTEGER NOT NULL DEFAULT 0,
@@ -43,6 +44,7 @@ CREATE TABLE "CredentialBatchItem" (
     "batchId" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
     "index" INTEGER NOT NULL,
+    "reference" TEXT,
     "state" "CredentialBatchItemState" NOT NULL DEFAULT 'QUEUED',
     "request" TEXT NOT NULL,
     "credentialId" TEXT,
@@ -69,6 +71,8 @@ CREATE INDEX "CredentialBatch_state_lastProgressAt_idx"
 CREATE INDEX "CredentialBatch_expiresAt_idx" ON "CredentialBatch"("expiresAt");
 CREATE UNIQUE INDEX "CredentialBatchItem_batchId_index_key"
   ON "CredentialBatchItem"("batchId", "index");
+CREATE UNIQUE INDEX "CredentialBatchItem_batchId_reference_key"
+  ON "CredentialBatchItem"("batchId", "reference");
 CREATE INDEX "CredentialBatchItem_batchId_state_index_idx"
   ON "CredentialBatchItem"("batchId", "state", "index");
 

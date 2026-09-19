@@ -380,7 +380,8 @@ model Credential {
   /// The status-entry composite foreign key targets `(id, tenantId)` safely
   /// because this child is database-pinned to the NATIVE origin, so every
   /// matching credential id and tenant identifies this native child.
-  batchItems   CredentialBatchItem[]
+  batchItems CredentialBatchItem[]
+
   /// Prisma requires the defining side of a one-to-one relation to be unique
   /// over the relation's fields; the primary key already makes it so.
   @@unique([id, tenantId, origin])
@@ -445,6 +446,7 @@ model CredentialStatusEntry {
 model CredentialBatch {
   id               String               @id @default(cuid())
   tenantId         String
+  correlationId    String
   state            CredentialBatchState @default(QUEUED)
   itemCount        Int
   queuedCount      Int                  @default(0)
@@ -481,28 +483,31 @@ model CredentialBatch {
  * relation keeps a deleted credential from making an ISSUED item executable.
  */
 model CredentialBatchItem {
-  id           String                   @id @default(cuid())
-  batchId      String
-  tenantId     String
-  index        Int
-  state        CredentialBatchItemState @default(QUEUED)
+  id               String                   @id @default(cuid())
+  batchId          String
+  tenantId         String
+  index            Int
+  /// Caller-supplied reference is stored in plaintext because the within-batch uniqueness index requires it; it is not covered by request encryption.
+  reference        String?
+  state            CredentialBatchItemState @default(QUEUED)
   /// @encryptedAtRest AES-256-GCM envelope of the validated issuance request.
-  request      String
-  credentialId String?
-  warning      Json?
-  errorClass   String?
-  errorMessage String?
+  request          String
+  credentialId     String?
+  warning          Json?
+  errorClass       String?
+  errorMessage     String?
   resolutionReason String?
-  resolvedAt   DateTime?
-  attemptCount Int                  @default(0)
-  nextAttemptAt DateTime?
-  attemptToken String?
-  updatedAt    DateTime                 @updatedAt
+  resolvedAt       DateTime?
+  attemptCount     Int                      @default(0)
+  nextAttemptAt    DateTime?
+  attemptToken     String?
+  updatedAt        DateTime                 @updatedAt
 
   batch      CredentialBatch @relation(fields: [batchId, tenantId], references: [id, tenantId], onDelete: Cascade)
   credential Credential?     @relation(fields: [credentialId, tenantId], references: [id, tenantId], onDelete: SetNull)
 
   @@unique([batchId, index])
+  @@unique([batchId, reference])
   @@index([batchId, state, index])
   @@index([batchId, state, nextAttemptAt, attemptCount, index], map: "batch_item_retry_schedule_idx")
 }

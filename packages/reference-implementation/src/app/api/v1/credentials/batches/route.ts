@@ -36,6 +36,21 @@ function serialisedJsonByteLength(value: object): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
+function validateUniqueBatchReferences(items: readonly { reference?: string }[]): void {
+  const firstIndexByReference = new Map<string, number>();
+  for (const [index, item] of items.entries()) {
+    if (item.reference === undefined) continue;
+    const firstIndex = firstIndexByReference.get(item.reference);
+    if (firstIndex !== undefined) {
+      throw new ValidationError(
+        `items[${index}].reference: must be unique within the batch; duplicates items[${firstIndex}].reference`,
+        { code: 'VALIDATION_FAILED' },
+      );
+    }
+    firstIndexByReference.set(item.reference, index);
+  }
+}
+
 /**
  * @swagger
  * /credentials/batches:
@@ -75,7 +90,7 @@ function serialisedJsonByteLength(value: object): number {
  *             schema:
  *               $ref: '#/components/schemas/CredentialBatchAcceptedResponse'
  *       400:
- *         description: Invalid Idempotency-Key or batch request shape, including an empty, oversized or invalid items array.
+ *         description: Invalid Idempotency-Key or batch request shape, including an empty, oversized or invalid items array or duplicate item references.
  *         content:
  *           application/json:
  *             schema:
@@ -170,6 +185,8 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
       code: 'BATCH_TOO_LARGE',
     });
   }
+
+  validateUniqueBatchReferences(body.items);
 
   const maxRequestBodyBytes = readMaxRequestBodyBytes();
   const oversizedItemIndex = body.items.findIndex((item) => serialisedJsonByteLength(item) > maxRequestBodyBytes);

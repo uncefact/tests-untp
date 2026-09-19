@@ -184,7 +184,10 @@ function inspectionOutput(item: CredentialBatchItemInspection) {
   return {
     tenantId: item.tenantId,
     batchId: item.batchId,
+    batchCorrelationId: item.batchCorrelationId,
+    itemCorrelationId: item.itemCorrelationId,
     index: item.index,
+    ...(item.reference === null || item.reference === undefined ? {} : { reference: item.reference }),
     batchState: item.batchState,
     batchVersion: item.batchVersion,
     itemState: item.itemState,

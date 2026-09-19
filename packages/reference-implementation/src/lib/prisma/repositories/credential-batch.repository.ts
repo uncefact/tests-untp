@@ -1,20 +1,26 @@
 import { EncryptionAlgorithm } from '@uncefact/untp-ri-services/encryption';
+import { getOrMintCorrelationId, getRequestContext, isValidCorrelationId } from '@uncefact/untp-ri-services/logging';
 import { Prisma } from '../generated';
 import type { Prisma as PrismaTypes } from '../generated';
 import { CredentialBatchItemState, CredentialBatchState } from '../generated';
 import { prisma } from '../prisma';
 import { isUniqueConstraintViolation } from '../db-errors';
 import { getEncryptionService } from '@/lib/encryption/encryption';
-import { readBatchRetentionDays } from '@/lib/config/credential-batch.config';
-import { OPERATOR_CONFIRMED_FAILURE_CODE } from '@/lib/credentials/credential-batch-projection';
+import {
+  credentialBatchItemAttemptLimit,
+  credentialBatchItemBackoffSeconds,
+  getCredentialBatchIssueEnqueueOptions,
+  readBatchRetentionDays,
+} from '@/lib/config/credential-batch.config';
+import {
+  interruptedBatchItemMessage,
+  OPERATOR_CONFIRMED_FAILURE_CODE,
+} from '@/lib/credentials/credential-batch-projection';
+import { credentialBatchItemCorrelationId } from '@/lib/credentials/credential-batch-correlation';
+import type { CredentialBatchItemRequest } from '@/lib/api/request-schemas/credential-batch';
 import { prismaSqlExecutor } from '@/lib/jobs/prisma-sql-executor';
 import type { JobQueue } from '@/lib/jobs/types';
 import { CREDENTIAL_BATCH_ISSUE_JOB } from '@/lib/jobs/queue-names';
-
-/** Item faults use the same four-step delay ladder as library verification; continuation is a new job. */
-export const CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS = {
-  retry: { limit: 4, backoffSeconds: 30, backoffMaxSeconds: 600 },
-} as const;
 
 const BATCH_WITH_ITEMS_INCLUDE = {
   items: { orderBy: { index: 'asc' as const } },
@@ -50,7 +56,7 @@ type CreateCredentialBatchInput = {
   tenantId: string;
   idempotencyKey: string;
   bodyDigest: string;
-  items: readonly Record<string, unknown>[];
+  items: readonly CredentialBatchItemRequest[];
   queue: JobQueue;
 };
 
@@ -66,25 +72,12 @@ export type BatchMutationOutcome =
   | { outcome: 'missing' }
   | { outcome: 'superseded' };
 
-export const CREDENTIAL_BATCH_ITEM_ATTEMPT_LIMIT = CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS.retry.limit;
-
-/** Returns the delay after the supplied one-based item fault count. */
-export function credentialBatchItemBackoffSeconds(attemptCount: number): number {
-  return Math.min(
-    CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS.retry.backoffMaxSeconds,
-    CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS.retry.backoffSeconds * 2 ** Math.max(0, attemptCount - 1),
-  );
-}
-
 export type BatchSettlementOutcome =
   | { outcome: 'applied'; state: CredentialBatchState }
   | { outcome: 'missing' }
   | { outcome: 'not-ready' }
   | { outcome: 'superseded' }
   | { outcome: 'already-settled' };
-
-export const INTERRUPTED_BATCH_ITEM_MESSAGE =
-  'A previous attempt was interrupted after it may have issued this item; check the library for a credential matching this request before re-submitting';
 
 type CredentialBatchResolutionBatch = {
   state: CredentialBatchState;
@@ -177,6 +170,8 @@ export type ResolveUnknownBatchItemResult =
 export type CredentialBatchItemInspection = {
   tenantId: string;
   batchId: string;
+  batchCorrelationId: string;
+  itemCorrelationId: string;
   index: number;
   batchState: CredentialBatchState;
   batchVersion: number;
@@ -191,6 +186,7 @@ export type CredentialBatchItemInspection = {
   errorMessage: string | null;
   resolutionReason: string | null;
   itemResolvedAt: Date | null;
+  reference: string | null;
   encryptedRequest: string;
 };
 
@@ -248,13 +244,18 @@ export async function findCredentialBatchSubmission(
  * the committed winner is ever replayed.
  */
 export async function createCredentialBatch(input: CreateCredentialBatchInput): Promise<BatchSubmissionResult> {
-  const encryptedRequests = input.items.map(encryptRequest);
+  const correlationId = getRequestContext()?.correlationId ?? getOrMintCorrelationId();
+  const encryptedItems = input.items.map(({ reference, ...request }) => ({
+    reference: reference ?? null,
+    request: encryptRequest(request),
+  }));
   try {
     const batch = await prisma.$transaction(
       async (tx) => {
         const created = await tx.credentialBatch.create({
           data: {
             tenantId: input.tenantId,
+            correlationId,
             state: CredentialBatchState.QUEUED,
             itemCount: input.items.length,
             queuedCount: input.items.length,
@@ -264,11 +265,12 @@ export async function createCredentialBatch(input: CreateCredentialBatchInput): 
         });
 
         await tx.credentialBatchItem.createMany({
-          data: encryptedRequests.map((request, index) => ({
+          data: encryptedItems.map(({ reference, request }, index) => ({
             batchId: created.id,
             tenantId: input.tenantId,
             index,
             state: CredentialBatchItemState.QUEUED,
+            reference,
             request,
           })),
         });
@@ -277,7 +279,7 @@ export async function createCredentialBatch(input: CreateCredentialBatchInput): 
           prismaSqlExecutor(tx),
           CREDENTIAL_BATCH_ISSUE_JOB,
           { batchId: created.id, tenantId: input.tenantId },
-          CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS,
+          getCredentialBatchIssueEnqueueOptions(),
         );
         return created;
       },
@@ -289,6 +291,7 @@ export async function createCredentialBatch(input: CreateCredentialBatchInput): 
   } catch (error) {
     if (!isUniqueConstraintViolation(error)) throw error;
     const winner = await findCredentialBatchSubmission(input.tenantId, input.idempotencyKey);
+    // The reference unique index is a backstop unreachable behind the route's duplicate check, so a hit is rethrown as unexpected.
     if (!winner) throw error;
     return classifySubmission(winner, input.bodyDigest);
   }
@@ -316,6 +319,7 @@ export async function getCredentialBatchItemForInspection(
     select: {
       id: true,
       tenantId: true,
+      correlationId: true,
       state: true,
       bodyDigest: true,
       createdAt: true,
@@ -334,6 +338,7 @@ export async function getCredentialBatchItemForInspection(
           resolutionReason: true,
           resolvedAt: true,
           updatedAt: true,
+          reference: true,
           request: true,
         },
       },
@@ -341,9 +346,14 @@ export async function getCredentialBatchItemForInspection(
   });
   const item = batch?.items[0];
   if (batch === null || item === undefined) return null;
+  const derivedItemCorrelationId = credentialBatchItemCorrelationId(batch.correlationId, item.index);
   return {
     tenantId: batch.tenantId,
     batchId: batch.id,
+    batchCorrelationId: batch.correlationId,
+    itemCorrelationId: isValidCorrelationId(derivedItemCorrelationId)
+      ? derivedItemCorrelationId
+      : '(not derivable; search by batchCorrelationId and index)',
     index: item.index,
     batchState: batch.state,
     batchVersion: batch.version,
@@ -358,6 +368,7 @@ export async function getCredentialBatchItemForInspection(
     errorMessage: item.errorMessage,
     resolutionReason: item.resolutionReason,
     itemResolvedAt: item.resolvedAt,
+    reference: item.reference,
     encryptedRequest: item.request,
   };
 }
@@ -505,7 +516,7 @@ export async function resolveUnknownBatchItem(
     data: {
       state: input.resolution.state === 'ISSUED' ? CredentialBatchItemState.ISSUED : CredentialBatchItemState.FAILED,
       credentialId: issuedCredentialId,
-      warning: Prisma.JsonNull,
+      warning: Prisma.DbNull,
       errorClass: input.resolution.state === 'FAILED' ? OPERATOR_CONFIRMED_FAILURE_CODE : null,
       errorMessage: input.resolution.state === 'FAILED' ? input.resolution.evidence.trim() : null,
       resolutionReason: input.reason.trim(),
@@ -600,7 +611,7 @@ function jsonValue(
   value: PrismaTypes.JsonValue | null | undefined,
 ): PrismaTypes.InputJsonValue | PrismaTypes.NullableJsonNullValueInput | undefined {
   if (value === undefined) return undefined;
-  return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
+  return value === null ? Prisma.DbNull : (value as Prisma.InputJsonValue);
 }
 
 /** Marks a processing item issued and moves its stored counters atomically. */
@@ -676,7 +687,7 @@ export async function markItemFailed(
     },
     data: {
       state: CredentialBatchItemState.FAILED,
-      warning: Prisma.JsonNull,
+      warning: Prisma.DbNull,
       errorClass: input.errorClass,
       errorMessage: input.errorMessage,
       updatedAt: now,
@@ -720,7 +731,7 @@ export async function markItemQueued(
   });
   if (current === null) return itemNotApplied(tx, input);
   const attemptCount = current.attemptCount + 1;
-  const exhausted = attemptCount >= CREDENTIAL_BATCH_ITEM_ATTEMPT_LIMIT;
+  const exhausted = attemptCount >= credentialBatchItemAttemptLimit();
   const item = await tx.credentialBatchItem.updateMany({
     where: {
       batchId: input.batchId,
@@ -733,7 +744,7 @@ export async function markItemQueued(
     data: {
       state: exhausted ? CredentialBatchItemState.FAILED : CredentialBatchItemState.QUEUED,
       attemptToken: null,
-      warning: Prisma.JsonNull,
+      warning: Prisma.DbNull,
       errorClass: exhausted ? 'ITEM_ATTEMPTS_EXHAUSTED' : null,
       errorMessage: exhausted ? input.errorMessage : null,
       attemptCount,
@@ -812,7 +823,7 @@ export async function markItemOutcomeUnknown(
     },
     data: {
       state: CredentialBatchItemState.OUTCOME_UNKNOWN,
-      warning: Prisma.JsonNull,
+      warning: Prisma.DbNull,
       errorClass: input.errorClass,
       errorMessage: input.errorMessage,
       ...(input.credentialId === undefined ? {} : { credentialId: input.credentialId }),
@@ -960,7 +971,7 @@ export async function claimBatchAttempt(
   const now = new Date(Date.now());
   const current = await tx.credentialBatch.findFirst({
     where: { id: input.batchId, tenantId: input.tenantId, version: input.expectedVersion },
-    select: { state: true, attemptToken: true, lastProgressAt: true },
+    select: { state: true, attemptToken: true, lastProgressAt: true, correlationId: true },
   });
   if (
     current === null ||
@@ -978,39 +989,27 @@ export async function claimBatchAttempt(
   }
   let unknownCount = 0;
   if (takingOver) {
-    const unknown = await tx.credentialBatchItem.updateMany({
+    unknownCount = await markInterruptedItems(tx, {
       where: {
         batchId: input.batchId,
         tenantId: input.tenantId,
         state: CredentialBatchItemState.PROCESSING,
         attemptToken: current.attemptToken,
       },
-      data: {
-        state: CredentialBatchItemState.OUTCOME_UNKNOWN,
-        errorClass: 'OUTCOME_UNKNOWN',
-        errorMessage: INTERRUPTED_BATCH_ITEM_MESSAGE,
-        warning: Prisma.JsonNull,
-        updatedAt: now,
-      },
+      batchCorrelationId: current.correlationId,
+      now,
     });
-    unknownCount = unknown.count;
   } else if (current.attemptToken === null) {
-    const unknown = await tx.credentialBatchItem.updateMany({
+    unknownCount = await markInterruptedItems(tx, {
       where: {
         batchId: input.batchId,
         tenantId: input.tenantId,
         state: CredentialBatchItemState.PROCESSING,
         OR: [{ attemptToken: { not: input.token } }, { attemptToken: null }],
       },
-      data: {
-        state: CredentialBatchItemState.OUTCOME_UNKNOWN,
-        errorClass: 'OUTCOME_UNKNOWN',
-        errorMessage: INTERRUPTED_BATCH_ITEM_MESSAGE,
-        warning: Prisma.JsonNull,
-        updatedAt: now,
-      },
+      batchCorrelationId: current.correlationId,
+      now,
     });
-    unknownCount = unknown.count;
   }
   const updated = await tx.credentialBatch.updateMany({
     where: {
@@ -1038,6 +1037,36 @@ export async function claimBatchAttempt(
   });
   if (updated.count !== 1 && unknownCount > 0) throw new CredentialBatchAttemptFenceLostError();
   return { applied: updated.count === 1 };
+}
+
+async function markInterruptedItems(
+  tx: PrismaTypes.TransactionClient,
+  input: {
+    where: PrismaTypes.CredentialBatchItemWhereInput;
+    batchCorrelationId: string;
+    now: Date;
+  },
+): Promise<number> {
+  const items = await tx.credentialBatchItem.findMany({ where: input.where, select: { index: true } });
+  let count = 0;
+  for (const item of items) {
+    const derivedItemCorrelationId = credentialBatchItemCorrelationId(input.batchCorrelationId, item.index);
+    const errorMessage = isValidCorrelationId(derivedItemCorrelationId)
+      ? interruptedBatchItemMessage({ itemCorrelationId: derivedItemCorrelationId })
+      : interruptedBatchItemMessage({ batchCorrelationId: input.batchCorrelationId, index: item.index });
+    const updated = await tx.credentialBatchItem.updateMany({
+      where: { ...input.where, index: item.index },
+      data: {
+        state: CredentialBatchItemState.OUTCOME_UNKNOWN,
+        errorClass: 'OUTCOME_UNKNOWN',
+        errorMessage,
+        warning: Prisma.DbNull,
+        updatedAt: input.now,
+      },
+    });
+    count += updated.count;
+  }
+  return count;
 }
 
 /** Claims a stalled batch for reconciliation, then leaves the fresh job free to claim it. */
@@ -1069,7 +1098,14 @@ export async function claimBatchAttemptAndRelease(
 /** Checkpoints a normal continuation and atomically places its next job. */
 export async function checkpointBatchContinuation(
   tx: PrismaTypes.TransactionClient,
-  input: { batchId: string; tenantId: string; token: string; queue: JobQueue; startAfter?: Date },
+  input: {
+    batchId: string;
+    tenantId: string;
+    token: string;
+    correlationId: string;
+    queue: JobQueue;
+    startAfter?: Date;
+  },
 ): Promise<{ applied: boolean }> {
   const now = new Date(Date.now());
   const updated = await tx.credentialBatch.updateMany({
@@ -1087,13 +1123,12 @@ export async function checkpointBatchContinuation(
     },
   });
   if (updated.count !== 1) return { applied: false };
+  const enqueueOptions = getCredentialBatchIssueEnqueueOptions();
   await input.queue.enqueueWithin(
     prismaSqlExecutor(tx),
     CREDENTIAL_BATCH_ISSUE_JOB,
-    { batchId: input.batchId, tenantId: input.tenantId },
-    input.startAfter === undefined
-      ? CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS
-      : { ...CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS, startAfter: input.startAfter },
+    { batchId: input.batchId, tenantId: input.tenantId, correlationId: input.correlationId },
+    input.startAfter === undefined ? enqueueOptions : { ...enqueueOptions, startAfter: input.startAfter },
   );
   return { applied: true };
 }
@@ -1102,6 +1137,7 @@ export type StalledCredentialBatch = Prisma.CredentialBatchGetPayload<{
   select: {
     id: true;
     tenantId: true;
+    correlationId: true;
     state: true;
     version: true;
     attemptToken: true;
@@ -1129,6 +1165,7 @@ export async function findStalledCredentialBatches(staleBefore: Date, take = 100
     select: {
       id: true,
       tenantId: true,
+      correlationId: true,
       state: true,
       version: true,
       attemptToken: true,

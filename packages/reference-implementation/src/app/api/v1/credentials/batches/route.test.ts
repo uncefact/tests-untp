@@ -38,6 +38,7 @@ jest.mock('@/lib/prisma/repositories/credential-batch.repository', () => {
 import { POST } from './route';
 import { CredentialBatchState } from '@/lib/prisma/generated';
 
+const jobQueue = jest.requireMock('@/lib/jobs/app-job-queue') as { startJobQueue: jest.Mock };
 const repository = jest.requireMock('@/lib/prisma/repositories/credential-batch.repository') as {
   classifySubmission: jest.Mock;
   createCredentialBatch: jest.Mock;
@@ -64,7 +65,7 @@ function request(body: unknown, key?: string): Request {
 
 const item = {
   credentialType: 'DigitalProductPassport',
-  version: '0.6.0',
+  version: '0.7.0',
   credentialPayload: { issuer: { id: 'did:web:issuer.example' } },
 };
 
@@ -96,6 +97,19 @@ describe('POST /api/v1/credentials/batches', () => {
     });
     expect(repository.createCredentialBatch).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: 'tenant-1', idempotencyKey: 'key-1' }),
+    );
+  });
+
+  it('accepts ordinary non-ASCII reference text', async () => {
+    // Regression: the widened control-character guard must not reject ordinary non-ASCII reference text.
+    const reference = 'Ref-ä-日本';
+    const response = await POST(request({ items: [{ ...item, reference }] }, 'non-ascii-reference-key'), {
+      tenantId: 'tenant-1',
+    } as never);
+
+    expect(response.status).toBe(202);
+    expect(repository.createCredentialBatch).toHaveBeenCalledWith(
+      expect.objectContaining({ items: [expect.objectContaining({ reference })] }),
     );
   });
 
@@ -135,6 +149,95 @@ describe('POST /api/v1/credentials/batches', () => {
     expect(response.status).toBe(422);
     expect(repository.createCredentialBatch).not.toHaveBeenCalled();
   });
+
+  it('rejects a later duplicate reference after accepting distinct references', async () => {
+    const distinctItems = [
+      { ...item, reference: 'PO-1' },
+      { ...item, reference: 'PO-2' },
+    ];
+    const accepted = await POST(request({ items: distinctItems }, 'distinct-key'), { tenantId: 'tenant-1' } as never);
+
+    expect(accepted.status).toBe(202);
+    expect(repository.createCredentialBatch).toHaveBeenCalledTimes(1);
+
+    repository.createCredentialBatch.mockClear();
+    jobQueue.startJobQueue.mockClear();
+    const response = await POST(
+      request(
+        {
+          items: [
+            { ...item, reference: 'PO-1' },
+            { ...item, reference: 'PO-2' },
+            { ...item, reference: 'PO-1' },
+          ],
+        },
+        'duplicate-key',
+      ),
+      { tenantId: 'tenant-1' } as never,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'items[2].reference: must be unique within the batch; duplicates items[0].reference',
+      code: 'VALIDATION_FAILED',
+    });
+    expect(jobQueue.startJobQueue).not.toHaveBeenCalled();
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('reports a duplicate reference before an oversized later item', async () => {
+    // Regression: duplicate-reference validation must run before item-size validation when both reject the same item.
+    process.env.MAX_REQUEST_BODY_BYTES = '2048';
+
+    const response = await POST(
+      request(
+        {
+          items: [
+            { ...item, reference: 'PO-1' },
+            { ...oversizedItem, reference: 'PO-1' },
+          ],
+        },
+        'duplicate-and-oversized-key',
+      ),
+      { tenantId: 'tenant-1' } as never,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'items[1].reference: must be unique within the batch; duplicates items[0].reference',
+      code: 'VALIDATION_FAILED',
+    });
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replay when only an item reference changes', async () => {
+    const originalBody = { items: [{ ...item, reference: 'PO-1' }] };
+    const changedBody = { items: [{ ...item, reference: 'PO-2' }] };
+    const digest = await (
+      await import('@/lib/api/idempotency')
+    ).digestRequestBody(new Uint8Array(Buffer.from(JSON.stringify(originalBody))));
+    repository.findCredentialBatchSubmission.mockResolvedValue({ id: 'batch-existing', bodyDigest: digest });
+
+    const response = await POST(request(changedBody, 'key-1'), { tenantId: 'tenant-1' } as never);
+
+    expect(response.status).toBe(422);
+    expect((await response.json()).code).toBe('IDEMPOTENCY_KEY_MISMATCH');
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it.each(['', 'a'.repeat(201), 'a\u0000b', 'a\u0085b', 'a\u009Fb'])(
+    'rejects an invalid reference with its indexed pointer: %j',
+    async (reference) => {
+      // Regression: a batch item validation error must identify the reference field at its zero-based item index.
+      const response = await POST(request({ items: [{ ...item, reference }] }, 'invalid-reference-key'), {
+        tenantId: 'tenant-1',
+      } as never);
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toMatch(/^items\[0\]\.reference:/);
+      expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects a batch over MAX_BATCH_ITEMS before checking item sizes', async () => {
     // Regression: BATCH_TOO_LARGE must win over an oversized item instead of exposing the wrong refusal.

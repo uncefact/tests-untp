@@ -34,7 +34,7 @@ const EXACT_NOW_BATCH_ID = 'expiry-handler-exact-now';
 const ITEM = {
   credentialPayload: { issuer: { id: 'did:web:issuer.example' } },
   credentialType: 'DigitalProductPassport',
-  version: '0.6.0',
+  version: '0.7.0',
 };
 
 type BatchItemFixture = {
@@ -49,6 +49,7 @@ type BatchItemFixture = {
 
 type BatchFixture = {
   id: string;
+  correlationId?: string;
   state: CredentialBatchState;
   itemCount: number;
   queuedCount: number;
@@ -75,6 +76,7 @@ async function insertBatch(fixture: BatchFixture): Promise<void> {
     data: {
       id: fixture.id,
       tenantId: TENANT_ID,
+      correlationId: fixture.correlationId ?? `correlation-${fixture.id}`,
       state: fixture.state,
       itemCount: fixture.itemCount,
       queuedCount: fixture.queuedCount,

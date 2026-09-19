@@ -10,6 +10,6 @@ declare namespace Cypress {
      * Subsequent cy.request() calls automatically include the session cookie.
      * Specs that exercise the UI must visit their page explicitly afterwards.
      */
-    apiLogin(username?: string, password?: string): Chainable<void>;
+    apiLogin(username?: string, password?: string, options?: { cleanupActor?: boolean }): Chainable<void>;
   }
 }

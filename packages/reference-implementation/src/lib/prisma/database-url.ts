@@ -13,3 +13,7 @@ export function databaseUrlFromEnvParts(env: NodeJS.ProcessEnv = process.env): s
   }
   return `postgresql://${RI_POSTGRES_USER}:${RI_POSTGRES_PASSWORD}@${RI_POSTGRES_HOST}:${RI_POSTGRES_PORT}/${RI_POSTGRES_DB}?schema=public`;
 }
+
+export function setDatabaseUrlIfAbsent(env: NodeJS.ProcessEnv, databaseUrl: string | undefined): void {
+  if (!env.RI_DATABASE_URL && databaseUrl) env.RI_DATABASE_URL = databaseUrl;
+}

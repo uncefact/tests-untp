@@ -1,4 +1,5 @@
 import { ValidationError } from '../../src/lib/api/validation';
+import type { CredentialBatchItemRequest } from '../../src/lib/api/request-schemas/credential-batch';
 import { StorageStoreError } from '@uncefact/untp-ri-services';
 import { CredentialBatchItemState, CredentialBatchState, LibraryRecordOrigin } from '../../src/lib/prisma/generated';
 import {
@@ -8,6 +9,7 @@ import {
   getCredentialBatchById,
   type BatchSubmissionResult,
 } from '../../src/lib/prisma/repositories/credential-batch.repository';
+import { credentialBatchItemCorrelationId } from '../../src/lib/credentials/credential-batch-correlation';
 import {
   credentialBatchIssueHandler,
   defaultCredentialBatchIssueDependencies,
@@ -30,7 +32,7 @@ const prisma = createRigClient();
 const ITEM = (index: number) => ({
   credentialPayload: { issuer: { id: 'did:web:issuer.example' }, index },
   credentialType: 'DigitalProductPassport',
-  version: '0.6.0',
+  version: '0.7.0',
 });
 
 function context(expireSeconds = 30, signal: AbortSignal = new AbortController().signal): JobContext {
@@ -157,7 +159,7 @@ describe('credential batch worker and reconciliation', () => {
 
   async function submit(
     key: string,
-    items: readonly Record<string, unknown>[],
+    items: readonly CredentialBatchItemRequest[],
     selectedQueue: JobQueue = idleQueue,
   ): Promise<string> {
     return batchId(
@@ -267,7 +269,17 @@ describe('credential batch worker and reconciliation', () => {
       }
     }
 
-    await expect(getCredentialBatchById(id, 'tenant-1')).resolves.toMatchObject({
+    const { correlationId: batchCorrelationId } = await prisma.credentialBatch.findUniqueOrThrow({
+      where: { id },
+      select: { correlationId: true },
+    });
+    const expectedErrorMessage = `The item could not be issued because the issuing service faulted; ask your operator to search the logs for correlation id ${credentialBatchItemCorrelationId(
+      batchCorrelationId,
+      0,
+    )}.`;
+
+    const settled = await getCredentialBatchById(id, 'tenant-1');
+    expect(settled).toMatchObject({
       state: CredentialBatchState.COMPLETED,
       issuedCount: 2,
       failedCount: 1,
@@ -279,10 +291,13 @@ describe('credential batch worker and reconciliation', () => {
           state: CredentialBatchItemState.FAILED,
           attemptCount: 4,
           errorClass: 'ITEM_ATTEMPTS_EXHAUSTED',
-          errorMessage: 'persistent pre-dispatch failure',
+          errorMessage: expectedErrorMessage,
         }),
       ]),
     });
+    // Regression: the raw pre-dispatch exception text must never reach the stored row.
+    const failedItem = settled?.items.find((item) => item.index === 0);
+    expect(failedItem?.errorMessage).not.toContain('persistent pre-dispatch failure');
     expect((issueCalls as ReturnType<typeof ITEM>[]).map((item) => item.credentialPayload.index)).toEqual([1, 2]);
   });
 

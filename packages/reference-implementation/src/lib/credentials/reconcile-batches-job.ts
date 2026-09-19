@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { appLogger } from '@/lib/api/logger';
+import { runWithRequestContext } from '@uncefact/untp-ri-services/logging';
 import { readReconcilePendingRunsBatchSize } from '@/lib/config/reconcile-pending-runs.config';
+import { getCredentialBatchIssueEnqueueOptions } from '@/lib/config/credential-batch.config';
 import { readWorkerJobTimeoutSeconds } from '@/lib/config/worker-job-timeout.config';
 import { CREDENTIAL_BATCH_ISSUE_JOB, CREDENTIAL_BATCH_RECONCILE_JOB } from '@/lib/jobs/queue-names';
 import type { JobHandler, JobQueue } from '@/lib/jobs/types';
 import { prismaSqlExecutor } from '@/lib/jobs/prisma-sql-executor';
 import {
-  CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS,
   CredentialBatchAttemptFenceLostError,
   claimBatchAttemptAndRelease,
   findStalledCredentialBatches,
@@ -50,8 +51,8 @@ export function defaultCredentialBatchReconciliationDependencies(
           await queue.enqueueWithin(
             prismaSqlExecutor(tx),
             CREDENTIAL_BATCH_ISSUE_JOB,
-            { batchId: batch.id, tenantId: batch.tenantId },
-            CREDENTIAL_BATCH_ISSUE_ENQUEUE_OPTIONS,
+            { batchId: batch.id, tenantId: batch.tenantId, correlationId: batch.correlationId },
+            getCredentialBatchIssueEnqueueOptions(),
           );
           return true;
         });
@@ -75,17 +76,36 @@ export function credentialBatchReconciliationHandler(
     let active = 0;
     let failed = 0;
     for (const batch of batches) {
-      if (await deps.hasActiveJob(batch.id)) {
-        active += 1;
-        logger.info({ batchId: batch.id, tenantId: batch.tenantId }, 'Stalled credential batch still has a queue job');
-        continue;
-      }
-      try {
-        if (await deps.claimAndEnqueue(batch, randomUUID(), staleBefore)) requeued += 1;
-      } catch (error) {
-        failed += 1;
-        logger.error({ err: error, batchId: batch.id, tenantId: batch.tenantId }, 'Credential batch re-enqueue failed');
-      }
+      await runWithRequestContext(batch.correlationId, async () => {
+        if (await deps.hasActiveJob(batch.id)) {
+          active += 1;
+          logger.info(
+            {
+              correlationId: batch.correlationId,
+              batchCorrelationId: batch.correlationId,
+              batchId: batch.id,
+              tenantId: batch.tenantId,
+            },
+            'Stalled credential batch still has a queue job',
+          );
+          return;
+        }
+        try {
+          if (await deps.claimAndEnqueue(batch, randomUUID(), staleBefore)) requeued += 1;
+        } catch (error) {
+          failed += 1;
+          logger.error(
+            {
+              correlationId: batch.correlationId,
+              batchCorrelationId: batch.correlationId,
+              err: error,
+              batchId: batch.id,
+              tenantId: batch.tenantId,
+            },
+            'Credential batch re-enqueue failed',
+          );
+        }
+      });
     }
     logger.info({ selected: batches.length, requeued, active, failed }, 'Credential batch reconciliation finished');
   };

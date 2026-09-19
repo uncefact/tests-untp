@@ -1,5 +1,6 @@
 import { config, runnerReachableUri, runTag } from '../../../support/config';
 import { decodeStoredCredential, decryptStoredCopy, expectStatusListIndex } from '../../../support/stored-credential';
+import { readV070CredentialPayload } from '../../../support/v0.7-credential-payload';
 
 /**
  * Batch rows are left by design. The run-tag cleanup deletes the native
@@ -11,8 +12,10 @@ import { decodeStoredCredential, decryptStoredCopy, expectStatusListIndex } from
 describe('Credential batch API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
   const CREDENTIAL_TYPE = 'DigitalProductPassport';
-  const CREDENTIAL_VERSION = '0.6.1';
+  const CREDENTIAL_VERSION = '0.7.0';
   const STATUS_PURPOSES = config.capabilities.statusDefaultPurposes;
+  const VALID_FROM = new Date().toISOString();
+  const VALID_UNTIL = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
   let issuerDid: string;
   let foreignDid: string;
 
@@ -21,6 +24,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
     credentialType: string;
     version: string;
     statusPurposes: string[];
+    reference?: string;
   };
 
   type BatchRequest = {
@@ -29,6 +33,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
 
   type BatchItem = {
     index: number;
+    reference?: string;
     state: string;
     credentialId?: string;
     warning?: unknown;
@@ -48,30 +53,40 @@ describe('Credential batch API', { testIsolation: false }, () => {
     items: BatchItem[];
   };
 
-  /**
-   * Builds the same minimal DPP v0.6.1 payload shape used by the single
-   * credential-management journey, with a distinct subject and credential id.
-   */
-  function buildCredentialRequest(issuer: string, label: string): CredentialRequest {
-    return {
-      credentialPayload: {
-        '@context': ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
-        id: `urn:uuid:e2e-batch-${label}-${RUN_ID}`,
-        type: ['DigitalProductPassport', 'VerifiableCredential'],
-        issuer: {
-          type: ['CredentialIssuer'],
-          id: issuer,
-          name: `E2E Batch Issuer ${RUN_ID}`,
-        },
-        credentialSubject: {
-          type: ['ProductPassport'],
-          id: `https://example.com/products/e2e-batch-${label}-${RUN_ID}`,
-        },
-      },
+  type CredentialRequestSpec = {
+    issuer: string;
+    label: string;
+    reference?: string;
+  };
+
+  function buildCredentialRequest(issuer: string, label: string): Cypress.Chainable<CredentialRequest> {
+    return readV070CredentialPayload({
+      templateDir: 'digital_product_passport',
+      credentialId: `urn:uuid:e2e-batch-${label}-${RUN_ID}`,
+      issuerDid: issuer,
+      validFrom: VALID_FROM,
+      validUntil: VALID_UNTIL,
+    }).then((credentialPayload) => ({
+      credentialPayload,
       credentialType: CREDENTIAL_TYPE,
       version: CREDENTIAL_VERSION,
       statusPurposes: STATUS_PURPOSES,
-    };
+    }));
+  }
+
+  function buildBatchRequest(specs: CredentialRequestSpec[]): Cypress.Chainable<BatchRequest> {
+    return specs
+      .reduce(
+        (chain, spec) =>
+          chain.then((items) =>
+            buildCredentialRequest(spec.issuer, spec.label).then((item) => [
+              ...items,
+              spec.reference === undefined ? item : { ...item, reference: spec.reference },
+            ]),
+          ),
+        cy.wrap([] as CredentialRequest[]),
+      )
+      .then((items) => ({ items }));
   }
 
   function waitForBatchCompletion(statusUrl: string, timeoutMs = 120_000): Cypress.Chainable<BatchStatus> {
@@ -232,28 +247,29 @@ describe('Credential batch API', { testIsolation: false }, () => {
 
   it('submits an ordered batch, waits for completion, and proves every item was issued', () => {
     const idempotencyKey = `e2e-batch-journey-${RUN_ID}`;
-    const requestBody: BatchRequest = {
-      items: [
-        buildCredentialRequest(issuerDid, 'valid-0'),
-        buildCredentialRequest(issuerDid, 'valid-1'),
-        buildCredentialRequest(issuerDid, 'valid-2'),
-      ],
-    };
+    const references = [`PO-${RUN_ID}-0`, `PO-${RUN_ID}-1`];
+    buildBatchRequest([
+      { issuer: issuerDid, label: 'valid-0', reference: references[0] },
+      { issuer: issuerDid, label: 'valid-1', reference: references[1] },
+      { issuer: issuerDid, label: 'valid-2' },
+    ])
+      .then((requestBody) =>
+        cy
+          .request({
+            method: 'POST',
+            url: '/api/v1/credentials/batches',
+            headers: { 'Idempotency-Key': idempotencyKey },
+            body: requestBody,
+          })
+          .then((response) => {
+            expect(response.status).to.eq(202);
+            expect(response.body.batchId).to.be.a('string').and.not.empty;
+            expect(response.body.status).to.match(/^\/api\/v1\/credentials\/batches\/.+/);
+            expect(response.headers.location).to.eq(response.body.status);
 
-    cy.request({
-      method: 'POST',
-      url: '/api/v1/credentials/batches',
-      headers: { 'Idempotency-Key': idempotencyKey },
-      body: requestBody,
-    })
-      .then((response) => {
-        expect(response.status).to.eq(202);
-        expect(response.body.batchId).to.be.a('string').and.not.empty;
-        expect(response.body.status).to.match(/^\/api\/v1\/credentials\/batches\/.+/);
-        expect(response.headers.location).to.eq(response.body.status);
-
-        return waitForBatchCompletion(response.body.status).then((status) => ({ status, requestBody }));
-      })
+            return waitForBatchCompletion(response.body.status).then((status) => ({ status, requestBody }));
+          }),
+      )
       .then(({ status, requestBody: submitted }) => {
         expect(status.state).to.eq('COMPLETED');
         expect(status.counts).to.deep.eq({
@@ -267,6 +283,9 @@ describe('Credential batch API', { testIsolation: false }, () => {
         expect(status.items).to.have.length(3);
         expect(status.items.map((item) => item.index)).to.deep.eq([0, 1, 2]);
         expect(status.items.map((item) => item.state)).to.deep.eq(['ISSUED', 'ISSUED', 'ISSUED']);
+        expect(status.items[0].reference).to.eq(references[0]);
+        expect(status.items[1].reference).to.eq(references[1]);
+        expect(status.items[2]).not.to.have.property('reference');
 
         return assertIssuedCredential(status.items[0], submitted.items[0], 'item 0')
           .then(() => assertIssuedCredential(status.items[1], submitted.items[1], 'item 1'))
@@ -276,47 +295,49 @@ describe('Credential batch API', { testIsolation: false }, () => {
 
   it('replays an identical batch and rejects a changed body for the same key', () => {
     const idempotencyKey = `e2e-batch-replay-${RUN_ID}`;
-    const requestBody: BatchRequest = {
-      items: [buildCredentialRequest(issuerDid, 'replay')],
-    };
-
-    cy.request({
-      method: 'POST',
-      url: '/api/v1/credentials/batches',
-      headers: { 'Idempotency-Key': idempotencyKey },
-      body: requestBody,
-    })
-      .then((firstResponse) => {
-        expect(firstResponse.status).to.eq(202);
-        expect(firstResponse.body.batchId).to.be.a('string').and.not.empty;
-        expect(firstResponse.headers.location).to.eq(firstResponse.body.status);
-
-        return cy
+    buildBatchRequest([{ issuer: issuerDid, label: 'replay', reference: `PO-${RUN_ID}-replay-1` }])
+      .then((requestBody) =>
+        cy
           .request({
             method: 'POST',
             url: '/api/v1/credentials/batches',
             headers: { 'Idempotency-Key': idempotencyKey },
             body: requestBody,
           })
-          .then((replayResponse) => {
-            expect(replayResponse.status).to.eq(202);
-            expect(replayResponse.body.batchId).to.eq(firstResponse.body.batchId);
-            expect(replayResponse.body.status).to.eq(firstResponse.body.status);
-            expect(replayResponse.headers.location).to.eq(firstResponse.headers.location);
-          })
-          .then(() =>
-            cy.request({
-              method: 'POST',
-              url: '/api/v1/credentials/batches',
-              headers: { 'Idempotency-Key': idempotencyKey },
-              body: {
-                items: [buildCredentialRequest(issuerDid, 'replay-changed')],
-              },
-              failOnStatusCode: false,
-            }),
-          )
-          .then((changedResponse) => ({ changedResponse, statusUrl: firstResponse.body.status }));
-      })
+          .then((firstResponse) => {
+            expect(firstResponse.status).to.eq(202);
+            expect(firstResponse.body.batchId).to.be.a('string').and.not.empty;
+            expect(firstResponse.headers.location).to.eq(firstResponse.body.status);
+
+            return cy
+              .request({
+                method: 'POST',
+                url: '/api/v1/credentials/batches',
+                headers: { 'Idempotency-Key': idempotencyKey },
+                body: requestBody,
+              })
+              .then((replayResponse) => {
+                expect(replayResponse.status).to.eq(202);
+                expect(replayResponse.body.batchId).to.eq(firstResponse.body.batchId);
+                expect(replayResponse.body.status).to.eq(firstResponse.body.status);
+                expect(replayResponse.headers.location).to.eq(firstResponse.headers.location);
+              })
+              .then(() =>
+                buildBatchRequest([{ issuer: issuerDid, label: 'replay', reference: `PO-${RUN_ID}-replay-2` }]).then(
+                  (changedBody) =>
+                    cy
+                      .request({
+                        method: 'POST',
+                        url: '/api/v1/credentials/batches',
+                        headers: { 'Idempotency-Key': idempotencyKey },
+                        body: changedBody,
+                        failOnStatusCode: false,
+                      })
+                      .then((changedResponse) => ({ changedResponse, statusUrl: firstResponse.body.status })),
+                ),
+              );
+          }),
+      )
       .then(({ changedResponse, statusUrl }) => {
         expect(changedResponse.status).to.eq(422);
         expect(changedResponse.body.code).to.eq('IDEMPOTENCY_KEY_MISMATCH');
@@ -324,27 +345,69 @@ describe('Credential batch API', { testIsolation: false }, () => {
       });
   });
 
-  it('settles a mixed batch with one real issuance and one per-item refusal', () => {
-    const requestBody: BatchRequest = {
-      items: [
-        buildCredentialRequest(issuerDid, 'partial-issued'),
-        buildCredentialRequest(foreignDid, 'partial-failed'),
-      ],
-    };
+  it('accepts distinct references and refuses a later duplicate reference', () => {
+    buildBatchRequest([
+      { issuer: issuerDid, label: 'reference-distinct-0', reference: `PO-${RUN_ID}-distinct-0` },
+      { issuer: issuerDid, label: 'reference-distinct-1', reference: `PO-${RUN_ID}-distinct-1` },
+    ])
+      .then((distinctBody) =>
+        cy
+          .request({
+            method: 'POST',
+            url: '/api/v1/credentials/batches',
+            headers: { 'Idempotency-Key': `e2e-batch-reference-distinct-${RUN_ID}` },
+            body: distinctBody,
+          })
+          .then((acceptedResponse) => {
+            expect(acceptedResponse.status).to.eq(202);
+            return waitForBatchCompletion(acceptedResponse.body.status);
+          }),
+      )
+      .then(() =>
+        buildBatchRequest([
+          { issuer: issuerDid, label: 'reference-duplicate-0', reference: `PO-${RUN_ID}-duplicate` },
+          { issuer: issuerDid, label: 'reference-duplicate-1', reference: `PO-${RUN_ID}-other` },
+          { issuer: issuerDid, label: 'reference-duplicate-2', reference: `PO-${RUN_ID}-duplicate` },
+        ]).then((duplicateBody) =>
+          cy.request({
+            method: 'POST',
+            url: '/api/v1/credentials/batches',
+            headers: { 'Idempotency-Key': `e2e-batch-reference-duplicate-${RUN_ID}` },
+            body: duplicateBody,
+            failOnStatusCode: false,
+          }),
+        ),
+      )
+      .then((duplicateResponse) => {
+        expect(duplicateResponse.status).to.eq(400);
+        expect(duplicateResponse.body).to.deep.eq({
+          error: 'items[2].reference: must be unique within the batch; duplicates items[0].reference',
+          code: 'VALIDATION_FAILED',
+        });
+      });
+  });
 
-    cy.request({
-      method: 'POST',
-      url: '/api/v1/credentials/batches',
-      headers: { 'Idempotency-Key': `e2e-batch-partial-${RUN_ID}` },
-      body: requestBody,
-    })
-      .then((response) => {
-        expect(response.status).to.eq(202);
-        expect(response.body.batchId).to.be.a('string').and.not.empty;
-        expect(response.headers.location).to.eq(response.body.status);
-        return waitForBatchCompletion(response.body.status);
-      })
-      .then((status) => {
+  it('settles a mixed batch with one real issuance and one per-item refusal', () => {
+    buildBatchRequest([
+      { issuer: issuerDid, label: 'partial-issued' },
+      { issuer: foreignDid, label: 'partial-failed' },
+    ])
+      .then((requestBody) =>
+        cy
+          .request({
+            method: 'POST',
+            url: '/api/v1/credentials/batches',
+            headers: { 'Idempotency-Key': `e2e-batch-partial-${RUN_ID}` },
+            body: requestBody,
+          })
+          .then((response) => {
+            expect(response.status).to.eq(202);
+            expect(response.body.batchId).to.be.a('string').and.not.empty;
+            expect(response.headers.location).to.eq(response.body.status);
+            return waitForBatchCompletion(response.body.status).then((status) => ({ status, requestBody }));
+          }),
+      )
+      .then(({ status, requestBody }) => {
         expect(status.state).to.eq('COMPLETED');
         expect(status.counts).to.deep.eq({
           total: 2,
