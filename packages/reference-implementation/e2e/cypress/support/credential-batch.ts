@@ -16,43 +16,6 @@ export type BatchItem = {
   error?: { code?: string; message?: string };
 };
 
-export type CredentialRequestFixture = {
-  runId: string;
-  context: string[];
-  credentialType: string;
-  version: string;
-  statusPurposes: string[];
-  credentialIdPrefix: string;
-  issuerNamePrefix: string;
-  subjectIdPrefix: string;
-};
-
-export function buildCredentialRequest(
-  fixture: CredentialRequestFixture,
-  issuer: string,
-  label: string,
-): CredentialRequest {
-  return {
-    credentialPayload: {
-      '@context': fixture.context,
-      id: `urn:uuid:${fixture.credentialIdPrefix}-${label}-${fixture.runId}`,
-      type: ['DigitalProductPassport', 'VerifiableCredential'],
-      issuer: {
-        type: ['CredentialIssuer'],
-        id: issuer,
-        name: `${fixture.issuerNamePrefix} ${fixture.runId}`,
-      },
-      credentialSubject: {
-        type: ['ProductPassport'],
-        id: `https://example.com/products/${fixture.subjectIdPrefix}-${label}-${fixture.runId}`,
-      },
-    },
-    credentialType: fixture.credentialType,
-    version: fixture.version,
-    statusPurposes: fixture.statusPurposes,
-  };
-}
-
 export function assertIssuedCredential(
   batchItem: BatchItem,
   requestItem: CredentialRequest,

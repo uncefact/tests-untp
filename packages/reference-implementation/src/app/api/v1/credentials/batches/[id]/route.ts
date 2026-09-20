@@ -21,9 +21,9 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  *       queued, but one or more external issuance outcomes are unknown and
  *       require operator resolution before the batch can become `CANCELLED`
  *       or `COMPLETED`. Cancellation with zero cancelled items can still end
- *       `COMPLETED`. Cancellation never revokes credentials (ADR-060). A
- *       settled batch is retained until BATCH_RETENTION_DAYS after settlement;
- *       the expired tombstone keeps the idempotency key and counts but removes
+ *       `COMPLETED`. Cancellation never revokes credentials (ADR-060).
+ *       A `COMPLETED` or `CANCELLED` batch is retained for `BATCH_RETENTION_DAYS` from settlement; a `NEEDS_ATTENTION` batch has no deadline until its last unknown item is resolved, and the window then runs from that resolution.
+ *       The expired tombstone keeps the idempotency key and counts but removes
  *       encrypted item requests and outcomes. Ordering is promised within the
  *       batch only.
  *     tags:

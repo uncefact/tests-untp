@@ -9,6 +9,7 @@ import {
 } from '@/lib/api/errors';
 import { mapRouteError } from '@/lib/api/route-error-mapping';
 import { ValidationError } from '@/lib/api/validation';
+import type { projectCredentialBatch } from '@/lib/credentials/credential-batch-projection';
 
 export type CredentialBatchErrorOutcome = { code?: string; message: string };
 
@@ -18,6 +19,34 @@ export const CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE =
   'Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.';
 export const CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE =
   'This credential batch cannot be cancelled because it has already settled.';
+
+/**
+ * Carries counter-drift diagnostics without putting identifiers in the error
+ * message that a generic route boundary might return to the tenant.
+ */
+export class CredentialBatchCounterDriftError extends Error {
+  readonly batchId: string;
+  readonly tenantId: string;
+  readonly batchCorrelationId: string;
+  readonly cancelledRows: number;
+  readonly queuedCount: number;
+
+  constructor(input: {
+    batchId: string;
+    tenantId: string;
+    batchCorrelationId: string;
+    cancelledRows: number;
+    queuedCount: number;
+  }) {
+    super('Credential batch counters disagree with its queued items.');
+    this.name = 'CredentialBatchCounterDriftError';
+    this.batchId = input.batchId;
+    this.tenantId = input.tenantId;
+    this.batchCorrelationId = input.batchCorrelationId;
+    this.cancelledRows = input.cancelledRows;
+    this.queuedCount = input.queuedCount;
+  }
+}
 
 function isTenantSafeRouteError(error: unknown): boolean {
   return (
@@ -40,7 +69,7 @@ export function buildCredentialBatchExpiredBody(batchId?: string) {
   };
 }
 
-export function credentialBatchExpiredResponse(projection: object) {
+export function credentialBatchExpiredResponse(projection: ReturnType<typeof projectCredentialBatch>) {
   return {
     body: { ...projection, ...buildCredentialBatchExpiredBody() },
     init: { status: 410 as const, headers: { 'Cache-Control': 'no-store' } },

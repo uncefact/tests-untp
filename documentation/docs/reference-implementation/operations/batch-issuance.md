@@ -25,7 +25,7 @@ A growing `credentials.issue-batch` queue means work is arriving faster than the
 
 The reconciliation sweep looks at batches that are still `QUEUED` or `RUNNING` and whose last progress is older than twice `WORKER_JOB_TIMEOUT_SECONDS`. Before it acts it asks the queue whether an issuance job for that batch is still active, retrying or scheduled. Only when there is none does it take the ownership fence. For an ordinary batch it queues a continuation. For a cancellation-requested batch it converts abandoned processing to `OUTCOME_UNKNOWN` and settles without enqueueing issuance. It never fails an item merely because a queue job disappeared.
 
-The reconciliation summary counts `settled` batches that reached a terminal state, `requeued` batches given a new issuance job, `superseded` batches whose ownership had changed, and `unsettled` batches whose settlement did not apply; `unsettled` is the outcome that needs a human.
+The reconciliation summary line carries seven counters: `selected` batches the sweep looked at, `active` batches skipped because an issuance job was still live, `requeued` batches given a new issuance job, `settled` batches that reached a terminal state, `superseded` batches whose ownership or version had moved on before the sweep could take the fence, `unsettled` batches whose settlement did not apply, and `failed` batches whose recovery threw. `unsettled` is the outcome that needs a human.
 
 ## Cancellation
 
@@ -39,13 +39,17 @@ Poll GET for `counts.cancelled`, `cancelRequestedAt` and the ordered item outcom
 
 A repeated cancellation while the batch remains `QUEUED` or `RUNNING` returns `202` without another write. `COMPLETED`, `NEEDS_ATTENTION` and settled `CANCELLED` return `409 BATCH_NOT_CANCELLABLE`. Expired batches return `410 BATCH_EXPIRED` with the tombstone; unknown or foreign ids return `404`. The [API refusal table](../api/credentials#cancel-a-batch) gives the exact messages and body validation responses.
 
-### Counter-drift refusal
-
-If cancellation is refused with `500` because the batch's stored counts disagree with its items, quiesce the workers. Inspect the batch and each item with the existing `pnpm batch:inspect-item -- --tenant TENANT --batch BATCH --index INDEX --reason TICKET` command. Repair the counts under the batch lock from the item rows, cancel the batch again and confirm the `202` response, then restart the workers. Counts are not rebuilt automatically because the drift may mean rows are missing.
+The cancel route also writes the `Credential batch operator audit` warning line with `action: cancel`, the batch id, tenant id and both correlation ids, so that line is not exclusive to the inspect and resolve commands.
 
 The worker claims no further item and queues no continuation after cancellation. Reconciliation still recovers cancellation-requested `QUEUED` or `RUNNING` batches whose job vanished. It records an abandoned processing item as unknown, then settles without enqueueing issuance. A duplicate delivery cannot resume cancelled work.
 
 Resolve a held unknown item using the commands below. Cancellation does not resolve uncertainty about an external effect. Resolving the last unknown produces `CANCELLED` when cancelled items remain, otherwise `COMPLETED`; it never queues issuance.
+
+### Counter-drift refusal
+
+If cancellation is refused with `500` because the batch's stored counts disagree with its items, quiesce the workers. Inspect the batch and each item with the existing `pnpm batch:inspect-item -- --tenant TENANT --batch BATCH --index INDEX --reason TICKET` command. Counts are not rebuilt automatically, because the drift may mean rows are missing. Repairing them means editing batch counters directly, which the warning under Faults otherwise forbids; do it only under the batch lock, from the item rows, and record the change against the ticket. Then cancel the batch again, confirm the `202`, and restart the workers.
+
+A post-commit cancellation can still answer `202` when its item rows commit but the settlement sum check does not apply. Its projection reads `RUNNING` with queued 0 and processing 0; once `lastProgressAt` is at least twice `WORKER_JOB_TIMEOUT_SECONDS` old and no issuance job is active, retrying or scheduled, a reconciliation sweep can retry settlement, but a counter-sum mismatch will continue to fail until an operator repairs the counters using the procedure above. Every sweep that still cannot settle warns with the batch id, both correlation ids and the settlement outcome. A batch that warns on consecutive sweeps needs the counter-drift procedure above.
 
 ## `NEEDS_ATTENTION`
 

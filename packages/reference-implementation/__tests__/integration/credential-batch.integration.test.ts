@@ -35,6 +35,7 @@ import {
 } from '../../src/lib/prisma/repositories/credential-batch.repository';
 import { credentialBatchItemAttemptLimit } from '../../src/lib/config/credential-batch.config';
 import { projectCredentialBatch } from '../../src/lib/credentials/credential-batch-projection';
+import { CredentialBatchCounterDriftError } from '../../src/lib/credentials/credential-batch-error';
 import { runResolveCredentialBatchItem } from '../../src/lib/credentials/credential-batch-operator';
 import { CREDENTIAL_BATCH_ISSUE_JOB } from '../../src/lib/jobs/queue-names';
 import type { EnqueueOptions, JobQueue } from '../../src/lib/jobs/types';
@@ -1566,7 +1567,7 @@ describe('credential batch persistence and progression', () => {
     `;
     expect(storedWarning).toEqual([{ warning }]);
   });
-  async function runningBatch(key: string, count: number, processing = true) {
+  async function runningBatch(key: string, count: number, processing = true, token = 'cancel-attempt') {
     const batchId = createdBatchId(
       await submit(
         key,
@@ -1576,7 +1577,7 @@ describe('credential batch persistence and progression', () => {
     );
     const batch = await getCredentialBatchById(batchId, 'tenant-1');
     if (batch === null) throw new Error('expected the running batch fixture to exist');
-    const input = { batchId, tenantId: 'tenant-1', token: 'cancel-attempt', correlationId: batch.correlationId };
+    const input = { batchId, tenantId: 'tenant-1', token, correlationId: batch.correlationId };
     await prisma.$transaction(async (tx) => {
       expect(await claimBatchAttempt(tx, { ...input, expectedVersion: 0 })).toEqual({ applied: true });
       if (processing)
@@ -1670,9 +1671,18 @@ describe('credential batch persistence and progression', () => {
     const beforeBatch = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: batchId } });
     const beforeItems = await prisma.credentialBatchItem.findMany({ where: { batchId }, orderBy: { index: 'asc' } });
 
-    await expect(
-      prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId, tenantId: 'tenant-1' })),
-    ).rejects.toThrow(`batchId=${batchId}, tenantId=tenant-1, cancelledRows=2, queuedCount=3`);
+    const counterDriftError = await prisma
+      .$transaction((tx) => cancelCredentialBatch(tx, { batchId, tenantId: 'tenant-1' }))
+      .catch((error: unknown) => error);
+    expect(counterDriftError).toBeInstanceOf(CredentialBatchCounterDriftError);
+    expect(counterDriftError).toMatchObject({
+      batchId,
+      tenantId: 'tenant-1',
+      batchCorrelationId: beforeBatch.correlationId,
+      cancelledRows: 2,
+      queuedCount: 3,
+    });
+    expect(counterDriftError).toHaveProperty('message', 'Credential batch counters disagree with its queued items.');
 
     await expect(prisma.credentialBatch.findUniqueOrThrow({ where: { id: batchId } })).resolves.toEqual(beforeBatch);
     await expect(
@@ -1937,6 +1947,42 @@ describe('credential batch persistence and progression', () => {
     });
     expect(await getCredentialBatchById(held.batchId, held.tenantId)).toEqual(heldBefore);
     expect(await expireDueCredentialBatches(deadline)).toBe(0);
+  });
+
+  it('returns superseded without changing any rows when the batch fence changed but the item still has the old token', async () => {
+    // Regression: the batch-level token guard must prevent re-queuing an item whose token still matches the old attempt.
+    const input = await runningBatch('fault-batch-token', 2, true, 'attempt-1');
+    await prisma.credentialBatch.update({
+      where: { id: input.batchId },
+      data: { attemptToken: 'attempt-2' },
+    });
+    const beforeBatch = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: input.batchId } });
+    const beforeItems = await prisma.credentialBatchItem.findMany({
+      where: { batchId: input.batchId },
+      orderBy: { index: 'asc' },
+    });
+    expect(beforeBatch).toMatchObject({ attemptToken: 'attempt-2', processingCount: 1 });
+    expect(beforeItems[0]).toMatchObject({ state: 'PROCESSING', attemptToken: input.token });
+    expect(beforeItems[1]).toMatchObject({ state: 'QUEUED', attemptToken: null });
+
+    const outcome = await prisma.$transaction((tx) =>
+      markItemQueued(tx, { ...input, index: 0, errorMessage: 'decrypt unavailable' }),
+    );
+
+    const afterBatch = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: input.batchId } });
+    const afterItems = await prisma.credentialBatchItem.findMany({
+      where: { batchId: input.batchId },
+      orderBy: { index: 'asc' },
+    });
+    expect({
+      outcome,
+      batchSnapshot: JSON.stringify(afterBatch),
+      itemSnapshot: JSON.stringify(afterItems),
+    }).toEqual({
+      outcome: { outcome: 'superseded' },
+      batchSnapshot: JSON.stringify(beforeBatch),
+      itemSnapshot: JSON.stringify(beforeItems),
+    });
   });
 
   it.each(['cancel', 'claim'] as const)(

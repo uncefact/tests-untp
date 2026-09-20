@@ -235,7 +235,32 @@ describe('credential batch worker and reconciliation', () => {
         Array.from({ length: 5 }, (_, index) => ITEM(index)),
       );
       await entered.promise;
-      await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' }));
+      const first = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' }));
+      expect(first.outcome).toBe('applied');
+      if (first.outcome !== 'applied') throw new Error('Expected the first cancellation to apply');
+      expect(first.batch.cancelRequestedAt).not.toBeNull();
+      const persistedAfterFirst = {
+        batch: await prisma.credentialBatch.findFirstOrThrow({ where: { id, tenantId: 'tenant-1' } }),
+        items: await prisma.credentialBatchItem.findMany({
+          where: { batchId: id, tenantId: 'tenant-1' },
+          orderBy: { index: 'asc' },
+        }),
+      };
+      const second = await prisma.$transaction((tx) =>
+        cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' }),
+      );
+      expect(second.outcome).toBe('already-requested');
+      if (second.outcome !== 'already-requested')
+        throw new Error('Expected the second cancellation to be already-requested');
+      expect(second.batch.cancelRequestedAt).toEqual(first.batch.cancelRequestedAt);
+      const persistedAfterSecond = {
+        batch: await prisma.credentialBatch.findFirstOrThrow({ where: { id, tenantId: 'tenant-1' } }),
+        items: await prisma.credentialBatchItem.findMany({
+          where: { batchId: id, tenantId: 'tenant-1' },
+          orderBy: { index: 'asc' },
+        }),
+      };
+      expect(JSON.stringify(persistedAfterSecond)).toBe(JSON.stringify(persistedAfterFirst));
       expect(await getCredentialBatchById(id, 'tenant-1')).toMatchObject({
         state: 'RUNNING',
         queuedCount: 0,

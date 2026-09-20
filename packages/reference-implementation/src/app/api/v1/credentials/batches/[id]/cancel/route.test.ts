@@ -32,26 +32,30 @@ import { POST } from './route';
 import { GET } from '../route';
 import { prisma } from '@/lib/prisma/prisma';
 import { cancelCredentialBatch, getCredentialBatchById } from '@/lib/prisma/repositories/credential-batch.repository';
+import { unexpectedErrorMessage } from '@/lib/api/errors';
+import { runWithRequestContext } from '@uncefact/untp-ri-services/logging';
 import {
   CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
   CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
+  CredentialBatchCounterDriftError,
 } from '@/lib/credentials/credential-batch-error';
 
 const cancel = jest.mocked(cancelCredentialBatch);
 const getBatch = jest.mocked(getCredentialBatchById);
 const transaction = jest.mocked(prisma.$transaction);
-const logger = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
+const logger = jest.requireMock('@/lib/api/logger').apiLogger as Record<string, jest.Mock>;
 const tx = Object.freeze({});
 const context = { tenantId: 'tenant-1', params: Promise.resolve({ id: 'batch-1' }) };
 const message = CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE;
 
-function batch(state = 'RUNNING') {
+function batch(state = 'RUNNING', reference?: string) {
   const isQueued = state === 'QUEUED';
   const isRunning = state === 'RUNNING';
   const isExpired = state === 'EXPIRED';
   return {
     id: 'batch-1',
     tenantId: 'tenant-1',
+    correlationId: 'batch-correlation',
     version: 7,
     state,
     itemCount: 5,
@@ -69,6 +73,7 @@ function batch(state = 'RUNNING') {
       : isQueued
         ? [0, 1, 2, 3, 4].map((index) => ({
             index,
+            ...(index === 0 && reference !== undefined ? { reference } : {}),
             state: 'CANCELLED',
             credentialId: null,
             warning: null,
@@ -77,6 +82,7 @@ function batch(state = 'RUNNING') {
           }))
         : [0, 1, 2, 3, 4].map((index) => ({
             index,
+            ...(index === 0 && reference !== undefined ? { reference } : {}),
             state: index === 0 ? (isRunning ? 'PROCESSING' : 'ISSUED') : 'CANCELLED',
             credentialId: index === 0 && !isRunning ? 'credential-1' : null,
             warning: null,
@@ -146,6 +152,7 @@ describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
       expect(body.code).toBeUndefined();
       expect(response.headers.get('Cache-Control')).toBe('no-store');
       expect(transaction).toHaveBeenCalledTimes(1);
+      expect(transaction).toHaveBeenCalledWith(expect.any(Function), { maxWait: 5_000, timeout: 15_000 });
       expect(cancel).toHaveBeenCalledTimes(1);
       expect(cancel).toHaveBeenCalledWith(tx, { batchId: 'batch-1', tenantId: 'tenant-1' });
       expect(logger.warn).toHaveBeenCalledTimes(1);
@@ -154,6 +161,7 @@ describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
           action: 'cancel',
           batchId: 'batch-1',
           tenantId: 'tenant-1',
+          batchCorrelationId: 'batch-correlation',
           cancelledCount: 4,
           outcome: 'applied',
           at: expect.any(String),
@@ -163,6 +171,54 @@ describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
       expect((logger.warn.mock.calls[0] as unknown[])[0]).not.toHaveProperty('actor');
     },
   );
+
+  it('redacts counter drift from the caller and returns the request correlation id', async () => {
+    // Regression: counter drift must not expose tenant identifiers or internal counter names through the 500 body.
+    cancel.mockRejectedValue(
+      new CredentialBatchCounterDriftError({
+        batchId: 'batch-1',
+        tenantId: 'tenant-1',
+        batchCorrelationId: 'batch-correlation',
+        cancelledRows: 1,
+        queuedCount: 2,
+      }),
+    );
+    logger.error.mockClear();
+
+    const response = await runWithRequestContext('request-correlation', () =>
+      POST(request(undefined, '0'), context as never),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: unexpectedErrorMessage('request-correlation') });
+    expect(JSON.stringify(body)).not.toContain('tenant-1');
+    expect(JSON.stringify(body)).not.toContain('queuedCount');
+    expect(logger.error).toHaveBeenCalledWith(
+      {
+        correlationId: 'request-correlation',
+        batchCorrelationId: 'batch-correlation',
+        batchId: 'batch-1',
+        tenantId: 'tenant-1',
+        cancelledRows: 1,
+        queuedCount: 2,
+      },
+      'Credential batch cancellation counter drift',
+    );
+  });
+
+  // Regression: cancellation must retain the caller's reference on the projected cancelled item.
+  it('preserves a caller-supplied reference when cancellation marks the item cancelled', async () => {
+    const stored = batch('QUEUED', 'PO-1');
+    cancel.mockResolvedValue({ outcome: 'applied', batch: stored } as never);
+
+    const response = await POST(request(undefined, '0'), context as never);
+
+    expect(response.status).toBe(202);
+    expect((await response.json()).items[0]).toEqual(
+      expect.objectContaining({ reference: 'PO-1', state: 'CANCELLED' }),
+    );
+  });
 
   it.each(['\0', 'abc\0def', '\0abc'])('returns 404 for a batch id containing a NUL byte: %j', async (id) => {
     const response = await POST(request(), {

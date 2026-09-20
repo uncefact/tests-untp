@@ -1,19 +1,23 @@
 import { NextResponse } from 'next/server';
-import { ConflictError, NotFoundError } from '@/lib/api/errors';
+import { ConflictError, NotFoundError, unexpectedErrorMessage } from '@/lib/api/errors';
 import { ValidationError } from '@/lib/api/validation';
 import { readRequestBytes } from '@/lib/api/request-body';
-import { appLogger } from '@/lib/api/logger';
+import { apiLogger } from '@/lib/api/logger';
 import { containsNulByte } from '@/lib/api/route-id';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { prisma } from '@/lib/prisma/prisma';
 import { cancelCredentialBatch } from '@/lib/prisma/repositories/credential-batch.repository';
+import { getRequestContext } from '@uncefact/untp-ri-services/logging';
 import {
   credentialBatchExpiredResponse,
   CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE,
   CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
   CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
+  CredentialBatchCounterDriftError,
 } from '@/lib/credentials/credential-batch-error';
 import { projectCredentialBatch } from '@/lib/credentials/credential-batch-projection';
+
+const logger = apiLogger.child({ route: '/api/v1/credentials/batches/[id]/cancel' });
 
 /**
  * @swagger
@@ -65,7 +69,7 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  *                     - { index: 4, state: CANCELLED }
  *                   message: Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.
  *       400:
- *         description: A non-empty or unreadable request body was supplied.
+ *         description: A non-empty request body was supplied.
  *         content:
  *           application/json:
  *             schema:
@@ -73,8 +77,6 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  *             examples:
  *               bodyNotAllowed:
  *                 value: { error: 'Send this request without a body.' }
- *               unreadable:
- *                 value: { error: 'Could not read the request body' }
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
@@ -122,11 +124,14 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  *       413:
  *         $ref: '#/components/responses/PayloadTooLargeResponse'
  *       500:
- *         description: Server error.
+ *         description: The response is sanitised and carries the generic server-error message with the request correlation id.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               counterDrift:
+ *                 value: { error: 'An unexpected error has occurred. If the issue persists, please contact support and quote correlation id "request-correlation-id".' }
  */
 export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const bytes = await readRequestBytes(req);
@@ -134,18 +139,40 @@ export const POST = withTenantAuth(async (req, { tenantId, params }) => {
 
   const { id } = await params;
   if (containsNulByte(id)) throw new NotFoundError('Credential batch not found.');
-  const result = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId }));
+  let result;
+  try {
+    result = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId }), {
+      maxWait: 5_000,
+      timeout: 15_000,
+    });
+  } catch (error) {
+    if (!(error instanceof CredentialBatchCounterDriftError)) throw error;
+    const correlationId = getRequestContext()?.correlationId;
+    logger.error(
+      {
+        correlationId,
+        batchCorrelationId: error.batchCorrelationId,
+        batchId: error.batchId,
+        tenantId: error.tenantId,
+        cancelledRows: error.cancelledRows,
+        queuedCount: error.queuedCount,
+      },
+      'Credential batch cancellation counter drift',
+    );
+    return NextResponse.json({ error: unexpectedErrorMessage(correlationId) }, { status: 500 });
+  }
   if (result.outcome === 'missing') throw new NotFoundError('Credential batch not found.');
   if (result.outcome === 'not-cancellable') {
     throw new ConflictError(CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE, 'BATCH_NOT_CANCELLABLE');
   }
 
   if (result.outcome === 'applied') {
-    appLogger.warn(
+    logger.warn(
       {
         action: 'cancel',
         tenantId,
         batchId: id,
+        batchCorrelationId: result.batch.correlationId,
         cancelledCount: result.batch.cancelledCount,
         outcome: result.outcome,
         at: new Date().toISOString(),

@@ -356,11 +356,13 @@ An unexpected pre-dispatch fault is requeued for that item with a doubling ladde
 
 Send `POST /api/v1/credentials/batches/{id}/cancel` with no body. Even `{}` or whitespace is rejected. The request uses the same tenant authentication as the status resource and does not require an `Idempotency-Key`.
 
-Every queued item, including a deferred retry, is cancelled in one transaction. The item already processing finishes its current attempt, and issued items remain issued. A successful response is `202`, including when the batch settles immediately. This guarantee holds only where every worker runs this release or later; follow the [migration guide rollout order](../../migration-guides/ri-v0.6#batch-cancellation) before exposing the route. It contains the same projection as GET, plus this exact `message`:
+Every queued item, including a deferred retry, is cancelled in one transaction. The item already processing finishes its current attempt, and issued items remain issued. A successful response is `202`, including when the batch settles immediately. No further item is started after the request, and that holds only where every worker runs this release or later, so follow the [migration guide rollout order](../../migration-guides/ri-v0.6#batch-cancellation) before exposing the route. The `202` body carries the same projection as GET, plus this exact `message`:
 
 > Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.
 
-If the batch's stored queued count disagrees with the number of queued items, cancellation is refused with `500`.
+If the batch's stored queued count disagrees with the number of queued items, cancellation answers `500` with the generic server-error message and a correlation id. Retry later; if it persists, report the correlation id to the operator, who follows the counter-drift procedure in the [batch issuance runbook](../operations/batch-issuance#counter-drift-refusal).
+
+A `202` whose projection shows `RUNNING` with zero queued and zero processing items confirms cancellation but not settlement; reconciliation can retry once `lastProgressAt` is at least twice `WORKER_JOB_TIMEOUT_SECONDS` old and no issuance job is active, retrying or scheduled, while persistent counter disagreement requires operator repair using the batch issuance runbook.
 
 For example, cancelling five items while the first is processing returns `state: RUNNING`, `counts.processing: 1`, `counts.cancelled: 4` and a non-null `cancelRequestedAt`. Once that attempt issues, GET reports `CANCELLED`, issued 1 and cancelled 4, with the retained credential id on the issued item. The six item counts always sum to `total`.
 

@@ -1,6 +1,6 @@
 import { config, runTag } from '../../../support/config';
 import { readV070CredentialPayload } from '../../../support/v0.7-credential-payload';
-import { assertIssuedCredential } from '../../../support/credential-batch';
+import { assertIssuedCredential, type CredentialRequest } from '../../../support/credential-batch';
 
 /**
  * Batch rows are left by design. The run-tag cleanup deletes the native
@@ -18,14 +18,6 @@ describe('Credential batch API', { testIsolation: false }, () => {
   const VALID_UNTIL = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
   let issuerDid: string;
   let foreignDid: string;
-
-  type CredentialRequest = {
-    credentialPayload: Record<string, unknown>;
-    credentialType: string;
-    version: string;
-    statusPurposes: string[];
-    reference?: string;
-  };
 
   type BatchRequest = {
     items: CredentialRequest[];

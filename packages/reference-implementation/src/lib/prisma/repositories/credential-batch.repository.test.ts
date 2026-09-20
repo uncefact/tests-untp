@@ -1,3 +1,4 @@
+jest.mock('@/lib/api/logger');
 jest.mock('@/lib/prisma/prisma', () => ({
   prisma: { $transaction: jest.fn(), credentialBatch: { findFirst: jest.fn() } },
 }));
@@ -11,6 +12,7 @@ import { CredentialBatchItemState, CredentialBatchState } from '../generated';
 import {
   claimBatchAttempt,
   claimNextBatchItem,
+  cancelCredentialBatch,
   classifyBatchCancellation,
   checkpointBatchContinuation,
   createCredentialBatch,
@@ -20,12 +22,14 @@ import {
   markItemQueued,
   resolveUnknownBatchItem,
 } from './credential-batch.repository';
+import { CredentialBatchCounterDriftError } from '@/lib/credentials/credential-batch-error';
 import { prisma } from '../prisma';
 
 const prismaMock = prisma as unknown as {
   $transaction: jest.Mock;
   credentialBatch: { findFirst: jest.Mock };
 };
+const loggerCalls = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
 
 describe('createCredentialBatch', () => {
   const originalEncryptionKey = process.env.DATA_ENCRYPTION_KEY;
@@ -358,6 +362,24 @@ describe('credential batch item retry scheduling', () => {
     );
   });
 
+  it('reports a missing batch separately from a superseded checkpoint', async () => {
+    // Regression: a deleted batch must not be reported as an ownership change to the worker.
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      credentialBatch: { findFirst: jest.fn() },
+    } as never;
+
+    await expect(
+      checkpointBatchContinuation(tx, {
+        batchId: 'missing-batch',
+        tenantId: 'tenant-1',
+        token: 'attempt-token',
+        correlationId: 'batch-correlation',
+        queue: { enqueueWithin: jest.fn() } as never,
+      }),
+    ).resolves.toEqual({ outcome: 'missing' });
+  });
+
   it('writes the batch-derived correlation id into every item made outcome unknown by takeover', async () => {
     // Regression: takeover must preserve an operator-searchable item id instead of restoring the old generic message.
     const itemUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
@@ -613,5 +635,104 @@ describe('classifyBatchCancellation', () => {
     [CredentialBatchState.EXPIRED, new Date(0), 'expired'],
   ])('classifies %s with cancellation timestamp %s as %s', (state, cancelRequestedAt, expected) => {
     expect(classifyBatchCancellation({ state, cancelRequestedAt })).toBe(expected);
+  });
+});
+
+describe('cancelCredentialBatch', () => {
+  it('throws typed counter-drift details without putting them in the error message', async () => {
+    // Regression: cancellation must preserve diagnostics for internal logging without exposing them through a route error.
+    const lockedBatch = {
+      id: 'batch-1',
+      tenantId: 'tenant-1',
+      correlationId: 'batch-correlation',
+      state: CredentialBatchState.RUNNING,
+      itemCount: 2,
+      queuedCount: 2,
+      processingCount: 0,
+      issuedCount: 0,
+      failedCount: 0,
+      unknownCount: 0,
+      cancelledCount: 0,
+      cancelRequestedAt: null,
+      version: 1,
+      attemptToken: null,
+    };
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
+      credentialBatch: {
+        findFirst: jest.fn().mockResolvedValue(lockedBatch),
+        update: jest.fn(),
+        findFirstOrThrow: jest.fn(),
+      },
+      credentialBatchItem: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    } as never;
+
+    try {
+      await cancelCredentialBatch(tx, { batchId: 'batch-1', tenantId: 'tenant-1' });
+      throw new Error('Expected counter drift to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(CredentialBatchCounterDriftError);
+      expect(error).toMatchObject({
+        batchId: 'batch-1',
+        tenantId: 'tenant-1',
+        batchCorrelationId: 'batch-correlation',
+        cancelledRows: 1,
+        queuedCount: 2,
+      });
+      expect(error).toHaveProperty('message', 'Credential batch counters disagree with its queued items.');
+    }
+  });
+
+  it('warns with the batch correlation id and counters when settlement does not apply', async () => {
+    // Regression: a non-applied cancellation settlement must identify the batch and the counters that caused it.
+    loggerCalls.warn.mockClear();
+    const lockedBatch = {
+      id: 'batch-1',
+      tenantId: 'tenant-1',
+      correlationId: 'batch-correlation',
+      state: CredentialBatchState.RUNNING,
+      itemCount: 2,
+      queuedCount: 1,
+      processingCount: 0,
+      issuedCount: 0,
+      failedCount: 0,
+      unknownCount: 0,
+      cancelledCount: 0,
+      cancelRequestedAt: null,
+      version: 1,
+      attemptToken: null,
+    };
+    const updatedBatch = {
+      ...lockedBatch,
+      queuedCount: 0,
+      cancelledCount: 1,
+      version: 2,
+    };
+    const view = { ...updatedBatch, items: [] };
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
+      credentialBatch: {
+        findFirst: jest.fn().mockResolvedValue(lockedBatch),
+        update: jest.fn().mockResolvedValue(updatedBatch),
+        findFirstOrThrow: jest.fn().mockResolvedValue(view),
+      },
+      credentialBatchItem: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    } as never;
+
+    await expect(cancelCredentialBatch(tx, { batchId: 'batch-1', tenantId: 'tenant-1' })).resolves.toEqual({
+      outcome: 'applied',
+      batch: view,
+    });
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        batchCorrelationId: 'batch-correlation',
+        cancelledCount: 1,
+      }),
+      'Credential batch cancellation could not settle',
+    );
   });
 });

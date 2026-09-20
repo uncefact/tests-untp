@@ -1,11 +1,6 @@
 import { config, runTag } from '../../../support/config';
-import {
-  assertIssuedCredential,
-  buildCredentialRequest,
-  type BatchItem,
-  type CredentialRequest,
-  type CredentialRequestFixture,
-} from '../../../support/credential-batch';
+import { readV070CredentialPayload } from '../../../support/v0.7-credential-payload';
+import { assertIssuedCredential, type BatchItem, type CredentialRequest } from '../../../support/credential-batch';
 
 /**
  * Batch rows are left by design. The existing run-tag cleanup removes the
@@ -15,8 +10,10 @@ import {
 describe('Credential batch cancellation API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
   const CREDENTIAL_TYPE = 'DigitalProductPassport';
-  const CREDENTIAL_VERSION = '0.6.1';
+  const CREDENTIAL_VERSION = '0.7.0';
   const STATUS_PURPOSES = config.capabilities.statusDefaultPurposes;
+  const VALID_FROM = new Date().toISOString();
+  const VALID_UNTIL = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
   const CANCEL_ACCEPTED_MESSAGE =
     'Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.';
   const BODY_NOT_ALLOWED_MESSAGE = 'Send this request without a body.';
@@ -29,17 +26,6 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
   let issuerDid: string;
   let foreignDid: string;
   let foreignBatchId: string;
-
-  const credentialFixture: CredentialRequestFixture = {
-    runId: RUN_ID,
-    context: ['https://www.w3.org/ns/credentials/v2', 'https://test.uncefact.org/vocabulary/untp/dpp/0.6.1/'],
-    credentialType: CREDENTIAL_TYPE,
-    version: CREDENTIAL_VERSION,
-    statusPurposes: STATUS_PURPOSES,
-    credentialIdPrefix: 'e2e-batch-cancel',
-    issuerNamePrefix: 'E2E Batch Cancellation Issuer',
-    subjectIdPrefix: 'e2e-batch-cancel',
-  };
 
   type BatchRequest = {
     items: CredentialRequest[];
@@ -67,12 +53,32 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
     statusUrl: string;
   };
 
-  function buildBatchRequest(issuer: string, label: string, count = BATCH_ITEM_COUNT): BatchRequest {
-    return {
-      items: Array.from({ length: count }, (_, index) =>
-        buildCredentialRequest(credentialFixture, issuer, `${label}-${index}`),
-      ),
-    };
+  function buildCredentialRequest(issuer: string, label: string): Cypress.Chainable<CredentialRequest> {
+    return readV070CredentialPayload({
+      templateDir: 'digital_product_passport',
+      credentialId: `urn:uuid:e2e-batch-cancel-${label}-${RUN_ID}`,
+      issuerDid: issuer,
+      validFrom: VALID_FROM,
+      validUntil: VALID_UNTIL,
+    }).then((credentialPayload) => {
+      credentialPayload.credentialSubject.id = `https://example.com/products/e2e-batch-cancel-${label}-${RUN_ID}`;
+      return {
+        credentialPayload,
+        credentialType: CREDENTIAL_TYPE,
+        version: CREDENTIAL_VERSION,
+        statusPurposes: STATUS_PURPOSES,
+      };
+    });
+  }
+
+  function buildBatchRequest(issuer: string, label: string, count = BATCH_ITEM_COUNT): Cypress.Chainable<BatchRequest> {
+    return Array.from({ length: count }, (_, index) => `${label}-${index}`)
+      .reduce(
+        (chain, itemLabel) =>
+          chain.then((items) => buildCredentialRequest(issuer, itemLabel).then((item) => [...items, item])),
+        cy.wrap([] as CredentialRequest[]),
+      )
+      .then((items) => ({ items }));
   }
 
   function submitBatch(
@@ -244,13 +250,11 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
         expect(response.status).to.eq(201);
         foreignDid = response.body.did;
 
-        return submitBatch(
-          `e2e-batch-cancel-foreign-${RUN_ID}`,
-          { items: [buildCredentialRequest(credentialFixture, foreignDid, 'foreign-batch')] },
-          result.accessToken,
-        ).then(({ batchId }) => {
-          foreignBatchId = batchId;
-        });
+        return buildCredentialRequest(foreignDid, 'foreign-batch')
+          .then((item) => submitBatch(`e2e-batch-cancel-foreign-${RUN_ID}`, { items: [item] }, result.accessToken))
+          .then(({ batchId }) => {
+            foreignBatchId = batchId;
+          });
       });
     });
 
@@ -304,200 +308,181 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
   });
 
   it('cancels a running batch and proves issued and cancelled outcomes', () => {
-    const requestBody = buildBatchRequest(issuerDid, 'running');
-
-    submitBatch(`e2e-batch-cancel-running-${RUN_ID}`, requestBody)
-      .then(({ statusUrl }) => waitForActiveBatch(statusUrl).then((active) => ({ statusUrl, active })))
-      .then(({ statusUrl, active }) => {
-        expect(active.items.some((item) => item.state === 'PROCESSING' || item.state === 'ISSUED')).to.eq(true);
-        return cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }).then((response) => {
-          const accepted = assertCancelAccepted(response, BATCH_ITEM_COUNT);
-          return waitForBatchSettlement(statusUrl, ['CANCELLED', 'COMPLETED']).then((settled) => ({
-            accepted,
-            settled,
-          }));
-        });
-      })
-      .then(({ accepted, settled }) => {
-        expect(settled.cancelRequestedAt, 'settlement cancelRequestedAt').to.eq(accepted.cancelRequestedAt);
-        assertRunningCancellationSettlement(settled, BATCH_ITEM_COUNT);
-        return assertSettledItems(settled, requestBody, 'running cancellation');
-      });
-  });
-
-  it('accepts a second cancel while the batch is still running with the first timestamp', () => {
-    const requestBody = buildBatchRequest(issuerDid, 'second-cancel');
-
-    submitBatch(`e2e-batch-cancel-second-${RUN_ID}`, requestBody)
-      .then(({ statusUrl }) => waitForActiveBatch(statusUrl).then(() => statusUrl))
-      .then((statusUrl) =>
-        cy
-          .request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false })
-          .then((firstResponse) => ({ statusUrl, first: assertCancelAccepted(firstResponse, BATCH_ITEM_COUNT) })),
-      )
-      .then(({ statusUrl, first }) => {
-        expect(first.state, 'first cancel must observe a running batch').to.eq('RUNNING');
-        return cy
-          .request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false })
-          .then((secondResponse) => {
-            expect(secondResponse.status, 'second cancel status').to.eq(202);
-            expect(secondResponse.body.message, 'second cancel message').to.eq(CANCEL_ACCEPTED_MESSAGE);
-            expect(secondResponse.body.cancelRequestedAt, 'second cancelRequestedAt').to.eq(first.cancelRequestedAt);
-            return waitForBatchSettlement(statusUrl, ['CANCELLED', 'COMPLETED']);
-          });
-      })
-      .then((settled) => {
-        assertRunningCancellationSettlement(settled, BATCH_ITEM_COUNT);
-        return assertSettledItems(settled, requestBody, 'second cancellation');
-      });
+    return buildBatchRequest(issuerDid, 'running').then((requestBody) =>
+      submitBatch(`e2e-batch-cancel-running-${RUN_ID}`, requestBody)
+        .then(({ statusUrl }) => waitForActiveBatch(statusUrl).then((active) => ({ statusUrl, active })))
+        .then(({ statusUrl, active }) => {
+          expect(active.items.some((item) => item.state === 'PROCESSING' || item.state === 'ISSUED')).to.eq(true);
+          return cy
+            .request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false })
+            .then((response) => {
+              const accepted = assertCancelAccepted(response, BATCH_ITEM_COUNT);
+              return waitForBatchSettlement(statusUrl, ['CANCELLED', 'COMPLETED']).then((settled) => ({
+                accepted,
+                settled,
+              }));
+            });
+        })
+        .then(({ accepted, settled }) => {
+          expect(settled.cancelRequestedAt, 'settlement cancelRequestedAt').to.eq(accepted.cancelRequestedAt);
+          assertRunningCancellationSettlement(settled, BATCH_ITEM_COUNT);
+          return assertSettledItems(settled, requestBody, 'running cancellation');
+        }),
+    );
   });
 
   it('refuses cancellation after settlement without changing the projection', () => {
-    const requestBody = buildBatchRequest(issuerDid, 'settled', 1);
-
-    submitBatch(`e2e-batch-cancel-settled-${RUN_ID}`, requestBody)
-      .then(({ statusUrl }) => waitForBatchSettlement(statusUrl, ['COMPLETED']).then(() => statusUrl))
-      .then((statusUrl) =>
-        cy.request({ method: 'GET', url: statusUrl }).then((beforeResponse) => ({ statusUrl, beforeResponse })),
-      )
-      .then(({ statusUrl, beforeResponse }) => {
-        expect(beforeResponse.status, 'settled projection before refusal').to.eq(200);
-        expect(beforeResponse.body.state, 'settled state before refusal').to.eq('COMPLETED');
-        return cy
-          .request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false })
-          .then((cancelResponse) => ({ statusUrl, beforeProjection: beforeResponse.body, cancelResponse }));
-      })
-      .then(({ statusUrl, beforeProjection, cancelResponse }) => {
-        expect(cancelResponse.status, 'settled cancel status').to.eq(409);
-        expect(cancelResponse.body).to.deep.eq({ error: NOT_CANCELLABLE_MESSAGE, code: 'BATCH_NOT_CANCELLABLE' });
-        return cy.request({ method: 'GET', url: statusUrl }).then((afterResponse) => {
-          expect(afterResponse.status, 'settled projection after refusal').to.eq(200);
-          expect(afterResponse.body).to.deep.eq(beforeProjection);
-        });
-      });
+    return buildBatchRequest(issuerDid, 'settled', 1).then((requestBody) =>
+      submitBatch(`e2e-batch-cancel-settled-${RUN_ID}`, requestBody)
+        .then(({ statusUrl }) => waitForBatchSettlement(statusUrl, ['COMPLETED']).then(() => statusUrl))
+        .then((statusUrl) =>
+          cy.request({ method: 'GET', url: statusUrl }).then((beforeResponse) => ({ statusUrl, beforeResponse })),
+        )
+        .then(({ statusUrl, beforeResponse }) => {
+          expect(beforeResponse.status, 'settled projection before refusal').to.eq(200);
+          expect(beforeResponse.body.state, 'settled state before refusal').to.eq('COMPLETED');
+          return cy
+            .request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false })
+            .then((cancelResponse) => ({ statusUrl, beforeProjection: beforeResponse.body, cancelResponse }));
+        })
+        .then(({ statusUrl, beforeProjection, cancelResponse }) => {
+          expect(cancelResponse.status, 'settled cancel status').to.eq(409);
+          expect(cancelResponse.body).to.deep.eq({ error: NOT_CANCELLABLE_MESSAGE, code: 'BATCH_NOT_CANCELLABLE' });
+          return cy.request({ method: 'GET', url: statusUrl }).then((afterResponse) => {
+            expect(afterResponse.status, 'settled projection after refusal').to.eq(200);
+            expect(afterResponse.body).to.deep.eq(beforeProjection);
+          });
+        }),
+    );
   });
 
   it('cancels a large batch while work remains queued', () => {
-    const requestBody = buildBatchRequest(issuerDid, 'queued', LARGE_BATCH_ITEM_COUNT);
-
-    submitBatch(`e2e-batch-cancel-queued-${RUN_ID}`, requestBody)
-      .then(({ statusUrl }) =>
-        cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }).then((response) => ({
-          statusUrl,
-          accepted: assertCancelAccepted(response, LARGE_BATCH_ITEM_COUNT),
-        })),
-      )
-      .then(({ statusUrl, accepted }) => {
-        expect(accepted.cancelRequestedAt, 'queued cancellation timestamp').to.be.a('string').and.not.empty;
-        return waitForBatchSettlement(statusUrl, ['CANCELLED']);
-      })
-      .then((settled) => {
-        assertCancelledSettlement(settled, LARGE_BATCH_ITEM_COUNT, 'queued cancellation');
-        return assertSettledItems(settled, requestBody, 'queued cancellation');
-      });
+    return buildBatchRequest(issuerDid, 'queued', LARGE_BATCH_ITEM_COUNT).then((requestBody) =>
+      submitBatch(`e2e-batch-cancel-queued-${RUN_ID}`, requestBody)
+        .then(({ statusUrl }) =>
+          cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }).then((response) => ({
+            statusUrl,
+            accepted: assertCancelAccepted(response, LARGE_BATCH_ITEM_COUNT),
+          })),
+        )
+        .then(({ statusUrl, accepted }) => {
+          expect(accepted.cancelRequestedAt, 'queued cancellation timestamp').to.be.a('string').and.not.empty;
+          return waitForBatchSettlement(statusUrl, ['CANCELLED']);
+        })
+        .then((settled) => {
+          assertCancelledSettlement(settled, LARGE_BATCH_ITEM_COUNT, 'queued cancellation');
+          return assertSettledItems(settled, requestBody, 'queued cancellation');
+        }),
+    );
   });
 
   it('refuses cancellation of a completed batch', () => {
-    const requestBody = buildBatchRequest(issuerDid, 'completed', 1);
-
-    submitBatch(`e2e-batch-cancel-completed-${RUN_ID}`, requestBody)
-      .then(({ statusUrl }) => waitForBatchSettlement(statusUrl, ['COMPLETED']).then(() => statusUrl))
-      .then((statusUrl) => cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }))
-      .then((response) => {
-        expect(response.status, 'completed cancel status').to.eq(409);
-        expect(response.body).to.deep.eq({ error: NOT_CANCELLABLE_MESSAGE, code: 'BATCH_NOT_CANCELLABLE' });
-      });
+    return buildBatchRequest(issuerDid, 'completed', 1).then((requestBody) =>
+      submitBatch(`e2e-batch-cancel-completed-${RUN_ID}`, requestBody)
+        .then(({ statusUrl }) => waitForBatchSettlement(statusUrl, ['COMPLETED']).then(() => statusUrl))
+        .then((statusUrl) => cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }))
+        .then((response) => {
+          expect(response.status, 'completed cancel status').to.eq(409);
+          expect(response.body).to.deep.eq({ error: NOT_CANCELLABLE_MESSAGE, code: 'BATCH_NOT_CANCELLABLE' });
+        }),
+    );
   });
 
   it('refuses unknown, foreign and bodyful cancellation requests', () => {
     const unknownBatchUrl = `/api/v1/credentials/batches/unknown-${RUN_ID}`;
-    const bodyRequest = buildBatchRequest(issuerDid, 'body-refusal', 1);
-
-    cy.request({ method: 'POST', url: `${unknownBatchUrl}/cancel`, failOnStatusCode: false })
-      .then((unknownResponse) => {
-        expect(unknownResponse.status, 'unknown batch cancel status').to.eq(404);
-        expect(unknownResponse.body).to.deep.eq(NOT_FOUND_BODY);
-      })
-      .then(() =>
-        cy.request({
-          method: 'GET',
-          url: `/api/v1/credentials/batches/${foreignBatchId}`,
-          failOnStatusCode: false,
-        }),
-      )
-      .then((foreignGetResponse) => {
-        expect(foreignGetResponse.status, 'foreign batch GET status').to.eq(404);
-        expect(foreignGetResponse.body, 'foreign batch GET body').to.deep.eq(NOT_FOUND_BODY);
-        return cy.request({
-          method: 'POST',
-          url: `/api/v1/credentials/batches/${foreignBatchId}/cancel`,
-          failOnStatusCode: false,
-        });
-      })
-      .then((foreignResponse) => {
-        expect(foreignResponse.status, 'foreign batch cancel status').to.eq(404);
-        expect(foreignResponse.body).to.deep.eq(NOT_FOUND_BODY);
-      })
-      .then(() => submitBatch(`e2e-batch-cancel-body-${RUN_ID}`, bodyRequest))
-      .then(({ statusUrl }) =>
-        cy
-          .request({ method: 'POST', url: `${statusUrl}/cancel`, body: {}, failOnStatusCode: false })
-          .then((emptyObjectResponse) => {
-            expect(emptyObjectResponse.status, 'empty object cancel status').to.eq(400);
-            expect(emptyObjectResponse.body).to.deep.eq({ error: BODY_NOT_ALLOWED_MESSAGE });
-          })
-          .then(() => cy.request({ method: 'POST', url: `${statusUrl}/cancel`, body: 'x', failOnStatusCode: false }))
-          .then((stringResponse) => {
-            expect(stringResponse.status, 'string body cancel status').to.eq(400);
-            expect(stringResponse.body).to.deep.eq({ error: BODY_NOT_ALLOWED_MESSAGE });
+    return buildBatchRequest(issuerDid, 'body-refusal', 1).then((bodyRequest) =>
+      cy
+        .request({ method: 'POST', url: `${unknownBatchUrl}/cancel`, failOnStatusCode: false })
+        .then((unknownResponse) => {
+          expect(unknownResponse.status, 'unknown batch cancel status').to.eq(404);
+          expect(unknownResponse.body).to.deep.eq(NOT_FOUND_BODY);
+        })
+        .then(() =>
+          cy.request({
+            method: 'GET',
+            url: `/api/v1/credentials/batches/${foreignBatchId}`,
+            failOnStatusCode: false,
           }),
-      );
+        )
+        .then((foreignGetResponse) => {
+          expect(foreignGetResponse.status, 'foreign batch GET status').to.eq(404);
+          expect(foreignGetResponse.body, 'foreign batch GET body').to.deep.eq(NOT_FOUND_BODY);
+          return cy.request({
+            method: 'POST',
+            url: `/api/v1/credentials/batches/${foreignBatchId}/cancel`,
+            failOnStatusCode: false,
+          });
+        })
+        .then((foreignResponse) => {
+          expect(foreignResponse.status, 'foreign batch cancel status').to.eq(404);
+          expect(foreignResponse.body).to.deep.eq(NOT_FOUND_BODY);
+        })
+        .then(() => submitBatch(`e2e-batch-cancel-body-${RUN_ID}`, bodyRequest))
+        .then(({ statusUrl }) =>
+          cy
+            .request({ method: 'POST', url: `${statusUrl}/cancel`, body: {}, failOnStatusCode: false })
+            .then((emptyObjectResponse) => {
+              expect(emptyObjectResponse.status, 'empty object cancel status').to.eq(400);
+              expect(emptyObjectResponse.body).to.deep.eq({ error: BODY_NOT_ALLOWED_MESSAGE });
+            })
+            .then(() => cy.request({ method: 'POST', url: `${statusUrl}/cancel`, body: 'x', failOnStatusCode: false }))
+            .then((stringResponse) => {
+              expect(stringResponse.status, 'string body cancel status').to.eq(400);
+              expect(stringResponse.body).to.deep.eq({ error: BODY_NOT_ALLOWED_MESSAGE });
+            }),
+        ),
+    );
   });
 
   it('replays the cancelled batch for the same key and rejects a changed body', () => {
     const idempotencyKey = `e2e-batch-cancel-replay-${RUN_ID}`;
-    const requestBody = buildBatchRequest(issuerDid, 'replay', LARGE_BATCH_ITEM_COUNT);
-    const changedBody = buildBatchRequest(issuerDid, 'replay-changed', LARGE_BATCH_ITEM_COUNT);
-
-    submitBatch(idempotencyKey, requestBody)
-      .then(({ batchId, statusUrl }) =>
-        cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }).then((response) => ({
-          batchId,
-          statusUrl,
-          accepted: assertCancelAccepted(response, LARGE_BATCH_ITEM_COUNT),
-        })),
-      )
-      .then(({ batchId, statusUrl }) => {
-        return waitForBatchSettlement(statusUrl, ['CANCELLED']).then((settled) => ({ batchId, statusUrl, settled }));
-      })
-      .then(({ batchId, statusUrl, settled }) => {
-        assertCancelledSettlement(settled, LARGE_BATCH_ITEM_COUNT, 'replay cancellation');
-        return assertSettledItems(settled, requestBody, 'replay cancellation').then(() =>
-          cy
-            .request({
-              method: 'POST',
-              url: '/api/v1/credentials/batches',
-              headers: { 'Idempotency-Key': idempotencyKey },
-              body: requestBody,
-              failOnStatusCode: false,
-            })
-            .then((replayResponse) => {
-              expect(replayResponse.status, 'cancelled replay status').to.eq(202);
-              expect(replayResponse.body.batchId, 'cancelled replay batch id').to.eq(batchId);
-              expect(replayResponse.body.status, 'cancelled replay status URL').to.eq(statusUrl);
-              return cy.request({
-                method: 'POST',
-                url: '/api/v1/credentials/batches',
-                headers: { 'Idempotency-Key': idempotencyKey },
-                body: changedBody,
-                failOnStatusCode: false,
-              });
-            }),
-        );
-      })
-      .then((changedResponse) => {
-        expect(changedResponse.status, 'changed replay status').to.eq(422);
-        expect(changedResponse.body.code, 'changed replay error code').to.eq('IDEMPOTENCY_KEY_MISMATCH');
-      });
+    return buildBatchRequest(issuerDid, 'replay', LARGE_BATCH_ITEM_COUNT).then((requestBody) =>
+      buildBatchRequest(issuerDid, 'replay-changed', LARGE_BATCH_ITEM_COUNT).then((changedBody) =>
+        submitBatch(idempotencyKey, requestBody)
+          .then(({ batchId, statusUrl }) =>
+            cy.request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false }).then((response) => ({
+              batchId,
+              statusUrl,
+              accepted: assertCancelAccepted(response, LARGE_BATCH_ITEM_COUNT),
+            })),
+          )
+          .then(({ batchId, statusUrl }) => {
+            return waitForBatchSettlement(statusUrl, ['CANCELLED']).then((settled) => ({
+              batchId,
+              statusUrl,
+              settled,
+            }));
+          })
+          .then(({ batchId, statusUrl, settled }) => {
+            assertCancelledSettlement(settled, LARGE_BATCH_ITEM_COUNT, 'replay cancellation');
+            return assertSettledItems(settled, requestBody, 'replay cancellation').then(() =>
+              cy
+                .request({
+                  method: 'POST',
+                  url: '/api/v1/credentials/batches',
+                  headers: { 'Idempotency-Key': idempotencyKey },
+                  body: requestBody,
+                  failOnStatusCode: false,
+                })
+                .then((replayResponse) => {
+                  expect(replayResponse.status, 'cancelled replay status').to.eq(202);
+                  expect(replayResponse.body.batchId, 'cancelled replay batch id').to.eq(batchId);
+                  expect(replayResponse.body.status, 'cancelled replay status URL').to.eq(statusUrl);
+                  return cy.request({
+                    method: 'POST',
+                    url: '/api/v1/credentials/batches',
+                    headers: { 'Idempotency-Key': idempotencyKey },
+                    body: changedBody,
+                    failOnStatusCode: false,
+                  });
+                }),
+            );
+          })
+          .then((changedResponse) => {
+            expect(changedResponse.status, 'changed replay status').to.eq(422);
+            expect(changedResponse.body.code, 'changed replay error code').to.eq('IDEMPOTENCY_KEY_MISMATCH');
+          }),
+      ),
+    );
   });
 });

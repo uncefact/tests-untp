@@ -16,6 +16,7 @@ import {
   interruptedBatchItemMessage,
   OPERATOR_CONFIRMED_FAILURE_CODE,
 } from '@/lib/credentials/credential-batch-projection';
+import { CredentialBatchCounterDriftError } from '@/lib/credentials/credential-batch-error';
 import { credentialBatchItemCorrelationId } from '@/lib/credentials/credential-batch-correlation';
 import type { CredentialBatchItemRequest } from '@/lib/api/request-schemas/credential-batch';
 import { appLogger } from '@/lib/api/logger';
@@ -370,9 +371,13 @@ export async function cancelCredentialBatch(
     data: { state: CredentialBatchItemState.CANCELLED, attemptToken: null, nextAttemptAt: null },
   });
   if (cancelled.count !== batch.queuedCount) {
-    throw new Error(
-      `Credential batch queued items disagree with its counters: batchId=${input.batchId}, tenantId=${input.tenantId}, cancelledRows=${cancelled.count}, queuedCount=${batch.queuedCount}`,
-    );
+    throw new CredentialBatchCounterDriftError({
+      batchId: input.batchId,
+      tenantId: input.tenantId,
+      batchCorrelationId: batch.correlationId,
+      cancelledRows: cancelled.count,
+      queuedCount: batch.queuedCount,
+    });
   }
   const updated = await tx.credentialBatch.update({
     where: { id: input.batchId, tenantId: input.tenantId },
@@ -387,7 +392,20 @@ export async function cancelCredentialBatch(
     const settlement = await settleLockedBatch(tx, updated, updated.attemptToken);
     if (settlement.outcome !== 'applied') {
       logger.warn(
-        { batchId: input.batchId, tenantId: input.tenantId, settlement: settlement.outcome },
+        {
+          batchId: input.batchId,
+          tenantId: input.tenantId,
+          correlationId: updated.correlationId,
+          batchCorrelationId: updated.correlationId,
+          settlement: settlement.outcome,
+          itemCount: updated.itemCount,
+          queuedCount: updated.queuedCount,
+          processingCount: updated.processingCount,
+          issuedCount: updated.issuedCount,
+          failedCount: updated.failedCount,
+          unknownCount: updated.unknownCount,
+          cancelledCount: updated.cancelledCount,
+        },
         'Credential batch cancellation could not settle',
       );
     }
@@ -704,6 +722,8 @@ export async function markItemIssued(
     warning?: PrismaTypes.JsonValue | null;
   },
 ): Promise<BatchMutationOutcome> {
+  // Taken for lock ordering only. A vanished batch needs no early return here:
+  // the item update below matches nothing and itemNotApplied reports the miss.
   await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
@@ -755,6 +775,8 @@ export async function markItemFailed(
     errorMessage: string;
   },
 ): Promise<BatchMutationOutcome> {
+  // Taken for lock ordering only. A vanished batch needs no early return here:
+  // the item update below matches nothing and itemNotApplied reports the miss.
   await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
@@ -793,7 +815,10 @@ export async function markItemFailed(
   return { outcome: 'applied' };
 }
 
-/** Finishes a pre-dispatch fault as failed, cancelled or queued for retry (#1080). */
+/**
+ * Finishes a pre-dispatch fault as failed, cancelled or queued for retry (#1080).
+ * The batch guard runs first because a deleted batch has no items left to compare.
+ */
 export async function markItemQueued(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; index: number; token: string; errorMessage: string },
@@ -872,6 +897,8 @@ export async function recordKnownCredentialId(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; index: number; credentialId: string },
 ): Promise<{ applied: boolean }> {
+  // Taken for lock ordering only. A vanished batch needs no early return here:
+  // the item update below matches nothing and itemNotApplied reports the miss.
   await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const updated = await tx.credentialBatchItem.updateMany({
@@ -906,6 +933,8 @@ export async function markItemOutcomeUnknown(
     credentialId?: string;
   },
 ): Promise<BatchMutationOutcome> {
+  // Taken for lock ordering only. A vanished batch needs no early return here:
+  // the item update below matches nothing and itemNotApplied reports the miss.
   await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
   const now = new Date(Date.now());
   const item = await tx.credentialBatchItem.updateMany({
@@ -945,7 +974,11 @@ export async function markItemOutcomeUnknown(
   return { outcome: 'applied' };
 }
 
-/** Claims the next queued item for this attempt and moves it into PROCESSING. */
+/**
+ * Claims the next queued item for this attempt and moves it into PROCESSING.
+ * A cancellation request short-circuits ahead of the fence check, so a superseded
+ * attempt on a cancelled batch reports 'cancelled'.
+ */
 export async function claimNextBatchItem(
   tx: PrismaTypes.TransactionClient,
   input: { batchId: string; tenantId: string; token: string },
@@ -1240,7 +1273,8 @@ export async function claimBatchAttemptAndRelease(
 /**
  * In the caller's transaction, settles cancellation or checkpoints and enqueues (#1080).
  * Missing or superseded ownership makes no change. Cancellation with processing
- * still present retains ownership and enqueues nothing.
+ * still present settles nothing and enqueues nothing; the caller decides whether to release
+ * the fence, and the worker releases it itself when settlement does not apply.
  */
 export async function checkpointBatchContinuation(
   tx: PrismaTypes.TransactionClient,
@@ -1254,7 +1288,8 @@ export async function checkpointBatchContinuation(
   },
 ): Promise<BatchCheckpointOutcome> {
   const batch = await lockCredentialBatchForUpdate(tx, input.batchId, input.tenantId);
-  if (batch === null || batch.state !== CredentialBatchState.RUNNING || batch.attemptToken !== input.token) {
+  if (batch === null) return { outcome: 'missing' };
+  if (batch.state !== CredentialBatchState.RUNNING || batch.attemptToken !== input.token) {
     return { outcome: 'superseded' };
   }
   if (batch.cancelRequestedAt !== null) {
