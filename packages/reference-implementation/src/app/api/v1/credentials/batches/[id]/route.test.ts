@@ -50,11 +50,10 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
     expect(repository.getCredentialBatchById).toHaveBeenCalledWith('batch-1', 'tenant-1');
   });
 
-  it('returns the same 404 for a NUL id without querying the repository', async () => {
-    // Regression: a NUL in the path must be treated as an unknown batch before PostgreSQL sees the parameter.
+  it.each(['\0', 'abc\0def', '\0abc'])('returns 404 for a batch id containing a NUL byte: %j', async (id) => {
     const response = (await GET(
-      { url: 'http://localhost/api/v1/credentials/batches/batch-%00-invalid' } as Request,
-      { tenantId: 'tenant-1', params: Promise.resolve({ id: 'batch-\0-invalid' }) } as never,
+      { url: 'http://localhost/api/v1/credentials/batches/batch-with-nul' } as Request,
+      { tenantId: 'tenant-1', params: Promise.resolve({ id }) } as never,
     )) as unknown as { status: number; json: () => Promise<unknown> };
 
     expect(response.status).toBe(404);
@@ -72,6 +71,8 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
       issuedCount: 2,
       failedCount: 1,
       unknownCount: 0,
+      cancelledCount: 0,
+      cancelRequestedAt: null,
       createdAt: new Date('2026-09-17T00:00:00.000Z'),
       settledAt: new Date('2026-09-17T01:00:00.000Z'),
       items: [],
@@ -85,7 +86,8 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
     expect(await response.json()).toEqual({
       id: 'batch-expired',
       state: 'EXPIRED',
-      counts: { total: 3, queued: 0, processing: 0, issued: 2, failed: 1, unknown: 0 },
+      counts: { total: 3, queued: 0, processing: 0, issued: 2, failed: 1, unknown: 0, cancelled: 0 },
+      cancelRequestedAt: null,
       createdAt: '2026-09-17T00:00:00.000Z',
       settledAt: '2026-09-17T01:00:00.000Z',
       items: [],
@@ -103,6 +105,8 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
       issuedCount: 1,
       failedCount: 1,
       unknownCount: 0,
+      cancelledCount: 0,
+      cancelRequestedAt: null,
       createdAt: new Date('2026-09-17T00:00:00.000Z'),
       settledAt: new Date('2026-09-17T01:00:00.000Z'),
       items: [
@@ -134,7 +138,8 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
     expect(await response.json()).toEqual({
       id: 'batch-complete',
       state: 'COMPLETED',
-      counts: { total: 2, queued: 0, processing: 0, issued: 1, failed: 1, unknown: 0 },
+      counts: { total: 2, queued: 0, processing: 0, issued: 1, failed: 1, unknown: 0, cancelled: 0 },
+      cancelRequestedAt: null,
       createdAt: '2026-09-17T00:00:00.000Z',
       settledAt: '2026-09-17T01:00:00.000Z',
       items: [

@@ -1,7 +1,10 @@
 import { requestBodyTooLargeMessage } from '@/lib/api/request-body';
 import { IDEMPOTENCY_KEY_MISMATCH_MESSAGE } from '@/lib/api/idempotency';
 import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config';
-import { BATCH_EXPIRED_MESSAGE } from '@/lib/credentials/credential-batch-error';
+import {
+  BATCH_EXPIRED_MESSAGE,
+  CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
+} from '@/lib/credentials/credential-batch-error';
 import {
   credentialDeleteStatusOperationMessage,
   STATUS_METADATA_UNAVAILABLE_MESSAGE,
@@ -214,6 +217,7 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   serviceInstanceStatusPendingMessage('service-instance-1', 1),
   'Service instance not found: service-instance-1',
   'Credential batch not found.',
+  CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
   IDEMPOTENCY_KEY_MISMATCH_MESSAGE,
   BATCH_EXPIRED_MESSAGE,
   SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,

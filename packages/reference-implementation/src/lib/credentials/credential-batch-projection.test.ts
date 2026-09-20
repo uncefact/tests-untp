@@ -31,6 +31,7 @@ describe('projectCredentialBatch', () => {
       issuedCount: 0,
       failedCount: 1,
       unknownCount: 0,
+      cancelledCount: 0,
       idempotencyKey: 'key-fault',
       bodyDigest: 'digest-fault',
       createdAt: new Date(0),
@@ -38,6 +39,7 @@ describe('projectCredentialBatch', () => {
       settledAt: new Date(0),
       resolvedAt: null,
       expiresAt: new Date(1),
+      cancelRequestedAt: null,
       attemptToken: null,
       attemptStartedAt: null,
       version: 1,
@@ -68,18 +70,20 @@ describe('projectCredentialBatch', () => {
     expect(result.items[0].error).toEqual({ code: 'UNEXPECTED', message });
   });
 
-  it('projects counts, references and stable refusal codes in item order without the encrypted request', () => {
+  it('projects cancelled, issued and failed outcomes with their stored counts and retained credential id', () => {
     const result = projectCredentialBatch({
       id: 'batch-1',
       tenantId: 'tenant-1',
       correlationId: 'batch-correlation',
-      state: CredentialBatchState.COMPLETED,
-      itemCount: 2,
+      state: CredentialBatchState.CANCELLED,
+      itemCount: 3,
       queuedCount: 0,
       processingCount: 0,
       issuedCount: 1,
       failedCount: 1,
       unknownCount: 0,
+      cancelledCount: 1,
+      cancelRequestedAt: new Date('2026-09-17T01:02:30.000Z'),
       idempotencyKey: 'key-1',
       bodyDigest: 'digest-1',
       createdAt: new Date('2026-09-17T01:02:03.000Z'),
@@ -92,6 +96,25 @@ describe('projectCredentialBatch', () => {
       version: 2,
       lastProgressAt: new Date('2026-09-17T01:03:03.000Z'),
       items: [
+        {
+          id: 'item-2',
+          batchId: 'batch-1',
+          tenantId: 'tenant-1',
+          index: 2,
+          reference: null,
+          state: CredentialBatchItemState.CANCELLED,
+          request: 'encrypted cancelled request',
+          credentialId: null,
+          warning: null,
+          errorClass: null,
+          errorMessage: null,
+          resolvedAt: null,
+          resolutionReason: null,
+          attemptCount: 0,
+          nextAttemptAt: null,
+          attemptToken: null,
+          updatedAt: new Date('2026-09-17T01:03:00.000Z'),
+        },
         {
           id: 'item-1',
           batchId: 'batch-1',
@@ -135,11 +158,13 @@ describe('projectCredentialBatch', () => {
 
     expect(result).toEqual({
       id: 'batch-1',
-      state: 'COMPLETED',
-      counts: { total: 2, queued: 0, processing: 0, issued: 1, failed: 1, unknown: 0 },
+      state: 'CANCELLED',
+      counts: { total: 3, queued: 0, processing: 0, issued: 1, failed: 1, unknown: 0, cancelled: 1 },
+      cancelRequestedAt: '2026-09-17T01:02:30.000Z',
       createdAt: '2026-09-17T01:02:03.000Z',
       settledAt: '2026-09-17T01:03:03.000Z',
       items: [
+        { index: 2, state: 'CANCELLED' },
         {
           index: 1,
           reference: 'PO-1',
@@ -170,6 +195,8 @@ describe('projectCredentialBatch', () => {
       issuedCount: 0,
       failedCount: 1,
       unknownCount: 0,
+      cancelledCount: 0,
+      cancelRequestedAt: null,
       idempotencyKey: 'key-operator-failure',
       bodyDigest: 'digest-operator-failure',
       createdAt: new Date('2026-09-17T01:02:03.000Z'),
@@ -204,6 +231,7 @@ describe('projectCredentialBatch', () => {
       ],
     });
 
+    expect(result.cancelRequestedAt).toBeNull();
     expect(result.items).toEqual([
       {
         index: 0,

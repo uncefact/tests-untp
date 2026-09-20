@@ -1,12 +1,18 @@
+jest.mock('@/lib/api/logger');
+
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { ValidationError } from '../../src/lib/api/validation';
 import type { CredentialBatchItemRequest } from '../../src/lib/api/request-schemas/credential-batch';
 import { StorageStoreError } from '@uncefact/untp-ri-services';
 import { CredentialBatchItemState, CredentialBatchState, LibraryRecordOrigin } from '../../src/lib/prisma/generated';
 import {
   claimBatchAttempt,
+  cancelCredentialBatch,
   claimNextBatchItem,
   createCredentialBatch,
   getCredentialBatchById,
+  markItemIssued,
   type BatchSubmissionResult,
 } from '../../src/lib/prisma/repositories/credential-batch.repository';
 import { credentialBatchItemCorrelationId } from '../../src/lib/credentials/credential-batch-correlation';
@@ -23,12 +29,14 @@ import { CREDENTIAL_BATCH_ISSUE_JOB } from '../../src/lib/jobs/queue-names';
 import { PgBossJobQueue } from '../../src/lib/jobs/pg-boss-job-queue';
 import type { JobContext, JobQueue } from '../../src/lib/jobs/types';
 import { createRigClient, truncateApplicationTables } from './rig/db';
+import { barrier } from './rig/locks';
 
 process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
 process.env.BATCH_RETENTION_DAYS = '1';
 process.env.WORKER_JOB_TIMEOUT_SECONDS = '30';
 
 const prisma = createRigClient();
+const loggerCalls = jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>;
 const ITEM = (index: number) => ({
   credentialPayload: { issuer: { id: 'did:web:issuer.example' }, index },
   credentialType: 'DigitalProductPassport',
@@ -62,6 +70,7 @@ describe('credential batch worker and reconciliation', () => {
   });
   const idleQueue = new PgBossJobQueue({ connectionString: process.env.RI_DATABASE_URL as string });
   const activeQueue = new PgBossJobQueue({ connectionString: process.env.RI_DATABASE_URL as string });
+  let issueGate: (() => Promise<void>) | undefined;
   let issuedNumber = 0;
   let issueCalls: unknown[] = [];
   let activeJobRun: { fetched: () => void; completed: Promise<void> } | undefined;
@@ -116,7 +125,10 @@ describe('credential batch worker and reconciliation', () => {
 
   beforeAll(async () => {
     const deps = defaultCredentialBatchIssueDependencies(queue);
-    deps.issue = fakeIssue as never;
+    deps.issue = async (input) => {
+      await issueGate?.();
+      return fakeIssue(input as never);
+    };
     registerCredentialBatchIssue(queue, deps, 1);
     activeQueue.register(ACTIVE_JOB, async () => {
       const run = activeJobRun;
@@ -138,15 +150,20 @@ describe('credential batch worker and reconciliation', () => {
     // when cleanup runs, and deleting waiting rows does not wait for that handler,
     // so the truncate deadlocks against it (40P01). A graceful stop does wait.
     await queue.stop();
+    await activeQueue.stop();
     await clearJobs();
     await truncateApplicationTables(prisma);
     await prisma.tenant.create({ data: { id: 'tenant-1', name: 'Tenant One' } });
     issuedNumber = 0;
     issueCalls = [];
+    issueGate = undefined;
     await queue.start();
+    await activeQueue.start();
   });
 
   afterEach(async () => {
+    await queue.stop();
+    await activeQueue.stop();
     await clearJobs();
   });
 
@@ -154,6 +171,7 @@ describe('credential batch worker and reconciliation', () => {
     await queue.stop();
     await idleQueue.stop();
     await activeQueue.stop();
+    await truncateApplicationTables(prisma);
     await prisma.$disconnect();
   });
 
@@ -185,6 +203,436 @@ describe('credential batch worker and reconciliation', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
+
+  async function jobsFor(id: string) {
+    return prisma.$queryRaw<Array<{ id: string; state: string }>>`
+      SELECT id::text, state::text FROM pgboss.job
+      WHERE name = ${CREDENTIAL_BATCH_ISSUE_JOB} AND data->>'batchId' = ${id}
+    `;
+  }
+
+  async function waitForCompletedJobs(id: string, count: number) {
+    const deadline = Date.now() + 15_000;
+    for (;;) {
+      const jobs = await jobsFor(id);
+      if (jobs.length === count && jobs.every((job) => job.state === 'completed')) return jobs;
+      if (Date.now() >= deadline) throw new Error(`Batch ${id} jobs did not complete`);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  it('cancels four queued items while the real queue finishes only the held first item', async () => {
+    const entered = barrier();
+    const finish = barrier();
+    issueGate = async () => {
+      entered.release();
+      await finish.promise;
+    };
+    let id!: string;
+    try {
+      id = await submit(
+        'worker-cancel-five',
+        Array.from({ length: 5 }, (_, index) => ITEM(index)),
+      );
+      await entered.promise;
+      const first = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' }));
+      expect(first.outcome).toBe('applied');
+      if (first.outcome !== 'applied') throw new Error('Expected the first cancellation to apply');
+      expect(first.batch.cancelRequestedAt).not.toBeNull();
+      const persistedAfterFirst = {
+        batch: await prisma.credentialBatch.findFirstOrThrow({ where: { id, tenantId: 'tenant-1' } }),
+        items: await prisma.credentialBatchItem.findMany({
+          where: { batchId: id, tenantId: 'tenant-1' },
+          orderBy: { index: 'asc' },
+        }),
+      };
+      const second = await prisma.$transaction((tx) =>
+        cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' }),
+      );
+      expect(second.outcome).toBe('already-requested');
+      if (second.outcome !== 'already-requested')
+        throw new Error('Expected the second cancellation to be already-requested');
+      expect(second.batch.cancelRequestedAt).toEqual(first.batch.cancelRequestedAt);
+      const persistedAfterSecond = {
+        batch: await prisma.credentialBatch.findFirstOrThrow({ where: { id, tenantId: 'tenant-1' } }),
+        items: await prisma.credentialBatchItem.findMany({
+          where: { batchId: id, tenantId: 'tenant-1' },
+          orderBy: { index: 'asc' },
+        }),
+      };
+      expect(JSON.stringify(persistedAfterSecond)).toBe(JSON.stringify(persistedAfterFirst));
+      expect(await getCredentialBatchById(id, 'tenant-1')).toMatchObject({
+        state: 'RUNNING',
+        queuedCount: 0,
+        processingCount: 1,
+        cancelledCount: 4,
+        items: [
+          expect.objectContaining({ state: 'PROCESSING' }),
+          ...Array.from({ length: 4 }, () => expect.objectContaining({ state: 'CANCELLED' })),
+        ],
+      });
+    } finally {
+      finish.release();
+    }
+    const settled = await waitForBatch(id, CredentialBatchState.CANCELLED);
+    expect(settled).toMatchObject({
+      issuedCount: 1,
+      cancelledCount: 4,
+      queuedCount: 0,
+      processingCount: 0,
+      items: [
+        expect.objectContaining({ state: 'ISSUED', credentialId: 'worker-credential-0' }),
+        ...Array.from({ length: 4 }, () => expect.objectContaining({ state: 'CANCELLED' })),
+      ],
+    });
+    await waitForCompletedJobs(id, 1);
+    await idleQueue.enqueue(CREDENTIAL_BATCH_ISSUE_JOB, { batchId: id, tenantId: 'tenant-1' });
+    const afterDuplicate = await waitForCompletedJobs(id, 2);
+    await credentialBatchReconciliationHandler(defaultCredentialBatchReconciliationDependencies(idleQueue))(
+      {} as never,
+      context(),
+    );
+    expect(await jobsFor(id)).toEqual(afterDuplicate);
+    expect(await getCredentialBatchById(id, 'tenant-1')).toEqual(settled);
+    expect(issueCalls).toHaveLength(1);
+    expect(await prisma.libraryRecord.count()).toBe(1);
+  });
+
+  it('cancels a pre-dispatch fault without recreating queued work or a continuation', async () => {
+    await queue.stop();
+    const id = await submit('cancel-before-dispatch', [ITEM(0), ITEM(1)], noOpQueue);
+    const deps = defaultCredentialBatchIssueDependencies(idleQueue);
+    deps.issue = async () => {
+      await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' }));
+      throw new Error('pre-dispatch unavailable');
+    };
+    await credentialBatchIssueHandler(deps)({ batchId: id, tenantId: 'tenant-1' }, context());
+    expect(await getCredentialBatchById(id, 'tenant-1')).toMatchObject({
+      state: 'CANCELLED',
+      cancelledCount: 2,
+      queuedCount: 0,
+      processingCount: 0,
+      items: [
+        expect.objectContaining({ state: 'CANCELLED', attemptCount: 1 }),
+        expect.objectContaining({ state: 'CANCELLED' }),
+      ],
+    });
+    expect(await jobsFor(id)).toEqual([]);
+    expect(await prisma.libraryRecord.count()).toBe(0);
+  });
+
+  it('marks a stale worker outcome superseded without changing the live takeover owner', async () => {
+    // Regression: an old worker must not write an issued outcome after a newer attempt takes ownership.
+    await queue.stop();
+    const id = await submit('cancel-stale-worker', [ITEM(0), ITEM(1)], noOpQueue);
+    await prisma.$transaction(async (tx) => {
+      await claimBatchAttempt(tx, { batchId: id, tenantId: 'tenant-1', token: 'old-worker', expectedVersion: 0 });
+      await claimNextBatchItem(tx, { batchId: id, tenantId: 'tenant-1', token: 'old-worker' });
+      await cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' });
+    });
+    const oldSnapshot = await getCredentialBatchById(id, 'tenant-1');
+    expect(oldSnapshot).toMatchObject({ attemptToken: 'old-worker', processingCount: 1, cancelledCount: 1 });
+    await prisma.$transaction(async (tx) => {
+      expect(
+        await claimBatchAttempt(tx, {
+          batchId: id,
+          tenantId: 'tenant-1',
+          token: 'new-worker',
+          expectedVersion: oldSnapshot!.version,
+          staleBefore: new Date(Date.now() + 1_000),
+        }),
+      ).toEqual({ applied: true });
+    });
+    const liveBefore = await getCredentialBatchById(id, 'tenant-1');
+    expect(liveBefore).toMatchObject({
+      attemptToken: 'new-worker',
+      processingCount: 0,
+      unknownCount: 1,
+      cancelledCount: 1,
+    });
+
+    let observedOutcome: string | undefined;
+    const deps = defaultCredentialBatchIssueDependencies(idleQueue);
+    deps.getBatch = async () => oldSnapshot;
+    deps.claimAttempt = async () => ({ applied: true });
+    deps.claimNextItem = async () => ({
+      outcome: 'claimed' as const,
+      item: { index: 0, request: oldSnapshot!.items[0].request },
+    });
+    deps.issue = async () => ({ status: 201 as const, body: { credentialId: 'stale-worker-credential' } });
+    deps.markIssued = async (tx, input) => {
+      const result = await markItemIssued(tx, input);
+      observedOutcome = result.outcome;
+      return result;
+    };
+    deps.recordKnownCredentialId = async () => ({ applied: false });
+    await credentialBatchIssueHandler(deps)({ batchId: id, tenantId: 'tenant-1' }, context());
+
+    expect(observedOutcome).toBe('superseded');
+    expect(await getCredentialBatchById(id, 'tenant-1')).toEqual(liveBefore);
+  });
+
+  it('handles a stale worker claim after live takeover and cancellation without touching the settled owner', async () => {
+    // Regression: a stale worker must treat an already-settled cancellation as success and leave no warning or fence release.
+    await queue.stop();
+    const id = await submit('cancel-stale-claim', [ITEM(0)], noOpQueue);
+    const claimEntered = barrier();
+    const allowClaim = barrier();
+    let staleToken: string | undefined;
+    let staleClaimToken: string | undefined;
+    const deps = defaultCredentialBatchIssueDependencies(noOpQueue);
+    deps.claimAttempt = async (tx, input) => {
+      staleToken = input.token;
+      return claimBatchAttempt(tx, input);
+    };
+    deps.claimNextItem = async (tx, input) => {
+      claimEntered.release();
+      await allowClaim.promise;
+      staleClaimToken = input.token;
+      const result = await claimNextBatchItem(tx, input);
+      expect(result).toEqual({ outcome: 'cancelled' });
+      return result;
+    };
+
+    const staleWorker = credentialBatchIssueHandler(deps)({ batchId: id, tenantId: 'tenant-1' }, context());
+    try {
+      await claimEntered.promise;
+      const held = await getCredentialBatchById(id, 'tenant-1');
+      expect(staleToken).toEqual(expect.any(String));
+      expect(held).toMatchObject({ state: CredentialBatchState.RUNNING, attemptToken: staleToken, queuedCount: 1 });
+
+      expect(
+        await prisma.$transaction((tx) =>
+          claimBatchAttempt(tx, {
+            batchId: id,
+            tenantId: 'tenant-1',
+            token: 'live-worker',
+            expectedVersion: held!.version,
+            staleBefore: new Date(Date.now() + 1_000),
+          }),
+        ),
+      ).toEqual({ applied: true });
+      expect(await getCredentialBatchById(id, 'tenant-1')).toMatchObject({
+        state: CredentialBatchState.RUNNING,
+        attemptToken: 'live-worker',
+      });
+
+      const cancellation = await prisma.$transaction((tx) =>
+        cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' }),
+      );
+      expect(cancellation).toMatchObject({
+        outcome: 'applied',
+        batch: {
+          state: CredentialBatchState.CANCELLED,
+          settledAt: expect.any(Date),
+          attemptToken: null,
+          queuedCount: 0,
+          processingCount: 0,
+          cancelledCount: 1,
+        },
+      });
+      const settledBeforeStaleClaim = await getCredentialBatchById(id, 'tenant-1');
+      expect(settledBeforeStaleClaim).toMatchObject({
+        state: CredentialBatchState.CANCELLED,
+        attemptToken: null,
+        queuedCount: 0,
+        processingCount: 0,
+        cancelledCount: 1,
+      });
+
+      loggerCalls.info.mockClear();
+      loggerCalls.warn.mockClear();
+      allowClaim.release();
+      await expect(staleWorker).resolves.toBeUndefined();
+
+      expect(await getCredentialBatchById(id, 'tenant-1')).toMatchObject({
+        state: settledBeforeStaleClaim!.state,
+        attemptToken: settledBeforeStaleClaim!.attemptToken,
+        lastProgressAt: settledBeforeStaleClaim!.lastProgressAt,
+      });
+      expect(staleClaimToken).toBe(staleToken);
+      expect(loggerCalls.info).toHaveBeenCalledTimes(1);
+      expect(loggerCalls.info).toHaveBeenCalledWith(
+        expect.objectContaining({ batchId: id, tenantId: 'tenant-1', settlement: 'already-settled' }),
+        'Credential batch cancellation already settled',
+      );
+      expect(loggerCalls.warn).not.toHaveBeenCalled();
+    } finally {
+      allowClaim.release();
+      await staleWorker;
+    }
+  });
+
+  it('serialises cancellation against a post-dispatch fault and makes retry harmless', async () => {
+    await queue.stop();
+    const id = await submit('cancel-after-dispatch', [ITEM(0), ITEM(1)], noOpQueue);
+    const dispatched = barrier();
+    const fault = barrier();
+    const cancelWritten = barrier();
+    const commitCancel = barrier();
+    const faultTransaction = barrier();
+    const other = createRigClient();
+    let cancelPid = 0;
+    let faultPid = 0;
+    let captureFault = false;
+    const deps = defaultCredentialBatchIssueDependencies(idleQueue);
+    deps.transaction = (callback) =>
+      other.$transaction(
+        async (tx) => {
+          if (captureFault) {
+            const [session] = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+            faultPid = session.pid;
+            faultTransaction.release();
+          }
+          return callback(tx);
+        },
+        { timeout: 15_000 },
+      );
+    let dispatchCount = 0;
+    deps.issue = async ({ onDispatch }) => {
+      dispatchCount += 1;
+      onDispatch?.();
+      dispatched.release();
+      await fault.promise;
+      throw new Error('lost provider response');
+    };
+    const run = credentialBatchIssueHandler(deps)({ batchId: id, tenantId: 'tenant-1' }, context());
+    const observed = run.then(
+      () => ({ error: null }),
+      (error: Error) => ({ error }),
+    );
+    const cancelling = prisma.$transaction(
+      async (tx) => {
+        await dispatched.promise;
+        const [session] = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+        cancelPid = session.pid;
+        await cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' });
+        cancelWritten.release();
+        await commitCancel.promise;
+      },
+      { timeout: 15_000 },
+    );
+    const drained = cancelling.catch(() => undefined);
+    try {
+      await Promise.race([cancelWritten.promise, cancelling]);
+      captureFault = true;
+      fault.release();
+      await Promise.race([faultTransaction.promise, observed]);
+      const deadline = Date.now() + 5_000;
+      let blocked = false;
+      while (Date.now() < deadline) {
+        const [row] = await prisma.$queryRaw<Array<{ blocked: boolean }>>`
+          SELECT ${cancelPid} = ANY(pg_blocking_pids(${faultPid}::int)) AS blocked
+        `;
+        if (row.blocked) {
+          blocked = true;
+          break;
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      expect(blocked).toBe(true);
+      commitCancel.release();
+      await cancelling;
+      expect((await observed).error?.message).toBe('lost provider response');
+      const settled = await getCredentialBatchById(id, 'tenant-1');
+      expect(settled).toMatchObject({
+        state: 'NEEDS_ATTENTION',
+        unknownCount: 1,
+        cancelledCount: 1,
+        queuedCount: 0,
+        processingCount: 0,
+        attemptToken: null,
+        expiresAt: null,
+        items: [expect.objectContaining({ state: 'OUTCOME_UNKNOWN' }), expect.objectContaining({ state: 'CANCELLED' })],
+      });
+      await credentialBatchIssueHandler(deps)({ batchId: id, tenantId: 'tenant-1' }, context());
+      expect(await getCredentialBatchById(id, 'tenant-1')).toEqual(settled);
+      expect(await jobsFor(id)).toEqual([]);
+      expect(dispatchCount).toBe(1);
+    } finally {
+      fault.release();
+      commitCancel.release();
+      await drained;
+      await observed;
+      await other.$disconnect();
+    }
+  });
+
+  it('reconciles a cancelled dead attempt without enqueueing and reports CANCELLED from the resolve command', async () => {
+    await queue.stop();
+    const id = await submit('cancel-dead-worker', [ITEM(0), ITEM(1)], noOpQueue);
+    await prisma.$transaction(async (tx) => {
+      await claimBatchAttempt(tx, { batchId: id, tenantId: 'tenant-1', token: 'dead-worker', expectedVersion: 0 });
+      await claimNextBatchItem(tx, { batchId: id, tenantId: 'tenant-1', token: 'dead-worker' });
+      await cancelCredentialBatch(tx, { batchId: id, tenantId: 'tenant-1' });
+    });
+    await prisma.credentialBatch.update({ where: { id }, data: { lastProgressAt: new Date(0) } });
+    const reconcile = credentialBatchReconciliationHandler(defaultCredentialBatchReconciliationDependencies(idleQueue));
+    await reconcile({} as never, context());
+    const held = await getCredentialBatchById(id, 'tenant-1');
+    expect(held).toMatchObject({
+      state: 'NEEDS_ATTENTION',
+      unknownCount: 1,
+      cancelledCount: 1,
+      processingCount: 0,
+      queuedCount: 0,
+      attemptToken: null,
+      expiresAt: null,
+      items: [expect.objectContaining({ state: 'OUTCOME_UNKNOWN' }), expect.objectContaining({ state: 'CANCELLED' })],
+    });
+    expect(await jobsFor(id)).toEqual([]);
+    await reconcile({} as never, context());
+    expect(await getCredentialBatchById(id, 'tenant-1')).toEqual(held);
+    const credential = await fakeIssue({ tenantId: 'tenant-1', body: ITEM(0) });
+    const args = [
+      '--import',
+      'tsx',
+      'scripts/resolve-credential-batch-item.ts',
+      '--tenant',
+      'tenant-1',
+      '--batch',
+      id,
+      '--index',
+      '0',
+      '--version',
+      String(held!.version),
+      '--issued',
+      credential.body.credentialId,
+      '--reason',
+      'verified library record',
+    ];
+    const execute = promisify(execFile);
+    const dryRun = await execute(process.execPath, [...args, '--dry-run'], {
+      env: { ...process.env, LOG_LEVEL: 'warn' },
+    });
+    expect(dryRun.stdout).toContain('"batchState":"CANCELLED"');
+    expect(await getCredentialBatchById(id, 'tenant-1')).toEqual(held);
+    const applied = await execute(process.execPath, args, { env: { ...process.env, LOG_LEVEL: 'warn' } });
+    expect(applied.stdout).toContain('"batchState":"NEEDS_ATTENTION"');
+    expect(applied.stdout).toContain('"batchState":"CANCELLED"');
+    const resolved = await getCredentialBatchById(id, 'tenant-1');
+    expect(resolved).toMatchObject({
+      state: 'CANCELLED',
+      issuedCount: 1,
+      cancelledCount: 1,
+      unknownCount: 0,
+      expiresAt: expect.any(Date),
+      items: [
+        expect.objectContaining({ state: 'ISSUED', credentialId: credential.body.credentialId }),
+        expect.objectContaining({ state: 'CANCELLED' }),
+      ],
+    });
+    await expect(execute(process.execPath, args, { env: { ...process.env, LOG_LEVEL: 'warn' } })).rejects.toMatchObject(
+      { code: 1 },
+    );
+    const deps = defaultCredentialBatchIssueDependencies(idleQueue);
+    deps.issue = fakeIssue as never;
+    await credentialBatchIssueHandler(deps)({ batchId: id, tenantId: 'tenant-1' }, context());
+    await reconcile({} as never, context());
+    expect(await getCredentialBatchById(id, 'tenant-1')).toEqual(resolved);
+    expect(await jobsFor(id)).toEqual([]);
+    expect(issueCalls).toHaveLength(1);
+  });
 
   it('issues five items through the real queue in order and settles with ids and counts', async () => {
     // Regression: the worker must process every submitted item in index order and persist each record id.

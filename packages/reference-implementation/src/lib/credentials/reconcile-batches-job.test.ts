@@ -9,6 +9,8 @@ jest.mock('@/lib/prisma/repositories/credential-batch.repository', () => {
 
 import { runWithRequestContext } from '@uncefact/untp-ri-services/logging';
 import { prisma } from '@/lib/prisma/prisma';
+jest.mock('@/lib/api/logger');
+import { appLogger } from '@/lib/api/logger';
 import type { StalledCredentialBatch } from '@/lib/prisma/repositories/credential-batch.repository';
 import {
   defaultCredentialBatchReconciliationDependencies,
@@ -47,7 +49,7 @@ describe('credential batch reconciliation', () => {
     const deps: CredentialBatchReconciliationDependencies = {
       findStalled: jest.fn(async () => [batch, { ...batch, id: 'batch-2' }]),
       hasActiveJob: jest.fn(async (batchId) => batchId === 'batch-2'),
-      claimAndEnqueue: jest.fn(async () => true),
+      recover: jest.fn(async () => 'requeued' as const),
       now: () => new Date(60_000),
     };
 
@@ -59,8 +61,8 @@ describe('credential batch reconciliation', () => {
       signal: new AbortController().signal,
     });
 
-    expect(deps.claimAndEnqueue).toHaveBeenCalledTimes(1);
-    expect(deps.claimAndEnqueue).toHaveBeenCalledWith(batch, expect.any(String), new Date(-540_000));
+    expect(deps.recover).toHaveBeenCalledTimes(1);
+    expect(deps.recover).toHaveBeenCalledWith(batch, expect.any(String), new Date(-540_000));
     expect(deps.hasActiveJob).toHaveBeenCalledWith('batch-2');
   });
 
@@ -83,9 +85,7 @@ describe('credential batch reconciliation', () => {
 
     try {
       const deps = defaultCredentialBatchReconciliationDependencies(queue);
-      await runWithRequestContext('sweep-correlation', () =>
-        deps.claimAndEnqueue(batch, 'takeover-token', new Date(60_000)),
-      );
+      await runWithRequestContext('sweep-correlation', () => deps.recover(batch, 'takeover-token', new Date(60_000)));
 
       expect(enqueueWithin).toHaveBeenCalledWith(
         expect.anything(),
@@ -102,4 +102,50 @@ describe('credential batch reconciliation', () => {
       else process.env.BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS = previousValues.max;
     }
   });
+});
+
+it('reports unsettled cancellations separately from requeued, superseded and failed recovery', async () => {
+  // Regression: a non-applied settlement must be warned and counted separately from superseded recovery.
+  const recover = jest
+    .fn()
+    .mockResolvedValueOnce('settled')
+    .mockResolvedValueOnce('superseded')
+    .mockResolvedValueOnce({ outcome: 'unsettled', settlement: 'not-ready' } as const)
+    .mockRejectedValueOnce(new Error('database unavailable'));
+  const deps: CredentialBatchReconciliationDependencies = {
+    findStalled: jest.fn(async () => [
+      batch,
+      { ...batch, id: 'batch-2' },
+      { ...batch, id: 'batch-3' },
+      { ...batch, id: 'batch-4' },
+    ]),
+    hasActiveJob: jest.fn(async () => false),
+    recover,
+    now: () => new Date(60_000),
+  };
+  await credentialBatchReconciliationHandler(deps)({} as never, {
+    jobId: 'job',
+    attempt: 1,
+    isFinalAttempt: false,
+    expireSeconds: 300,
+    signal: new AbortController().signal,
+  });
+  expect(appLogger.info).toHaveBeenCalledWith(
+    { selected: 4, requeued: 0, settled: 1, superseded: 1, unsettled: 1, active: 0, failed: 1 },
+    'Credential batch reconciliation finished',
+  );
+  expect(appLogger.warn).toHaveBeenCalledWith(
+    {
+      correlationId: 'batch-correlation',
+      batchCorrelationId: 'batch-correlation',
+      batchId: 'batch-3',
+      tenantId: 'tenant-1',
+      settlement: 'not-ready',
+    },
+    'Credential batch settlement did not apply during recovery',
+  );
+  expect(appLogger.error).toHaveBeenCalledWith(
+    expect.objectContaining({ batchId: 'batch-4', tenantId: 'tenant-1', err: expect.any(Error) }),
+    'Credential batch recovery failed',
+  );
 });

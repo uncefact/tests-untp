@@ -1,6 +1,6 @@
-import { config, runnerReachableUri, runTag } from '../../../support/config';
-import { decodeStoredCredential, decryptStoredCopy, expectStatusListIndex } from '../../../support/stored-credential';
+import { config, runTag } from '../../../support/config';
 import { readV070CredentialPayload } from '../../../support/v0.7-credential-payload';
+import { assertIssuedCredential, type CredentialRequest } from '../../../support/credential-batch';
 
 /**
  * Batch rows are left by design. The run-tag cleanup deletes the native
@@ -19,14 +19,6 @@ describe('Credential batch API', { testIsolation: false }, () => {
   let issuerDid: string;
   let foreignDid: string;
 
-  type CredentialRequest = {
-    credentialPayload: Record<string, any>;
-    credentialType: string;
-    version: string;
-    statusPurposes: string[];
-    reference?: string;
-  };
-
   type BatchRequest = {
     items: CredentialRequest[];
   };
@@ -39,7 +31,6 @@ describe('Credential batch API', { testIsolation: false }, () => {
     warning?: unknown;
     error?: { code?: string; message?: string };
   };
-
   type BatchStatus = {
     state: string;
     counts: {
@@ -49,6 +40,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
       issued: number;
       failed: number;
       unknown: number;
+      cancelled: number;
     };
     items: BatchItem[];
   };
@@ -88,7 +80,6 @@ describe('Credential batch API', { testIsolation: false }, () => {
       )
       .then((items) => ({ items }));
   }
-
   function waitForBatchCompletion(statusUrl: string, timeoutMs = 120_000): Cypress.Chainable<BatchStatus> {
     const startedAt = Date.now();
 
@@ -116,74 +107,13 @@ describe('Credential batch API', { testIsolation: false }, () => {
     return poll();
   }
 
-  function assertIssuedCredential(batchItem: BatchItem, requestItem: CredentialRequest, label: string) {
-    expect(batchItem.credentialId, `${label} batch credentialId`).to.be.a('string').and.not.empty;
-    const credentialId = batchItem.credentialId as string;
-
-    return cy
-      .request(`/api/v1/library/${credentialId}`)
-      .then((libraryResponse) => {
-        expect(libraryResponse.status, `${label} library status`).to.eq(200);
-        expect(libraryResponse.body.id, `${label} library id`).to.eq(credentialId);
-        expect(libraryResponse.body.origin, `${label} library origin`).to.eq('native');
-        expect(libraryResponse.body.storageUri, `${label} storage URI`).to.be.a('string').and.not.empty;
-        expect(libraryResponse.body.decryptionKey, `${label} library decryption key`).to.be.a('string').and.not.empty;
-        expect(libraryResponse.body.warnings, `${label} library warnings`).to.be.an('array');
-
-        const status = libraryResponse.body.status;
-        expect(status, `${label} library status projection`).to.be.an('object');
-        expect(status.capture, `${label} status capture`).to.eq('CAPTURED');
-        expect(status.statusCaptureError, `${label} status capture error`).to.be.null;
-        expect(status.entries, `${label} status entries`).to.be.an('array').and.have.length(STATUS_PURPOSES.length);
-        expect(
-          status.entries.map((entry: Record<string, any>) => entry.statusPurpose),
-          `${label} status purposes`,
-        ).to.deep.eq(STATUS_PURPOSES);
-
-        status.entries.forEach((entry: Record<string, any>) => {
-          expect(entry.entryId, `${label} status entry id`).to.be.a('string').and.not.empty;
-          expect(entry.value, `${label} status value`).to.be.null;
-          expect(entry.observedAt, `${label} status observedAt`).to.be.null;
-          expect(entry.valueChangedAt, `${label} status valueChangedAt`).to.be.null;
-          expect(entry.version, `${label} status version`).to.be.a('number').and.greaterThan(0);
-          expectStatusListIndex(entry.statusListIndex, `${label} status-list index`, 'stored');
-          expect(entry.statusListCredential, `${label} status-list credential`).to.be.a('string').and.not.empty;
-          expect(entry.pending, `${label} pending status`).to.be.null;
-        });
-
-        expect(batchItem.warning ?? [], `${label} batch warnings`).to.deep.eq(libraryResponse.body.warnings);
-
-        return cy
-          .request({ method: 'GET', url: runnerReachableUri(libraryResponse.body.storageUri) })
-          .then((storedResponse) => {
-            expect(storedResponse.status, `${label} stored copy status`).to.eq(200);
-            expect(storedResponse.body.type, `${label} stored envelope type`).to.eq('aes-256-gcm');
-            expect(storedResponse.body.cipherText, `${label} stored envelope cipherText`).to.be.a('string').and.not
-              .empty;
-            expect(storedResponse.body.iv, `${label} stored envelope iv`).to.be.a('string').and.not.empty;
-            expect(storedResponse.body.tag, `${label} stored envelope tag`).to.be.a('string').and.not.empty;
-
-            return decryptStoredCopy(storedResponse.body, libraryResponse.body.decryptionKey).then((decryptedCopy) => {
-              const storedCredential = decodeStoredCredential(decryptedCopy);
-              expect(storedCredential.credentialSubject.id, `${label} stored credential subject id`).to.eq(
-                requestItem.credentialPayload.credentialSubject.id,
-              );
-
-              const storedIssuer =
-                typeof storedCredential.issuer === 'string' ? storedCredential.issuer : storedCredential.issuer?.id;
-              expect(storedIssuer, `${label} stored credential issuer`).to.eq(issuerDid);
-            });
-          });
-      })
-      .then(() => undefined);
-  }
-
   before(() => {
-    cy.task('getServiceAccountToken', config.serviceAccounts.sa2).then((result: any) => {
+    cy.task('getServiceAccountToken', config.serviceAccounts.sa2).then((result) => {
+      const { accessToken } = result as { accessToken: string };
       cy.request({
         method: 'POST',
         url: '/api/v1/dids',
-        headers: { Authorization: `Bearer ${result.accessToken}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
         body: {
           type: 'MANAGED',
           method: 'DID_WEB',
@@ -239,7 +169,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
 
     cy.request('/api/v1/dids').then((response) => {
       expect(response.status).to.eq(200);
-      const defaultDid = response.body.data.find((did: Record<string, any>) => did.isDefault === true);
+      const defaultDid = response.body.data.find((did: { did: string; isDefault?: boolean }) => did.isDefault === true);
       expect(defaultDid, 'A default DID must be configured for the batch issuer').to.exist;
       issuerDid = defaultDid.did;
     });
@@ -279,6 +209,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
           issued: 3,
           failed: 0,
           unknown: 0,
+          cancelled: 0,
         });
         expect(status.items).to.have.length(3);
         expect(status.items.map((item) => item.index)).to.deep.eq([0, 1, 2]);
@@ -287,9 +218,25 @@ describe('Credential batch API', { testIsolation: false }, () => {
         expect(status.items[1].reference).to.eq(references[1]);
         expect(status.items[2]).not.to.have.property('reference');
 
-        return assertIssuedCredential(status.items[0], submitted.items[0], 'item 0')
-          .then(() => assertIssuedCredential(status.items[1], submitted.items[1], 'item 1'))
-          .then(() => assertIssuedCredential(status.items[2], submitted.items[2], 'item 2'));
+        return assertIssuedCredential(status.items[0], submitted.items[0], {
+          label: 'item 0',
+          expectedIssuer: issuerDid,
+          statusPurposes: STATUS_PURPOSES,
+        })
+          .then(() =>
+            assertIssuedCredential(status.items[1], submitted.items[1], {
+              label: 'item 1',
+              expectedIssuer: issuerDid,
+              statusPurposes: STATUS_PURPOSES,
+            }),
+          )
+          .then(() =>
+            assertIssuedCredential(status.items[2], submitted.items[2], {
+              label: 'item 2',
+              expectedIssuer: issuerDid,
+              statusPurposes: STATUS_PURPOSES,
+            }),
+          );
       });
   });
 
@@ -386,7 +333,6 @@ describe('Credential batch API', { testIsolation: false }, () => {
         });
       });
   });
-
   it('settles a mixed batch with one real issuance and one per-item refusal', () => {
     buildBatchRequest([
       { issuer: issuerDid, label: 'partial-issued' },
@@ -416,6 +362,7 @@ describe('Credential batch API', { testIsolation: false }, () => {
           issued: 1,
           failed: 1,
           unknown: 0,
+          cancelled: 0,
         });
         expect(status.items).to.have.length(2);
         expect(status.items.map((item) => item.index)).to.deep.eq([0, 1]);
@@ -427,7 +374,11 @@ describe('Credential batch API', { testIsolation: false }, () => {
           `Issuer DID "${foreignDid}" is not registered to your tenant. You can only issue credentials with a DID that belongs to your tenant or the system default DID.`,
         );
 
-        return assertIssuedCredential(status.items[0], requestBody.items[0], 'partial issued item');
+        return assertIssuedCredential(status.items[0], requestBody.items[0], {
+          label: 'partial issued item',
+          expectedIssuer: issuerDid,
+          statusPurposes: STATUS_PURPOSES,
+        });
       });
   });
 });

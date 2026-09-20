@@ -1,17 +1,31 @@
+import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { listMigrationDirectories } from '../../src/lib/prisma/migration-directories';
 import { createRigClient, truncateApplicationTables } from './rig/db';
-import { CredentialBatchItemState, CredentialBatchState, LibraryRecordOrigin } from '../../src/lib/prisma/generated';
+import { contend } from './rig/locks';
+import {
+  PrismaClient,
+  CredentialBatchItemState,
+  CredentialBatchState,
+  LibraryRecordOrigin,
+} from '../../src/lib/prisma/generated';
 import {
   CredentialBatchAttemptFenceLostError,
   claimBatchAttempt,
+  claimBatchAttemptAndRelease,
+  checkpointBatchContinuation,
+  cancelCredentialBatch,
+  markItemQueued,
   claimNextBatchItem,
   createCredentialBatch,
   expireDueCredentialBatches,
+  findStalledCredentialBatches,
   findCredentialBatchSubmission,
   getCredentialBatchById,
   getCredentialBatchItemForInspection,
   markItemFailed,
   markItemIssued,
-  markItemQueued,
   markItemOutcomeUnknown,
   recordKnownCredentialId,
   releaseBatchAttempt,
@@ -19,7 +33,9 @@ import {
   settleBatchIfFinished,
   type BatchSubmissionResult,
 } from '../../src/lib/prisma/repositories/credential-batch.repository';
+import { credentialBatchItemAttemptLimit } from '../../src/lib/config/credential-batch.config';
 import { projectCredentialBatch } from '../../src/lib/credentials/credential-batch-projection';
+import { CredentialBatchCounterDriftError } from '../../src/lib/credentials/credential-batch-error';
 import { runResolveCredentialBatchItem } from '../../src/lib/credentials/credential-batch-operator';
 import { CREDENTIAL_BATCH_ISSUE_JOB } from '../../src/lib/jobs/queue-names';
 import type { EnqueueOptions, JobQueue } from '../../src/lib/jobs/types';
@@ -146,6 +162,7 @@ describe('credential batch persistence and progression', () => {
 
   afterAll(async () => {
     await queue.stop();
+    await truncateApplicationTables(prisma);
     await prisma.$disconnect();
   });
 
@@ -884,25 +901,15 @@ describe('credential batch persistence and progression', () => {
         data: { state: CredentialBatchState.RUNNING, queuedCount: 0, issuedCount: 1, attemptToken: 'settle-token' },
       });
     }
-    await prisma.$transaction(async (tx) => {
-      const wrappedTx = {
-        credentialBatch: {
-          findFirst: async (...args: Parameters<typeof tx.credentialBatch.findFirst>) => {
-            const found = await tx.credentialBatch.findFirst(...args);
-            if (found !== null) {
-              await prisma.$executeRawUnsafe(
-                'UPDATE "CredentialBatch" SET "version" = "version" + 1 WHERE "id" = $1',
-                supersededId,
-              );
-            }
-            return found;
-          },
-          updateMany: tx.credentialBatch.updateMany.bind(tx.credentialBatch),
-        },
-      } as unknown as Parameters<typeof settleBatchIfFinished>[0];
-      await expect(
-        settleBatchIfFinished(wrappedTx, { batchId: supersededId, tenantId: 'tenant-1', token: 'settle-token' }),
-      ).resolves.toEqual({ outcome: 'superseded' });
+    await expect(
+      prisma.$transaction((tx) =>
+        settleBatchIfFinished(tx, { batchId: supersededId, tenantId: 'tenant-1', token: 'stale-token' }),
+      ),
+    ).resolves.toEqual({ outcome: 'superseded' });
+    await expect(prisma.credentialBatch.findUniqueOrThrow({ where: { id: supersededId } })).resolves.toMatchObject({
+      state: CredentialBatchState.RUNNING,
+      attemptToken: 'settle-token',
+      settledAt: null,
     });
 
     await expect(
@@ -910,6 +917,57 @@ describe('credential batch persistence and progression', () => {
         settleBatchIfFinished(tx, { batchId: appliedId, tenantId: 'tenant-1', token: 'settle-token' }),
       ),
     ).resolves.toMatchObject({ outcome: 'applied', state: CredentialBatchState.COMPLETED });
+  });
+
+  it('returns a non-applied cancellation settlement to reconciliation without calling it fence loss', async () => {
+    // Regression: a not-ready settlement must reach reconciliation as its own outcome.
+    const created = await submit('settle-cancel-not-ready-key', 'digest-settle-cancel-not-ready', [ITEM, ITEM]);
+    const batchId = createdBatchId(created);
+    await prisma.$transaction(async (tx) => {
+      await claimBatchAttempt(tx, { batchId, tenantId: 'tenant-1', token: 'old-attempt', expectedVersion: 0 });
+      await claimNextBatchItem(tx, { batchId, tenantId: 'tenant-1', token: 'old-attempt' });
+    });
+    await prisma.$executeRaw`
+      UPDATE "CredentialBatchItem"
+      SET state = 'PROCESSING', "attemptToken" = 'other-attempt'
+      WHERE "batchId" = ${batchId} AND index = 1
+    `;
+    await prisma.$executeRaw`
+      UPDATE "CredentialBatch"
+      SET "queuedCount" = 0, "processingCount" = 2
+      WHERE id = ${batchId}
+    `;
+    const cancelled = await prisma.$transaction((tx) => cancelCredentialBatch(tx, { batchId, tenantId: 'tenant-1' }));
+    if (cancelled.outcome !== 'applied') throw new Error('expected cancellation to apply');
+    await prisma.credentialBatch.update({ where: { id: batchId }, data: { lastProgressAt: new Date(0) } });
+    const staleBefore = new Date(Date.now() - 1_000);
+
+    await expect(
+      prisma.$transaction((tx) =>
+        claimBatchAttemptAndRelease(tx, {
+          batchId,
+          tenantId: 'tenant-1',
+          token: 'recovery-attempt',
+          expectedVersion: cancelled.batch.version,
+          staleBefore,
+        }),
+      ),
+    ).resolves.toEqual({ applied: true, settled: false, settlement: 'not-ready' });
+    await expect(
+      prisma.credentialBatch.findUnique({ where: { id: batchId }, include: { items: true } }),
+    ).resolves.toMatchObject({
+      attemptToken: null,
+      lastProgressAt: staleBefore,
+      processingCount: 1,
+      unknownCount: 1,
+      items: expect.arrayContaining([
+        expect.objectContaining({ state: CredentialBatchItemState.OUTCOME_UNKNOWN }),
+        expect.objectContaining({ state: CredentialBatchItemState.PROCESSING, attemptToken: 'other-attempt' }),
+      ]),
+    });
+    expect(await findStalledCredentialBatches(new Date())).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: batchId, attemptToken: null })]),
+    );
   });
 
   it('returns tenant-fenced missing or zero-row outcomes without changing a row', async () => {
@@ -952,7 +1010,7 @@ describe('credential batch persistence and progression', () => {
     ).resolves.toEqual({ applied: false });
     await expect(
       prisma.$transaction((tx) => claimNextBatchItem(tx, { batchId: queuedId, tenantId: 'tenant-2', token: 'wrong' })),
-    ).resolves.toEqual({ outcome: 'empty' });
+    ).resolves.toEqual({ outcome: 'missing' });
     await expect(
       prisma.$transaction((tx) =>
         settleBatchIfFinished(tx, { batchId: queuedId, tenantId: 'tenant-2', token: 'wrong' }),
@@ -1089,37 +1147,15 @@ describe('credential batch persistence and progression', () => {
     });
     await prisma.credentialBatch.update({ where: { id: batchId }, data: { lastProgressAt: new Date(0) } });
 
-    let signalFlipped!: () => void;
-    const itemFlipped = new Promise<void>((resolve) => {
-      signalFlipped = resolve;
-    });
-    let concurrentClaim!: Promise<unknown>;
     await expect(
       prisma.$transaction(async (tx) => {
         const wrappedTx = {
+          ...tx,
           credentialBatch: {
-            findFirst: tx.credentialBatch.findFirst.bind(tx.credentialBatch),
-            updateMany: tx.credentialBatch.updateMany.bind(tx.credentialBatch),
-          },
-          credentialBatchItem: {
-            findMany: tx.credentialBatchItem.findMany.bind(tx.credentialBatchItem),
-            updateMany: async (...args: Parameters<typeof tx.credentialBatchItem.updateMany>) => {
-              const result = await tx.credentialBatchItem.updateMany(...args);
-              if (result.count === 1) {
-                signalFlipped();
-                await concurrentClaim;
-              }
-              return result;
-            },
+            ...tx.credentialBatch,
+            updateMany: async () => ({ count: 0 }),
           },
         } as unknown as Parameters<typeof claimBatchAttempt>[0];
-        concurrentClaim = (async () => {
-          await itemFlipped;
-          return prisma.credentialBatch.update({
-            where: { id: batchId },
-            data: { attemptToken: 'concurrent-attempt', version: { increment: 1 } },
-          });
-        })();
         await claimBatchAttempt(wrappedTx, {
           batchId,
           tenantId: 'tenant-1',
@@ -1129,12 +1165,11 @@ describe('credential batch persistence and progression', () => {
         });
       }),
     ).rejects.toBeInstanceOf(CredentialBatchAttemptFenceLostError);
-    await concurrentClaim;
 
     await expect(
       prisma.credentialBatch.findUnique({ where: { id: batchId }, include: { items: true } }),
     ).resolves.toMatchObject({
-      attemptToken: 'concurrent-attempt',
+      attemptToken: 'old-attempt',
       processingCount: 1,
       unknownCount: 0,
       items: [{ state: CredentialBatchItemState.PROCESSING, attemptToken: 'old-attempt' }],
@@ -1318,7 +1353,6 @@ describe('credential batch persistence and progression', () => {
       unknownCount: 1,
     });
   });
-
   it('stores absent warnings as SQL NULL, preserves warning arrays, and clears stale warnings', async () => {
     // Regression: every repository path that clears a warning must write SQL NULL, not an empty JSON value.
     const created = await submit('warning-storage-key', 'digest-warning-storage', [ITEM, ITEM, ITEM, ITEM, ITEM, ITEM]);
@@ -1533,4 +1567,717 @@ describe('credential batch persistence and progression', () => {
     `;
     expect(storedWarning).toEqual([{ warning }]);
   });
+  async function runningBatch(key: string, count: number, processing = true, token = 'cancel-attempt') {
+    const batchId = createdBatchId(
+      await submit(
+        key,
+        key,
+        Array.from({ length: count }, () => ITEM),
+      ),
+    );
+    const batch = await getCredentialBatchById(batchId, 'tenant-1');
+    if (batch === null) throw new Error('expected the running batch fixture to exist');
+    const input = { batchId, tenantId: 'tenant-1', token, correlationId: batch.correlationId };
+    await prisma.$transaction(async (tx) => {
+      expect(await claimBatchAttempt(tx, { ...input, expectedVersion: 0 })).toEqual({ applied: true });
+      if (processing)
+        expect(await claimNextBatchItem(tx, input)).toMatchObject({ outcome: 'claimed', item: { index: 0 } });
+    });
+    return input;
+  }
+
+  it('cancels deferred queued items together and preserves the in-flight attempt and issued credential', async () => {
+    const input = await runningBatch('cancel-five', 5);
+    const before = await getCredentialBatchById(input.batchId, input.tenantId);
+    await prisma.credentialBatchItem.updateMany({
+      where: { batchId: input.batchId, index: 2 },
+      data: { nextAttemptAt: new Date(Date.now() + 60_000), attemptToken: 'old-retry-token' },
+    });
+    const result = await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+    expect(result).toMatchObject({
+      outcome: 'applied',
+      batch: {
+        state: CredentialBatchState.RUNNING,
+        queuedCount: 0,
+        processingCount: 1,
+        cancelledCount: 4,
+        cancelRequestedAt: expect.any(Date),
+        settledAt: null,
+        attemptToken: input.token,
+        lastProgressAt: before?.lastProgressAt,
+      },
+    });
+    const during = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(during?.items[0]).toEqual(before?.items[0]);
+    expect(
+      during?.items.slice(1).map(({ state, nextAttemptAt, attemptToken }) => ({ state, nextAttemptAt, attemptToken })),
+    ).toEqual(Array.from({ length: 4 }, () => ({ state: 'CANCELLED', nextAttemptAt: null, attemptToken: null })));
+    expect(await prisma.$transaction((tx) => cancelCredentialBatch(tx, input))).toEqual({
+      outcome: 'already-requested',
+      batch: during,
+    });
+    expect(await getCredentialBatchById(input.batchId, input.tenantId)).toEqual(during);
+    await nativeCredential('cancel-issued-credential');
+    await prisma.$transaction(async (tx) => {
+      expect(await markItemIssued(tx, { ...input, index: 0, credentialId: 'cancel-issued-credential' })).toEqual({
+        outcome: 'applied',
+      });
+      expect(await settleBatchIfFinished(tx, input)).toEqual({
+        outcome: 'applied',
+        state: CredentialBatchState.CANCELLED,
+      });
+    });
+    const after = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(after).toMatchObject({
+      state: CredentialBatchState.CANCELLED,
+      issuedCount: 1,
+      cancelledCount: 4,
+      processingCount: 0,
+      queuedCount: 0,
+      attemptToken: null,
+      settledAt: expect.any(Date),
+      expiresAt: expect.any(Date),
+    });
+    expect(after?.items[0]).toMatchObject({
+      state: CredentialBatchItemState.ISSUED,
+      credentialId: 'cancel-issued-credential',
+    });
+    const settled = await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+    expect(settled).toEqual({ outcome: 'not-cancellable', batch: after });
+    expect(await getCredentialBatchById(input.batchId, input.tenantId)).toEqual(after);
+    expect(await prisma.credential.findUnique({ where: { id: 'cancel-issued-credential' } })).not.toBeNull();
+  });
+
+  it('rolls back the cancellation flag, items and counters if the transaction fails', async () => {
+    const input = await runningBatch('cancel-rollback', 2);
+    const before = await getCredentialBatchById(input.batchId, input.tenantId);
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await cancelCredentialBatch(tx, input);
+        throw new Error('cancel transaction fault');
+      }),
+    ).rejects.toThrow('cancel transaction fault');
+    expect(await getCredentialBatchById(input.batchId, input.tenantId)).toEqual(before);
+  });
+
+  it('rejects a queued-row counter mismatch with its batch identity and leaves every row unchanged', async () => {
+    // Regression: a counter mismatch must roll back every batch and item row.
+    const batchId = createdBatchId(await submit('cancel-counter-drift', 'cancel-counter-drift', [ITEM, ITEM]));
+    await prisma.$executeRaw`
+      UPDATE "CredentialBatch"
+      SET "queuedCount" = "queuedCount" + 1, "itemCount" = "itemCount" + 1
+      WHERE id = ${batchId}
+    `;
+    const beforeBatch = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: batchId } });
+    const beforeItems = await prisma.credentialBatchItem.findMany({ where: { batchId }, orderBy: { index: 'asc' } });
+
+    const counterDriftError = await prisma
+      .$transaction((tx) => cancelCredentialBatch(tx, { batchId, tenantId: 'tenant-1' }))
+      .catch((error: unknown) => error);
+    expect(counterDriftError).toBeInstanceOf(CredentialBatchCounterDriftError);
+    expect(counterDriftError).toMatchObject({
+      batchId,
+      tenantId: 'tenant-1',
+      batchCorrelationId: beforeBatch.correlationId,
+      cancelledRows: 2,
+      queuedCount: 3,
+    });
+    expect(counterDriftError).toHaveProperty('message', 'Credential batch counters disagree with its queued items.');
+
+    await expect(prisma.credentialBatch.findUniqueOrThrow({ where: { id: batchId } })).resolves.toEqual(beforeBatch);
+    await expect(
+      prisma.credentialBatchItem.findMany({ where: { batchId }, orderBy: { index: 'asc' } }),
+    ).resolves.toEqual(beforeItems);
+  });
+
+  it('settles queued cancellation immediately and returns tenant-scoped refusal outcomes without writes', async () => {
+    const batchId = createdBatchId(await submit('cancel-queued', 'cancel-queued', [ITEM, ITEM]));
+    const input = { batchId, tenantId: 'tenant-1' };
+    const before = await getCredentialBatchById(batchId, input.tenantId);
+    expect(await prisma.$transaction((tx) => cancelCredentialBatch(tx, { ...input, tenantId: 'tenant-2' }))).toEqual({
+      outcome: 'missing',
+    });
+    expect(await prisma.$transaction((tx) => cancelCredentialBatch(tx, { ...input, batchId: 'absent' }))).toEqual({
+      outcome: 'missing',
+    });
+    expect(await getCredentialBatchById(batchId, input.tenantId)).toEqual(before);
+    expect(await prisma.$transaction((tx) => cancelCredentialBatch(tx, input))).toMatchObject({
+      outcome: 'applied',
+      batch: {
+        state: CredentialBatchState.CANCELLED,
+        queuedCount: 0,
+        cancelledCount: 2,
+        settledAt: expect.any(Date),
+        expiresAt: expect.any(Date),
+      },
+    });
+    for (const state of [
+      CredentialBatchState.COMPLETED,
+      CredentialBatchState.NEEDS_ATTENTION,
+      CredentialBatchState.CANCELLED,
+      CredentialBatchState.EXPIRED,
+    ]) {
+      await prisma.credentialBatch.update({ where: { id: batchId }, data: { state } });
+      const snapshot = await getCredentialBatchById(batchId, input.tenantId);
+      expect(await prisma.$transaction((tx) => cancelCredentialBatch(tx, input))).toEqual({
+        outcome: state === CredentialBatchState.EXPIRED ? 'expired' : 'not-cancellable',
+        batch: snapshot,
+      });
+      expect(await getCredentialBatchById(batchId, input.tenantId)).toEqual(snapshot);
+    }
+  });
+
+  it('completes with zero cancelled items when the sole in-flight item issues', async () => {
+    const input = await runningBatch('cancel-zero', 1);
+    await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+    await nativeCredential('cancel-zero-credential');
+    await prisma.$transaction(async (tx) => {
+      await markItemIssued(tx, { ...input, index: 0, credentialId: 'cancel-zero-credential' });
+      expect(await settleBatchIfFinished(tx, input)).toEqual({
+        outcome: 'applied',
+        state: CredentialBatchState.COMPLETED,
+      });
+    });
+    expect(await getCredentialBatchById(input.batchId, input.tenantId)).toMatchObject({
+      state: CredentialBatchState.COMPLETED,
+      cancelledCount: 0,
+      issuedCount: 1,
+      cancelRequestedAt: expect.any(Date),
+    });
+  });
+
+  it.each(['ISSUED', 'FAILED'] as const)(
+    'holds uncertainty after cancellation and resolves the last unknown as %s',
+    async (state) => {
+      const input = await runningBatch(`cancel-unknown-${state}`, 2);
+      await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+      await prisma.$transaction(async (tx) => {
+        expect(
+          await markItemOutcomeUnknown(tx, {
+            ...input,
+            index: 0,
+            errorClass: 'OUTCOME_UNKNOWN',
+            errorMessage: 'check library',
+          }),
+        ).toEqual({ outcome: 'applied' });
+        expect(await settleBatchIfFinished(tx, input)).toEqual({
+          outcome: 'applied',
+          state: CredentialBatchState.NEEDS_ATTENTION,
+        });
+      });
+      const held = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: input.batchId } });
+      expect(held).toMatchObject({ unknownCount: 1, cancelledCount: 1, expiresAt: null });
+      await nativeCredential('resolved-cancel-credential');
+      const result = await prisma.$transaction((tx) =>
+        resolveUnknownBatchItem(tx, {
+          ...input,
+          index: 0,
+          expectedVersion: held.version,
+          reason: 'checked provider and library',
+          resolution:
+            state === 'ISSUED'
+              ? { state, credentialId: 'resolved-cancel-credential' }
+              : { state, evidence: 'provider confirmed no issuance' },
+        }),
+      );
+      expect(result).toMatchObject({
+        outcome: 'applied',
+        after: {
+          batchState: CredentialBatchState.CANCELLED,
+          counts: {
+            total: 2,
+            cancelled: 1,
+            unknown: 0,
+            issued: state === 'ISSUED' ? 1 : 0,
+            failed: state === 'FAILED' ? 1 : 0,
+          },
+        },
+      });
+      expect(await getCredentialBatchById(input.batchId, input.tenantId)).toMatchObject({
+        state: CredentialBatchState.CANCELLED,
+        settledAt: held.settledAt,
+        expiresAt: expect.any(Date),
+        resolvedAt: expect.any(Date),
+      });
+    },
+  );
+
+  it('keeps exhausted pre-dispatch attempts failed after cancellation', async () => {
+    const input = await runningBatch('cancel-exhausted', 2);
+    await prisma.credentialBatchItem.updateMany({
+      where: { batchId: input.batchId, index: 0 },
+      data: { attemptCount: credentialBatchItemAttemptLimit() - 1 },
+    });
+    await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+    await prisma.$transaction(async (tx) => {
+      expect(await markItemQueued(tx, { ...input, index: 0, errorMessage: 'decrypt unavailable' })).toEqual({
+        outcome: 'attempts-exhausted',
+      });
+      await settleBatchIfFinished(tx, input);
+    });
+    expect(await getCredentialBatchById(input.batchId, input.tenantId)).toMatchObject({
+      state: CredentialBatchState.CANCELLED,
+      cancelledCount: 1,
+      failedCount: 1,
+      processingCount: 0,
+      items: [
+        expect.objectContaining({
+          state: 'FAILED',
+          attemptCount: credentialBatchItemAttemptLimit(),
+          nextAttemptAt: null,
+          attemptToken: null,
+        }),
+        expect.objectContaining({ state: 'CANCELLED' }),
+      ],
+    });
+  });
+
+  it.each([
+    ['budget', 'cancel'],
+    ['budget', 'checkpoint'],
+    ['deferred', 'cancel'],
+    ['deferred', 'checkpoint'],
+  ] as const)('serialises the %s checkpoint with %s first', async (path, first) => {
+    const input = await runningBatch(`checkpoint-${path}-${first}`, path === 'budget' ? 5 : 1);
+    await clearBatchJobs();
+    const startAfter = new Date(Date.now() + 30_000);
+    if (path === 'budget') await nativeCredential('checkpoint-issued');
+    const cancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
+    await prisma.$transaction(async (tx) => {
+      if (path === 'budget') {
+        expect(await markItemIssued(tx, { ...input, index: 0, credentialId: 'checkpoint-issued' })).toEqual({
+          outcome: 'applied',
+        });
+      } else {
+        expect(await markItemQueued(tx, { ...input, index: 0, errorMessage: 'pre-dispatch fault' })).toEqual({
+          outcome: 'applied',
+        });
+      }
+    });
+    const checkpoint = (tx: Parameters<typeof checkpointBatchContinuation>[0]) =>
+      checkpointBatchContinuation(tx, { ...input, queue, ...(path === 'deferred' ? { startAfter } : {}) });
+    const results =
+      first === 'cancel' ? await contend(prisma, cancel, checkpoint) : await contend(prisma, checkpoint, cancel);
+    expect(results[first === 'cancel' ? 1 : 0]).toEqual({
+      outcome: first === 'checkpoint' ? 'checkpointed' : 'superseded',
+    });
+    expect(results[first === 'cancel' ? 0 : 1]).toMatchObject({ outcome: 'applied' });
+    const batch = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(batch).toMatchObject({
+      state: 'CANCELLED',
+      queuedCount: 0,
+      processingCount: 0,
+      issuedCount: path === 'budget' ? 1 : 0,
+      cancelledCount: path === 'budget' ? 4 : 1,
+      attemptToken: null,
+    });
+    const jobs = await prisma.$queryRaw<Array<{ start_after: Date }>>`
+      SELECT start_after FROM pgboss.job WHERE name = ${CREDENTIAL_BATCH_ISSUE_JOB} AND data->>'batchId' = ${input.batchId}
+    `;
+    expect(jobs).toHaveLength(first === 'checkpoint' ? 1 : 0);
+    if (first === 'checkpoint' && path === 'deferred') expect(jobs[0].start_after).toEqual(startAfter);
+    expect(await prisma.$transaction((tx) => claimNextBatchItem(tx, input))).toEqual({ outcome: 'cancelled' });
+  });
+
+  it.each(['budget', 'deferred'] as const)(
+    'settles cancellation at the %s checkpoint after the held attempt finishes',
+    async (path) => {
+      const input = await runningBatch(`cancel-held-checkpoint-${path}`, 2);
+      await clearBatchJobs();
+      await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+      await prisma.$transaction((tx) => markItemQueued(tx, { ...input, index: 0, errorMessage: 'pre-dispatch fault' }));
+      const before = await getCredentialBatchById(input.batchId, input.tenantId);
+      expect(before).toMatchObject({
+        state: 'RUNNING',
+        cancelledCount: 2,
+        processingCount: 0,
+        attemptToken: input.token,
+      });
+      expect(
+        await prisma.$transaction((tx) => checkpointBatchContinuation(tx, { ...input, token: 'stale', queue })),
+      ).toEqual({ outcome: 'superseded' });
+      expect(await getCredentialBatchById(input.batchId, input.tenantId)).toEqual(before);
+      expect(
+        await prisma.$transaction((tx) =>
+          checkpointBatchContinuation(tx, {
+            ...input,
+            queue,
+            ...(path === 'deferred' ? { startAfter: new Date(Date.now() + 30_000) } : {}),
+          }),
+        ),
+      ).toEqual({ outcome: 'applied', state: CredentialBatchState.CANCELLED });
+      expect(await getCredentialBatchById(input.batchId, input.tenantId)).toMatchObject({
+        state: 'CANCELLED',
+        cancelledCount: 2,
+        attemptToken: null,
+      });
+      const jobs = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM pgboss.job WHERE name = ${CREDENTIAL_BATCH_ISSUE_JOB} AND data->>'batchId' = ${input.batchId}
+    `;
+      expect(jobs).toEqual([]);
+    },
+  );
+
+  it('expires cancelled items while retaining tombstone counts and held unknown evidence', async () => {
+    const cancelled = await runningBatch('expiry-cancelled', 2, false);
+    await prisma.$transaction((tx) => cancelCredentialBatch(tx, cancelled));
+    const held = await runningBatch('expiry-cancelled-held', 2);
+    await prisma.$transaction(async (tx) => {
+      await cancelCredentialBatch(tx, held);
+      await markItemOutcomeUnknown(tx, {
+        ...held,
+        index: 0,
+        errorClass: 'OUTCOME_UNKNOWN',
+        errorMessage: 'lost response',
+      });
+      await settleBatchIfFinished(tx, held);
+    });
+    const before = await getCredentialBatchById(cancelled.batchId, cancelled.tenantId);
+    expect(before?.expiresAt).toBeInstanceOf(Date);
+    const deadline = new Date(before!.expiresAt!.getTime() + 1);
+    // A stale deadline must not make held investigation evidence eligible for expiry.
+    await prisma.credentialBatch.update({ where: { id: held.batchId }, data: { expiresAt: new Date(0) } });
+    const heldBefore = await getCredentialBatchById(held.batchId, held.tenantId);
+    expect(await expireDueCredentialBatches(deadline)).toBe(1);
+    expect(await getCredentialBatchById(cancelled.batchId, cancelled.tenantId)).toEqual({
+      ...before,
+      state: 'EXPIRED',
+      items: [],
+      updatedAt: expect.any(Date),
+    });
+    expect(await getCredentialBatchById(held.batchId, held.tenantId)).toEqual(heldBefore);
+    expect(await expireDueCredentialBatches(deadline)).toBe(0);
+  });
+
+  it('returns superseded without changing any rows when the batch fence changed but the item still has the old token', async () => {
+    // Regression: the batch-level token guard must prevent re-queuing an item whose token still matches the old attempt.
+    const input = await runningBatch('fault-batch-token', 2, true, 'attempt-1');
+    await prisma.credentialBatch.update({
+      where: { id: input.batchId },
+      data: { attemptToken: 'attempt-2' },
+    });
+    const beforeBatch = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: input.batchId } });
+    const beforeItems = await prisma.credentialBatchItem.findMany({
+      where: { batchId: input.batchId },
+      orderBy: { index: 'asc' },
+    });
+    expect(beforeBatch).toMatchObject({ attemptToken: 'attempt-2', processingCount: 1 });
+    expect(beforeItems[0]).toMatchObject({ state: 'PROCESSING', attemptToken: input.token });
+    expect(beforeItems[1]).toMatchObject({ state: 'QUEUED', attemptToken: null });
+
+    const outcome = await prisma.$transaction((tx) =>
+      markItemQueued(tx, { ...input, index: 0, errorMessage: 'decrypt unavailable' }),
+    );
+
+    const afterBatch = await prisma.credentialBatch.findUniqueOrThrow({ where: { id: input.batchId } });
+    const afterItems = await prisma.credentialBatchItem.findMany({
+      where: { batchId: input.batchId },
+      orderBy: { index: 'asc' },
+    });
+    expect({
+      outcome,
+      batchSnapshot: JSON.stringify(afterBatch),
+      itemSnapshot: JSON.stringify(afterItems),
+    }).toEqual({
+      outcome: { outcome: 'superseded' },
+      batchSnapshot: JSON.stringify(beforeBatch),
+      itemSnapshot: JSON.stringify(beforeItems),
+    });
+  });
+
+  it.each(['cancel', 'claim'] as const)(
+    'serialises cancel versus claim with %s holding the batch lock first',
+    async (first) => {
+      const input = await runningBatch(`race-claim-${first}`, 2, false);
+      const cancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
+      const claim = (tx: Parameters<typeof claimNextBatchItem>[0]) => claimNextBatchItem(tx, input);
+      const results = first === 'cancel' ? await contend(prisma, cancel, claim) : await contend(prisma, claim, cancel);
+      expect(results[0]).toMatchObject({ outcome: first === 'cancel' ? 'applied' : 'claimed' });
+      expect(results[1]).toMatchObject({ outcome: first === 'cancel' ? 'cancelled' : 'applied' });
+      const batch = await getCredentialBatchById(input.batchId, input.tenantId);
+      expect(batch).toMatchObject({
+        queuedCount: 0,
+        processingCount: first === 'claim' ? 1 : 0,
+        cancelledCount: first === 'claim' ? 1 : 2,
+        state: first === 'claim' ? 'RUNNING' : 'CANCELLED',
+      });
+      expect(batch?.items.map((item) => item.state)).toEqual(
+        first === 'claim' ? ['PROCESSING', 'CANCELLED'] : ['CANCELLED', 'CANCELLED'],
+      );
+      expect(await prisma.$transaction((tx) => claimNextBatchItem(tx, input))).toEqual({ outcome: 'cancelled' });
+    },
+  );
+
+  it('returns cancelled before checking a non-owner token and preserves the live owner', async () => {
+    // Regression: moving the cancellation check below the token fence would return superseded here.
+    const input = await runningBatch('cancel-non-owner-claim', 2);
+    await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+    const before = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(before).toMatchObject({
+      state: CredentialBatchState.RUNNING,
+      attemptToken: input.token,
+      processingCount: 1,
+      cancelledCount: 1,
+    });
+
+    expect(await prisma.$transaction((tx) => claimNextBatchItem(tx, { ...input, token: 'non-owner-token' }))).toEqual({
+      outcome: 'cancelled',
+    });
+    const after = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(after).toMatchObject({
+      state: before!.state,
+      attemptToken: before!.attemptToken,
+      lastProgressAt: before!.lastProgressAt,
+      processingCount: before!.processingCount,
+      cancelledCount: before!.cancelledCount,
+    });
+  });
+
+  it.each(['first-session', 'second-session'] as const)(
+    'serialises two cancellation requests with the %s session first',
+    async (firstSession) => {
+      // Regression: concurrent cancellation must apply once and preserve the first request timestamp.
+      const input = await runningBatch(`race-cancel-cancel-${firstSession}`, 2);
+      const before = await getCredentialBatchById(input.batchId, input.tenantId);
+      const firstCancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
+      const secondCancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
+      const results =
+        firstSession === 'first-session'
+          ? await contend(prisma, firstCancel, secondCancel)
+          : await contend(prisma, secondCancel, firstCancel);
+
+      expect(results[0]).toMatchObject({ outcome: 'applied', batch: { cancelRequestedAt: expect.any(Date) } });
+      expect(results[1]).toMatchObject({ outcome: 'already-requested' });
+      if (results[0].outcome !== 'applied' || results[1].outcome !== 'already-requested') {
+        throw new Error('expected the first cancellation to apply and the second to join it');
+      }
+      expect(results[1].batch.cancelRequestedAt).toEqual(results[0].batch.cancelRequestedAt);
+      const after = await getCredentialBatchById(input.batchId, input.tenantId);
+      expect(after).toMatchObject({
+        queuedCount: 0,
+        processingCount: 1,
+        cancelledCount: 1,
+        state: CredentialBatchState.RUNNING,
+        version: (before?.version ?? 0) + 1,
+      });
+      expect(after?.items.map((item) => item.state)).toEqual(['PROCESSING', 'CANCELLED']);
+    },
+  );
+
+  it.each(['cancel', 'fault'] as const)('serialises cancel versus pre-dispatch fault with %s first', async (first) => {
+    const input = await runningBatch(`race-fault-${first}`, 2);
+    const cancel = (tx: Parameters<typeof cancelCredentialBatch>[0]) => cancelCredentialBatch(tx, input);
+    const fault = (tx: Parameters<typeof markItemQueued>[0]) =>
+      markItemQueued(tx, { ...input, index: 0, errorMessage: 'decrypt unavailable' });
+    const results = first === 'cancel' ? await contend(prisma, cancel, fault) : await contend(prisma, fault, cancel);
+    expect(results.map((result) => result.outcome)).toEqual(['applied', 'applied']);
+    if (first === 'cancel') await prisma.$transaction((tx) => settleBatchIfFinished(tx, input));
+    const batch = await getCredentialBatchById(input.batchId, input.tenantId);
+    expect(batch).toMatchObject({
+      state: CredentialBatchState.CANCELLED,
+      queuedCount: 0,
+      processingCount: 0,
+      cancelledCount: 2,
+    });
+    expect(
+      batch?.items.map(({ state, nextAttemptAt, attemptToken }) => ({ state, nextAttemptAt, attemptToken })),
+    ).toEqual([
+      { state: 'CANCELLED', nextAttemptAt: null, attemptToken: null },
+      { state: 'CANCELLED', nextAttemptAt: null, attemptToken: null },
+    ]);
+    expect(batch?.items[0].attemptCount).toBe(1);
+  });
+
+  it('preserves already issued rows when cancellation arrives during the next item', async () => {
+    const input = await runningBatch('cancel-existing-issued', 3);
+    await nativeCredential('already-issued-before-cancel');
+    await prisma.$transaction(async (tx) => {
+      await markItemIssued(tx, { ...input, index: 0, credentialId: 'already-issued-before-cancel' });
+      expect(await claimNextBatchItem(tx, input)).toMatchObject({ outcome: 'claimed', item: { index: 1 } });
+    });
+    const issued = await prisma.credentialBatchItem.findFirstOrThrow({ where: { batchId: input.batchId, index: 0 } });
+    const result = await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+    expect(result).toMatchObject({
+      outcome: 'applied',
+      batch: { issuedCount: 1, processingCount: 1, cancelledCount: 1, queuedCount: 0 },
+    });
+    expect(await prisma.credentialBatchItem.findFirstOrThrow({ where: { batchId: input.batchId, index: 0 } })).toEqual(
+      issued,
+    );
+    await prisma.$transaction(async (tx) => {
+      await markItemFailed(tx, { ...input, index: 1, errorClass: 'REFUSED', errorMessage: 'service refused' });
+      expect(await settleBatchIfFinished(tx, input)).toEqual({
+        outcome: 'applied',
+        state: CredentialBatchState.CANCELLED,
+      });
+    });
+    expect(await getCredentialBatchById(input.batchId, input.tenantId)).toMatchObject({
+      state: 'CANCELLED',
+      issuedCount: 1,
+      failedCount: 1,
+      cancelledCount: 1,
+      queuedCount: 0,
+      processingCount: 0,
+    });
+  });
+
+  it('recovers a cancelled stalled attempt as unknown and settles while the new token is owned', async () => {
+    const input = await runningBatch('cancel-stalled', 2);
+    await prisma.$transaction((tx) => cancelCredentialBatch(tx, input));
+    const batch = await prisma.credentialBatch.update({
+      where: { id: input.batchId },
+      data: { lastProgressAt: new Date(0) },
+    });
+    await prisma.$transaction(async (tx) => {
+      expect(
+        await claimBatchAttempt(tx, {
+          ...input,
+          token: 'recovery',
+          expectedVersion: batch.version,
+          staleBefore: new Date(1_000),
+        }),
+      ).toEqual({ applied: true });
+      expect(await settleBatchIfFinished(tx, input)).toEqual({ outcome: 'superseded' });
+      expect(await settleBatchIfFinished(tx, { ...input, token: 'recovery' })).toEqual({
+        outcome: 'applied',
+        state: CredentialBatchState.NEEDS_ATTENTION,
+      });
+    });
+    expect(await getCredentialBatchById(input.batchId, input.tenantId)).toMatchObject({
+      state: 'NEEDS_ATTENTION',
+      cancelledCount: 1,
+      unknownCount: 1,
+      processingCount: 0,
+      attemptToken: null,
+      expiresAt: null,
+      items: [expect.objectContaining({ state: 'OUTCOME_UNKNOWN' }), expect.objectContaining({ state: 'CANCELLED' })],
+    });
+  });
+
+  it.each(['unknown', 'failed'] as const)(
+    'settles cancellation arriving after the final %s outcome but before worker settlement',
+    async (outcome) => {
+      const input = await runningBatch(`cancel-after-outcome-${outcome}`, 1);
+      await prisma.$transaction((tx) =>
+        outcome === 'unknown'
+          ? markItemOutcomeUnknown(tx, {
+              ...input,
+              index: 0,
+              errorClass: 'OUTCOME_UNKNOWN',
+              errorMessage: 'check library',
+            })
+          : markItemFailed(tx, { ...input, index: 0, errorClass: 'REFUSED', errorMessage: 'refused' }),
+      );
+      expect(await prisma.$transaction((tx) => cancelCredentialBatch(tx, input))).toMatchObject({
+        outcome: 'applied',
+        batch: {
+          state: outcome === 'unknown' ? 'NEEDS_ATTENTION' : 'COMPLETED',
+          cancelledCount: 0,
+          queuedCount: 0,
+          processingCount: 0,
+          settledAt: expect.any(Date),
+          expiresAt: outcome === 'unknown' ? null : expect.any(Date),
+        },
+      });
+    },
+  );
+});
+
+describe('credential batch cancellation migration on populated tables', () => {
+  const migration = '20260918120000_credential_batch_cancel';
+  const schema = `cancel_upgrade_${randomUUID().replaceAll('-', '')}`;
+  const admin = createRigClient();
+  let upgrade: PrismaClient | undefined;
+  let url: string;
+
+  function deploy(args: string[]) {
+    return execFileSync('pnpm', ['exec', 'prisma', ...args, '--config', 'prisma/prisma.config.ts'], {
+      cwd: path.resolve(__dirname, '../..'),
+      env: { ...process.env, RI_DATABASE_URL: url },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).toString();
+  }
+
+  afterAll(async () => {
+    await upgrade?.$disconnect();
+    await admin.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    const rows = await admin.$queryRaw<Array<{ schema_name: string }>>`
+      SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${schema}
+    `;
+    await admin.$disconnect();
+    expect(rows).toEqual([]);
+  });
+
+  it('deploys over existing batches, preserves their meaning and enforces both revised count constraints', async () => {
+    // Regression: the migrated sum constraint must retain failed, processing and unknown work in the total.
+    const target = new URL(process.env.RI_DATABASE_URL as string);
+    target.searchParams.set('schema', schema);
+    url = target.toString();
+    await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
+    upgrade = new PrismaClient({ datasources: { db: { url } } });
+    const migrations = listMigrationDirectories(path.resolve(__dirname, '../../prisma/migrations'));
+    for (const name of migrations.filter((name) => name >= migration)) {
+      deploy(['migrate', 'resolve', '--applied', name]);
+    }
+    deploy(['migrate', 'deploy']);
+    const columnsBefore = await upgrade.$queryRaw<Array<{ column_name: string }>>`
+      SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'CredentialBatch'
+    `;
+    expect(columnsBefore.map((column) => column.column_name)).toContain('unknownCount');
+    expect(columnsBefore.map((column) => column.column_name)).not.toContain('cancelledCount');
+    await upgrade.$executeRaw`INSERT INTO "Tenant" (id, name, "updatedAt") VALUES ('upgrade-tenant', 'Upgrade tenant', now())`;
+    await upgrade.$executeRaw`
+      INSERT INTO "CredentialBatch" (id, "tenantId", "correlationId", state, "itemCount", "queuedCount", "processingCount", "issuedCount", "failedCount", "unknownCount", "idempotencyKey", "bodyDigest", "updatedAt")
+      VALUES ('upgrade-queued', 'upgrade-tenant', 'upgrade-correlation-queued', 'QUEUED', 2, 2, 0, 0, 0, 0, 'upgrade-key', 'upgrade-digest', now()),
+             ('upgrade-completed', 'upgrade-tenant', 'upgrade-correlation-completed', 'COMPLETED', 1, 0, 0, 1, 0, 0, 'completed-key', 'completed-digest', now()),
+             ('upgrade-attention', 'upgrade-tenant', 'upgrade-correlation-attention', 'NEEDS_ATTENTION', 3, 0, 1, 0, 1, 1, 'attention-key', 'attention-digest', now())
+    `;
+    await upgrade.$executeRaw`
+      INSERT INTO "CredentialBatchItem" (id, "batchId", "tenantId", "index", state, request, "updatedAt")
+      VALUES ('upgrade-item-0', 'upgrade-queued', 'upgrade-tenant', 0, 'QUEUED', 'retained envelope zero', now()),
+             ('upgrade-item-1', 'upgrade-queued', 'upgrade-tenant', 1, 'QUEUED', 'retained envelope one', now()),
+             ('upgrade-attention-item-0', 'upgrade-attention', 'upgrade-tenant', 0, 'FAILED', 'failed envelope', now()),
+             ('upgrade-attention-item-1', 'upgrade-attention', 'upgrade-tenant', 1, 'PROCESSING', 'processing envelope', now()),
+             ('upgrade-attention-item-2', 'upgrade-attention', 'upgrade-tenant', 2, 'OUTCOME_UNKNOWN', 'unknown envelope', now())
+    `;
+    const before = await upgrade.$queryRaw<Array<Record<string, unknown>>>`SELECT * FROM "CredentialBatch" ORDER BY id`;
+    const itemsBefore = await upgrade.$queryRaw<
+      Array<Record<string, unknown>>
+    >`SELECT * FROM "CredentialBatchItem" ORDER BY id`;
+    await upgrade.$executeRaw`DELETE FROM "_prisma_migrations" WHERE migration_name = ${migration}`;
+    expect(deploy(['migrate', 'deploy'])).toContain(migration);
+    await upgrade.$disconnect();
+    upgrade = new PrismaClient({ datasources: { db: { url } } });
+    const after = await upgrade.$queryRaw<Array<Record<string, unknown>>>`SELECT * FROM "CredentialBatch" ORDER BY id`;
+    expect(after).toEqual(before.map((row) => ({ ...row, cancelledCount: 0, cancelRequestedAt: null })));
+    expect(await upgrade.$queryRaw`SELECT * FROM "CredentialBatchItem" ORDER BY id`).toEqual(itemsBefore);
+    await upgrade.$transaction(async (tx) => {
+      await tx.$executeRaw`UPDATE "CredentialBatchItem" SET state = 'CANCELLED' WHERE "batchId" = 'upgrade-queued'`;
+      await tx.$executeRaw`UPDATE "CredentialBatch" SET state = 'CANCELLED', "queuedCount" = 0, "cancelledCount" = 2, "cancelRequestedAt" = now() WHERE id = 'upgrade-queued'`;
+    });
+    expect(
+      await upgrade.credentialBatch.findUnique({ where: { id: 'upgrade-queued' }, include: { items: true } }),
+    ).toMatchObject({
+      state: 'CANCELLED',
+      cancelledCount: 2,
+      queuedCount: 0,
+      cancelRequestedAt: expect.any(Date),
+      items: [expect.objectContaining({ state: 'CANCELLED' }), expect.objectContaining({ state: 'CANCELLED' })],
+    });
+    await expect(
+      upgrade.$executeRaw`UPDATE "CredentialBatch" SET "cancelledCount" = 3 WHERE id = 'upgrade-queued'`,
+    ).rejects.toThrow('CredentialBatch_counts_sum_check');
+    await expect(
+      upgrade.$executeRaw`UPDATE "CredentialBatch" SET "cancelledCount" = -1, "queuedCount" = 3 WHERE id = 'upgrade-queued'`,
+    ).rejects.toThrow('CredentialBatch_counts_non_negative_check');
+    // Regression: the new sum constraint must still count unknown work when failed and processing work exist.
+    await expect(
+      upgrade.$executeRaw`UPDATE "CredentialBatch" SET "unknownCount" = 0 WHERE id = 'upgrade-attention'`,
+    ).rejects.toThrow('CredentialBatch_counts_sum_check');
+    expect(await upgrade.credentialBatch.findUnique({ where: { id: 'upgrade-queued' } })).toMatchObject({
+      queuedCount: 0,
+      cancelledCount: 2,
+      itemCount: 2,
+    });
+  }, 180_000);
 });

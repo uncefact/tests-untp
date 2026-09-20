@@ -183,6 +183,7 @@ enum CredentialBatchState {
   COMPLETED
   NEEDS_ATTENTION
   EXPIRED
+  CANCELLED
 }
 
 enum CredentialBatchItemState {
@@ -191,6 +192,7 @@ enum CredentialBatchItemState {
   ISSUED
   FAILED
   OUTCOME_UNKNOWN
+  CANCELLED
 }
 
 /**
@@ -436,35 +438,37 @@ model CredentialStatusEntry {
  * Durable state for an ordered batch of ordinary credential issuance requests
  * (ADR-060). Counts are updated with each item transition, rather than derived
  * by a status read. `bodyDigest` is the raw request-body digest used by the
- * batch-owned idempotency key. `expiresAt` is populated after settlement only
- * for COMPLETED batches; an unresolved NEEDS_ATTENTION batch is held until
+ * batch-owned idempotency key. `expiresAt` is populated after settlement for
+ * COMPLETED and CANCELLED batches; NEEDS_ATTENTION holds no expiry until
  * operator resolution. Expiry removes confidential item requests and leaves
  * this tombstone.
  * The API's `error.code` and `error.message` fields are stored in item
  * `errorClass` and `errorMessage`, respectively.
  */
 model CredentialBatch {
-  id               String               @id @default(cuid())
-  tenantId         String
-  correlationId    String
-  state            CredentialBatchState @default(QUEUED)
-  itemCount        Int
-  queuedCount      Int                  @default(0)
-  processingCount  Int                  @default(0)
-  issuedCount      Int                  @default(0)
-  failedCount      Int                  @default(0)
-  unknownCount     Int                  @default(0)
-  idempotencyKey   String
-  bodyDigest       String
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  settledAt        DateTime?
-  resolvedAt       DateTime?
-  expiresAt        DateTime?
-  attemptToken     String?
-  attemptStartedAt DateTime?
-  version          Int                  @default(0)
-  lastProgressAt   DateTime             @default(now())
+  id                String               @id @default(cuid())
+  tenantId          String
+  correlationId     String
+  state             CredentialBatchState @default(QUEUED)
+  itemCount         Int
+  queuedCount       Int                  @default(0)
+  processingCount   Int                  @default(0)
+  issuedCount       Int                  @default(0)
+  failedCount       Int                  @default(0)
+  unknownCount      Int                  @default(0)
+  cancelledCount    Int                  @default(0)
+  cancelRequestedAt DateTime?
+  idempotencyKey    String
+  bodyDigest        String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  settledAt         DateTime?
+  resolvedAt        DateTime?
+  expiresAt         DateTime?
+  attemptToken      String?
+  attemptStartedAt  DateTime?
+  version           Int                  @default(0)
+  lastProgressAt    DateTime             @default(now())
 
   tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items  CredentialBatchItem[]

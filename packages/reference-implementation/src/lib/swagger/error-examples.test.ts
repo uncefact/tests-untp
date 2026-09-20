@@ -166,7 +166,7 @@ describe('published error response examples', () => {
     expect(without413).toEqual([]);
   });
 
-  it('does not advertise 413 on an operation with no request body', () => {
+  it('advertises bodyless 413 only for cancellation, whose bounded reader rejects oversized bodies', () => {
     const advertised = errorResponses(spec)
       .filter((r) => r.status === '413')
       .filter((r) => {
@@ -176,7 +176,7 @@ describe('published error response examples', () => {
       })
       .map((r) => `${r.id} 413`);
 
-    expect(advertised).toEqual([]);
+    expect(advertised).toEqual(['post /credentials/batches/{id}/cancel 413']);
   });
 
   it.each(Object.keys(SHARED_STATUS_EXAMPLES))(

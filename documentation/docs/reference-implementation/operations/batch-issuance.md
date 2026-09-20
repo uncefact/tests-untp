@@ -23,7 +23,33 @@ Poll the batch status resource returned by the submission. A healthy batch moves
 
 A growing `credentials.issue-batch` queue means work is arriving faster than the configured `BATCH_JOB_CONCURRENCY` allows, or a dependency is faulting. That setting controls how many batches one worker process runs at once. It never makes the items inside a batch concurrent.
 
-The reconciliation sweep looks at batches that are still `QUEUED` or `RUNNING` and whose last progress is older than twice `WORKER_JOB_TIMEOUT_SECONDS`. Before it acts it asks the queue whether an issuance job for that batch is still active, retrying or scheduled. Only when there is none does it take the ownership fence and queue a continuation. It never fails an item merely because a queue job disappeared.
+The reconciliation sweep looks at batches that are still `QUEUED` or `RUNNING` and whose last progress is older than twice `WORKER_JOB_TIMEOUT_SECONDS`. Before it acts it asks the queue whether an issuance job for that batch is still active, retrying or scheduled. Only when there is none does it take the ownership fence. For an ordinary batch it queues a continuation. For a cancellation-requested batch it converts abandoned processing to `OUTCOME_UNKNOWN` and settles without enqueueing issuance. It never fails an item merely because a queue job disappeared.
+
+The reconciliation summary line carries seven counters: `selected` batches the sweep looked at, `active` batches skipped because an issuance job was still live, `requeued` batches given a new issuance job, `settled` batches that reached a terminal state, `superseded` batches whose ownership or version had moved on before the sweep could take the fence, `unsettled` batches whose settlement did not apply, and `failed` batches whose recovery threw. `unsettled` is the outcome that needs a human.
+
+## Cancellation
+
+Upgrade every worker before exposing `POST /api/v1/credentials/batches/{id}/cancel`. An old worker does not check cancellation between items. Apply the migration and rollout order in the [v0.6 migration guide](../../migration-guides/ri-v0.6#batch-cancellation).
+
+An issuer sends a bodyless POST to cancel a queued or running batch. Every queued item, including deferred retries, becomes `CANCELLED` atomically. The item already processing finishes its current attempt, and credentials already issued remain issued. The `202` response includes the batch projection and this message:
+
+> Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.
+
+Poll GET for `counts.cancelled`, `cancelRequestedAt` and the ordered item outcomes. The timestamp is null before cancellation and otherwise contains the first request time as ISO 8601 text. While an item is processing the batch remains `RUNNING`. Once nothing is queued or processing, unknown outcomes take precedence as `NEEDS_ATTENTION`; otherwise a positive cancelled count gives `CANCELLED`, and zero cancelled gives `COMPLETED`. For example, cancelling a batch whose only remaining item is in flight can end `COMPLETED` with cancelled 0 if that item issues.
+
+A repeated cancellation while the batch remains `QUEUED` or `RUNNING` returns `202` without another write. `COMPLETED`, `NEEDS_ATTENTION` and settled `CANCELLED` return `409 BATCH_NOT_CANCELLABLE`. Expired batches return `410 BATCH_EXPIRED` with the tombstone; unknown or foreign ids return `404`. The [API refusal table](../api/credentials#cancel-a-batch) gives the exact messages and body validation responses.
+
+The cancel route also writes the `Credential batch operator audit` warning line with `action: cancel`, the batch id, tenant id and both correlation ids, so that line is not exclusive to the inspect and resolve commands.
+
+The worker claims no further item and queues no continuation after cancellation. Reconciliation still recovers cancellation-requested `QUEUED` or `RUNNING` batches whose job vanished. It records an abandoned processing item as unknown, then settles without enqueueing issuance. A duplicate delivery cannot resume cancelled work.
+
+Resolve a held unknown item using the commands below. Cancellation does not resolve uncertainty about an external effect. Resolving the last unknown produces `CANCELLED` when cancelled items remain, otherwise `COMPLETED`; it never queues issuance.
+
+### Counter-drift refusal
+
+If cancellation is refused with `500` because the batch's stored counts disagree with its items, quiesce the workers. Inspect the batch and each item with the existing `pnpm batch:inspect-item -- --tenant TENANT --batch BATCH --index INDEX --reason TICKET` command. Counts are not rebuilt automatically, because the drift may mean rows are missing. Repairing them means editing batch counters directly, which the warning under Faults otherwise forbids; do it only under the batch lock, from the item rows, and record the change against the ticket. Then cancel the batch again, confirm the `202`, and restart the workers.
+
+A post-commit cancellation can still answer `202` when its item rows commit but the settlement sum check does not apply. Its projection reads `RUNNING` with queued 0 and processing 0; once `lastProgressAt` is at least twice `WORKER_JOB_TIMEOUT_SECONDS` old and no issuance job is active, retrying or scheduled, a reconciliation sweep can retry settlement, but a counter-sum mismatch will continue to fail until an operator repairs the counters using the procedure above. Every sweep that still cannot settle warns with the batch id, both correlation ids and the settlement outcome. A batch that warns on consecutive sweeps needs the counter-drift procedure above.
 
 ## `NEEDS_ATTENTION`
 
@@ -108,12 +134,12 @@ A fault affecting every item, such as an unusable data encryption key, no longer
 
 A status-list mint failure is a pre-dispatch fault: the item ladder retries it and settles the item as `FAILED`, never `OUTCOME_UNKNOWN`.
 
-There is no cancellation, and an unknown item is never replayed automatically. Do not edit counters or item state by hand, because that breaks the attempt-token fence and the audit trail.
+An unknown item is never replayed automatically. A retryable, non-exhausted pre-dispatch fault on a cancel-requested batch becomes `CANCELLED`; an attempt that exhausts its retries becomes `FAILED` whether the exhaustion happens before or after cancellation was requested. Do not edit counters or item state by hand, because that breaks the attempt-token fence and the audit trail.
 
 ## Retention
 
-A batch that completes normally is retained for `BATCH_RETENTION_DAYS` from `settledAt`, thirty days by default.
+A `COMPLETED` or `CANCELLED` batch is retained for `BATCH_RETENTION_DAYS` from `settledAt`, thirty days by default.
 
-A `NEEDS_ATTENTION` batch has no expiry deadline while any item is still unknown, so its encrypted request evidence is kept for the investigation. When the last unknown item is resolved the batch becomes `COMPLETED` and a fresh retention window starts from `resolvedAt`.
+A `NEEDS_ATTENTION` batch has no expiry deadline while any item is still unknown, so its encrypted request evidence is kept for the investigation. When the last unknown item is resolved the batch becomes `CANCELLED` if cancelled items remain, otherwise `COMPLETED`, and a fresh retention window starts from `resolvedAt`.
 
-The sweep only expires a `COMPLETED` batch that is past its deadline. It deletes the batch's items, which is where the encrypted requests and the per-item outcomes live, and leaves an `EXPIRED` tombstone holding the submission key, the body digest and the counts. The status resource then answers `410`. Issued credentials in the library are not touched by batch expiry.
+The sweep only expires a `COMPLETED` or `CANCELLED` batch that is past its deadline. It deletes the batch's items, which is where the encrypted requests and the per-item outcomes live, and leaves an `EXPIRED` tombstone holding the submission key, the body digest and the counts. The status resource then answers `410`. Issued credentials in the library are not touched by batch expiry.

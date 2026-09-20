@@ -80,6 +80,7 @@ const batch = {
   idempotencyKey: 'key',
   bodyDigest: 'digest',
   createdAt: new Date(0),
+  cancelRequestedAt: null,
   settledAt: null,
   expiresAt: null,
   attemptToken: null,
@@ -100,7 +101,7 @@ function context(expireSeconds = 60, signal: AbortSignal = new AbortController()
 }
 
 function dependencies(overrides: Partial<CredentialBatchIssueDependencies> = {}): CredentialBatchIssueDependencies {
-  const queue = {} as JobQueue;
+  const queue = { enqueueWithin: jest.fn() } as unknown as JobQueue;
   return {
     getBatch: jest.fn(async () => batch),
     transaction: jest.fn(async (callback) => callback({} as never)),
@@ -128,7 +129,7 @@ function dependencies(overrides: Partial<CredentialBatchIssueDependencies> = {})
     recordKnownCredentialId: jest.fn(async () => ({ applied: true })),
     releaseAttempt: jest.fn(async () => ({ applied: true })),
     settle: jest.fn(async () => ({ outcome: 'applied' as const, state: 'COMPLETED' as never })),
-    checkpoint: jest.fn(async () => ({ applied: true })),
+    checkpoint: jest.fn(async () => ({ outcome: 'checkpointed' as const })),
     now: () => new Date(0),
     queue,
     ...overrides,
@@ -136,6 +137,153 @@ function dependencies(overrides: Partial<CredentialBatchIssueDependencies> = {})
 }
 
 describe('credential batch issue handler', () => {
+  it('settles a cancelled claim boundary without dispatching or checkpointing', async () => {
+    const deps = dependencies({ claimNextItem: jest.fn().mockResolvedValue({ outcome: 'cancelled' }) });
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+    expect(deps.settle).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ...payload, token: expect.any(String) }),
+    );
+    expect(deps.issue).not.toHaveBeenCalled();
+    expect(deps.checkpoint).not.toHaveBeenCalled();
+    expect(deps.releaseAttempt).not.toHaveBeenCalled();
+  });
+
+  it('treats an already-settled cancelled claim as success without releasing or warning', async () => {
+    // Regression: a cancellation settled by another path must not warn or try to release its cleared fence.
+    loggerCalls.info.mockClear();
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({
+      claimNextItem: jest.fn().mockResolvedValue({ outcome: 'cancelled' }),
+      settle: jest.fn().mockResolvedValue({ outcome: 'already-settled' as const }),
+    });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+
+    expect(deps.releaseAttempt).not.toHaveBeenCalled();
+    expect(loggerCalls.info).toHaveBeenCalledTimes(1);
+    expect(loggerCalls.info).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, settlement: 'already-settled' }),
+      'Credential batch cancellation already settled',
+    );
+    expect(loggerCalls.warn).not.toHaveBeenCalled();
+  });
+
+  it('warns and releases when a cancelled claim cannot settle', async () => {
+    // Regression: a not-ready cancellation must warn with identity and release an owned fence.
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({
+      claimNextItem: jest.fn().mockResolvedValue({ outcome: 'cancelled' }),
+      settle: jest.fn().mockResolvedValue({ outcome: 'not-ready' }),
+      releaseAttempt: jest.fn().mockResolvedValue({ applied: true }),
+    });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+    expect(deps.releaseAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ...payload, token: expect.any(String) }),
+    );
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, settlement: 'not-ready' }),
+      'Credential batch cancellation could not settle',
+    );
+  });
+
+  it('reports a cancelled claim takeover when the settlement fence is no longer owned', async () => {
+    // Regression: a superseded cancellation claim must not be reported as counter drift or as a failed release.
+    loggerCalls.info.mockClear();
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({
+      claimNextItem: jest.fn().mockResolvedValue({ outcome: 'cancelled' }),
+      settle: jest.fn().mockResolvedValue({ outcome: 'superseded' as const }),
+      releaseAttempt: jest.fn().mockResolvedValue({ applied: false }),
+    });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+
+    expect(deps.releaseAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ...payload, token: expect.any(String) }),
+    );
+    expect(loggerCalls.info).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, settlement: 'superseded' }),
+      'Credential batch cancellation is owned by another attempt',
+    );
+    expect(loggerCalls.warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing', 'warn'],
+    ['superseded', 'info'],
+  ] as const)('logs a %s claim outcome at %s and does not settle', async (outcome, level) => {
+    // Regression: missing claims warn while superseded claims remain informational and neither settles.
+    loggerCalls.warn.mockClear();
+    loggerCalls.info.mockClear();
+    const deps = dependencies({ claimNextItem: jest.fn().mockResolvedValue({ outcome }) });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).resolves.toBeUndefined();
+
+    expect(deps.settle).not.toHaveBeenCalled();
+    expect(loggerCalls[level]).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, outcome }),
+      'Credential batch claim stopped',
+    );
+    expect(loggerCalls[level === 'warn' ? 'info' : 'warn']).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'Credential batch claim stopped',
+    );
+  });
+
+  it('persists post-dispatch uncertainty and settles while ownership is held', async () => {
+    const events: string[] = [];
+    const deps = dependencies({
+      issue: jest.fn(async ({ onDispatch }) => {
+        onDispatch?.();
+        throw new Error('lost response');
+      }),
+      markOutcomeUnknown: jest.fn(async () => {
+        events.push('unknown');
+        return { outcome: 'applied' as const };
+      }),
+      settle: jest.fn(async () => {
+        events.push('settle');
+        return { outcome: 'applied' as const, state: 'NEEDS_ATTENTION' as const };
+      }),
+      releaseAttempt: jest.fn(async () => {
+        events.push('release');
+        return { applied: true };
+      }),
+    });
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toThrow('lost response');
+    expect(events).toEqual(['unknown', 'settle']);
+    expect(deps.checkpoint).not.toHaveBeenCalled();
+    expect(deps.markQueued).not.toHaveBeenCalled();
+  });
+
+  it('releases a post-dispatch fault only after settlement finds work remaining', async () => {
+    const events: string[] = [];
+    const deps = dependencies({
+      issue: jest.fn(async ({ onDispatch }) => {
+        onDispatch?.();
+        throw new Error('lost response');
+      }),
+      markOutcomeUnknown: jest.fn(async () => {
+        events.push('unknown');
+        return { outcome: 'applied' as const };
+      }),
+      settle: jest.fn(async () => {
+        events.push('settle');
+        return { outcome: 'not-ready' as const };
+      }),
+      releaseAttempt: jest.fn(async () => {
+        events.push('release');
+        return { applied: true };
+      }),
+    });
+    await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toThrow('lost response');
+    expect(events).toEqual(['unknown', 'settle', 'release']);
+  });
+
   it('issues items sequentially by index and settles after the queue is empty', async () => {
     // Regression: a batch must not issue item 1 before item 0 or leave a fully processed batch unsettled.
     const deps = dependencies();
@@ -558,6 +706,54 @@ describe('credential batch issue handler', () => {
     }
   });
 
+  it.each([
+    ['budget', 'not-ready', 'warn', true, 'Credential batch cancellation could not settle'],
+    ['deferred', 'not-ready', 'warn', true, 'Credential batch cancellation could not settle'],
+    ['budget', 'superseded', 'info', false, 'Credential batch checkpoint stopped'],
+    ['deferred', 'superseded', 'info', false, 'Credential batch checkpoint stopped'],
+    ['budget', 'applied', 'info', false, 'Credential batch cancellation settled'],
+    ['deferred', 'applied', 'info', false, 'Credential batch cancellation settled'],
+    ['budget', 'already-settled', 'info', false, 'Credential batch cancellation already settled'],
+    ['deferred', 'already-settled', 'info', false, 'Credential batch cancellation already settled'],
+    ['budget', 'missing', 'warn', false, 'Credential batch cancellation could not settle because the batch is gone'],
+    ['deferred', 'missing', 'warn', false, 'Credential batch cancellation could not settle because the batch is gone'],
+  ] as const)('handles the %s checkpoint settlement outcome %s', async (path, outcome, level, releases, message) => {
+    // Regression: each checkpoint arm must report its outcome and only an owned, non-applied settlement may release.
+    loggerCalls.warn.mockClear();
+    loggerCalls.info.mockClear();
+    const checkpointResult = outcome === 'applied' ? { outcome, state: 'CANCELLED' as never } : { outcome };
+    const checkpoint = jest.fn(async () => checkpointResult);
+    const deps = dependencies({
+      checkpoint,
+      ...(path === 'deferred'
+        ? { claimNextItem: jest.fn(async () => ({ outcome: 'empty' as const, nextAttemptAt: new Date(1_000) })) }
+        : {}),
+    });
+
+    await expect(
+      credentialBatchIssueHandler(deps)(payload, context(path === 'budget' ? 5 : 60)),
+    ).resolves.toBeUndefined();
+
+    expect(checkpoint).toHaveBeenCalledTimes(1);
+    if (releases) {
+      expect(deps.releaseAttempt).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ ...payload, token: expect.any(String) }),
+      );
+    } else {
+      expect(deps.releaseAttempt).not.toHaveBeenCalled();
+    }
+    expect((deps.queue as unknown as { enqueueWithin: jest.Mock }).enqueueWithin).not.toHaveBeenCalled();
+    const fields = outcome === 'superseded' ? { outcome } : { settlement: outcome };
+    expect(loggerCalls[level]).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, ...fields }),
+      message,
+    );
+    if (outcome === 'already-settled') {
+      expect(loggerCalls.warn).not.toHaveBeenCalledWith(expect.anything(), message);
+    }
+  });
+
   it('records a definitive refusal and continues after a pre-dispatch fault', async () => {
     // Regression: a client refusal is an item outcome, while a pre-dispatch fault is retried per item in this job.
     const refusal = dependencies({
@@ -616,6 +812,38 @@ describe('credential batch issue handler', () => {
       }),
     );
     expect(loggerCalls.error.mock.calls.at(-1)?.[0]).not.toHaveProperty('request');
+  });
+
+  it('logs a refused item transition outcome and its raw cause when the item fence is lost', async () => {
+    // Regression: a superseded refusal must expose the transition outcome and error without changing the stored message.
+    const refusalError = new ValidationError('payload refused', { code: 'PAYLOAD_INVALID' });
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({
+      claimNextItem: jest
+        .fn()
+        .mockResolvedValueOnce({ outcome: 'claimed', item: { index: 0, request: JSON.stringify(request) } })
+        .mockResolvedValueOnce({ outcome: 'empty' }),
+      issue: jest.fn(async () => {
+        throw refusalError;
+      }),
+      markFailed: jest.fn().mockResolvedValue({ outcome: 'superseded' as const }),
+    });
+
+    await credentialBatchIssueHandler(deps)(payload, context());
+
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: 'FAILED',
+        errorCode: 'PAYLOAD_INVALID',
+        err: refusalError,
+        itemOutcome: 'superseded',
+      }),
+      'Credential batch item refused',
+    );
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ itemOutcome: 'superseded', issueDispatched: false }),
+      'Credential batch refused item transition was superseded',
+    );
   });
 
   it('treats adapter 429 errors as faults but records a validation refusal with its code', async () => {
@@ -678,6 +906,10 @@ describe('credential batch issue handler', () => {
         .mockResolvedValueOnce({ outcome: 'claimed', item: { index: 1, request: JSON.stringify(request) } })
         .mockResolvedValueOnce({ outcome: 'empty' }),
       issue,
+      settle: jest
+        .fn()
+        .mockResolvedValueOnce({ outcome: 'not-ready' })
+        .mockResolvedValue({ outcome: 'applied', state: 'NEEDS_ATTENTION' }),
     });
 
     await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toThrow('provider unavailable');
@@ -910,13 +1142,21 @@ describe('credential batch issue handler', () => {
   });
 
   it('stops when a fresh ownership token is still held by another attempt', async () => {
-    // Regression: duplicate delivery must not issue an item under a stale or losing token.
-    const deps = dependencies({ claimAttempt: jest.fn(async () => ({ applied: false })) });
+    // Regression: a non-applied claim without cancellation must retain the ownership-fence warning.
+    const getBatch = jest
+      .fn()
+      .mockResolvedValueOnce(batch)
+      .mockResolvedValueOnce({ ...(batch as Record<string, unknown>), cancelRequestedAt: null });
+    loggerCalls.info.mockClear();
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({ getBatch, claimAttempt: jest.fn(async () => ({ applied: false })) });
 
     await credentialBatchIssueHandler(deps)(payload, context());
 
+    expect(getBatch).toHaveBeenCalledTimes(2);
     expect(deps.issue).not.toHaveBeenCalled();
     expect(deps.claimNextItem).not.toHaveBeenCalled();
+    expect(loggerCalls.info).not.toHaveBeenCalled();
     expect(loggerCalls.warn).toHaveBeenCalledWith(
       expect.objectContaining({
         attemptStartedAt: (batch as { attemptStartedAt: Date | null }).attemptStartedAt,
@@ -924,6 +1164,34 @@ describe('credential batch issue handler', () => {
       }),
       'Credential batch job did not acquire the current ownership fence',
     );
+  });
+
+  it('reports a cancellation that commits before the worker claim at info', async () => {
+    // Regression: a cancellation that wins the race after the worker read must not be reported as a fence warning.
+    const cancelledCorrelationId = 'cancelled-batch-correlation';
+    const cancelledBatch = {
+      ...(batch as Record<string, unknown>),
+      correlationId: cancelledCorrelationId,
+      cancelRequestedAt: new Date(1_000),
+    };
+    const getBatch = jest.fn().mockResolvedValueOnce(batch).mockResolvedValueOnce(cancelledBatch);
+    loggerCalls.info.mockClear();
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({ getBatch, claimAttempt: jest.fn(async () => ({ applied: false })) });
+
+    await credentialBatchIssueHandler(deps)(payload, context());
+
+    expect(getBatch).toHaveBeenCalledTimes(2);
+    expect(loggerCalls.info).toHaveBeenCalledWith(
+      {
+        correlationId: cancelledCorrelationId,
+        batchCorrelationId: cancelledCorrelationId,
+        batchId: payload.batchId,
+        tenantId: payload.tenantId,
+      },
+      'Credential batch job stopped: the batch has a cancellation request and the claim did not apply',
+    );
+    expect(loggerCalls.warn).not.toHaveBeenCalled();
   });
 
   it('warns and stops when the issued credential cannot be recorded under the fence', async () => {
@@ -1016,6 +1284,37 @@ describe('credential batch issue handler', () => {
     );
   });
 
+  it('keeps the abort error when releasing the ownership fence fails', async () => {
+    // Regression: a release failure during shutdown must not replace the original abort reason.
+    const abortError = new Error('worker shutting down');
+    const releaseError = new Error('release failed');
+    const controller = new AbortController();
+    controller.abort(abortError);
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({ releaseAttempt: jest.fn().mockRejectedValue(releaseError) });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context(60, controller.signal))).rejects.toBe(abortError);
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: releaseError }),
+      'Failed to release credential batch ownership fence after an aborted job',
+    );
+  });
+
+  it('names an unapplied ownership-fence release as an aborted-job warning', async () => {
+    // Regression: an aborted job whose release predicate matches no row must not be logged as tenant cancellation.
+    const abortError = new Error('worker shutting down');
+    const controller = new AbortController();
+    controller.abort(abortError);
+    loggerCalls.warn.mockClear();
+    const deps = dependencies({ releaseAttempt: jest.fn().mockResolvedValue({ applied: false }) });
+
+    await expect(credentialBatchIssueHandler(deps)(payload, context(60, controller.signal))).rejects.toBe(abortError);
+    expect(loggerCalls.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId: payload.batchId, tenantId: payload.tenantId, token: expect.any(String) }),
+      'Credential batch ownership fence release did not apply after an aborted job',
+    );
+  });
+
   it('checks cancellation once before each item claim', async () => {
     // Regression: placing a second abort check inside the item body would change the one-check-per-loop invariant.
     const events: string[] = [];
@@ -1071,7 +1370,7 @@ describe('credential batch issue handler', () => {
       })(),
       checkpoint: jest.fn(async () => {
         state.checkpointed = true;
-        return { applied: true };
+        return { outcome: 'checkpointed' as const };
       }),
       settle: jest.fn(async () => {
         state.settled = true;

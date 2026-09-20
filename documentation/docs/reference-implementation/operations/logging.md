@@ -97,7 +97,7 @@ The log level is controlled by the `LOG_LEVEL` environment variable. Only messag
 | ----------- | ------------------------------------------------------------ | ------- |
 | `LOG_LEVEL` | Minimum log level to emit (`debug`, `info`, `warn`, `error`) | `info`  |
 
-Batch item inspection and resolution audit lines are emitted at `warn`. Set `LOG_LEVEL` to `warn`, `info` or `debug` before using `--disclose-request`; disclosure refuses to print plaintext at `error` because that level would filter the audit line.
+Batch item inspection and resolution audit lines are emitted at `warn`, and so is the `Credential batch operator audit` line the cancel route writes with `action: cancel`. Set `LOG_LEVEL` to `warn`, `info` or `debug` before using `--disclose-request`; disclosure refuses to print plaintext at `error` because that level would filter the audit line.
 
 ## Library storage lines that need an operator
 
