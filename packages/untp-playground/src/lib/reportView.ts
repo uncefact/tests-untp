@@ -1,13 +1,20 @@
 import { credentialTypeLabel } from '@/lib/credentialCollection';
 import { linkSetSubtitle } from '@/lib/linkSetCollection';
-import { schemaStepMessages } from '@/lib/linkSetValidation';
+import { schemaStepDialogErrors, schemaStepMessages } from '@/lib/linkSetValidation';
 import { coverageCountText, mismatchText } from '@/lib/linkTypeCoverage';
+import {
+  buildValidationCards,
+  validationCardsInDrawerOrder,
+  type ValidationErrorCard,
+} from '@/lib/validationErrorCards';
 import type {
   TestReport,
   TestReportCoverageStep,
   TestReportLinkSetResult,
   TestReportLinkSetSchemaStep,
   TestReportResult,
+  TestReportSchemeResult,
+  TestReportStep,
 } from '@/types';
 import { permittedCredentialTypes } from '../../constants';
 
@@ -23,12 +30,19 @@ export interface TestReportView extends Omit<TestReport, 'linkSets'> {
   linkSets: LinkSetView[];
 }
 
+type StepView = TestReportStep & { validationCards: ValidationErrorCard[] };
+type CredentialResultView = Omit<TestReportResult, 'core' | 'extension'> & {
+  core: Omit<TestReportResult['core'], 'steps'> & { steps: StepView[] };
+  extension?: Omit<NonNullable<TestReportResult['extension']>, 'steps'> & { steps: StepView[] };
+};
+type SchemeResultView = Omit<TestReportSchemeResult, 'steps'> & { steps: StepView[] };
+
 export interface CredentialGroupView {
   type: string;
   /** The spaced type name the Credentials tab shows, e.g. `Digital Product Passport`. */
   displayName: string;
   count: number;
-  results: TestReportResult[];
+  results: CredentialResultView[];
 }
 
 /** The link set entry for the template: the two steps carry their presentation, so the plain `steps` tuple is left out. */
@@ -36,7 +50,7 @@ export interface LinkSetView extends Omit<TestReportLinkSetResult, 'steps'> {
   /** `Link Set · v<version>`, the card's subtitle. */
   subtitle: string;
   /** The schema step with the card's explanation (minus its Verify hint), one line per error or one for a load failure. */
-  schemaStep: TestReportLinkSetSchemaStep & { messages: string[] };
+  schemaStep: TestReportLinkSetSchemaStep & { messages: string[]; validationCards: ValidationErrorCard[] };
   /** The coverage step with the count line the card shows and one line per mismatch. */
   coverageStep: TestReportCoverageStep & { countText: string; mismatchLines: Array<{ text: string; href: string }> };
 }
@@ -57,19 +71,50 @@ function groupCredentials(results: TestReportResult[]): CredentialGroupView[] {
       type: group[0].core.type,
       displayName: credentialTypeLabel(group[0].core.type),
       count: group.length,
-      results: group,
+      results: group.map(credentialResultView),
     }));
+}
+
+function stepView(step: TestReportStep, errors = step.details?.errors): StepView {
+  return {
+    ...step,
+    validationCards: validationCardsInDrawerOrder(buildValidationCards(errors, step.failure)),
+  };
+}
+
+function credentialResultView(result: TestReportResult): CredentialResultView {
+  const { core, extension, ...rest } = result;
+  return {
+    ...rest,
+    core: { ...core, steps: core.steps.map((step) => stepView(step)) },
+    ...(extension ? { extension: { ...extension, steps: extension.steps.map((step) => stepView(step)) } } : {}),
+  };
+}
+
+function schemeResultView(result: TestReportSchemeResult): SchemeResultView {
+  return { ...result, steps: result.steps.map((step) => stepView(step)) };
 }
 
 function linkSetView(entry: TestReportLinkSetResult): LinkSetView {
   const { steps, ...rest } = entry;
   const [schemaStep, coverageStep] = steps;
+  const schemaFailure = schemaStep.failure ?? schemaStep.details.failure;
+  const schemaErrors =
+    schemaStep.details.kind === 'document'
+      ? schemaStepDialogErrors(schemaStep.details, entry.linkSet)
+      : schemaStep.details.kind === 'schema-unusable' && schemaFailure
+        ? schemaStep.details.errors ?? []
+        : schemaStepMessages(schemaStep.details, entry.linkSet).map(({ text, relationRule }) => ({
+            message: text,
+            ...(relationRule ? { relationRule } : {}),
+          }));
   return {
     ...rest,
     subtitle: linkSetSubtitle(entry),
     schemaStep: {
       ...schemaStep,
       messages: schemaStepMessages(schemaStep.details, entry.linkSet).map((message) => message.text),
+      validationCards: validationCardsInDrawerOrder(buildValidationCards(schemaErrors, schemaFailure)),
     },
     coverageStep: {
       ...coverageStep,
@@ -87,6 +132,7 @@ export function buildReportView(report: TestReport): TestReportView {
   return {
     ...report,
     credentialGroups: groupCredentials(report.verifiableCredentials),
+    conformitySchemes: report.conformitySchemes.map(schemeResultView),
     linkSets: report.linkSets.map(linkSetView),
   };
 }

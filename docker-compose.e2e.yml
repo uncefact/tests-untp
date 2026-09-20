@@ -20,6 +20,7 @@ services:
       - NODE_EXTRA_CA_CERTS=/certs/ca.crt
       - VERIFICATION_SERVICE_URL=https://vckit.e2e.internal/agent/routeVerificationCredential
       - VERIFICATION_SERVICE_TOKEN=test123
+      # Deliberately omit FETCH_ALLOW_PRIVATE_URLS so a host or reference implementation value of true cannot enable this proxy.
     depends_on:
       vckit-tls:
         condition: service_started

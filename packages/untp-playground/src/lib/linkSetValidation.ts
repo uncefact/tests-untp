@@ -204,6 +204,36 @@ export interface SchemaStepMessage {
   relationRule?: true;
 }
 
+export interface LinkSetSchemaMessageError {
+  message: string;
+  pointer?: string;
+  relationRule?: true;
+}
+
+/** Adapts link-set schema failures to the shared validation drawer's message-error shape. */
+export function schemaStepDialogErrors(
+  details: LinkSetSchemaStepDetails | undefined,
+  decoded: Record<string, unknown>,
+): Array<ErrorObject | LinkSetSchemaMessageError> {
+  if (!details || details.kind !== 'document') return [];
+
+  const relationMessages = schemaStepMessages(details, decoded).filter((message) => message.relationRule);
+  let relationIndex = 0;
+  return details.errors.map((error) => {
+    if (!isRelationRejection(error, decoded)) {
+      return error.keyword === 'additionalProperties'
+        ? { message: formatValidationError(error), pointer: error.instancePath }
+        : error;
+    }
+    const relationMessage = relationMessages[relationIndex++]?.text ?? formatValidationError(error);
+    return {
+      message: `${relationMessage} Any credential links listed on this card can still be verified.`,
+      pointer: error.instancePath,
+      relationRule: true,
+    };
+  });
+}
+
 /**
  * The verifier-facing explanation of a Schema Validation step's details, shared by the card and
  * the downloadable report (#814) so the two never explain the same failure differently. The text

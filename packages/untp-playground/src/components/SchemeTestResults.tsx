@@ -39,8 +39,7 @@ import { detectVersionFromContext } from '@uncefact/untp-utils/artefacts';
 import { contextEntries, formatObserved } from '@/lib/schemaValidation';
 import { SUPPORTED_CVC_SPEC_VERSIONS } from '@uncefact/untp-utils/conformity-vocabulary';
 import type { ArtefactSlot, CollectionState, InstanceId, RunId } from '@/types/artefact';
-import type { StoredScheme, TestStep } from '@/types';
-import type { DisplayableError } from '@/types/validation';
+import type { DisplayableError, StoredScheme, TestStep } from '@/types';
 import confetti from 'canvas-confetti';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -465,45 +464,25 @@ async function runSchemePipeline(
   }
 }
 
-const SUPPORT_URL = process.env.NEXT_PUBLIC_SUPPORT_URL || 'https://github.com/uncefact/tests-untp/issues';
-
 function stepErrors(step: TestStep): DisplayableError[] {
   const errors = step.details?.errors;
   if (!Array.isArray(errors)) return [];
-  const out: DisplayableError[] = [];
-  for (const e of errors) {
-    if (typeof e?.message !== 'string' || e.message.length === 0) continue;
-    out.push({ message: e.message, supportable: e.supportable === true });
-  }
-  return out;
-}
-
-function isAjvError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const candidate = error as { keyword?: unknown; instancePath?: unknown };
-  return typeof candidate.keyword === 'string' && typeof candidate.instancePath === 'string';
-}
-
-function schemeMessageDetails(errors: DisplayableError[]) {
-  return (
-    <ul className='list-disc space-y-1 pl-6 text-sm text-red-600'>
-      {errors.map((error, idx) => (
-        <li key={idx}>
-          {error.message}
-          {error.supportable && (
-            <>
-              {' '}
-              If this keeps happening,{' '}
-              <a href={SUPPORT_URL} target='_blank' rel='noopener noreferrer' className='underline'>
-                report an issue
-              </a>
-              .
-            </>
-          )}
-        </li>
-      ))}
-    </ul>
+  return errors.filter(
+    (error): error is DisplayableError =>
+      typeof error === 'object' && error !== null && typeof (error as { message?: unknown }).message === 'string',
   );
+}
+
+function schemeMessageErrors(details: SchemeStructuralParseDetails) {
+  return details.errors.map((error, index) => {
+    const pointer = details.diagnostics[index]?.pointer;
+    const prefix = `${pointer ?? 'document root'}: `;
+    return {
+      ...error,
+      ...(pointer !== undefined ? { pointer } : {}),
+      message: error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message,
+    };
+  });
 }
 
 function classifySchemePipelineFailure(error: unknown, declaredVersion?: string): ArtefactStepFailure {
@@ -567,7 +546,7 @@ function SchemeCard({ item, onRemove }: { item: SchemeSlot; onRemove: () => void
   return (
     <Card className='group relative overflow-hidden p-4'>
       <div
-        className='flex flex-wrap items-center justify-between gap-2 cursor-pointer'
+        className='relative flex flex-wrap items-center justify-between gap-2 cursor-pointer'
         onClick={() => setIsExpanded((prev) => !prev)}
         data-testid='scheme-group-header'
         data-instance-id={item.instanceId}
@@ -580,28 +559,28 @@ function SchemeCard({ item, onRemove }: { item: SchemeSlot; onRemove: () => void
           </div>
         </div>
         <StatusIcon status={overallStatus} testId={item.instanceId} />
+        <button
+          type='button'
+          aria-label={`Remove ${title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          // Revealed only when the pointer is over the header row's delete region, or when the
+          // control is keyboard-focused, rather than on hover of the whole card.
+          className='absolute inset-y-0 right-0 flex w-12 items-center justify-center bg-red-400 text-white opacity-0 transition-opacity hover:bg-red-500 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100'
+        >
+          <Trash2 className='h-4 w-4' />
+        </button>
       </div>
       {isExpanded && (
-        <div className='mt-4 space-y-2 pl-6'>
+        <div className='mt-4 space-y-2 pl-6' data-testid='scheme-group-body'>
           {scheme.source && <SourceCaption source={scheme.source} />}
           {steps.map((step) => (
             <SchemeStepItem key={step.id} step={step} />
           ))}
         </div>
       )}
-      <button
-        type='button'
-        aria-label={`Remove ${title}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        // Revealed only when the pointer is over the delete region itself (the right edge), or when
-        // the control is keyboard-focused, rather than on hover of the whole card.
-        className='absolute bottom-0 right-0 top-0 flex w-12 items-center justify-center bg-red-400 text-white opacity-0 transition-opacity hover:bg-red-500 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100'
-      >
-        <Trash2 className='h-4 w-4' />
-      </button>
     </Card>
   );
 }
@@ -611,15 +590,8 @@ function SchemeStepItem({ step }: { step: TestStep }) {
   const errors = stepErrors(step);
   const failurePresentation = describeArtefactFailure(step.failure, 'scheme');
   const structuralDetails = schemeStructuralParseDetails(step);
-  const messageErrors = structuralDetails?.errors ?? errors;
-  const ajvErrors = step.details?.errors;
-  const usesErrorDialog =
-    step.id === TestCaseStepId.SCHEME_SCHEMA_VALIDATION &&
-    Array.isArray(ajvErrors) &&
-    ajvErrors.length > 0 &&
-    ajvErrors.every(isAjvError);
-  const usesFailureOnlyDetails =
-    step.failure?.class === 'could-not-fetch' || step.failure?.class === 'unusable-artefact';
+  const isNotExecuted = step.failure?.code === 'playground.pipeline.not-executed';
+  const dialogErrors = isNotExecuted ? [] : structuralDetails ? schemeMessageErrors(structuralDetails) : errors;
 
   return (
     <div className='py-2'>
@@ -627,27 +599,14 @@ function SchemeStepItem({ step }: { step: TestStep }) {
         <div className='flex items-center gap-2'>
           <StatusIcon status={step.status} testId={step.id} />
           <span>{step.name}</span>
-          {failurePresentation && (
-            <span className='text-xs font-medium text-amber-700' data-testid='artefact-failure-class'>
-              {failurePresentation.heading}
-            </span>
-          )}
         </div>
         {step.status === TestCaseStatus.FAILURE && (failurePresentation || errors.length > 0) && (
           <ValidationDetailsSheet
             isOpen={isDetailsOpen}
             onOpenChange={setIsDetailsOpen}
-            errors={usesErrorDialog && Array.isArray(step.details?.errors) ? step.details.errors : []}
+            errors={dialogErrors}
             failure={step.failure}
             family='scheme'
-            content={
-              usesErrorDialog ||
-              usesFailureOnlyDetails ||
-              messageErrors.length === 0 ||
-              step.failure?.code === 'playground.pipeline.not-executed'
-                ? undefined
-                : schemeMessageDetails(messageErrors)
-            }
             trigger={
               <Button variant='ghost' size='sm' data-testid={`${step.id}-details-trigger`}>
                 View Details

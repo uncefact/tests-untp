@@ -146,27 +146,76 @@ describe('SchemeTestResults', () => {
     render(<Harness schemes={[scheme({ id: 'x', name: 'No Context Scheme' })]} />);
 
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
-    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_VERSION_DETECTION}-row`)).toHaveTextContent('Scheme invalid');
 
     await openStepDetails(TestCaseStepId.SCHEME_VERSION_DETECTION);
+    expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
     expect(
-      screen.getAllByText('The scheme declares no @context entries, so no UNTP version can be detected.').length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText('Check the scheme @context for a recognised UNTP version.')).toBeInTheDocument();
+      screen.getByText(/The scheme declares no @context entries, so no UNTP version can be detected\./),
+    ).toBeInTheDocument();
     await closeStepDetails();
+
+    // The step row carries the status icon, name and action only. The drawer owns the skipped-state words.
+    expect(screen.queryByTestId(`${TestCaseStepId.SCHEME_VERSION_DETECTION}-not-executed`)).not.toBeInTheDocument();
 
     for (const stepId of [
       TestCaseStepId.SCHEME_SCHEMA_VALIDATION,
       TestCaseStepId.SCHEME_STRUCTURAL_PARSE,
       TestCaseStepId.CONTEXT_VALIDATION,
     ]) {
-      expect(screen.getByTestId(`${stepId}-row`)).toHaveTextContent('Not executed');
+      const row = screen.getByTestId(`${stepId}-row`);
+      const stepName = {
+        [TestCaseStepId.SCHEME_SCHEMA_VALIDATION]: 'Schema Validation',
+        [TestCaseStepId.SCHEME_STRUCTURAL_PARSE]: 'Structural Parse',
+        [TestCaseStepId.CONTEXT_VALIDATION]: 'JSON-LD Document Expansion and Context Validation',
+      }[stepId];
+      expect(row.textContent).toBe(`${stepName}View Details`);
+      expect(row).not.toHaveTextContent('Not executed');
+      expect(row).toContainElement(screen.getByTestId(`${stepId}-status-icon-failure`));
+      expect(row).toContainElement(screen.getByTestId(`${stepId}-details-trigger`));
       await openStepDetails(stepId);
+      expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
+      expect(screen.getByTestId('failure-card-heading')).toHaveTextContent('Not executed');
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(/not executed because/);
       expect(
-        screen.getByText('This scheme step was not executed because step "Version Detection" failed first.'),
+        screen.getByText('Issue: This scheme step was not executed because step "Version Detection" failed first.'),
       ).toBeInTheDocument();
       await closeStepDetails();
     }
+  });
+
+  it('drops scheme detail entries without a string message before opening the drawer', async () => {
+    render(
+      <SchemeTestResults
+        collection={{
+          items: [
+            {
+              instanceId: 'invalid-error-entry',
+              contentHash: 'invalid-error-entry',
+              payload: scheme({ id: 'invalid-error-entry', name: 'Invalid Error Entry' }),
+              runId: 'settled',
+              result: [
+                {
+                  id: TestCaseStepId.SCHEME_VERSION_DETECTION,
+                  name: 'Version Detection',
+                  status: TestCaseStatus.FAILURE,
+                  details: {
+                    errors: [{ keyword: 'required' }, { message: 'This entry is displayable.' }],
+                  },
+                },
+              ],
+            },
+          ],
+        }}
+        dispatch={jest.fn() as SchemeDispatch}
+      />,
+    );
+
+    await userEvent.click(await screen.findByTestId('scheme-group-header'));
+    await userEvent.click(screen.getByTestId(`${TestCaseStepId.SCHEME_VERSION_DETECTION}-details-trigger`));
+
+    expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
+    expect(screen.getByText('Issue: This entry is displayable.')).toBeInTheDocument();
+    expect(screen.queryByText(/Missing required field/)).not.toBeInTheDocument();
   });
 
   it('names the observed scheme contexts when none carries a recognised version', async () => {
@@ -182,10 +231,8 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
     await openStepDetails(TestCaseStepId.SCHEME_VERSION_DETECTION);
     expect(
-      screen.getAllByText(
-        'The scheme declares @context entries ["https://example.test/context"], but none carries a recognised UNTP version.',
-      ).length,
-    ).toBeGreaterThan(0);
+      screen.getByText(/The scheme declares @context entries \["https:\/\/example\.test\/context"\]/),
+    ).toBeInTheDocument();
     await closeStepDetails();
   });
 
@@ -205,15 +252,15 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
+    expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
     expect(
-      screen.getAllByText(/Conformity Scheme schemas have no legacy layout before UNTP 0\.7\.0; detected 0\.6\.0\./)
-        .length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText(/Check the scheme version in @context/)).toBeInTheDocument();
+      screen.getByText(/Conformity Scheme schemas have no legacy layout before UNTP 0\.7\.0; detected 0\.6\.0\./),
+    ).toBeInTheDocument();
     await closeStepDetails();
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
+    expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
     expect(
-      screen.getByText('This scheme step was not executed because step "Schema Validation" failed first.'),
+      screen.getByText('Issue: This scheme step was not executed because step "Schema Validation" failed first.'),
     ).toBeInTheDocument();
     expect(parseSchemeStructure).not.toHaveBeenCalled();
     expect(validateContext).toHaveBeenCalled();
@@ -256,8 +303,19 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     expect(await screen.findByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-details-trigger`)).toBeInTheDocument();
-    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).toHaveTextContent('Scheme invalid');
     expect(screen.queryByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-details-trigger`)).not.toBeInTheDocument();
+  });
+
+  it('keeps the remove control inside the expanded header row', async () => {
+    render(<Harness schemes={[scheme({ id: 'header-only', name: 'Header Only Scheme' })]} />);
+
+    const removeButton = await screen.findByRole('button', { name: 'Remove Header Only Scheme' });
+    await userEvent.click(screen.getByTestId('scheme-group-header'));
+
+    const header = screen.getByTestId('scheme-group-header');
+    const body = screen.getByTestId('scheme-group-body');
+    expect(header.contains(removeButton)).toBe(true);
+    expect(body.contains(removeButton)).toBe(false);
   });
 
   it('keeps both structural skip copies free of every step display name', () => {
@@ -291,9 +349,11 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-row`)).toHaveTextContent('Scheme invalid');
-    expect(screen.getByText('/id: scheme.id is required and must be a non-empty string.')).toBeInTheDocument();
-    expect(screen.getByText('/name: scheme.name is required and must be a non-empty string.')).toBeInTheDocument();
+    expect(screen.getByText(/We Found 2 Issues/)).toBeInTheDocument();
+    expect(screen.getByText('Location: id')).toBeInTheDocument();
+    expect(screen.getByText('Issue: scheme.id is required and must be a non-empty string.')).toBeInTheDocument();
+    expect(screen.getByText('Location: name')).toBeInTheDocument();
+    expect(screen.getByText('Issue: scheme.name is required and must be a non-empty string.')).toBeInTheDocument();
     expect(screen.getByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-status-icon-in-progress`)).toBeInTheDocument();
     await closeStepDetails();
 
@@ -303,7 +363,7 @@ describe('SchemeTestResults', () => {
     );
   });
 
-  it('shows only the failure banner for a context fetch failure', async () => {
+  it('shows a context fetch failure as one issue card', async () => {
     const contextUrl = 'https://publisher.example/context.jsonld';
     const diagnostic = `Couldn't load the @context at "${contextUrl}". Common causes: the URL is unreachable, is not https, resolves to a private address, redirected too many times, or returned a non-JSON-LD response. Reported cause: the context service answered status 503.`;
     (validateContext as jest.Mock).mockResolvedValue({
@@ -324,15 +384,15 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
     await openStepDetails(TestCaseStepId.CONTEXT_VALIDATION);
 
-    const banner = screen.getByTestId('artefact-failure-banner');
-    expect(screen.getAllByTestId('artefact-failure-banner')).toHaveLength(1);
-    expect(banner).toHaveTextContent('Could not fetch');
-    expect(banner).toHaveTextContent(contextUrl);
-    expect(banner).toHaveTextContent(
+    const card = screen.getByTestId('validation-issue-card');
+    expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
+    expect(card).toHaveTextContent(`The Playground's context service answered 503 while fetching "${contextUrl}".`);
+    expect(card).toHaveTextContent(contextUrl);
+    expect(card).toHaveTextContent(
       'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
     );
-    expect(screen.queryByText(/Common causes:/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Reported cause:/)).not.toBeInTheDocument();
+    expect(card).not.toHaveTextContent(/Common causes:/);
+    expect(card).not.toHaveTextContent(/Reported cause:/);
     await closeStepDetails();
   });
 
@@ -355,12 +415,10 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
-    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).toHaveTextContent('Scheme invalid');
     expect(screen.getByText(/No schema published at/)).toBeInTheDocument();
     await closeStepDetails();
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-row`)).toHaveTextContent('Scheme invalid');
-    expect(screen.getByText(/The declared Conformity Scheme version "0\.7\.1" has no parser/)).toBeInTheDocument();
+    expect(screen.getByText(/Skipped: the Playground has no parser for UNTP 0\.7\.1/)).toBeInTheDocument();
     expect(parseSchemeStructure).not.toHaveBeenCalled();
     expect(validateContext).toHaveBeenCalled();
     await closeStepDetails();
@@ -487,8 +545,8 @@ describe('SchemeTestResults', () => {
     expect(parseSchemeStructure).not.toHaveBeenCalledWith(first.decoded, expect.anything());
     await userEvent.click(screen.getByTestId('scheme-group-header'));
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByText('Second Scheme structural result')).toBeInTheDocument();
-    expect(screen.queryByText('First Scheme structural result')).not.toBeInTheDocument();
+    expect(screen.getByText(/Second Scheme structural result/)).toBeInTheDocument();
+    expect(screen.queryByText(/First Scheme structural result/)).not.toBeInTheDocument();
     await closeStepDetails();
   });
 
@@ -557,12 +615,15 @@ describe('SchemeTestResults', () => {
     expect(
       (await screen.findAllByText(/The Playground could not build a scheme schema URL: invalid version/)).length,
     ).toBeGreaterThan(0);
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+      'Report these details to the Playground operator.',
+    );
     expect(screen.getByRole('link', { name: 'report an issue' })).toBeInTheDocument();
     expect(screen.queryByText(/Use a Conformity Scheme published/)).not.toBeInTheDocument();
     await closeStepDetails();
   });
 
-  it('shows the schema fetch failure banner without a second diagnostic list', async () => {
+  it('shows the schema fetch failure as one issue card', async () => {
     (validateSchemeSchema as jest.Mock).mockRejectedValue(
       new SchemaFetchError({
         code: 'playground.schema.fetch',
@@ -578,14 +639,14 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
-    const banner = screen.getByTestId('artefact-failure-banner');
-    expect(banner).toHaveTextContent('The Playground could not fetch the artefact');
-    expect(banner).toHaveTextContent('https://untp.unece.org/x.json');
-    expect(banner).toHaveTextContent('Retry the check');
+    const card = screen.getByTestId('validation-issue-card');
+    expect(card).toHaveTextContent('The Playground could not fetch the artefact');
+    expect(card).toHaveTextContent('https://untp.unece.org/x.json');
+    expect(card).toHaveTextContent('Retry the check');
     await closeStepDetails();
   });
 
-  it('classifies a schema timeout as Could not fetch without showing an unexpected-failure toast', async () => {
+  it('shows a schema timeout as an issue card without an unexpected-failure toast', async () => {
     (validateSchemeSchema as jest.Mock).mockRejectedValue(
       new SchemaFetchError({
         code: 'playground.schema.fetch',
@@ -602,8 +663,11 @@ describe('SchemeTestResults', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
 
-    expect(screen.getByText(/The Playground could not fetch the artefact/)).toBeInTheDocument();
-    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).toHaveTextContent('Could not fetch');
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+      'The Playground could not fetch the artefact',
+    );
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('https://untp.unece.org/x.json');
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('Retry the check');
     expect(toastSpy).not.toHaveBeenCalled();
     toastSpy.mockRestore();
     await closeStepDetails();

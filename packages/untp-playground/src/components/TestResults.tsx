@@ -29,7 +29,6 @@ import { newId } from '@/lib/id';
 import {
   classifySchemaFetchFailure,
   classifySchemaSelectionFailure,
-  describeArtefactFailure,
   isUnexpectedFailure,
   unexpectedFailure,
   type ArtefactFailureFamily,
@@ -68,6 +67,10 @@ interface TestResultsProps {
   dispatch: CredentialDispatch;
   /** Admits a decrypted plaintext through the page's upload gates; false keeps the card locked. */
   onDecrypted: (item: CredentialSlot, credential: unknown) => boolean;
+  /** Requests one credential card to open and centre in the Credentials tab. */
+  focusInstanceId?: InstanceId;
+  /** Clears a focus request after its credential header has been scrolled into view. */
+  onFocusInstanceConsumed?: () => void;
 }
 
 export const confettiConfig = {
@@ -232,7 +235,13 @@ function initialisationFailureSteps(stored: StoredCredential): TestStep[] {
   return steps;
 }
 
-export function TestResults({ collection, dispatch, onDecrypted }: TestResultsProps) {
+export function TestResults({
+  collection,
+  dispatch,
+  onDecrypted,
+  focusInstanceId,
+  onFocusInstanceConsumed,
+}: TestResultsProps) {
   // Confetti fires once per (instance, run) so it does not re-fire on unrelated re-renders.
   const confettiShownRef = useRef<Set<string>>(new Set());
   const [pendingRemoval, setPendingRemoval] = useState<CredentialSlot | null>(null);
@@ -308,6 +317,8 @@ export function TestResults({ collection, dispatch, onDecrypted }: TestResultsPr
           instances={lockedInstances}
           onRemove={(item) => setPendingRemoval(item)}
           onDecrypted={onDecrypted}
+          focusInstanceId={focusInstanceId}
+          onFocusInstanceConsumed={onFocusInstanceConsumed}
         />
       )}
       {groups.map((group) => (
@@ -317,6 +328,8 @@ export function TestResults({ collection, dispatch, onDecrypted }: TestResultsPr
           instances={group.instances}
           onRemove={(item) => setPendingRemoval(item)}
           onDecrypted={onDecrypted}
+          focusInstanceId={focusInstanceId}
+          onFocusInstanceConsumed={onFocusInstanceConsumed}
         />
       ))}
 
@@ -571,13 +584,23 @@ function CredentialTypeGroup({
   instances,
   onRemove,
   onDecrypted,
+  focusInstanceId,
+  onFocusInstanceConsumed,
 }: {
   type: string;
   instances: CredentialSlot[];
   onRemove: (item: CredentialSlot) => void;
   onDecrypted: (item: CredentialSlot, credential: unknown) => boolean;
+  focusInstanceId?: InstanceId;
+  onFocusInstanceConsumed?: () => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
+
+  useEffect(() => {
+    if (focusInstanceId && instances.some((item) => item.instanceId === focusInstanceId)) {
+      setIsExpanded(true);
+    }
+  }, [focusInstanceId, instances]);
 
   const rollup = useMemo(() => worstStatus(instances.map((item) => instanceStatus(item.result))), [instances]);
 
@@ -617,6 +640,8 @@ function CredentialTypeGroup({
               item={item}
               onRemove={() => onRemove(item)}
               onDecrypted={(credential) => onDecrypted(item, credential)}
+              focusInstanceId={focusInstanceId}
+              onFocusInstanceConsumed={onFocusInstanceConsumed}
             />
           ))}
         </div>
@@ -629,10 +654,14 @@ function CredentialInstanceRow({
   item,
   onRemove,
   onDecrypted,
+  focusInstanceId,
+  onFocusInstanceConsumed,
 }: {
   item: CredentialSlot;
   onRemove: () => void;
   onDecrypted: (credential: unknown) => boolean;
+  focusInstanceId?: InstanceId;
+  onFocusInstanceConsumed?: () => void;
 }) {
   const stored = item.payload;
   const steps = item.result ?? [];
@@ -642,6 +671,22 @@ function CredentialInstanceRow({
   const [isExpanded, setIsExpanded] = useState(
     () => stored.decryptedFromEnvelope === true && !credentialIsTerminal(item.result ?? []),
   );
+  const headerRef = useRef<HTMLDivElement>(null);
+  const lastFocusedIdRef = useRef<InstanceId | undefined>(undefined);
+  const isExpandedRef = useRef(isExpanded);
+  isExpandedRef.current = isExpanded;
+
+  useEffect(() => {
+    if (focusInstanceId !== item.instanceId) return;
+    if (lastFocusedIdRef.current === focusInstanceId && isExpandedRef.current) {
+      onFocusInstanceConsumed?.();
+      return;
+    }
+    lastFocusedIdRef.current = focusInstanceId;
+    setIsExpanded(true);
+    headerRef.current?.scrollIntoView({ block: 'center' });
+    onFocusInstanceConsumed?.();
+  }, [focusInstanceId, item.instanceId, onFocusInstanceConsumed]);
   const title = locked ? 'Encrypted credential' : credentialTitle(stored);
   const status = instanceStatus(item.result);
   // A queued or mid-pipeline instance offers no remove control until its pipeline settles (#810 AC).
@@ -661,7 +706,8 @@ function CredentialInstanceRow({
   return (
     <div className='group relative overflow-hidden rounded-md border'>
       <div
-        className='flex flex-wrap items-center justify-between gap-2 p-3 cursor-pointer'
+        ref={headerRef}
+        className='relative flex flex-wrap items-center justify-between gap-2 p-3 cursor-pointer'
         onClick={() => setIsExpanded((prev) => !prev)}
         data-testid='credential-instance-header'
         data-instance-id={item.instanceId}
@@ -685,9 +731,24 @@ function CredentialInstanceRow({
         ) : (
           <StatusIcon status={status} testId={item.instanceId} />
         )}
+        {removable && (
+          <button
+            type='button'
+            aria-label={`Remove ${title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            // Revealed only when the pointer is over the header row's delete region, or when the
+            // control is keyboard-focused, rather than on hover of the whole card.
+            className='absolute inset-y-0 right-0 flex w-12 items-center justify-center bg-red-400 text-white opacity-0 transition-opacity hover:bg-red-500 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100'
+          >
+            <Trash2 className='h-4 w-4' />
+          </button>
+        )}
       </div>
       {isExpanded && (
-        <div className='space-y-2 px-3 pb-3 pl-9'>
+        <div className='space-y-2 px-3 pb-3 pl-9' data-testid='credential-instance-body'>
           {stored.source && <SourceCaption source={stored.source} />}
           {locked ? (
             <DecryptCredential
@@ -698,21 +759,6 @@ function CredentialInstanceRow({
             steps.map((step) => <TestStepItem key={step.id} step={step} />)
           )}
         </div>
-      )}
-      {removable && (
-        <button
-          type='button'
-          aria-label={`Remove ${title}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          // Revealed only when the pointer is over the delete region itself (the right edge), or when
-          // the control is keyboard-focused, rather than on hover of the whole row.
-          className='absolute bottom-0 right-0 top-0 flex w-12 items-center justify-center bg-red-400 text-white opacity-0 transition-opacity hover:bg-red-500 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100'
-        >
-          <Trash2 className='h-4 w-4' />
-        </button>
       )}
     </div>
   );
@@ -726,19 +772,13 @@ const TestStepItem = ({ step }: { step: TestStep }) => {
   }, [step.details, step.failure]);
 
   const family = familyForStep(step.id);
-  const failurePresentation = describeArtefactFailure(step.failure, family);
 
   return (
     <div className='py-2'>
-      <div className='flex items-center justify-between'>
+      <div className='flex items-center justify-between' data-testid={`${step.id}-row`}>
         <div className='flex items-center gap-2'>
           <StatusIcon status={step.status} testId={`${step.id}`} />
           <span>{step.name}</span>
-          {failurePresentation && (
-            <span className='text-xs font-medium text-amber-700' data-testid='artefact-failure-class'>
-              {failurePresentation.heading}
-            </span>
-          )}
         </div>
         {shouldShowDetails && (
           <ValidationDetailsSheet

@@ -56,15 +56,9 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.contains('Could not determine the cause').should('be.visible');
-    cy.openValidationDetails('Diagnostic details');
-
-    // Check the diagnostic and the separate remediation line; repeating the
-    // diagnostic would not prove that the failure copy is complete.
-    cy.checkValidationErrorMessages([
-      'Invalid JSON-LD syntax; invalid term definition.',
-      'Report these details to the Playground operator.',
-    ]);
+    cy.get('[data-testid="validation-issue-card"]')
+      .should('contain.text', 'Invalid JSON-LD syntax; invalid term definition.')
+      .and('contain.text', 'Report these details to the Playground operator.');
   });
 
   it('should show error for unresolvable context', () => {
@@ -73,13 +67,12 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.contains('Could not fetch').should('be.visible');
-
-    // Established fetch failures show the URL in the banner and the retry/report remediation directly.
-    cy.checkValidationErrorMessages([
-      'https://unresolvable-context.invalid',
-      'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
-    ]);
+    cy.get('[data-testid="validation-issue-card"]')
+      .should('contain.text', 'https://unresolvable-context.invalid')
+      .and(
+        'contain.text',
+        'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
+      );
   });
 
   it('should show error for invalid properties', () => {
@@ -88,11 +81,8 @@ describe('JSON-LD Expansion and Validation', () => {
     cy.checkValidationStatus('JSON-LD Document Expansion and Context Validation', 'failure');
 
     cy.openErrorDetailsByStepName('JSON-LD Document Expansion and Context Validation');
-    cy.openValidationDetails('Property not defined in @context');
-
-    cy.checkValidationErrorMessages([
-      'Property "invalid" appears in the credential but isn\'t defined by any @context.',
-      'Add "invalid" to a @context, or remove it from the credential.',
-    ]);
+    cy.get('[data-testid="validation-issue-card"]')
+      .should('contain.text', 'Property "invalid" appears in the credential but isn\'t defined by any @context.')
+      .and('contain.text', 'Add "invalid" to a @context, or remove it from the credential.');
   });
 });

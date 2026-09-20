@@ -10,3 +10,9 @@ The UNTP Playground validates UNTP artefacts: verifiable credentials, conformity
 The Playground has three tabs: Credentials, Conformity Schemes and Link Sets. Each tab continues validating its loaded artefacts in the background when you select another tab. A tab shows its loaded instance count and a failure marker when an instance has failed; the Credentials tab also shows a spinner while a credential is being verified. Empty tabs show no marker.
 
 Once the loaded artefacts are ready, a report of them and their results can be generated and downloaded; see [Generating reports](./generating-reports.md).
+
+## Settings
+
+> Warning: Use `FETCH_ALLOW_PRIVATE_URLS=true` only for local development. It lets any browser user who can call `/api/fetch` make the server attempt HTTP or HTTPS requests to any address it can route to, including private, loopback, link-local and other reserved destinations such as cloud metadata addresses, on the initial request and every redirect hop.
+>
+> This setting applies only to `/api/fetch`; `/api/context` and `/api/schema` are unchanged.

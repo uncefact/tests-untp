@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ArtefactUploader, type ArtefactSource } from '@/components/ArtefactUploader';
@@ -128,6 +128,12 @@ export default function Home() {
   const linkSet = useArtefactCollection<StoredLinkSet, TestStep[]>();
   const [fileCount, setFileCount] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>('credentials');
+  const [focusInstanceId, setFocusInstanceId] = useState<InstanceId>();
+  const showCredential = useCallback((instanceId: InstanceId) => {
+    setActiveTab('credentials');
+    setFocusInstanceId(instanceId);
+  }, []);
+  const consumeCredentialFocus = useCallback(() => setFocusInstanceId(undefined), []);
   // Which credential instance each URL's latest accepted ingestion produced (#812); the link set
   // rows read their state through this rather than matching sources, because content-hash
   // identity can append or re-source instances underneath a URL. See urlBindings.ts.
@@ -627,6 +633,8 @@ export default function Home() {
                       collection={credential.state}
                       dispatch={credential.dispatch}
                       onDecrypted={handleDecryptedCredential}
+                      focusInstanceId={focusInstanceId}
+                      onFocusInstanceConsumed={consumeCredentialFocus}
                     />
                   )}
                 </TabsContent>
@@ -662,6 +670,7 @@ export default function Home() {
                       urlBindings={urlBindings}
                       assessments={linkSetAssessments}
                       onVerifyCredential={handleCredentialUpload}
+                      onShowCredential={showCredential}
                       beginUrlAttempt={beginUrlAttempt}
                       onVerifyRejected={handleUrlRejected}
                       onResolveSecondary={handleResolveSecondary}

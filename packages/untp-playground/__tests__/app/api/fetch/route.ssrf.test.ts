@@ -15,13 +15,31 @@ jest.mock('../../../../../untp-utils/node_modules/undici', () => ({
   }),
 }));
 
-import { POST } from '@/app/api/fetch/route';
 import { lookup } from 'node:dns/promises';
 import { Agent, fetch as undiciFetch } from '../../../../../untp-utils/node_modules/undici';
+
+type FetchPost = typeof import('@/app/api/fetch/route').POST;
 
 const mockedLookup = lookup as jest.MockedFunction<typeof lookup>;
 const mockedAgent = Agent as jest.MockedClass<typeof Agent>;
 const mockedUndiciFetch = undiciFetch as jest.MockedFunction<typeof undiciFetch>;
+
+function loadFetchRoute(fetchAllowPrivateUrls: string | undefined): FetchPost {
+  const previousValue = process.env.FETCH_ALLOW_PRIVATE_URLS;
+  if (fetchAllowPrivateUrls === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+  else process.env.FETCH_ALLOW_PRIVATE_URLS = fetchAllowPrivateUrls;
+
+  try {
+    let post: FetchPost | undefined;
+    jest.isolateModules(() => {
+      post = require('@/app/api/fetch/route').POST as FetchPost;
+    });
+    return post!;
+  } finally {
+    if (previousValue === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+    else process.env.FETCH_ALLOW_PRIVATE_URLS = previousValue;
+  }
+}
 
 function makeRequest(url: string, accept?: string): Request {
   return new Request('http://localhost/api/fetch', {
@@ -41,6 +59,7 @@ function makeResponse(body: string | Uint8Array | null, status = 200, headers?: 
 }
 
 describe('POST /api/fetch with the real resolver and guard', () => {
+  let POST: FetchPost;
   let consoleError: jest.SpyInstance;
   // The undici instance mock below only traps the resolver's own transport. A
   // route that reached for the global fetch would bypass every guard while
@@ -51,6 +70,7 @@ describe('POST /api/fetch with the real resolver and guard', () => {
   let originalFetch: typeof globalThis.fetch;
 
   beforeEach(() => {
+    POST = loadFetchRoute(undefined);
     globalFetchCalls.length = 0;
     originalFetch = globalThis.fetch;
     globalThis.fetch = ((...args: unknown[]) => {
