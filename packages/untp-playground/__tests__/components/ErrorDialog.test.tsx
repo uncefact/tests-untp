@@ -42,9 +42,27 @@ describe('ErrorDialog', () => {
       />,
     );
 
-    expect(screen.getAllByText('Could not fetch')).toHaveLength(1);
+    expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
+    expect(screen.getByText('Issue: The Playground could not fetch the artefact.')).toBeInTheDocument();
     expect(screen.getAllByText('Retry the check and report the details if it keeps failing.')).toHaveLength(1);
     expect(screen.queryByText(/Additional properties found/i)).not.toBeInTheDocument();
+  });
+
+  it('labels a synthesised failure card with its classified heading', () => {
+    render(
+      <ErrorDialog
+        errors={[]}
+        failure={{
+          class: 'unknown',
+          code: 'playground.pipeline.not-executed',
+          message: 'This scheme step was not executed because step "Version Detection" failed first.',
+          remediation: 'Review the first failed step.',
+        }}
+        family='scheme'
+      />,
+    );
+
+    expect(screen.getByTestId('failure-card-heading')).toHaveTextContent('Not executed');
   });
 
   it('keeps fetched-schema diagnostics separate from credential correction guidance', () => {
@@ -64,6 +82,9 @@ describe('ErrorDialog', () => {
     );
 
     expect(screen.getByText('These diagnostics describe the fetched schema, not the credential.')).toBeInTheDocument();
+    expect(screen.getByText('Location: https://publisher.example/schema.json')).toBeInTheDocument();
+    expect(screen.getByText('Report the schema to its publisher.')).toBeInTheDocument();
+    expect(screen.queryByText(/Change the value to match the expected type/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /choose from allowed values/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /diagnostic details/i }));
     expect(screen.queryByText(/Try this instead/i)).not.toBeInTheDocument();
@@ -83,12 +104,11 @@ describe('ErrorDialog', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /fix validation error/i }));
     expect(screen.getByText(/Add the artefact on its own tab\. The Playground accepts:/i)).toBeInTheDocument();
     expect(screen.queryByText(/supported UNTP credential types: the supported UNTP types/i)).not.toBeInTheDocument();
   });
 
-  it('does not show a second speculative causes list for an established fetch failure', () => {
+  it('renders one classified card for an established context fetch failure', () => {
     render(
       <ErrorDialog
         errors={[
@@ -104,13 +124,19 @@ describe('ErrorDialog', () => {
           code: 'context.fetch',
           message: 'The Playground context service answered 503.',
           remediation: 'Retry the check.',
+          artefactUrl: 'https://publisher.example/context.jsonld',
+          serviceStatus: 503,
         }}
       />,
     );
 
-    expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(
+    expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
       'The Playground context service answered 503.',
     );
+    expect(screen.getByText('Location: https://publisher.example/context.jsonld')).toBeInTheDocument();
+    expect(screen.getByText('Service status: 503')).toBeInTheDocument();
+    expect(screen.getByText('Retry the check.')).toBeInTheDocument();
     expect(screen.queryByText(/Common causes:/i)).not.toBeInTheDocument();
   });
 
@@ -160,6 +186,74 @@ describe('ErrorDialog', () => {
     expect(screen.getAllByText(/data → field1/i)).toHaveLength(2);
     expect(screen.getByText(/wrong type/i)).toBeInTheDocument();
     expect(screen.getByText(/missing field/i)).toBeInTheDocument();
+  });
+
+  it('renders message-shaped issues and advisory diagnostics as drawer cards', () => {
+    render(
+      <ErrorDialog
+        errors={[
+          {
+            message: 'The score entry is malformed.',
+            pointer: '/includedProfile/0/score/1/code',
+            tip: 'Keep the score entry aligned with the scheme.',
+          },
+          { message: 'The parser could not name this location.', supportable: true },
+          { keyword: 'additionalProperties', instancePath: '', params: { additionalProperty: 'legacy' } },
+        ]}
+        failure={{
+          class: 'credential-invalid',
+          code: 'conformity-scheme.parse-failed',
+          message: 'The scheme is invalid.',
+          remediation: 'Correct the scheme.',
+        }}
+        family='scheme'
+      />,
+    );
+
+    expect(screen.getByText('We Found 2 Issues')).toBeInTheDocument();
+    expect(screen.getByText('Location: includedProfile → 0 → score → 1 → code')).toBeInTheDocument();
+    expect(screen.getByText('Issue: The score entry is malformed.')).toBeInTheDocument();
+    expect(screen.getByText('Keep the score entry aligned with the scheme.')).toBeInTheDocument();
+    expect(screen.getByText('Issue: The parser could not name this location.')).toBeInTheDocument();
+    expect(screen.getByText('Correct the scheme.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'report an issue' })).toBeInTheDocument();
+    expect(screen.getByText('1 Warning')).toBeInTheDocument();
+    expect(screen.getByText('Additional property: "legacy"')).toBeInTheDocument();
+    expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(2);
+  });
+
+  it('keeps the support link and supplied tip when a described error repeats the failure message', () => {
+    render(
+      <ErrorDialog
+        errors={[{ message: 'The schema service failed.', supportable: true, tip: 'Report the service response.' }]}
+        failure={{
+          class: 'unknown',
+          code: 'schema.unknown',
+          message: 'The schema service failed.',
+          remediation: 'Retry the check.',
+        }}
+      />,
+    );
+
+    expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
+    expect(screen.getByText('Report the service response.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'report an issue' })).toBeInTheDocument();
+  });
+
+  it('decodes escaped JSON Pointer tokens in issue card paths', () => {
+    render(
+      <ErrorDialog
+        errors={[
+          {
+            keyword: 'type',
+            instancePath: '/linkset/0/https:~1~1test.uncefact.org~1voc~1untp~1dpp/0',
+            params: { type: 'object' },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Location: linkset → 0 → https://test.uncefact.org/voc/untp/dpp → 0')).toBeInTheDocument();
   });
 
   it('displays warnings for additional properties', () => {
@@ -284,11 +378,7 @@ describe('ErrorDialog', () => {
 
     render(<ErrorDialog errors={errors} />);
 
-    // Expand the error details
-    const expandButton = screen.getByRole('button', { name: /Fix validation error/i });
-    fireEvent.click(expandButton);
-
-    // Verify tip content
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('Issue: Unknown validation error');
     expect(
       screen.getByText(/Resolve the conflict by removing the conflicting field or updating it to a unique one/i),
     ).toBeInTheDocument();
@@ -313,7 +403,6 @@ describe('ErrorDialog', () => {
     ] as any;
 
     render(<ErrorDialog errors={errors} />);
-    fireEvent.click(screen.getByRole('button', { name: /Fix validation error/i }));
 
     expect(
       screen.getByText(
@@ -366,7 +455,6 @@ describe('ErrorDialog', () => {
     expect(screen.getByText(/we found 2 issues/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /fix validation error/i }));
-
     expect(screen.getByText((_, element) => element?.textContent === 'Missing field: owner')).toBeInTheDocument();
     expect(
       screen.getByText((_, element) => element?.textContent === 'Missing field: documentation'),
@@ -398,32 +486,17 @@ describe('ErrorDialog', () => {
 
     render(<ErrorDialog errors={errors} />);
 
-    expect(screen.getByText(/we found 1 issue/i)).toBeInTheDocument();
-
-    const button = screen.getByRole('button');
-    fireEvent.click(button);
-
-    const errorMessages = screen.getAllByText(/the first element of "@context" must be one of the following:/i);
-    const specificErrorMessage = errorMessages[0];
-    expect(specificErrorMessage).toBeInTheDocument();
-
-    expect(
-      screen.getByText((content, element) => {
-        return (
-          content.includes('https://www.w3.org/2018/credentials/v1') &&
-          content.includes('https://www.w3.org/ns/credentials/v2')
-        );
-      }),
-    ).toBeInTheDocument();
-
-    const copyButton = screen.getByRole('button', { name: /copy/i });
-    fireEvent.click(copyButton);
-
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      JSON.stringify(['https://www.w3.org/2018/credentials/v1', 'https://www.w3.org/ns/credentials/v2'], null, 2),
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+      'Issue: The first element of "@context" must be one of the following:',
     );
-
-    expect(screen.getByText(/missing value/i)).toBeInTheDocument();
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('missing value');
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+      'Make sure your input matches the required format.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /fix validation error/i }));
+    expect(screen.getByText('Example:')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(JSON.stringify(errors[0].params.allowedValues, null, 2));
   });
 
   it('displays minItems error details correctly', () => {
@@ -462,7 +535,9 @@ describe('ErrorDialog', () => {
 
       render(<ErrorDialog errors={errors} />);
 
-      expect(screen.getByRole('button', { name: /property not defined in @context/i })).toBeInTheDocument();
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+        'Property "mediaQuery" appears in the credential',
+      );
       expect(screen.queryByText(/Location:/i)).not.toBeInTheDocument();
     });
 
@@ -477,10 +552,13 @@ describe('ErrorDialog', () => {
       ] as any;
 
       render(<ErrorDialog errors={errors} />);
-      fireEvent.click(screen.getByRole('button', { name: /diagnostic details json-ld validation/i }));
-
-      expect(screen.getByText(/JSON-LD code:/i)).toBeInTheDocument();
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('Issue: something');
+      fireEvent.click(screen.getByRole('button', { name: /diagnostic details/i }));
+      expect(screen.getByText('JSON-LD code:')).toBeInTheDocument();
       expect(screen.getByText('relative @id reference')).toBeInTheDocument();
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+        'Report the JSON-LD diagnostic shown above.',
+      );
     });
 
     it('shows a property-specific tip for invalid property errors', () => {
@@ -505,12 +583,10 @@ describe('ErrorDialog', () => {
           family='context'
         />,
       );
-      fireEvent.click(screen.getByRole('button', { name: /property not defined in @context/i }));
-
       expect(screen.getByText(/Add "mediaQuery" to a @context, or remove it from the credential/i)).toBeInTheDocument();
     });
 
-    it('uses default remediation when the invalid property has no term', () => {
+    it('shows an invalid property in the issue list when the drawer has Ajv errors', () => {
       const failure = classifyJsonLdFailure({
         kind: 'document',
         source: 'safe-mode-event',
@@ -532,13 +608,12 @@ describe('ErrorDialog', () => {
         />,
       );
 
-      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(
-        'Correct the named field or term in the credential.',
-      );
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('A property was not defined.');
+      expect(screen.getByText(/A property was not defined\./)).toBeInTheDocument();
       expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
     });
 
-    it('shows the URL-specific header and tip for invalid context URL errors', () => {
+    it('shows the classified fetch card for invalid context URL errors', () => {
       const errors = [
         {
           keyword: 'jsonldUrl',
@@ -563,11 +638,16 @@ describe('ErrorDialog', () => {
         />,
       );
 
-      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Could not fetch');
-      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(/Retry the check/);
+      expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+        'The Playground could not fetch the JSON-LD context',
+      );
+      expect(screen.getByText('Location: https://example.invalid/ctx')).toBeInTheDocument();
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(/Retry the check/);
+      expect(screen.queryByText(/Couldn.t load the @context/i)).not.toBeInTheDocument();
     });
 
-    it('shows a host-delivery header and tip when the context host failed after passing the guard', () => {
+    it('shows the classified service failure when the context host failed after passing the guard', () => {
       const errors = [
         {
           keyword: 'jsonldUrl',
@@ -591,11 +671,16 @@ describe('ErrorDialog', () => {
         />,
       );
 
-      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Could not fetch');
+      expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+        'The Playground could not fetch the JSON-LD context',
+      );
+      expect(screen.getByText('Location: https://example.invalid/ctx')).toBeInTheDocument();
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('Retry the check.');
       expect(screen.queryByText(/change|rename|use a different/i)).not.toBeInTheDocument();
     });
 
-    it('shows an unusable-artefact header and tip for a fetched context that is not a context', () => {
+    it('shows the classified unusable-artefact card for a fetched context that is not a context', () => {
       const errors = [
         {
           keyword: 'jsonldUrl',
@@ -619,7 +704,13 @@ describe('ErrorDialog', () => {
         />,
       );
 
-      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Unusable artefact');
+      expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+        'The JSON-LD context at "https://example.invalid/ctx" was fetched but is not usable.',
+      );
+      expect(screen.getByText('Location: https://example.invalid/ctx')).toBeInTheDocument();
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('Report the artefact URL');
+      expect(screen.queryByText(/was fetched but isn.t a usable JSON-LD context/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/change|rename|use a different/i)).not.toBeInTheDocument();
     });
 
@@ -646,7 +737,11 @@ describe('ErrorDialog', () => {
         />,
       );
 
-      expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Could not fetch');
+      expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+        'The Playground context service could not be reached.',
+      );
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('Retry the check.');
       expect(screen.queryByText(/change|rename|use a different/i)).not.toBeInTheDocument();
     });
   });

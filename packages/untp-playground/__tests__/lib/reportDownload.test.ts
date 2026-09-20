@@ -1,5 +1,7 @@
 import { downloadHtml } from '@/lib/reportDownload';
 import { classifyJsonLdFailure } from '@/lib/artefactFailure';
+import { buildValidationCards, validationCardsInDrawerOrder } from '@/lib/validationErrorCards';
+import { ErrorDialog } from '@/components/ErrorDialog';
 import type { ArtefactStepFailure } from '@/lib/artefactFailure';
 import type {
   PermittedCredentialType,
@@ -10,6 +12,8 @@ import type {
   TestReportStatus,
 } from '@/types';
 import { TestCaseStatus, TestCaseStepId } from '../../constants';
+import { cleanup, render as renderReact, screen } from '@testing-library/react';
+import { createElement } from 'react';
 
 /**
  * Renders the real template (the Jest `.hbs` adapter reads it from disk) through the real
@@ -249,6 +253,152 @@ describe('downloadHtml (#814)', () => {
     expect(article?.querySelector('a')).toBeNull();
   });
 
+  it('renders the same shared cards as the drawer for schema, VCDM, JSON-LD, fetch and skipped failures', async () => {
+    const enumError = {
+      keyword: 'enum',
+      instancePath: '/@context/0',
+      message: 'must be equal to one of the allowed values',
+      params: { allowedValues: ['https://example.test/context'] },
+    };
+    const cases = [
+      {
+        family: 'credential' as const,
+        name: 'UNTP Schema Validation',
+        errors: [enumError],
+        failure: undefined,
+      },
+      {
+        family: 'vcdm' as const,
+        name: 'VCDM Schema Validation',
+        errors: [],
+        failure: {
+          class: 'credential-invalid' as const,
+          code: 'schema.validation.payload' as const,
+          message: 'The credential failed VCDM validation.',
+          remediation: 'Correct the credential fields.',
+        },
+      },
+      {
+        family: 'context' as const,
+        name: 'JSON-LD Document Expansion and Context Validation',
+        errors: [
+          {
+            keyword: 'jsonldValidation',
+            instancePath: '@context/0',
+            message: 'A property is not defined in the JSON-LD context.',
+            params: { code: 'invalid property', property: 'example:term' },
+          },
+        ],
+        failure: undefined,
+      },
+      {
+        family: 'context' as const,
+        name: 'Context fetch',
+        errors: [],
+        failure: {
+          class: 'could-not-fetch' as const,
+          code: 'context.fetch' as const,
+          message: 'The context could not be fetched.',
+          remediation: 'Retry the check.',
+          artefactUrl: 'https://example.test/context.jsonld',
+          serviceStatus: 503,
+        },
+      },
+      {
+        family: 'scheme' as const,
+        name: 'Version Detection',
+        errors: [],
+        failure: {
+          class: 'unknown' as const,
+          code: 'playground.pipeline.not-executed' as const,
+          message: 'This scheme step was not executed because an earlier step failed.',
+          remediation: 'Review the first failed step.',
+        },
+      },
+    ];
+
+    const credentialResult = credential('DigitalProductPassport', 'cards.json');
+    credentialResult.status = TestCaseStatus.FAILURE;
+    credentialResult.core.steps = cases.slice(0, 4).map((testCase, index) => ({
+      id: [
+        TestCaseStepId.UNTP_SCHEMA_VALIDATION,
+        TestCaseStepId.VCDM_SCHEMA_VALIDATION,
+        TestCaseStepId.CONTEXT_VALIDATION,
+        TestCaseStepId.VERIFICATION,
+      ][index],
+      name: testCase.name,
+      status: TestCaseStatus.FAILURE,
+      details: { errors: testCase.errors },
+      ...(testCase.failure ? { failure: testCase.failure } : {}),
+    }));
+    const schemeResult = scheme('Skipped Scheme', 'Skipped Scheme');
+    schemeResult.status = TestCaseStatus.FAILURE;
+    schemeResult.steps = [
+      {
+        ...schemeResult.steps[0],
+        status: TestCaseStatus.FAILURE,
+        name: cases[4].name,
+        failure: cases[4].failure,
+        details: { errors: [] },
+      },
+    ];
+
+    const doc = await render(
+      report({ pass: false, verifiableCredentials: [credentialResult], conformitySchemes: [schemeResult] }),
+    );
+    jest.restoreAllMocks();
+    const reportCardText = (stepName: string) => {
+      const stepNode = Array.from(doc.querySelectorAll('.step')).find(
+        (node) => node.querySelector('.step-name')?.textContent === stepName,
+      );
+      return Array.from(stepNode?.querySelectorAll('.err') ?? []).map((node) =>
+        (node.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      );
+    };
+    const drawerCardText = (testCase: (typeof cases)[number]) => {
+      const { unmount } = renderReact(
+        createElement(ErrorDialog, { errors: testCase.errors, failure: testCase.failure, family: testCase.family }),
+      );
+      const cards = [
+        ...screen.queryAllByTestId('validation-issue-card'),
+        ...screen.queryAllByTestId('validation-warning-card'),
+      ];
+      const texts = cards.map((card) => {
+        const copy = card.cloneNode(true) as HTMLElement;
+        copy.querySelector('[data-testid="failure-card-heading"]')?.remove();
+        copy.querySelector('button > div > div > span:first-child')?.remove();
+        copy.querySelectorAll('svg').forEach((icon) => icon.remove());
+        return (copy.textContent ?? '').replace(/\s+/g, ' ').trim();
+      });
+      unmount();
+      cleanup();
+      return texts;
+    };
+
+    cases.forEach((testCase) => {
+      const expected = validationCardsInDrawerOrder(buildValidationCards(testCase.errors, testCase.failure));
+      expect(reportCardText(testCase.name)).toEqual(
+        expected.map((card) => {
+          const fields = [
+            card.keyword,
+            card.path ? `Location: ${card.path}` : undefined,
+            ...card.messages,
+            card.detail,
+            card.tip ? `Tip: ${card.tip}` : undefined,
+            card.supportable ? 'If this keeps happening, report an issue.' : undefined,
+          ];
+          return fields.filter(Boolean).join(' ');
+        }),
+      );
+      const compact = (text: string) => text.replace(/\s+/g, '');
+      expect(drawerCardText(testCase).map(compact)).toEqual(reportCardText(testCase.name).map(compact));
+    });
+
+    expect(html).not.toContain('Credential invalid:');
+    expect(html).not.toContain('allowed:');
+    expect(html).not.toContain('unexpected:');
+  });
+
   const schemeFailureCases: Array<{ label: string; failure: ArtefactStepFailure }> = [
     {
       label: 'could-not-fetch',
@@ -291,7 +441,7 @@ describe('downloadHtml (#814)', () => {
     },
   ];
 
-  it.each(schemeFailureCases)('renders the $label failure summary on a scheme step', async ({ failure }) => {
+  it.each(schemeFailureCases)('renders the $label failure card on a scheme step', async ({ failure }) => {
     const entry = scheme('Failed Scheme', 'Failed Scheme');
     entry.status = TestCaseStatus.FAILURE;
     entry.steps = [
@@ -303,18 +453,10 @@ describe('downloadHtml (#814)', () => {
     ];
 
     const doc = await render(report({ pass: false, conformitySchemes: [entry] }));
-    const summary = doc.querySelector('article[data-result="scheme"] [data-failure-summary="true"]')?.textContent ?? '';
-    expect(summary).toContain(
-      failure.class === 'could-not-fetch'
-        ? 'Could not fetch'
-        : failure.class === 'unusable-artefact'
-          ? 'Unusable artefact'
-          : failure.class === 'credential-invalid'
-            ? 'Scheme invalid'
-            : 'Could not determine the cause',
-    );
-    expect(summary).toContain(failure.message);
-    expect(summary).toContain(failure.remediation);
+    const card = doc.querySelector('article[data-result="scheme"] .err');
+    expect(card?.textContent).toContain(failure.message);
+    expect(card?.textContent).toContain(failure.remediation);
+    expect(doc.querySelector('[data-failure-summary="true"]')).toBeNull();
   });
 
   it('renders every recorded failure class with its remediation and keeps field errors', async () => {
@@ -358,26 +500,26 @@ describe('downloadHtml (#814)', () => {
           status: TestCaseStatus.FAILURE,
           failure,
           ...(failure.class === 'credential-invalid'
-            ? { details: { errors: [{ keyword: 'required', message: 'must have issuer', params: {} }] } }
+            ? {
+                details: {
+                  errors: [{ keyword: 'required', message: 'must have issuer', params: { missingProperty: 'issuer' } }],
+                },
+              }
             : {}),
         },
       ];
       return result;
     });
     const doc = await render(report({ pass: false, verifiableCredentials: results }));
-    const summaries = Array.from(doc.querySelectorAll('[data-failure-summary="true"]')).map((node) => node.textContent);
-    expect(summaries).toHaveLength(4);
-    expect(summaries[0]).toContain('Could not fetch');
-    expect(summaries[0]).toContain('Retry');
-    expect(summaries[1]).toContain('Unusable artefact');
-    expect(summaries[1]).toContain('publisher');
-    expect(summaries[2]).toContain('Credential invalid');
-    expect(summaries[3]).toContain('Could not determine the cause');
-    expect(summaries[0]).not.toMatch(/correct|change|rename|fix/i);
-    expect(summaries[1]).not.toMatch(/correct|change|rename|fix/i);
-    expect(summaries[3]).not.toMatch(/correct|change|rename|fix/i);
-    expect(doc.body.textContent).toContain('must have issuer');
+    expect(doc.querySelectorAll('[data-failure-summary="true"]')).toHaveLength(0);
+    const bodyText = doc.body.textContent ?? '';
+    expect(bodyText).toContain('Retry the check or report the URL and status.');
+    expect(bodyText).toContain('Report the artefact URL to its publisher.');
+    expect(bodyText).toContain('Add the missing "issuer" field.');
+    expect(bodyText).toContain('Report these details to the Playground operator.');
+    expect(doc.body.textContent).toContain('Missing required field: issuer');
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('Credential invalid:');
   });
 
   it('renders the default remediation for a term-less invalid-property failure', async () => {
@@ -453,7 +595,7 @@ describe('downloadHtml (#814)', () => {
     expect(steps[0].textContent).toContain('schema: https://untp.example/0.7.0/linkset.json');
   });
 
-  it('shows schema errors with the shared explanation but without the card-only Verify hint, and lists mismatches with hrefs', async () => {
+  it('shows schema errors with the same card explanation as the drawer, and lists mismatches with hrefs', async () => {
     const entry = linkSet({
       status: TestCaseStatus.FAILURE,
       steps: [
@@ -512,8 +654,8 @@ describe('downloadHtml (#814)', () => {
     expect(errors[0]).toContain('rejects the relation "untp:dpp"');
     expect(errors[1]).toContain('title');
     expect(errors[0]).toContain('concerns the relation name only.');
-    expect(html).not.toContain('this card');
-    expect(html).not.toContain('can still be verified');
+    expect(html).toContain('this card');
+    expect(html).toContain('can still be verified');
     const mismatches = article.querySelector('li[data-step="linkset-link-type-coverage"]')!;
     expect(mismatches.querySelector('.err-msg')?.textContent).toBe('dpp link resolved to DigitalConformityCredential');
     expect(mismatches.querySelector('.err-detail li')?.textContent).toBe('https://c.example.org/dpp.json');

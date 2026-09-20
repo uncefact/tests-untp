@@ -34,12 +34,15 @@ describe('Display Error Messages', () => {
     cy.checkValidationStatus('UNTP Schema Validation', 'failure');
 
     cy.openErrorDetailsByStepName('UNTP Schema Validation');
-    cy.contains('Credential invalid').should('be.visible');
+    cy.contains('We Found 1 Issue').should('be.visible');
     cy.contains(
       'The credential declares @context entries ["https://www.w3.org/ns/credentials/v2"], but none carries a recognised UNTP version.',
     ).should('be.visible');
+    cy.get('[data-testid="validation-issue-card"]').should(
+      'contain.text',
+      'The credential declares @context entries ["https://www.w3.org/ns/credentials/v2"], but none carries a recognised UNTP version.',
+    );
     cy.contains('Check the credential @context for a recognised UNTP version.').should('be.visible');
-    cy.contains('Fix validation error').should('not.exist');
   });
 
   it('should open error details when clicking on View Detail Upload', () => {

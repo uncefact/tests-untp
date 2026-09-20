@@ -1,8 +1,15 @@
 /**
- * Fetches verifier-supplied HTTPS documents through the shared resolver. The
+ * Fetches verifier-supplied documents through the shared resolver. The
  * resolver validates and pins every redirect hop, and one 10-second budget
  * covers DNS, redirects, transport and body reading. Private-address details
  * stay in server logs and are not included in the response.
+ * Use `FETCH_ALLOW_PRIVATE_URLS=true` only for local development. It lets any
+ * browser user who can call `/api/fetch` make the server attempt HTTP or HTTPS
+ * requests to any address it can route to, including private, loopback, link-local
+ * and other reserved destinations such as cloud metadata addresses, on the
+ * initial request and every redirect hop.
+ * This setting applies only to `/api/fetch`; `/api/context` and `/api/schema`
+ * are unchanged.
  *
  * @see https://github.com/uncefact/tests-untp/issues/825
  * @see ../../../../../../docs/adrs/035-utils-throws-structured-errors.md
@@ -27,12 +34,17 @@ import {
   resolveDocument,
   type LoadResult,
 } from '@uncefact/untp-utils/resolvers';
+import { fetchAllowPrivateUrls } from '@/lib/fetchAllowPrivateUrls';
 
 export const runtime = 'nodejs';
 
 const MAX_RESPONSE_BYTES = 10 * 1_048_576;
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_REDIRECTS = 3;
+
+const documentFetchOptions = fetchAllowPrivateUrls
+  ? { allowedSchemes: ['http', 'https'], allowPrivateAddresses: true }
+  : { allowedSchemes: ['https'] };
 
 type FetchError = 'invalid-url' | 'blocked' | 'not-found' | 'timeout' | 'too-large' | 'too-many-redirects' | 'network';
 
@@ -92,7 +104,7 @@ export async function POST(request: Request): Promise<NextResponse<FetchResponse
   // escaping as a framework 500 outside the response contract.
   try {
     const result: LoadResult = await resolveDocument(parsed.url, {
-      allowedSchemes: ['https'],
+      ...documentFetchOptions,
       maxResponseBytes: MAX_RESPONSE_BYTES,
       totalTimeoutMs: REQUEST_TIMEOUT_MS,
       maxRedirects: MAX_REDIRECTS,
@@ -145,7 +157,7 @@ function mapFetchError(error: unknown, inputUrl: string): Exclude<FetchResponse,
     return {
       ok: false,
       error: 'blocked',
-      message: `Only https: URLs are allowed (got ${stringReceived(error, 'unknown')}:).`,
+      message: `Only ${formatAllowedSchemes(error)} URLs are allowed (got ${stringReceived(error, 'unknown')}:).`,
     };
   }
   if (error instanceof PrivateHostnameError) {
@@ -197,6 +209,17 @@ function mapFetchError(error: unknown, inputUrl: string): Exclude<FetchResponse,
 
 function stringReceived(error: UrlValidationError, fallback: string): string {
   return typeof error.received === 'string' ? error.received : fallback;
+}
+
+function formatAllowedSchemes(error: UnsupportedSchemeError): string {
+  const expected = error.expected;
+  const allowedSchemes =
+    Array.isArray(expected) &&
+    expected.length > 0 &&
+    expected.every((scheme): scheme is string => typeof scheme === 'string')
+      ? expected
+      : ['https'];
+  return allowedSchemes.map((scheme) => `${scheme}:`).join(' or ');
 }
 
 function logFetchError(error: unknown): void {

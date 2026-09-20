@@ -4,14 +4,14 @@ These are the user-facing release notes for the UNTP Playground. They focus
 on what's new for you, the person using the playground, not on the internal
 mechanics. For a technical, per-change log see [CHANGELOG.md](./CHANGELOG.md).
 
-## 0.4.0 - 2026-09-18
+## 0.4.0 - 2026-09-21
 
 The 0.4.0 release gives the UNTP Playground a tabbed workspace for
 credentials, Conformity Schemes and Identity Resolver link sets. It validates
 each loaded family in one session, makes failure causes visible, and produces
 reports that include every loaded and validated family.
 
-- Technical changelog: [CHANGELOG.md § 0.4.0](./CHANGELOG.md#040---2026-09-18)
+- Technical changelog: [CHANGELOG.md § 0.4.0](./CHANGELOG.md#040---2026-09-21)
 - Container image: [ghcr.io/uncefact/tests-untp/untp-playground](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Funtp-playground) (`:0.4.0`, `:latest`)
 
 ### Breaking changes
@@ -126,7 +126,7 @@ through the shared guarded resolver. One 10-second budget covers DNS,
 redirects, transport and body reading. Each redirect is checked before it is
 requested, and the connection uses the address that was checked.
 
-**Safer failures.** Private and reserved address ranges and internal-looking
+**Safer failures.** By default, private and reserved address ranges and internal-looking
 hostnames are refused. Public IPv6 literals are fetched, private IPv6
 literals are refused, and a 304 response is not followed. Network errors are
 reported with safe messages rather than raw Node error details.
@@ -164,6 +164,8 @@ validated.
 linked credential or changing a URL binding discards the generated report.
 
 ### New environment variables
+
+For local development only, the off-by-default `FETCH_ALLOW_PRIVATE_URLS=true` setting lets any browser user make `/api/fetch` retrieve HTTP or HTTPS documents from private, loopback and other reserved destinations, including cloud metadata addresses, directly or through redirects.
 
 **Configurable documentation links.** Set
 `NEXT_PUBLIC_DECRYPTION_DOCS_URL` to change the encryption support link on

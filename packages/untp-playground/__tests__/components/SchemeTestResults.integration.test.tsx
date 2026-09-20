@@ -136,8 +136,10 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByText('/id: scheme.id is required and must be a non-empty string.')).toBeInTheDocument();
-    expect(screen.getByText('/name: scheme.name is required and must be a non-empty string.')).toBeInTheDocument();
+    expect(screen.getByText('Location: id')).toBeInTheDocument();
+    expect(screen.getByText('Issue: scheme.id is required and must be a non-empty string.')).toBeInTheDocument();
+    expect(screen.getByText('Location: name')).toBeInTheDocument();
+    expect(screen.getByText('Issue: scheme.name is required and must be a non-empty string.')).toBeInTheDocument();
     await closeStepDetails();
     expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-status-icon-failure`)).toBeInTheDocument();
     expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-status-icon-failure`)).toBeInTheDocument();
@@ -154,8 +156,10 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByText('/id: scheme.id is required and must be a non-empty string.')).toBeInTheDocument();
-    expect(screen.getByText('/name: scheme.name is required and must be a non-empty string.')).toBeInTheDocument();
+    expect(screen.getByText('Location: id')).toBeInTheDocument();
+    expect(screen.getByText('Issue: scheme.id is required and must be a non-empty string.')).toBeInTheDocument();
+    expect(screen.getByText('Location: name')).toBeInTheDocument();
+    expect(screen.getByText('Issue: scheme.name is required and must be a non-empty string.')).toBeInTheDocument();
     await closeStepDetails();
     expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-status-icon-failure`)).toBeInTheDocument();
   });
@@ -167,7 +171,8 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
 
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(screen.getByText(/\/name: scheme\.name is required/)).toBeInTheDocument();
+    expect(screen.getByText('Location: name')).toBeInTheDocument();
+    expect(screen.getByText(/Issue: scheme\.name is required/)).toBeInTheDocument();
     await closeStepDetails();
     expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-status-icon-success`)).toBeInTheDocument();
     expect(screen.getByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-status-icon-success`)).toBeInTheDocument();
@@ -239,15 +244,20 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
 
       expect(schemaRequests).toBe(0);
       await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
+      expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
       expect(
-        screen.getByText('This scheme step was not executed because step "Schema Validation" failed first.'),
+        screen.getByText('Issue: This scheme step was not executed because step "Schema Validation" failed first.'),
       ).toBeInTheDocument();
       expect(screen.queryByText(buildUnsupportedParserSkipMessage('0.6.0'))).not.toBeInTheDocument();
       await closeStepDetails();
       expect(parserSpy).not.toHaveBeenCalled();
       expect(await screen.findByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-status-icon-failure`)).toBeInTheDocument();
-      expect(screen.getByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-row`)).toHaveTextContent('Could not fetch');
-      expect(screen.queryByText('Could not determine the cause')).not.toBeInTheDocument();
+      await openStepDetails(TestCaseStepId.CONTEXT_VALIDATION);
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+        "The Playground's context service answered 422",
+      );
+      expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('Retry the check');
+      await closeStepDetails();
       expect(contextRequests).toBe(1);
       expect(toastSpy).not.toHaveBeenCalled();
     } finally {
@@ -271,13 +281,12 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     expect(schemaRequests).toBe(1);
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
     expect(requestedSchemaUrl).not.toBe('');
-    const expectedSchemaMessage = `The schema at "${requestedSchemaUrl}" returned HTTP status ${status}; it was not published for declared version 0.7.0-rc.1.`;
-    expect(screen.getAllByText(expectedSchemaMessage).length).toBeGreaterThan(0);
+    expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`Schema host returned status ${status}`))).toBeInTheDocument();
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(`Schema host returned status ${status}`);
     await closeStepDetails();
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    expect(
-      screen.getByText(/The declared Conformity Scheme version "0\.7\.0-rc\.1" has no parser/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(`Issue: ${buildUnsupportedParserSkipMessage('0.7.0-rc.1')}`)).toBeInTheDocument();
     await closeStepDetails();
     expect(parserSpy).not.toHaveBeenCalled();
     expect(contextRequests).toBe(1);
@@ -304,10 +313,9 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
     await openStepDetails(TestCaseStepId.CONTEXT_VALIDATION);
 
-    const expectedContextMessage = `The context at "${contextUrl}" returned HTTP status ${status}; it was not published for declared version 0.7.0.`;
-    expect(screen.getAllByText(expectedContextMessage).length).toBeGreaterThan(0);
-    expect(screen.getByTestId(`${TestCaseStepId.CONTEXT_VALIDATION}-row`)).toHaveTextContent('Scheme invalid');
-    expect(screen.getByText(/correct the scheme's declared @context version/i)).toBeInTheDocument();
+    expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`The @context at .* returned HTTP ${status}`))).toBeInTheDocument();
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(`The @context at`);
     await closeStepDetails();
   });
 
@@ -319,8 +327,12 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     await userEvent.click(await screen.findByTestId('scheme-group-header'));
     await openStepDetails(TestCaseStepId.SCHEME_SCHEMA_VALIDATION);
 
-    expect(screen.getByText(/was fetched but its response was not valid JSON/)).toBeInTheDocument();
-    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).toHaveTextContent('Unusable artefact');
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+      'was fetched but its response was not valid JSON',
+    );
+    expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-row`)).not.toHaveTextContent(
+      'Unusable artefact',
+    );
     await closeStepDetails();
     expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-status-icon-success`)).toBeInTheDocument();
   });
@@ -339,10 +351,10 @@ describe('SchemeTestResults with the real scheme pipeline', () => {
     await closeStepDetails();
     expect(screen.getByTestId(`${TestCaseStepId.SCHEME_SCHEMA_VALIDATION}-status-icon-failure`)).toBeInTheDocument();
     await openStepDetails(TestCaseStepId.SCHEME_STRUCTURAL_PARSE);
-    const structuralMessage = screen.getByText(/\/name: scheme\.name is required/);
+    const structuralMessage = screen.getByText(/Issue: scheme\.name is required/);
     expect(structuralMessage).toBeInTheDocument();
     expect(screen.getByTestId(`${TestCaseStepId.SCHEME_STRUCTURAL_PARSE}-status-icon-failure`)).toBeInTheDocument();
-    expect(structuralMessage.closest('li')?.querySelector('a')).toBeNull();
+    expect(structuralMessage.closest('[data-testid="validation-issue-card"]')?.querySelector('a')).toBeNull();
     await closeStepDetails();
   });
 });

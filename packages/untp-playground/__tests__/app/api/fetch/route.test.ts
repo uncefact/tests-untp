@@ -33,6 +33,35 @@ import {
 
 const mockedResolveDocument = resolveDocument as jest.MockedFunction<typeof resolveDocument>;
 
+function loadFetchRoute(fetchAllowPrivateUrls: string | undefined): {
+  post: typeof POST;
+  resolveDocument: jest.MockedFunction<typeof resolveDocument>;
+  UnsupportedSchemeError: typeof UnsupportedSchemeError;
+} {
+  const previousValue = process.env.FETCH_ALLOW_PRIVATE_URLS;
+  if (fetchAllowPrivateUrls === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+  else process.env.FETCH_ALLOW_PRIVATE_URLS = fetchAllowPrivateUrls;
+
+  try {
+    let post: typeof POST;
+    let isolatedResolveDocument: jest.MockedFunction<typeof resolveDocument>;
+    let isolatedUnsupportedSchemeError: typeof UnsupportedSchemeError;
+    jest.isolateModules(() => {
+      post = require('@/app/api/fetch/route').POST;
+      isolatedResolveDocument = jest.requireMock('@uncefact/untp-utils/resolvers').resolveDocument;
+      isolatedUnsupportedSchemeError = require('@uncefact/untp-utils/node').UnsupportedSchemeError;
+    });
+    return {
+      post: post!,
+      resolveDocument: isolatedResolveDocument!,
+      UnsupportedSchemeError: isolatedUnsupportedSchemeError!,
+    };
+  } finally {
+    if (previousValue === undefined) delete process.env.FETCH_ALLOW_PRIVATE_URLS;
+    else process.env.FETCH_ALLOW_PRIVATE_URLS = previousValue;
+  }
+}
+
 function makeRequest(body: unknown): Request {
   return new Request('http://localhost/api/fetch', {
     method: 'POST',
@@ -96,15 +125,16 @@ describe('POST /api/fetch', () => {
   });
 
   it('forwards the JSON resolver options and preserves a well-formed Content-Type', async () => {
-    mockedResolveDocument.mockResolvedValueOnce(
+    const { post, resolveDocument: isolatedResolveDocument } = loadFetchRoute(undefined);
+    isolatedResolveDocument.mockResolvedValueOnce(
       await makeLoadResult('{}', { contentType: 'text/html; charset=utf-8' }),
     );
 
     const url = 'https://example.com/x.json';
-    const response = await POST(makeRequest({ url }));
+    const response = await post(makeRequest({ url }));
 
     expect(response.status).toBe(200);
-    expect(mockedResolveDocument).toHaveBeenCalledWith(url, {
+    expect(isolatedResolveDocument).toHaveBeenCalledWith(url, {
       allowedSchemes: ['https'],
       maxResponseBytes: 10 * 1_048_576,
       totalTimeoutMs: 10_000,
@@ -114,16 +144,88 @@ describe('POST /api/fetch', () => {
     expect(await response.json()).toMatchObject({ contentType: 'text/html; charset=utf-8' });
   });
 
+  it('keeps an HTTP loopback URL blocked when private URL fetching is unset', async () => {
+    const {
+      post,
+      resolveDocument: isolatedResolveDocument,
+      UnsupportedSchemeError: isolatedUnsupportedSchemeError,
+    } = loadFetchRoute(undefined);
+    const url = 'http://127.0.0.1:4199/linksets/first.json';
+    isolatedResolveDocument.mockRejectedValueOnce(new isolatedUnsupportedSchemeError('http', ['https']));
+
+    const response = await post(makeRequest({ url }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'blocked',
+      message: 'Only https: URLs are allowed (got http:).',
+    });
+    expect(isolatedResolveDocument).toHaveBeenCalledWith(url, {
+      allowedSchemes: ['https'],
+      maxResponseBytes: 10 * 1_048_576,
+      totalTimeoutMs: 10_000,
+      maxRedirects: 3,
+      headers: { Accept: 'application/json, application/ld+json, */*;q=0.1' },
+    });
+  });
+
+  it('passes HTTP loopback URLs to the resolver when private URL fetching is enabled', async () => {
+    const { post, resolveDocument: isolatedResolveDocument } = loadFetchRoute('true');
+    const url = 'http://127.0.0.1:4199/linksets/first.json';
+    isolatedResolveDocument.mockResolvedValueOnce(
+      await makeLoadResult('{"linkset":[]}', { finalUrl: url, contentType: 'application/linkset+json' }),
+    );
+
+    const response = await post(makeRequest({ url, accept: 'linkset' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      body: '{"linkset":[]}',
+      contentType: 'application/linkset+json',
+      finalUrl: url,
+    });
+    expect(isolatedResolveDocument).toHaveBeenCalledWith(url, {
+      allowedSchemes: ['http', 'https'],
+      allowPrivateAddresses: true,
+      maxResponseBytes: 10 * 1_048_576,
+      totalTimeoutMs: 10_000,
+      maxRedirects: 3,
+      headers: { Accept: 'application/linkset+json, application/json;q=0.5, */*;q=0.1' },
+    });
+  });
+
+  it('reports all allowed schemes when private URL fetching rejects an unsupported scheme', async () => {
+    const {
+      post,
+      resolveDocument: isolatedResolveDocument,
+      UnsupportedSchemeError: isolatedUnsupportedSchemeError,
+    } = loadFetchRoute('true');
+    const url = 'ftp://example.com/x';
+    isolatedResolveDocument.mockRejectedValueOnce(new isolatedUnsupportedSchemeError('ftp', ['http', 'https']));
+
+    const response = await post(makeRequest({ url }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'blocked',
+      message: 'Only http: or https: URLs are allowed (got ftp:).',
+    });
+  });
+
   it('forwards the link set Accept profile', async () => {
-    mockedResolveDocument.mockResolvedValueOnce(
+    const { post, resolveDocument: isolatedResolveDocument } = loadFetchRoute(undefined);
+    isolatedResolveDocument.mockResolvedValueOnce(
       await makeLoadResult('{"linkset":[]}', { contentType: 'application/linkset+json' }),
     );
 
     const url = 'https://resolver.example.org/01/1?linkType=all';
-    const response = await POST(makeRequest({ url, accept: 'linkset' }));
+    const response = await post(makeRequest({ url, accept: 'linkset' }));
 
     expect(response.status).toBe(200);
-    expect(mockedResolveDocument).toHaveBeenCalledWith(url, {
+    expect(isolatedResolveDocument).toHaveBeenCalledWith(url, {
       allowedSchemes: ['https'],
       maxResponseBytes: 10 * 1_048_576,
       totalTimeoutMs: 10_000,

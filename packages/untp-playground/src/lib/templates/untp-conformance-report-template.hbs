@@ -226,6 +226,33 @@
       margin: 0 0 4px;
       font-weight: 500;
     }
+    .err-path {
+      margin: 0 0 4px;
+      color: var(--ink-2);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .err-keyword {
+      display: inline-block;
+      margin: 0 0 6px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: hsl(213 90% 95%);
+      color: hsl(213 65% 38%);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .err-tip {
+      margin: 8px 0 0;
+      padding: 8px 10px;
+      border-radius: 4px;
+      background: hsl(213 90% 97%);
+      color: hsl(213 65% 30%);
+    }
+    .err-support {
+      margin: 6px 0 0;
+      color: var(--ink-2);
+    }
     .err-detail {
       margin: 0;
       padding: 2px 0 0;
@@ -368,29 +395,16 @@
                       }}✕{{else}}·{{/if}}</span>
                     <span class='step-name'>{{name}}</span>
                     <span class='step-status'>{{status}}</span>
-                    {{#if failure}}
-                      <p class='err-msg' data-failure-summary='true'>{{failureSummary failure 'credential'}}</p>
-                    {{/if}}
-                    {{#if details.errors}}
+                    {{#if validationCards.length}}
                       <ul class='errors'>
-                        {{#each details.errors}}
+                        {{#each validationCards}}
                           <li class='err'>
-                            <p class='err-msg'>{{message}}</p>
-                            {{#if params.allowedValue}}
-                              <ul class='err-detail'>
-                                <li>allowed: {{params.allowedValue}}</li>
-                              </ul>
-                            {{/if}}
-                            {{#if params.allowedValues}}
-                              <ul class='err-detail'>
-                                {{#each params.allowedValues}}<li>allowed: {{this}}</li>{{/each}}
-                              </ul>
-                            {{/if}}
-                            {{#if params.additionalProperty}}
-                              <ul class='err-detail'>
-                                <li>unexpected: {{params.additionalProperty}}</li>
-                              </ul>
-                            {{/if}}
+                            {{#if keyword}}<span class='err-keyword'>{{keyword}}</span>{{/if}}
+                            {{#if path}}<p class='err-path'>Location: {{path}}</p>{{/if}}
+                            {{#each messages}}<p class='err-msg'>{{this}}</p>{{/each}}
+                            {{#if detail}}<p class='err-support'>{{detail}}</p>{{/if}}
+                            {{#if tip}}<p class='err-tip'><strong>Tip: </strong>{{tip}}</p>{{/if}}
+                            {{#if supportable}}<p class='err-support'>If this keeps happening, report an issue.</p>{{/if}}
                           </li>
                         {{/each}}
                       </ul>
@@ -406,20 +420,16 @@
                         }}✕{{else}}·{{/if}}</span>
                       <span class='step-name'>{{name}}</span>
                       <span class='step-status'>{{status}}</span>
-                      {{#if failure}}
-                        <p class='err-msg' data-failure-summary='true'>{{failureSummary failure 'extension'}}</p>
-                      {{/if}}
-                      {{#if details.errors}}
+                      {{#if validationCards.length}}
                         <ul class='errors'>
-                          {{#each details.errors}}
+                          {{#each validationCards}}
                             <li class='err'>
-                              <p class='err-msg'>{{message}}</p>
-                              {{#if params.allowedValue}}<ul class='err-detail'><li>allowed:
-                                    {{params.allowedValue}}</li></ul>{{/if}}
-                              {{#if params.allowedValues}}<ul class='err-detail'>{{#each params.allowedValues}}<li
-                                    >allowed: {{this}}</li>{{/each}}</ul>{{/if}}
-                              {{#if params.additionalProperty}}<ul class='err-detail'><li>unexpected:
-                                    {{params.additionalProperty}}</li></ul>{{/if}}
+                              {{#if keyword}}<span class='err-keyword'>{{keyword}}</span>{{/if}}
+                              {{#if path}}<p class='err-path'>Location: {{path}}</p>{{/if}}
+                              {{#each messages}}<p class='err-msg'>{{this}}</p>{{/each}}
+                              {{#if detail}}<p class='err-support'>{{detail}}</p>{{/if}}
+                              {{#if tip}}<p class='err-tip'><strong>Tip: </strong>{{tip}}</p>{{/if}}
+                              {{#if supportable}}<p class='err-support'>If this keeps happening, report an issue.</p>{{/if}}
                             </li>
                           {{/each}}
                         </ul>
@@ -468,14 +478,16 @@
                     }}✕{{else}}·{{/if}}</span>
                   <span class='step-name'>{{name}}</span>
                   <span class='step-status'>{{status}}</span>
-                  {{#if failure}}
-                    <p class='err-msg' data-failure-summary='true'>{{failureSummary failure 'scheme'}}</p>
-                  {{/if}}
-                  {{#if details.errors}}
+                  {{#if validationCards.length}}
                     <ul class='errors'>
-                      {{#each details.errors}}
+                      {{#each validationCards}}
                         <li class='err'>
-                          <p class='err-msg'>{{message}}</p>
+                          {{#if keyword}}<span class='err-keyword'>{{keyword}}</span>{{/if}}
+                          {{#if path}}<p class='err-path'>Location: {{path}}</p>{{/if}}
+                          {{#each messages}}<p class='err-msg'>{{this}}</p>{{/each}}
+                          {{#if detail}}<p class='err-support'>{{detail}}</p>{{/if}}
+                          {{#if tip}}<p class='err-tip'><strong>Tip: </strong>{{tip}}</p>{{/if}}
+                          {{#if supportable}}<p class='err-support'>If this keeps happening, report an issue.</p>{{/if}}
                         </li>
                       {{/each}}
                     </ul>
@@ -519,11 +531,16 @@
                     }}✕{{else}}·{{/if}}</span>
                   <span class='step-name'>{{name}}</span>
                   <span class='step-status'>{{status}}</span>
-                  {{#if messages.length}}
+                  {{#if validationCards.length}}
                     <ul class='errors'>
-                      {{#each messages}}
+                      {{#each validationCards}}
                         <li class='err'>
-                          <p class='err-msg'>{{this}}</p>
+                          {{#if keyword}}<span class='err-keyword'>{{keyword}}</span>{{/if}}
+                          {{#if path}}<p class='err-path'>Location: {{path}}</p>{{/if}}
+                          {{#each messages}}<p class='err-msg'>{{this}}</p>{{/each}}
+                          {{#if detail}}<p class='err-support'>{{detail}}</p>{{/if}}
+                          {{#if tip}}<p class='err-tip'><strong>Tip: </strong>{{tip}}</p>{{/if}}
+                          {{#if supportable}}<p class='err-support'>If this keeps happening, report an issue.</p>{{/if}}
                         </li>
                       {{/each}}
                     </ul>

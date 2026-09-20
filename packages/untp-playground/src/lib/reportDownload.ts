@@ -1,5 +1,4 @@
 import handlebars from 'handlebars';
-import { describeArtefactFailure, type ArtefactFailureFamily, type ArtefactStepFailure } from '@/lib/artefactFailure';
 import { buildReportView } from '@/lib/reportView';
 import templateContent from '@/lib/templates/untp-conformance-report-template.hbs';
 import { downloadFile } from '@/lib/utils';
@@ -12,15 +11,6 @@ handlebars.registerHelper('formatDate', (value: unknown) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-});
-
-/** Renders a step failure as one sentence for the HTML report. */
-handlebars.registerHelper('failureSummary', (value: unknown, familyValue: unknown) => {
-  if (!value || typeof value !== 'object') return '';
-  const failure = value as ArtefactStepFailure;
-  const family = familyValue as ArtefactFailureFamily;
-  const presentation = describeArtefactFailure(failure, family);
-  return presentation ? `${presentation.heading}: ${presentation.message} ${presentation.remediation}` : '';
 });
 
 /**

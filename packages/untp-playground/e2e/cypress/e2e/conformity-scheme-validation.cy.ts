@@ -70,21 +70,22 @@ CONFORMITY_SCHEME_E2E_VERSIONS.forEach((spec) => {
         cy.get(`[data-testid="${SCHEME_GROUP_HEADER}"]`).click();
 
         cy.checkValidationStatus(invalidCase.failsAt, 'failure');
-        if (invalidCase.failsAt === 'Version Detection' || invalidCase.failsAt === 'Structural Parse') {
-          const rowTestId =
-            invalidCase.failsAt === 'Version Detection'
-              ? 'scheme-version-detection-row'
-              : 'scheme-structural-parse-row';
-          cy.get(`[data-testid="${rowTestId}"]`).should('contain.text', 'Scheme invalid');
-        }
         if (invalidCase.failsAt === 'Version Detection') {
-          cy.get('[data-testid="scheme-schema-validation-row"]').should('contain.text', 'Not executed');
-          cy.get('[data-testid="scheme-structural-parse-row"]').should('contain.text', 'Not executed');
-          cy.get('[data-testid="context-row"]').should('contain.text', 'Not executed');
+          cy.get('[data-testid="scheme-schema-validation-row"]').should('not.contain.text', 'Not executed');
+          cy.get('[data-testid="scheme-structural-parse-row"]').should('not.contain.text', 'Not executed');
+          cy.get('[data-testid="context-row"]').should('not.contain.text', 'Not executed');
+          cy.get('[data-testid="scheme-schema-validation-details-trigger"]').click();
+          cy.contains('Validation Details').should('be.visible');
+          cy.get('[data-testid="failure-card-heading"]').should('have.text', 'Not executed');
+          cy.contains('Issue: This scheme step was not executed because step "Version Detection" failed first.').should(
+            'be.visible',
+          );
+          cy.get('[role="dialog"] > button').click();
         }
         cy.openErrorDetailsByStepName(invalidCase.failsAt);
         if (invalidCase.name === 'blank scheme name') {
-          cy.contains('/name: scheme.name is required and must be a non-empty string.').should('be.visible');
+          cy.contains('Location: name').should('be.visible');
+          cy.contains('Issue: scheme.name is required and must be a non-empty string.').should('be.visible');
         }
       });
     });

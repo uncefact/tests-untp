@@ -89,7 +89,16 @@ describe('VCDM Schema Validation', () => {
     cy.checkValidationStatus('VCDM Version Detection', 'success');
     cy.checkValidationStatus('VCDM Schema Validation', 'failure');
 
-    cy.openErrorDetails();
+    cy.get('[data-testid="credential-instance-header"]').then(($header) => {
+      const headerBottom = $header[0].getBoundingClientRect().bottom;
+      cy.get('button[aria-label^="Remove"]').then(($removeButton) => {
+        expect($removeButton[0].getBoundingClientRect().bottom).to.be.at.most(headerBottom + 1);
+      });
+    });
+    cy.get('[data-testid="vcdm-schema-validation-view-details"]').then(($viewDetails) => {
+      const viewDetailsRect = $viewDetails[0].getBoundingClientRect();
+      cy.wrap($viewDetails).click(viewDetailsRect.width / 2, viewDetailsRect.height / 2);
+    });
     cy.contains('Fix validation error').click();
     cy.contains('Missing field: issuer').should('be.visible');
     cy.contains('Add the missing "issuer" field.').should('be.visible');
@@ -107,11 +116,10 @@ describe('VCDM Schema Validation', () => {
     cy.checkValidationStatus('VCDM Version Detection', 'success');
 
     cy.wait('@schemaFetch');
-    cy.contains('VCDM Schema Validation').parent().should('contain.text', 'Could not fetch');
     cy.openErrorDetailsByStepName('VCDM Schema Validation');
-    cy.contains('Could not fetch').should('be.visible');
-    cy.contains('Retry the check').should('be.visible');
-    cy.contains('Fix validation error').should('not.exist');
+    cy.get('[data-testid="validation-issue-card"]')
+      .should('contain.text', 'could not fetch')
+      .and('contain.text', 'Retry the check');
   });
 
   it('should show confetti for fully valid credential', () => {

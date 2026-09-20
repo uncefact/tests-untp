@@ -60,6 +60,8 @@ services:
       - NODE_ENV=development
       - VERIFICATION_SERVICE_URL=${VERIFICATION_SERVICE_URL:-http://localhost:3332/agent/routeVerificationCredential}
       - VERIFICATION_SERVICE_TOKEN=${VERIFICATION_SERVICE_TOKEN:-test123}
+      # Pass through only when set so the production-safe default remains off.
+      - FETCH_ALLOW_PRIVATE_URLS
 
   vckit-api:
     image: ghcr.io/uncefact/project-vckit:1.2.1@sha256:9c6f305ee7834e311dbcc7d6fec98bdf350d6064bfbc71781b11088020fc0ae0

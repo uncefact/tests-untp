@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TestResults, confettiConfig } from '@/components/TestResults';
 import { useArtefactCollection } from '@/hooks/useArtefactCollection';
 import {
@@ -153,6 +153,94 @@ function Harness({
   );
 }
 
+function FocusHarness({ onConsumed }: { onConsumed: () => void }) {
+  const collection = useArtefactCollection<StoredCredential, TestStep[]>();
+  const [focusInstanceId, setFocusInstanceId] = useState<string>();
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    const { outcome } = collection.dispatch((state) =>
+      upsert(state, {
+        payload: makeStored({ id: 'focus-target' }),
+        contentHash: 'focus-target',
+        mintInstanceId: () => 'focus-instance',
+      }),
+    );
+    setFocusInstanceId(outcome.instanceId);
+  }, [collection]);
+
+  return (
+    <TestResults
+      collection={collection.state}
+      dispatch={collection.dispatch}
+      onDecrypted={() => true}
+      focusInstanceId={focusInstanceId}
+      onFocusInstanceConsumed={() => {
+        onConsumed();
+        setFocusInstanceId(undefined);
+      }}
+    />
+  );
+}
+
+function RepeatFocusHarness() {
+  const collection = useArtefactCollection<StoredCredential, TestStep[]>();
+  const [focusInstanceId, setFocusInstanceId] = useState<string>();
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    const { outcome } = collection.dispatch((state) =>
+      upsert(state, {
+        payload: makeStored({ id: 'repeat-focus-target' }),
+        contentHash: 'repeat-focus-target',
+        mintInstanceId: () => 'repeat-focus-instance',
+      }),
+    );
+    setFocusInstanceId(outcome.instanceId);
+  }, [collection]);
+
+  return (
+    <>
+      <button type='button' data-testid='repeat-focus-clear' onClick={() => setFocusInstanceId(undefined)}>
+        Clear focus
+      </button>
+      <button
+        type='button'
+        data-testid='repeat-focus-request'
+        onClick={() => setFocusInstanceId('repeat-focus-instance')}
+      >
+        Focus again
+      </button>
+      <TestResults
+        collection={collection.state}
+        dispatch={collection.dispatch}
+        onDecrypted={() => true}
+        focusInstanceId={focusInstanceId}
+      />
+    </>
+  );
+}
+
+function StaticResults({ step }: { step: TestStep }) {
+  const collection: CollectionState<StoredCredential, TestStep[]> = {
+    items: [
+      {
+        instanceId: 'static-instance',
+        contentHash: 'static-content',
+        payload: makeStored({ id: 'static-credential' }),
+        runId: 'static-run',
+        result: [step],
+      },
+    ],
+  };
+
+  return <TestResults collection={collection} dispatch={jest.fn() as any} onDecrypted={() => true} />;
+}
+
 const expandInstance = () => userEvent.click(screen.getByTestId('credential-instance-header'));
 
 // The group rollup icon is shown only while the group is collapsed (expanded groups show each
@@ -208,6 +296,109 @@ beforeEach(() => {
 });
 
 describe('TestResults grouping (#810, #845)', () => {
+  it('expands and centres the requested credential card once', async () => {
+    const scrollIntoView = jest.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    const onConsumed = jest.fn();
+
+    try {
+      render(<FocusHarness onConsumed={onConsumed} />);
+
+      await waitFor(() => expect(screen.getByTestId('credential-instance-body')).toBeInTheDocument());
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+      expect(onConsumed).toHaveBeenCalledTimes(1);
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+    }
+  });
+
+  it('does not scroll again when the same expanded credential is requested twice', async () => {
+    const scrollIntoView = jest.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    try {
+      render(<RepeatFocusHarness />);
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByTestId('repeat-focus-clear'));
+      fireEvent.click(screen.getByTestId('repeat-focus-request'));
+
+      await waitFor(() => expect(screen.getByTestId('credential-instance-body')).toBeInTheDocument());
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+    }
+  });
+
+  it.each([
+    [
+      'successful',
+      {
+        id: TestCaseStepId.UNTP_SCHEMA_VALIDATION,
+        name: 'UNTP Schema Validation',
+        status: TestCaseStatus.SUCCESS,
+      },
+      'UNTP Schema Validation',
+    ],
+    [
+      'failed',
+      {
+        id: TestCaseStepId.UNTP_SCHEMA_VALIDATION,
+        name: 'UNTP Schema Validation',
+        status: TestCaseStatus.FAILURE,
+        failure: {
+          class: 'credential-invalid' as const,
+          code: 'schema.validation.payload',
+          message: 'The credential is invalid.',
+          remediation: 'Correct the credential.',
+        },
+      },
+      'UNTP Schema ValidationView Details',
+    ],
+    [
+      'not-executed',
+      {
+        id: TestCaseStepId.UNTP_SCHEMA_VALIDATION,
+        name: 'UNTP Schema Validation',
+        status: TestCaseStatus.FAILURE,
+        failure: {
+          class: 'unknown' as const,
+          code: 'playground.pipeline.not-executed',
+          message: 'This step was not executed.',
+          remediation: 'Review the first failed step.',
+        },
+      },
+      'UNTP Schema ValidationView Details',
+    ],
+  ])('keeps the %s credential step row limited to its name and details action', async (_label, step, expectedText) => {
+    render(<StaticResults step={step as TestStep} />);
+    fireEvent.click(await screen.findByTestId('credential-instance-header'));
+
+    expect((await screen.findByTestId(`${TestCaseStepId.UNTP_SCHEMA_VALIDATION}-row`)).textContent).toBe(expectedText);
+  });
+
   it('renders a group only for a credential type that has an uploaded instance', async () => {
     render(<Harness credentials={[makeStored({ id: 'a' })]} />);
 
@@ -323,6 +514,23 @@ describe('TestResults removal (#810)', () => {
       expect(screen.getByRole('button', { name: 'Remove dpp-pending.json' })).toBeInTheDocument();
     });
   });
+
+  it('keeps the remove control inside the expanded header row', async () => {
+    render(
+      <Harness credentials={[makeStored({ id: 'header-only' }, { kind: 'file', filename: 'dpp-header-only.json' })]} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Remove dpp-header-only.json' })).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByTestId('credential-instance-header'));
+
+    const header = screen.getByTestId('credential-instance-header');
+    const body = screen.getByTestId('credential-instance-body');
+    const removeButton = screen.getByRole('button', { name: 'Remove dpp-header-only.json' });
+    expect(header.contains(removeButton)).toBe(true);
+    expect(body.contains(removeButton)).toBe(false);
+  });
 });
 
 describe('Credential verification throw regression (#810)', () => {
@@ -365,11 +573,7 @@ describe('Credential verification throw regression (#810)', () => {
     });
     expect(screen.queryByTestId('decryption-status-icon-failure')).not.toBeInTheDocument();
     expect(screen.queryAllByTestId(/status-icon-(pending|in-progress)/)).toHaveLength(0);
-    const failureMarkers = screen.getAllByTestId('artefact-failure-class');
-    expect(failureMarkers).toHaveLength(6);
-    for (const marker of failureMarkers) {
-      expect(marker).toHaveTextContent('Could not determine the cause');
-    }
+    expect(screen.getAllByRole('button', { name: 'View Details' })).toHaveLength(6);
     expect(toast.error).toHaveBeenCalledWith(
       'Validation could not start. Report the details to the Playground operator.',
     );
@@ -511,7 +715,6 @@ describe('Credential replace-in-place through the collection (#810)', () => {
       expect(screen.getByTestId('vcdm-schema-validation-status-icon-success')).toBeInTheDocument();
     });
     expect(screen.getByTestId('replacement-vcdm-failure')).toHaveTextContent('undefined');
-    expect(screen.queryByTestId('artefact-failure-class')).not.toBeInTheDocument();
   });
 });
 
@@ -526,7 +729,9 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
       expect(screen.getByTestId('vcdm-version-status-icon-failure')).toBeInTheDocument();
     });
     await userEvent.click(screen.getByTestId('vcdm-version-view-details'));
-    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent('Credential invalid');
+    expect(await screen.findByTestId('validation-issue-card')).toHaveTextContent(
+      'The credential declares @context entries',
+    );
   });
 
   it('states the missing context fact for an unsupported VCDM version', async () => {
@@ -539,7 +744,7 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
       expect(screen.getByTestId('vcdm-version-status-icon-failure')).toBeInTheDocument();
     });
     await userEvent.click(screen.getByTestId('vcdm-version-view-details'));
-    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent(
+    expect(await screen.findByTestId('validation-issue-card')).toHaveTextContent(
       'The credential declares no @context entries, so no VCDM version can be detected.',
     );
   });
@@ -594,9 +799,10 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
     await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
-    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent('Could not determine the cause');
-    expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent('Playground could not build a schema URL');
-    expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(
+    expect(await screen.findByTestId('validation-issue-card')).toHaveTextContent(
+      'The Playground could not build a schema URL',
+    );
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
       'Report these details to the Playground operator.',
     );
     expect(screen.queryByText(/Use a Conformity Scheme published/)).not.toBeInTheDocument();
@@ -619,7 +825,9 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     });
 
     await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
-    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent('Could not determine the cause');
+    expect(await screen.findByTestId('validation-issue-card')).toHaveTextContent(
+      'The credential validation step failed unexpectedly: fetch failed',
+    );
   });
 
   it('records schema selection failures without a retry toast, and still settles the later steps', async () => {
@@ -634,7 +842,6 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     await waitFor(() => {
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('artefact-failure-class')).toHaveTextContent('Credential invalid');
     expect(toast.error).not.toHaveBeenCalled();
 
     // The selection branch must fall through to Context Validation. Returning early there leaves
@@ -701,10 +908,11 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     await waitFor(() => {
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('artefact-failure-class')).toHaveTextContent('Could not fetch');
     await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
-    expect(await screen.findByTestId('artefact-failure-banner')).toHaveTextContent('Could not fetch');
-    expect(screen.getByTestId('artefact-failure-banner')).toHaveTextContent(/Retry the check/);
+    expect(await screen.findByTestId('validation-issue-card')).toHaveTextContent(
+      'The Playground could not fetch the artefact',
+    );
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(/Retry the check/);
     expect(screen.queryByText(/required UNTP context IRIs/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Nothing in the credential/)).not.toBeInTheDocument();
   });
@@ -721,9 +929,10 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     await waitFor(() => {
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
-    const headings = screen.getAllByTestId('artefact-failure-class');
-    expect(headings.some((node) => node.textContent?.includes('Could not determine the cause'))).toBe(true);
-    expect(headings.some((node) => node.textContent?.includes('Credential invalid'))).toBe(false);
+    await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
+    expect(await screen.findByTestId('validation-issue-card')).toHaveTextContent(
+      'The credential validation step failed unexpectedly: [object Object]',
+    );
   });
 
   it('classifies a 403 schema response as not published for the declared version', async () => {
@@ -746,12 +955,12 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
       expect(screen.getByTestId('untp-schema-validation-status-icon-failure')).toBeInTheDocument();
     });
     await userEvent.click(screen.getByTestId('untp-schema-validation-view-details'));
-    const banner = await screen.findByTestId('artefact-failure-banner');
-    expect(banner).toHaveTextContent('Credential invalid');
-    expect(banner).toHaveTextContent(untpContext('0.6.0'));
-    expect(banner).toHaveTextContent('HTTP status 403');
-    expect(banner).toHaveTextContent('declared version 0.6.0');
-    expect(banner).toHaveTextContent('@context version 0.6.0');
+    const card = await screen.findByTestId('validation-issue-card');
+    expect(card).toHaveTextContent('returned HTTP status 403');
+    expect(card).toHaveTextContent(untpContext('0.6.0'));
+    expect(card).toHaveTextContent('HTTP status 403');
+    expect(card).toHaveTextContent('declared version 0.6.0');
+    expect(card).toHaveTextContent('@context version 0.6.0');
   });
 
   it('blames the extension schema host, not the credential, when that schema could not be fetched', async () => {
@@ -781,7 +990,7 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     });
   });
 
-  it('uses the context timeout copy in the failure banner, not the raw abort error', async () => {
+  it('uses the context timeout copy in the issue card, not the raw abort error', async () => {
     (validateContext as jest.Mock).mockResolvedValue({
       valid: false,
       error: {
@@ -808,8 +1017,8 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
       expect(screen.getByTestId('context-status-icon-failure')).toBeInTheDocument();
     });
     await userEvent.click(screen.getByTestId('context-view-details'));
-    const banner = await screen.findByTestId('artefact-failure-banner');
-    expect(banner).toHaveTextContent('did not respond within 15s');
+    const card = await screen.findByTestId('validation-issue-card');
+    expect(card).toHaveTextContent('did not respond within 15s');
     expect(screen.queryByText('The user aborted a request.')).not.toBeInTheDocument();
   });
 
@@ -833,7 +1042,7 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
       expect(screen.queryByTestId('vcdm-schema-validation-status-icon-success')).not.toBeInTheDocument();
     });
     await userEvent.click(screen.getByTestId('vcdm-schema-validation-view-details'));
-    expect(screen.getAllByTestId('artefact-failure-banner')).toHaveLength(1);
+    expect(screen.getAllByTestId('validation-issue-card')).toHaveLength(1);
     expect(screen.getAllByText('Report these details to the Playground operator.')).toHaveLength(1);
   });
 

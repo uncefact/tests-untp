@@ -7,7 +7,7 @@ import { newId } from '@/lib/id';
 import type { StoredLinkSet, TestStep } from '@/types';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
-import { TestCaseStatus } from '../../constants';
+import { TestCaseStatus, TestCaseStepId } from '../../constants';
 import { useEffect, useMemo } from 'react';
 
 jest.mock('@/lib/fetchLinkedCredential', () => ({
@@ -62,6 +62,7 @@ const LINK_SET = {
 const mockOnVerifyCredential = jest.fn();
 const mockOnVerifyRejected = jest.fn();
 const mockOnResolveSecondary = jest.fn(async () => {});
+const mockOnShowCredential = jest.fn();
 
 function Harness({
   initial,
@@ -69,6 +70,7 @@ function Harness({
   credentialItems = [],
   urlBindings = new Map(),
   assessmentsOverride,
+  onShowCredential = mockOnShowCredential,
 }: {
   initial: Array<{ payload: StoredLinkSet }>;
   reingest?: StoredLinkSet;
@@ -76,6 +78,7 @@ function Harness({
   urlBindings?: Map<string, string>;
   /** Hand the card a projection other than the derived one, or an empty map (#1007 tests). */
   assessmentsOverride?: (derived: Map<string, LinkSetAssessment>) => Map<string, LinkSetAssessment>;
+  onShowCredential?: (instanceId: string) => void;
 }) {
   const linkSet = useArtefactCollection<StoredLinkSet, TestStep[]>();
   // The same projection the page computes (#1007), so the card is exercised with real assessments.
@@ -119,6 +122,7 @@ function Harness({
         urlBindings={urlBindings}
         assessments={assessments}
         onVerifyCredential={mockOnVerifyCredential}
+        onShowCredential={onShowCredential}
         beginUrlAttempt={() => 7}
         onVerifyRejected={mockOnVerifyRejected}
         onResolveSecondary={mockOnResolveSecondary}
@@ -133,6 +137,15 @@ const storedLinkSet = (source: StoredLinkSet['source'], validationVersion = '0.7
   source,
   validationVersion,
 });
+
+function expectLinkedCredentialLeftColumnInvariant(row: HTMLElement) {
+  const left = within(row).getByTestId('linked-credential-left-column');
+  const label = within(left).getByTestId('linked-credential-label');
+  const href = left.children[1];
+  expect(left.children).toHaveLength(2);
+  expect(href).toBeDefined();
+  expect(left.textContent).toBe(`${label.textContent}${href?.textContent}`);
+}
 
 describe('LinkSetTestResults', () => {
   beforeEach(() => {
@@ -156,11 +169,25 @@ describe('LinkSetTestResults', () => {
 
     fireEvent.click(header);
     expect(screen.getByText('Schema Validation')).toBeInTheDocument();
-    expect(screen.queryByTestId('linkset-schema-errors')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`${TestCaseStepId.LINKSET_SCHEMA_VALIDATION}-view-details`)).not.toBeInTheDocument();
     expect(screen.getByTestId('linkset-validation-docs')).toHaveAttribute(
       'href',
       expect.stringContaining('validating-link-sets'),
     );
+  });
+
+  it('keeps the remove control inside the expanded header row', async () => {
+    render(
+      <Harness initial={[{ payload: storedLinkSet({ kind: 'url', url: 'https://r.example.org/01/header-only' }) }]} />,
+    );
+
+    const header = await screen.findByTestId('linkset-card-header');
+    const removeButton = screen.getByRole('button', { name: 'Remove r.example.org/01/header-only' });
+    fireEvent.click(header);
+
+    const body = screen.getByTestId('linkset-card-body');
+    expect(header.contains(removeButton)).toBe(true);
+    expect(body.contains(removeButton)).toBe(false);
   });
 
   it('titles a resolved card by the scheme-stripped URL and shows the full URL in the source caption', async () => {
@@ -188,7 +215,10 @@ describe('LinkSetTestResults', () => {
     fireEvent.click(await screen.findByTestId('linkset-card-header'));
 
     // The dpp relation and the vc media type qualify; the pip product page does not.
-    expect(screen.getByText('Linked credentials · 2')).toBeInTheDocument();
+    const linkedCredentials = screen.getByTestId('linked-credentials');
+    const linkedHeading = within(linkedCredentials).getByText('Linked credentials · 2');
+    expect(linkedHeading).toHaveClass('text-sm', 'font-semibold');
+    expect(linkedHeading).not.toHaveClass('text-muted-foreground');
     const rows = screen.getAllByTestId('linked-credential-row');
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('Digital Product Passport');
@@ -344,11 +374,22 @@ describe('linked-credential Verify (#812)', () => {
   const expandCard = () => fireEvent.click(screen.getByTestId('linkset-card-header'));
   const firstVerify = () => screen.getAllByTestId('linked-credential-verify')[0];
 
-  const credentialInstance = (instanceId: string, statuses: string[], sourceUrl = DPP_HREF) => ({
+  const credentialInstance = (
+    instanceId: string,
+    statuses: string[],
+    sourceUrl = DPP_HREF,
+    encryptedEnvelope = false,
+    decoded: Record<string, unknown> = {},
+  ) => ({
     instanceId,
     runId: null,
     contentHash: `hash-${instanceId}`,
-    payload: { original: {}, decoded: {}, source: { kind: 'url', url: sourceUrl, via: 'link-set' } }, // a credential slot, not a link set
+    payload: {
+      original: {},
+      decoded,
+      source: { kind: 'url', url: sourceUrl, via: 'link-set' },
+      ...(encryptedEnvelope ? { encryptedEnvelope: true } : {}),
+    }, // a credential slot, not a link set
     result: statuses.map((status, index) => ({ id: `step-${index}`, name: `Step ${index}`, status })),
   });
 
@@ -362,16 +403,24 @@ describe('linked-credential Verify (#812)', () => {
 
     expect(screen.getAllByTestId('linked-credential-verify')).toHaveLength(2);
     expect(fetchLinkedCredential).not.toHaveBeenCalled();
+
+    for (const row of screen.getAllByTestId('linked-credential-row')) {
+      const left = within(row).getByTestId('linked-credential-left-column');
+      const actionSlot = within(row).getByTestId('linked-credential-action-slot');
+      expect(actionSlot).toContainElement(within(row).getByTestId('linked-credential-verify'));
+      expect(left).toContainElement(within(row).getByTestId('linked-credential-label'));
+      expectLinkedCredentialLeftColumnInvariant(row);
+    }
   });
 
   it('shows the Encrypted tag only on a target declaring an encryptionMethod', () => {
     render(<Harness initial={[{ payload: storedLinkSet(urlSource) }]} />);
     expandCard();
 
-    expect(screen.getAllByTestId('linked-credential-encrypted')).toHaveLength(1);
+    expect(screen.getAllByTestId('linked-credential-locked')).toHaveLength(1);
     const rows = screen.getAllByTestId('linked-credential-row');
     const dccRow = rows.find((row) => row.textContent?.includes('creds/dcc.json')) as HTMLElement;
-    const tag = within(dccRow).getByTestId('linked-credential-encrypted');
+    const tag = within(dccRow).getByTestId('linked-credential-locked');
     // The tag sits in the label paragraph, before the row's action column.
     expect(
       tag.compareDocumentPosition(within(dccRow).getByTestId('linked-credential-verify')) &
@@ -422,7 +471,17 @@ describe('linked-credential Verify (#812)', () => {
     expandCard();
 
     fireEvent.click(firstVerify());
-    expect(screen.getByTestId('linked-credential-fetching')).toHaveTextContent('Fetching...');
+    expect(screen.getByTestId('linked-credential-fetching')).toHaveTextContent('Fetching');
+    const fetchingRow = screen
+      .getAllByTestId('linked-credential-row')
+      .find((row) => row.textContent?.includes('creds/dpp.json')) as HTMLElement;
+    expect(within(fetchingRow).getByTestId('linked-credential-left-column')).not.toContainElement(
+      within(fetchingRow).getByTestId('linked-credential-fetching'),
+    );
+    expect(within(fetchingRow).getByTestId('linked-credential-action-slot')).toContainElement(
+      within(fetchingRow).getByTestId('linked-credential-fetching'),
+    );
+    expectLinkedCredentialLeftColumnInvariant(fetchingRow);
     // The clicked row's button is gone while fetching; the other row keeps its own.
     expect(screen.getAllByTestId('linked-credential-verify')).toHaveLength(1);
 
@@ -499,14 +558,18 @@ describe('linked-credential Verify (#812)', () => {
   });
 
   it.each([
-    [['pending', 'success'], 'linked-credential-verifying', 'Verifying in Credentials tab'],
-    [['success', 'success'], 'linked-credential-verified', 'Verified'],
-    [['failure', 'success'], 'linked-credential-failed', 'Failed in Credentials tab'],
+    [['pending', 'success'], 'linked-credential-verifying', 'Verifying'],
+    [['success', 'success'], 'linked-credential-verified', undefined],
+    [['failure', 'success'], 'linked-credential-failed', undefined],
   ])('derives the row state from its bound instance (%j)', (statuses, testId, text) => {
     render(
       <Harness
         initial={[{ payload: storedLinkSet(urlSource) }]}
-        credentialItems={[credentialInstance('inst-1', statuses as string[])]}
+        credentialItems={[
+          credentialInstance('inst-1', statuses as string[], DPP_HREF, false, {
+            type: ['VerifiableCredential', 'DigitalProductPassport'],
+          }),
+        ]}
         urlBindings={new Map([[DPP_HREF, 'inst-1']])}
       />,
     );
@@ -514,8 +577,52 @@ describe('linked-credential Verify (#812)', () => {
 
     const rows = screen.getAllByTestId('linked-credential-row');
     const dppRow = rows.find((row) => row.textContent?.includes('creds/dpp.json')) as HTMLElement;
-    expect(within(dppRow).getByTestId(testId)).toHaveTextContent(text);
-    expect(within(dppRow).queryByTestId('linked-credential-verify')).not.toBeInTheDocument();
+    expect(within(dppRow).getByTestId(testId)).toBeInTheDocument();
+    expectLinkedCredentialLeftColumnInvariant(dppRow);
+    const actionSlot = within(dppRow).getByTestId('linked-credential-action-slot');
+    if (testId === 'linked-credential-verifying') {
+      expect(actionSlot).toHaveTextContent(text as string);
+      expect(within(dppRow).getByTestId('linked-credential-left-column')).not.toContainElement(
+        within(dppRow).getByTestId(testId),
+      );
+      expect(actionSlot).not.toContainElement(within(dppRow).queryByTestId('linked-credential-verify-again'));
+    } else {
+      expect(
+        within(dppRow).getByTestId(
+          'linked-credential-status-icon-' +
+            (within(dppRow).queryByTestId('linked-credential-coverage-mismatch') || testId.endsWith('failed')
+              ? 'failure'
+              : 'success'),
+        ),
+      ).toBeInTheDocument();
+      expect(actionSlot).toContainElement(within(dppRow).getByTestId('linked-credential-verify-again'));
+    }
+  });
+
+  it('opens the settled credential from its status control without starting another verification', () => {
+    render(
+      <Harness
+        initial={[{ payload: storedLinkSet(urlSource) }]}
+        credentialItems={[
+          credentialInstance('inst-open', ['success'], DPP_HREF, false, {
+            type: ['VerifiableCredential', 'DigitalProductPassport'],
+          }),
+        ]}
+        urlBindings={new Map([[DPP_HREF, 'inst-open']])}
+      />,
+    );
+    expandCard();
+
+    const dppRow = screen
+      .getAllByTestId('linked-credential-row')
+      .find((row) => row.textContent?.includes('creds/dpp.json')) as HTMLElement;
+    const openButton = within(dppRow).getByTestId('linked-credential-verified');
+
+    expect(openButton).toHaveAttribute('aria-label', 'Open this credential in the Credentials tab');
+    fireEvent.click(openButton);
+
+    expect(mockOnShowCredential).toHaveBeenCalledWith('inst-open');
+    expect(fetchLinkedCredential).not.toHaveBeenCalled();
   });
 
   it('keeps the row bound when a mirror URL replaced the instance and rewrote its source', () => {
@@ -531,7 +638,9 @@ describe('linked-credential Verify (#812)', () => {
     );
     expandCard();
 
-    expect(screen.getByTestId('linked-credential-verified')).toHaveTextContent('Verified');
+    expect(screen.getByTestId('linked-credential-coverage-mismatch')).toContainElement(
+      screen.getByTestId('linked-credential-status-icon-failure'),
+    );
   });
 
   it('follows the binding to the newest instance after content drift at the same URL', () => {
@@ -547,7 +656,9 @@ describe('linked-credential Verify (#812)', () => {
     );
     expandCard();
 
-    expect(screen.getByTestId('linked-credential-verifying')).toHaveTextContent('Verifying in Credentials tab');
+    const rows = screen.getAllByTestId('linked-credential-row');
+    const dppRow = rows.find((row) => row.textContent?.includes('creds/dpp.json')) as HTMLElement;
+    expect(within(dppRow).getByTestId('linked-credential-action-slot')).toHaveTextContent('Verifying');
   });
 
   it('fails open to the Verify button when the bound instance was removed', () => {
@@ -597,6 +708,28 @@ describe('linked-credential Verify (#812)', () => {
 
     expect(screen.queryByTestId('linked-credential-verify-again')).not.toBeInTheDocument();
   });
+
+  it('keeps a locked instance state in the left column and reserves the right action slot', () => {
+    render(
+      <Harness
+        initial={[{ payload: storedLinkSet(urlSource) }]}
+        credentialItems={[credentialInstance('inst-locked', ['pending'], DPP_HREF, true)]}
+        urlBindings={new Map([[DPP_HREF, 'inst-locked']])}
+      />,
+    );
+    expandCard();
+
+    const row = screen
+      .getAllByTestId('linked-credential-row')
+      .find((candidate) => candidate.textContent?.includes('creds/dpp.json')) as HTMLElement;
+    expect(within(row).getByTestId('linked-credential-left-column')).toContainElement(
+      within(row).getByTestId('linked-credential-locked'),
+    );
+    expect(within(row).getByTestId('linked-credential-action-slot')).toContainElement(
+      within(row).getByTestId('linked-credential-verify-again'),
+    );
+    expectLinkedCredentialLeftColumnInvariant(row);
+  });
 });
 
 describe('encrypted discovery fallback (#812)', () => {
@@ -624,7 +757,7 @@ describe('encrypted discovery fallback (#812)', () => {
     // The dpp row carries no encryptionMethod metadata, so it starts untagged.
     const rows = screen.getAllByTestId('linked-credential-row');
     const dppRow = rows.find((row) => row.textContent?.includes('creds/dpp.json')) as HTMLElement;
-    expect(within(dppRow).queryByTestId('linked-credential-encrypted')).not.toBeInTheDocument();
+    expect(within(dppRow).queryByTestId('linked-credential-locked')).not.toBeInTheDocument();
 
     fireEvent.click(within(dppRow).getByTestId('linked-credential-verify'));
     await waitFor(() => {
@@ -633,14 +766,14 @@ describe('encrypted discovery fallback (#812)', () => {
       );
     });
     expect(toast.error).not.toHaveBeenCalled();
-    expect(screen.getAllByTestId('linked-credential-encrypted')).toHaveLength(2);
+    expect(screen.getAllByTestId('linked-credential-locked')).toHaveLength(2);
 
     // The discovery lives at the list level: collapse and re-expand keeps the tag.
     expandCard();
     expandCard();
     const rowsAfter = screen.getAllByTestId('linked-credential-row');
     const dppAfter = rowsAfter.find((row) => row.textContent?.includes('creds/dpp.json')) as HTMLElement;
-    expect(within(dppAfter).getByTestId('linked-credential-encrypted')).toBeInTheDocument();
+    expect(within(dppAfter).getByTestId('linked-credential-locked')).toBeInTheDocument();
     // Still verifiable: the metadata was a discovery, not a lockout.
     expect(within(dppAfter).getByTestId('linked-credential-verify')).toBeInTheDocument();
   });
@@ -664,7 +797,7 @@ describe('encrypted discovery fallback (#812)', () => {
 
     fireEvent.click(within(dppRow).getByTestId('linked-credential-verify'));
     await waitFor(() => {
-      expect(within(dppRow).getByTestId('linked-credential-encrypted')).toBeInTheDocument();
+      expect(within(dppRow).getByTestId('linked-credential-locked')).toBeInTheDocument();
     });
 
     (fetchLinkedCredential as jest.Mock).mockResolvedValueOnce({
@@ -675,7 +808,7 @@ describe('encrypted discovery fallback (#812)', () => {
     fireEvent.click(within(dppRow).getByTestId('linked-credential-verify'));
 
     await waitFor(() => {
-      expect(within(dppRow).queryByTestId('linked-credential-encrypted')).not.toBeInTheDocument();
+      expect(within(dppRow).queryByTestId('linked-credential-locked')).not.toBeInTheDocument();
     });
   });
 
@@ -694,7 +827,7 @@ describe('encrypted discovery fallback (#812)', () => {
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('The URL returned 404. Check the address.');
     });
-    expect(screen.getAllByTestId('linked-credential-encrypted')).toHaveLength(1);
+    expect(screen.getAllByTestId('linked-credential-locked')).toHaveLength(1);
   });
 });
 
@@ -711,7 +844,9 @@ describe('secondary resolver rows (#974)', () => {
     expandCard();
 
     const section = screen.getByTestId('secondary-resolvers');
-    expect(section).toHaveTextContent('Secondary resolvers · 1');
+    const heading = within(section).getByText('Secondary resolvers · 1');
+    expect(heading).toHaveClass('text-sm', 'font-semibold');
+    expect(heading).not.toHaveClass('text-muted-foreground');
     expect(within(section).getByTestId('secondary-resolver-resolve')).toBeInTheDocument();
     expect(section).toHaveTextContent('Item-level resolver');
     // Credential rows unchanged; the pip page stays the only other link.
@@ -727,7 +862,14 @@ describe('secondary resolver rows (#974)', () => {
     expandCard();
 
     fireEvent.click(screen.getByTestId('secondary-resolver-resolve'));
-    expect(screen.getByTestId('secondary-resolver-resolving')).toHaveTextContent('Resolving...');
+    expect(screen.getByTestId('secondary-resolver-resolving')).toHaveTextContent('Resolving');
+    const resolvingRow = screen.getByTestId('secondary-resolver-row');
+    expect(within(resolvingRow).getByTestId('secondary-resolver-left-column')).not.toContainElement(
+      within(resolvingRow).getByTestId('secondary-resolver-resolving'),
+    );
+    expect(within(resolvingRow).getByTestId('secondary-resolver-action-slot')).toContainElement(
+      within(resolvingRow).getByTestId('secondary-resolver-resolving'),
+    );
     expect(mockOnResolveSecondary).toHaveBeenCalledWith('https://resolver.item.example.org/01/1/21/serial');
 
     await act(async () => {
@@ -960,12 +1102,12 @@ describe('Schema Validation outcomes (#988)', () => {
     const instanceId = header.getAttribute('data-instance-id') as string;
     await screen.findByTestId(`${instanceId}-status-icon-failure`);
     fireEvent.click(header);
-    const items = within(screen.getByTestId('linkset-schema-errors')).getAllByRole('listitem');
-    expect(items.map((li) => li.textContent)).toEqual([
-      'Missing required field: linkset → 0 → anchor',
-      'Missing required field: linkset → 0 → https://test.uncefact.org/voc/untp/dpp → 0 → title',
-      'Unknown field at linkset → 0 → dpp → 0: colour',
-    ]);
+    fireEvent.click(screen.getByTestId(`${TestCaseStepId.LINKSET_SCHEMA_VALIDATION}-view-details`));
+    expect(screen.getByText(/We Found 3 Issues/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Location: linkset → 0/)).toHaveLength(3);
+    expect(screen.getByText('Missing required field: linkset → 0 → anchor')).toBeInTheDocument();
+    expect(screen.getByText(/Missing required field: linkset → 0 → https/)).toBeInTheDocument();
+    expect(screen.getByText('Issue: Unknown field at linkset → 0 → dpp → 0: colour')).toBeInTheDocument();
   });
 
   it('explains a relation the published schema rejects instead of calling it an unknown field', async () => {
@@ -990,7 +1132,8 @@ describe('Schema Validation outcomes (#988)', () => {
     const header = await screen.findByTestId('linkset-card-header');
     await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
     fireEvent.click(header);
-    const item = within(screen.getByTestId('linkset-schema-errors')).getByRole('listitem');
+    fireEvent.click(screen.getByTestId(`${TestCaseStepId.LINKSET_SCHEMA_VALIDATION}-view-details`));
+    const item = screen.getByTestId('validation-issue-card');
     expect(item).toHaveAttribute('data-relation-rule', 'true');
     // The plain path-and-rule line stays; the explanation follows it.
     expect(item).toHaveTextContent(
@@ -1037,8 +1180,11 @@ describe('Schema Validation outcomes (#988)', () => {
     const header = await screen.findByTestId('linkset-card-header');
     await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
     fireEvent.click(header);
-    const item = within(screen.getByTestId('linkset-schema-errors')).getByRole('listitem');
+    fireEvent.click(screen.getByTestId(`${TestCaseStepId.LINKSET_SCHEMA_VALIDATION}-view-details`));
+    const item = screen.getByTestId('validation-issue-card');
     expect(item).not.toHaveAttribute('data-relation-rule');
+    expect(screen.getByText('We Found 1 Issue')).toBeInTheDocument();
+    expect(item).toHaveTextContent('Location: linkset → 0');
     expect(item).toHaveTextContent('Unknown field at linkset → 0: lastUpdated');
     expect(item).not.toHaveTextContent('rejects the relation');
   });
@@ -1053,17 +1199,25 @@ describe('Schema Validation outcomes (#988)', () => {
       message,
       version: '0.7.0',
       schemaUrl: SCHEMA_URL,
+      failure: {
+        class: 'could-not-fetch',
+        code: reason === 'not-found' ? 'schema.fetch.not-found' : 'schema.fetch.parse',
+        message: `The link set schema could not be fetched for ${SCHEMA_URL}.`,
+        remediation: 'Report the schema problem to the Playground operator.',
+        artefactUrl: SCHEMA_URL,
+      },
     });
     render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
     const header = await screen.findByTestId('linkset-card-header');
     await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
     fireEvent.click(header);
-    const text = screen.getByTestId('linkset-schema-errors').textContent ?? '';
-    expect(text).toContain('The link set schema for UNTP v0.7.0 could not be loaded');
-    expect(text).toContain('If this keeps happening, report it to the Playground operator');
-    expect(text).toContain(`Details: ${message.replace(/\.$/, '')}.`);
+    fireEvent.click(screen.getByTestId(`${TestCaseStepId.LINKSET_SCHEMA_VALIDATION}-view-details`));
+    expect(screen.getByTestId('validation-issue-card')).toBeInTheDocument();
+    const text = screen.getByTestId('validation-issue-card').textContent ?? '';
+    expect(text).toContain('The link set schema could not be fetched');
+    expect(text).toContain('Report the schema problem to the Playground operator.');
     expect(text).toContain(SCHEMA_URL);
-    expect(text).not.toContain('again to retry');
+    expect(text).not.toContain(message);
   });
 
   it('shows the loader message on an unusable schema so the operator has something to act on', async () => {
@@ -1072,14 +1226,24 @@ describe('Schema Validation outcomes (#988)', () => {
       message: 'schema is invalid: data/type must be equal to one of the allowed values',
       version: '0.7.0',
       schemaUrl: SCHEMA_URL,
+      failure: {
+        class: 'unusable-artefact',
+        code: 'schema.fetch.invalid-json',
+        message: `The link set schema at ${SCHEMA_URL} is not usable.`,
+        remediation: 'Report the schema URL and these details to the Playground operator.',
+        artefactUrl: SCHEMA_URL,
+      },
     });
     render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
     const header = await screen.findByTestId('linkset-card-header');
     await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
     fireEvent.click(header);
-    expect(screen.getByTestId('linkset-schema-errors')).toHaveTextContent(
-      'The schema loader reported: schema is invalid: data/type must be equal to one of the allowed values.',
+    fireEvent.click(screen.getByTestId(`${TestCaseStepId.LINKSET_SCHEMA_VALIDATION}-view-details`));
+    expect(screen.getByTestId('validation-issue-card')).toBeInTheDocument();
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+      `The link set schema at ${SCHEMA_URL} is not usable.`,
     );
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent('Report the schema URL');
   });
 
   it("lets a replacement mid-run win: the old run's late result is rejected", async () => {
@@ -1120,14 +1284,26 @@ describe('Schema Validation outcomes (#988)', () => {
       message: 'Schema host unreachable (https://untp.unece.org/...).',
       version: '0.7.0',
       schemaUrl: SCHEMA_URL,
+      failure: {
+        class: 'could-not-fetch',
+        code: 'schema.fetch.network',
+        message: `The link set schema could not be fetched for ${SCHEMA_URL}.`,
+        remediation: 'Retry the check and report the schema details if it keeps failing.',
+        artefactUrl: SCHEMA_URL,
+      },
     });
     render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
 
     const header = await screen.findByTestId('linkset-card-header');
     await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
     fireEvent.click(header);
-    expect(screen.getByTestId('linkset-schema-errors')).toHaveTextContent(
-      'The link set schema for UNTP v0.7.0 could not be loaded, so this check could not determine whether the link set conforms. Details: Schema host unreachable (https://untp.unece.org/...). Resolve or upload the link set again to retry.',
+    fireEvent.click(screen.getByTestId(`${TestCaseStepId.LINKSET_SCHEMA_VALIDATION}-view-details`));
+    expect(screen.getByTestId('validation-issue-card')).toBeInTheDocument();
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+      `The link set schema could not be fetched for ${SCHEMA_URL}.`,
+    );
+    expect(screen.getByTestId('validation-issue-card')).toHaveTextContent(
+      'Retry the check and report the schema details if it keeps failing.',
     );
     expect(screen.getByLabelText('Remove r.example.org/01/1')).toBeEnabled();
   });
@@ -1138,15 +1314,24 @@ describe('Schema Validation outcomes (#988)', () => {
       message: 'schema is invalid',
       version: '0.7.0',
       schemaUrl: SCHEMA_URL,
+      failure: {
+        class: 'unusable-artefact',
+        code: 'schema.validation.meta-schema',
+        message: `The link set schema at ${SCHEMA_URL} is not usable.`,
+        remediation: 'Report the schema URL and these details to the Playground operator.',
+        artefactUrl: SCHEMA_URL,
+      },
     });
     render(<Harness initial={[{ payload: storedLinkSet(source) }]} />);
 
     const header = await screen.findByTestId('linkset-card-header');
     await waitFor(() => expect(screen.getAllByTestId(/status-icon-failure/).length).toBeGreaterThan(0));
     fireEvent.click(header);
-    const text = screen.getByTestId('linkset-schema-errors').textContent ?? '';
-    expect(text).toContain('could not be used');
-    expect(text).toContain('Report this problem to the Playground operator');
+    fireEvent.click(screen.getByTestId(`${TestCaseStepId.LINKSET_SCHEMA_VALIDATION}-view-details`));
+    expect(screen.getByTestId('validation-issue-card')).toBeInTheDocument();
+    const text = screen.getByTestId('validation-issue-card').textContent ?? '';
+    expect(text).toContain(`The link set schema at ${SCHEMA_URL} is not usable.`);
+    expect(text).toContain('Report the schema URL and these details to the Playground operator.');
     expect(text).toContain(SCHEMA_URL);
     expect(text).not.toContain('again to retry');
   });
@@ -1308,8 +1493,10 @@ describe('Link Type Coverage (#1007)', () => {
     expect(screen.getByTestId('linkset-link-type-coverage-status-icon-pending')).toBeInTheDocument();
     expect(screen.getByTestId('linkset-coverage-count')).toHaveTextContent('1 of 3 credential links checked.');
     expect(screen.queryAllByTestId(/status-icon-in-progress/)).toHaveLength(0);
-    // The matched row says so beside its verified state.
-    expect(screen.getByTestId('linked-credential-coverage-match')).toHaveTextContent('Type matches dpp');
+    // The matched row shows the settled success icon beside its label.
+    expect(screen.getByTestId('linked-credential-verified')).toContainElement(
+      screen.getByTestId('linked-credential-status-icon-success'),
+    );
     // Removal is not blocked by pending coverage: it happens.
     fireEvent.click(screen.getByLabelText('Remove r.example.org/01/1'));
     await waitFor(() => expect(screen.queryByTestId('linkset-card-header')).not.toBeInTheDocument());
@@ -1379,9 +1566,17 @@ describe('Link Type Coverage (#1007)', () => {
       'dcc link resolved to DigitalProductPassport',
     );
     expect(screen.getByTestId('linkset-coverage-mismatches')).toHaveTextContent('https://x/c');
-    expect(screen.getByTestId('linked-credential-coverage-mismatch')).toHaveTextContent(
-      'dcc link resolved to DigitalProductPassport',
+    const mismatchIcon = screen.getByTestId('linked-credential-coverage-mismatch');
+    const mismatchButton = mismatchIcon.closest('button') as HTMLElement;
+    expect(mismatchButton).toHaveAttribute(
+      'aria-label',
+      'Open this credential in the Credentials tab. dcc link resolved to DigitalProductPassport',
     );
+    expect(mismatchButton).toHaveAttribute('title', 'dcc link resolved to DigitalProductPassport');
+    expect(mismatchButton).toHaveAttribute('data-testid', 'linked-credential-failed');
+    expect(mismatchIcon).toContainElement(screen.getByTestId('linked-credential-status-icon-failure'));
+    const mismatchRow = mismatchButton.closest('[data-testid="linked-credential-row"]') as HTMLElement;
+    expectLinkedCredentialLeftColumnInvariant(mismatchRow);
   });
 
   it('succeeds with 3 of 3 when every link resolved to its type', async () => {
@@ -1491,6 +1686,7 @@ describe('Link Type Coverage (#1007)', () => {
       'No UNTP-relation credential links to check.',
     );
     expect(screen.getAllByTestId('linked-credential-row')).toHaveLength(1);
+    expect(screen.queryByTestId('linked-credential-coverage-excluded')).not.toBeInTheDocument();
   });
 });
 
@@ -1546,7 +1742,7 @@ describe('rejected re-verify forgets the binding (#1007)', () => {
       const header = await screen.findByTestId('linkset-card-header');
       fireEvent.click(header);
       // Bound and matched before the re-verify.
-      expect(screen.getByTestId('linked-credential-coverage-match')).toBeInTheDocument();
+      expect(screen.getByTestId('linked-credential-verified')).toBeInTheDocument();
       fireEvent.click(screen.getByTestId('linked-credential-verify-again'));
       // The tick taken when Verify started travels with the rejection.
       await waitFor(() => expect(mockOnVerifyRejected).toHaveBeenCalledWith(['https://x/a'], 7));

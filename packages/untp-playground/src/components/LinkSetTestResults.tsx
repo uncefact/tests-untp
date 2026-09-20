@@ -21,14 +21,15 @@ import {
 
 import {
   linkSetSchemaStepDetails,
+  schemaStepDialogErrors,
+  schemaStepMessages,
   linkSetSchemaUrl,
   linkSetValidationSteps,
-  schemaStepMessages,
   toLinkSetSchemaStepDetails,
   validateLinkSetSchema,
   type LinkSetSchemaStepDetails,
 } from '@/lib/linkSetValidation';
-import { describeArtefactFailure, isUnexpectedFailure, unexpectedFailure } from '@/lib/artefactFailure';
+import { isUnexpectedFailure, unexpectedFailure } from '@/lib/artefactFailure';
 import { credentialIsTerminal, instanceStatus } from '@/lib/credentialCollection';
 import { newId } from '@/lib/id';
 import { fetchLinkedCredential } from '@/lib/fetchLinkedCredential';
@@ -37,7 +38,8 @@ import type { LinkedCredentialRow } from '@/lib/linkSetCollection';
 import type { ArtefactSlot, CollectionState, InstanceId, RunId } from '@/types/artefact';
 import type { ArtefactSource, StoredCredential, StoredLinkSet, TestStep } from '@/types';
 import { ChevronDown, ChevronRight, Loader2, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
+import ValidationDetailsSheet from '@/components/ValidationDetailsSheet';
 import { toast } from 'sonner';
 import {
   CREDENTIAL_LINKS_DOCS_URL,
@@ -86,6 +88,8 @@ interface LinkSetTestResultsProps {
     rawArtefact: unknown,
     source: ArtefactSource,
   ) => { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true };
+  /** Opens the linked credential in the Credentials tab and focuses its card. */
+  onShowCredential: (instanceId: InstanceId) => void;
   /**
    * Resolves a secondary identity resolver link as a new link set card (#974): the same flow as
    * submitting the URL through the resolve input, owned by the page so identity and replace
@@ -101,6 +105,7 @@ export function LinkSetTestResults({
   urlBindings,
   assessments,
   onVerifyCredential,
+  onShowCredential,
   beginUrlAttempt,
   onVerifyRejected,
   onResolveSecondary,
@@ -187,6 +192,7 @@ export function LinkSetTestResults({
           credentialItems={credentialItems}
           urlBindings={urlBindings}
           onVerifyCredential={onVerifyCredential}
+          onShowCredential={onShowCredential}
           beginUrlAttempt={beginUrlAttempt}
           onVerifyRejected={onVerifyRejected}
           onResolveSecondary={onResolveSecondary}
@@ -266,9 +272,6 @@ async function runLinkSetPipeline(
   }
 }
 
-/** The card's relation-rule message ends with what the verifier can still do here; the report omits it. */
-const VERIFY_HINT = ' Any credential links listed on this card can still be verified.';
-
 function LinkSetCard({
   item,
   onRemove,
@@ -276,6 +279,7 @@ function LinkSetCard({
   credentialItems,
   urlBindings,
   onVerifyCredential,
+  onShowCredential,
   beginUrlAttempt,
   onVerifyRejected,
   onResolveSecondary,
@@ -293,6 +297,7 @@ function LinkSetCard({
     rawArtefact: unknown,
     source: ArtefactSource,
   ) => { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true };
+  onShowCredential: (instanceId: InstanceId) => void;
   beginUrlAttempt: () => number;
   onVerifyRejected: (urls: Array<string | undefined>, startedAt: number) => void;
   onResolveSecondary: (href: string) => Promise<void>;
@@ -302,6 +307,7 @@ function LinkSetCard({
   setDiscoveredEncrypted: (href: string, discovered: boolean) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const linkSet = item.payload;
   // The page supplies the composed steps and status; a caller that supplies no assessment for this
   // instance gets the stored schema steps alone.
@@ -321,11 +327,27 @@ function LinkSetCard({
   const overallStatus = assessment?.overallStatus ?? instanceStatus(item.result);
   const rowOutcome = (row: LinkedCredentialRow): RowCoverageOutcome | undefined =>
     assessment?.coverage.outcomes.get(occurrenceKey(row.occurrence));
+  const schemaStep = steps.find((step) => step.id === TestCaseStepId.LINKSET_SCHEMA_VALIDATION);
+  const schemaStepDetails = schemaStep ? linkSetSchemaStepDetails(schemaStep) : undefined;
+  const schemaStepFailure = schemaStep?.failure ?? schemaStepDetails?.failure;
+  const schemaDialogErrors =
+    schemaStepDetails?.kind === 'document'
+      ? schemaStepDialogErrors(schemaStepDetails, linkSet.decoded)
+      : schemaStepDetails?.kind === 'schema-unusable' && schemaStepFailure
+        ? schemaStepDetails.errors ?? []
+        : schemaStepFailure
+          ? []
+          : schemaStepDetails
+            ? schemaStepMessages(schemaStepDetails, linkSet.decoded).map(({ text, relationRule }) => ({
+                message: text,
+                ...(relationRule ? { relationRule } : {}),
+              }))
+            : [];
 
   return (
     <Card className='group relative overflow-hidden p-4'>
       <div
-        className='flex flex-wrap items-center justify-between gap-2 cursor-pointer'
+        className='relative flex flex-wrap items-center justify-between gap-2 cursor-pointer'
         onClick={() => setIsExpanded((prev) => !prev)}
         data-testid='linkset-card-header'
         data-instance-id={item.instanceId}
@@ -340,35 +362,47 @@ function LinkSetCard({
           </div>
         </div>
         <StatusIcon status={overallStatus} testId={item.instanceId} />
+        <button
+          type='button'
+          aria-label={`Remove ${title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          // Revealed only when the pointer is over the header row's delete region, or when the
+          // control is keyboard-focused, rather than on hover of the whole card.
+          className='absolute inset-y-0 right-0 flex w-12 items-center justify-center bg-red-400 text-white opacity-0 transition-opacity hover:bg-red-500 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100'
+        >
+          <Trash2 className='h-4 w-4' />
+        </button>
       </div>
       {isExpanded && (
-        <div className='mt-4 space-y-2 pl-6'>
+        <div className='mt-4 space-y-2 pl-6' data-testid='linkset-card-body'>
           {linkSet.source && <SourceCaption source={linkSet.source} />}
           {steps.map((step) => (
             <div key={step.id} className='py-2'>
-              <div className='flex items-center gap-2'>
-                <StatusIcon status={step.status} testId={step.id} />
-                <span>{step.name}</span>
-                {step.failure && (
-                  <span className='text-xs font-medium text-amber-700' data-testid='artefact-failure-class'>
-                    {describeArtefactFailure(step.failure, 'link-set')?.heading}
-                  </span>
-                )}
+              <div className='flex items-center justify-between' data-testid={`${step.id}-row`}>
+                <div className='flex items-center gap-2'>
+                  <StatusIcon status={step.status} testId={step.id} />
+                  <span>{step.name}</span>
+                </div>
+                {step.id === TestCaseStepId.LINKSET_SCHEMA_VALIDATION &&
+                  step.status === TestCaseStatus.FAILURE &&
+                  (step.details || step.failure) && (
+                    <ValidationDetailsSheet
+                      isOpen={isDetailsOpen}
+                      onOpenChange={setIsDetailsOpen}
+                      errors={schemaDialogErrors}
+                      failure={schemaStepFailure}
+                      family='link-set'
+                      trigger={
+                        <Button variant='ghost' size='sm' data-testid={`${step.id}-view-details`}>
+                          View Details
+                        </Button>
+                      }
+                    />
+                  )}
               </div>
-              {step.id === TestCaseStepId.LINKSET_SCHEMA_VALIDATION &&
-                step.status === TestCaseStatus.FAILURE &&
-                (step.details || step.failure) && (
-                  <ul
-                    className='mt-1 list-disc space-y-1 pl-6 text-sm text-red-600'
-                    data-testid='linkset-schema-errors'
-                  >
-                    {schemaStepMessages(linkSetSchemaStepDetails(step), linkSet.decoded).map((message, idx) => (
-                      <li key={idx} data-relation-rule={message.relationRule ? 'true' : undefined}>
-                        {message.relationRule ? `${message.text}${VERIFY_HINT}` : message.text}
-                      </li>
-                    ))}
-                  </ul>
-                )}
               {step.id === TestCaseStepId.LINKSET_LINK_TYPE_COVERAGE && assessment && (
                 <div className='mt-1 pl-6 text-sm' data-testid='linkset-coverage'>
                   <p className='text-muted-foreground' data-testid='linkset-coverage-count'>
@@ -404,9 +438,7 @@ function LinkSetCard({
           </p>
           {credentialRows.length > 0 && (
             <div className='pt-2' data-testid='linked-credentials'>
-              <p className='text-xs font-semibold text-muted-foreground'>
-                Linked credentials · {credentialRows.length}
-              </p>
+              <p className='text-sm font-semibold'>Linked credentials · {credentialRows.length}</p>
               {/* The heading carries the total, so the row list can scroll: a resolver can answer
                   with hundreds of links and an unbounded card would swallow the page. */}
               <div className='mt-2 max-h-80 space-y-2 overflow-y-auto pr-1'>
@@ -419,6 +451,7 @@ function LinkSetCard({
                     credentialItems={credentialItems}
                     urlBindings={urlBindings}
                     onVerifyCredential={onVerifyCredential}
+                    onShowCredential={onShowCredential}
                     beginUrlAttempt={beginUrlAttempt}
                     onVerifyRejected={onVerifyRejected}
                     isFetching={fetchingHrefs.has(`verify:${row.href}`)}
@@ -432,9 +465,7 @@ function LinkSetCard({
           )}
           {secondaryRows.length > 0 && (
             <div className='pt-2' data-testid='secondary-resolvers'>
-              <p className='text-xs font-semibold text-muted-foreground'>
-                Secondary resolvers · {secondaryRows.length}
-              </p>
+              <p className='text-sm font-semibold'>Secondary resolvers · {secondaryRows.length}</p>
               {/* The heading carries the total, so the row list can scroll: a resolver can answer
                   with many delegations and an unbounded card would swallow the page. */}
               <div className='mt-2 max-h-80 space-y-2 overflow-y-auto pr-1'>
@@ -465,19 +496,6 @@ function LinkSetCard({
           )}
         </div>
       )}
-      <button
-        type='button'
-        aria-label={`Remove ${title}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        // Revealed only when the pointer is over the delete region itself (the right edge), or when
-        // the control is keyboard-focused, rather than on hover of the whole card.
-        className='absolute bottom-0 right-0 top-0 flex w-12 items-center justify-center bg-red-400 text-white opacity-0 transition-opacity hover:bg-red-500 hover:opacity-100 focus:opacity-100 focus-visible:opacity-100'
-      >
-        <Trash2 className='h-4 w-4' />
-      </button>
     </Card>
   );
 }
@@ -487,10 +505,9 @@ function LinkSetCard({
  * this href's latest accepted ingestion produced), so the note survives card collapse and
  * re-render, follows a re-fetch from either entry point, and fails open to the Verify button when
  * the bound instance was removed. Nothing is fetched until Verify is clicked (targets may be
- * large, gated or encrypted). While the fetch itself runs the row shows a plain "Fetching..."
- * phase: no credential exists yet to group, hash or count, so the "Verifying in Credentials" note
- * and the tab activity begin at accepted ingestion (settled deviation from the ticket's
- * click-instant wording, recorded on the PR).
+ * large, gated or encrypted). While the fetch or credential pipeline runs, the action slot shows
+ * the current short activity label. Settled outcomes stay beside the link label, and no verdict
+ * line is rendered below the href.
  */
 function LinkedCredentialRowView({
   row,
@@ -499,6 +516,7 @@ function LinkedCredentialRowView({
   credentialItems,
   urlBindings,
   onVerifyCredential,
+  onShowCredential,
   beginUrlAttempt,
   onVerifyRejected,
   isFetching,
@@ -517,6 +535,7 @@ function LinkedCredentialRowView({
     rawArtefact: unknown,
     source: ArtefactSource,
   ) => { accepted: false } | { accepted: true; instanceId: string; encrypted?: true; alreadyDecrypted?: true };
+  onShowCredential: (instanceId: InstanceId) => void;
   beginUrlAttempt: () => number;
   onVerifyRejected: (urls: Array<string | undefined>, startedAt: number) => void;
   isFetching: boolean;
@@ -586,7 +605,7 @@ function LinkedCredentialRowView({
       type='button'
       variant='outline'
       size='sm'
-      className='shrink-0'
+      className='w-full'
       onClick={(e) => {
         e.stopPropagation();
         void handleVerify();
@@ -597,66 +616,88 @@ function LinkedCredentialRowView({
     </Button>
   );
 
+  const coverageMismatchMessage = settled && coverage?.kind === 'mismatch' ? mismatchText(coverage) : undefined;
+  const openCredential = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (instance) onShowCredential(instance.instanceId);
+  };
+  const settledOutcome =
+    instance && locked ? (
+      <button
+        type='button'
+        className='ml-2 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800'
+        aria-label='Open this credential in the Credentials tab'
+        onClick={openCredential}
+        data-testid='linked-credential-locked'
+      >
+        Encrypted
+      </button>
+    ) : instance && settled ? (
+      <button
+        type='button'
+        className='ml-2 inline-flex items-center'
+        aria-label={
+          coverageMismatchMessage
+            ? `Open this credential in the Credentials tab. ${coverageMismatchMessage}`
+            : 'Open this credential in the Credentials tab'
+        }
+        title={coverageMismatchMessage}
+        onClick={openCredential}
+        data-testid={`linked-credential-${failed || coverageMismatchMessage ? 'failed' : 'verified'}`}
+      >
+        <span
+          className='inline-flex items-center'
+          data-testid={coverageMismatchMessage ? 'linked-credential-coverage-mismatch' : undefined}
+        >
+          <StatusIcon
+            status={coverageMismatchMessage || failed ? TestCaseStatus.FAILURE : TestCaseStatus.SUCCESS}
+            size='sm'
+            testId='linked-credential'
+          />
+        </span>
+      </button>
+    ) : null;
+
+  const busyAction = (label: string, testId: string) => (
+    <span
+      className='flex h-9 w-full items-center justify-center gap-1.5 text-xs text-muted-foreground'
+      data-testid={testId}
+    >
+      <Loader2 className='h-4 w-4 shrink-0 animate-spin' aria-hidden='true' />
+      {label}
+    </span>
+  );
+
+  const action = isFetching
+    ? busyAction('Fetching', 'linked-credential-fetching')
+    : instance && locked
+      ? verifyAction('Verify again')
+      : instance && settled
+        ? verifyAction('Verify again')
+        : instance
+          ? busyAction('Verifying', 'linked-credential-verifying')
+          : verifyAction('Verify');
+
   return (
     <div className='flex items-center justify-between gap-3 rounded-md border p-3' data-testid='linked-credential-row'>
-      <div className='min-w-0'>
-        <p className='truncate text-sm font-medium'>
+      <div className='min-w-0 flex-1' data-testid='linked-credential-left-column'>
+        <div className='truncate text-sm font-medium' data-testid='linked-credential-label'>
           {row.label}
-          {showEncryptedTag && (
+          {showEncryptedTag && !settledOutcome && (
             <span
               className='ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800'
-              data-testid='linked-credential-encrypted'
+              data-testid='linked-credential-locked'
             >
               Encrypted
             </span>
           )}
-        </p>
+          {settledOutcome}
+        </div>
         <p className='truncate font-mono text-xs text-muted-foreground'>{row.href}</p>
-        {coverage?.kind === 'excluded' && (
-          <p className='text-xs text-muted-foreground' data-testid='linked-credential-coverage-excluded'>
-            Not checked: no UNTP credential relation
-          </p>
-        )}
       </div>
-      {isFetching ? (
-        <span
-          className='flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground'
-          data-testid='linked-credential-fetching'
-        >
-          <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
-          Fetching...
-        </span>
-      ) : instance && locked ? (
-        <span className='flex shrink-0 items-center gap-3'>
-          <span className='text-xs text-muted-foreground' data-testid='linked-credential-locked'>
-            Encrypted in Credentials tab
-          </span>
-          {/* Re-fetch stays available: the target may have been replaced with plaintext. */}
-          {verifyAction('Verify again')}
-        </span>
-      ) : instance ? (
-        <span className='flex shrink-0 items-center gap-3'>
-          <span
-            className='text-xs text-muted-foreground'
-            data-testid={`linked-credential-${!settled ? 'verifying' : failed ? 'failed' : 'verified'}`}
-          >
-            {!settled ? 'Verifying in Credentials tab' : failed ? 'Failed in Credentials tab' : 'Verified'}
-          </span>
-          {/* Only a settled instance has a type to compare; an unsettled one already reads "Verifying". */}
-          {settled && coverage && (coverage.kind === 'match' || coverage.kind === 'mismatch') && (
-            <span
-              className={`text-xs ${coverage.kind === 'mismatch' ? 'text-red-600' : 'text-muted-foreground'}`}
-              data-testid={`linked-credential-coverage-${coverage.kind}`}
-            >
-              {coverage.kind === 'match' ? `Type matches ${coverage.expectedType}` : mismatchText(coverage)}
-            </span>
-          )}
-          {/* A settled row can re-fetch (the target may have drifted); a running one cannot. */}
-          {settled && verifyAction('Verify again')}
-        </span>
-      ) : (
-        verifyAction('Verify')
-      )}
+      <div className='flex w-24 shrink-0 justify-end' data-testid='linked-credential-action-slot'>
+        {action}
+      </div>
     </div>
   );
 }
@@ -693,36 +734,38 @@ function SecondaryResolverRowView({
 
   return (
     <div className='flex items-center justify-between gap-3 rounded-md border p-3' data-testid='secondary-resolver-row'>
-      <div className='min-w-0'>
+      <div className='min-w-0 flex-1' data-testid='secondary-resolver-left-column'>
         <p className='truncate text-sm font-medium'>{row.label}</p>
         <p className='truncate font-mono text-xs text-muted-foreground'>{row.href}</p>
       </div>
-      {isFetching ? (
-        <span
-          className='flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground'
-          data-testid='secondary-resolver-resolving'
-        >
-          <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
-          Resolving...
-        </span>
-      ) : (
-        <Button
-          type='button'
-          variant='outline'
-          size='sm'
-          className='shrink-0'
-          // The href keeps repeated titles distinguishable for assistive tech: resolvers routinely
-          // reuse a generic title across delegation links.
-          aria-label={`Resolve ${row.label} (${row.href})`}
-          onClick={(e) => {
-            e.stopPropagation();
-            void handleResolve();
-          }}
-          data-testid='secondary-resolver-resolve'
-        >
-          Resolve
-        </Button>
-      )}
+      <div className='flex w-24 shrink-0 justify-end' data-testid='secondary-resolver-action-slot'>
+        {isFetching ? (
+          <span
+            className='flex h-9 w-full items-center justify-center gap-1.5 text-xs text-muted-foreground'
+            data-testid='secondary-resolver-resolving'
+          >
+            <Loader2 className='h-4 w-4 shrink-0 animate-spin' aria-hidden='true' />
+            Resolving
+          </span>
+        ) : (
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            className='w-full'
+            // The href keeps repeated titles distinguishable for assistive tech: resolvers routinely
+            // reuse a generic title across delegation links.
+            aria-label={`Resolve ${row.label} (${row.href})`}
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleResolve();
+            }}
+            data-testid='secondary-resolver-resolve'
+          >
+            Resolve
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

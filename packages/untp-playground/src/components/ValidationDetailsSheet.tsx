@@ -12,7 +12,6 @@ interface ValidationDetailsSheetProps {
   failure?: ArtefactStepFailure;
   family?: ArtefactFailureFamily;
   trigger?: React.ReactNode;
-  content?: React.ReactNode;
 }
 
 const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({
@@ -22,7 +21,6 @@ const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({
   failure,
   family = 'credential',
   trigger,
-  content,
 }) => {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -32,14 +30,7 @@ const ValidationDetailsSheet: React.FC<ValidationDetailsSheetProps> = ({
           <SheetTitle>Validation Details</SheetTitle>
         </SheetHeader>
         <div className='mt-4 overflow-y-auto max-h-[calc(100vh-8rem)]'>
-          {failure && content !== undefined && (
-            <ErrorDialog errors={[]} failure={failure} family={family} className='w-full max-w-none' />
-          )}
-          {content !== undefined ? (
-            content
-          ) : (
-            <ErrorDialog errors={errors} failure={failure} family={family} className='w-full max-w-none' />
-          )}
+          <ErrorDialog errors={errors} failure={failure} family={family} className='w-full max-w-none' />
         </div>
       </SheetContent>
     </Sheet>

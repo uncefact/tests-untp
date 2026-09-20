@@ -990,6 +990,12 @@ describe('verify from a link set (#812)', () => {
     (detectExtension as jest.Mock).mockReturnValue(undefined);
   });
 
+  afterEach(() => {
+    (LinkSetTestResults as jest.Mock).mockImplementation(() => (
+      <div data-testid='mock-linkset-results'>Link Set Results</div>
+    ));
+  });
+
   // The link set panel renders its results component only once a link set exists, so each test
   // ingests one through the uploader mock first.
   const ingestLinkSetButton = () => {
@@ -1047,6 +1053,52 @@ describe('verify from a link set (#812)', () => {
       url: 'https://x.example.org/creds/dpp.json',
       via: 'link-set',
     });
+  });
+
+  it('switches to Credentials and forwards the linked instance focus request', async () => {
+    (ArtefactUploader as jest.Mock).mockImplementation(
+      ({ onArtefactUpload }: { onArtefactUpload: (artefact: any, source?: any) => void }) => (
+        <>
+          <button
+            data-testid='mock-upload-credential-for-focus'
+            onClick={() =>
+              onArtefactUpload({ verifiableCredential: { type: ['VerifiableCredential', 'DigitalProductPassport'] } })
+            }
+          >
+            Upload credential
+          </button>
+          <button
+            data-testid='mock-upload-linkset-for-focus'
+            onClick={() => onArtefactUpload({ linkset: [] }, { kind: 'file', filename: 'linkset.json' })}
+          >
+            Upload link set
+          </button>
+        </>
+      ),
+    );
+    (TestResults as jest.Mock).mockImplementation(({ focusInstanceId }: { focusInstanceId?: string }) => (
+      <output data-testid='credential-focus-request'>{focusInstanceId ?? 'none'}</output>
+    ));
+    (LinkSetTestResults as jest.Mock).mockImplementation(
+      ({ credentialItems, onShowCredential }: { credentialItems: any[]; onShowCredential: (id: string) => void }) => (
+        <button
+          data-testid='mock-open-linked-credential'
+          onClick={() => onShowCredential(credentialItems[0].instanceId)}
+        >
+          Open linked credential
+        </button>
+      ),
+    );
+
+    render(<Home />);
+    fireEvent.click(screen.getByTestId('mock-upload-credential-for-focus'));
+    await screen.findByRole('tab', { name: /Credentials.*1/ });
+    await userEvent.click(screen.getByRole('tab', { name: 'Link Sets' }));
+    fireEvent.click(screen.getByTestId('mock-upload-linkset-for-focus'));
+    fireEvent.click(await screen.findByTestId('mock-open-linked-credential'));
+
+    expect(screen.getByRole('tab', { name: /Credentials/ })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByTestId('credential-focus-request')).not.toHaveTextContent('none');
   });
 });
 

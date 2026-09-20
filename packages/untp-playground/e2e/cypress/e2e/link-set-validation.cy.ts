@@ -46,9 +46,13 @@ describe('Link set schema validation', () => {
     cy.get(CARD_HEADER).click();
     cy.get('[data-testid$="status-icon-failure"]', { timeout: 20000 }).should('exist');
     cy.checkValidationStatus('Schema Validation', 'failure');
-    cy.get('[data-testid="linkset-schema-errors"]').should(
-      'contain.text',
-      'Missing required field: linkset → 0 → https://test.uncefact.org/voc/untp/dpp → 0 → title',
+    cy.get('[data-testid="linkset-schema-validation-row"]').within(() => {
+      cy.contains('View Details').should('be.visible');
+    });
+    cy.get('[data-testid="linkset-schema-validation-view-details"]').click();
+    cy.contains('We Found 1 Issue').should('be.visible');
+    cy.contains('Missing required field: linkset → 0 → https://test.uncefact.org/voc/untp/dpp → 0 → title').should(
+      'be.visible',
     );
   });
 
