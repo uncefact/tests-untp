@@ -1,0 +1,62 @@
+---
+sidebar_position: 9
+title: Encryption Audit
+---
+
+# Encryption Audit
+
+The Reference Implementation [encrypts four kinds of data at rest](../services/service-architecture#encryption-at-rest) under `DATA_ENCRYPTION_KEY`: service instance configurations, credential decryption keys, the decryption keys of credentials registered from third parties, and the response bodies stored for idempotent retries. Startup validation decrypts a single sampled envelope, so a mixed-key database, or rows corrupted after that check, can pass boot and only surface when a request happens to touch an affected row. The `audit:encryption` command answers the question exhaustively: it attempts to decrypt every stored envelope under the active key and reports the result per store, without writing anything.
+
+Run it:
+
+- before rotating `DATA_ENCRYPTION_KEY`, to confirm the current key decrypts everything the rotation will re-encrypt (see [Encryption Key Rotation](./encryption-key-rotation));
+- after restoring a database backup, to confirm the restored data and the configured key still match (use the [stopped-writers form](#running-with-the-application-stopped) below, as the [recovery procedure](./key-management#recovery) directs);
+- during incident triage, when decryption errors suggest a key or data problem and you need the full extent rather than the one row a request tripped over. A [library](../api/library) verification that settles as `STORED_COPY_UNAVAILABLE` while the worker logs `stored-key-unwrap-failed` is one such trigger, because the key held for that record's durable copy did not open under the active key.
+
+## Running the audit
+
+From a source checkout, in `packages/reference-implementation`:
+
+```bash
+pnpm audit:encryption
+```
+
+The published Docker image carries no package manifest for the Reference Implementation, so inside the image run the script directly against the running application (live triage):
+
+```bash
+docker compose exec -w /app ri node_modules/.bin/tsx scripts/audit-encryption.ts
+```
+
+### Running with the application stopped
+
+Before a [rotation](./encryption-key-rotation), after a [restore](./key-management#recovery), and in any state where writers must stay stopped, the audit runs as a one-off container instead. The key under test is whatever `DATA_ENCRYPTION_KEY` holds in `.env`, exactly as for the serving application, so the command needs no key arguments. The boot preflight runs for the web and worker processes, not for this maintenance command. The `SKIP_` variables still stop the image's entrypoint running migrations, backfills, and the seed first, with `SKIP_MIGRATIONS=true` covering the backfills as well, because they run inside the same guard. The empty `SERVICE_ENCRYPTION_KEY` override neutralises a leftover old-name value the compose file would otherwise forward. The audit resolves its key the way the application does, which refuses to run while that leftover differs from `DATA_ENCRYPTION_KEY`, the state a deployment is in between a rotation and the leftover's removal:
+
+```bash
+docker compose run --rm \
+  -e SKIP_MIGRATIONS=true -e SKIP_SEED=true \
+  -e SERVICE_ENCRYPTION_KEY= \
+  ri node_modules/.bin/tsx scripts/audit-encryption.ts
+```
+
+To audit under a key other than the one in `.env` (verifying a historical backup's key, for example), forward it for this one run by name-only `-e DATA_ENCRYPTION_KEY` with the value loaded from your secret store by command substitution (`DATA_ENCRYPTION_KEY="$(...)" docker compose run ... -e DATA_ENCRYPTION_KEY ...`); never type the literal key into the command, which records it in shell history.
+
+On a source checkout, `pnpm audit:encryption` needs no entrypoint handling, but a leftover `SERVICE_ENCRYPTION_KEY` must likewise be unset or overridden when it differs from `DATA_ENCRYPTION_KEY`. It is never read as a key, and the run fails with a rename instruction if it is the only name set.
+
+The command needs `DATA_ENCRYPTION_KEY` and a database target: a pre-set `RI_DATABASE_URL` is honoured as given, and the `RI_POSTGRES_*` variables are used to construct one only when it is absent (the same rule the application and the backfill follow).
+
+## Reading the report
+
+For each store the audit prints how many values decrypted cleanly, then the ids of any rows that failed to decrypt (a valid envelope that will not open, meaning a key mismatch or corruption of the envelope's ciphertext, IV, or authentication tag) and of any rows holding corrupted values (data that is not a valid envelope at all). Service instance configurations, the decryption keys of credentials registered from third parties, and stored response bodies are always written encrypted, so any non-envelope value in those stores is corruption. A response body that is corrupted or does not open is reported with its remedy, and it never blocks a rotation or a backfill and never counts as proof that the key is right: the next rotation clears the body and keeps the claim. A retry is answered with the recorded credential, with a warning while the unreadable body remains and without one once it is cleared, and never with a second issuance. Credential keys can legitimately predate encryption at rest, so only values that look like a damaged envelope are flagged; other plain values are counted as legacy plaintext.
+
+The audit doubles as the dry run for the [decryption-key backfill](./backfills/decryption-keys): it reports how many legacy plaintext keys a backfill run would wrap, notes any corrupted-looking credential rows a backfill would skip untouched, and states when a backfill would refuse to run without `--force` because no stored envelope proves the key. When the audit finds decrypt failures, or corruption in service instance configurations or in the keys of credentials registered from third parties, a backfill run aborts before writing anything, and `--force` does not change that. Resolve those rows first.
+
+When the database holds nothing encrypted (a fresh deployment, or only legacy plaintext keys), the audit says so explicitly: a clean result in that state means nothing failed, not that the key was proven able to decrypt anything.
+
+## Exit codes
+
+- `0`: the audit completed and every stored envelope decrypted cleanly (including the nothing-to-verify case, which is stated in the output).
+- `1`: the audit found decrypt failures or corrupted rows, or it could not complete (for example, the database was unreachable). The output distinguishes the two. Findings against stored response bodies count towards this exit code even though they block nothing, so read the report before treating a `1` as a key problem.
+
+## Concurrent writes
+
+The audit reads in id order with cursor pagination and no transaction, so it is a point-in-time report: a row changed after it was scanned, or inserted behind the scan position, is not re-examined. When the result gates a rotation or a restore, stop application writers first and keep them stopped until the follow-up action is done. A run against a live system is fine for triage; re-run it quiesced before acting on the result.

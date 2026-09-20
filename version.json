@@ -1,6 +1,6 @@
 {
-  "version": "0.5.0",
-  "docVersion": "0.5.0",
+  "version": "0.6.0",
+  "docVersion": "0.6.0",
   "dependencies": {
     "vckit": {
       "repoUrl": "https://github.com/uncefact/project-vckit.git",
