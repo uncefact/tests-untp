@@ -6,35 +6,26 @@ numbers follow semantic versioning. The package ships via the
 `untp-utils-v<X.Y.Z>` tag-triggered publish workflow described in
 [ADR 031](../../docs/adrs/031-per-package-tag-triggered-npm-release.md).
 
-## [Unreleased]
-
-### Added
-
-- **common:** add `canonicalJson` for deterministic JSON serialisation.
-
-## [0.4.0](https://github.com/uncefact/tests-untp/compare/untp-utils-v0.3.0...untp-utils-v0.4.0) (2026-09-17)
+## [0.4.0](https://github.com/uncefact/tests-untp/compare/untp-utils-v0.3.0...untp-utils-v0.4.0) (2026-09-20)
 
 ### ⚠ BREAKING CHANGES
 
-- **conformity-vocabulary:** the `ConformityWarningCode` union now includes four score-membership and catalogue-tier diagnosis codes. Consumers with exhaustive switches and any total mapping keyed by the union, for example `Record<ConformityWarningCode, T>`, must handle `conformity-attestation.score-not-in-framework`, `conformity-assessment.score-not-in-framework`, `conformity-scheme.wrong-tier` and `conformity-profile.wrong-tier` ([#1068](https://github.com/uncefact/tests-untp/issues/1068)).
-- **conformity-vocabulary:** `parseConformityScheme` now throws `ConformitySchemeParseError` for a present `schemeScoringFramework`, `criterionScoringFramework` entry, `score` entry or `requiredPerformance` entry of the wrong shape, or missing its required `name` or `score`, where 0.3.0 ignored those fields. The failure pointer names the malformed field, for example `/includedProfile/0/criterionScoringFramework/0/score/1/code`. Before 0.4.0, that malformed field was ignored and parsing could return a scheme; from 0.4.0, parsing throws with the pointer in `failures` ([#1068](https://github.com/uncefact/tests-untp/issues/1068)).
+- **conformity-vocabulary:** the `ConformityWarningCode` union now includes four score-membership and catalogue-tier diagnosis codes. Consumers with exhaustive switches and any total mapping keyed by the union, for example `Record<ConformityWarningCode, T>`, must handle `conformity-attestation.score-not-in-framework`, `conformity-assessment.score-not-in-framework`, `conformity-scheme.wrong-tier` and `conformity-profile.wrong-tier` ([#1073](https://github.com/uncefact/tests-untp/pull/1073)) ([1d4296086](https://github.com/uncefact/tests-untp/commit/1d4296086)).
+- **conformity-vocabulary:** `parseConformityScheme` now throws `ConformitySchemeParseError` for a present `schemeScoringFramework`, `criterionScoringFramework` entry, `score` entry or `requiredPerformance` entry of the wrong shape, or missing its required `name` or `score`, where 0.3.0 ignored those fields. The failure pointer names the malformed field, for example `/includedProfile/0/criterionScoringFramework/0/score/1/code`. Before 0.4.0, that malformed field was ignored and parsing could return a scheme; from 0.4.0, parsing throws with the pointer in `failures`. Fix the named field or catch `ConformitySchemeParseError` and report its `failures` ([#1073](https://github.com/uncefact/tests-untp/pull/1073)) ([1d4296086](https://github.com/uncefact/tests-untp/commit/1d4296086)).
+- **artefacts:** `buildUntpArtefactUrls`, `bundledSchema` and `bundledContext` now throw for a `ConformityScheme` below UNTP 0.7.0, where they previously returned a legacy URL or `undefined`. Check `isV070OrAbove(version)` before calling them with that type ([#1075](https://github.com/uncefact/tests-untp/pull/1075)) ([b38b2b947](https://github.com/uncefact/tests-untp/commit/b38b2b947)).
+- **artefacts:** `detectVersionFromContext` now recognises a version-shaped path segment at the end of a context URL, where 0.3.0 required a trailing slash, and ignores version-shaped query and fragment parts. Put the version in the path or pass `specVersion` to `parseConformityScheme` when it is not in the path ([#1067](https://github.com/uncefact/tests-untp/pull/1067)) ([fcf6847ab](https://github.com/uncefact/tests-untp/commit/fcf6847ab)).
+- **artefacts:** `buildUntpArtefactUrls`, `buildSpecificationPageUrl`, `bundledSchema` and `bundledContext` now reject inherited names such as `toString` with the unknown-type error. Pass a recognised artefact type name instead ([#1067](https://github.com/uncefact/tests-untp/pull/1067)) ([fcf6847ab](https://github.com/uncefact/tests-untp/commit/fcf6847ab)).
 
 ### Features
 
-- **conformity-vocabulary:** parse scheme, profile and criterion scoring frameworks, retaining score codes, ranks, definitions and required-performance scores.
-- **conformity-vocabulary:** validate attestation and assessment score-code membership, with a third optional reference-resolution parameter for catalogue tier diagnosis.
-- **conformity-vocabulary:** add the four warning codes `conformity-attestation.score-not-in-framework`, `conformity-assessment.score-not-in-framework`, `conformity-scheme.wrong-tier` and `conformity-profile.wrong-tier` ([#1068](https://github.com/uncefact/tests-untp/issues/1068)).
-
-### ⚠ BREAKING CHANGES
-
-- **artefacts:** `buildUntpArtefactUrls`, `bundledSchema` and `bundledContext` now throw for a `ConformityScheme` below UNTP 0.7.0, where they previously returned a legacy URL or `undefined`. Check `isV070OrAbove(version)` before calling them with that type.
+- **conformity-vocabulary:** parse scheme, profile and criterion scoring frameworks, retaining score codes, ranks, definitions, required-performance scores, and optional metric `id` and `name` as `metric.canonicalId` and `metric.name` ([#1073](https://github.com/uncefact/tests-untp/pull/1073)) ([1d4296086](https://github.com/uncefact/tests-untp/commit/1d4296086)).
+- **conformity-vocabulary:** validate attestation and assessment score-code membership, with a third optional reference-resolution parameter for catalogue tier diagnosis ([#1073](https://github.com/uncefact/tests-untp/pull/1073)) ([1d4296086](https://github.com/uncefact/tests-untp/commit/1d4296086)).
+- **conformity-vocabulary:** add the four warning codes `conformity-attestation.score-not-in-framework`, `conformity-assessment.score-not-in-framework`, `conformity-scheme.wrong-tier` and `conformity-profile.wrong-tier` ([#1073](https://github.com/uncefact/tests-untp/pull/1073)) ([1d4296086](https://github.com/uncefact/tests-untp/commit/1d4296086)).
+- **common:** add `canonicalJson` for deterministic JSON serialisation ([#1074](https://github.com/uncefact/tests-untp/pull/1074)) ([e0e155df6](https://github.com/uncefact/tests-untp/commit/e0e155df6)).
 
 ### Changed
 
-- **artefacts:** version detection now reads a version-shaped path segment of a context URL whether or not a slash follows it, so a context URL that ends in its version segment now detects. Query and fragment parts of the URL never supply the version. The exact context string remains the schema's decision. `parseConformityScheme` therefore selects the 0.7.0 parser for a context URL ending in `/0.7.0`.
-- **artefacts:** inherited object keys such as `toString` no longer build a
-  schema or specification URL; they now throw the unknown-type error like any
-  other unrecognised name.
+- **conformity-vocabulary:** missing-profile warnings now return a sorted and deduplicated `expected` list, and catalogue-resolved profile or wrong-tier cases use more specific warning messages ([#1073](https://github.com/uncefact/tests-untp/pull/1073)) ([1d4296086](https://github.com/uncefact/tests-untp/commit/1d4296086)).
 
 ## [0.3.0](https://github.com/uncefact/tests-untp/compare/untp-utils-v0.2.0...untp-utils-v0.3.0) (2026-09-11)
 

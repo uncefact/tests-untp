@@ -4,6 +4,321 @@ User-facing release notes for `@uncefact/untp-utils`. Each entry frames what
 the release lets you do, not how it does it. For a technical, per-change
 record see [CHANGELOG.md](./CHANGELOG.md).
 
+## 0.4.0 - 2026-09-20
+
+0.3.0 made the package survive a network that does not cooperate. 0.4.0 is
+about the conformity vocabulary: the part of a conformity scheme that says how
+good a result has to be, and what to tell an issuer who claims a grade the
+scheme never published.
+
+A UNTP conformity scheme can publish scoring frameworks, at the scheme, the
+profile and the individual criterion. Until now the parser read a scheme's
+profiles, criteria and topics and dropped every scoring field on the floor, so
+a Digital Conformity Credential could assert a `profileScore` of `Platinum`
+against a scheme whose only published grades were `Pass` and `Fail`, and
+nothing noticed. 0.4.0 parses those frameworks, retains their codes, ranks and
+definitions, and checks a claim's attestation and assessment score codes
+against them. The reference implementation runs the check at issuance and
+returns the warnings beside the credential.
+
+The validator also takes an optional third parameter, a set of catalogue
+matches a caller has already resolved. It uses them to say something more
+useful than "not found" when an issuer has referenced a real id at the wrong
+level of the vocabulary: a criterion URI where a profile belonged, or a profile
+URI where a scheme belonged. The other addition is `canonicalJson`, a
+deterministic serialiser in `./common`, which the playground uses for content
+identity and the reference implementation uses for configuration comparisons,
+status-provider configuration digests and repeated unreadable-document log
+suppression.
+
+- Package: [@uncefact/untp-utils on npm](https://www.npmjs.com/package/@uncefact/untp-utils) (`npm install @uncefact/untp-utils@0.4.0`)
+
+### Upgrading from 0.3.0
+
+No import path changes, and no exported name was removed or renamed. Five
+changes can need attention.
+
+**1. `ConformityWarningCode` has four new members.** An exhaustive `switch`
+over the union, and any total mapping keyed by it such as
+`Record<ConformityWarningCode, T>`, stops compiling until the new codes are
+handled:
+
+```ts
+import type { ConformityWarningCode } from '@uncefact/untp-utils/conformity-vocabulary';
+
+// 0.3.0: this seven-key map compiles.
+// 0.4.0: it is missing these four members:
+// conformity-attestation.score-not-in-framework
+// conformity-assessment.score-not-in-framework
+// conformity-scheme.wrong-tier
+// conformity-profile.wrong-tier
+// @ts-expect-error 0.4.0 requires the four members above.
+const severityAt030: Record<ConformityWarningCode, 'error' | 'advisory'> = {
+  'conformity-scheme.not-found': 'error',
+  'conformity-profile.not-found': 'error',
+  'conformity-profile.not-specified': 'advisory',
+  'conformity-criterion.not-in-profile': 'error',
+  'conformity-criterion.missing': 'error',
+  'conformity-criterion.topic-mismatch': 'advisory',
+  'conformity-assessment.topic-mismatch': 'advisory',
+};
+
+// 0.4.0: the same map with all eleven keys compiles.
+const severityAt040: Record<ConformityWarningCode, 'error' | 'advisory'> = {
+  'conformity-scheme.not-found': 'error',
+  'conformity-profile.not-found': 'error',
+  'conformity-profile.not-specified': 'advisory',
+  'conformity-criterion.not-in-profile': 'error',
+  'conformity-criterion.missing': 'error',
+  'conformity-criterion.topic-mismatch': 'advisory',
+  'conformity-assessment.topic-mismatch': 'advisory',
+  'conformity-attestation.score-not-in-framework': 'error',
+  'conformity-assessment.score-not-in-framework': 'error',
+  'conformity-scheme.wrong-tier': 'error',
+  'conformity-profile.wrong-tier': 'error',
+};
+```
+
+A `switch` with a `default` branch keeps compiling and sends an unhandled new
+code through that branch. A partial `Partial<Record<...>>` lookup also keeps
+compiling but returns `undefined` for a new code unless you add it. If you want
+each code handled deliberately, make the mapping total and let the compiler
+list what is missing.
+
+**2. `parseConformityScheme` throws on a malformed scoring field that 0.3.0
+ignored.** In 0.3.0 the parser did not read `schemeScoringFramework`,
+`criterionScoringFramework`, `score` or `requiredPerformance` at all, so a
+scheme document carrying a broken one parsed and returned. From 0.4.0 those
+fields are read, and a wrong shape or a missing required `name` or `score`
+appends a failure, which makes `parseConformityScheme` throw
+`ConformitySchemeParseError` with a pointer to the offending field:
+
+```ts
+import { ConformitySchemeParseError, parseConformityScheme } from '@uncefact/untp-utils/conformity-vocabulary';
+
+const document = {
+  '@context': ['https://vocabulary.uncefact.org/untp/0.7.0/context/'],
+  id: 'https://example.org/scheme',
+  name: 'Example scheme',
+  includedProfile: [
+    {
+      id: 'https://example.org/profile/1.0.0',
+      name: 'Example profile',
+      version: '1.0.0',
+      status: 'active',
+      criterionScoringFramework: [
+        {
+          name: 'Grades',
+          score: [{ code: 'Pass' }, { code: 42 }], // code must be a string
+        },
+      ],
+      criterion: [],
+    },
+  ],
+};
+
+// 0.3.0: returns a scheme; the malformed score is ignored.
+// 0.4.0: throws ConformitySchemeParseError.
+try {
+  parseConformityScheme(document, { sourceUrl: 'https://example.org/scheme' });
+} catch (error) {
+  if (error instanceof ConformitySchemeParseError) {
+    error.failures[0].pointer; // '/includedProfile/0/criterionScoringFramework/0/score/1/code'
+  }
+}
+```
+
+The action is to fix the scheme document the pointer names, or, if you ingest
+documents you do not control, to catch `ConformitySchemeParseError` and report
+the pointer rather than assuming a scheme comes back. Every failure the parser
+found is in `failures`, not just the first.
+
+**3. Artefact helpers throw for a `ConformityScheme` below UNTP 0.7.0.**
+`ConformityScheme` was introduced in 0.7.0 and no earlier artefact was ever
+published for it. In 0.3.0, `buildUntpArtefactUrls('ConformityScheme', '0.6.1')`
+returned a legacy URL that resolves to nothing, and `bundledSchema` and
+`bundledContext` returned `undefined` for it. They now throw:
+
+```ts
+import { buildUntpArtefactUrls } from '@uncefact/untp-utils/artefacts';
+
+// 0.3.0: { schemaUrl: 'https://test.uncefact.org/vocabulary/untp/cvc/untp-cvc-schema-0.6.1.json', ... }
+// 0.4.0: throws Error('ConformityScheme has no artefacts for versions before UNTP 0.7.0 ...')
+try {
+  buildUntpArtefactUrls('ConformityScheme', '0.6.1');
+} catch (error) {
+  if (error instanceof Error) console.log(error.message);
+}
+```
+
+Guard the call with the version predicate the package exports:
+
+```ts
+import { buildUntpArtefactUrls, isV070OrAbove } from '@uncefact/untp-utils/artefacts';
+
+const version = '0.7.0';
+if (isV070OrAbove(version)) {
+  const { schemaUrl } = buildUntpArtefactUrls('ConformityScheme', version);
+}
+```
+
+Only `ConformityScheme` is affected. The five credential types still build
+legacy URLs for 0.6.x exactly as before.
+
+**4. Context version detection reads path segments to the end of the URL.**
+`detectVersionFromContext` now returns `0.7.0` for a context URL ending in
+`/0.7.0`, where 0.3.0 required a trailing slash. A version-shaped value in a
+query or fragment is ignored. Put the version in the path, or pass
+`specVersion` to `parseConformityScheme` when the version is carried only in a
+query or fragment. If your caller relied on the old unsupported-version error
+for a terminal path, update it to handle the detected version.
+
+**5. Artefact helpers reject inherited object keys.**
+`buildUntpArtefactUrls`, `buildSpecificationPageUrl`, `bundledSchema` and
+`bundledContext` now throw the unknown-type error for a name such as
+`toString`, where 0.3.0 could build a URL from an inherited property. Pass a
+recognised artefact type name instead.
+
+### Scoring frameworks are parsed, and score codes are checked
+
+A conformity scheme publishes more than a list of criteria. It publishes the
+grades a result can carry: a scheme-wide framework in `schemeScoringFramework`,
+per-profile frameworks in `criterionScoringFramework`, and a required grade per
+criterion in `requiredPerformance`. A credential then asserts one of those
+grades, as the attestation's `profileScore` and as each assessment's scores.
+
+`parseConformityScheme` now reads all three and keeps what they publish. A
+framework parses into `ConformityScoringFramework` with a `name`, an optional
+`description` and its `scores`; each `ConformityScore` carries the exact
+`code`, an optional integer `rank` and an optional `definition`. The scheme's
+own framework lands on `ConformityScheme.scoringFramework`, a profile's on
+`ConformityProfile.criterionScoringFrameworks`, and a criterion's required
+grades on `ConformityCriterion.requiredPerformance`. A required-performance
+entry also retains an optional metric `id` as `metric.canonicalId` and its
+`name`. Codes are kept verbatim, because a submitted code is compared with a
+published one by exact string equality.
+
+`validateConformityClaim` uses them for two new checks.
+
+The attestation check compares the claim's `profileScore.code` with the codes
+the scheme's own framework publishes, and warns with
+`conformity-attestation.score-not-in-framework` at pointer `/profileScore/code`
+when the code is not among them. It runs before the profile branches, so an
+issuer who both picked an unpublished grade and referenced a missing profile
+hears about both.
+
+The assessment check compares each `assessedScores[].code` with the union of
+the codes that apply to the claim's profile: the scheme framework, the
+profile's criterion frameworks, and the `requiredPerformance` scores of the
+criteria that assessment references. A code outside the union warns with
+`conformity-assessment.score-not-in-framework` at
+`/assessments/{i}/assessedScores/{j}/code`, carrying the union as `expected`.
+The union is deliberately wide, because a Digital Conformity Credential does
+not say which framework a performance score came from.
+
+Both checks stay silent when there is nothing to check. A claim with no score,
+a scheme that publishes no applicable codes, and an assessment referencing a
+criterion the profile does not publish all pass without a score warning. That
+last case is suppressed on purpose: the unresolved criterion could be the one
+publishing the code, and `conformity-criterion.not-in-profile` has already
+reported it. An unresolved assessment criterion suppresses only that
+assessment's score check; the attestation's `profileScore` check still runs.
+
+The reference implementation runs this at issuance. It looks the scheme up in
+the catalogue, projects the scoring evidence only when the claim actually
+carries a score, calls the validator, and returns the warnings beside the
+issued credential. Validation is advisory, so a warning never blocks issuance.
+When the scheme's stored document cannot be read, it says so with
+`conformity-claim.score-checks-unavailable` rather than passing the claim in
+silence.
+
+### The validator can say "that is a criterion, not a profile"
+
+Until now, an id the scheme graph did not hold produced
+`conformity-scheme.not-found` or `conformity-profile.not-found`, whatever the
+reason. For example, an issuer might paste a criterion URI where the profile
+URI belongs, or a scheme URI where a profile URI belongs.
+
+`validateConformityClaim` now takes an optional third parameter,
+`ConformityReferenceResolution`, carrying matches a caller has already looked
+up:
+
+```ts
+import type { ConformityClaim, ConformityScheme } from '@uncefact/untp-utils/conformity-vocabulary';
+import { validateConformityClaim } from '@uncefact/untp-utils/conformity-vocabulary';
+
+declare const claim: ConformityClaim;
+declare const scheme: ConformityScheme;
+
+const warnings = validateConformityClaim(claim, scheme, {
+  profile: [
+    {
+      tier: 'criterion',
+      schemes: ['https://example.org/scheme'],
+      profiles: ['https://example.org/profile/1.0.0'],
+    },
+  ],
+});
+```
+
+With that in hand, the validator raises `conformity-profile.wrong-tier` at
+`/profile` and names the profiles and schemes the id actually belongs to,
+instead of the bare not-found. The same applies one tier up:
+`conformity-scheme.wrong-tier` at `/scheme` when the scheme reference resolves
+to a profile or a criterion. A match whose tier is the expected one is not a
+wrong-tier case, and keeps the ordinary not-found warning, with the owning
+schemes named when the id is a profile of some other scheme. Omit the third
+parameter and catalogue-tier diagnosis does not run. The two-argument call
+still checks score-code membership, and missing-profile warnings now carry a
+sorted, deduplicated `expected` list.
+
+The lookup stays with the caller because only the caller knows what its
+catalogue holds and which entries the requester is allowed to see. The
+reference implementation resolves ids against the tenant's catalogue and
+passes the result straight through.
+
+### `canonicalJson`, for a document that needs a stable identity
+
+`./common` gains `canonicalJson`, which serialises a JSON-compatible value
+deterministically: object keys sorted by UTF-16 code unit, no whitespace,
+array order preserved, scalars serialised by `JSON.stringify`. The same value
+always produces the same string, whatever order the keys arrived in.
+
+```ts
+import { canonicalJson } from '@uncefact/untp-utils/common';
+
+canonicalJson({ b: 1, a: 2 }); // '{"a":2,"b":1}'
+canonicalJson({ a: 2, b: 1 }); // '{"a":2,"b":1}', the same string
+```
+
+That is what you want before hashing. The playground hashes the canonical form
+to give an uploaded artefact a content identity, so the same document uploaded
+twice under different filenames is recognised as one instance. In the reference
+implementation, it keys suppression of repeated unreadable-document logs,
+compares incoming service-instance configuration with the configuration already
+stored, and derives the status-provider configuration digest.
+
+The intended input is JSON-compatible data, such as a value returned by
+`JSON.parse`. Object keys with an `undefined` value are omitted, as
+`JSON.stringify` omits them. An explicit `undefined` array element becomes
+`null`, but an array hole is not an element and can omit a position or produce
+invalid JSON. Non-finite numbers such as `NaN` and `Infinity` become `null`,
+where RFC 8785 requires an error. Function and symbol values throw a
+`TypeError` as object members and as array elements, where `JSON.stringify`
+would drop the object key or write `null` in the array. A top-level `undefined`
+throws a `TypeError` rather than returning `undefined`.
+
+One further difference from `JSON.stringify` matters if you nest rich objects:
+`toJSON` is not called. A `Date` nested in an object therefore canonicalises to
+`{}`, not to an ISO string. Convert dates and other custom-serialising values to
+strings before canonicalising.
+
+Object-key ordering follows RFC 8785, but number and string serialisation uses
+`JSON.stringify` and does not follow RFC 8785's number and string rules. Treat
+the function as a deterministic serialiser for identity and comparison within
+your own system, not as a certified RFC 8785 implementation to exchange
+digests with an independent one.
+
 ## 0.3.0 - 2026-09-11
 
 0.2.0 made this package the shared toolkit the UNTP projects build on, and put
