@@ -115,7 +115,7 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
         }
         expect(body.state, `active batch state for ${statusUrl}`).to.be.oneOf(['QUEUED', 'RUNNING']);
 
-        if (body.items.some((item) => item.state === 'PROCESSING' || item.state === 'ISSUED')) return body;
+        if (body.items.some((item) => item.state === 'PROCESSING')) return body;
         if (Date.now() - startedAt >= timeoutMs) {
           throw new Error(`Timed out waiting for an active batch item; last response: ${JSON.stringify(body)}`);
         }
@@ -312,15 +312,49 @@ describe('Credential batch cancellation API', { testIsolation: false }, () => {
       submitBatch(`e2e-batch-cancel-running-${RUN_ID}`, requestBody)
         .then(({ statusUrl }) => waitForActiveBatch(statusUrl).then((active) => ({ statusUrl, active })))
         .then(({ statusUrl, active }) => {
-          expect(active.items.some((item) => item.state === 'PROCESSING' || item.state === 'ISSUED')).to.eq(true);
+          expect(active.items.some((item) => item.state === 'PROCESSING')).to.eq(true);
           return cy
             .request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false })
             .then((response) => {
               const accepted = assertCancelAccepted(response, BATCH_ITEM_COUNT);
-              return waitForBatchSettlement(statusUrl, ['CANCELLED', 'COMPLETED']).then((settled) => ({
-                accepted,
-                settled,
-              }));
+              // The barrier-based __tests__/integration/credential-batch-worker.integration.test.ts
+              // proves an active repeat deterministically. This E2E request
+              // covers the live race: settlement can happen between the two
+              // POST requests, so both the active 202 and settled 409 outcomes
+              // are valid.
+              const settlement = (): Cypress.Chainable<BatchStatus> =>
+                waitForBatchSettlement(statusUrl, ['CANCELLED', 'COMPLETED']);
+              return cy
+                .request({ method: 'POST', url: `${statusUrl}/cancel`, failOnStatusCode: false })
+                .then((repeatResponse) => {
+                  if (repeatResponse.status === 202) {
+                    const repeatBody = assertCancelAccepted(repeatResponse, BATCH_ITEM_COUNT);
+                    expect(repeatBody.cancelRequestedAt, 'repeated running cancellation timestamp').to.eq(
+                      accepted.cancelRequestedAt,
+                    );
+                    expect(repeatBody.state, 'repeated running cancellation state').to.eq('RUNNING');
+                    return settlement();
+                  }
+
+                  expect(repeatResponse.status, 'settled repeat cancellation status').to.eq(409);
+                  expect(repeatResponse.body).to.include({
+                    error: NOT_CANCELLABLE_MESSAGE,
+                    code: 'BATCH_NOT_CANCELLABLE',
+                  });
+                  return cy.request(statusUrl).then((statusResponse) => {
+                    expect(statusResponse.status, 'settled repeat cancellation GET status').to.eq(200);
+                    const settled = statusResponse.body as BatchStatus;
+                    expect(settled.state, 'settled repeat cancellation state').to.eq('CANCELLED');
+                    expect(settled.cancelRequestedAt, 'settled repeat cancellation timestamp').to.eq(
+                      accepted.cancelRequestedAt,
+                    );
+                    return settled;
+                  });
+                })
+                .then((settled) => ({
+                  accepted,
+                  settled,
+                }));
             });
         })
         .then(({ accepted, settled }) => {

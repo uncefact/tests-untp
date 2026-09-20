@@ -1,4 +1,5 @@
 import { ConflictError } from '@/lib/api/errors';
+import { apiLogger } from '@/lib/api/logger';
 import { prisma } from '@/lib/prisma/prisma';
 import { isTransactionDeadlock } from '@/lib/prisma/db-errors';
 import { STATUS_RECONCILIATION_IN_PROGRESS_MESSAGE } from './credential-status-messages';
@@ -23,6 +24,8 @@ import {
   applicationObservationAt,
   type ApplicationClock,
 } from './credential-status-context';
+
+const logger = apiLogger.child({ module: 'reconcile-credential-status' });
 
 export type ReconcileCredentialStatusRequest = {
   recordId: string;
@@ -80,6 +83,10 @@ export async function reconcileCredentialStatus(input: ReconcileCredentialStatus
     return { entry, version, provider, attributedInstanceId: record.vcServiceInstanceId };
   });
   const { entry, provider, version } = snapshot;
+  logger.info(
+    { recordId: input.recordId, tenantId: input.tenantId, purpose: input.purpose },
+    'Reading credential status from provider for reconciliation',
+  );
   const budget = statusDeadline(new Date(Date.now() + readStatusOperationBudgetMs()));
   let observation;
   try {
@@ -103,6 +110,10 @@ export async function reconcileCredentialStatus(input: ReconcileCredentialStatus
     );
   }
   let commitRequested = false;
+  logger.info(
+    { recordId: input.recordId, tenantId: input.tenantId, purpose: input.purpose },
+    'Persisting credential status reconciliation',
+  );
   try {
     await prisma.$transaction(async (tx) => {
       if (!(await lockLibraryRecordForUpdate(tx, input.recordId, input.tenantId)))
@@ -143,6 +154,10 @@ export async function reconcileCredentialStatus(input: ReconcileCredentialStatus
         );
       commitRequested = true;
     });
+    logger.info(
+      { recordId: input.recordId, tenantId: input.tenantId, purpose: input.purpose },
+      'Credential status reconciliation persisted',
+    );
   } catch (error) {
     if (error instanceof CredentialStatusError) throw error;
     const commitUncertain = commitRequested && !isTransactionDeadlock(error);

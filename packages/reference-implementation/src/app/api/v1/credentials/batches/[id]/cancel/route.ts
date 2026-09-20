@@ -69,7 +69,7 @@ const logger = apiLogger.child({ route: '/api/v1/credentials/batches/[id]/cancel
  *                     - { index: 4, state: CANCELLED }
  *                   message: Queued items are cancelled. An item already processing may still be issued. Cancellation does not revoke any credentials.
  *       400:
- *         description: A non-empty request body was supplied.
+ *         description: A non-empty request body was supplied, or the request body could not be read.
  *         content:
  *           application/json:
  *             schema:
@@ -77,6 +77,8 @@ const logger = apiLogger.child({ route: '/api/v1/credentials/batches/[id]/cancel
  *             examples:
  *               bodyNotAllowed:
  *                 value: { error: 'Send this request without a body.' }
+ *               unreadableBody:
+ *                 value: { error: 'Could not read the request body' }
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
@@ -124,7 +126,7 @@ const logger = apiLogger.child({ route: '/api/v1/credentials/batches/[id]/cancel
  *       413:
  *         $ref: '#/components/responses/PayloadTooLargeResponse'
  *       500:
- *         description: The response is sanitised and carries the generic server-error message with the request correlation id.
+ *         description: Server error. A cancellation counter-drift failure returns the sanitised message with the request correlation id shown below. Other server errors follow the shared route error handler.
  *         content:
  *           application/json:
  *             schema:

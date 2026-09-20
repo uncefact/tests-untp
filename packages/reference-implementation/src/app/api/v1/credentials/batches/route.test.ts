@@ -7,6 +7,7 @@ jest.mock('next/server', () => ({
     }),
   },
 }));
+jest.mock('@/lib/api/logger');
 
 jest.mock('@/lib/api/with-tenant-auth', () => {
   const { handleRouteError } = jest.requireActual('@/lib/api/handle-route-error');
@@ -45,14 +46,15 @@ const repository = jest.requireMock('@/lib/prisma/repositories/credential-batch.
   findCredentialBatchSubmission: jest.Mock;
 };
 
-function request(body: unknown, key?: string): Request {
-  const bytes = new Uint8Array(Buffer.from(JSON.stringify(body)));
+function request(body: unknown, key?: string, unreadable = false): Request {
+  const bytes = new Uint8Array(Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)));
   let delivered = false;
   return {
     headers: { get: (name: string) => (name.toLowerCase() === 'idempotency-key' ? key ?? null : null) },
     body: {
       getReader: () => ({
         read: async () => {
+          if (unreadable) throw new Error('connection lost');
           if (delivered) return { done: true as const, value: undefined };
           delivered = true;
           return { done: false as const, value: bytes };
@@ -95,6 +97,7 @@ describe('POST /api/v1/credentials/batches', () => {
       batchId: 'batch-1',
       status: '/api/v1/credentials/batches/batch-1',
     });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(repository.createCredentialBatch).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: 'tenant-1', idempotencyKey: 'key-1' }),
     );
@@ -117,7 +120,31 @@ describe('POST /api/v1/credentials/batches', () => {
     const response = await POST(request({ items: [item] }), { tenantId: 'tenant-1' } as never);
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: 'Idempotency-Key is required', code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    expect(await response.json()).toEqual({ error: 'Idempotency-Key is required', code: 'VALIDATION_FAILED' });
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it.each(['   ', 'a'.repeat(256), 'a\u0000b'])(
+    'reclassifies an invalid idempotency key as VALIDATION_FAILED: %j',
+    async (key) => {
+      const response = await POST(request({ items: [item] }, key), { tenantId: 'tenant-1' } as never);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'VALIDATION_FAILED' });
+      expect(repository.findCredentialBatchSubmission).not.toHaveBeenCalled();
+    },
+  );
+
+  it('sanitises a job-queue start failure before returning it to the tenant', async () => {
+    jobQueue.startJobQueue.mockRejectedValueOnce(new Error('RI_DATABASE_URL postgres://internal:5432/ri'));
+
+    const response = await POST(request({ items: [item] }, 'queue-failure-key'), { tenantId: 'tenant-1' } as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(JSON.stringify(body)).not.toContain('RI_DATABASE_URL');
+    expect(JSON.stringify(body)).not.toContain('postgres://internal');
     expect(repository.createCredentialBatch).not.toHaveBeenCalled();
   });
 
@@ -138,7 +165,47 @@ describe('POST /api/v1/credentials/batches', () => {
       batchId: 'batch-existing',
       status: '/api/v1/credentials/batches/batch-existing',
     });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('maps a post-transaction mismatch outcome to the idempotency mismatch response', async () => {
+    repository.createCredentialBatch.mockResolvedValueOnce({ outcome: 'mismatch' });
+
+    const response = await POST(request({ items: [item] }, 'key-race-mismatch'), { tenantId: 'tenant-1' } as never);
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({
+      error: 'This Idempotency-Key was already used with a different request body.',
+      code: 'IDEMPOTENCY_KEY_MISMATCH',
+    });
+  });
+
+  it('maps a post-transaction expired outcome to the batch tombstone', async () => {
+    repository.createCredentialBatch.mockResolvedValueOnce({ outcome: 'expired', batchId: 'batch-race-expired' });
+
+    const response = await POST(request({ items: [item] }, 'key-race-expired'), { tenantId: 'tenant-1' } as never);
+
+    expect(response.status).toBe(410);
+    expect(await response.json()).toEqual({
+      error: 'This credential batch has expired. Its credentials were not deleted.',
+      code: 'BATCH_EXPIRED',
+      batchId: 'batch-race-expired',
+    });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('projects a post-transaction replay outcome with the stored status location', async () => {
+    repository.createCredentialBatch.mockResolvedValueOnce({ outcome: 'replay', batchId: 'batch-race-replay' });
+
+    const response = await POST(request({ items: [item] }, 'key-race-replay'), { tenantId: 'tenant-1' } as never);
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      batchId: 'batch-race-replay',
+      status: '/api/v1/credentials/batches/batch-race-replay',
+    });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('maps a mismatching reused key to 422', async () => {
@@ -207,6 +274,25 @@ describe('POST /api/v1/credentials/batches', () => {
       error: 'items[1].reference: must be unique within the batch; duplicates items[0].reference',
       code: 'VALIDATION_FAILED',
     });
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the raw batch body cannot be read', async () => {
+    const response = await POST(request({ items: [item] }, 'unreadable-body-key', true), {
+      tenantId: 'tenant-1',
+    } as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Could not read the request body' });
+    expect(repository.findCredentialBatchSubmission).not.toHaveBeenCalled();
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for malformed JSON after reading the raw batch body', async () => {
+    const response = await POST(request('{', 'malformed-json-key'), { tenantId: 'tenant-1' } as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid JSON body' });
     expect(repository.createCredentialBatch).not.toHaveBeenCalled();
   });
 
@@ -336,6 +422,7 @@ describe('POST /api/v1/credentials/batches', () => {
       code: 'BATCH_EXPIRED',
       batchId: 'batch-expired',
     });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(repository.createCredentialBatch).not.toHaveBeenCalled();
   });
 });

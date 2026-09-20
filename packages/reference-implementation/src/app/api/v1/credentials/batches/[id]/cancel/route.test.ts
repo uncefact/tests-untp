@@ -207,6 +207,26 @@ describe('POST /api/v1/credentials/batches/{id}/cancel', () => {
     );
   });
 
+  it('rethrows a non-drift transaction failure to the shared database mapping', async () => {
+    // Regression: an ordinary transaction failure must not be logged as counter drift with missing identifiers.
+    const databaseError = Object.assign(new Error('database host and table details'), {
+      name: 'PrismaClientKnownRequestError',
+      clientVersion: '6.19.2',
+    });
+    cancel.mockRejectedValue(databaseError);
+    logger.error.mockClear();
+
+    const response = await POST(request(undefined, '0'), context as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: 'An unexpected error has occurred.' });
+    expect(JSON.stringify(body)).not.toContain('database host');
+    expect(logger.error.mock.calls.some((call) => call[1] === 'Credential batch cancellation counter drift')).toBe(
+      false,
+    );
+  });
+
   // Regression: cancellation must retain the caller's reference on the projected cancelled item.
   it('preserves a caller-supplied reference when cancellation marks the item cancelled', async () => {
     const stored = batch('QUEUED', 'PO-1');

@@ -56,7 +56,7 @@ The web process alone needs these settings. `STATUS_LIST_BUSY` means lock conten
 
 Reconciliation with no pending intent is also how an operator or issuer obtains a first confirmed observation after [capture](./backfills/credential-status-entries) and [attribution](./backfills/credential-status-attribution).
 
-After the deadline, no RI request for this reservation is still on the wire. A request VCKit had already accepted may still be applied afterwards. Reconciliation records what it observes. A later drift check can still differ. The provider offers no outcome lookup or fencing.
+After the deadline, no RI request for this reservation is still on the wire. A request the provider had already accepted may still be applied afterwards. Reconciliation records what it observes. A later drift check can still differ. The provider offers no outcome lookup or fencing.
 
 ## Repair an unreachable pinned configuration
 

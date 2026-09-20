@@ -191,8 +191,6 @@ services:
       - BATCH_JOB_RETRY_LIMIT
       - BATCH_JOB_RETRY_BACKOFF_SECONDS
       - BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS
-      - BATCH_SETTLEMENT_ALLOWANCE_MS
-      - BATCH_MINIMUM_ITEM_COST_MS
       - BATCH_JOB_CONCURRENCY
       # Tenant mode (default: open; override to "closed" for closed mode tests)
       - TENANT_MODE=${TENANT_MODE:-open}

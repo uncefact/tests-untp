@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
+import { parseIfVersion } from '@/lib/api/if-version';
 import { parseRequestBody } from '@/lib/api/validation';
 import { rethrowAsValidationFailed } from '@/lib/api/rethrow-as-validation-failed';
 import { parseStatusPurpose, setCredentialStatusSchema } from '@/lib/api/request-schemas/credential-status';
 import { setCredentialStatus } from '@/lib/credentials/set-credential-status';
+import { requireStatusRecordVisible } from '@/lib/credentials/credential-status-context';
 
 async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> {
   try {
@@ -51,19 +53,27 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  *     responses:
  *       200:
  *         description: The provider observation was committed.
+ *         headers:
+ *           Cache-Control:
+ *             description: This status response is never cached.
+ *             schema: { type: string, enum: [no-store] }
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/CredentialStatusObservation'
  *       400:
- *         description: VALIDATION_FAILED for an invalid body, purpose or If-Version header.
+ *         description: |
+ *           The tenant-scoped record lookup runs first, so an absent or foreign record
+ *           answers 404 whatever the headers carry. INVALID_IF_VERSION then covers a
+ *           missing or malformed If-Version header, and VALIDATION_FAILED covers an
+ *           invalid body, purpose or validation raised by the status operation.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               missingIfVersion:
- *                 value: { error: 'If-Version header is required.', code: VALIDATION_FAILED }
+ *                 value: { error: 'If-Version header is required.', code: INVALID_IF_VERSION }
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
@@ -76,7 +86,7 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  *               externalCredential:
  *                 value: { error: 'External credential status is managed by its issuer.', code: EXTERNAL_CREDENTIAL_STATUS_NOT_MANAGEABLE }
  *       404:
- *         description: NOT_FOUND for an absent or foreign record; STATUS_ENTRY_NOT_FOUND for a purpose it does not carry.
+ *         description: NOT_FOUND for an absent or foreign record, refused before header and body validation; STATUS_ENTRY_NOT_FOUND for a purpose it does not carry.
  *         content:
  *           application/json:
  *             schema:
@@ -147,6 +157,9 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  */
 export const PUT = withTenantAuth(async (req, { tenantId, params }) => {
   const { id, purpose } = await params;
+  await requireStatusRecordVisible(id, tenantId);
+  const ifVersion = req.headers.get('If-Version');
+  parseIfVersion(ifVersion);
   const body = await recodeValidation(() => parseRequestBody(req, setCredentialStatusSchema));
   const parsedPurpose = await recodeValidation(() => parseStatusPurpose(purpose));
   const observation = await recodeValidation(() =>
@@ -155,7 +168,7 @@ export const PUT = withTenantAuth(async (req, { tenantId, params }) => {
       tenantId,
       purpose: parsedPurpose,
       value: body.value,
-      ifVersion: req.headers.get('If-Version'),
+      ifVersion,
     }),
   );
   return NextResponse.json(observation, { headers: { 'Cache-Control': 'no-store' } });

@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
+import { apiLogger } from '@/lib/api/logger';
 import { NotFoundError } from '@/lib/api/errors';
 import { containsNulByte } from '@/lib/api/route-id';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { getCredentialBatchById } from '@/lib/prisma/repositories/credential-batch.repository';
 import { credentialBatchExpiredResponse } from '@/lib/credentials/credential-batch-error';
 import { projectCredentialBatch } from '@/lib/credentials/credential-batch-projection';
+
+const logger = apiLogger.child({ route: '/api/v1/credentials/batches/[id]' });
 
 /**
  * @swagger
@@ -34,6 +37,7 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  *         required: true
  *         schema:
  *           type: string
+ *         description: The tenant-owned credential batch id returned by submission.
  *     responses:
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
@@ -80,6 +84,10 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  *                   error: Credential batch not found.
  *       410:
  *         description: The batch's retained item data has expired.
+ *         headers:
+ *           Cache-Control:
+ *             description: This expired response is never cached.
+ *             schema: { type: string, enum: [no-store] }
  *         content:
  *           application/json:
  *             schema:
@@ -106,14 +114,23 @@ import { projectCredentialBatch } from '@/lib/credentials/credential-batch-proje
  */
 export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
   const { id } = await params;
-  if (containsNulByte(id)) throw new NotFoundError('Credential batch not found.');
+  if (containsNulByte(id)) {
+    logger.info({ tenantId, reason: 'nul_id' }, 'Credential batch treated as missing');
+    throw new NotFoundError('Credential batch not found.');
+  }
+  logger.info({ batchId: id, tenantId }, 'Looking up credential batch');
   const batch = await getCredentialBatchById(id, tenantId);
-  if (batch === null) throw new NotFoundError('Credential batch not found.');
+  if (batch === null) {
+    logger.info({ batchId: id, tenantId }, 'Credential batch not found');
+    throw new NotFoundError('Credential batch not found.');
+  }
 
   const projection = projectCredentialBatch(batch);
   if (batch.state === 'EXPIRED') {
+    logger.info({ batchId: id, tenantId, state: batch.state }, 'Credential batch expired');
     const expired = credentialBatchExpiredResponse(projection);
     return NextResponse.json(expired.body, expired.init);
   }
+  logger.info({ batchId: id, tenantId, state: batch.state }, 'Credential batch retrieved');
   return NextResponse.json(projection, { status: 200, headers: { 'Cache-Control': 'no-store' } });
 });

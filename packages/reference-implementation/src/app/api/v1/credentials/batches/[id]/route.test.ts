@@ -2,7 +2,7 @@ jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number; headers?: Record<string, string> }) => ({
       status: init?.status ?? 200,
-      headers: { get: () => Object.values(init?.headers ?? {})[0] ?? null },
+      headers: { get: (name: string) => init?.headers?.[name] ?? null },
       json: async () => body,
     }),
   },
@@ -80,7 +80,11 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
     const response = (await GET(
       { url: 'http://localhost/api/v1/credentials/batches/batch-expired' } as Request,
       { tenantId: 'tenant-1', params: Promise.resolve({ id: 'batch-expired' }) } as never,
-    )) as unknown as { status: number; json: () => Promise<Record<string, unknown>> };
+    )) as unknown as {
+      status: number;
+      headers: { get: (name: string) => string | null };
+      json: () => Promise<Record<string, unknown>>;
+    };
 
     expect(response.status).toBe(410);
     expect(await response.json()).toEqual({
@@ -93,6 +97,7 @@ describe('GET /api/v1/credentials/batches/{id}', () => {
       items: [],
       ...buildCredentialBatchExpiredBody(),
     });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('returns the complete projection for an active batch', async () => {

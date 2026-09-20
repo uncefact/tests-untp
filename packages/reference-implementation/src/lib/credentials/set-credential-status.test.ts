@@ -311,8 +311,9 @@ it('preserves a definitive provider refusal when clearing its reservation fails'
   const body = await response.json();
   expect(body).toMatchObject({
     code: 'VC_SERVICE_UNAVAILABLE',
-    error: expect.stringContaining('provider returned 502'),
+    error: expect.stringContaining('The provider refused the change. The previous confirmed value is unchanged.'),
   });
+  expect(JSON.stringify(body)).not.toContain('provider returned 502');
   expect(body).toMatchObject({ error: expect.stringContaining('reservation could not be cleared') });
   expect((body.error as string).match(/reservation (?:was|could not be) cleared/g)).toEqual([
     'reservation could not be cleared',
@@ -322,6 +323,40 @@ it('preserves a definitive provider refusal when clearing its reservation fails'
     { err: providerError, clearFailure },
     'Credential status failure and reservation clear failure',
   );
+});
+it('uses the shared sanitised server message for an unexpected provider-set failure', async () => {
+  const providerError = new Error('provider host and token details');
+  mockSet.mockRejectedValue(providerError);
+
+  let failure: unknown;
+  try {
+    await setCredentialStatus(input);
+  } catch (error) {
+    failure = error;
+  }
+
+  expect(failure).toMatchObject({ code: 'VC_SERVICE_UNAVAILABLE', statusCode: 503 });
+  const response = handleRouteError(failure);
+  expect(response.status).toBe(503);
+  const body = await response.json();
+  expect(body).toEqual({
+    error: 'An unexpected error has occurred.',
+    code: 'VC_SERVICE_UNAVAILABLE',
+  });
+  expect(JSON.stringify(body)).not.toContain('provider host');
+  expect(JSON.stringify(body)).not.toContain('token details');
+  // Regression: the sanitised 503 must still leave the operator the cause and the clear outcome.
+  const clearOutcomeLog = mockLogger.error.mock.calls.find(
+    (call) => call[1] === 'Credential status reservation clear outcome after an unexpected provider failure',
+  );
+  expect(clearOutcomeLog).toBeDefined();
+  expect(clearOutcomeLog![0]).toMatchObject({
+    err: providerError,
+    reservationCleared: true,
+    recordId: input.recordId,
+    tenantId: input.tenantId,
+  });
+  expect(clearOutcomeLog![0]).toHaveProperty('correlationId');
 });
 it('reports a failed reservation clear on an unsupported 422 provider response', async () => {
   const providerError = new VcStatusEntryUnsupportedError('unsupported index', 'index');

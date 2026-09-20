@@ -3,6 +3,7 @@ import {
   credentialBatchStatusSchema,
   credentialBatchCancelAcceptedResponseSchema,
   credentialBatchExpiredResponseSchema,
+  credentialBatchSubmissionExpiredResponseSchema,
 } from './schemas';
 import { getApiDocs } from './swagger';
 import { CredentialBatchItemState, CredentialBatchState } from '@/lib/prisma/generated';
@@ -11,6 +12,7 @@ import {
   CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE,
   CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
 } from '@/lib/credentials/credential-batch-error';
+import { REQUEST_BODY_UNREADABLE_MESSAGE } from '@/lib/api/errors';
 
 describe('credential batch OpenAPI components', () => {
   it('documents the request and all durable status states', () => {
@@ -66,7 +68,15 @@ describe('credential batch OpenAPI components', () => {
 });
 
 describe('published batch cancellation contract', () => {
-  type Response = { content?: { 'application/json'?: { examples?: Record<string, { value: unknown }> } } };
+  type Response = {
+    headers?: Record<string, { schema?: unknown }>;
+    content?: {
+      'application/json'?: {
+        schema?: { $ref?: string };
+        examples?: Record<string, { value: unknown }>;
+      };
+    };
+  };
   type Operation = { requestBody?: unknown; responses: Record<string, Response> };
   let paths: Record<string, { get?: Operation; post?: Operation }>;
   beforeAll(async () => {
@@ -98,6 +108,9 @@ describe('published batch cancellation contract', () => {
     expect(operation.responses['400'].content!['application/json']!.examples!.bodyNotAllowed.value).toEqual({
       error: CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE,
     });
+    expect(operation.responses['400'].content!['application/json']!.examples!.unreadableBody.value).toEqual({
+      error: REQUEST_BODY_UNREADABLE_MESSAGE,
+    });
     expect(operation.responses['404'].content!['application/json']!.examples!.notFound.value).toEqual({
       error: 'Credential batch not found.',
     });
@@ -114,6 +127,56 @@ describe('published batch cancellation contract', () => {
       error: 'This credential batch has expired. Its credentials were not deleted.',
       code: 'BATCH_EXPIRED',
     });
+  });
+
+  it('publishes only the batch submission responses the route can emit', () => {
+    const operation = paths['/credentials/batches'].post!;
+    expect(Object.keys(operation.responses).sort()).toEqual(['202', '400', '401', '403', '410', '413', '422', '500']);
+    const noStoreHeader = { schema: { type: 'string', enum: ['no-store'] } };
+    expect(operation.responses['202'].headers?.['Cache-Control']).toMatchObject(noStoreHeader);
+    expect(operation.responses['410'].headers?.['Cache-Control']).toMatchObject(noStoreHeader);
+
+    const expiredResponse = operation.responses['410'].content!['application/json']!;
+    expect(expiredResponse.schema).toEqual({
+      $ref: '#/components/schemas/CredentialBatchSubmissionExpiredResponse',
+    });
+    const expired = expiredResponse.examples!.expired.value;
+    expect(credentialBatchSubmissionExpiredResponseSchema.safeParse(expired).success).toBe(true);
+    expect(expired).toEqual({
+      error: 'This credential batch has expired. Its credentials were not deleted.',
+      code: 'BATCH_EXPIRED',
+      batchId: 'batch-1',
+    });
+
+    expect(operation.responses['400'].content!['application/json']!.examples).toEqual(
+      expect.objectContaining({
+        batchTooLarge: {
+          summary: 'The submitted item count exceeds the configured maximum',
+          value: { error: 'items: batch contains 3 items but MAX_BATCH_ITEMS is 2.', code: 'BATCH_TOO_LARGE' },
+        },
+        duplicateReference: {
+          summary: 'Two items use the same issuer-supplied reference',
+          value: {
+            error: 'items[2].reference: must be unique within the batch; duplicates items[0].reference',
+            code: 'VALIDATION_FAILED',
+          },
+        },
+        oversizedItem: {
+          summary: 'An item exceeds MAX_REQUEST_BODY_BYTES',
+          value: {
+            error: 'items[1]: item is 3139 bytes but MAX_REQUEST_BODY_BYTES is 2048.',
+            code: 'VALIDATION_FAILED',
+          },
+        },
+        unreadableBody: {
+          summary: 'The request body could not be read',
+          value: { error: REQUEST_BODY_UNREADABLE_MESSAGE },
+        },
+        missingIdempotencyKey: {
+          value: { error: 'Idempotency-Key is required', code: 'VALIDATION_FAILED' },
+        },
+      }),
+    );
   });
 
   it('requires the cancelled count and nullable timestamp on GET and cancellation projections', () => {
@@ -149,5 +212,12 @@ describe('published batch cancellation contract', () => {
     const expired =
       paths['/credentials/batches/{id}'].get!.responses['410'].content!['application/json']!.examples!.expired.value;
     expect(credentialBatchExpiredResponseSchema.safeParse(expired).success).toBe(true);
+    const noStoreHeader = { schema: { type: 'string', enum: ['no-store'] } };
+    expect(paths['/credentials/batches/{id}'].get!.responses['200'].headers?.['Cache-Control']).toMatchObject(
+      noStoreHeader,
+    );
+    expect(paths['/credentials/batches/{id}'].get!.responses['410'].headers?.['Cache-Control']).toMatchObject(
+      noStoreHeader,
+    );
   });
 });

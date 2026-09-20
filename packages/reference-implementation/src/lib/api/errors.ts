@@ -78,6 +78,8 @@ export class UnprocessableError extends Error {
   }
 }
 
+export const REQUEST_BODY_UNREADABLE_MESSAGE = 'Could not read the request body';
+
 /**
  * Thrown when the request body cannot be read at all, for example when the
  * connection drops mid-upload. Distinct from malformed JSON: nothing has been
@@ -87,7 +89,7 @@ export class UnprocessableError extends Error {
  */
 export class RequestBodyUnreadableError extends Error {
   constructor() {
-    super('Could not read the request body');
+    super(REQUEST_BODY_UNREADABLE_MESSAGE);
     this.name = 'RequestBodyUnreadableError';
   }
 }

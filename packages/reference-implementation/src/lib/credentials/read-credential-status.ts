@@ -12,6 +12,8 @@ import {
 } from './credential-status-context';
 import { statusFactsOf } from '@/lib/library/credential-record-projection';
 
+const logger = appLogger.child({ module: 'read-credential-status' });
+
 /** Returns stored facts; fresh reads are observations only and never resolve pending intent (ADR-058). */
 export async function readCredentialStatus(input: { recordId: string; tenantId: string; fresh?: boolean }) {
   const record = await loadStatusRecord(input.recordId, input.tenantId);
@@ -68,10 +70,7 @@ export async function readCredentialStatus(input: { recordId: string; tenantId: 
         observedAt: applicationObservationAt(),
       });
     } catch (error) {
-      appLogger.warn(
-        { err: error, recordId: input.recordId, entryId: entry.id },
-        'Fresh credential status read failed',
-      );
+      logger.warn({ err: error, recordId: input.recordId, entryId: entry.id }, 'Fresh credential status read failed');
       const failure = statusReadFailure(error);
       failures.push({
         entryId: entry.id,

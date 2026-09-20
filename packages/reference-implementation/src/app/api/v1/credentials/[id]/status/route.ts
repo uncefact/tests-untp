@@ -33,12 +33,18 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  *         name: id
  *         required: true
  *         schema: { type: string }
+ *         description: The tenant-owned library record id, not the credential's external identifier.
  *       - in: query
  *         name: fresh
  *         schema: { type: boolean, default: false }
+ *         description: When true, read each captured status entry from its attributed provider without changing stored state.
  *     responses:
  *       200:
  *         description: Stored facts, with separate observations and failures when fresh=true. Cache-Control is no-store.
+ *         headers:
+ *           Cache-Control:
+ *             description: This status response is never cached.
+ *             schema: { type: string, enum: [no-store] }
  *         content:
  *           application/json:
  *             schema:
@@ -86,5 +92,7 @@ export const GET = withTenantAuth(async (req, { tenantId, params }) => {
   const { id } = await params;
   const { fresh } = await recodeValidation(() => parseQueryParams(new URL(req.url), readCredentialStatusQuerySchema));
   const result = await readCredentialStatus({ recordId: id, tenantId, fresh });
+  // Keep the strict schema gate here because this read has a deliberately
+  // narrower public projection than the credential status domain result.
   return NextResponse.json(credentialStatusReadSchema.parse(result), { headers: { 'Cache-Control': 'no-store' } });
 });

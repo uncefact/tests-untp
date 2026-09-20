@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
+import { apiLogger } from '@/lib/api/logger';
+import { parseIfVersion } from '@/lib/api/if-version';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { parseRequestBody } from '@/lib/api/validation';
 import { rethrowAsValidationFailed } from '@/lib/api/rethrow-as-validation-failed';
 import { parseStatusPurpose, reconcileCredentialStatusSchema } from '@/lib/api/request-schemas/credential-status';
 import { reconcileCredentialStatus } from '@/lib/credentials/reconcile-credential-status';
+import { requireStatusRecordVisible } from '@/lib/credentials/credential-status-context';
+
+const logger = apiLogger.child({ route: '/api/v1/credentials/[id]/status/[purpose]/reconcile' });
 
 async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> {
   try {
@@ -32,6 +37,7 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  *         name: id
  *         required: true
  *         schema: { type: string }
+ *         description: The tenant-owned library record id, not the credential's external identifier.
  *       - in: path
  *         name: purpose
  *         required: true
@@ -41,6 +47,7 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  *         name: If-Version
  *         required: true
  *         schema: { type: integer, minimum: 1, maximum: 2147483647 }
+ *         description: Current status entry version. Stale requests are refused, never replayed.
  *     requestBody:
  *       required: true
  *       content:
@@ -50,19 +57,27 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  *     responses:
  *       200:
  *         description: The observation was committed, the version advanced and any inspected pending intent cleared.
+ *         headers:
+ *           Cache-Control:
+ *             description: This status response is never cached.
+ *             schema: { type: string, enum: [no-store] }
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/CredentialStatusObservation'
  *       400:
- *         description: VALIDATION_FAILED for an invalid body, purpose or If-Version header.
+ *         description: |
+ *           The tenant-scoped record lookup runs first, so an absent or foreign record
+ *           answers 404 whatever the headers carry. INVALID_IF_VERSION then covers a
+ *           missing or malformed If-Version header, and VALIDATION_FAILED covers an
+ *           invalid body, purpose or validation raised by reconciliation.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               missingIfVersion:
- *                 value: { error: 'If-Version header is required.', code: VALIDATION_FAILED }
+ *                 value: { error: 'If-Version header is required.', code: INVALID_IF_VERSION }
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
@@ -75,7 +90,7 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  *               externalCredential:
  *                 value: { error: 'External credential status is managed by its issuer.', code: EXTERNAL_CREDENTIAL_STATUS_NOT_MANAGEABLE }
  *       404:
- *         description: NOT_FOUND or STATUS_ENTRY_NOT_FOUND. The latter names the requested purpose.
+ *         description: NOT_FOUND for an absent or foreign record, refused before header and body validation; STATUS_ENTRY_NOT_FOUND for a purpose it does not carry.
  *         content:
  *           application/json:
  *             schema:
@@ -135,14 +150,19 @@ async function recodeValidation<T>(operation: () => T | Promise<T>): Promise<T> 
  */
 export const POST = withTenantAuth(async (req, { tenantId, params }) => {
   const { id, purpose } = await params;
+  await requireStatusRecordVisible(id, tenantId);
+  const ifVersion = req.headers.get('If-Version');
+  parseIfVersion(ifVersion);
+  logger.info({ recordId: id, purpose }, 'Validating credential status reconciliation request');
   const body = await recodeValidation(() => parseRequestBody(req, reconcileCredentialStatusSchema));
   const parsedPurpose = await recodeValidation(() => parseStatusPurpose(purpose));
+  logger.info({ recordId: id, purpose: parsedPurpose }, 'Reconciling credential status');
   const observation = await recodeValidation(() =>
     reconcileCredentialStatus({
       recordId: id,
       tenantId,
       purpose: parsedPurpose,
-      ifVersion: req.headers.get('If-Version'),
+      ifVersion,
       ...body,
     }),
   );
