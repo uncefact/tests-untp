@@ -4,7 +4,7 @@ const mockInstanceFindUniqueOrThrow = jest.fn();
 const mockQueryRaw = jest.fn();
 const mockTransaction = jest.fn();
 const mockRead = jest.fn();
-const mockLogger = { warn: jest.fn(), error: jest.fn(), child: jest.fn() };
+const mockLogger = { warn: jest.fn(), info: jest.fn(), error: jest.fn(), child: jest.fn() };
 mockLogger.child.mockReturnValue(mockLogger);
 
 const mockTx = {

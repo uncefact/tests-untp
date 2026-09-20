@@ -1,7 +1,7 @@
 # ADR-060: Batch issuance is a queue of ordinary issuances
 
 - **Date:** 2026-09-17
-- **Status:** proposed
+- **Status:** accepted
 
 Update (2026-09-19): Cancellation is terminal for the item and the batch: nothing resumes a cancelled batch. The encrypted item requests are retained until the batch expires, so a later resume feature is not foreclosed by the data.
 
@@ -69,4 +69,4 @@ The additional tables, stored counters and fencing fields require migration and 
 - ADR-037
 - ADR-051
 - ADR-054
-- ADR-060 planning artefacts: bulk issuance epic and stories B and C
+- #663 (batch issuance epic)

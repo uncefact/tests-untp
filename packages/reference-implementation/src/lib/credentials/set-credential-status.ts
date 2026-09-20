@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { VcStatusSetError, VcStatusEntryUnsupportedError } from '@uncefact/untp-ri-services';
-import { ConflictError, UnprocessableError } from '@/lib/api/errors';
+import { ConflictError, unexpectedErrorMessage, UnprocessableError } from '@/lib/api/errors';
 import { apiLogger } from '@/lib/api/logger';
 import { prisma } from '@/lib/prisma/prisma';
 import { isTransactionDeadlock } from '@/lib/prisma/db-errors';
@@ -42,6 +42,7 @@ import {
   type StatusRecord,
 } from './credential-status-context';
 import type { CredentialStatusEntry } from '@/lib/prisma/generated';
+import { getRequestContext } from '@uncefact/untp-ri-services/logging';
 
 const logger = apiLogger.child({ module: 'set-credential-status' });
 
@@ -199,6 +200,15 @@ export async function setCredentialStatus(input: SetCredentialStatusRequest) {
           ),
       });
     } catch (error) {
+      logger.error(
+        {
+          err: error,
+          correlationId: getRequestContext()?.correlationId,
+          recordId: input.recordId,
+          tenantId: input.tenantId,
+        },
+        'Credential status provider set failed',
+      );
       if (error instanceof StatusListLockLostError || (error instanceof VcStatusSetError && error.mayHaveApplied)) {
         throw new CredentialStatusError(
           'STATUS_OUTCOME_UNKNOWN',
@@ -233,14 +243,27 @@ export async function setCredentialStatus(input: SetCredentialStatusRequest) {
         );
       if (error instanceof VcStatusEntryUnsupportedError || error instanceof CredentialStatusError)
         throw statusReadFailure(error, false, clearFailure, true);
-      const providerAnswer = error instanceof Error ? error.message : 'The provider returned an unknown failure';
+      const providerRefusalMessage = 'The provider refused the change. The previous confirmed value is unchanged.';
+      const unavailableMessage = unexpectedErrorMessage(getRequestContext()?.correlationId);
+      // The 503 answer is sanitised, so the reservation-clear outcome the caller
+      // used to read in the message is recorded here for the operator instead.
+      if (!(error instanceof VcStatusSetError))
+        logger.error(
+          {
+            err: error,
+            clearFailure,
+            reservationCleared: clearFailure === undefined,
+            correlationId: getRequestContext()?.correlationId,
+            recordId: input.recordId,
+            tenantId: input.tenantId,
+          },
+          'Credential status reservation clear outcome after an unexpected provider failure',
+        );
       throw new CredentialStatusError(
         'VC_SERVICE_UNAVAILABLE',
-        statusFailureMessage(
-          `The provider refused the change: ${providerAnswer}. The previous confirmed value is unchanged.`,
-          clearFailure,
-          true,
-        ),
+        error instanceof VcStatusSetError
+          ? statusFailureMessage(providerRefusalMessage, clearFailure, true)
+          : unavailableMessage,
         error instanceof VcStatusSetError ? 502 : 503,
         error,
         undefined,

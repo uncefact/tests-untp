@@ -178,6 +178,11 @@ export const credentialBatchExpiredResponseSchema = credentialBatchStatusSchema.
   code: z.literal('BATCH_EXPIRED'),
 });
 
+export const credentialBatchSubmissionExpiredResponseSchema = errorResponseSchema.extend({
+  code: z.literal('BATCH_EXPIRED'),
+  batchId: z.string(),
+});
+
 // ============================================================================
 // Data Model Schemas
 // ============================================================================
@@ -568,6 +573,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     CredentialBatchStatus: credentialBatchStatusSchema,
     CredentialBatchCancelAcceptedResponse: credentialBatchCancelAcceptedResponseSchema,
     CredentialBatchExpiredResponse: credentialBatchExpiredResponseSchema,
+    CredentialBatchSubmissionExpiredResponse: credentialBatchSubmissionExpiredResponseSchema,
     CredentialWarning: credentialWarningSchema,
     Registrar: registrarSchema,
     SchemeQualifier: schemeQualifierSchema,

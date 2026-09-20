@@ -1,10 +1,14 @@
 import { TextDecoder, TextEncoder } from 'node:util';
 import { NextResponse } from 'next/server';
+import { apiLogger } from '@/lib/api/logger';
 import { ValidationError, parseRequestBody } from '@/lib/api/validation';
 import { digestRequestBody, parseIdempotencyKeyHeader, throwIdempotencyClassification } from '@/lib/api/idempotency';
 import { readRequestBytes } from '@/lib/api/request-body';
+import { rethrowAsValidationFailed } from '@/lib/api/rethrow-as-validation-failed';
+import { sanitisedServerError } from '@/lib/api/sanitised-server-error';
 import { withTenantAuth } from '@/lib/api/with-tenant-auth';
 import { startJobQueue } from '@/lib/jobs/app-job-queue';
+import type { JobQueue } from '@/lib/jobs/types';
 import {
   classifySubmission,
   createCredentialBatch,
@@ -16,6 +20,7 @@ import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config'
 import { buildCredentialBatchExpiredBody } from '@/lib/credentials/credential-batch-error';
 
 const BATCH_STATUS_PATH = '/api/v1/credentials/batches';
+const logger = apiLogger.child({ route: '/api/v1/credentials/batches' });
 
 function statusUrl(batchId: string): string {
   return `${BATCH_STATUS_PATH}/${encodeURIComponent(batchId)}`;
@@ -32,6 +37,13 @@ function batchValidationMessage(message: string): string {
   return message.replace(/items\.(\d+)(?=\.|$)/g, 'items[$1]');
 }
 
+/**
+ * Measures the compact JSON form after schema parsing, not the bytes submitted
+ * by the caller. The raw request has already been bounded separately; this
+ * per-item limit keeps the normalised item within the single-issuance limit
+ * even when the submitted JSON contains formatting whitespace or escape
+ * spelling that parsing removes.
+ */
 function serialisedJsonByteLength(value: object): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
@@ -85,41 +97,51 @@ function validateUniqueBatchReferences(items: readonly { reference?: string }[])
  *           Location:
  *             description: Relative URL of the batch status resource.
  *             schema: { type: string }
+ *           Cache-Control:
+ *             description: This response is never cached.
+ *             schema: { type: string, enum: [no-store] }
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/CredentialBatchAcceptedResponse'
  *       400:
- *         description: Invalid Idempotency-Key or batch request shape, including an empty, oversized or invalid items array or duplicate item references.
+ *         description: Invalid Idempotency-Key or batch request shape, including an empty, oversized or invalid items array, duplicate item references or a request body that could not be read.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
  *               missingIdempotencyKey:
- *                 value: { error: 'Idempotency-Key is required', code: IDEMPOTENCY_KEY_REQUIRED }
+ *                 value: { error: 'Idempotency-Key is required', code: VALIDATION_FAILED }
+ *               batchTooLarge:
+ *                 summary: The submitted item count exceeds the configured maximum
+ *                 value: { error: 'items: batch contains 3 items but MAX_BATCH_ITEMS is 2.', code: BATCH_TOO_LARGE }
+ *               duplicateReference:
+ *                 summary: Two items use the same issuer-supplied reference
+ *                 value: { error: 'items[2].reference: must be unique within the batch; duplicates items[0].reference', code: VALIDATION_FAILED }
+ *               oversizedItem:
+ *                 summary: An item exceeds MAX_REQUEST_BODY_BYTES
+ *                 value: { error: 'items[1]: item is 3139 bytes but MAX_REQUEST_BODY_BYTES is 2048.', code: VALIDATION_FAILED }
+ *               unreadableBody:
+ *                 summary: The request body could not be read
+ *                 value: { error: 'Could not read the request body' }
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:
  *         $ref: '#/components/responses/TenantAssignmentForbiddenResponse'
- *       409:
- *         description: The same Idempotency-Key is still being processed. Retry shortly.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *             examples:
- *               inFlight:
- *                 value: { error: 'A request with this Idempotency-Key is still being processed. Retry shortly.', code: IDEMPOTENCY_KEY_IN_FLIGHT }
  *       410:
  *         description: The retained batch for this Idempotency-Key has expired.
+ *         headers:
+ *           Cache-Control:
+ *             description: This expired response is never cached.
+ *             schema: { type: string, enum: [no-store] }
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/CredentialBatchExpiredResponse'
+ *               $ref: '#/components/schemas/CredentialBatchSubmissionExpiredResponse'
  *             examples:
  *               expired:
- *                 value: { error: 'This credential batch has expired. Its credentials were not deleted.', code: BATCH_EXPIRED }
+ *                 value: { error: 'This credential batch has expired. Its credentials were not deleted.', code: BATCH_EXPIRED, batchId: 'batch-1' }
  *       413:
  *         description: The raw batch body exceeds MAX_BATCH_REQUEST_BODY_BYTES.
  *         content:
@@ -147,9 +169,14 @@ function validateUniqueBatchReferences(items: readonly { reference?: string }[])
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 export const POST = withTenantAuth(async (req, { tenantId }) => {
-  const idempotencyKey = parseIdempotencyKeyHeader(req);
+  let idempotencyKey: string | undefined;
+  try {
+    idempotencyKey = parseIdempotencyKeyHeader(req);
+  } catch (error) {
+    rethrowAsValidationFailed(error);
+  }
   if (idempotencyKey === undefined) {
-    throw new ValidationError('Idempotency-Key is required', { code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    throw new ValidationError('Idempotency-Key is required', { code: 'VALIDATION_FAILED' });
   }
 
   const requestBytes = await readRequestBytes(req, readMaxBatchRequestBodyBytes(), 'MAX_BATCH_REQUEST_BODY_BYTES');
@@ -162,7 +189,7 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     const replayUrl = statusUrl(classification.batchId);
     return NextResponse.json(
       { batchId: classification.batchId, status: replayUrl },
-      { status: 202, headers: { Location: replayUrl } },
+      { status: 202, headers: { Location: replayUrl, 'Cache-Control': 'no-store' } },
     );
   }
 
@@ -198,7 +225,16 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
     );
   }
 
-  const queue = await startJobQueue();
+  let queue: JobQueue;
+  try {
+    queue = await startJobQueue();
+  } catch (error) {
+    return sanitisedServerError(
+      error instanceof Error ? error : new Error(String(error)),
+      logger,
+      'The job queue could not be started',
+    );
+  }
   const result = await createCredentialBatch({
     tenantId,
     idempotencyKey,
@@ -211,6 +247,6 @@ export const POST = withTenantAuth(async (req, { tenantId }) => {
   const location = statusUrl(result.batchId);
   return NextResponse.json(
     { batchId: result.batchId, status: location },
-    { status: 202, headers: { Location: location } },
+    { status: 202, headers: { Location: location, 'Cache-Control': 'no-store' } },
   );
 });

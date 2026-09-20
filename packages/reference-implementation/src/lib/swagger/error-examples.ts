@@ -3,6 +3,8 @@ import { IDEMPOTENCY_KEY_MISMATCH_MESSAGE } from '@/lib/api/idempotency';
 import { readMaxRequestBodyBytes } from '@/lib/config/request-body-limit.config';
 import {
   BATCH_EXPIRED_MESSAGE,
+  CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE,
+  CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
   CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
 } from '@/lib/credentials/credential-batch-error';
 import {
@@ -16,7 +18,7 @@ import {
   statusOperationInProgressMessage,
   statusRecoveryRequiredMessage,
 } from '@/lib/credentials/credential-status-messages';
-import { serviceInstanceStatusPendingMessage } from '@/lib/api/errors';
+import { REQUEST_BODY_UNREADABLE_MESSAGE, serviceInstanceStatusPendingMessage } from '@/lib/api/errors';
 import {
   DECRYPTION_REQUIRED_MESSAGE,
   SOURCE_ENCRYPTION_NOT_ALLOWED_MESSAGE,
@@ -217,6 +219,9 @@ export const VERIFIED_ERROR_MESSAGES = new Set([
   serviceInstanceStatusPendingMessage('service-instance-1', 1),
   'Service instance not found: service-instance-1',
   'Credential batch not found.',
+  REQUEST_BODY_UNREADABLE_MESSAGE,
+  CREDENTIAL_BATCH_BODY_NOT_ALLOWED_MESSAGE,
+  CREDENTIAL_BATCH_CANCEL_ACCEPTED_MESSAGE,
   CREDENTIAL_BATCH_NOT_CANCELLABLE_MESSAGE,
   IDEMPOTENCY_KEY_MISMATCH_MESSAGE,
   BATCH_EXPIRED_MESSAGE,

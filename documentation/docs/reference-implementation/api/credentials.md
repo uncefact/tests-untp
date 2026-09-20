@@ -334,25 +334,94 @@ A request body over the configured limit returns HTTP `413` with code `REQUEST_B
 
 ### Batch issuance
 
-For an issuer that needs to issue several credentials, `POST /api/v1/credentials/batches` accepts an ordered `items` array. Each item uses the exact issuance request shape accepted by `POST /api/v1/credentials`, including refusal of caller-supplied `credentialPayload.credentialStatus`, and may add an issuer-supplied `reference`. A reference is a string of 1 to 200 characters with no control characters, including NUL. The value is stored in plaintext because the per-batch uniqueness index needs it; the request body is encrypted. The single-issuance endpoint ignores and discards `reference`; only batch items carry it. References must be unique within the batch by exact string equality. A duplicate refuses the whole batch with `400 VALIDATION_FAILED` and the message `items[<later index>].reference: must be unique within the batch; duplicates items[<earlier index>].reference`. Duplicate-reference validation runs before per-item size validation, so that refusal wins when both apply. The batch boundary validates that shape, the configured item count, each item's serialised JSON size, the whole request body size and that the array is non-empty. DID ownership, service resolution, JSON-LD and schema conformance run for each item in the worker, so one item can fail without stopping the rest.
-
-`Idempotency-Key` is required, and a submission without one is refused with `400 IDEMPOTENCY_KEY_REQUIRED`. A successful submission returns `202` with `{ "batchId": "...", "status": "/api/v1/credentials/batches/..." }` and a matching `Location` header. The batch and its encrypted item requests are committed with one `credentials.issue-batch` job. Repeating the same key with the same raw request body returns the same `202` and batch id. Reusing the key with a different body returns `422 IDEMPOTENCY_KEY_MISMATCH`; replaying an expired batch returns `410 BATCH_EXPIRED`.
-
-Poll `GET /api/v1/credentials/batches/{id}`. It returns the batch state, stored counts (`total`, `queued`, `processing`, `issued`, `failed`, `unknown` and `cancelled`) and zero-based items in submission order. An item echoes its `reference` immediately after `index` when one was supplied; an item without one omits the field. An issued item includes its retained `credentialId` and any warning; deleting that credential later clears the id. A cancelled item has state `CANCELLED` and no cancellation error. The batch includes `createdAt`, `settledAt` and `cancelRequestedAt` as ISO 8601 timestamps, with null for settlement or cancellation that has not happened. An outcome-unknown item includes an `{ "code": "...", "message": "..." }` error and includes `credentialId` when the worker learned it before losing ownership. A failed item never includes `credentialId`. An operator-confirmed failed item uses `error.code` `OPERATOR_CONFIRMED_FAILED` and the fixed `error.message` `An operator confirmed this item was not issued.` The evidence submitted during resolution is retained on the item record and shown to operators through inspection, not returned to the tenant. `COMPLETED` means every item is issued or failed, including an all-failed batch. `NEEDS_ATTENTION` means no work remains but at least one outcome is unknown.
-
 Items are claimed in index order; an item that faults before dispatch goes to the back behind items not yet tried and retries with backoff. The worker checks its budget between items, so an item already in flight can run past the budget; that item is recorded as `ISSUED` when its write succeeds or `OUTCOME_UNKNOWN` when the external effect cannot be confirmed. It commits `lastProgressAt` and the counts, and enqueues a continuation of the same batch with the retry policy configured by `BATCH_JOB_RETRY_LIMIT` (default `4`), `BATCH_JOB_RETRY_BACKOFF_SECONDS` (default `30` seconds) and `BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS` (default `600` seconds) in that checkpoint transaction. A continuation is normal progress, not a retry. Queue retries are reserved for faults such as an unavailable database or provider. A refusal that can be projected as a normal API 4xx settles that item as `FAILED` and the worker continues.
 
 The external-effect boundary is inside the VC service's `sign` call, immediately before it sends the credential request. Status-list minting occurs before that hook, so a status-list mint failure is a retried pre-dispatch fault and settles `FAILED` with `ITEM_ATTEMPTS_EXHAUSTED`, never `OUTCOME_UNKNOWN`.
 
 If a worker stops after claiming an item but before its outcome is durably recorded, a later attempt does not issue that item again. Once the batch progress is older than the job budget, the item becomes `OUTCOME_UNKNOWN` with an instruction to check the library for a credential matching the request before re-submitting. Its error message names the correlation id to quote to the operator when searching the logs. The batch then settles as `NEEDS_ATTENTION` when no other work remains. The operator should search the library using the request's issuer and subject identifiers, compare the credential payload and issuance time, and decide whether to retain the credential, handle any external publication, or submit a new batch. There is no automatic retry or cancellation for an unknown outcome.
 
-The maximum item count is `MAX_BATCH_ITEMS` (default `500`). Each item's serialised JSON must be no larger than `MAX_REQUEST_BODY_BYTES`; the first item over that bound refuses the batch with `400 VALIDATION_FAILED` and a pointer such as `items[17]`. The whole raw batch body uses `MAX_BATCH_REQUEST_BODY_BYTES` (default `52428800`, 50 MiB), which must not be smaller than `MAX_REQUEST_BODY_BYTES`; an over-limit body returns `413 REQUEST_BODY_TOO_LARGE` and names the batch setting. More items than the item count refuses the batch with `400 BATCH_TOO_LARGE`, and the message names the limit in force. An item shape error, including `credentialPayload.credentialStatus`, also refuses the whole batch with `400`, and array paths use `items[<index>].<field>`, for example `items[17].credentialPayload`. Per-item refusals have stable error codes where the cause is known, such as `ISSUER_DID_NOT_REGISTERED`. Ordering is promised within one batch only; separate batches may run independently.
-
 An unexpected pre-dispatch fault is requeued for that item with a doubling ladder starting at `BATCH_JOB_RETRY_BACKOFF_SECONDS` (default `30` seconds), capped at `BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS` (default `600` seconds). `BATCH_JOB_RETRY_LIMIT` (default `4`) bounds both the queue's fault retries and the per-item fault attempts. Each retried item attempt allocates a fresh status-list index set on the VC service, and failed attempts' indices are never reclaimed, so one item costs at most `BATCH_JOB_RETRY_LIMIT` sets. Never-attempted items run before deferred retries, and the worker continues with every claimable item in the same job. Once an item reaches the ladder's limit, it is marked `FAILED` with error code `ITEM_ATTEMPTS_EXHAUSTED` and the last projected error message. For an unmapped fault, that message is `The item could not be issued because the issuing service faulted; ask your operator to search the logs for correlation id <item correlation id>.`; mapped refusal messages retain their own text. The batch can then settle normally. A post-dispatch fault still makes the outcome unknown and throws for queue recovery. Data-model schema and JSON-LD context fetch failures are not retried by the batch worker after the request has been resolved, so submit the item again once the referenced artefact is reachable.
 
 `COMPLETED` and `CANCELLED` batches are retained for `BATCH_RETENTION_DAYS` (default `30`) from `settledAt`. A `NEEDS_ATTENTION` batch has no expiry deadline while an item remains unknown. After the final unknown item is resolved, retention starts from `resolvedAt`. Expiry removes encrypted request bodies and item outcomes while retaining a tombstone with the key, digest and counts. The expired status resource answers `410` and issued credentials remain unaffected. Operators running a deployment should read the [batch issuance runbook](../operations/batch-issuance).
 
-#### Cancel a batch
+### Submit a batch
+
+```
+POST /api/v1/credentials/batches
+Idempotency-Key: 4f0c2c2e-1c6a-4d6f-9a8f-0b2f1d6c9a11
+Content-Type: application/json
+
+{ "items": [ ... ] }
+```
+
+For an issuer that needs to issue several credentials, `POST /api/v1/credentials/batches` accepts an ordered `items` array. Each item uses the exact issuance request shape accepted by `POST /api/v1/credentials`, including refusal of caller-supplied `credentialPayload.credentialStatus`, and may add an issuer-supplied `reference`. A reference is a string of 1 to 200 characters with no control characters, including NUL. The value is stored in plaintext because the per-batch uniqueness index needs it; the request body is encrypted. The single-issuance endpoint ignores and discards `reference`; only batch items carry it. References must be unique within the batch by exact string equality. A duplicate refuses the whole batch with `400 VALIDATION_FAILED` and the message `items[<later index>].reference: must be unique within the batch; duplicates items[<earlier index>].reference`. Duplicate-reference validation runs before per-item size validation, so that refusal wins when both apply. The batch boundary validates that shape, the configured item count, each item's compact re-serialised JSON size, the whole request body size and that the array is non-empty. DID ownership, service resolution, JSON-LD and schema conformance run for each item in the worker, so one item can fail without stopping the rest.
+
+`Idempotency-Key` is required, and a missing, blank, over-length or non-printable value is refused with `400 VALIDATION_FAILED`. A successful submission returns `202` with `{ "batchId": "...", "status": "/api/v1/credentials/batches/..." }` and a matching `Location` header. The batch and its encrypted item requests are committed with one `credentials.issue-batch` job. Repeating the same key with the same raw request body returns the same `202` and batch id. Reusing the key with a different body returns `422 IDEMPOTENCY_KEY_MISMATCH`; replaying an expired batch returns `410 BATCH_EXPIRED`.
+
+The maximum item count is `MAX_BATCH_ITEMS` (default `500`). Each item's compact re-serialised JSON must be no larger than `MAX_REQUEST_BODY_BYTES`; the first item over that bound refuses the batch with `400 VALIDATION_FAILED` and a pointer such as `items[17]`. This per-item value is measured after parsing, while the whole-request limit measures submitted bytes. The whole raw batch body uses `MAX_BATCH_REQUEST_BODY_BYTES` (default `52428800`, 50 MiB), which must not be smaller than `MAX_REQUEST_BODY_BYTES`; an over-limit body returns `413 REQUEST_BODY_TOO_LARGE` and names the batch setting. More items than the item count refuses the batch with `400 BATCH_TOO_LARGE`, and the message names the limit in force. An item shape error, including `credentialPayload.credentialStatus`, also refuses the whole batch with `400`, and array paths use `items[<index>].<field>`, for example `items[17].credentialPayload`. Per-item refusals have stable error codes where the cause is known, such as `ISSUER_DID_NOT_REGISTERED`. Ordering is promised within one batch only; separate batches may run independently.
+
+Resubmitting the same `Idempotency-Key` and body after cancellation replays the cancelled batch id and issues nothing; a fresh batch needs a new key.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant RI as Reference Implementation
+    participant DB as Database
+    participant Worker
+    participant VC as VC Service
+    participant Storage as Storage Service
+
+    Client->>RI: POST /api/v1/credentials/batches (Idempotency-Key)
+    RI->>RI: Read body within MAX_BATCH_REQUEST_BODY_BYTES, digest it
+    RI->>DB: Look up a prior submission for this key
+    alt Key already used
+        DB-->>RI: Stored submission
+        RI-->>Client: 202 replay, 422 IDEMPOTENCY_KEY_MISMATCH or 410 BATCH_EXPIRED
+    else New submission
+        RI->>RI: Validate items, MAX_BATCH_ITEMS, unique references, item sizes
+        RI->>DB: One transaction: batch row, encrypted item rows, credentials.issue-batch job
+        RI-->>Client: 202 { batchId, status } with Location
+    end
+    Worker->>DB: Claim the attempt with an ownership fence token
+    loop Each claimable item in index order
+        Worker->>DB: Claim the next item and decrypt its request
+        Worker->>VC: Mint status entry, then sign the credential
+        Worker->>Storage: Store the credential
+        alt Fault before dispatch
+            Worker->>DB: Requeue with backoff, or FAILED ITEM_ATTEMPTS_EXHAUSTED at the limit
+        else Fault after dispatch
+            Worker->>DB: OUTCOME_UNKNOWN, then rethrow for a queue retry
+        else Issued
+            Worker->>DB: Record ISSUED with the credential id and any warning
+        end
+    end
+    Worker->>DB: Checkpoint a continuation, or settle when no work remains
+    Client->>RI: GET /api/v1/credentials/batches/{id}
+    RI->>DB: Read the batch and its items
+    RI-->>Client: 200 projection, or 410 BATCH_EXPIRED after retention
+```
+
+### Get batch status
+
+```
+GET /api/v1/credentials/batches/{id}
+```
+
+Poll `GET /api/v1/credentials/batches/{id}`. It returns the batch state, stored counts (`total`, `queued`, `processing`, `issued`, `failed`, `unknown` and `cancelled`) and zero-based items in submission order. An item echoes its `reference` immediately after `index` when one was supplied; an item without one omits the field. An issued item includes its retained `credentialId` and any warning; deleting that credential later clears the id. A cancelled item has state `CANCELLED` and no cancellation error. The batch includes `createdAt`, `settledAt` and `cancelRequestedAt` as ISO 8601 timestamps, with null for settlement or cancellation that has not happened. An outcome-unknown item includes an `{ "code": "...", "message": "..." }` error and includes `credentialId` when the worker learned it before losing ownership. A failed item never includes `credentialId`. An operator-confirmed failed item uses `error.code` `OPERATOR_CONFIRMED_FAILED` and the fixed `error.message` `An operator confirmed this item was not issued.` The evidence submitted during resolution is retained on the item record and shown to operators through inspection, not returned to the tenant. `COMPLETED` means every item is issued or failed, including an all-failed batch. `NEEDS_ATTENTION` means no work remains but at least one outcome is unknown.
+
+The route is tenant scoped. An unknown id, an id carrying a NUL byte and a batch belonging to another tenant all answer `404` with no code and the message `Credential batch not found.`, so a caller cannot learn whether another tenant holds that id. Both the `200` and the expired `410` carry `Cache-Control: no-store`.
+
+| Batch condition                                      | Response                                                                                                                   |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Tenant-owned batch in any unsettled or settled state | `200` with the projection and `Cache-Control: no-store`                                                                    |
+| Unknown id, NUL-bearing id or another tenant's batch | `404`, no code, `Credential batch not found.`                                                                              |
+| Retained item data expired                           | `410 BATCH_EXPIRED`, `This credential batch has expired. Its credentials were not deleted.`, with the tombstone projection |
+
+### Cancel a batch
+
+```
+POST /api/v1/credentials/batches/{id}/cancel
+```
 
 Send `POST /api/v1/credentials/batches/{id}/cancel` with no body. Even `{}` or whitespace is rejected. The request uses the same tenant authentication as the status resource and does not require an `Idempotency-Key`.
 
@@ -370,6 +439,37 @@ A credential issued before or during cancellation should be revoked through its 
 
 A batch settles as `NEEDS_ATTENTION` while any outcome is unknown, then as `CANCELLED` after the final unknown is resolved if cancelled items remain. If the only remaining item was already processing and issues, cancellation can end as `COMPLETED` with cancelled 0. The cancellation timestamp records the request, not a promise that any item was cancelled.
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant RI as Reference Implementation
+    participant DB as Database
+    participant Worker
+
+    Client->>RI: POST /api/v1/credentials/batches/{id}/cancel (no body)
+    RI->>RI: Refuse any non-empty body with 400
+    RI->>DB: Begin one transaction and lock the batch row
+    alt Batch settled
+        RI-->>Client: 409 BATCH_NOT_CANCELLABLE
+    else Batch expired
+        RI-->>Client: 410 BATCH_EXPIRED with the tombstone projection
+    else Queued or running
+        RI->>DB: Move every QUEUED item, deferred retries included, to CANCELLED
+        alt Cancelled rows disagree with the stored queued count
+            RI->>DB: Roll the transaction back
+            RI-->>Client: 500 with a correlation id
+        else Counts agree
+            RI->>DB: Record cancelRequestedAt, adjust counts, advance the version
+            RI->>DB: Settle now when no item is processing
+            RI-->>Client: 202 projection with the cancellation message
+        end
+    end
+    Worker->>Worker: Finish the item already in flight
+    Worker->>DB: Ask for the next item at the item boundary
+    DB-->>Worker: Cancellation observed, no further item
+    Worker->>DB: Settle the batch
+```
+
 | Request or batch condition                                        | Response                                                                                                                               |
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Queued or running batch                                           | `202` with the projection and message above                                                                                            |
@@ -382,8 +482,6 @@ A batch settles as `NEEDS_ATTENTION` while any outcome is unknown, then as `CANC
 | `EXPIRED`                                                         | `410 BATCH_EXPIRED`, `This credential batch has expired. Its credentials were not deleted.`, with the same tombstone projection as GET |
 
 Refusals do not change the batch. If the response is lost, poll GET: an active repeat is accepted unchanged, but a repeat after settlement is refused. After cancellation no further item is started. If processing stalls, the batch is settled without issuing anything more. The [operations page](../operations/batch-issuance#cancellation) explains investigation and retention.
-
-Resubmitting the same `Idempotency-Key` and body after cancellation replays the cancelled batch id and issues nothing; a fresh batch needs a new key.
 
 ## Verification Endpoint
 
@@ -547,9 +645,50 @@ If the preliminary read already equals the requested value, the service commits 
 
 A confirmed change updates library lifecycle immediately. It never rewrites a verification generation. The response is an observation, not a verification summary.
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant RI as Reference Implementation
+    participant DB as Database
+    participant VC as VC Service
+
+    Client->>RI: PUT /api/v1/credentials/{id}/status/{purpose} (If-Version)
+    RI->>DB: Load the record, select the entry, check the transition
+    RI->>RI: Compare If-Version with the entry version
+    RI->>RI: Check that mutation is enabled
+    alt Mutation disabled
+        RI-->>Client: 503 STATUS_MUTATION_DISABLED
+    else Enabled
+        RI->>DB: Lock the record and provider, reserve pending intent with a deadline
+        alt Stale version
+            RI-->>Client: 409 VERSION_CONFLICT
+        else Reserved
+            RI->>VC: Read the current bit
+            opt Bit differs from the request
+                RI->>DB: Acquire the status-list advisory lock
+                alt Not acquired within CREDENTIAL_STATUS_LOCK_ACQUIRE_MS
+                    RI-->>Client: 503 STATUS_LIST_BUSY, no set dispatched
+                else Acquired
+                    RI->>VC: Set the bit
+                    RI->>VC: Read the value back
+                end
+            end
+            alt Outcome not established
+                RI-->>Client: 503 STATUS_OUTCOME_UNKNOWN or STATUS_OUTCOME_MISMATCH, pending intent retained
+            else Read-back matches
+                RI->>DB: Revalidate the provider, clear pending, advance the version
+                RI-->>Client: 200 observation with the new version
+            end
+        end
+    end
+```
+
+The tenant-scoped record lookup happens before header and body validation. An absent or foreign-tenant id returns the same `404 NOT_FOUND` whatever the request carries. The `If-Version` header is then validated before the body and the path purpose, so a request whose header and body are both invalid reports `400 INVALID_IF_VERSION`.
+
 | Response                                                        | Meaning and next action                                                                                                                                                                                                                                                                           |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400 VALIDATION_FAILED`                                         | Supply a decimal integer header between 1 and 2147483647. A missing or malformed header, invalid body or invalid purpose is refused.                                                                                                                                                              |
+| `400 INVALID_IF_VERSION`                                        | Supply a decimal integer `If-Version` header between 1 and 2147483647. A missing or malformed header is refused before body and purpose validation, but after the tenant-scoped record lookup.                                                                                                    |
+| `400 VALIDATION_FAILED`                                         | An invalid body, purpose or validation raised by the status operation is refused.                                                                                                                                                                                                                 |
 | `401` / `403`                                                   | Authentication or tenant assignment refused; an external record answers `403 EXTERNAL_CREDENTIAL_STATUS_NOT_MANAGEABLE`.                                                                                                                                                                          |
 | `404 NOT_FOUND` / `STATUS_ENTRY_NOT_FOUND`                      | No tenant-owned native record, or no captured entry for that purpose.                                                                                                                                                                                                                             |
 | `409 STATUS_METADATA_UNAVAILABLE`                               | Capture or issuing-service attribution is missing. Follow the backfill or attribution command named in the response.                                                                                                                                                                              |
@@ -601,9 +740,37 @@ An entry this service cannot represent answers `422 STATUS_ENTRY_UNSUPPORTED`. A
 
 The shared `400`, `401`, `403`, `404`, `409 STATUS_METADATA_UNAVAILABLE`, `409 VERSION_CONFLICT`, `413` and `500 RECORD_UNREADABLE` responses apply here too. A concurrent change or failed commit answers `503 STATUS_PERSISTENCE_FAILED`. A lost commit acknowledgement answers `503 STATUS_PERSISTENCE_UNCERTAIN`. Re-read stored status before further action.
 
-After the deadline, no RI request for this reservation is still on the wire. A request VCKit had already accepted may still be applied afterwards. Reconciliation records what it observes. A later drift check can still differ. The provider offers no outcome lookup or fencing.
+After the deadline, no RI request for this reservation is still on the wire. A request the provider had already accepted may still be applied afterwards. Reconciliation records what it observes. A later drift check can still differ. The provider offers no outcome lookup or fencing.
 
 Stop admission, drain, wait for provider quiescence, then reconcile. Reconciliation is evidence of the observed bit at its timestamp, not proof that a delayed provider write can no longer arrive.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant RI as Reference Implementation
+    participant DB as Database
+    participant VC as VC Service
+
+    Client->>RI: POST /api/v1/credentials/{id}/status/{purpose}/reconcile (If-Version)
+    RI->>DB: Load the record and compare If-Version with the entry version
+    RI->>DB: Lock the record, pick the pinned or attributed instance
+    alt Pending intent, before deadline plus CREDENTIAL_STATUS_RECONCILE_GRACE_MS
+        RI-->>Client: 409 STATUS_OPERATION_IN_PROGRESS
+    else Provider digest changed and not acknowledged
+        RI-->>Client: 503 STATUS_PROVIDER_CHANGED
+    else Ready to observe
+        RI->>VC: Read the current bit
+        alt Provider unavailable
+            RI-->>Client: 503 VC_SERVICE_UNAVAILABLE, retry later
+        else Deterministic fault
+            RI-->>Client: 502 VC_STATUS_RESPONSE_INVALID or 422 STATUS_ENTRY_UNSUPPORTED
+        else Observed
+            RI->>DB: Revalidate the provider identity
+            RI->>DB: Record the observation, clear any pending intent, advance the version
+            RI-->>Client: 200 observation with the new version
+        end
+    end
+```
 
 ## Retired read routes
 

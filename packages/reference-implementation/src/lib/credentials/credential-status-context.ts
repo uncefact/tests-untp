@@ -8,6 +8,7 @@ import { canonicalJson } from '@uncefact/untp-utils/common';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/lib/api/errors';
 import { parseIfVersion } from '@/lib/api/if-version';
+import { containsNulByte } from '@/lib/api/route-id';
 import { prisma } from '@/lib/prisma/prisma';
 import type { CredentialStatusEntry, Prisma } from '@/lib/prisma/generated';
 import {
@@ -24,7 +25,7 @@ import { CredentialStatusError, statusReadFailure } from './credential-status-er
 
 /** Reads only tenant-owned records, including the origin needed to refuse external management. */
 export async function loadStatusRecord(recordId: string, tenantId: string, client: Prisma.TransactionClient = prisma) {
-  const record = recordId.includes('\0')
+  const record = containsNulByte(recordId)
     ? null
     : await client.libraryRecord.findFirst({
         where: { id: recordId, tenantId },
@@ -46,6 +47,20 @@ export async function loadStatusRecord(recordId: string, tenantId: string, clien
 }
 
 export type StatusRecord = Awaited<ReturnType<typeof loadStatusRecord>>;
+
+/**
+ * Answers the tenant-scoped 404 before any header or body validation, matching
+ * the order PATCH /api/v1/library/{id} documents. An absent or foreign record
+ * must not be distinguishable through an If-Version or body error, so the
+ * status mutation routes run this narrow existence read first and leave the
+ * full load, its external-origin refusal and its transaction to the use case.
+ */
+export async function requireStatusRecordVisible(recordId: string, tenantId: string): Promise<void> {
+  const visible = containsNulByte(recordId)
+    ? null
+    : await prisma.libraryRecord.findFirst({ where: { id: recordId, tenantId }, select: { id: true } });
+  if (!visible) throw new NotFoundError('No such credential record.', 'NOT_FOUND');
+}
 
 /** Capture and entry selection precede transition policy and version validation (ADR-058). */
 export function selectStatusEntry(record: StatusRecord, purpose: string): CredentialStatusEntry {
