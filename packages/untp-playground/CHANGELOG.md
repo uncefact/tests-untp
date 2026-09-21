@@ -5,6 +5,12 @@ format is loosely based on [Keep a Changelog](https://keepachangelog.com/)
 and the version numbers follow semantic versioning. Production releases are
 shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 
+## [0.4.1] - 2026-09-21
+
+### Fixed
+
+- **Context step budget.** The browser now allows the `JSON-LD Document Expansion and Context Validation` step 60 seconds instead of 15. The step expands the whole document on the server, where a large Conformity Scheme runs close to the old budget on a small host, so the step could fail as a service timeout instead of finishing. The timeout message now says the service may be unavailable or still expanding a large document. A proxy in front of a deployment can still end the request sooner: on the hosted Playground a context check that waits more than about 30 seconds for the server's response gets a 504 from the edge.
+
 ## [0.4.0] - 2026-09-21
 
 ### ⚠ BREAKING CHANGES
@@ -109,5 +115,6 @@ shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 - Dedupe concurrent schema fetches for the same URL.
 - JSON-LD and schema validation errors render with actionable context.
 
+[0.4.1]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.1
 [0.4.0]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.0
 [0.3.0]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.3.0
