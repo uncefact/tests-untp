@@ -995,14 +995,15 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
       valid: false,
       error: {
         keyword: 'jsonldService',
-        message: "The Playground's context service did not respond within 15s. Retry in a moment.",
+        message:
+          "The Playground's context service did not respond within 60s. It may be unavailable or still expanding a large document. Retry in a moment.",
         instancePath: '',
       },
       failure: {
         class: 'could-not-fetch',
         code: 'context.service',
         message:
-          "The Playground context service could not be reached: The Playground's context service did not respond within 15s. Retry in a moment.",
+          "The Playground's context service did not respond within 60s. It may be unavailable or still expanding a large document. Retry in a moment.",
         remediation:
           'Retry the check. If it keeps failing, report the URL and these details to the Playground operator.',
       },
@@ -1018,7 +1019,7 @@ describe('Credential validation pipeline (preserved verbatim from pre-#810)', ()
     });
     await userEvent.click(screen.getByTestId('context-view-details'));
     const card = await screen.findByTestId('validation-issue-card');
-    expect(card).toHaveTextContent('did not respond within 15s');
+    expect(card).toHaveTextContent('did not respond within 60s');
     expect(screen.queryByText('The user aborted a request.')).not.toBeInTheDocument();
   });
 

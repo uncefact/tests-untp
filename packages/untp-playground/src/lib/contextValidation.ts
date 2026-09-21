@@ -11,8 +11,16 @@ import { classifyJsonLdFailure } from './artefactFailure';
 import type { ArtefactFailureFamily, ArtefactStepFailure } from './artefactFailure';
 import { API_BASE_PATH } from '../../constants';
 
-/** One budget covering the request to `/api/context` and reading its body. */
-export const CONTEXT_FETCH_TIMEOUT_MS = 15_000;
+/**
+ * One budget covering the request to `/api/context` and reading its body. The route expands the
+ * whole document server-side, and that expansion is CPU-bound, so the time scales with the
+ * document size and the host's share of a core: a 90 KB Conformity Scheme expands in well under a
+ * second on a laptop core but took over ten seconds on the hosted task sized in
+ * `infra/infra/app.ts`. The budget leaves room for a large scheme on a modest host to finish
+ * rather than fail. A proxy in front of a deployment may still cut the request earlier; the
+ * hosted Playground's edge answers 504 after 30 seconds.
+ */
+export const CONTEXT_FETCH_TIMEOUT_MS = 60_000;
 
 const MAX_CONTEXT_DECLARATION_DEPTH = 32;
 const MAX_CONTEXT_DECLARATION_NODES = 10_000;
@@ -200,7 +208,7 @@ export async function validateContext(
       error instanceof Error && error.name === 'AbortError'
         ? `The Playground's context service did not respond within ${
             CONTEXT_FETCH_TIMEOUT_MS / 1000
-          }s. Retry in a moment.`
+          }s. It may be unavailable or still expanding a large document. Retry in a moment.`
         : 'The Playground context service could not be reached. Retry in a moment.';
     const failure: ContextFailure = { kind: 'service', detail };
     return {

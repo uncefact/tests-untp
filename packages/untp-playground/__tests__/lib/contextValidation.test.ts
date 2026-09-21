@@ -669,18 +669,59 @@ describe('contextValidation', () => {
       });
     });
 
+    it('times out when the context service never answers, naming both a slow expansion and an outage', async () => {
+      jest.useFakeTimers();
+      try {
+        let requestAborted = false;
+        fetchMock.mockImplementationOnce(
+          (_url: string, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () => {
+                requestAborted = true;
+                reject(Object.assign(new Error('The user aborted a request.'), { name: 'AbortError' }));
+              });
+            }),
+        );
+
+        const pending = validateContext({ '@context': ['https://www.w3.org/ns/credentials/v2'] });
+        await Promise.resolve();
+        await Promise.resolve();
+        // The abort must fire at the budget, not before it.
+        jest.advanceTimersByTime(60_000 - 1);
+        expect(requestAborted).toBe(false);
+        jest.advanceTimersByTime(1);
+        expect(requestAborted).toBe(true);
+        const result = await pending;
+        expect(result.valid).toBe(false);
+        expect(result.error?.keyword).toBe('jsonldService');
+        expect(result.error?.message).toBe(
+          "The Playground's context service did not respond within 60s. It may be unavailable or still expanding a large document. Retry in a moment.",
+        );
+        expect(result.failure).toMatchObject({
+          class: 'could-not-fetch',
+          code: 'context.service',
+          message:
+            "The Playground's context service did not respond within 60s. It may be unavailable or still expanding a large document. Retry in a moment.",
+        });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('times out while the context service response body is still being read', async () => {
       jest.useFakeTimers();
       try {
+        let bodyReadAborted = false;
         fetchMock.mockImplementationOnce((_url: string, init: RequestInit) =>
           Promise.resolve({
             ok: true,
             status: 200,
             json: () =>
               new Promise((_resolve, reject) => {
-                init.signal?.addEventListener('abort', () =>
-                  reject(Object.assign(new Error('body read aborted'), { name: 'AbortError' })),
-                );
+                init.signal?.addEventListener('abort', () => {
+                  bodyReadAborted = true;
+                  reject(Object.assign(new Error('body read aborted'), { name: 'AbortError' }));
+                });
               }),
           }),
         );
@@ -688,19 +729,23 @@ describe('contextValidation', () => {
         const pending = validateContext({ '@context': ['https://www.w3.org/ns/credentials/v2'] });
         await Promise.resolve();
         await Promise.resolve();
-        jest.advanceTimersByTime(15_000);
+        // The abort must fire at the budget, not before it.
+        jest.advanceTimersByTime(60_000 - 1);
+        expect(bodyReadAborted).toBe(false);
+        jest.advanceTimersByTime(1);
+        expect(bodyReadAborted).toBe(true);
         const result = await pending;
         expect(result.valid).toBe(false);
         expect(result.error?.keyword).toBe('jsonldService');
         expect(result.error?.message).toContain('answered 200');
-        expect(result.error?.message).toContain('did not finish arriving within 15s');
+        expect(result.error?.message).toContain('did not finish arriving within 60s');
         expect(result.error?.message).not.toContain('did not respond');
         expect(result.failure).toMatchObject({
           class: 'could-not-fetch',
           code: 'context.service',
           serviceStatus: 200,
           message:
-            "The Playground's context service answered 200 but the result did not finish arriving within 15s. Retry in a moment.",
+            "The Playground's context service answered 200 but the result did not finish arriving within 60s. Retry in a moment.",
         });
       } finally {
         jest.useRealTimers();
