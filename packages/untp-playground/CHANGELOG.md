@@ -5,6 +5,12 @@ format is loosely based on [Keep a Changelog](https://keepachangelog.com/)
 and the version numbers follow semantic versioning. Production releases are
 shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 
+## [0.4.2] - 2026-09-22
+
+### Fixed
+
+- **Sample Digital Product Passport reissued.** The bundled sample expired on 1 March 2026, so the `Verification` step failed on it with "Credential has expired". The sample is reissued by the same test issuer with the same content, a validity window that ends on 1 March 2040 and a fresh status list entry.
+
 ## [0.4.1] - 2026-09-21
 
 ### Fixed
@@ -115,6 +121,7 @@ shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 - Dedupe concurrent schema fetches for the same URL.
 - JSON-LD and schema validation errors render with actionable context.
 
+[0.4.2]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.2
 [0.4.1]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.1
 [0.4.0]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.0
 [0.3.0]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.3.0

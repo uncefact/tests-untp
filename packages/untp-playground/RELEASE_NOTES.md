@@ -4,6 +4,18 @@ These are the user-facing release notes for the UNTP Playground. They focus
 on what's new for you, the person using the playground, not on the internal
 mechanics. For a technical, per-change log see [CHANGELOG.md](./CHANGELOG.md).
 
+## 0.4.2 - 2026-09-22
+
+A patch for the sample Digital Product Passport that the Playground offers
+for download. The sample was issued with a validity window that ended on
+1 March 2026, so since then its Verification step has failed with
+"Credential has expired". The sample is reissued by the same test issuer with
+the same content and a validity window that ends on 1 March 2040, so it
+verifies again. If you kept a copy of the old sample, download it again.
+
+- Technical changelog: [CHANGELOG.md § 0.4.2](./CHANGELOG.md#042---2026-09-22)
+- Container image: [ghcr.io/uncefact/tests-untp/untp-playground](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Funtp-playground) (`:0.4.2`, `:latest`)
+
 ## 0.4.1 - 2026-09-21
 
 A patch for large Conformity Schemes on the hosted Playground. The JSON-LD
