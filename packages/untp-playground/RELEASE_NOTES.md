@@ -4,6 +4,31 @@ These are the user-facing release notes for the UNTP Playground. They focus
 on what's new for you, the person using the playground, not on the internal
 mechanics. For a technical, per-change log see [CHANGELOG.md](./CHANGELOG.md).
 
+## 0.4.1 - 2026-09-21
+
+A patch for large Conformity Schemes on the hosted Playground. The JSON-LD
+Document Expansion and Context Validation step expands the whole document on
+the server, where a scheme of around 90 KB takes about 13 seconds. That left
+almost nothing in hand against the 15 seconds the browser allowed, so the
+step could fail with a service timeout while the expansion was still
+finishing. The browser now allows 60 seconds, and the timeout message says
+the service may be unavailable or still expanding a large document.
+
+The longer wait applies to credentials as well as schemes. On a self-hosted
+Playground with no proxy timeout of its own, an unanswered context check now
+stays in progress for 60 seconds instead of 15, and the credential's result
+stays in progress until that step settles. A refused connection or an HTTP
+error still fails straight away.
+
+On the hosted Playground, a context check that waits more than about 30
+seconds for the server's response fails with HTTP 504, which the Playground
+shows as a service failure. So a document that needs more than that on the
+hosted instance still fails. A self-hosted Playground has no such cap unless
+its own proxy adds one.
+
+- Technical changelog: [CHANGELOG.md § 0.4.1](./CHANGELOG.md#041---2026-09-21)
+- Container image: [ghcr.io/uncefact/tests-untp/untp-playground](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Funtp-playground) (`:0.4.1`, `:latest`)
+
 ## 0.4.0 - 2026-09-21
 
 The 0.4.0 release gives the UNTP Playground a tabbed workspace for

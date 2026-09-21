@@ -97,7 +97,7 @@ describe('generateReport', () => {
       reportName: 'UNTP',
       testSuite: {
         runner: 'untp-test-suite',
-        version: '0.4.0',
+        version: '0.4.1',
         url: 'https://github.com/uncefact/tests-untp',
       },
       implementation: {
@@ -286,7 +286,7 @@ describe('generateReport', () => {
       classifyJsonLdFailure(
         {
           kind: 'service',
-          detail: 'The Playground context service answered 200 but the result did not finish arriving within 15s.',
+          detail: 'The Playground context service answered 200 but the result did not finish arriving within 60s.',
         },
         'context',
         undefined,
@@ -341,7 +341,7 @@ describe('generateReport', () => {
             class: 'could-not-fetch',
             code: 'context.service',
             serviceStatus: 200,
-            message: expect.stringContaining('did not finish arriving within 15s'),
+            message: expect.stringContaining('did not finish arriving within 60s'),
           }),
         }),
       ]),
