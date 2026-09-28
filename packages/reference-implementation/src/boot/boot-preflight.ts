@@ -2,8 +2,14 @@ import { AesGcmEncryptionAdapter } from '@uncefact/untp-ri-services/encryption';
 import { createLogger } from '@uncefact/untp-ri-services/logging';
 import type { LoggerService } from '@uncefact/untp-ri-services/logging';
 import { validateBundledArtefactsFallbackOnBoot } from '../lib/config/bundled-artefacts-fallback.config';
-import { validateFetchSettingsOnBoot } from '../lib/config/credential-fetch.config';
-import { validateStatusSettingsOnBoot } from '../lib/config/credential-status.config';
+import {
+  validateFetchAllowPrivateUrlsOnBoot,
+  validateFetchSettingsOnBoot,
+} from '../lib/config/credential-fetch.config';
+import {
+  validateStatusIssuanceSettingsOnBoot,
+  validateStatusSettingsOnBoot,
+} from '../lib/config/credential-status.config';
 import { resolveAppUrl } from '../lib/config/app-url.config';
 import { validateHttpUserAgentOnBoot } from '../lib/config/http-user-agent.config';
 import { validateStaleClaimOnBoot } from '../lib/config/idempotency-claim.config';
@@ -42,6 +48,15 @@ export function resolveBootProcessRole(value: string | undefined = process.env.R
  * because a pre-upgrade or first-boot database may not have the tables it
  * needs yet.
  *
+ * Both roles check the settings credential issuance reads, because the worker
+ * issues batch items through the same code as the web's single route:
+ * `RI_APP_URL`, the private-address fetch setting and the status issuance
+ * settings. The web alone checks the settings only it reads (the other fetch
+ * settings, the status operation settings, request body limits, idempotency
+ * and the CVC refresh interval). The worker alone requires
+ * `DATA_ENCRYPTION_KEY` and checks its reconciliation, sweep and batch budget
+ * configuration.
+ *
  * @see ../../../../docs/adrs/045-seed-fails-loudly-on-missing-configuration.md
  */
 export function runBootPreflight(role: 'web', logger?: LoggerService): Promise<BootPreflightResult>;
@@ -54,9 +69,7 @@ export async function runBootPreflight(
   role: BootProcessRole = 'web',
   logger: LoggerService = createLogger(),
 ): Promise<BootPreflightResult | WorkerBootPreflightResult> {
-  if (role === 'web') {
-    resolveAppUrl();
-  }
+  resolveAppUrl();
   validateHttpUserAgentOnBoot();
   validateCacheMaxEntriesOnBoot();
   validateBundledArtefactsFallbackOnBoot();
@@ -67,6 +80,9 @@ export async function runBootPreflight(
     validateCredentialBatchRequestBodySettingsOnWebBoot();
     validateFetchSettingsOnBoot(logger);
     validateStatusSettingsOnBoot(process.env, logger);
+  } else {
+    validateFetchAllowPrivateUrlsOnBoot(logger);
+    validateStatusIssuanceSettingsOnBoot(process.env, logger);
   }
 
   if (role === 'web') {

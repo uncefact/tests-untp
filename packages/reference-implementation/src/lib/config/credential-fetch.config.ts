@@ -5,14 +5,16 @@
  * registration and the supplier-source check used by re-verification. The
  * private-address setting also relaxes the existing stored-address URL checks
  * on the registrar, identifier-link, data-model, service and credential
- * publishing routes. None of them applies to context or schema fetches, or to
- * the worker's stored-copy read.
+ * publishing routes, and it is the one setting of the three the worker reads:
+ * a batch item runs the credential issuance code, which checks the item's
+ * verification URLs with it. None of them applies to context or schema
+ * fetches, or to the worker's stored-copy read.
  *
  * Each setting has a new `FETCH_` name and its RI v0.4 `VERIFY_` name. The old
- * name is read throughout RI v0.5 and produces a startup warning, and it stops
- * being read in RI v0.6 (#992). Setting both names of one pair, non-blank
- * after trimming, fails startup whatever the values are, because a boolean and
- * a byte count carry nothing that would let equal values count as agreement.
+ * name is still read and produces a startup warning (#992). Setting both names
+ * of one pair, non-blank after trimming, fails startup whatever the values
+ * are, because a boolean and a byte count carry nothing that would let equal
+ * values count as agreement.
  *
  * The readers are uncached, so a pair introduced after boot is seen by the
  * next call. That call throws inside a route gate or the fetch helper, and the
@@ -48,8 +50,8 @@ type ResolvedFetchSetting =
 
 /**
  * Keyed by setting rather than ordered, so each reader names the pair it
- * reads. Deleting a pair in v0.6 is then a compile error in that reader
- * instead of a silent re-point at whichever pair moved into the free slot.
+ * reads. Deleting a pair is then a compile error in that reader instead of a
+ * silent re-point at whichever pair moved into the free slot.
  */
 const FETCH_SETTING_PAIRS = {
   allowPrivateUrls: { oldName: 'VERIFY_ALLOW_PRIVATE_URLS', newName: 'FETCH_ALLOW_PRIVATE_URLS' },
@@ -136,13 +138,33 @@ export function validateFetchSettingsOnBoot(
   readFetchTimeoutMs(env);
 
   for (const pair of Object.values(FETCH_SETTING_PAIRS)) {
-    const resolved = resolveFetchSetting(env, pair);
-    if (resolved.source === 'old') {
-      logger.warn(
-        `${pair.oldName} was renamed to ${pair.newName} in v0.5 and will stop being read in v0.6. Rename ${pair.oldName} to ${pair.newName}, keeping its value, and restart.`,
-      );
-    }
+    warnIfSuppliedUnderOldName(logger, env, pair);
   }
+}
+
+/**
+ * The worker's boot check. The worker reads only the private-address setting
+ * of the three, so it resolves that pair alone, with the same reader issuance
+ * calls: both names set throws, and any value but `true` keeps the protection
+ * on without an error. The old-name warning follows the check.
+ */
+export function validateFetchAllowPrivateUrlsOnBoot(
+  logger: { warn(message: string): void },
+  env: Record<string, string | undefined> = process.env,
+): void {
+  readFetchAllowPrivateUrls(env);
+  warnIfSuppliedUnderOldName(logger, env, FETCH_SETTING_PAIRS.allowPrivateUrls);
+}
+
+function warnIfSuppliedUnderOldName(
+  logger: { warn(message: string): void },
+  env: Record<string, string | undefined>,
+  pair: FetchSettingPair,
+): void {
+  if (resolveFetchSetting(env, pair).source !== 'old') return;
+  logger.warn(
+    `${pair.oldName} was renamed to ${pair.newName} in v0.5 and will stop being read in v0.6. Rename ${pair.oldName} to ${pair.newName}, keeping its value, and restart.`,
+  );
 }
 
 /**

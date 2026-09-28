@@ -269,6 +269,15 @@ services:
       - BATCH_SETTLEMENT_ALLOWANCE_MS
       - BATCH_MINIMUM_ITEM_COST_MS
       - BATCH_JOB_CONCURRENCY
+      # A batch item runs the single credential route's issuance code in this
+      # process, so these settings must match the app service's values. The
+      # worker validates them at boot and refuses to start without RI_APP_URL.
+      - RI_APP_URL=http://localhost:3003
+      - FETCH_ALLOW_PRIVATE_URLS=${FETCH_ALLOW_PRIVATE_URLS:-true}
+      - VERIFY_ALLOW_PRIVATE_URLS=${VERIFY_ALLOW_PRIVATE_URLS:-}
+      - CREDENTIAL_STATUS_DEFAULT_PURPOSES
+      - CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED
+      - CREDENTIAL_STATUS_LOCK_ACQUIRE_MS
     extra_hosts:
       - 'localhost:host-gateway'
     volumes:

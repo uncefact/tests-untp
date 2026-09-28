@@ -103,6 +103,7 @@ import { runWorker } from './bootstrap';
 describe('the shutdown steps runWorker wires', () => {
   beforeAll(async () => {
     process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
+    process.env.RI_APP_URL = 'https://ri.example.com';
     await runWorker({ sdk: { shutdown: () => new Promise<void>(() => undefined) }, migrationsDir: '/unused' });
   });
 

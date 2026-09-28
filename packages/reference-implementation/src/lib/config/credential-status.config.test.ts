@@ -3,6 +3,7 @@ import {
   readStatusLockAcquireMs,
   readStatusMultiplePurposesEnabled,
   readStatusMutationEnabled,
+  validateStatusIssuanceSettingsOnBoot,
   validateStatusSettingsOnBoot,
 } from './credential-status.config';
 
@@ -116,6 +117,64 @@ describe('validateStatusSettingsOnBoot', () => {
       validateStatusSettingsOnBoot({
         CREDENTIAL_STATUS_DEFAULT_PURPOSES: 'revocation,suspension',
         CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED: 'true',
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe('validateStatusIssuanceSettingsOnBoot', () => {
+  const noStatusWarning =
+    'CREDENTIAL_STATUS_DEFAULT_PURPOSES=none: credentials issued without an explicit statusPurposes carry no status entry and can never be revoked or suspended.';
+  const lockWarning = 'CREDENTIAL_STATUS_LOCK_ACQUIRE_MS has invalid value "abc"; using the default 2000 milliseconds.';
+
+  it('accepts the built-in defaults and a multi-purpose default with the opt-in, silently', () => {
+    const logger = { warn: jest.fn() };
+    expect(() => validateStatusIssuanceSettingsOnBoot({}, logger)).not.toThrow();
+    expect(() =>
+      validateStatusIssuanceSettingsOnBoot(
+        {
+          CREDENTIAL_STATUS_DEFAULT_PURPOSES: 'revocation,suspension',
+          CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED: 'true',
+        },
+        logger,
+      ),
+    ).not.toThrow();
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      { CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED: 'yes' },
+      'CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED must be true or false.',
+    ],
+    [
+      { CREDENTIAL_STATUS_DEFAULT_PURPOSES: 'message' },
+      'CREDENTIAL_STATUS_DEFAULT_PURPOSES has invalid value "message"',
+    ],
+    [
+      { CREDENTIAL_STATUS_DEFAULT_PURPOSES: 'revocation,suspension' },
+      'CREDENTIAL_STATUS_DEFAULT_PURPOSES names more than one purpose, but CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED is false.',
+    ],
+  ])('refuses %p', (env, message) => {
+    expect(() => validateStatusIssuanceSettingsOnBoot(env)).toThrow(message);
+  });
+
+  it('warns about a no-status default and then an unusable lock duration, in that order', () => {
+    const logger = { warn: jest.fn() };
+    validateStatusIssuanceSettingsOnBoot(
+      { CREDENTIAL_STATUS_DEFAULT_PURPOSES: 'none', CREDENTIAL_STATUS_LOCK_ACQUIRE_MS: 'abc' },
+      logger,
+    );
+    expect(logger.warn.mock.calls).toEqual([[noStatusWarning], [lockWarning]]);
+  });
+
+  it('does not check the status operation settings the issuance code never reads', () => {
+    // Fails if the worker's check grows into the web's whole status check.
+    expect(() =>
+      validateStatusIssuanceSettingsOnBoot({
+        CREDENTIAL_STATUS_MUTATION_ENABLED: 'maybe',
+        CREDENTIAL_STATUS_OPERATION_BUDGET_MS: '0',
+        CREDENTIAL_STATUS_RECONCILE_GRACE_MS: 'soon',
       }),
     ).not.toThrow();
   });

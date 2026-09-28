@@ -71,9 +71,11 @@ function resolveCoreCredentialType(coreDataModelType: string): CoreCredentialTyp
 }
 
 /**
- * Default human verification link: this RI's own verify page, built from the
- * boot-validated RI_APP_URL (see instrumentation.node.ts). Used when a caller
- * requests publishing without an explicit publishingOptions.humanVerificationUrl.
+ * Default human verification link: this RI's own verify page, built from
+ * RI_APP_URL. Used when a caller requests publishing without an explicit
+ * publishingOptions.humanVerificationUrl. A batch item reaches this in the
+ * worker, so `runBootPreflight` validates RI_APP_URL in both the web and
+ * worker roles.
  */
 function defaultHumanVerificationUrl(): string {
   return buildVerifyUrl(resolveAppUrl());

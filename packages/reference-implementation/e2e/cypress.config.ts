@@ -503,9 +503,11 @@ export default defineConfig({
         }
         cleanupErrors.push(...formatCleanupFailures(apiCleanup.failures));
 
-        // The publishing spec registers one namespace with the Identity
-        // Resolver directly, as an operator would; it is retired the same
-        // way, together with any namespace an earlier run failed to retire.
+        // The publishing spec and the batch journey spec register one shared
+        // namespace with the Identity Resolver directly, as an operator
+        // would. The specs run one after another, and each spec start retires
+        // the namespace. It is retired the same way here, together with any
+        // namespace an earlier run failed to retire.
         cleanupErrors.push(...(await retireRecordedNamespaces(`e2e-pub-${RUN_TAG}`)));
 
         // Fresh service-account tokens for the proof as well: cleanup may

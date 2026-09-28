@@ -16,8 +16,14 @@ describe('Credential batch API', { testIsolation: false }, () => {
   const STATUS_PURPOSES = config.capabilities.statusDefaultPurposes;
   const VALID_FROM = new Date().toISOString();
   const VALID_UNTIL = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
+  // The resolver has no listing to sweep, so this reuses the one namespace the
+  // harness ledger in cypress.config.ts retires even after a killed run.
+  const PUBLISH_NAMESPACE = `e2e-pub-${RUN_ID}`;
+  const PUBLISH_PRIMARY_KEY = `arn-batch-${RUN_ID}`;
+  const idrAuthHeaders = { Authorization: `Bearer ${config.services.idr.apiKey}` };
   let issuerDid: string;
   let foreignDid: string;
+  let publishNamespaceRegistered = false;
 
   type BatchRequest = {
     items: CredentialRequest[];
@@ -178,6 +184,25 @@ describe('Credential batch API', { testIsolation: false }, () => {
       const defaultDid = response.body.data.find((did: { did: string; isDefault?: boolean }) => did.isDefault === true);
       expect(defaultDid, 'A default DID must be configured for the batch issuer').to.exist;
       issuerDid = defaultDid.did;
+    });
+  });
+
+  after(() => {
+    if (!publishNamespaceRegistered) return;
+    // Pyx IDR v4 deletes one namespace through the query parameter, and
+    // answers 400 "not found" for a namespace it no longer holds.
+    cy.request({
+      method: 'DELETE',
+      url: `${config.services.idr.publicBaseUrl}/api/v4/identifiers`,
+      headers: idrAuthHeaders,
+      qs: { namespace: PUBLISH_NAMESPACE },
+      failOnStatusCode: false,
+    }).then((response) => {
+      const alreadyRetired = response.status === 400 && /not found/i.test(JSON.stringify(response.body));
+      expect(
+        alreadyRetired || [200, 204, 404].includes(response.status),
+        `resolver namespace delete status ${response.status}`,
+      ).to.eq(true);
     });
   });
 
@@ -480,6 +505,147 @@ describe('Credential batch API', { testIsolation: false }, () => {
           expectedIssuer: issuerDid,
           statusPurposes: STATUS_PURPOSES,
         });
+      });
+  });
+
+  // Catches a worker that cannot publish with the default human verification
+  // link. Without RI_APP_URL the worker refuses to boot and this batch never
+  // settles. Without that boot check it fails the item with
+  // ITEM_ATTEMPTS_EXHAUSTED.
+  it('publishes a batch item with the default human verification link', () => {
+    const retry = Cypress.currentRetry;
+    const label = `publish-${retry}`;
+    const identifierValue = `${RUN_ID}-batch-publish-r${retry}`;
+    type IdrLink = { mimeType?: string; targetUrl: string };
+
+    cy.request({
+      method: 'POST',
+      url: '/api/v1/registrars',
+      body: {
+        name: `E2E Batch Publishing Registrar ${RUN_ID}`,
+        namespace: PUBLISH_NAMESPACE,
+        url: `https://registrar-${RUN_ID}.example.com`,
+      },
+    })
+      .then((registrarResponse) => {
+        expect(registrarResponse.status, 'publishing registrar status').to.eq(201);
+        return cy.request({
+          method: 'POST',
+          url: '/api/v1/schemes',
+          body: {
+            registrarId: registrarResponse.body.id,
+            name: `E2E Batch ARN Scheme ${RUN_ID}`,
+            primaryKey: PUBLISH_PRIMARY_KEY,
+            validationPattern: '^e2e-\\d{10,}.*$',
+            linkTemplate: '/{primaryKey}/{value}',
+          },
+        });
+      })
+      .then((schemeResponse) => {
+        expect(schemeResponse.status, 'publishing scheme status').to.eq(201);
+        return cy.request({
+          method: 'POST',
+          url: '/api/v1/identifiers',
+          body: { schemeId: schemeResponse.body.id, value: identifierValue },
+        });
+      })
+      .then((identifierResponse) => {
+        expect(identifierResponse.status, 'publishing identifier status').to.eq(201);
+        publishNamespaceRegistered = true;
+        return cy.request({
+          method: 'POST',
+          url: `${config.services.idr.publicBaseUrl}/api/v4/identifiers`,
+          headers: idrAuthHeaders,
+          body: {
+            namespace: PUBLISH_NAMESPACE,
+            applicationIdentifiers: [
+              {
+                title: `E2E Batch ARN ${RUN_ID}`,
+                label: 'ARN',
+                shortcode: PUBLISH_PRIMARY_KEY,
+                ai: PUBLISH_PRIMARY_KEY,
+                type: 'I',
+                regex: '^e2e-\\d{10,}.*$',
+              },
+            ],
+          },
+        });
+      })
+      .then((namespaceResponse) => {
+        expect(namespaceResponse.status, 'resolver namespace status').to.be.oneOf([200, 201]);
+        return buildCredentialRequest(issuerDid, label, ['revocation']);
+      })
+      .then((baseItem) => {
+        // The v0.7.0 DPP bridge publishes under the product's model number.
+        const requestItem: CredentialRequest & { publishingOptions: { publish: boolean } } = {
+          ...baseItem,
+          credentialPayload: {
+            ...baseItem.credentialPayload,
+            credentialSubject: { ...baseItem.credentialPayload.credentialSubject, modelNumber: identifierValue },
+          },
+          publishingOptions: { publish: true },
+        };
+        return cy
+          .request({
+            method: 'POST',
+            url: '/api/v1/credentials/batches',
+            headers: { 'Idempotency-Key': `e2e-batch-publish-${RUN_ID}-r${retry}` },
+            body: { items: [requestItem] },
+          })
+          .then((response) => {
+            expect(response.status, 'publishing batch submission status').to.eq(202);
+            expect(response.body.batchId, 'publishing batch id').to.be.a('string').and.not.empty;
+            return waitForBatchCompletion(response.body.status).then((status) => ({ status, requestItem }));
+          });
+      })
+      .then(({ status, requestItem }) => {
+        expect(status.state, 'publishing batch state').to.eq('COMPLETED');
+        expect(status.counts).to.deep.eq({
+          total: 1,
+          queued: 0,
+          processing: 0,
+          issued: 1,
+          failed: 0,
+          unknown: 0,
+          cancelled: 0,
+        });
+        expect(status.items, 'publishing batch item count').to.have.length(1);
+        const [item] = status.items;
+        expect(item.state, `publishing batch item ${JSON.stringify(item)}`).to.eq('ISSUED');
+        expect(item, `publishing batch item warning ${JSON.stringify(item.warning)}`).not.to.have.property('warning');
+        return assertIssuedCredential(item, requestItem, {
+          label: 'publishing item',
+          expectedIssuer: issuerDid,
+          statusPurposes: ['revocation'],
+        });
+      })
+      .then(() =>
+        cy.request({
+          method: 'GET',
+          url: `${config.services.idr.publicBaseUrl}/api/v4/resolver/links`,
+          headers: idrAuthHeaders,
+          qs: {
+            namespace: PUBLISH_NAMESPACE,
+            identificationKeyType: PUBLISH_PRIMARY_KEY,
+            identificationKey: identifierValue,
+          },
+        }),
+      )
+      .then((linksResponse) => {
+        expect(linksResponse.status, 'resolver links status').to.eq(200);
+        const links = linksResponse.body as IdrLink[];
+        expect(links, JSON.stringify(links)).to.have.length(2);
+        expect(
+          links.find((link) => link.mimeType === 'application/json'),
+          'credential link',
+        ).to.exist;
+
+        const humanLink = links.find((link) => link.mimeType === 'text/html');
+        expect(humanLink, 'human verification link').to.exist;
+        const target = new URL((humanLink as IdrLink).targetUrl);
+        const verifyPage = new URL('/verify', Cypress.config('baseUrl') as string);
+        expect(target.origin, 'human link origin').to.eq(verifyPage.origin);
+        expect(target.pathname, 'human link path').to.eq(verifyPage.pathname);
       });
   });
 });
