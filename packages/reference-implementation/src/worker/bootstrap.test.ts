@@ -27,6 +27,7 @@ describe('requireEncryptionKeyOnBoot', () => {
     DATA_ENCRYPTION_KEY: process.env.DATA_ENCRYPTION_KEY,
     SERVICE_ENCRYPTION_KEY: process.env.SERVICE_ENCRYPTION_KEY,
     WORKER_JOB_TIMEOUT_SECONDS: process.env.WORKER_JOB_TIMEOUT_SECONDS,
+    RI_APP_URL: process.env.RI_APP_URL,
   };
   beforeEach(() => {
     delete process.env.DATA_ENCRYPTION_KEY;
@@ -62,6 +63,7 @@ describe('requireEncryptionKeyOnBoot', () => {
 
   it('runs the shared worker preflight before the existing image checks', async () => {
     process.env.DATA_ENCRYPTION_KEY = KEY;
+    process.env.RI_APP_URL = 'https://ri.example.com';
     process.env.WORKER_JOB_TIMEOUT_SECONDS = '5';
 
     await expect(

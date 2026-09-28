@@ -13,6 +13,8 @@ Three queues are involved. `credentials.issue-batch` carries the issuance work. 
 
 The settings sit with the other boot-validated settings on the [Startup page](./startup#batch-issuance-settings). The first job uses the web process's `WORKER_JOB_TIMEOUT_SECONDS`; continuations use the worker process's value, so keep that setting identical in both roles when the same job budget is required.
 
+The worker issues each item with the same code as `POST /api/v1/credentials`, so it needs the web process's issuance settings, listed in the [worker settings table](./worker#worker-settings).
+
 `BATCH_SETTLEMENT_ALLOWANCE_MS` holds time back for the checkpoint write, while `BATCH_MINIMUM_ITEM_COST_MS` sets the floor for the running item-cost estimate and the first item in a job. Raise the allowance when checkpoint commits are slow, or raise the minimum item cost when the provider chain is slow so the first item is not assumed cheap.
 
 A batch issues its items one at a time. Items in flight across the deployment equal the number of worker containers multiplied by `BATCH_JOB_CONCURRENCY`. In one measurement on an 8-vCPU host with the bundled VCKit and storage services, five to eight workers at concurrency 1 reached about 600 items per minute. More items in flight per issuer DID beyond about eight raised per-item latency and caused status-list lock timeouts that consume retry attempts. A deployment whose tenants issue under their own DIDs has independent locks and scales further than one that funnels every tenant through the system default DID.

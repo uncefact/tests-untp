@@ -76,6 +76,7 @@ function getWarn(logger: LoggerService): jest.Mock {
 
 function setWorkerEnvironment(): void {
   process.env.DATA_ENCRYPTION_KEY = KEY;
+  process.env.RI_APP_URL = 'https://ri.example.com';
 }
 
 beforeEach(() => {
@@ -116,7 +117,6 @@ describe('runBootPreflight', () => {
 
   it('accepts a worker without web-only settings while checking its own required settings', async () => {
     setWorkerEnvironment();
-    process.env.RI_APP_URL = 'not a url';
     process.env.MAX_REQUEST_BODY_BYTES = '100';
     process.env.MAX_BATCH_REQUEST_BODY_BYTES = '0';
     process.env.IDEMPOTENCY_STALE_CLAIM_MINUTES = '0';
@@ -212,13 +212,37 @@ describe('runBootPreflight', () => {
     expect(process.getActiveResourcesInfo()).toEqual(before);
   });
 
-  it('does not apply caller-supplied fetch settings to the worker role', async () => {
+  it('does not apply the web-only fetch settings to the worker role', async () => {
+    // Fails if the worker starts validating the size or timeout, which only
+    // the web reads: an invalid value or a both-names pair must not stop it.
+    setWorkerEnvironment();
+    process.env.FETCH_TIMEOUT_MS = '0';
+    process.env.VERIFY_MAX_CREDENTIAL_SIZE = '2048';
+    process.env.FETCH_MAX_RESPONSE_SIZE = '4096';
+
+    await expect(runBootPreflight('worker', createLogger())).resolves.toMatchObject({ key: KEY });
+  });
+
+  it('refuses a worker given both private-address names, as the web does', async () => {
+    // Issuance on the worker reads this pair, so a conflict the web refuses at
+    // boot must not reach the first batch item instead.
     setWorkerEnvironment();
     process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
     process.env.FETCH_ALLOW_PRIVATE_URLS = 'true';
-    process.env.FETCH_TIMEOUT_MS = '0';
+
+    await expect(runBootPreflight('worker', createLogger())).rejects.toThrow(
+      'VERIFY_ALLOW_PRIVATE_URLS and FETCH_ALLOW_PRIVATE_URLS are both set. VERIFY_ALLOW_PRIVATE_URLS was renamed to FETCH_ALLOW_PRIVATE_URLS in v0.5. Set FETCH_ALLOW_PRIVATE_URLS to the value you intend, remove VERIFY_ALLOW_PRIVATE_URLS, and restart.',
+    );
+  });
+
+  it('accepts a worker with a web-only status setting the web refuses', async () => {
+    // Fails if the worker runs the web's whole status validator instead of
+    // the issuance part: the worker never mutates status.
+    setWorkerEnvironment();
+    process.env.CREDENTIAL_STATUS_MUTATION_ENABLED = 'maybe';
 
     await expect(runBootPreflight('worker', createLogger())).resolves.toMatchObject({ key: KEY });
+    await expect(runBootPreflight('web', createLogger())).rejects.toThrow('CREDENTIAL_STATUS_MUTATION_ENABLED');
   });
 
   it('accepts the deprecated fetch name and emits its existing warning', async () => {
@@ -269,6 +293,8 @@ describe('runBootPreflight', () => {
   });
 
   it('refuses a worker with no key before any database-backed check', async () => {
+    process.env.RI_APP_URL = 'https://ri.example.com';
+
     await expect(runBootPreflight('worker', createLogger())).rejects.toMatchObject({
       code: 'worker.encryption-key-missing',
       message: expect.stringContaining('DATA_ENCRYPTION_KEY'),
@@ -324,6 +350,28 @@ describe('runBootPreflight', () => {
         process.env.RI_APP_URL = 'not a url';
       },
       message: 'RI_APP_URL is not a valid http(s) URL.',
+    },
+    {
+      name: 'resolveAppUrl for a worker with no RI_APP_URL',
+      role: 'worker' as const,
+      setup: () => {
+        // Regression: a worker without the base URL fails every batch item
+        // that publishes with the default verification link.
+        process.env.DATA_ENCRYPTION_KEY = KEY;
+      },
+      message: "RI_APP_URL is required. Set it to this deployment's public base URL, e.g. https://ri.example.com",
+    },
+    {
+      name: 'multi-purpose default rule for worker',
+      role: 'worker' as const,
+      setup: () => {
+        // Regression: issuance takes the default as it is, so a worker that
+        // skipped this rule would mint two status entries per item.
+        setWorkerEnvironment();
+        process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES = 'revocation,suspension';
+      },
+      message:
+        'CREDENTIAL_STATUS_DEFAULT_PURPOSES names more than one purpose, but CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED is false.',
     },
     {
       name: 'validateHttpUserAgentOnBoot',
@@ -589,6 +637,38 @@ describe('runBootPreflight', () => {
     await expect(runBootPreflight('web', logger)).resolves.toMatchObject({ key: KEY });
     expect(getWarn(logger)).toHaveBeenCalledTimes(1);
     expect(getWarn(logger)).toHaveBeenCalledWith(warning);
+  });
+
+  it('warns a worker about a no-status default and still boots', async () => {
+    // The worker issues batch items with this default, so it tells the
+    // operator the same consequence the web does instead of acting silently.
+    setWorkerEnvironment();
+    process.env.CREDENTIAL_STATUS_DEFAULT_PURPOSES = 'none';
+    const logger = createLogger();
+
+    await expect(runBootPreflight('worker', logger)).resolves.toMatchObject({ key: KEY });
+    expect(getWarn(logger).mock.calls).toEqual([
+      [
+        'CREDENTIAL_STATUS_DEFAULT_PURPOSES=none: credentials issued without an explicit statusPurposes carry no status entry and can never be revoked or suspended.',
+      ],
+    ]);
+  });
+
+  it('boots a worker given the legacy-fetch override values, with one rename warning', async () => {
+    // docker-compose.e2e-legacy-fetch.yml blanks the new name and sets the old
+    // one. Fails if a blank new name stops counting as unset, which would turn
+    // this pair into a conflict and stop the worker in that CI job.
+    setWorkerEnvironment();
+    process.env.FETCH_ALLOW_PRIVATE_URLS = '';
+    process.env.VERIFY_ALLOW_PRIVATE_URLS = 'true';
+    const logger = createLogger();
+
+    await expect(runBootPreflight('worker', logger)).resolves.toMatchObject({ key: KEY });
+    expect(getWarn(logger).mock.calls).toEqual([
+      [
+        'VERIFY_ALLOW_PRIVATE_URLS was renamed to FETCH_ALLOW_PRIVATE_URLS in v0.5 and will stop being read in v0.6. Rename VERIFY_ALLOW_PRIVATE_URLS to FETCH_ALLOW_PRIVATE_URLS, keeping its value, and restart.',
+      ],
+    ]);
   });
 
   it('keeps an unset CREDENTIAL_STATUS_LOCK_ACQUIRE_MS silent', async () => {

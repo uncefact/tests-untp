@@ -2,9 +2,10 @@
  * RI_APP_URL is the Reference Implementation's public base URL. It backs the
  * OIDC post-logout redirect and the default human verification link on
  * published credentials, and the identity-provider documentation lists it as
- * required. Validating it at process boot (instrumentation.node.ts) turns a
+ * required. The worker publishes batch items with the same link, so
+ * `runBootPreflight` validates it in both the web and worker roles, turning a
  * misconfigured deployment into a failed container start instead of a
- * runtime failure on the first logout or publish (#823).
+ * runtime failure on the first logout or publish (#823, #1093).
  */
 
 /**

@@ -1,5 +1,4 @@
 import { SUPPORTED_STATUS_PURPOSES, type SupportedStatusPurpose } from '@/lib/credentials/status-purposes';
-import type { LoggerService } from '@uncefact/untp-ri-services/logging';
 
 const CREDENTIAL_STATUS_DEFAULT_PURPOSES = ['revocation'] as const;
 const CREDENTIAL_STATUS_DEFAULT_PURPOSES_ENV_NAME = 'CREDENTIAL_STATUS_DEFAULT_PURPOSES';
@@ -88,15 +87,29 @@ export function readStatusLockAcquireMs(
 /** Validates status-related deployment settings during web boot. */
 export function validateStatusSettingsOnBoot(
   env: Record<string, string | undefined> = process.env,
-  logger?: Pick<LoggerService, 'warn'>,
+  logger?: { warn(message: string): void },
 ): void {
   const enabled = env.CREDENTIAL_STATUS_MUTATION_ENABLED;
   if (enabled !== undefined && enabled !== '' && enabled !== 'true' && enabled !== 'false') {
     throw new Error('CREDENTIAL_STATUS_MUTATION_ENABLED must be true or false.');
   }
-  const multiplePurposesEnabled = readStatusMultiplePurposesEnabled(env);
   readStatusOperationBudgetMs(env);
   readStatusReconcileGraceMs(env);
+  validateStatusIssuanceSettingsOnBoot(env, logger);
+}
+
+/**
+ * Validates the status settings credential issuance reads. Both roles run it:
+ * the web issues single credentials and the worker issues batch items through
+ * the same code. It is the only check of the rule that a multi-purpose default
+ * needs `CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED=true`, because issuance
+ * takes the default as it is.
+ */
+export function validateStatusIssuanceSettingsOnBoot(
+  env: Record<string, string | undefined> = process.env,
+  logger?: { warn(message: string): void },
+): void {
+  const multiplePurposesEnabled = readStatusMultiplePurposesEnabled(env);
   const purposes = readDefaultStatusPurposes(env);
   if (!multiplePurposesEnabled && purposes.length > 1) {
     throw new Error(

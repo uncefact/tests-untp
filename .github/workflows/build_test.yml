@@ -131,6 +131,13 @@ jobs:
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
+      # Reads the Compose files at the repository root, which the changed-files
+      # filter below does not map to this package, so it runs on every PR.
+      - name: Check the worker's Compose environment matches the web's
+        if: matrix.package == 'untp-reference-implementation'
+        working-directory: packages/reference-implementation
+        run: npx jest --maxWorkers=1 src/boot/compose-worker-environment.test.ts
+
       - name: Build ${{ matrix.package }} (and affected deps)
         run: pnpm turbo run build --filter='${{ matrix.package }}...[origin/next]'
 
@@ -318,10 +325,12 @@ jobs:
             --input-type=module -e "await import('/app/src/worker/bootstrap.ts'); console.log('worker bootstrap imports cleanly')"
           # The worker runs the shared configuration preflight before its
           # database-target check, so give it the placeholder key a local
-          # deployment may use; the check under test is the one after it.
+          # deployment may use and the base URL the preflight requires; the
+          # check under test is the one after it.
           out=$(docker run --rm --entrypoint node \
             -e DATA_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000 \
             -e DEPLOYMENT_ENVIRONMENT=local \
+            -e RI_APP_URL=http://localhost:3003 \
             app:e2e --import tsx src/worker/main.ts 2>&1 || true)
           echo "$out" | grep -q 'jobs.database-url-missing' || { echo "::error::worker entrypoint did not reach the database-target check"; echo "$out"; exit 1; }
           echo "$out" | grep -q 'version unresolved' && { echo "::error::worker could not resolve its package version in the image"; echo "$out"; exit 1; }

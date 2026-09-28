@@ -3,6 +3,7 @@ import {
   readFetchMaxResponseSize,
   readFetchTimeoutMs,
   readFetchAllowPrivateUrlsIfSet,
+  validateFetchAllowPrivateUrlsOnBoot,
   validateFetchSettingsOnBoot,
 } from './credential-fetch.config';
 
@@ -194,6 +195,65 @@ describe('validateFetchSettingsOnBoot', () => {
     validateFetchSettingsOnBoot(logger, env);
     validateFetchSettingsOnBoot(logger, env);
     expect(logger.warn).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('validateFetchAllowPrivateUrlsOnBoot', () => {
+  const logger = { warn: jest.fn() };
+
+  beforeEach(() => {
+    logger.warn.mockClear();
+  });
+
+  it.each([
+    ['nothing set', {}],
+    ['the new name', { FETCH_ALLOW_PRIVATE_URLS: 'true' }],
+    ['a value that keeps the protection on', { FETCH_ALLOW_PRIVATE_URLS: 'yes' }],
+  ])('accepts %s without a warning', (_label, env) => {
+    expect(() => validateFetchAllowPrivateUrlsOnBoot(logger, env)).not.toThrow();
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('refuses both names with the conflict issuance would throw, and warns nothing', () => {
+    // Fails if the worker's check stops refusing the pair issuance refuses, or
+    // refuses it in other words.
+    expect(() =>
+      validateFetchAllowPrivateUrlsOnBoot(logger, {
+        VERIFY_ALLOW_PRIVATE_URLS: 'false',
+        FETCH_ALLOW_PRIVATE_URLS: 'true',
+      }),
+    ).toThrow(
+      'VERIFY_ALLOW_PRIVATE_URLS and FETCH_ALLOW_PRIVATE_URLS are both set. VERIFY_ALLOW_PRIVATE_URLS was renamed to FETCH_ALLOW_PRIVATE_URLS in v0.5. Set FETCH_ALLOW_PRIVATE_URLS to the value you intend, remove VERIFY_ALLOW_PRIVATE_URLS, and restart.',
+    );
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("warns once, in the web check's words, when only the old name is set", () => {
+    // Fails if the two checks' wording diverges: the web check's output for
+    // the same input is the expected value.
+    const env = { VERIFY_ALLOW_PRIVATE_URLS: 'true' };
+    const webLogger = { warn: jest.fn() };
+    validateFetchSettingsOnBoot(webLogger, env);
+
+    validateFetchAllowPrivateUrlsOnBoot(logger, env);
+
+    expect(logger.warn.mock.calls).toEqual([
+      [
+        'VERIFY_ALLOW_PRIVATE_URLS was renamed to FETCH_ALLOW_PRIVATE_URLS in v0.5 and will stop being read in v0.6. Rename VERIFY_ALLOW_PRIVATE_URLS to FETCH_ALLOW_PRIVATE_URLS, keeping its value, and restart.',
+      ],
+    ]);
+    expect(logger.warn.mock.calls).toEqual(webLogger.warn.mock.calls);
+  });
+
+  it('ignores the size and timeout pairs, including an invalid value and a both-names pair', () => {
+    expect(() =>
+      validateFetchAllowPrivateUrlsOnBoot(logger, {
+        VERIFY_MAX_CREDENTIAL_SIZE: '2048',
+        FETCH_MAX_RESPONSE_SIZE: '4096',
+        VERIFY_FETCH_TIMEOUT_MS: '1.5',
+      }),
+    ).not.toThrow();
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });
 

@@ -71,6 +71,7 @@ const OPTIONS = { sdk: { shutdown: async () => undefined }, migrationsDir: '/unu
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.DATA_ENCRYPTION_KEY = 'a'.repeat(64);
+  process.env.RI_APP_URL = 'https://ri.example.com';
   delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_CRON;
   delete process.env.LIBRARY_RECONCILE_PENDING_RUNS_BATCH_SIZE;
   delete process.env.BATCH_EXPIRY_SWEEP_MINUTES;
