@@ -108,4 +108,6 @@ Before you upgrade the worker, give it these settings:
 
 The worker reads each of these settings when it issues an item. So setting them on a v0.6.0 worker already fixes batch items, and you can do that before the upgrade.
 
+The same upgrade changes one bound on the web process. A key-bearing recovery on `POST /api/v1/library/{id}/verify` reads the record's stored copy inside the request, and that read is now bounded by `FETCH_TIMEOUT_MS` instead of `WORKER_JOB_TIMEOUT_SECONDS`. The default falls from 300 seconds to 10 seconds, with a ceiling of 120 seconds. A read that overruns settles the generation as `STORED_COPY_UNAVAILABLE`, retryable. If your storage needs longer, raise `FETCH_TIMEOUT_MS`. That also lengthens the supplier fetches on the verify, registration and re-verification routes.
+
 The status operation settings stay on the web process only, as described under [Credential-status management and library lifecycle](#credential-status-management-and-library-lifecycle).

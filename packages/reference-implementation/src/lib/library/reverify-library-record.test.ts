@@ -111,6 +111,7 @@ import {
 } from '@/lib/library/register-external-credential';
 import {
   DecryptionRequiredError,
+  defaultReverifyLibraryRecordDependencies,
   reverifyLibraryRecord,
   type EnqueueVerification,
   type PrepareEnqueue,
@@ -2473,5 +2474,31 @@ describe('a successful key-bearing recovery removes the copy it retired', () => 
     expect(mockResolveStorageService).not.toHaveBeenCalled();
     expect(mockStorageDelete).not.toHaveBeenCalled();
     expect(logLines.map((line) => line.message)).not.toContain('Retired recovery copy removed');
+  });
+});
+
+describe("the bound on a key-bearing recovery's stored-copy read", () => {
+  const TIMEOUT_NAMES = ['FETCH_TIMEOUT_MS', 'VERIFY_FETCH_TIMEOUT_MS', 'WORKER_JOB_TIMEOUT_SECONDS'] as const;
+  const savedEnvironment = Object.fromEntries(TIMEOUT_NAMES.map((name) => [name, process.env[name]]));
+
+  beforeEach(() => {
+    for (const name of TIMEOUT_NAMES) delete process.env[name];
+  });
+
+  afterEach(() => {
+    for (const name of TIMEOUT_NAMES) {
+      const value = savedEnvironment[name];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+
+  it('defaults to the fetch timeout, not the worker job budget', () => {
+    // The read holds a web request open, so it takes the route's fetch bound.
+    // Fails if the default reads the worker's job budget, which answers 600000.
+    process.env.FETCH_TIMEOUT_MS = '4321';
+    process.env.WORKER_JOB_TIMEOUT_SECONDS = '600';
+
+    expect(defaultReverifyLibraryRecordDependencies().storedCopyTimeoutMs?.()).toBe(4_321);
   });
 });

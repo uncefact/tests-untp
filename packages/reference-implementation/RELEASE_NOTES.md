@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-This patch gives the worker the issuance settings the web process has, so a batch item is issued as the same request on the single route would be. An upgraded worker refuses to start without `RI_APP_URL`. Before you upgrade, give every worker the web process's values of the five settings below, and upgrade it when no batch is running. Read [Upgrading from v0.6.0](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.6#upgrading-from-v060) before upgrading.
+This patch gives the worker the issuance settings the web process has, so a batch item is issued as the same request on the single route would be. An upgraded worker refuses to start without `RI_APP_URL`. Before you upgrade, give every worker the web process's values of the five settings below, and upgrade it when no batch is running. The patch also bounds the key-bearing recovery's stored-copy read by `FETCH_TIMEOUT_MS`. Read [Upgrading from v0.6.0](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.6#upgrading-from-v060) before upgrading.
 
 ### Batch items use the web process's issuance settings
 
@@ -15,6 +15,10 @@ If you override `RI_APP_URL`, the private-URL setting or a status issuance setti
 Upgrade the worker, or change its settings, when no batch is running. A worker restart during a batch can leave the item in flight `OUTCOME_UNKNOWN`, so the batch ends `NEEDS_ATTENTION` and needs an operator. The batch's remaining items can also wait for the reconciliation sweep, which picks a batch up once its last progress is older than twice `WORKER_JOB_TIMEOUT_SECONDS`. A batch that continues after the restart issues its later items with the worker's new settings. With `CREDENTIAL_STATUS_DEFAULT_PURPOSES=none`, a later item that does not ask for `statusPurposes` carries no status entry. Items that already ended `FAILED` are not issued again.
 
 Before you upgrade, give every worker the web process's `RI_APP_URL`, and copy the web process's effective values of `FETCH_ALLOW_PRIVATE_URLS`, `CREDENTIAL_STATUS_DEFAULT_PURPOSES`, `CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED` and `CREDENTIAL_STATUS_LOCK_ACQUIRE_MS` onto it. Where the web process leaves one of them unset, leave it unset on the worker too. Set only one private-URL name, preferably `FETCH_ALLOW_PRIVATE_URLS`. An upgraded worker refuses to boot when both `FETCH_ALLOW_PRIVATE_URLS` and `VERIFY_ALLOW_PRIVATE_URLS` are set, even with equal values. An upgraded worker without `RI_APP_URL` exits at boot, and Compose's `restart: always` keeps restarting it. Until the value is set, every worker job waits: batch issuance, library verification, the reconciliation sweeps and batch expiry. A library verification that is still pending when the worker returns, and was queued longer ago than the pending-run reconciliation cutoff (60 minutes by default), is then settled as failed with `VERIFICATION_UNAVAILABLE`, retryable, so its caller must re-verify it. The worker reads these settings when it issues each item, so setting them on a v0.6.0 worker already fixes batch items before you upgrade.
+
+### Key-bearing recovery bounds its stored-copy read by `FETCH_TIMEOUT_MS`
+
+`POST /api/v1/library/{id}/verify` with a decryption key reads the record's stored copy from storage inside the request. That read is now bounded by `FETCH_TIMEOUT_MS`, the same bound as the route's read from the supplier's URL, instead of the worker's `WORKER_JOB_TIMEOUT_SECONDS`. The default falls from 300 seconds to 10 seconds, and the ceiling is 120 seconds. A read that overruns settles the generation as `STORED_COPY_UNAVAILABLE`, retryable. If your storage needs longer, raise `FETCH_TIMEOUT_MS` on the web process. That also lengthens the supplier fetches on the verify, registration and re-verification routes. `WORKER_JOB_TIMEOUT_SECONDS` now applies only to worker jobs.
 
 ## 0.6.0 - 2026-09-21
 
