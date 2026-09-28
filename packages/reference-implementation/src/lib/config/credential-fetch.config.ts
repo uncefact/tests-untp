@@ -7,7 +7,10 @@
  * on the registrar, identifier-link, data-model, service and credential
  * publishing routes, and it is the one setting of the three the worker reads:
  * a batch item runs the credential issuance code, which checks the item's
- * verification URLs with it. None of them applies to context or schema
+ * verification URLs with it. The time budget also bounds the key-bearing
+ * recovery's in-request read of a library record's own stored copy
+ * (`reverify-library-record.ts`), because that read holds a web request open
+ * just as the supplier read does. None of them applies to context or schema
  * fetches, or to the worker's stored-copy read.
  *
  * Each setting has a new `FETCH_` name and its RI v0.4 `VERIFY_` name. The old
@@ -102,11 +105,14 @@ export function readFetchMaxResponseSize(env: Record<string, string | undefined>
 
 /**
  * The whole-fetch time budget in milliseconds, covering the wait for DNS,
- * connect, redirects and body. Unlike the size, an unusable value throws: a public route holds a
- * request open for the whole budget, so silently running on the default when
- * the operator asked for something else is a difference they need to be told
- * about. The throw is surfaced at process boot (instrumentation.node.ts), and
- * the message names whichever of the two names was actually supplied.
+ * connect, redirects and body. It also bounds the key-bearing recovery's read
+ * of a record's own stored copy on the library verify route. The worker's
+ * stored-copy reads use its job budget instead. Unlike the size, an unusable
+ * value throws: a public route holds a request open for the whole budget, so
+ * silently running on the default when the operator asked for something else
+ * is a difference they need to be told about. The throw is surfaced at process
+ * boot (instrumentation.node.ts), and the message names whichever of the two
+ * names was actually supplied.
  */
 export function readFetchTimeoutMs(env: Record<string, string | undefined> = process.env): number {
   const resolved = resolveFetchSetting(env, FETCH_SETTING_PAIRS.timeoutMs);

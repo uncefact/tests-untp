@@ -52,7 +52,7 @@ import {
   type RegisterExternalCredentialInput,
 } from './register-external-credential';
 import { fetchStoredCopyBytes, StoredCopyReadError } from './verify-generation-job';
-import { readWorkerJobTimeoutSeconds } from '@/lib/config/worker-job-timeout.config';
+import { readFetchTimeoutMs } from '@/lib/config/credential-fetch.config';
 import { errorNameOf, removeStoredObject, storageCoordinatesForLog } from './remove-stored-object';
 import {
   DECRYPTION_REQUIRED_MESSAGE,
@@ -160,7 +160,12 @@ export type ReverifyLibraryRecordDependencies = {
    * through to the real `fetch`.
    */
   fetchStoredCopy: (uri: string, timeoutMs: number) => Promise<Uint8Array>;
-  /** The request-side bound for reading a record's own durable copy. */
+  /**
+   * The request-side bound for reading a record's own durable copy. It
+   * defaults to `FETCH_TIMEOUT_MS`, the same bound as the supplier read on
+   * this route, because the read holds the web request open. The worker's
+   * job budget does not apply here.
+   */
   storedCopyTimeoutMs?: () => number;
 };
 
@@ -172,7 +177,7 @@ export function defaultReverifyLibraryRecordDependencies(): ReverifyLibraryRecor
     reserveGeneration: reserveRecoveryGeneration,
     finaliseGeneration: finaliseRecoveryGeneration,
     fetchStoredCopy: fetchStoredCopyBytes,
-    storedCopyTimeoutMs: () => readWorkerJobTimeoutSeconds() * 1_000,
+    storedCopyTimeoutMs: readFetchTimeoutMs,
   };
 }
 
@@ -695,7 +700,7 @@ async function recoverExternalRecord(
         reservedCustody,
         reservedCustody.storageUri,
         deps.fetchStoredCopy,
-        deps.storedCopyTimeoutMs?.() ?? readWorkerJobTimeoutSeconds() * 1_000,
+        deps.storedCopyTimeoutMs?.() ?? readFetchTimeoutMs(),
         earned,
       );
       prepared =
