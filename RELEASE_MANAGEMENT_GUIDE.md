@@ -49,6 +49,8 @@ We follow Semantic Versioning (SemVer) for our version strategy, which uses the 
 - **MINOR** version increments when adding functionality in a backward-compatible manner.
 - **PATCH** version increments when making backward-compatible bug fixes.
 
+While a package is at major version 0, a patch release may also require a new deployment setting when that is how it fixes a defect, as long as it changes no API, schema or database migration. The release notes must open with the change and say what an upgraded deployment without the setting does. For example, reference implementation v0.6.1 requires `RI_APP_URL` on the worker, because a worker without it failed every batch item published without a `humanVerificationUrl`.
+
 Additional labels for pre-release and build metadata are available as extensions to the **MAJOR.MINOR.PATCH** format. [Reference link](https://semver.org/#semantic-versioning-specification-semver)
 **Example**: 1.0.0-alpha < 1.0.0-alpha.1 < 1.0.0-alpha.beta < 1.0.0-beta < 1.0.0-beta.2 < 1.0.0-beta.11 < 1.0.0-rc.1 < 1.0.0.
 
@@ -84,6 +86,8 @@ Repository updates and API documentation updates must be released simultaneously
 **MINOR** version will be changed when the documentation is updated. In some cases, the documentation is not updated, but the code is updated. For example, when a new feature like management of a new type of resource is added, the documentation is not updated, but the code is updated.
 
 **PATCH** version will be changed when the documentation is updated. It does not mean the code version is updated.
+
+For the reference implementation documentation, the following replaces the MINOR and PATCH rules above. A patch release does not cut a new documentation version. It keeps `docVersion` at the current minor and makes that minor's snapshot in `documentation/versioned_docs/` an exact copy of `documentation/docs`, removing any page that `documentation/docs` no longer has (for example `rsync -a --checksum --delete documentation/docs/ documentation/versioned_docs/version-X.Y.0/`). `diff -rq documentation/docs documentation/versioned_docs/version-X.Y.0` then prints nothing. `documentation/versions.json` and the versioned sidebars stay unchanged, as ADR-012 describes. A minor or major release cuts a new version with `pnpm release:doc`.
 
 ---
 
@@ -139,7 +143,7 @@ The version.json file serves as a central metadata file to define the versioning
    ```bash
    pnpm generate-version-mapping
    ```
-8. Generate the documentation for the new version using the release script:
+8. For a patch release, update the current minor's snapshot in place instead of running this step (see [Documentation Versioning](#documentation-versioning)). For a minor or major release, generate the documentation for the new version using the release script:
    ```bash
    # Run the release script
    pnpm release:doc

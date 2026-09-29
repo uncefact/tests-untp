@@ -2,6 +2,7 @@
 
 - **Date:** 2026-05-12
 - **Status:** accepted
+- **Update (2026-09-30):** while the reference implementation is at major version 0, a patch release may require a new deployment setting when that is how it fixes a defect (see Versioning Strategy in `RELEASE_MANAGEMENT_GUIDE.md`; first used for v0.6.1). A rolling `:X.Y` tag would then carry that change. For a release tag, `docker-ri.yml` currently publishes only `:X.Y.Z` and `:latest`.
 - **Update (2026-05-13):** `docker-ri.yml` and `docker-playground.yml` currently trigger on `push: branches: next` with path filters, not on semver tags. The semver-tag-trigger design described in PR #611 is proposed but not yet merged. The pnpm migration on this branch rewrote both Dockerfiles internally without changing image names or tag formats; the decisions in this ADR are unchanged.
 
 ## Context
