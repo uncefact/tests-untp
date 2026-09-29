@@ -60,15 +60,18 @@ The Docker Compose stack starts the following services. Each is an independent c
 docker compose down
 ```
 
-To remove all data and start fresh:
-
-```bash
-docker compose down -v
-```
+To remove all data and start fresh, remove the named volumes and the object store's data. The object store keeps its data in `./minio_data` on the host, which `docker compose down -v` does not remove. On a native Linux Docker engine those files belong to root, so use `sudo rm -rf ./minio_data` there.
 
 :::warning
 The `-v` flag removes all named volumes. This deletes all database data and forces Keycloak to re-import its realm configuration on the next start. Only use this when you need a clean slate.
 :::
+
+```bash
+docker compose down -v
+rm -rf ./minio_data
+```
+
+An older checkout whose Compose file uses the `quay.io/minio/minio` image cannot read object store data that the current image has written. To go back to such a checkout, restore a copy of `./minio_data` taken before you upgraded, or remove the directory as above.
 
 To reset a specific service's data without affecting others, remove its volume individually. For example, to reset Keycloak so it re-imports the latest realm configuration:
 
