@@ -3,6 +3,7 @@
 - **Date:** 2026-05-12
 - **Status:** proposed
 - **Update (2026-08-20):** the playground instance is now in force, built with #811 and recorded in [ADR-048](./048-playground-docs-are-an-independent-docs-instance.md); the reference-implementation docs remain in the original instance and the test-suite and guides instances remain proposed.
+- **Update (2026-09-30):** the reference-implementation docs now follow this ADR's patch rule. Reference implementation v0.6.1 updated the `version-0.6.0` snapshot in place and kept `docVersion` at 0.6.0, so the 0.6.0 docs describe the maintained 0.6 line rather than only the 0.6.0 image. The multi-instance split remains proposed for the reference implementation.
 
 ## Context
 
