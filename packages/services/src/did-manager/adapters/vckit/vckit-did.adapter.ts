@@ -102,17 +102,22 @@ export class VCKitDidAdapter implements IDidService {
 
       if (!response.ok) {
         const bodyText = await response.text().catch(() => '');
+
+        // VCKit returns 500 with "already exists" for duplicate DIDs instead of 409.
+        // Throw a specific DidConflictError so callers don't need to inspect HTTP status codes.
+        // Logged at debug: callers expect it and report it.
+        if (bodyText.toLowerCase().includes('already exists')) {
+          this.logger.debug(
+            { status: response.status, alias: resolvedAlias, body: bodyText },
+            'DID already exists at the provider',
+          );
+          throw new DidConflictError(resolvedAlias);
+        }
+
         this.logger.error(
           { status: response.status, statusText: response.statusText, body: bodyText },
           'Failed to create DID',
         );
-
-        // VCKit returns 500 with "already exists" for duplicate DIDs instead of 409.
-        // Throw a specific DidConflictError so callers don't need to inspect HTTP status codes.
-        if (bodyText.toLowerCase().includes('already exists')) {
-          throw new DidConflictError(resolvedAlias);
-        }
-
         throw new DidCreateError(`HTTP ${response.status}: ${response.statusText}`, response.status);
       }
 

@@ -168,41 +168,65 @@ describe('VCKitDidAdapter', () => {
       ).rejects.toThrow(DidCreateError);
     });
 
-    it('throws DidConflictError when upstream returns "already exists"', async () => {
-      const alreadyExistsBody =
-        '{"error":"illegal_argument: Identifier with alias: localhost:3332:test-org, provider: did:web already exists: did:web:localhost:3332:test-org"}';
-      const mockResponse = {
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: jest.fn().mockResolvedValue({}),
-        text: jest.fn().mockResolvedValue(alreadyExistsBody),
-      } as unknown as Response;
-      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+    describe('non-OK responses', () => {
+      // The adapter built in the outer beforeEach has no injected logger, so
+      // these cases build their own to observe the log level each outcome uses.
+      const createLoggedService = () => {
+        const errorLog = jest.fn();
+        const debugLog = jest.fn();
+        const logger: LoggerService = {
+          info: jest.fn(),
+          warn: jest.fn(),
+          error: errorLog,
+          debug: debugLog,
+          child: jest.fn().mockReturnThis(),
+        };
+        return { errorLog, debugLog, loggedService: new VCKitDidAdapter(BASE_URL, HEADERS, 'Ed25519', logger) };
+      };
 
-      await expect(
-        service.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' }),
-      ).rejects.toThrow(DidConflictError);
-    });
+      const conflictDebugCalls = (debugLog: jest.Mock) =>
+        debugLog.mock.calls.filter(([, message]) => message === 'DID already exists at the provider');
 
-    it('throws DidCreateError for non-duplicate 500 errors', async () => {
-      const genericBody = '{"error":"something went wrong"}';
-      const mockResponse = {
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        json: jest.fn().mockResolvedValue({}),
-        text: jest.fn().mockResolvedValue(genericBody),
-      } as unknown as Response;
-      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+      it('logs an "already exists" conflict at debug, not error, and throws DidConflictError', async () => {
+        // The body VCKit returns when its entrypoint has already imported the system DID.
+        const alreadyExists = {
+          error:
+            'illegal_argument: Identifier with alias: uncefact.github.io:project-vckit:test-and-development, provider: did:web already exists: did:web:uncefact.github.io:project-vckit:test-and-development',
+        };
+        (global.fetch as jest.Mock).mockResolvedValue(createMockResponse(alreadyExists, false, 500));
+        const { errorLog, debugLog, loggedService } = createLoggedService();
 
-      const error = await service
-        .create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' })
-        .catch((e) => e);
+        await expect(
+          loggedService.create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' }),
+        ).rejects.toThrow(DidConflictError);
 
-      expect(error).toBeInstanceOf(DidCreateError);
-      expect(error).not.toBeInstanceOf(DidConflictError);
-      expect((error.context as { httpStatus?: number }).httpStatus).toBe(500);
+        expect(errorLog).not.toHaveBeenCalled();
+        expect(conflictDebugCalls(debugLog)).toEqual([
+          [
+            { status: 500, alias: 'localhost%3A3332:test-org', body: JSON.stringify(alreadyExists) },
+            'DID already exists at the provider',
+          ],
+        ]);
+      });
+
+      it('logs any other 500 at error and throws DidCreateError', async () => {
+        const generic = { error: 'internal error' };
+        (global.fetch as jest.Mock).mockResolvedValue(createMockResponse(generic, false, 500));
+        const { errorLog, debugLog, loggedService } = createLoggedService();
+
+        const error = await loggedService
+          .create({ type: DidType.MANAGED, method: DidMethod.DID_WEB, alias: 'test-org' })
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(DidCreateError);
+        expect(error).not.toBeInstanceOf(DidConflictError);
+        expect((error.context as { httpStatus?: number }).httpStatus).toBe(500);
+        expect(errorLog).toHaveBeenCalledWith(
+          { status: 500, statusText: 'Error', body: JSON.stringify(generic) },
+          'Failed to create DID',
+        );
+        expect(conflictDebugCalls(debugLog)).toEqual([]);
+      });
     });
 
     it('throws DidCreateError for network errors', async () => {
