@@ -7,7 +7,7 @@ import Disclaimer from '.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-This guide covers upgrading a Reference Implementation deployment from v0.5 to v0.6. A deployment already running v0.6.0 needs only [Upgrading from v0.6.0](#upgrading-from-v060).
+This guide covers upgrading a Reference Implementation deployment from v0.5 to v0.6. A deployment already running v0.6.0 needs [Upgrading from v0.6.0](#upgrading-from-v060) and then [Upgrading from v0.6.1](#upgrading-from-v061). One already running v0.6.1 needs only [Upgrading from v0.6.1](#upgrading-from-v061).
 
 :::warning[Before you upgrade]
 Back up the Reference Implementation database before deploying v0.6. The
@@ -113,3 +113,13 @@ The worker reads each of these settings when it issues an item. So setting them 
 The same upgrade changes one bound on the web process. A key-bearing recovery on `POST /api/v1/library/{id}/verify` reads the record's stored copy inside the request, and that read is now bounded by `FETCH_TIMEOUT_MS` instead of `WORKER_JOB_TIMEOUT_SECONDS`. The default falls from 300 seconds to 10 seconds, with a ceiling of 120 seconds. A read that overruns settles the generation as `STORED_COPY_UNAVAILABLE`, retryable. If your storage needs longer, raise `FETCH_TIMEOUT_MS`. That also lengthens the supplier fetches on the verify, registration and re-verification routes.
 
 The status operation settings stay on the web process only, as described under [Credential-status management and library lifecycle](#credential-status-management-and-library-lifecycle).
+
+## Upgrading from v0.6.1
+
+v0.6.2 changes no setting, database migration or Compose file. When no batch is running, deploy the v0.6.2 image, or rebuild the bundled Compose stack, and restart the web process and every worker. [Upgrading from v0.6.0](#upgrading-from-v060) explains what a worker restart during a batch does.
+
+The worker no longer traces the job queue's background database calls, which normally run with no span active: polling, fetching and settling jobs, maintenance, creating its queues when the worker starts, and its keep-alive and health-probe queries. In v0.6.1 each of those calls became its own root `pg` trace. Review any dashboard or alert built on those traces or on their error status. Queue faults still log "Job queue reported an error". pg calls made inside a job are still traced.
+
+If your collector receives the Reference Implementation's OTLP metrics, the query-duration samples for those background calls stop, and the pool connection-count gauges start on the first job queue call made inside a span. Review any monitoring built on them. The bundled Compose stack does not receive metrics.
+
+No setting traces the background calls again. If you set `OTEL_NODE_DISABLED_INSTRUMENTATIONS=pg` on the worker to stop the v0.6.1 flood, you can remove it to get the pg spans inside jobs back. The [release notes](https://github.com/uncefact/tests-untp/blob/next/packages/reference-implementation/RELEASE_NOTES.md) list every change in v0.6.2, and [Observability](../reference-implementation/operations/observability#what-is-emitted) describes what each process emits.
