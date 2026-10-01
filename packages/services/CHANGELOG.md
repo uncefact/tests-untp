@@ -90,3 +90,7 @@ version numbers follow semantic versioning. The package ships via the
   automatic request-context registration side effect. Consumers should delete
   the call and pass `traceContextProvider` through `createLogger` when trace
   fields are required.
+
+### Fixed
+
+- **did-manager:** the VCKit DID adapter logs a provider "already exists" conflict at debug, not error, before throwing `DidConflictError`. Other creation failures still log at error.
