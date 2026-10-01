@@ -14,6 +14,11 @@
  * (`traceContextProvider` on the services logger), so there is one
  * enrichment mechanism and one field naming.
  *
+ * `pg` runs with `requireParentSpan`, so it creates spans only while another
+ * span is active, such as a job's. The job queue (pg-boss) does its
+ * background work outside any span, where each call would otherwise be a
+ * root trace (see #1099).
+ *
  * Extracted from `instrumentation.node.ts` so the configuration can be
  * unit-tested without standing up the SDK, mirroring `resource.ts`.
  */
@@ -47,5 +52,11 @@ export function buildInstrumentations(
     // Pino auto-instrumentation as well would add a second set of fields.
     '@opentelemetry/instrumentation-pino': { enabled: false },
     '@opentelemetry/instrumentation-fs': { enabled: options.enableFsInstrumentation ?? false },
+    // After updating `@opentelemetry/auto-instrumentations-node`, which
+    // supplies the pg instrumentation, check that an idle worker emits no
+    // root `pg-pool.connect` traces. `enabled` is left unset on purpose: a
+    // programmatic `enabled` outranks OTEL_NODE_DISABLED_INSTRUMENTATIONS,
+    // so setting it would stop an operator from disabling pg.
+    '@opentelemetry/instrumentation-pg': { requireParentSpan: true },
   });
 }

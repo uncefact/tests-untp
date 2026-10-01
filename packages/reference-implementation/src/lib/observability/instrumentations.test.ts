@@ -14,21 +14,23 @@ describe('buildInstrumentations', () => {
     mockGetNodeAutoInstrumentations.mockClear();
   });
 
-  it('disables the fs instrumentation by default', () => {
+  it('builds the default config: fs and pino off, pg only inside a span', () => {
     buildInstrumentations();
 
     expect(mockGetNodeAutoInstrumentations).toHaveBeenCalledWith({
       '@opentelemetry/instrumentation-fs': { enabled: false },
       '@opentelemetry/instrumentation-pino': { enabled: false },
+      '@opentelemetry/instrumentation-pg': { requireParentSpan: true },
     });
   });
 
-  it('re-enables the fs instrumentation when explicitly requested', () => {
+  it('re-enables fs on request and keeps pg only inside a span', () => {
     buildInstrumentations({ enableFsInstrumentation: true });
 
     expect(mockGetNodeAutoInstrumentations).toHaveBeenCalledWith({
       '@opentelemetry/instrumentation-fs': { enabled: true },
       '@opentelemetry/instrumentation-pino': { enabled: false },
+      '@opentelemetry/instrumentation-pg': { requireParentSpan: true },
     });
   });
 

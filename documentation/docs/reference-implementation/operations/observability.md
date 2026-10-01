@@ -25,7 +25,18 @@ Every trace carries these resource attributes:
 
 The Node SDK uses `@opentelemetry/auto-instrumentations-node`, covering HTTP, `fetch` through undici, `pg` and other common libraries. Pino auto-instrumentation is disabled because the application logger's mixin supplies the log trace fields. Prisma spans are not emitted because Prisma instrumentation is not installed, and filesystem auto-instrumentation is off.
 
-Next.js spans appear only on the web process. The web process also emits HTTP, undici, DNS and network spans for its outbound fetches. The worker emits pg and undici spans. Neither process emits filesystem spans.
+Next.js spans appear only on the web process. The web process also emits HTTP, undici, DNS and network spans for its outbound fetches, and no pg spans, because its boot loads `pg` through the job queue before it starts the SDK. The worker emits a span for each job it runs, undici spans, and pg spans only for job queue calls made while a span is active, in practice inside a job. Neither process emits filesystem spans.
+
+In the worker, the job queue's own background work (polling, fetching and settling jobs, maintenance and the scheduler's own polls) and the health-probe query normally run with no span active, so they emit no pg spans. No setting traces them again. To turn pg spans off entirely, set `OTEL_NODE_DISABLED_INSTRUMENTATIONS=pg` in the worker's environment. The bundled Compose file does not pass that variable through, so add it to the `ri-worker` service.
+
+When this background work in the worker opens a new database connection, its `tcp.connect` and `dns.lookup` spans may still appear as traces of their own.
+
+Failures in this work reach the logs, not the trace store:
+
+- The job queue's error and warning events, in both the web process and the worker, are logged as "Job queue reported an error".
+- The worker's health probe logs "Health probe failed; the heartbeat is not refreshed" at warn.
+
+One case is not logged. If the write that records a job as completed fails and the job queue then records the job as failed, nothing is logged. The job is retried if it has attempts left.
 
 The web process and worker use the same exporter and resource attribute shape, but they are separate processes with separate service names. A dashboard filtered only to `reference-implementation` will not show worker spans.
 
