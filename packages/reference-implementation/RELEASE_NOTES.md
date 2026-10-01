@@ -1,5 +1,30 @@
 # UNTP Reference Implementation release notes
 
+## 0.6.2 - 2026-10-01
+
+This patch stops an idle worker from flooding the trace store with database spans. It also stops the seed logging an error for a DID that VCKit already holds, and makes `/api-docs` report the release version. It changes no setting, database migration or Compose file. Read [Upgrading from v0.6.1](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.6#upgrading-from-v061) before upgrading.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.6.2`, `:latest`)
+- Upgrading from v0.6.1: when no batch is running, deploy the 0.6.2 image, or rebuild the bundled Compose stack, and restart the web process and every worker. Review any dashboard or alert built on the worker's root `pg` traces, and any monitoring of its pg metrics.
+
+### The worker no longer traces the job queue's background database calls
+
+The pg instrumentation now creates spans only while another span is active. In v0.6.1 each of the job queue's background database calls became its own root `pg` trace: polling, fetching and settling jobs, maintenance, creating its queues when the worker starts, and its keep-alive and health-probe queries. With default settings, an idle worker emitted about 34 spans a second, or about 3 million a day. It now emits about 0.05 spans a second, mostly `tcp.connect` and `dns.lookup` spans when the job queue opens a new database connection, plus the scheduled jobs' own spans. These background calls normally run with no span active. Occasionally one waits for a connection that a job then releases, and it is traced under that job's span. pg calls made inside a job are still traced, such as the batch reconciliation job's queue lookup, a `pg.query:SELECT` span under `credentials.reconcile-batches`. The web process emitted no pg spans in v0.6.1 and still emits none.
+
+The standalone pg traces for that background work are gone, including the error status a database fault there used to leave. Queue faults still reach the logs as "Job queue reported an error", and a failing health probe logs "Health probe failed; the heartbeat is not refreshed" at warn. One case now leaves neither a trace nor a log. If the write that records a job as completed fails and the job queue then records the job as failed, nothing is logged. The job is retried if it has attempts left.
+
+If your collector receives the Reference Implementation's OTLP metrics, the query-duration samples for those background calls stop too. The pool connection-count gauges start on the first job queue call made inside a span. The bundled Compose stack does not receive metrics.
+
+No setting traces the background calls again. `OTEL_NODE_DISABLED_INSTRUMENTATIONS=pg` still turns pg spans off entirely. Set it in the worker's environment, because the bundled Compose file does not pass it through. If you set it to stop the v0.6.1 flood, you can remove it and get the pg spans inside jobs back.
+
+### The seed no longer logs an error for a DID VCKit already holds
+
+When VCKit answers a DID creation with "already exists", the VCKit DID adapter now logs the conflict at debug before throwing its conflict error. In v0.6.1 it first logged "Failed to create DID" at error. On a fresh bundled stack VCKit already holds the system DID when the seed runs, so the seed logged that error for a condition it then handled. The seed's own warning that the DID already exists in the VC service, and the 409 warning from `POST /api/v1/dids`, are unchanged. Other DID creation failures still log at error.
+
+### `/api-docs` reports the release version
+
+The OpenAPI document at `/api-docs` reported `info.version` as 0.2.0. It now reports the Reference Implementation's package version, 0.6.2 for this release, so it changes with every release.
+
 ## 0.6.1 - 2026-09-30
 
 This patch gives the worker the issuance settings the web process has, so a batch item is issued the way the same request is on the single route. It is a breaking change for worker deployments: an upgraded worker refuses to start without `RI_APP_URL`, which a v0.6.0 worker did not need to start. The patch also bounds the key-bearing recovery's stored-copy read by `FETCH_TIMEOUT_MS`, and moves the Compose files' Identity Resolver object store to an image that can still be pulled. Read [Upgrading from v0.6.0](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.6#upgrading-from-v060) before upgrading.

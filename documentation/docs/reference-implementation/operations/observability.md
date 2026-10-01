@@ -5,7 +5,7 @@ title: Observability
 
 # Observability
 
-The Reference Implementation and its background worker emit OpenTelemetry traces. This release sends traces through an OTLP gRPC exporter. Metrics and shipping logs to a log store are not included.
+The Reference Implementation and its background worker emit OpenTelemetry traces through an OTLP gRPC exporter. The OpenTelemetry SDK also starts its default OTLP metrics exporter, which sends over HTTP, but the bundled stack does not receive or store metrics. Shipping logs to a log store is not included.
 
 ## Configuration
 
@@ -92,4 +92,4 @@ An enqueued job carries the request's correlation id. Its worker job span is nam
 
 ## What is not included
 
-This release does not emit metrics and does not ship application logs to a log store. The local stack stores traces in Tempo only; it is not a complete metrics and logs backend.
+This release does not ship application logs to a log store. The local stack stores traces in Tempo only and receives no metrics, so it is not a complete metrics and logs backend.
