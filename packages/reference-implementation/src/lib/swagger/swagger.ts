@@ -8,6 +8,11 @@ import {
   UNAUTHORISED_EXAMPLES,
 } from './error-examples';
 
+// Reached only from the bundled `/api-docs` page. In the image this relative
+// path reaches the repository root's manifest from unbundled code, so that
+// code must use `readReferenceImplementationVersion` (`src/worker/version.ts`).
+import pkg from '../../../package.json';
+
 export const getApiDocs = async (): Promise<Record<string, unknown>> => {
   // Generate schemas from Zod definitions
   const generatedSchemas = generateOpenAPISchemas();
@@ -18,7 +23,7 @@ export const getApiDocs = async (): Promise<Record<string, unknown>> => {
       openapi: '3.0.0',
       info: {
         title: 'UNTP Reference Implementation API',
-        version: '0.2.0',
+        version: pkg.version,
         description: 'API for the UNTP Reference Implementation',
       },
       servers: [
