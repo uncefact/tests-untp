@@ -394,6 +394,28 @@ describe('POST /api/v1/credentials/batches', () => {
     expect(repository.createCredentialBatch).not.toHaveBeenCalled();
   });
 
+  it('refuses the whole batch when one item repeats a tag, naming that item and both positions', async () => {
+    // Regression: an invalid list on any item must stop the batch before
+    // anything is queued, and the pointer must name the item that carries it.
+    const response = await POST(
+      request(
+        {
+          items: [
+            { ...item, tags: ['a'] },
+            { ...item, tags: ['a', 'a'] },
+          ],
+        },
+        'tags-key-1',
+      ),
+      { tenantId: 'tenant-1' } as never,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('items[1].tags.1: must not repeat a tag; duplicates items[1].tags.0');
+    expect(repository.createCredentialBatch).not.toHaveBeenCalled();
+  });
+
   it('leaves a top-level batch schema failure at its top-level pointer', async () => {
     // Regression: applying item-pointer rewriting to a top-level failure would publish a false item location.
     const response = await POST(request({ items: [] }, 'key-1'), { tenantId: 'tenant-1' } as never);

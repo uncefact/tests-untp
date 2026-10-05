@@ -91,6 +91,8 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *                       origin: external
  *                       credential: { name: Example credential, credentialType: DPP, issuerName: Example issuer, issuerDid: did:web:issuer.example, subjectName: Example subject, subjectId: https://issuer.example/subject-1, validFrom: '2026-07-20T10:00:00Z', validUntil: null }
  *                       annotations: { annotationVersion: 1, displayName: Example credential, declaredCredentialType: DPP, dateReceived: '2026-07-30', notes: null }
+ *                       tags: [supplier-audit, battery-line]
+ *                       tagVersion: 2
  *                       organisationId: null
  *                       facilityId: null
  *                       productId: null
@@ -106,7 +108,7 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *                       detailsError: null
  *                       status: null
  *                       lifecycle: null
- *                       capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                       capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                       warnings: []
  *                       createdAt: '2026-07-30T09:00:00Z'
  *                       updatedAt: '2026-07-30T09:00:06Z'
@@ -114,6 +116,8 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *                       origin: native
  *                       credential: { name: Native example, credentialType: DCC, issuerName: Example issuer, issuerDid: did:web:issuer.example, subjectName: Native subject, subjectId: https://issuer.example/subject-2, validFrom: '2026-07-15T09:00:00Z', validUntil: null }
  *                       annotations: null
+ *                       tags: []
+ *                       tagVersion: 1
  *                       organisationId: null
  *                       facilityId: null
  *                       productId: null
@@ -129,7 +133,7 @@ const logger = apiLogger.child({ route: '/api/v1/library/batch-get' });
  *                       detailsError: null
  *                       status: { capture: PENDING, statusCaptureError: null, entries: [] }
  *                       lifecycle: unknown
- *                       capabilities: { deletable: true, annotatable: false, verifiable: true, statusManageable: false }
+ *                       capabilities: { deletable: true, annotatable: false, taggable: true, verifiable: true, statusManageable: false }
  *                       warnings: []
  *                       createdAt: '2026-07-15T09:00:00Z'
  *                       updatedAt: '2026-07-15T09:00:00Z'

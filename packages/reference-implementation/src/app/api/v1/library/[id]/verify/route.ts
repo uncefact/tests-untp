@@ -199,6 +199,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -214,7 +216,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -225,6 +227,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -240,7 +244,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -251,6 +255,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: native
  *                   credential: { name: Battery Pack DPP, credentialType: DPP, issuerName: Acme Battery Co, issuerDid: 'did:web:acme.example', subjectName: Battery Pack Model X, subjectId: 'https://acme.example/products/battery-x', validFrom: '2026-07-15T09:00:00.000Z', validUntil: '2029-07-15T09:00:00.000Z' }
  *                   annotations: null
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: clw0org4n1s4t10n00000001
  *                   facilityId: null
  *                   productId: clw0pr0duct000000000001a
@@ -266,7 +272,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: { capture: PENDING, statusCaptureError: null, entries: [] }
  *                   lifecycle: unknown
- *                   capabilities: { deletable: true, annotatable: false, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: false, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-07-15T09:00:00.000Z'
  *                   updatedAt: '2026-07-15T09:00:00.000Z'
@@ -277,6 +283,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -292,7 +300,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -303,6 +311,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: Recovered DPP, credentialType: DPP, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Battery Pack, subjectId: 'https://supplier.example/products/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recovered DPP from Supplier Ltd, declaredCredentialType: DPP, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -318,7 +328,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-07T11:04:00.000Z'
@@ -329,6 +339,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: Recovered DPP, credentialType: DPP, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Battery Pack, subjectId: 'https://supplier.example/products/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recovered DPP from Supplier Ltd, declaredCredentialType: DPP, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -344,7 +356,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: [{ code: DUPLICATE_CONTENT, message: 'The credential content matches record clw0ext3rn4lprotect000003.', relatedRecordId: clw0ext3rn4lprotect000003 }]
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-07T11:04:00.000Z'
@@ -355,6 +367,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -370,7 +384,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -381,6 +395,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -396,7 +412,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-09T09:12:00.000Z'
@@ -407,6 +423,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -422,7 +440,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: [{ code: DUPLICATE_CONTENT, message: 'The credential content matches record clw0ext3rn4lprotect000003.', relatedRecordId: clw0ext3rn4lprotect000003 }]
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-09T09:12:00.000Z'
@@ -433,6 +451,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: null, credentialType: null, issuerName: null, issuerDid: null, subjectName: null, subjectId: null, validFrom: null, validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -448,7 +468,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'
@@ -459,6 +479,8 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   origin: external
  *                   credential: { name: null, credentialType: null, issuerName: null, issuerDid: null, subjectName: null, subjectId: null, validFrom: null, validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -474,7 +496,7 @@ function responseFor(view: Awaited<ReturnType<typeof getLibraryRecordById>>): Cr
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:00.000Z'

@@ -422,6 +422,20 @@ describe('POST /api/v1/credentials', () => {
       expect(mockIssueCredential).not.toHaveBeenCalled();
     });
 
+    it('returns 400 naming the tag and the rule for a malformed tag, before any claim or issuance', async () => {
+      // Regression: an invalid list must be refused before the key is claimed
+      // or anything is signed, so nothing is issued under it.
+      const req = createFakeRequest(validBody({ tags: ['Bad'] }), { 'Idempotency-Key': 'tags-key-1' });
+      const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe('tags.0: must be lowercase letters and digits, with single hyphens between them');
+      expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+      expect(mockResolveDataModel).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    });
+
     it('accepts a private-use BCP 47 hreflang tag (x-default)', async () => {
       const req = createFakeRequest(validBody({ publishingOptions: { hreflang: ['en-AU', 'x-default'] } }));
       const res = await POST(req, AUTH_CONTEXT as unknown as Parameters<typeof POST>[1]);
@@ -922,6 +936,7 @@ describe('POST /api/v1/credentials', () => {
         vcService,
         storageService,
         storageOptions: {},
+        tags: [],
         onDispatch: expect.any(Function),
         bridge: stubBridge,
       });

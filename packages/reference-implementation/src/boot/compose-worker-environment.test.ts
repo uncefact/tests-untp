@@ -37,6 +37,7 @@ const CALLER_FETCH_SIZE = 'caps the body of a caller-supplied fetch, which only 
 const CALLER_FETCH_TIMEOUT = 'bounds a caller-supplied fetch or the key-bearing recovery read, both made on web routes';
 const STATUS_OPERATION = 'status reads, changes and reconciliation run on web routes; issuance does not read it';
 const REQUEST_BODY = 'limits a web request body';
+const TAG_LIMIT = 'web admission limit; the worker issues the request the web admitted and never reads it';
 const DATABASE_URL_SET =
   'both services set RI_DATABASE_URL, which Prisma reads and the queue prefers over the parts (app-job-queue.ts)';
 
@@ -109,6 +110,8 @@ const COMPOSE_FILES = [
         ].map((name) => [name, SEED]),
       ),
       API_MAX_BATCH_LIMIT: 'limits the ids accepted by the web library batch-get route',
+      API_MAX_TAGS_PER_RECORD: TAG_LIMIT,
+      API_MAX_TAG_LENGTH: TAG_LIMIT,
       MAX_REQUEST_BODY_BYTES: REQUEST_BODY,
       IDEMPOTENCY_STALE_CLAIM_MINUTES: 'Idempotency-Key claims are taken on web routes',
     },

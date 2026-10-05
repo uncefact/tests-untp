@@ -215,6 +215,9 @@ export type NativeCredentialFixture = {
   organisationId?: string | null;
   facilityId?: string | null;
   productId?: string | null;
+  /** Parent timestamps. When absent, both take the time of the insert. */
+  createdAt?: Date;
+  updatedAt?: Date;
   checkRun?: {
     generation?: number;
     state?: CheckRunState;
@@ -263,6 +266,8 @@ export async function insertNativeCredential(
         ...(fixture.detailsStatus !== undefined ? { detailsStatus: fixture.detailsStatus } : {}),
         detailsError: fixture.detailsError ?? null,
         ...(fixture.details ?? {}),
+        ...(fixture.createdAt !== undefined ? { createdAt: fixture.createdAt } : {}),
+        ...(fixture.updatedAt !== undefined ? { updatedAt: fixture.updatedAt } : {}),
       },
     });
     await tx.credential.create({

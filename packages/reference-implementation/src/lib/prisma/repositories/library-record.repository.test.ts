@@ -461,6 +461,28 @@ describe('buildLibraryListQuery', () => {
     expect(proofValues).toEqual([CheckResult.FAIL, CheckResult.PASS, CheckResult.FAIL, CheckResult.PASS]);
     expect(sql).not.toContain('n."temporal"');
   });
+
+  it('binds tag values as parameters of an overlap and a negated overlap inside the filtered set', () => {
+    const query = buildLibraryListQuery({
+      tenantId: 'tenant-1',
+      tag: ['audit-2026', 'supplier-a'],
+      excludeTag: ['cab-portal'],
+    });
+    const { sql, values } = query as unknown as { sql: string; values: unknown[] };
+
+    // Fails if a tag is spliced into the SQL text, if the inclusion stops
+    // being "any of" (`&&`), if the exclusion loses its NOT, or if either
+    // predicate moves out of `filtered`, where it would stop narrowing the
+    // total with the page.
+    expect(sql).toContain('r."tags" && ARRAY[?,?]::text[]');
+    expect(sql).toContain('NOT (r."tags" && ARRAY[?]::text[])');
+    expect(sql).not.toContain('audit-2026');
+    expect(sql).not.toContain('cab-portal');
+    expect(values).toEqual(expect.arrayContaining(['audit-2026', 'supplier-a', 'cab-portal']));
+    const filteredEnd = sql.indexOf('page AS (');
+    expect(sql.indexOf('r."tags" &&')).toBeLessThan(filteredEnd);
+    expect(sql.indexOf('NOT (r."tags" &&')).toBeLessThan(filteredEnd);
+  });
 });
 
 describe('updateLibraryRecordAnnotations', () => {

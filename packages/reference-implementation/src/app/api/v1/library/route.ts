@@ -127,7 +127,12 @@ function listResponse(
  *       `RECORD_UNREADABLE`. A failure does not remove other rows from the
  *       page, and `pagination.total` includes unreadable selected rows.
  *
- *       `type` is repeatable and uses the extracted core type when present,
+ *       `type`, `tag` and `excludeTag` are repeatable, and repeated values of
+ *       one parameter match any of them. Different parameters combine, so
+ *       `?tag=audit&excludeTag=cab-portal` returns records tagged `audit` and
+ *       not tagged `cab-portal`; a record carrying both is left out. Tag
+ *       filters run in the query, so `pagination.total` and `hasMore` count
+ *       only matching records. `type` uses the extracted core type when present,
  *       otherwise the external record's declared type. `issuer` compares an
  *       issuer name case-insensitively or a DID exactly. Association filters
  *       match native records only. The `issuedAt` sort and date bounds use
@@ -144,6 +149,24 @@ function listResponse(
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/CredentialType'
+ *         style: form
+ *         explode: true
+ *       - in: query
+ *         name: tag
+ *         description: Repeatable OR filter keeping records that carry any of these tags. Each value must be lowercase letters and digits with single hyphens between them; any other value, including one with a NUL character, is a 400 naming the parameter. Values are not held to the deployment's tag length limit, so a tag stored under a higher limit stays filterable. Pages are taken over the tags as they are at each request, so a tag edit between requests can move a record across a page boundary.
+ *         schema:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/LibraryTag'
+ *         style: form
+ *         explode: true
+ *       - in: query
+ *         name: excludeTag
+ *         description: Repeatable filter leaving out records that carry any of these tags. Exclusion wins over `tag`, so a record matching both is left out. An untagged record is never excluded. Values follow the same grammar as `tag`, with no length limit.
+ *         schema:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/LibraryTag'
  *         style: form
  *         explode: true
  *       - in: query
@@ -268,6 +291,8 @@ function listResponse(
  *                       origin: external
  *                       credential: { name: Cobalt Shipment DFR, credentialType: DFR, issuerName: Cobalt Traders Ltd, issuerDid: did:web:cobalt-traders.example, subjectName: Cobalt shipment CB-2201, subjectId: https://cobalt-traders.example/shipments/CB-2201, validFrom: '2026-07-20T10:00:00Z', validUntil: null }
  *                       annotations: { annotationVersion: 1, displayName: Cobalt shipment DFR, declaredCredentialType: DFR, dateReceived: '2026-07-30', notes: '' }
+ *                       tags: [audit-2026-q3, cab-portal]
+ *                       tagVersion: 2
  *                       organisationId: null
  *                       facilityId: null
  *                       productId: null
@@ -283,7 +308,7 @@ function listResponse(
  *                       detailsError: null
  *                       status: null
  *                       lifecycle: null
- *                       capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                       capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                       warnings: []
  *                       createdAt: '2026-07-30T09:00:00Z'
  *                       updatedAt: '2026-07-30T09:00:06Z'
@@ -291,6 +316,8 @@ function listResponse(
  *                       origin: native
  *                       credential: { name: Battery Pack DPP, credentialType: DPP, issuerName: Acme Battery Co, issuerDid: did:web:acme.example, subjectName: Battery Pack Model X, subjectId: https://acme.example/products/battery-x, validFrom: '2026-07-15T09:00:00Z', validUntil: '2029-07-15T09:00:00Z' }
  *                       annotations: null
+ *                       tags: []
+ *                       tagVersion: 1
  *                       organisationId: cjld2cyuq0001qzrmf1w70eq4
  *                       facilityId: cjld2cyuq0002qzrmf1w70eq5
  *                       productId: cjld2cyuq0003qzrmf1w70eq6
@@ -306,7 +333,7 @@ function listResponse(
  *                       detailsError: null
  *                       status: { capture: PENDING, statusCaptureError: null, entries: [] }
  *                       lifecycle: unknown
- *                       capabilities: { deletable: true, annotatable: false, verifiable: true, statusManageable: false }
+ *                       capabilities: { deletable: true, annotatable: false, taggable: true, verifiable: true, statusManageable: false }
  *                       warnings: []
  *                       createdAt: '2026-07-15T09:00:00Z'
  *                       updatedAt: '2026-07-15T09:00:00Z'
@@ -321,7 +348,7 @@ function listResponse(
  *                   failures:
  *                     - { id: damaged-record-1, code: RECORD_UNREADABLE, message: 'The library record exists and belongs to this tenant but could not be read. Quote record id "damaged-record-1" and the x-correlation-id response header when contacting support.' }
  *       400:
- *         description: Validation failure, including a reversed date range, PAGE_LIMIT_EXCEEDED, or FREE_TEXT_SEARCH_DEFERRED.
+ *         description: Validation failure, including a reversed date range, a `tag` or `excludeTag` value outside the tag grammar, PAGE_LIMIT_EXCEEDED, or FREE_TEXT_SEARCH_DEFERRED.
  *         content:
  *           application/json:
  *             schema:
@@ -346,7 +373,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     throw new ValidationError(FREE_TEXT_SEARCH_DEFERRED_MESSAGE, { code: 'FREE_TEXT_SEARCH_DEFERRED' });
   }
 
-  const query = parseQueryParams(url, listLibraryQuerySchema, { repeatable: ['type'] });
+  const query = parseQueryParams(url, listLibraryQuerySchema, { repeatable: ['type', 'tag', 'excludeTag'] });
   if (hasLibraryQueryNul(query)) {
     const empty: CollectionReadResult<CredentialRecordResponse> = { data: [], failures: [] };
     const response = listResponse(empty, 0, query.limit, query.offset);
@@ -361,6 +388,8 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
     const read = await listLibraryRecords({
       tenantId,
       type: query.type,
+      tag: query.tag,
+      excludeTag: query.excludeTag,
       origin: query.origin,
       organisationId: query.organisationId,
       facilityId: query.facilityId,
@@ -771,6 +800,7 @@ async function register(req: Request, tenantId: string): Promise<Response> {
             : {}),
           ...(body.annotations.notes !== undefined ? { notes: body.annotations.notes } : {}),
         },
+        ...(body.tags !== undefined ? { tags: body.tags } : {}),
         idempotencyClaimId: claimId,
       },
       defaultRegisterDependencies((sql, job) =>

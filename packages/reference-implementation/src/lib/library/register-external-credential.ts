@@ -86,6 +86,11 @@ export type AcquiredCredentialInput = {
 export type RegisterExternalCredentialInput = AcquiredCredentialInput & {
   /** A canonical WHATWG href the route has already validated as http(s) without userinfo. */
   sourceUrl: string;
+  /**
+   * The new record's tags, already admitted by the route. Only a registration
+   * applies them; a recovery updates a record that already has its own.
+   */
+  tags?: readonly string[];
 };
 
 /**
@@ -300,6 +305,7 @@ export async function registerExternalCredential(
       tenantId: input.tenantId,
       sourceUrl: input.sourceUrl,
       annotations: input.annotations,
+      ...(input.tags !== undefined ? { tags: input.tags } : {}),
       ...(input.idempotencyClaimId !== undefined ? { idempotencyClaimId: input.idempotencyClaimId } : {}),
       ...persisted,
       // The record's `sourceDigest` column is the supplier provenance this

@@ -13,6 +13,7 @@ import {
   listLibraryQuerySchema,
   batchGetLibraryRequestSchema,
   updateLibraryAnnotationsRequestSchema,
+  replaceLibraryTagsRequestSchema,
 } from './library';
 import { MAX_BATCH_LIMIT } from '@/lib/api/batch-limits';
 
@@ -99,6 +100,18 @@ describe('registerExternalCredentialRequestSchema', () => {
       expect(result.data).not.toHaveProperty('tenantId');
       expect(result.data.annotations).not.toHaveProperty('storageUri');
     }
+  });
+
+  it('keeps tags beside annotations in order, leaves them out when omitted and refuses an invalid tag at its path', () => {
+    // Catches a regression that drops tags at registration, so the record would be created untagged.
+    expect(
+      registerExternalCredentialRequestSchema.parse({ ...validBody(), tags: ['cab-portal', 'audit'] }).tags,
+    ).toEqual(['cab-portal', 'audit']);
+    expect(registerExternalCredentialRequestSchema.parse(validBody())).not.toHaveProperty('tags');
+
+    const issue = firstIssue(registerExternalCredentialRequestSchema.safeParse({ ...validBody(), tags: ['ok', 'ok'] }));
+    expect(issue.path).toEqual(['tags', 1]);
+    expect(issue.message).toBe('must not repeat a tag; duplicates tags.0');
   });
 
   describe('sourceUrl', () => {
@@ -699,5 +712,15 @@ describe('verifyLibraryRecordRequestSchema', () => {
       }).success;
       expect([decryptionKey, picked]).toEqual([decryptionKey, registered]);
     }
+  });
+});
+
+describe('replaceLibraryTagsRequestSchema', () => {
+  it('keeps the full list in the submitted order and refuses an invalid tag at its path', () => {
+    expect(replaceLibraryTagsRequestSchema.parse({ tags: ['zeta', 'alpha'] })).toEqual({ tags: ['zeta', 'alpha'] });
+
+    const issue = firstIssue(replaceLibraryTagsRequestSchema.safeParse({ tags: ['audit', 'audit_2026'] }));
+    expect(issue.path).toEqual(['tags', 1]);
+    expect(issue.message).toBe('must be lowercase letters and digits, with single hyphens between them');
   });
 });

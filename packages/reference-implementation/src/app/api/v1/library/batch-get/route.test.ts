@@ -87,6 +87,8 @@ function externalView(id: string) {
       coreDataModelVersion: '0.7.0',
       detailsStatus: 'EXTRACTED',
       detailsError: null,
+      tags: [],
+      tagVersion: 1,
       createdAt: new Date('2026-07-30T09:00:00.000Z'),
       updatedAt: new Date('2026-07-30T09:00:06.000Z'),
     },

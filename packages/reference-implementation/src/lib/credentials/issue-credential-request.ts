@@ -397,6 +397,11 @@ export async function issueCredentialRequest(
     coreCredentialType: resolveCoreCredentialType(coreDataModelType),
     ...(body.statusPurposes !== undefined ? { statusPurposes: body.statusPurposes } : {}),
     ...(idempotencyClaimId !== undefined ? { idempotencyClaimId } : {}),
+    // The tags were held to the deployment's limits when the request was
+    // admitted, and are not checked again here: a batch item reaches this in
+    // the worker and is issued as the web admitted it. A body without them,
+    // such as an item queued before tags existed, issues untagged.
+    tags: body.tags ?? [],
     onDispatch: dispatchHook,
   });
 

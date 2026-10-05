@@ -38,6 +38,7 @@ import {
   registerExternalCredentialRequestSchema,
   verifyLibraryRecordRequestSchema,
   updateLibraryAnnotationsRequestSchema,
+  replaceLibraryTagsRequestSchema,
 } from '@/lib/api/request-schemas/library';
 import {
   credentialRecordSchema,
@@ -55,6 +56,7 @@ import {
   OPERATOR_CONFIRMED_FAILURE_MESSAGE,
 } from '@/lib/credentials/credential-batch-projection';
 import { libraryReadFailureSchema } from '@/lib/library/library-read-errors';
+import { libraryTagSchema } from '@/lib/library/library-tags';
 import { serviceTypeSchema, adapterTypeSchema } from '@/lib/api/request-schemas/service';
 import { CredentialBatchItemState, CredentialBatchState } from '@/lib/prisma/generated';
 import {
@@ -601,6 +603,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     RegisterExternalCredentialRequest: registerExternalCredentialRequestSchema,
     VerifyLibraryRecordRequest: verifyLibraryRecordRequestSchema,
     UpdateLibraryAnnotationsRequest: updateLibraryAnnotationsRequestSchema,
+    ReplaceLibraryTagsRequest: replaceLibraryTagsRequestSchema,
     BatchGetLibraryRequest: batchGetLibraryRequestSchema,
     CredentialRecord: credentialRecordSchema,
     CredentialRecordDetail: credentialRecordDetailSchema,
@@ -616,6 +619,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
     CredentialType: credentialTypeSchema,
     Origin: originSchema,
     VerificationSummary: verificationSummarySchema,
+    LibraryTag: libraryTagSchema,
   };
 
   const openAPISchemas: Record<string, OpenAPISchema> = {};
@@ -646,6 +650,7 @@ export function generateOpenAPISchemas(): Record<string, OpenAPISchema> {
       name === 'CredentialBatchRequest' ||
       name === 'RegisterExternalCredentialRequest' ||
       name === 'UpdateLibraryAnnotationsRequest' ||
+      name === 'ReplaceLibraryTagsRequest' ||
       name === 'BatchGetLibraryRequest' ||
       name === 'VerifyLibraryRecordRequest'
     ) {

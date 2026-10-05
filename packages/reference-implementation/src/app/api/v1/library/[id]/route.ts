@@ -170,6 +170,8 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   origin: native
  *                   credential: { name: Battery Pack DPP, credentialType: DPP, issuerName: Acme Battery Co, issuerDid: 'did:web:acme.example', subjectName: Battery Pack Model X, subjectId: 'https://acme.example/products/battery-x', validFrom: '2026-07-15T09:00:00.000Z', validUntil: '2029-07-15T09:00:00.000Z' }
  *                   annotations: null
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: clw0org4n1s4t10n00000001
  *                   facilityId: clw0f4c1l1ty000000000001
  *                   productId: clw0pr0duct000000000001a
@@ -185,7 +187,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   detailsError: null
  *                   status: { capture: PENDING, statusCaptureError: null, entries: [] }
  *                   lifecycle: unknown
- *                   capabilities: { deletable: true, annotatable: false, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: false, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-07-15T09:00:00.000Z'
  *                   updatedAt: '2026-07-15T09:00:00.000Z'
@@ -199,6 +201,8 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   origin: native
  *                   credential: { name: Battery Pack DPP, credentialType: DPP, issuerName: Acme Battery Co, issuerDid: 'did:web:acme.example', subjectName: Battery Pack Model X, subjectId: 'https://acme.example/products/battery-x', validFrom: '2026-07-15T09:00:00.000Z', validUntil: '2029-07-15T09:00:00.000Z' }
  *                   annotations: null
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: clw0org4n1s4t10n00000001
  *                   facilityId: null
  *                   productId: clw0pr0duct000000000001a
@@ -214,7 +218,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   detailsError: null
  *                   status: { capture: PENDING, statusCaptureError: null, entries: [] }
  *                   lifecycle: unknown
- *                   capabilities: { deletable: true, annotatable: false, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: false, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-07-15T09:00:00.000Z'
  *                   updatedAt: '2026-07-15T09:00:00.000Z'
@@ -228,6 +232,8 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: Received by email }
+ *                   tags: [audit-2026-q3, cab-portal]
+ *                   tagVersion: 2
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -243,10 +249,10 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
- *                   updatedAt: '2026-08-30T10:20:00.000Z'
+ *                   updatedAt: '2026-09-09T10:20:00.000Z'
  *                   storageUri: 'https://storage.internal.example/credentials/clw0ext3rn4lprotect000003'
  *                   digestMultibase: zQmExternalStorageDigestExample
  *                   decryptionKey: 'a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f801'
@@ -257,6 +263,8 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Recycled Content DCC from Supplier Ltd, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -272,7 +280,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: [{ code: DECRYPTION_KEY_UNAVAILABLE, message: 'The record is readable, but its stored decryption key could not be returned. Quote the record id and the x-correlation-id response header when contacting support.' }]
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-08-30T10:20:04.000Z'
@@ -286,6 +294,8 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   origin: external
  *                   credential: { name: null, credentialType: null, issuerName: null, issuerDid: null, subjectName: null, subjectId: null, validFrom: null, validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Encrypted DPP from Supplier Ltd, declaredCredentialType: DPP, dateReceived: '2026-08-30', notes: Key still to come }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -301,7 +311,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T11:05:00.000Z'
  *                   updatedAt: '2026-08-30T11:05:00.000Z'
@@ -315,6 +325,8 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   origin: external
  *                   credential: { name: null, credentialType: null, issuerName: null, issuerDid: null, subjectName: null, subjectId: null, validFrom: null, validUntil: null }
  *                   annotations: { annotationVersion: 1, displayName: Unreachable DPP from Supplier Ltd, declaredCredentialType: DPP, dateReceived: '2026-08-30', notes: null }
+ *                   tags: []
+ *                   tagVersion: 1
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -330,7 +342,7 @@ function sanitisedServerError(error: unknown, recordId: string, detail: string):
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T11:40:00.000Z'
  *                   updatedAt: '2026-08-30T11:40:00.000Z'
@@ -594,7 +606,9 @@ const NATIVE_ANNOTATION_MESSAGE = 'This is a native credential record; it has no
  *     description: |
  *       Updates one or more recipient-owned annotation fields on an external
  *       library record. The credential, its durable copy, extracted fields,
- *       verification runs and verification queue are never changed.
+ *       verification runs and verification queue are never changed. Tags are
+ *       the other kind of tenant annotation, with their own version, and are
+ *       replaced with `PUT /api/v1/library/{id}/tags`.
  *
  *       Two things beyond the annotations do move. A successful update
  *       advances the record's `updatedAt`, so a client using it as a
@@ -667,6 +681,8 @@ const NATIVE_ANNOTATION_MESSAGE = 'This is a native credential record; it has no
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 2, displayName: Corrected DCC, declaredCredentialType: DCC, dateReceived: '2026-08-30', notes: Received by email }
+ *                   tags: [cab-portal]
+ *                   tagVersion: 2
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -682,7 +698,7 @@ const NATIVE_ANNOTATION_MESSAGE = 'This is a native credential record; it has no
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-09T10:20:00.000Z'
@@ -693,6 +709,8 @@ const NATIVE_ANNOTATION_MESSAGE = 'This is a native credential record; it has no
  *                   origin: external
  *                   credential: { name: Recycled Content DCC, credentialType: DCC, issuerName: Supplier Ltd, issuerDid: 'did:web:supplier.example', subjectName: Cathode Batch 42, subjectId: 'https://supplier.example/batches/42', validFrom: '2026-08-30T10:15:00.000Z', validUntil: null }
  *                   annotations: { annotationVersion: 3, displayName: Corrected DCC, declaredCredentialType: DCC, dateReceived: null, notes: null }
+ *                   tags: [cab-portal]
+ *                   tagVersion: 2
  *                   organisationId: null
  *                   facilityId: null
  *                   productId: null
@@ -708,7 +726,7 @@ const NATIVE_ANNOTATION_MESSAGE = 'This is a native credential record; it has no
  *                   detailsError: null
  *                   status: null
  *                   lifecycle: null
- *                   capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false }
+ *                   capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false }
  *                   warnings: []
  *                   createdAt: '2026-08-30T10:20:00.000Z'
  *                   updatedAt: '2026-09-09T10:21:00.000Z'

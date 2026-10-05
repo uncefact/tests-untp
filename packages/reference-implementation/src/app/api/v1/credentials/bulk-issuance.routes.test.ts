@@ -74,6 +74,8 @@ function libraryRecordView(credentialId: string) {
       coreDataModelVersion: '0.7.0',
       detailsStatus: CredentialDetailsStatus.EXTRACTED,
       detailsError: null,
+      tags: [],
+      tagVersion: 1,
       createdAt,
       updatedAt: createdAt,
     },

@@ -80,6 +80,8 @@ export type CreateCredentialInput = {
   idempotencyClaimId?: string;
   /** Status facts captured from the signed artefact, persisted with issuance. */
   statusEntries?: readonly CredentialStatusEntryCaptureInput[];
+  /** The record's tags, in the order given; an empty list when omitted. */
+  tags?: readonly string[];
 } & CredentialDetailsInput &
   CredentialStatusCaptureInput &
   CredentialStatusAttributionInput;
@@ -206,6 +208,10 @@ export async function createCredential(
     ...input.details,
     detailsStatus: input.detailsStatus,
     detailsError: input.detailsError,
+    // Tags live on the parent record because both origins carry them
+    // (ADR-061). Both attempts below, with and without entity links, write
+    // this same record data.
+    tags: [...(input.tags ?? [])],
   };
   const childData = {
     tenantId: input.tenantId,

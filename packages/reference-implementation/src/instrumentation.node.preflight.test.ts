@@ -19,6 +19,7 @@ jest.mock('@/lib/cvc/seeded-refresh-interval', () => ({
 }));
 jest.mock('@/lib/api/pagination', () => ({ warnOnRejectedMaxPageLimitOverride: jest.fn() }));
 jest.mock('@/lib/api/batch-limits', () => ({ warnOnRejectedMaxBatchLimitOverride: jest.fn() }));
+jest.mock('@/lib/api/library-tag-limits', () => ({ warnOnRejectedLibraryTagLimitOverrides: jest.fn() }));
 jest.mock('@/lib/observability/instrumentations', () => ({ buildInstrumentations: () => [] }));
 jest.mock('@/lib/observability/resource', () => ({
   buildResource: () => ({}),

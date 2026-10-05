@@ -62,6 +62,8 @@ describe('credential.repository', () => {
       coreDataModelVersion: '0.6.1',
       detailsStatus: 'EXTRACTION_PENDING',
       detailsError: null,
+      tags: [],
+      tagVersion: 1,
       createdAt: new Date('2023-12-31'),
       updatedAt: new Date('2024-01-01'),
       ...overrides,

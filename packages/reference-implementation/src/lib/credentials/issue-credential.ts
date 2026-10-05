@@ -52,6 +52,12 @@ export type IssueCredentialInput = {
   bridge: IDataModelBridge;
   idempotencyClaimId?: string;
   statusPurposes?: readonly SupportedStatusPurpose[];
+  /**
+   * The library record's tags, written with the record. They label the
+   * record only: they are never added to the payload that is signed or to
+   * anything sent to the VC or storage service.
+   */
+  tags?: readonly string[];
   /** Passed through to the VC service immediately before its credential request is sent. */
   onDispatch: () => void;
   signal?: AbortSignal;
@@ -250,6 +256,7 @@ export async function issueCredential(input: IssueCredentialInput): Promise<Issu
     vcServiceAttributedAt: new Date(),
     ...details,
     idempotencyClaimId: input.idempotencyClaimId,
+    ...(input.tags !== undefined ? { tags: input.tags } : {}),
   });
 
   logger.info({ tenantId, credentialId: credentialRecord.id }, 'Credential issued and stored');

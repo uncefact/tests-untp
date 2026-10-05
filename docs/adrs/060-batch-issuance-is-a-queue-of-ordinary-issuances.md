@@ -27,6 +27,8 @@ Update (2026-09-19): The batch stores its submission correlation id, each item r
 
 Update (2026-09-19): The worker budget can be tuned with `BATCH_SETTLEMENT_ALLOWANCE_MS` and `BATCH_MINIMUM_ITEM_COST_MS`; the allowance is checked against the job timeout at worker boot. `BATCH_JOB_RETRY_LIMIT` (default `4`), `BATCH_JOB_RETRY_BACKOFF_SECONDS` (default `30`) and `BATCH_JOB_RETRY_BACKOFF_MAX_SECONDS` (default `600`) configure the shared queue retry and per-item fault ladder; both web and worker validate them at boot.
 
+Update (2026-10-05): Batch submission also validates each item's `tags`, and an item with invalid tags refuses the whole batch with a pointer such as `items[1].tags.3`. See ADR-061.
+
 ## Context
 
 Issuance is one synchronous request per credential. Issuers certifying a product range run that loop themselves, and every one of them rebuilds retry, progress and result collection. The reference implementation has a Postgres job queue and worker (ADR-054), idempotency claims (ADR-051), and a single callable issuance use case. A server-side batch can therefore be a durable ordered container around the existing issuance path.

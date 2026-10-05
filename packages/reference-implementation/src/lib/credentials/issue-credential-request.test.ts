@@ -108,3 +108,73 @@ describe('issueCredentialRequest policy refusals', () => {
     expect(mockIssueCredential).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-1', onDispatch }));
   });
 });
+
+describe('issueCredentialRequest library tags', () => {
+  function arrangeIssuance(): void {
+    mockResolveDataModel.mockResolvedValue({
+      dataModel: { name: 'Digital Product Passport' },
+      bridge: {
+        extractRefs: jest.fn(() => ({ organisations: [], facilities: [], products: [] })),
+        extractConformityClaimWithProvenance: jest.fn(() => null),
+      },
+      schemaUrls: [],
+      coreDataModelVersion: '0.7.0',
+      coreDataModelType: 'DigitalProductPassport',
+    });
+    mockValidateCredentialPayload.mockResolvedValue(undefined);
+    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1' });
+    mockResolveVcService.mockResolvedValue({ instanceId: 'vc-1', service: {} });
+    mockResolveStorageService.mockResolvedValue({ instanceId: 'storage-1', service: {} });
+    mockIssueCredential.mockResolvedValue({
+      credentialId: 'credential-1',
+      storageResponse: {},
+      primaryEntity: {},
+      entityLinkFailed: false,
+      detailsExtractionFailed: false,
+      statusCaptureFailed: false,
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.API_MAX_TAGS_PER_RECORD;
+    delete process.env.API_MAX_TAG_LENGTH;
+    arrangeIssuance();
+  });
+
+  afterAll(() => {
+    delete process.env.API_MAX_TAGS_PER_RECORD;
+    delete process.env.API_MAX_TAG_LENGTH;
+  });
+
+  it('passes the body tags to issueCredential in the order given', async () => {
+    // Regression: tags dropped here would leave a natively issued record untagged.
+    await issueCredentialRequest({
+      tenantId: 'tenant-1',
+      body: request({ version: '0.7.0', tags: ['zeta', 'audit-2026'] }),
+    });
+
+    expect(mockIssueCredential).toHaveBeenCalledWith(expect.objectContaining({ tags: ['zeta', 'audit-2026'] }));
+  });
+
+  it('issues with no tags when the body has none, as a batch item queued before tags existed does', async () => {
+    // Regression: an absent field must not reach the record as anything but an empty list.
+    await issueCredentialRequest({ tenantId: 'tenant-1', body: request({ version: '0.7.0' }) });
+
+    expect(mockIssueCredential).toHaveBeenCalledWith(expect.objectContaining({ tags: [] }));
+  });
+
+  it('issues tags the deployment limits would now refuse, because admission already applied them', async () => {
+    // Regression: a limit check here would fail a queued batch item in the
+    // worker after the web had admitted it.
+    process.env.API_MAX_TAGS_PER_RECORD = '1';
+    process.env.API_MAX_TAG_LENGTH = '3';
+
+    await issueCredentialRequest({
+      tenantId: 'tenant-1',
+      body: request({ version: '0.7.0', tags: ['audit', 'cab-portal', 'q3'] }),
+    });
+
+    expect(mockIssueCredential).toHaveBeenCalledWith(expect.objectContaining({ tags: ['audit', 'cab-portal', 'q3'] }));
+  });
+});

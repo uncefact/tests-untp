@@ -656,6 +656,23 @@ describe('credential batch worker and reconciliation', () => {
     ]);
   });
 
+  it('hands each item to issuance with its own tags', async () => {
+    // Regression: tags read from the first item, or from the batch, would
+    // label every record in the batch alike.
+    const id = await submit('worker-item-tags', [
+      { ...ITEM(0), tags: ['a'] },
+      { ...ITEM(1), tags: ['b', 'c'] },
+    ]);
+    await waitForBatch(id, CredentialBatchState.COMPLETED);
+
+    expect(
+      (issueCalls as CredentialBatchItemRequest[]).map((item) => [item.credentialPayload.index, item.tags]),
+    ).toEqual([
+      [0, ['a']],
+      [1, ['b', 'c']],
+    ]);
+  });
+
   it('re-queues a pre-dispatch fault and continues with the next item', async () => {
     // Regression: a pre-dispatch fault must not leave a PROCESSING item or delay an item behind it.
     const id = await submit('worker-fault-release', [ITEM(0), ITEM(1)], noOpQueue);

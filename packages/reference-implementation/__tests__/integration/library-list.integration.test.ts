@@ -68,6 +68,10 @@ async function idsWithSydneySession(options: Omit<ListLibraryRecordsOptions, 'te
   });
 }
 
+async function setTags(id: string, tags: string[]): Promise<void> {
+  await prisma.libraryRecord.update({ where: { id_tenantId: { id, tenantId: OWNER_TENANT_ID } }, data: { tags } });
+}
+
 beforeEach(async () => {
   await truncateApplicationTables(prisma);
   await prisma.tenant.create({ data: { id: OWNER_TENANT_ID, name: 'Library list owner' } });
@@ -529,5 +533,96 @@ describe('GET /library repository query against migrated Postgres', () => {
         })
       ).ids,
     ).toEqual([match.id]);
+  });
+});
+
+describe('GET /library tag filters against migrated Postgres', () => {
+  it('excludes before paging, so a full page stays full and the total counts only matching records', async () => {
+    // 25 records alternating native and external, newest first by issuedAt,
+    // with three of the first twenty tagged cab-portal. Filtering after the
+    // page was taken would return 17 rows on page one and a total of 25.
+    const ordered: string[] = [];
+    for (let index = 0; index < 25; index += 1) {
+      const validFrom = new Date(Date.UTC(2026, 5, 30 - index));
+      if (index % 2 === 0) {
+        const { id } = await insertNativeCredential(prisma, {
+          id: `library-list-walk-${String(index).padStart(2, '0')}`,
+          tenantId: OWNER_TENANT_ID,
+          details: { validFrom },
+        });
+        ordered.push(id);
+      } else {
+        ordered.push(await insertExternalCredential(prisma, OWNER_TENANT_ID, { validFrom }));
+      }
+    }
+    const excluded = [ordered[2], ordered[9], ordered[17]];
+    for (const id of excluded) await setTags(id, ['cab-portal']);
+    const kept = ordered.filter((id) => !excluded.includes(id));
+
+    const first = await summaries({ excludeTag: ['cab-portal'], sort: 'issuedAt:desc', limit: 20 });
+    expect(first.total).toBe(22);
+    expect(first.ids).toEqual(kept.slice(0, 20));
+
+    const second = await summaries({ excludeTag: ['cab-portal'], sort: 'issuedAt:desc', limit: 20, offset: 20 });
+    expect(second.total).toBe(22);
+    expect(second.ids).toEqual(kept.slice(20));
+  });
+
+  it('keeps untagged records under an exclusion, matches any listed tag, and lets the exclusion win', async () => {
+    const auditOnly = await insertExternalCredential(prisma, OWNER_TENANT_ID);
+    const auditAndPortal = await insertExternalCredential(prisma, OWNER_TENANT_ID);
+    const portalOnly = (await insertNativeCredential(prisma, { id: 'library-list-portal', tenantId: OWNER_TENANT_ID }))
+      .id;
+    const untagged = (await insertNativeCredential(prisma, { id: 'library-list-untagged', tenantId: OWNER_TENANT_ID }))
+      .id;
+    const supplierOnly = await insertExternalCredential(prisma, OWNER_TENANT_ID);
+    await setTags(auditOnly, ['audit']);
+    await setTags(auditAndPortal, ['audit', 'cab-portal']);
+    await setTags(portalOnly, ['cab-portal']);
+    await setTags(supplierOnly, ['supplier-a']);
+
+    // The column is never NULL: an untagged record holds an empty list, so
+    // its `tags && x` is false and `NOT (...)` keeps it.
+    const withoutPortal = await summaries({ excludeTag: ['cab-portal'] });
+    expect(withoutPortal.total).toBe(3);
+    expect(withoutPortal.ids).toEqual(expect.arrayContaining([auditOnly, untagged, supplierOnly]));
+
+    // Repeated values are "any of": a record holding only the second value matches.
+    const either = await summaries({ tag: ['audit', 'supplier-a'] });
+    expect(either.total).toBe(3);
+    expect(either.ids).toEqual(expect.arrayContaining([auditOnly, auditAndPortal, supplierOnly]));
+
+    const auditNotPortal = await summaries({ tag: ['audit'], excludeTag: ['cab-portal'] });
+    expect(auditNotPortal).toMatchObject({ total: 1, ids: [auditOnly] });
+
+    // The projection carries the stored tags through unchanged.
+    expect(auditNotPortal.projected[0]).toMatchObject({ tags: ['audit'] });
+  });
+
+  it('counts a matching unreadable record in failures and the total, and drops an excluded one from both', async () => {
+    const readable = await insertNativeCredential(prisma, {
+      id: 'library-list-tag-readable',
+      tenantId: OWNER_TENANT_ID,
+    });
+    const unreadableKept = await insertNativeCredential(prisma, {
+      id: 'library-list-tag-unreadable-kept',
+      tenantId: OWNER_TENANT_ID,
+      checkRun: { generation: 1 },
+    });
+    const unreadableExcluded = await insertNativeCredential(prisma, {
+      id: 'library-list-tag-unreadable-excluded',
+      tenantId: OWNER_TENANT_ID,
+      checkRun: { generation: 1 },
+    });
+    await setTags(unreadableKept.id, ['audit']);
+    await setTags(unreadableExcluded.id, ['cab-portal']);
+
+    const page = await summaries({ excludeTag: ['cab-portal'] });
+    expect(page.total).toBe(2);
+    expect(page.ids).toEqual([readable.id]);
+    expect(page.failures).toEqual([unreadableKept.id]);
+
+    const tagged = await summaries({ tag: ['audit'] });
+    expect(tagged).toMatchObject({ total: 1, ids: [], failures: [unreadableKept.id] });
   });
 });

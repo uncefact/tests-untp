@@ -1,5 +1,20 @@
 # UNTP Reference Implementation release notes
 
+## Unreleased
+
+Library records can now carry tags chosen by the tenant, and the library list can be filtered by them in the query, so paging stays correct when an application leaves some records out. Read [Upgrading from v0.6.2](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v062) before upgrading.
+
+- Upgrading from v0.6.2: apply the `20261005120000_library_record_tags` migration, stop the old workers and start the new ones, then expose the new web. With the bundled Compose stack, rebuild and recreate the whole stack with one `docker compose up -d --build`, not `ri` alone.
+- Clients that validate responses against a pinned copy of the published schema must regenerate it, because every library record gains `tags`, `tagVersion` and `capabilities.taggable`.
+
+### Tags on library records
+
+Every library record, native or external, carries a list of tags and a `tagVersion`. Tags can be set when an external credential is registered, when a credential is issued and on each item of a batch issuance. `PUT /api/v1/library/{id}/tags` replaces a record's tags under an `If-Version` header carrying its current `tagVersion`, and an empty list clears them. Tags are separate from recipient annotations, have their own version, and are never part of the credential itself.
+
+`GET /api/v1/library` accepts `tag` and `excludeTag`, both repeatable. `?tag=audit&excludeTag=cab-portal` returns records tagged `audit` and not tagged `cab-portal`. Both filters run before paging, so `pagination.total` and `hasMore` count only matching records.
+
+A tag is lowercase letters, digits and single hyphens between them, and a list may not repeat a tag. By default a record holds up to 10 tags of up to 64 characters each. `API_MAX_TAGS_PER_RECORD` and `API_MAX_TAG_LENGTH` change those limits. Only the web process reads them, and they apply when tags come in, never to stored records. See the [Library API](https://uncefact.github.io/tests-untp/docs/reference-implementation/api/library#tags) and [API Pagination](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/api-pagination#tag-limits).
+
 ## 0.6.2 - 2026-10-01
 
 This patch stops an idle worker from flooding the trace store with database spans. It also stops the seed logging an error for a DID that VCKit already holds, and makes `/api-docs` report the release version. It changes no setting, database migration or Compose file. Read [Upgrading from v0.6.1](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.6#upgrading-from-v061) before upgrading.

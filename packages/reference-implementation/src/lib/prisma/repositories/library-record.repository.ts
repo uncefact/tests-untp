@@ -53,6 +53,10 @@ export type LibraryListSort = (typeof LIBRARY_LIST_SORTS)[number];
 export type ListLibraryRecordsOptions = {
   tenantId: string;
   type?: readonly CoreCredentialType[];
+  /** Keeps records carrying any of these tags. */
+  tag?: readonly string[];
+  /** Drops records carrying any of these tags, even when `tag` matched them. */
+  excludeTag?: readonly string[];
   origin?: LibraryOrigin;
   organisationId?: string;
   facilityId?: string;
@@ -279,6 +283,17 @@ export function buildLibraryListQuery(options: ListLibraryRecordsOptions): Prism
     filters.push(
       Prisma.sql`((r."coreCredentialType" IS NOT NULL AND r."coreCredentialType" = ANY(${typeArray})) OR (r."coreCredentialType" IS NULL AND e."declaredCredentialType" = ANY(${typeArray})))`,
     );
+  }
+  // Both tag predicates sit in `filtered`, so the page and its total move
+  // together. The exclusion relies on the column being NOT NULL: against a
+  // NULL list `NOT (tags && ...)` would be NULL and drop an untagged record.
+  if (options.tag !== undefined) {
+    if (options.tag.length === 0) throw new LibraryRecordListError('tag filter must not be empty');
+    filters.push(Prisma.sql`r."tags" && ARRAY[${Prisma.join(options.tag)}]::text[]`);
+  }
+  if (options.excludeTag !== undefined) {
+    if (options.excludeTag.length === 0) throw new LibraryRecordListError('excludeTag filter must not be empty');
+    filters.push(Prisma.sql`NOT (r."tags" && ARRAY[${Prisma.join(options.excludeTag)}]::text[])`);
   }
   if (options.origin !== undefined) {
     const origin = options.origin === 'native' ? LibraryRecordOrigin.NATIVE : LibraryRecordOrigin.EXTERNAL;
@@ -544,6 +559,12 @@ export type UpdateLibraryRecordAnnotationsResult =
   | { outcome: 'updated'; view: ExternalLibraryRecordView }
   | { outcome: 'missing' }
   | { outcome: 'native' }
+  | { outcome: 'version_conflict'; currentVersion: number };
+
+/** A tag replacement answers for records of both origins, so it has no `native` outcome. */
+export type ReplaceLibraryRecordTagsResult =
+  | { outcome: 'updated'; view: LibraryRecordDetailView }
+  | { outcome: 'missing' }
   | { outcome: 'version_conflict'; currentVersion: number };
 
 /**
@@ -827,6 +848,87 @@ export async function updateLibraryRecordAnnotations(input: {
       // the repository has proved.
       if (updatedView.origin !== LibraryRecordOrigin.EXTERNAL) {
         throw new LibraryRecordWriteAnomalyError(input.recordId, 'was updated as EXTERNAL but read back as NATIVE');
+      }
+      return { outcome: 'updated', view: updatedView };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5_000,
+      timeout: 15_000,
+    },
+  );
+}
+
+/**
+ * Replaces a record's tags with `tags`, stored in the order given, and
+ * advances `tagVersion` by one, on a record of either origin. Every call that
+ * matches the version advances it, including one that sends the list already
+ * stored. `annotationVersion` and the recipient annotations are never touched,
+ * so a tag replacement and an annotation update never invalidate each other's
+ * token.
+ *
+ * The transaction has the same shape as `updateLibraryRecordAnnotations`, for
+ * the same reasons given there: Read Committed with the parent lock taken
+ * first, so the version comparison sees the state immediately before this
+ * write and a writer queued behind the lock answers `version_conflict` rather
+ * than a serialization failure; the same `maxWait` and `timeout`; and a
+ * read-back inside the transaction whose shape failure is this write's own
+ * anomaly. The token lives on the parent here, so the conditional write is the
+ * parent row itself and there is no child to touch.
+ */
+export async function replaceLibraryRecordTags(input: {
+  recordId: string;
+  tenantId: string;
+  expectedVersion: number;
+  tags: readonly string[];
+}): Promise<ReplaceLibraryRecordTagsResult> {
+  return prisma.$transaction(
+    async (tx) => {
+      if (!(await lockLibraryRecordForUpdate(tx, input.recordId, input.tenantId))) {
+        return { outcome: 'missing' };
+      }
+
+      const view = await readLibraryRecordFromClient(tx, input.recordId, input.tenantId);
+      if (view === null) return { outcome: 'missing' };
+
+      const currentVersion = view.record.tagVersion;
+      if (currentVersion !== input.expectedVersion) {
+        return { outcome: 'version_conflict', currentVersion };
+      }
+
+      const update = await tx.libraryRecord.updateMany({
+        where: { id: input.recordId, tenantId: input.tenantId, tagVersion: input.expectedVersion },
+        data: {
+          tags: [...input.tags],
+          tagVersion: { increment: 1 },
+          updatedAt: new Date(Date.now()),
+        },
+      });
+      if (update.count !== 1) {
+        throw new LibraryRecordWriteAnomalyError(
+          input.recordId,
+          'was not updated despite holding its parent lock and matching its tag version',
+        );
+      }
+
+      // As in the annotation update: the pre-write read keeps
+      // `LibraryRecordShapeError` for corruption that predates this
+      // transaction, while a broken shape on the row just written is this
+      // write's own invariant failing.
+      let updatedView: LibraryRecordDetailView | null;
+      try {
+        updatedView = await readLibraryRecordFromClient(tx, input.recordId, input.tenantId);
+      } catch (error) {
+        if (error instanceof LibraryRecordShapeError) {
+          throw new LibraryRecordWriteAnomalyError(
+            input.recordId,
+            `was written and read back in a shape the write paths never produce: ${error.message}`,
+          );
+        }
+        throw error;
+      }
+      if (updatedView === null) {
+        throw new LibraryRecordWriteAnomalyError(input.recordId, 'disappeared before the tag transaction completed');
       }
       return { outcome: 'updated', view: updatedView };
     },

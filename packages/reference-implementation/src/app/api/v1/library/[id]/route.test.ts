@@ -137,6 +137,8 @@ const COMPLETE_VIEW = {
     coreDataModelVersion: '0.6.0',
     detailsStatus: CredentialDetailsStatus.EXTRACTED,
     detailsError: null,
+    tags: [],
+    tagVersion: 1,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-04T00:00:00.000Z'),
   },

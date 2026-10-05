@@ -648,4 +648,47 @@ describe('Credential batch API', { testIsolation: false }, () => {
         expect(target.pathname, 'human link path').to.eq(verifyPage.pathname);
       });
   });
+
+  it('gives each record of a batch the tags its own item carried', () => {
+    const retry = Cypress.currentRetry;
+    const itemTags = [['e2e-batch-a'], ['e2e-batch-b', 'e2e-batch-c']];
+
+    return buildBatchRequest([
+      { issuer: issuerDid, label: `tags-0-${retry}` },
+      { issuer: issuerDid, label: `tags-1-${retry}` },
+    ])
+      .then((requestBody) =>
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/credentials/batches',
+          headers: { 'Idempotency-Key': `e2e-batch-tags-${RUN_ID}-r${retry}` },
+          body: { items: requestBody.items.map((item, index) => ({ ...item, tags: itemTags[index] })) },
+        }),
+      )
+      .then((response) => {
+        expect(response.status, 'tagged batch submission status').to.eq(202);
+        return waitForBatchCompletion(response.body.status);
+      })
+      .then((status) => {
+        expect(
+          status.items.map((item) => item.state),
+          'tagged batch item states',
+        ).to.deep.eq(['ISSUED', 'ISSUED']);
+        const ids = status.items.map((item) => item.credentialId as string);
+        return cy
+          .request({ method: 'POST', url: '/api/v1/library/batch-get', body: { ids } })
+          .then((response) => ({ response, ids }));
+      })
+      .then(({ response, ids }) => {
+        expect(response.status, 'batch-get status').to.eq(200);
+        expect(response.body.failures, 'batch-get failures').to.deep.eq([]);
+        const records = response.body.data as { id: string; tags: string[]; tagVersion: number }[];
+        ids.forEach((id, index) => {
+          const record = records.find((candidate) => candidate.id === id);
+          expect(record, `library record for item ${index}`).to.exist;
+          expect(record!.tags, `tags on the record for item ${index}`).to.deep.eq(itemTags[index]);
+          expect(record!.tagVersion, `tag version on the record for item ${index}`).to.eq(1);
+        });
+      });
+  });
 });
