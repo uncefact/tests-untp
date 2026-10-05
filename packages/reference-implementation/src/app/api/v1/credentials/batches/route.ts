@@ -105,7 +105,7 @@ function validateUniqueBatchReferences(items: readonly { reference?: string }[])
  *             schema:
  *               $ref: '#/components/schemas/CredentialBatchAcceptedResponse'
  *       400:
- *         description: Invalid Idempotency-Key or batch request shape, including an empty, oversized or invalid items array, duplicate item references or a request body that could not be read.
+ *         description: Invalid Idempotency-Key or batch request shape, including an empty, oversized or invalid items array, duplicate item references, invalid item tags or a request body that could not be read.
  *         content:
  *           application/json:
  *             schema:
@@ -122,6 +122,9 @@ function validateUniqueBatchReferences(items: readonly { reference?: string }[])
  *               oversizedItem:
  *                 summary: An item exceeds MAX_REQUEST_BODY_BYTES
  *                 value: { error: 'items[1]: item is 3139 bytes but MAX_REQUEST_BODY_BYTES is 2048.', code: VALIDATION_FAILED }
+ *               invalidItemTags:
+ *                 summary: An item repeats a tag, which refuses the whole batch
+ *                 value: { error: 'items[1].tags.3: must not repeat a tag; duplicates items[1].tags.1' }
  *               unreadableBody:
  *                 summary: The request body could not be read
  *                 value: { error: 'Could not read the request body' }

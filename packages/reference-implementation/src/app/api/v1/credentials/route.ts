@@ -171,9 +171,11 @@ async function completeIssuanceIdempotencyKeyOrReplay(input: {
  *         description: >-
  *           Validation error. Request-shape failures name the offending field
  *           (missing or mistyped credentialPayload, credentialType, version,
- *           storageOptions, or publishingOptions, including a malformed
+ *           storageOptions, publishingOptions or tags, including a malformed
  *           verification URL or hreflang entry; unknown body fields are
- *           ignored). A caller-supplied credentialPayload.credentialStatus is
+ *           ignored). The tags list is also refused for a tag outside the tag
+ *           format, a repeated tag, or more or longer tags than the deployment
+ *           allows. A caller-supplied credentialPayload.credentialStatus is
  *           refused with CREDENTIAL_STATUS_NOT_ACCEPTED. An invalid
  *           Idempotency-Key header (blank, longer than
  *           255 characters after trimming, or containing a character outside

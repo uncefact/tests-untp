@@ -165,6 +165,8 @@ export type CreateExternalCredentialInput = {
   decryptionKeyUnused?: boolean;
   details: ExternalDetailsCapture;
   checkRun: InitialCheckRunInput;
+  /** The record's tags, in the order given; an empty list when omitted. */
+  tags?: readonly string[];
   /**
    * When set, the record, its first check run and this claim are written in
    * one transaction (ADR-051 decision 3), so a crash cannot leave a
@@ -303,6 +305,7 @@ async function createExternalCredentialOnce(input: CreateExternalCredentialInput
           createdAt: now,
           updatedAt: now,
           ...detailsColumns(input.details),
+          tags: [...(input.tags ?? [])],
         },
       });
       const external = await tx.externalCredential.create({

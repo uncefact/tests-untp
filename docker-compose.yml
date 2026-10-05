@@ -181,6 +181,10 @@ services:
       # default applies. A `${VAR:-}` form would inject an empty string and
       # trigger the startup warning on every stock boot.
       API_MAX_BATCH_LIMIT:
+      # Library tag limits, checked when the web admits a request; the
+      # worker does not read them.
+      API_MAX_TAGS_PER_RECORD:
+      API_MAX_TAG_LENGTH:
       # Controls the web request-body limit.
       MAX_REQUEST_BODY_BYTES:
       # Controls the web idempotency stale-claim window.

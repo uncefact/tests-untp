@@ -267,7 +267,8 @@ model Tenant {
 /**
  * A library record (ADR-053 decision 1): identity and the fields that are
  * the same for both origins by construction, the descriptive fields
- * extraction reads from the signed artefact (decision 5). Each record has
+ * extraction reads from the signed artefact (decision 5), and the tenant's
+ * own tags, which apply to both origins (#1108). Each record has
  * exactly one child row, Credential or ExternalCredential, keyed by this id
  * and matching its origin and tenant. The write paths create both in one
  * transaction; the migration adds deferred constraint triggers that refuse
@@ -305,6 +306,15 @@ model LibraryRecord {
   coreDataModelVersion String?
   detailsStatus        CredentialDetailsStatus @default(EXTRACTION_PENDING)
   detailsError         CredentialDetailsError?
+
+  /// The tenant's own labels for the record (#1108), on both origins and in
+  /// the order they were submitted. Separate from the external child's
+  /// recipient annotations: tagVersion is the concurrency token the tags PUT
+  /// compares against, so a tag change and an annotation change never
+  /// conflict; it starts at 1. The column is NOT NULL, so an untagged record
+  /// holds an empty list and a tag exclusion filter keeps it.
+  tags       String[] @default([])
+  tagVersion Int      @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -70,6 +70,8 @@ function parent(overrides: Partial<LibraryRecord> = {}): LibraryRecord {
     coreDataModelVersion: null,
     detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING,
     detailsError: null,
+    tags: [],
+    tagVersion: 1,
     createdAt: new Date('2026-09-03T11:00:00.000Z'),
     updatedAt: new Date('2026-09-03T11:00:05.000Z'),
     ...overrides,
@@ -376,6 +378,8 @@ describe('toCredentialRecord', () => {
           credentialType: 'DigitalConformityCredential',
           coreDataModelVersion: '0.6.0',
           detailsStatus: CredentialDetailsStatus.EXTRACTED,
+          tags: ['supplier-b', 'audit-2026-q3'],
+          tagVersion: 4,
         },
       }),
       { now: NOW },
@@ -401,6 +405,8 @@ describe('toCredentialRecord', () => {
         dateReceived: '2026-08-30',
         notes: 'Received by email',
       },
+      tags: ['supplier-b', 'audit-2026-q3'],
+      tagVersion: 4,
       organisationId: null,
       facilityId: null,
       productId: null,
@@ -422,7 +428,7 @@ describe('toCredentialRecord', () => {
       currencyStatus: 'current',
       detailsStatus: 'EXTRACTED',
       detailsError: null,
-      capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false },
+      capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false },
       warnings: [],
       createdAt: '2026-09-03T11:00:00.000Z',
       updatedAt: '2026-09-03T11:00:05.000Z',
@@ -768,6 +774,8 @@ describe('toNativeCredentialRecord', () => {
           validFrom: new Date('2026-07-15T09:00:00.000Z'),
           validUntil: new Date('2029-07-15T09:00:00.000Z'),
           detailsStatus: CredentialDetailsStatus.EXTRACTED,
+          tags: ['line-7', 'audit'],
+          tagVersion: 3,
           createdAt: new Date('2026-07-15T09:00:00.000Z'),
           updatedAt: new Date('2026-07-16T14:30:00.000Z'),
         },
@@ -793,6 +801,8 @@ describe('toNativeCredentialRecord', () => {
         validUntil: '2029-07-15T09:00:00.000Z',
       },
       annotations: null,
+      tags: ['line-7', 'audit'],
+      tagVersion: 3,
       organisationId: 'organisation-1',
       facilityId: 'facility-1',
       productId: 'product-1',
@@ -802,7 +812,7 @@ describe('toNativeCredentialRecord', () => {
       issuedAt: '2026-07-15T09:00:00.000Z',
       encrypted: false,
       hasKey: false,
-      capabilities: { deletable: true, annotatable: false, verifiable: true },
+      capabilities: { deletable: true, annotatable: false, taggable: true, verifiable: true },
       verification: {
         generation: 1,
         state: 'complete',
@@ -969,6 +979,17 @@ describe('toNativeCredentialRecord', () => {
       now: NOW,
     });
     expect(projected).toMatchObject({ encrypted: true, hasKey: true });
+  });
+});
+
+describe('tags on the projected record', () => {
+  it('projects stored tags beyond the default limits, so a lowered limit never makes a record unreadable', () => {
+    // 12 tags of 100 characters exceed the default count and length limits,
+    // which apply only when tags are written.
+    const tags = Array.from({ length: 12 }, (_, i) => `${i}`.padStart(100, 't'));
+
+    expect(toCredentialRecord(record({ parent: { tags } }), { now: NOW }).tags).toEqual(tags);
+    expect(toNativeCredentialRecord(nativeRecord({ parent: { tags } }), { now: NOW }).tags).toEqual(tags);
   });
 });
 

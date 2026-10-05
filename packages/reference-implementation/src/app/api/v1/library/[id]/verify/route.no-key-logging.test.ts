@@ -171,6 +171,8 @@ function recordView(failure?: { code: CheckRunFailureCode; message: string }) {
       coreDataModelVersion: null,
       detailsStatus: 'EXTRACTION_PENDING' as const,
       detailsError: null,
+      tags: [],
+      tagVersion: 1,
       createdAt: new Date('2026-09-03T11:00:00.000Z'),
       updatedAt: new Date('2026-09-03T11:00:00.000Z'),
     },

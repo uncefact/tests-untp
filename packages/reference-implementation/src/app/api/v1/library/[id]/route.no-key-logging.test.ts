@@ -79,6 +79,8 @@ function view(storedKey: string | null): LibraryRecordDetailView {
     coreDataModelVersion: '0.6.0',
     detailsStatus: CredentialDetailsStatus.EXTRACTED,
     detailsError: null,
+    tags: [],
+    tagVersion: 1,
     createdAt: now,
     updatedAt: now,
   };

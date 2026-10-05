@@ -45,7 +45,7 @@ describe('published GET /library contract (#962)', () => {
     operation = spec.paths?.['/library']?.get as Operation;
   });
 
-  it('publishes the operation id, all fifteen query parameters, and repeatable type encoding', () => {
+  it('publishes the operation id, all seventeen query parameters, and repeatable type and tag encoding', () => {
     expect(operation.operationId).toBe('listLibrary');
     const parameters = operation.parameters ?? [];
     const queryParameterNames = parameters
@@ -55,6 +55,8 @@ describe('published GET /library contract (#962)', () => {
     expect(queryParameterNames).toEqual(
       [
         'type',
+        'tag',
+        'excludeTag',
         'origin',
         'organisationId',
         'facilityId',
@@ -76,6 +78,10 @@ describe('published GET /library contract (#962)', () => {
     expect(type?.description).toContain(
       'A native record with no recorded core type matches no value until an extraction records one; a record whose types name no core kind never matches a `type` value.',
     );
+    for (const name of ['tag', 'excludeTag']) {
+      const tagFilter = parameters.find((parameter) => parameter.name === name);
+      expect(tagFilter).toMatchObject({ in: 'query', style: 'form', explode: true });
+    }
     const limit = parameters.find((parameter) => parameter.name === 'limit');
     expect(limit?.description).toContain('smaller of 20 and the configured deployment maximum');
     expect(limit?.schema?.default).toBeUndefined();
@@ -88,6 +94,7 @@ describe('published GET /library contract (#962)', () => {
         Origin: expect.anything(),
         VerificationSummary: expect.anything(),
         CredentialLifecycle: expect.anything(),
+        LibraryTag: expect.anything(),
       }),
     );
     const description = operation.responses?.['400']?.description ?? '';

@@ -136,6 +136,7 @@ import {
   IdempotencyClaimOperationMismatchError,
 } from '@/lib/prisma/repositories/idempotency-key.repository';
 import { LIBRARY_VERIFY_JOB, VERIFY_JOB_ENQUEUE_OPTIONS } from '@/lib/library/verify-generation-job';
+import { LIBRARY_TAG_FORMAT_MESSAGE } from '@/lib/library/library-tags';
 import { digestRequestBody } from '@/lib/api/idempotency';
 import { GET, POST } from './route';
 
@@ -268,6 +269,8 @@ function parent(overrides: Partial<LibraryRecord> = {}): LibraryRecord {
     coreDataModelVersion: null,
     detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING,
     detailsError: null,
+    tags: [],
+    tagVersion: 1,
     createdAt: new Date('2026-09-03T11:00:00.000Z'),
     updatedAt: new Date('2026-09-03T11:00:00.000Z'),
     ...overrides,
@@ -584,6 +587,20 @@ describe('POST /api/v1/library request validation', () => {
       expect(loggedError.cause).toBeInstanceOf(ValidationError);
     },
   );
+  it('rejects a malformed tag before claiming the key or fetching the source', async () => {
+    // Regression: an invalid list must be refused before the key is claimed
+    // or the supplier is contacted, so nothing is fetched or stored for it.
+    const { status, body } = await post(registerRequest(validBody({ tags: ['a-'] })));
+
+    expect(status).toBe(400);
+    expect(body).toEqual({
+      error: 'tags.0: must be lowercase letters and digits, with single hyphens between them',
+      code: 'VALIDATION_FAILED',
+    });
+    expect(mockClaimIdempotencyKey).not.toHaveBeenCalled();
+    expect(mockStartJobQueue).not.toHaveBeenCalled();
+    expect(mockRegisterExternalCredential).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -649,6 +666,16 @@ describe('POST /api/v1/library registration', () => {
     expect(body.warnings).toEqual([
       expect.objectContaining({ code: 'DECRYPTION_KEY_UNUSED', message: expect.any(String) }),
     ]);
+  });
+
+  it('passes the tags to the registration in the order given', async () => {
+    // Regression: tags dropped by the route would leave the registered record untagged.
+    await post(registerRequest(validBody({ tags: ['zeta', 'audit-2026'] })));
+
+    expect(mockRegisterExternalCredential).toHaveBeenCalledWith(
+      expect.objectContaining({ tags: ['zeta', 'audit-2026'] }),
+      DEPS_MARKER,
+    );
   });
 
   it('registers without a key when the caller supplied none', async () => {
@@ -981,6 +1008,56 @@ describe('GET /api/v1/library', () => {
       issuedFrom: new Date('2026-01-01T00:00:00.000Z'),
       issuedTo: new Date('2026-01-31T23:59:59.999Z'),
     });
+  });
+
+  it('forwards repeated tag and excludeTag values to the repository as arrays, in order', async () => {
+    // Fails if either parameter is left out of the repeatable set (a repeated
+    // value would be a 400 and a single one would not parse as an array) or
+    // is not forwarded, which would return excluded records.
+    const response = await get(
+      'http://localhost/api/v1/library?tag=audit&tag=supplier-a&excludeTag=cab-portal&origin=external',
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockListLibraryRecords).toHaveBeenCalledTimes(1);
+    expect(mockListLibraryRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        tag: ['audit', 'supplier-a'],
+        excludeTag: ['cab-portal'],
+        origin: 'external',
+      }),
+    );
+  });
+
+  it.each([
+    ['excludeTag=CAB-Portal', 'excludeTag.0'],
+    ['tag=audit&tag=audit_2026', 'tag.1'],
+    [`tag=${encodeURIComponent('cab\0portal')}`, 'tag.0'],
+    ['excludeTag=', 'excludeTag.0'],
+  ])('refuses %s with a 400 naming the parameter, without querying', async (query, pointer) => {
+    const response = await get(`http://localhost/api/v1/library?${query}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe(`${pointer}: ${LIBRARY_TAG_FORMAT_MESSAGE}`);
+    expect(mockListLibraryRecords).not.toHaveBeenCalled();
+  });
+
+  it('accepts a legal tag filter value longer than the configured tag length limit', async () => {
+    // Fails if the admission length limit is applied to filters, which would
+    // make a tag stored under a higher limit impossible to filter on.
+    const original = process.env.API_MAX_TAG_LENGTH;
+    process.env.API_MAX_TAG_LENGTH = '64';
+    try {
+      const long = 'a'.repeat(100);
+      const response = await get(`http://localhost/api/v1/library?tag=${long}`);
+
+      expect(response.status).toBe(200);
+      expect(mockListLibraryRecords).toHaveBeenCalledWith(expect.objectContaining({ tag: [long] }));
+    } finally {
+      if (original === undefined) delete process.env.API_MAX_TAG_LENGTH;
+      else process.env.API_MAX_TAG_LENGTH = original;
+    }
   });
 
   it('rejects every present q form before any other query validation', async () => {

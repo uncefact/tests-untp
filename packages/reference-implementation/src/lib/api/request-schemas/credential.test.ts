@@ -147,4 +147,24 @@ describe('credentialIssueRequestSchema', () => {
       expect(result.data).not.toHaveProperty('unknownKey');
     }
   });
+
+  it('keeps supplied tags in order, leaves them out when omitted and refuses an invalid tag at its path', () => {
+    // Catches a regression that drops tags at the boundary, so the record would be created untagged.
+    const request = { credentialPayload: {}, credentialType: 'DigitalProductPassport', version: '0.7.0' };
+
+    expect(credentialIssueRequestSchema.parse({ ...request, tags: ['supplier-b', 'audit'] }).tags).toEqual([
+      'supplier-b',
+      'audit',
+    ]);
+    expect(credentialIssueRequestSchema.parse(request)).not.toHaveProperty('tags');
+
+    const result = credentialIssueRequestSchema.safeParse({ ...request, tags: ['audit', 'Audit'] });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(['tags', 1]);
+      expect(result.error.issues[0].message).toBe(
+        'must be lowercase letters and digits, with single hyphens between them',
+      );
+    }
+  });
 });

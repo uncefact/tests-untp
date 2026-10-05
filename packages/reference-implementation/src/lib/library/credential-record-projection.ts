@@ -309,7 +309,25 @@ export const credentialRecordSchema = z
       })
       .strict()
       .nullable()
-      .describe('Recipient-asserted fields; always present for an external record, always null for a native one.'),
+      .describe(
+        "Recipient-asserted fields; always present for an external record, always null for a native one. The tenant's other statement about a record is `tags`, which applies to both origins and has its own version.",
+      ),
+    // No pattern or bounds on the way out: the tag grammar and the
+    // deployment's count and length limits are enforced when tags are
+    // written, and a limit lowered later must not make a stored record
+    // unreadable.
+    tags: z
+      .array(z.string())
+      .describe(
+        'Labels the tenant sets on this record, in the order they were set; an empty list when it has none. Present on both origins. Never read from the credential, and separate from the recipient `annotations`.',
+      ),
+    tagVersion: z
+      .number()
+      .int()
+      .min(1)
+      .describe(
+        'The current version of `tags`, sent as `If-Version` to replace them. Independent of `annotations.annotationVersion`.',
+      ),
     organisationId: nullableString,
     facilityId: nullableString,
     productId: nullableString,
@@ -342,6 +360,7 @@ export const credentialRecordSchema = z
       .object({
         deletable: z.boolean(),
         annotatable: z.boolean(),
+        taggable: z.boolean().describe('Whether the tags can be replaced; true for every record of either origin.'),
         verifiable: z.boolean(),
         statusManageable: z
           .boolean()
@@ -711,6 +730,8 @@ export function toNativeCredentialRecord(
       validUntil: isoDateTime(parent.validUntil),
     },
     annotations: null,
+    tags: parent.tags,
+    tagVersion: parent.tagVersion,
     organisationId: credential.organisationId,
     facilityId: credential.facilityId,
     productId: credential.productId,
@@ -732,6 +753,7 @@ export function toNativeCredentialRecord(
     capabilities: {
       deletable: true,
       annotatable: false,
+      taggable: true,
       verifiable: true,
       statusManageable:
         credential.statusCapture === CredentialStatusCapture.CAPTURED &&
@@ -809,6 +831,8 @@ export function toCredentialRecord(
       dateReceived: isoDate(external.dateReceived),
       notes: external.notes,
     },
+    tags: parent.tags,
+    tagVersion: parent.tagVersion,
     organisationId: null,
     facilityId: null,
     productId: null,
@@ -824,7 +848,7 @@ export function toCredentialRecord(
     currencyStatus: deriveCurrencyStatus(parent.validFrom, parent.validUntil, now),
     detailsStatus: parent.detailsStatus,
     detailsError: parent.detailsError,
-    capabilities: { deletable: true, annotatable: true, verifiable: true, statusManageable: false },
+    capabilities: { deletable: true, annotatable: true, taggable: true, verifiable: true, statusManageable: false },
     warnings,
     createdAt: parent.createdAt.toISOString(),
     updatedAt: parent.updatedAt.toISOString(),

@@ -7,6 +7,7 @@ import {
   REGISTER_NOTES_MAX_LENGTH,
   REGISTER_SOURCE_URL_MAX_LENGTH,
 } from '@/lib/api/request-schemas/library';
+import { LIBRARY_TAG_PATTERN } from '@/lib/library/library-tags';
 
 /**
  * Minimal shape for navigating the generated OpenAPI JSON schema in these
@@ -26,6 +27,7 @@ type JsonSchemaObject = {
   type?: string;
   allOf?: JsonSchemaObject[];
   maxLength?: number;
+  maxItems?: number;
 };
 
 /**
@@ -606,5 +608,40 @@ describe('generateOpenAPISchemas: LibraryReadFailure (#1031)', () => {
     }
     expect(failure.properties?.code?.description).toContain('RECORD_UNREADABLE');
     expect(failure.properties?.code?.description).toContain('NOT_FOUND');
+  });
+});
+
+/**
+ * Every request body that accepts tags publishes them the same way: a plain
+ * array of strings carrying the tag grammar as a pattern. The count and
+ * length limits are deployment settings enforced at runtime, so a static
+ * `maxItems` or `maxLength` would misdescribe a reconfigured deployment, and
+ * an `allOf` would mean the list schema was composed with `.pipe()` again.
+ */
+describe('generateOpenAPISchemas: library tags on request components', () => {
+  const schemas = generateOpenAPISchemas() as Record<string, JsonSchemaObject>;
+  const tagLists: [string, JsonSchemaObject | undefined][] = [
+    ['ReplaceLibraryTagsRequest', schemas.ReplaceLibraryTagsRequest?.properties?.tags],
+    ['RegisterExternalCredentialRequest', schemas.RegisterExternalCredentialRequest?.properties?.tags],
+    ['CredentialIssueRequest', schemas.CredentialIssueRequest?.properties?.tags],
+    ['CredentialBatchRequest items', schemas.CredentialBatchRequest?.properties?.items?.items?.properties?.tags],
+  ];
+
+  it.each(tagLists)('%s publishes tags as a plain array of patterned strings', (_, tags) => {
+    expect(tags?.type).toBe('array');
+    expect(tags?.items).toEqual({ type: 'string', pattern: LIBRARY_TAG_PATTERN.source });
+    expect(tags).not.toHaveProperty('allOf');
+    expect(tags).not.toHaveProperty('maxItems');
+    expect(tags?.items).not.toHaveProperty('maxLength');
+  });
+
+  it('requires tags only on the replacement body', () => {
+    expect(schemas.ReplaceLibraryTagsRequest?.required).toEqual(['tags']);
+    expect(schemas.RegisterExternalCredentialRequest?.required).not.toContain('tags');
+    expect(schemas.CredentialIssueRequest?.required).not.toContain('tags');
+  });
+
+  it('does not document unknown keys on the replacement body as rejected, matching the runtime strip', () => {
+    expect(collectAdditionalProperties(schemas.ReplaceLibraryTagsRequest)).not.toContain(false);
   });
 });

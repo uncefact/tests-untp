@@ -396,6 +396,25 @@ describe('issueCredential', () => {
     expect(mockCreateCredential).toHaveBeenCalledWith(expect.objectContaining({ idempotencyClaimId: 'claim-1' }));
   });
 
+  it('passes the library tags through to createCredential in the order given', async () => {
+    // Regression: tags dropped here would leave a natively issued record untagged.
+    await issueCredential(buildInput({ tags: ['zeta', 'audit-2026'] }));
+
+    expect(mockCreateCredential).toHaveBeenCalledWith(expect.objectContaining({ tags: ['zeta', 'audit-2026'] }));
+  });
+
+  it('keeps library tags out of the payload and options sent for signing', async () => {
+    // Regression: a tag merged into the payload would be signed into the
+    // credential and published with it. Compared with a copy taken before the
+    // call, so a tag written into the caller's own object is caught too.
+    const payloadBefore = JSON.parse(JSON.stringify(PAYLOAD));
+    await issueCredential(buildInput({ tags: ['audit-2026'] }));
+
+    const [payload, options] = stubVcService.service.sign.mock.calls[0];
+    expect(payload).toStrictEqual(payloadBefore);
+    expect(options).not.toHaveProperty('tags');
+  });
+
   it('lets IdempotencyClaimLostError propagate from createCredential', async () => {
     const lost = new IdempotencyClaimLostError();
     mockCreateCredential.mockRejectedValue(lost);

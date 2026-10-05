@@ -12,6 +12,8 @@ import {
 } from './shared';
 import { MAX_PAGE_LIMIT } from '@/lib/api/pagination';
 import { MAX_BATCH_LIMIT } from '@/lib/api/batch-limits';
+import { libraryTagListSchema } from './library-tags';
+import { libraryTagSchema } from '@/lib/library/library-tags';
 
 /**
  * The shared non-blank rule with a length bound applied before it, because a
@@ -97,6 +99,10 @@ const libraryPaginationQuerySchema = paginationQuerySchema.extend({
 export const listLibraryQuerySchema = z
   .object({
     type: z.array(z.nativeEnum(CoreCredentialType)).min(1).optional(),
+    // Repeatable like `type`. Grammar only: the admission length limit is not
+    // applied, so a tag stored under a higher limit stays filterable.
+    tag: z.array(libraryTagSchema).min(1).optional(),
+    excludeTag: z.array(libraryTagSchema).min(1).optional(),
     origin: originSchema.optional(),
     organisationId: nonBlankString.optional(),
     facilityId: nonBlankString.optional(),
@@ -183,7 +189,10 @@ export type VerifyLibraryRecordRequest = z.infer<typeof verifyLibraryRecordReque
 /**
  * Request body for `POST /library`. Mirrors `RegisterExternalCredentialRequest`
  * in the discovery contract: a source location, the recipient's own
- * annotations, and an optional key.
+ * annotations, and an optional key. Optional `tags` sits beside
+ * `annotations` rather than inside it, because tags are not a recipient
+ * annotation: they apply to records of both origins and carry their own
+ * version.
  */
 export const registerExternalCredentialRequestSchema = z.object({
   // The bound is applied before the URL rule so it reaches the published
@@ -218,6 +227,7 @@ export const registerExternalCredentialRequestSchema = z.object({
       .optional()
       .describe(withNulRule('Free text kept with the record.')),
   }),
+  tags: libraryTagListSchema.optional(),
 });
 
 const annotationShape = registerExternalCredentialRequestSchema.shape.annotations.shape;
@@ -246,3 +256,14 @@ export const updateLibraryAnnotationsRequestSchema = requireAtLeastOneField(
 export type UpdateLibraryAnnotationsRequest = z.infer<typeof updateLibraryAnnotationsRequestSchema>;
 
 export type RegisterExternalCredentialRequest = z.infer<typeof registerExternalCredentialRequestSchema>;
+
+/**
+ * Request body for `PUT /library/{id}/tags`: the full list the record's tags
+ * become. An empty list clears them. A missing `tags` is "is required" and a
+ * value that is not an array is "must be an array", as on batch-get.
+ */
+export const replaceLibraryTagsRequestSchema = z.object({
+  tags: libraryTagListSchema,
+});
+
+export type ReplaceLibraryTagsRequest = z.infer<typeof replaceLibraryTagsRequestSchema>;

@@ -12,6 +12,7 @@ const mockValidateConfiguredEncryptionKey = jest.fn(async () => undefined);
 const mockStartJobQueue = jest.fn(async () => ({}));
 const mockStartSeededSchemeRefreshInterval = jest.fn();
 const mockWarnOnRejectedMaxBatchLimitOverride = jest.fn();
+const mockWarnOnRejectedLibraryTagLimitOverrides = jest.fn();
 
 jest.mock('./boot/boot-preflight', () => ({
   runBootPreflight: (...args: unknown[]) => mockRunBootPreflight(...(args as [])),
@@ -22,6 +23,9 @@ jest.mock('@/lib/encryption/encryption-key-boot', () => ({
 jest.mock('@/lib/api/pagination', () => ({ warnOnRejectedMaxPageLimitOverride: jest.fn() }));
 jest.mock('@/lib/api/batch-limits', () => ({
   warnOnRejectedMaxBatchLimitOverride: (...args: unknown[]) => mockWarnOnRejectedMaxBatchLimitOverride(...args),
+}));
+jest.mock('@/lib/api/library-tag-limits', () => ({
+  warnOnRejectedLibraryTagLimitOverrides: (...args: unknown[]) => mockWarnOnRejectedLibraryTagLimitOverrides(...args),
 }));
 jest.mock('@/lib/jobs/app-job-queue', () => ({
   startJobQueue: () => mockStartJobQueue(),
@@ -86,6 +90,8 @@ describe('registerNode boot wiring', () => {
     expect(mockValidateConfiguredEncryptionKey).not.toHaveBeenCalled();
     expect(mockStartJobQueue).toHaveBeenCalledTimes(1);
     expect(mockWarnOnRejectedMaxBatchLimitOverride).toHaveBeenCalledTimes(1);
+    expect(mockWarnOnRejectedLibraryTagLimitOverrides).toHaveBeenCalledTimes(1);
+    expect(mockWarnOnRejectedLibraryTagLimitOverrides).toHaveBeenCalledWith(expect.any(Object));
     expect(mockApiLoggerWarn).not.toHaveBeenCalled();
   });
 

@@ -18,6 +18,7 @@ import { startNodeSdk } from './lib/observability/start-sdk';
 import { apiLogger } from './lib/api/logger';
 import { warnOnRejectedMaxPageLimitOverride } from './lib/api/pagination';
 import { warnOnRejectedMaxBatchLimitOverride } from './lib/api/batch-limits';
+import { warnOnRejectedLibraryTagLimitOverrides } from './lib/api/library-tag-limits';
 import { validateConfiguredEncryptionKey } from './lib/encryption/encryption-key-boot';
 import { startSeededSchemeRefreshInterval } from './lib/cvc/seeded-refresh-interval';
 import { runBootPreflight } from './boot/boot-preflight';
@@ -76,9 +77,10 @@ async function startJobQueueOnBoot(): Promise<void> {
 function startOpenTelemetry(): void {
   const sdk = startNodeSdk({ serviceName: resolveServiceName() });
 
-  // Surface an unusable API_MAX_PAGE_LIMIT or API_MAX_BATCH_LIMIT to the operator once at startup.
+  // Surface an unusable API_MAX_PAGE_LIMIT, API_MAX_BATCH_LIMIT, API_MAX_TAGS_PER_RECORD or API_MAX_TAG_LENGTH to the operator once at startup.
   warnOnRejectedMaxPageLimitOverride(apiLogger);
   warnOnRejectedMaxBatchLimitOverride(apiLogger);
+  warnOnRejectedLibraryTagLimitOverrides(apiLogger);
 
   const shutdown = () => {
     sdk.shutdown().catch((err: unknown) => {

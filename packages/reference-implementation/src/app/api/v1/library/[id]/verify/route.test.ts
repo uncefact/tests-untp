@@ -123,6 +123,8 @@ function parent(overrides: Partial<LibraryRecord> = {}): LibraryRecord {
     coreDataModelVersion: null,
     detailsStatus: CredentialDetailsStatus.EXTRACTION_PENDING,
     detailsError: null,
+    tags: [],
+    tagVersion: 1,
     createdAt: new Date('2026-09-03T11:00:00.000Z'),
     updatedAt: new Date('2026-09-03T11:00:00.000Z'),
     ...overrides,

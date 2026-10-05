@@ -7,7 +7,7 @@ title: Library
 
 The library holds every credential a tenant has, whether the tenant issued it through this Reference Implementation or received it from someone else. A record for a credential the tenant issued is a **native** record. A record for a credential received from a third party is an **external** record: the tenant gives the credential's location, the Reference Implementation fetches it, checks it, and keeps its own copy, so the credential is still available if the supplier later takes it offline.
 
-This page covers listing the library, fetching several records by id, registering an external credential, retrieving one record, updating its recipient annotations, re-verifying a record and deleting a record.
+This page covers listing the library, fetching several records by id, registering an external credential, retrieving one record, updating its recipient annotations, replacing its tags, re-verifying a record and deleting a record.
 
 Native records keep the credential record id returned by issuance, so existing ids can be used with [library detail](#retrieve-one-library-record) after migrating from the retired credentials routes.
 
@@ -138,6 +138,27 @@ Most credentials are published in plain text and need no key at all; that is the
 
 `credential.name`, `credential.issuerName`, `credential.issuerDid`, `credential.subjectName`, `credential.subjectId`, `credential.validFrom` and `credential.validUntil` are read from the signed artefact the moment it is in hand, on the same terms as a credential this Reference Implementation issues. `detailsStatus` says whether that read has happened: `EXTRACTED` once it ran (so a `null` field is a real absence), `EXTRACTION_PENDING` while the artefact has not been reached (a failed fetch, an unopened ciphertext), `EXTRACTION_FAILED` when it was reached and could not be read, with `detailsError` saying why. `credential.credentialType` is the core UNTP type the artefact names; when it disagrees with the `declaredCredentialType` the caller supplied, the record carries a `DECLARED_TYPE_MISMATCH` warning rather than failing.
 
+### Tags
+
+Every library record, native or external, carries `tags`, a list of labels the tenant chooses. An application can use them to group records, or to leave out of its library screen the records another of its screens already shows, by listing with [`excludeTag`](#list-and-search-the-library).
+
+Tags are like [recipient annotations](#update-recipient-annotations) in one way. They are something the tenant says about a record, not something read from the credential. They are never written into the credential itself. They differ from annotations in two ways. Tags apply to records of both origins, so `capabilities.taggable` is `true` on every record, including a native record whose `annotatable` is `false`. And tags have their own version, `tagVersion`, separate from `annotations.annotationVersion`, so a tag change and an annotation change never conflict.
+
+A tag is made of lowercase letters `a` to `z`, digits and hyphens, and matches `^[a-z0-9]+(?:-[a-z0-9]+)*$`. It cannot start or end with a hyphen or contain two hyphens in a row. So `audit`, `cab-portal` and `q3-2026` are tags, while `Audit`, `cab_portal`, `-audit` and `cab--portal` are not. A list may not name the same tag twice.
+
+Tags are stored exactly as sent. They are never lower-cased, trimmed, sorted or de-duplicated, and a record returns them in the order they were submitted. A record with no tags has `tags: []`.
+
+By default a record holds up to 10 tags of up to 64 characters each. A deployment can change both limits with [`API_MAX_TAGS_PER_RECORD` and `API_MAX_TAG_LENGTH`](../operations/api-pagination#tag-limits). The limits apply when tags come in: on [register](#register-a-credential-received-from-a-third-party), on [single issuance](./credentials#issue-a-credential), on each item of a [batch](./credentials#submit-a-batch) and on [PUT](#replace-a-records-tags). They never apply to stored records or to the `tag` and `excludeTag` list filters. After a deployment lowers a limit, a record that holds more tags than the new limit keeps them. A PUT that is still over the limit is refused naming the limit, so the next edit has to bring the record within it.
+
+A tag that breaks a rule is a `400` whose message names the field path and the rule, never the submitted value:
+
+- `tags.2: must be lowercase letters and digits, with single hyphens between them`
+- `tags: must contain no more than 10 tags`
+- `tags.0: must be no longer than 64 characters`
+- `tags.3: must not repeat a tag; duplicates tags.1`
+
+`tagVersion` starts at `1`. Tags are set when a record is created, or replaced as a whole with [PUT](#replace-a-records-tags), which advances `tagVersion` by one. Records created before v0.7 start with `tags: []` and `tagVersion: 1`. Tag them with PUT, sending the record's `tagVersion`.
+
 ## Endpoints
 
 ### List and search the library
@@ -184,6 +205,8 @@ This returns both native and external records in the standard paginated envelope
         "dateReceived": "2026-07-30",
         "notes": ""
       },
+      "tags": ["audit"],
+      "tagVersion": 1,
       "organisationId": null,
       "facilityId": null,
       "productId": null,
@@ -214,7 +237,13 @@ This returns both native and external records in the standard paginated envelope
       "detailsError": null,
       "status": null,
       "lifecycle": null,
-      "capabilities": { "deletable": true, "annotatable": true, "verifiable": true, "statusManageable": false },
+      "capabilities": {
+        "deletable": true,
+        "annotatable": true,
+        "taggable": true,
+        "verifiable": true,
+        "statusManageable": false
+      },
       "warnings": [],
       "createdAt": "2026-07-30T09:00:00Z",
       "updatedAt": "2026-07-30T09:00:06Z"
@@ -233,6 +262,8 @@ This returns both native and external records in the standard paginated envelope
         "validUntil": "2029-07-15T09:00:00Z"
       },
       "annotations": null,
+      "tags": [],
+      "tagVersion": 1,
       "organisationId": "cjld2cyuq0001qzrmf1w70eq4",
       "facilityId": "cjld2cyuq0002qzrmf1w70eq5",
       "productId": "cjld2cyuq0003qzrmf1w70eq6",
@@ -263,7 +294,13 @@ This returns both native and external records in the standard paginated envelope
       "detailsError": null,
       "status": { "capture": "PENDING", "statusCaptureError": null, "entries": [] },
       "lifecycle": "unknown",
-      "capabilities": { "deletable": true, "annotatable": false, "verifiable": true, "statusManageable": false },
+      "capabilities": {
+        "deletable": true,
+        "annotatable": false,
+        "taggable": true,
+        "verifiable": true,
+        "statusManageable": false
+      },
       "warnings": [],
       "createdAt": "2026-07-15T09:00:00Z",
       "updatedAt": "2026-07-15T09:00:00Z"
@@ -294,12 +331,18 @@ The route accepts these filters. All supplied filters are combined with `AND`, a
 | `issuer`                                    | Exact non-blank issuer name, case-insensitively, or exact issuer DID. It is not a substring or fuzzy match.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `encrypted`                                 | Exact boolean match. For external records, an unobserved `null` encryption value matches neither `true` nor `false`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `status`                                    | The derived verification summary: `pending`, `verified`, `not_conformant` or `failed`. Native generation 1 with no stored run is `verified`. Native acquisition and custody checks are masked before the summary is derived.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `tag`                                       | Repeatable [tag](#tags) filter, for example `?tag=audit&tag=export`. A record matches when it holds any of the values. Applies to records of both origins.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `excludeTag`                                | Repeatable [tag](#tags) filter, for example `?excludeTag=cab-portal`. A record is left out when it holds any of the values. A record with no tags is never left out. When `tag` and `excludeTag` both name a tag a record holds, the record is left out.                                                                                                                                                                                                                                                                                                                                                                     |
 | `lifecycle`                                 | Confirmed issuer lifecycle: `revoked`, `suspended`, `none` or `unknown`. External records are excluded when this filter is supplied.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `issuedFrom`, `issuedTo`                    | Inclusive UTC calendar-day bounds over the effective date used for sorting: the credential's `validFrom`, falling back to `createdAt` when it is null. `issuedFrom` starts at `00:00:00.000Z` and `issuedTo` ends at `23:59:59.999Z`. A reversed range is a `400` validation error. The response's `issuedAt` remains `validFrom` and stays null when that is null.                                                                                                                                                                                                                                                          |
 | `sort`                                      | `issuedAt:asc`, `issuedAt:desc`, `createdAt:asc` or `createdAt:desc`. The default is `issuedAt:desc`. Every order uses `id` ascending as its tie-breaker. A page is a snapshot of its own request only, so a record registered between two fetches, or a backfill that changes a legacy row's effective date, can move a row between offset pages, repeat it or skip it.                                                                                                                                                                                                                                                     |
 | `limit`, `offset`                           | Positive page size and non-negative skip. A `limit` above the deployment maximum returns `400 PAGE_LIMIT_EXCEEDED` naming that maximum. It is never silently clamped.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
-The `q` parameter is documented for the future free-text search lane, but is deliberately not implemented in v1. Any presence of `q`, including `?q`, `?q=` or a repeated value, returns `400 FREE_TEXT_SEARCH_DEFERRED` rather than an unfiltered result. Unknown query keys are ignored according to the API's request parsing convention. `type` is the only key that may be supplied more than once, and any other repeated key returns a `400` naming it. A NUL byte in an issuer or association filter returns an empty page after validation so it cannot reach the database as invalid text.
+Values of one tag parameter are combined with `OR`, as `type` values are, and the two tag parameters are combined with `AND`. Both run in the query before paging, so `pagination.total` and `hasMore` count only the records that match the filters, including any reported in `failures`. Filtering the page in the client instead would break that accounting. A page of 20 records that holds three the client hides shows 17, and `total` and `hasMore` no longer describe what the user sees.
+
+For example, take a tenant whose library holds four records, tagged `[audit]`, `[audit, cab-portal]`, `[cab-portal]` and `[]`. `GET /api/v1/library?tag=audit&excludeTag=cab-portal` returns only the first, with `pagination.total` of `1`. The second holds `audit` but is left out by `excludeTag`. The third and fourth do not hold `audit`.
+
+The `q` parameter is documented for a future free-text search, but is deliberately not implemented in v1. Any presence of `q`, including `?q`, `?q=` or a repeated value, returns `400 FREE_TEXT_SEARCH_DEFERRED` rather than an unfiltered result. Unknown query keys are ignored according to the API's request parsing convention. `type`, `tag` and `excludeTag` are the only keys that may be supplied more than once, and any other repeated key returns a `400` naming it. A `tag` or `excludeTag` value that breaks the [tag format](#tags), including an empty value or one containing a NUL byte, returns a `400` naming the parameter. No length limit applies to these values, so a tag stored under a higher `API_MAX_TAG_LENGTH` can still be filtered on. A NUL byte in an issuer or association filter returns an empty page after validation so it cannot reach the database as invalid text.
 
 ### Fetch several library records by id
 
@@ -357,6 +400,8 @@ The response is always the keyless `CredentialRecord` shape. It does not include
         "dateReceived": "2026-07-30",
         "notes": null
       },
+      "tags": ["audit"],
+      "tagVersion": 1,
       "organisationId": null,
       "facilityId": null,
       "productId": null,
@@ -387,7 +432,13 @@ The response is always the keyless `CredentialRecord` shape. It does not include
       "detailsError": null,
       "status": null,
       "lifecycle": null,
-      "capabilities": { "deletable": true, "annotatable": true, "verifiable": true, "statusManageable": false },
+      "capabilities": {
+        "deletable": true,
+        "annotatable": true,
+        "taggable": true,
+        "verifiable": true,
+        "statusManageable": false
+      },
       "warnings": [],
       "createdAt": "2026-07-30T09:00:00Z",
       "updatedAt": "2026-07-30T09:00:06Z"
@@ -406,6 +457,8 @@ The response is always the keyless `CredentialRecord` shape. It does not include
         "validUntil": null
       },
       "annotations": null,
+      "tags": [],
+      "tagVersion": 1,
       "organisationId": null,
       "facilityId": null,
       "productId": null,
@@ -436,7 +489,13 @@ The response is always the keyless `CredentialRecord` shape. It does not include
       "detailsError": null,
       "status": { "capture": "PENDING", "statusCaptureError": null, "entries": [] },
       "lifecycle": "unknown",
-      "capabilities": { "deletable": true, "annotatable": false, "verifiable": true, "statusManageable": false },
+      "capabilities": {
+        "deletable": true,
+        "annotatable": false,
+        "taggable": true,
+        "verifiable": true,
+        "statusManageable": false
+      },
       "warnings": [],
       "createdAt": "2026-07-15T09:00:00Z",
       "updatedAt": "2026-07-15T09:00:00Z"
@@ -490,15 +549,16 @@ sequenceDiagram
     "declaredCredentialType": "DPP",
     "dateReceived": "2026-08-30",
     "notes": "Received by email"
-  }
+  },
+  "tags": ["audit", "supplier-ltd"]
 }
 ```
 
-`sourceUrl`, `annotations.displayName` and `annotations.declaredCredentialType` are required. `sourceEncryption` is optional and, when present, must carry `decryptionKey`; its `encryptionMethod` is accepted for compatibility with the contract and not currently used, because the envelope names its own algorithm. `dateReceived` is a calendar date.
+`sourceUrl`, `annotations.displayName` and `annotations.declaredCredentialType` are required. `tags` is optional. It sits at the top level beside `annotations` and follows the [tag rules](#tags), and a record registered without it has `tags: []`. Invalid tags return `400 VALIDATION_FAILED`. `sourceEncryption` is optional and, when present, must carry `decryptionKey`; its `encryptionMethod` is accepted for compatibility with the contract and not currently used, because the envelope names its own algorithm. `dateReceived` is a calendar date.
 
 Bounds: `sourceUrl` at most 2048 characters, `displayName` at most 200, `notes` at most 2000, `decryptionKey` must be an AES-256-GCM key as 64 hexadecimal characters; an over-long value is a `400` naming the field. `displayName` and `notes` cannot contain a NUL character. The declared credential type must be one of `DFR`, `DCC`, `DPP`, `DTE` or `DIA`, and a missing or invalid value returns a `400` naming the permitted values without repeating the submitted value. The read routes treat a NUL differently. There, a NUL in a record id or in one of the text filters (`organisationId`, `facilityId`, `productId`, `issuer`) matches nothing, while typed query parameters keep their own validation.
 
-The `Idempotency-Key` header is required. A register call creates a durable copy, so it cannot be retried safely without one. The value is caller-chosen and unique per attempt (a UUID is a good choice), 1 to 255 printable ASCII characters. A retry with the same key and the same body returns the record as it is now, with `201` again: not the original response body, but the current record, so a retried caller sees settled verification state rather than a stale `pending`. The same key with a different body is `422 IDEMPOTENCY_KEY_MISMATCH`. A key whose request was still running when the retry arrived is `409 IDEMPOTENCY_KEY_IN_FLIGHT`. A key whose request was rejected before a record was written (any `400`, the duplicate `409` below, and any `500` other than a failure to present a record that was already written) is not consumed by that request and may be reused once the problem is corrected.
+The `Idempotency-Key` header is required. A register call creates a durable copy, so it cannot be retried safely without one. The value is caller-chosen and unique per attempt (a UUID is a good choice), 1 to 255 printable ASCII characters. A retry with the same key and the same body returns the record as it is now, with `201` again: not the original response body, but the current record, so a retried caller sees settled verification state rather than a stale `pending`. The same key with a different body is `422 IDEMPOTENCY_KEY_MISMATCH`. Tags are part of the body, so the same key with different tags is a mismatch too. A key whose request was still running when the retry arrived is `409 IDEMPOTENCY_KEY_IN_FLIGHT`. A key whose request was rejected before a record was written (any `400`, the duplicate `409` below, and any `500` other than a failure to present a record that was already written) is not consumed by that request and may be reused once the problem is corrected.
 
 Duplicate detection compares the signed JWT content of an opened credential with external records in the same tenant. Different envelopes around the same signed credential therefore match, while native records do not participate. The comparison runs after decryption and credential detail extraction, before the durable copy is stored. Identity is the exact text of the accepted signed JWT, so two spellings of one credential that a verifier would both accept are two identities and neither matches the other. A duplicate creates no new record, and the request's `Idempotency-Key` is not consumed by this rejection, so the same key may be reused once the duplicate is resolved. When two registrations of the same credential race, the losing request may already have stored its durable copy before the database refuses its record. That copy is left in the storage service with no record pointing at it, and the rejection is logged for the operator. Duplicate detection applies to external records registered by this version of the Reference Implementation onwards, because records registered before it carry no content identity for a later registration to match.
 
@@ -511,7 +571,7 @@ Responses:
 - `201` with the record; see the outcome table above for which branch applied.
 - `400 VALIDATION_FAILED` for a body that fails validation, a malformed `sourceUrl`, or a missing or malformed `Idempotency-Key`; `400 SOURCE_NOT_PERMITTED` for a source on a private or reserved network address; `400` with no code when the request body could not be read at all; `413 REQUEST_BODY_TOO_LARGE` when the body exceeds the configured request size limit.
 - `409 IDEMPOTENCY_KEY_IN_FLIGHT` and `422 IDEMPOTENCY_KEY_MISMATCH` as above. `409 IDEMPOTENCY_KEY_RECORD_DELETED` when the record a replayed key produced was deleted while the request was being answered; retrying the request registers afresh.
-- `409 DUPLICATE_CREDENTIAL` when the opened signed credential is already registered as an external record in this tenant. The response names the existing record and includes its relative `Location` header. The request's `Idempotency-Key` remains available for a later fresh registration.
+- `409 DUPLICATE_CREDENTIAL` when the opened signed credential is already registered as an external record in this tenant. The response names the existing record and includes its relative `Location` header. The request's `Idempotency-Key` remains available for a later fresh registration. The request's `tags` are not applied to any record; to tag the existing record, [replace its tags](#replace-a-records-tags) on the record named in `Location`.
 - `500` with no code for any other server failure; the message carries a correlation id for the operator. `500 CREDENTIALS_ENCRYPTION_UNAVAILABLE` when this deployment cannot protect the storage key a copy of an opened credential needs. The fetch and any decrypt already ran; no copy is stored and no record is created. This is a deployment problem (the encryption key configuration), not a caller problem; see [Startup](../operations/startup).
 
 The response is the full record. Key material is never in it; the record's own decryption key is only returned by [the detail route](#retrieve-one-library-record), for a record of either origin.
@@ -614,7 +674,7 @@ sequenceDiagram
     RI-->>Client: 200 OK (updated record)
 ```
 
-This operation updates the recipient-owned annotations on an external record. The request may include any combination of `displayName`, `declaredCredentialType`, `dateReceived` and `notes`. `displayName` and `declaredCredentialType` are required on the stored record and cannot be cleared. `dateReceived` and `notes` accept an explicit `null` to clear their current values. Omitting either field leaves it unchanged. An empty body and a body containing only unknown fields are `400 VALIDATION_FAILED`, and unknown fields are stripped.
+This operation updates the recipient-owned annotations on an external record. The request may include any combination of `displayName`, `declaredCredentialType`, `dateReceived` and `notes`. `displayName` and `declaredCredentialType` are required on the stored record and cannot be cleared. `dateReceived` and `notes` accept an explicit `null` to clear their current values. Omitting either field leaves it unchanged. An empty body and a body containing only unknown fields are `400 VALIDATION_FAILED`, and unknown fields are stripped. Tags are a second kind of tenant annotation, separate from recipient annotations: they have their own version and are changed with [Replace a record's tags](#replace-a-records-tags), which works on native records too.
 
 The body bounds are the same as registration: `displayName` is between 1 and 200 characters and cannot be only whitespace, `notes` is at most 2000 characters, and `dateReceived` is a real `YYYY-MM-DD` calendar date. The two text fields cannot contain a NUL character. The declared type is one of `DFR`, `DCC`, `DPP`, `DTE` or `DIA`.
 
@@ -639,6 +699,90 @@ Responses:
 - `404 NOT_FOUND` for an absent or foreign-tenant id.
 - `409 VERSION_CONFLICT` for a stale version, with no annotation change.
 - Sanitised `500` for a read failure, an update that rolled back, or a projection failure after a committed update. A record that has reached its maximum annotation version cannot be annotated further and answers this response. Contact the operator.
+
+### Replace a record's tags
+
+```
+PUT /api/v1/library/{id}/tags
+If-Version: <tagVersion>
+```
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant RI as Reference Implementation
+    participant DB as Database
+
+    Client->>RI: PUT /api/v1/library/{id}/tags (If-Version, tags)
+    RI->>DB: Load the tenant's record
+    DB-->>RI: Record and tagVersion
+    RI->>RI: Validate If-Version, then the body
+    RI->>DB: Compare tagVersion (409 on mismatch), write tags, increment tagVersion
+    RI-->>Client: 200 OK (updated record)
+```
+
+This replaces the [tags](#tags) on a record of either origin. The body carries the full list the record should hold, and an empty list clears the tags:
+
+```json
+{
+  "tags": ["audit", "cab-portal"]
+}
+```
+
+`tags` is required and must be an array, so `{}` returns `tags: is required` and a string, object or `null` returns `tags: must be an array`. Each element follows the tag format, the list may not repeat a tag, and the deployment's [tag limits](#tags) apply. The `If-Version` header carries the record's current `tagVersion`, with the same rules as the [annotations PATCH](#update-recipient-annotations) applies to its header.
+
+The route checks in the same order as the annotations PATCH:
+
+1. An unknown id and an id belonging to another tenant return the same `404 NOT_FOUND`.
+2. A missing or malformed `If-Version` returns `400 INVALID_IF_VERSION`.
+3. An oversized body returns `413 REQUEST_BODY_TOO_LARGE`.
+4. An invalid body returns `400 VALIDATION_FAILED`, with a message that names the field path and the rule, such as `tags.2: must be lowercase letters and digits, with single hyphens between them`.
+5. A well-formed `If-Version` that does not match the stored `tagVersion` returns `409 VERSION_CONFLICT`.
+
+A successful replace answers `200` with the keyless record. Every success advances `tagVersion` by one and moves `updatedAt`, even when the list sent is the one the record already holds. A tag change never changes `annotations` or `annotations.annotationVersion`, and an annotation change never changes `tags` or `tagVersion`.
+
+For a record holding `tagVersion: 1`, the request above with `If-Version: 1` answers `200`. Other record fields are omitted here:
+
+```json
+{
+  "id": "clw0ext3rn4lprotect000003",
+  "origin": "external",
+  "tags": ["audit", "cab-portal"],
+  "tagVersion": 2,
+  "capabilities": {
+    "deletable": true,
+    "annotatable": true,
+    "taggable": true,
+    "verifiable": true,
+    "statusManageable": false
+  },
+  "updatedAt": "2026-10-05T09:30:00Z"
+}
+```
+
+Sending the same request again with `If-Version: 1` answers `409`, because the record is now at version `2`:
+
+```
+HTTP/1.1 409 Conflict
+Content-Type: application/json
+
+{
+  "error": "The supplied If-Version is stale.",
+  "code": "VERSION_CONFLICT"
+}
+```
+
+That is also what a retry gets when the first response was lost after the replace succeeded. Re-read the record, then send the list you now want with its current `tagVersion`.
+
+Responses:
+
+- `200` with the updated keyless record.
+- `401` when the request carries no valid token, as on every library operation.
+- `400 INVALID_IF_VERSION` for a missing or malformed header; `400 VALIDATION_FAILED` for an invalid body; `413 REQUEST_BODY_TOO_LARGE` when the body exceeds the configured request size limit.
+- `403` for the shared tenant-assignment refusal from authentication.
+- `404 NOT_FOUND` for an absent or foreign-tenant id.
+- `409 VERSION_CONFLICT` for a stale version, with no tag change.
+- Sanitised `500` for a read failure, a replacement that rolled back, or a projection failure after a committed replacement. Because the replacement may have committed, re-read the record and retry with the `tagVersion` it reports.
 
 ### Re-verify a library record
 

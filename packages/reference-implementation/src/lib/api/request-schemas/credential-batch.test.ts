@@ -43,4 +43,22 @@ describe('credentialBatchRequestSchema', () => {
       if (!result.success) expect(result.error.issues[0].path).toEqual(['items', 0, 'reference']);
     },
   );
+
+  it("carries each item's own tags and refuses a bad item's tags at that item's path", () => {
+    // Catches a regression that drops tags from batch items or reports a bad tag without naming its item.
+    expect(
+      credentialBatchRequestSchema.parse({ items: [{ ...item, tags: ['audit'] }, item, { ...item, tags: [] }] }),
+    ).toEqual({ items: [{ ...item, tags: ['audit'] }, item, { ...item, tags: [] }] });
+
+    const result = credentialBatchRequestSchema.safeParse({
+      items: [item, { ...item, tags: ['x', 'y', 'z', 'y'] }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toHaveLength(1);
+      expect(result.error.issues[0].path).toEqual(['items', 1, 'tags', 3]);
+      expect(result.error.issues[0].message).toBe('must not repeat a tag; duplicates items.1.tags.1');
+    }
+  });
 });

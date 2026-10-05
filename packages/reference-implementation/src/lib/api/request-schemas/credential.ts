@@ -3,6 +3,7 @@ import { AccessRole } from '@uncefact/untp-ri-services';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { bcp47TagSchema, idSchema, nonBlankString } from './shared';
 import { SUPPORTED_STATUS_PURPOSES } from '@/lib/credentials/status-purposes';
+import { libraryTagListSchema } from './library-tags';
 
 const HEX_64 = /^[a-f0-9]{64}$/i;
 
@@ -125,6 +126,9 @@ const credentialIssueRequestFields = {
     ),
   storageOptions: storageOptionsSchema.optional().describe('Storage service options'),
   publishingOptions: publishingOptionsSchema.optional().describe('IDR publishing options'),
+  // Applied to the library record the issuance creates; never part of the
+  // signed credential.
+  tags: libraryTagListSchema.optional(),
 };
 
 export const credentialIssueRequestSchema = z.object({
