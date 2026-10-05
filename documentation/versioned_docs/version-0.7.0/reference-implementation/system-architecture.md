@@ -1,0 +1,91 @@
+---
+sidebar_position: 3
+title: System Architecture
+---
+
+# System Architecture
+
+The Reference Implementation is a single application — a set of REST APIs and a web UI (currently under active development). It requires a PostgreSQL database for persistent storage and a federated identity provider (IDP) for authentication. On its own, it does not sign credentials, store files, or resolve identifiers. These capabilities are provided by independent external services — a verifiable credential service, a storage service, and an identity resolver service — each running and provisioned separately.
+
+Every component in this architecture runs independently and manages its own data. No component stores another component's data.
+
+## Components
+
+The diagram below shows all of the components and their relationships. See [Quick Start](./quick-start) for how to get these running.
+
+```mermaid
+graph TB
+    Browser["Browser"]
+    RI["Reference Implementation\n(Web UI + REST API)"]
+    Worker["Reference Implementation Worker\n(background jobs, same image)"]
+    DB["Database"]
+    KC["Federated IDP"]
+
+    VC["Verifiable Credential Service"]
+    Storage["Storage Service"]
+    IDR["Identity Resolver Service"]
+
+    Browser --> RI
+    RI -->|"queries, enqueues jobs"| DB
+    Worker -->|"claims and settles jobs"| DB
+    Worker --> VC
+    Worker --> Storage
+    RI -->|"authentication"| KC
+    RI --> VC
+    RI --> Storage
+    RI --> IDR
+```
+
+### Database
+
+The Reference Implementation uses a PostgreSQL database to store the information it needs to function: tenants, users, service registrations, identifier schemes, data models, render templates and configuration. The database does not contain signing key material, which remains in the verifiable credential service, or credential content, which lives within each service's own storage. It stores references and metadata returned from external services so that subsequent operations can find and act on them. For example, when a DID is created via the verifiable credential service, the Reference Implementation records that the DID exists, which service it was created through and which tenant it belongs to, but the key material itself remains in the verifiable credential service. It also contains service configurations, the decryption keys of credentials it stores, the external credential key store and encrypted idempotency response bodies, all encrypted at rest under `DATA_ENCRYPTION_KEY`. See [Key Management and Recovery](./operations/key-management).
+
+All data in the database is scoped to a tenant; see [Multi-Tenancy](#multi-tenancy) for how isolation is enforced. See [Database](./operations/database) for provisioning and configuration.
+
+On startup, the Reference Implementation automatically applies database migrations, converts existing rows to the formats the current version writes, and seeds system default records (tenants, service instances, data models, render templates, and more). All three steps are idempotent and can be disabled. The seed also applies any manifest mounted at `/app/seed/custom`, which is where registrars and identifier schemes come from. See [Startup](./operations/startup) for the full sequence and what gets seeded.
+
+### Background Work
+
+Some of what a request sets in motion finishes after the response. Registering a credential received from a third party ([Library API](./api/library)) does its fetching, opening and copying inside the request, then leaves the signature and status check to run later, so the record is returned in a `pending` state that settles afterwards.
+
+Batch issuance works the same way. A batch of credential requests ([Credentials API](./api/credentials#batch-issuance)) is accepted, stored and acknowledged in one response, and the worker then issues the items one at a time and records each outcome on the batch. The issuer polls the batch for progress. See the [batch issuance runbook](./operations/batch-issuance) for how a deployment monitors and recovers that work.
+
+That later work is carried by a job queue that lives in the same PostgreSQL database as everything else, so a job and the record whose state it will settle are committed together and neither can exist without the other. The application process that serves requests only places jobs on the queue. Taking them off and running them is the worker's job: a second container from the same image (`ri-worker` in the Compose stack) with a different entrypoint, no port and no HTTP, sharing the database. A deployment with no worker running leaves records waiting rather than losing them, and they settle when one starts. A job interrupted by a worker dying is retried by the queue once its attempt expires. A job that exhausts its retries, or that the queue's retention drops first, is settled by the worker's reconciliation sweep as a retryable `VERIFICATION_UNAVAILABLE` failure, and the caller re-verifies to create the next generation. The worker never migrates or seeds the database; it checks at boot that the schema it expects is there, and refuses to start without the data encryption key, because every job it runs needs it. The reasoning behind this shape is recorded in [ADR-054](https://github.com/uncefact/tests-untp/blob/next/docs/adrs/054-background-work-runs-on-a-worker.md). See [Startup](./operations/startup#job-queue-start) for queue startup and [Worker](./operations/worker) for worker lifecycle.
+
+### Federated IDP (Identity Provider)
+
+The Reference Implementation delegates authentication to a federated identity provider rather than managing credentials directly. The IDP handles user sign-in and issues tokens that the Reference Implementation validates on each request. See [Authentication](./authentication) for how authentication works, and [IDP Requirements](./authentication/idp-requirements) for supported providers and their configuration.
+
+### External Services
+
+The Reference Implementation requires three external services to operate. Each must be available for the system to issue, store, and resolve credentials:
+
+| Service                                                                   | What It Does                                                                                               |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [Verifiable Credential Service](./services/verifiable-credential-service) | Signs and verifies W3C Verifiable Credentials; manages DIDs and cryptographic key material                 |
+| [Storage Service](./services/storage-service)                             | Stores credentials, render templates, and other binary data                                                |
+| [Identity Resolver Service](./services/identity-resolver-service)         | Registers links for a given identifier so that related information, such as credentials, can be discovered |
+
+Organisations can replace any service independently as they progress along the [adoption ramp](./overview#incremental-adoption). See [Service Architecture](./services/service-architecture) for how the service registry and adapter pattern enable this.
+
+## Multi-Tenancy
+
+The Reference Implementation is a multi-tenant system. Each organisation that operates within an instance of the Reference Implementation is represented as a tenant. A tenant is the isolation boundary. Everything a tenant creates or configures — credentials, DIDs, service registrations, render templates — is private to that tenant and invisible to all others.
+
+Tenant isolation is enforced automatically — the authenticated user's identity is resolved from the IDP and mapped to a tenant, and every request is scoped to that tenant. Tenants cannot access each other's data. If a tenant does not yet exist for the authenticated user, it is created automatically. How this works depends on the tenant mode (open or closed) — see [Tenant Modes](./authentication/tenant-modes) for details.
+
+In addition to tenant-specific data, every instance of the Reference Implementation has a [system tenant](#system-tenant) that provides a shared, read-only baseline of configuration — things like core UNTP data models and default service instances, plus the registrars and identifier schemes from a mounted seed manifest. All tenants can access these system defaults, but cannot modify them. This means a new tenant is productive immediately against whatever the instance was provisioned with, without configuring anything of its own.
+
+### System Tenant
+
+The system tenant is a special internal tenant that owns all system default records. It is created automatically during [startup](./operations/startup) via the [seeding process](./operations/startup#step-3-database-seed) and serves as the mechanism through which system-wide configuration propagates to all tenants.
+
+Records owned by the system tenant — core UNTP data models, default service instances, and whichever registrars and identifier schemes the instance was provisioned with — are read-only and accessible to every tenant in the instance. So a tenant can issue credentials against the core UNTP data models (DPP, DCC, DFR, DIA, DTE) and use the default verifiable credential, storage, and identity resolver service instances without configuring anything of its own.
+
+Registrars and identifier schemes are provisioned per instance rather than built in. They come from a seed manifest mounted at `/app/seed/custom`. An instance deployed without one has none, and cannot create an identifier until it supplies some. See [Custom Seed](./operations/custom-seed).
+
+The system tenant cannot be modified by regular tenants. It exists purely to provide a shared baseline so that the system is usable out of the box. Tenants that need to customise their setup — for example, by registering their own service instances or creating their own DIDs — do so within their own tenant boundary. Tenant-level configuration — such as service instances, DIDs, and other resources — takes precedence over the system defaults when set as the active default for that tenant.
+
+## Authentication
+
+The Reference Implementation supports two authentication methods, both backed by the federated IDP: browser sessions (via OAuth2/OIDC redirect flow) and service account access (via Bearer tokens). Most routes require authentication, though some — such as credential verification — are publicly accessible. See [Authentication](./authentication) for full details.

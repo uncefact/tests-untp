@@ -1,10 +1,11 @@
 # UNTP Reference Implementation release notes
 
-## Unreleased
+## 0.7.0 - 2026-10-06
 
 Library records can now carry tags chosen by the tenant, and the library list can be filtered by them in the query, so paging stays correct when an application leaves some records out. Read [Upgrading from v0.6.2](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v062) before upgrading.
 
-- Upgrading from v0.6.2: apply the `20261005120000_library_record_tags` migration, stop the old workers and start the new ones, then expose the new web. With the bundled Compose stack, rebuild and recreate the whole stack with one `docker compose up -d --build`, not `ri` alone.
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.7.0`, `:latest`)
+- Upgrading from v0.6.2: when no batch is running, apply the `20261005120000_library_record_tags` migration, stop the old workers and start the new ones, then expose the new web. With the bundled Compose stack, rebuild and recreate the whole stack with one `docker compose up -d --build`, not `ri` alone.
 - Clients that validate responses against a pinned copy of the published schema must regenerate it, because every library record gains `tags`, `tagVersion` and `capabilities.taggable`.
 
 ### Tags on library records
