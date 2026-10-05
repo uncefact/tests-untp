@@ -40,11 +40,13 @@ type DccReferenceScheme = {
 
 type ReferenceItem = { type: [string]; id: string; name: string };
 
+type DccConformityTopic = { type: ['ConformityTopic']; id: string; name?: string; definition?: string };
+
 type DccConformityAssessment = {
   type: ['ConformityAssessment', 'Declaration'];
   referenceStandard?: ReferenceItem[];
   referenceRegulation?: ReferenceItem[];
-  assessmentCriteria?: { type: ['Criterion']; id: string; name: string; conformityTopic?: string }[];
+  assessmentCriteria?: { type: ['Criterion']; id: string; name: string; conformityTopic?: DccConformityTopic[] }[];
   assessedProduct?: DccProductVerification[];
   assessedFacility?: DccFacilityVerification[];
   assessedOrganisation?: ReturnType<typeof buildParty>;
@@ -101,7 +103,17 @@ function buildAssessment(conformityInput: ConformityInput, entities: BridgeEntit
         type: ['Criterion'] as ['Criterion'],
         id: c.id,
         name: c.name,
-        ...(c.conformityTopic && { conformityTopic: c.conformityTopic }),
+        ...(c.conformityTopics &&
+          c.conformityTopics.length > 0 && {
+            conformityTopic: c.conformityTopics.map(
+              (t): DccConformityTopic => ({
+                type: ['ConformityTopic'],
+                id: t.id,
+                ...(t.name && { name: t.name }),
+                ...(t.definition && { definition: t.definition }),
+              }),
+            ),
+          }),
       }));
 
     if (filteredCriteria.length > 0) {

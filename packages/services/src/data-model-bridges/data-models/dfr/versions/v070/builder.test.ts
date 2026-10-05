@@ -215,7 +215,11 @@ describe('buildDfrSubject (v0.7.0)', () => {
           conformity: [
             createConformityInput({
               criteria: [
-                { id: 'https://example.org/criteria/1', name: 'Criterion 1', conformityTopic: 'environment.emissions' },
+                {
+                  id: 'https://example.org/criteria/1',
+                  name: 'Criterion 1',
+                  conformityTopics: [{ id: 'https://example.org/topic/emissions', name: 'Emissions' }],
+                },
               ],
             }),
           ],
@@ -227,7 +231,9 @@ describe('buildDfrSubject (v0.7.0)', () => {
           type: ['Criterion'],
           id: 'https://example.org/criteria/1',
           name: 'Criterion 1',
-          conformityTopic: 'environment.emissions',
+          conformityTopic: [
+            { type: ['ConformityTopic'], id: 'https://example.org/topic/emissions', name: 'Emissions' },
+          ],
         },
       ]);
       expect(claim.assessmentCriteria).toBeUndefined();

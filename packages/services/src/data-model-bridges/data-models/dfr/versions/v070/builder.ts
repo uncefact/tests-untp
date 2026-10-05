@@ -13,11 +13,13 @@ type PartyRole = {
 
 type ReferenceItem = { type: [string]; id: string; name: string };
 
+type DfrConformityTopic = { type: ['ConformityTopic']; id: string; name?: string; definition?: string };
+
 type PerformanceClaim = {
   type: ['Claim', 'Declaration'];
   referenceStandard?: ReferenceItem[];
   referenceRegulation?: ReferenceItem[];
-  referenceCriteria?: { type: ['Criterion']; id: string; name: string; conformityTopic?: string }[];
+  referenceCriteria?: { type: ['Criterion']; id: string; name: string; conformityTopic?: DfrConformityTopic[] }[];
 };
 
 type DfrFacility = {
@@ -53,7 +55,17 @@ function buildPerformanceClaim(input: ConformityInput): PerformanceClaim {
         type: ['Criterion'] as ['Criterion'],
         id: c.id,
         name: c.name,
-        ...(c.conformityTopic && { conformityTopic: c.conformityTopic }),
+        ...(c.conformityTopics &&
+          c.conformityTopics.length > 0 && {
+            conformityTopic: c.conformityTopics.map(
+              (t): DfrConformityTopic => ({
+                type: ['ConformityTopic'],
+                id: t.id,
+                ...(t.name && { name: t.name }),
+                ...(t.definition && { definition: t.definition }),
+              }),
+            ),
+          }),
       }));
 
     if (filteredCriteria.length > 0) {
