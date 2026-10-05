@@ -89,25 +89,55 @@ describe('buildDfrSubject (v0.7.0)', () => {
       expect(subject.idScheme).toBeUndefined();
     });
 
-    it('maps locationInformation when geo fields are present', () => {
+    it('maps locationInformation as v0.7.0 Coordinate shapes when geo fields are present', () => {
       const subject = bridge.buildSubject(createBridgeEntities());
       expect(subject.locationInformation).toEqual({
         type: ['Location'],
         plusCode: '4RRH469X+VF',
-        geoLocation: { type: 'Point', coordinates: [151.2093, -33.8688] },
+        geoLocation: { latitude: -33.8688, longitude: 151.2093 },
       });
     });
 
-    it('maps address when present', () => {
+    it('maps address with a v0.7.0 Country object for addressCountry when present', () => {
       const subject = bridge.buildSubject(createBridgeEntities());
       expect(subject.address).toEqual({
-        type: ['Address'],
         streetAddress: '123 Test Street',
         postalCode: '2000',
         addressLocality: 'Sydney',
         addressRegion: 'NSW',
-        addressCountry: 'AU',
+        addressCountry: { countryCode: 'AU' },
       });
+    });
+
+    it('includes countryName when addressCountry is supplied as a code/name pair', () => {
+      const subject = bridge.buildSubject(
+        createBridgeEntities({
+          facility: createFacility({
+            location: {
+              address: {
+                streetAddress: '123 Test Street',
+                postalCode: '2000',
+                addressLocality: 'Sydney',
+                addressRegion: 'NSW',
+                addressCountry: { code: 'AU', name: 'Australia' },
+              },
+            },
+          }),
+        }),
+      );
+      const address = subject.address as Record<string, unknown>;
+      expect(address.addressCountry).toEqual({ countryCode: 'AU', countryName: 'Australia' });
+    });
+
+    it('omits address entirely when a required field is missing (v0.7.0 Address requires all five)', () => {
+      const subject = bridge.buildSubject(
+        createBridgeEntities({
+          facility: createFacility({
+            location: { address: { streetAddress: '123 Test Street', postalCode: '2000' } },
+          }),
+        }),
+      );
+      expect(subject.address).toBeUndefined();
     });
 
     it('omits both location and address when facility has no location data', () => {
@@ -135,6 +165,7 @@ describe('buildDfrSubject (v0.7.0)', () => {
       const party = parties[0].party as Record<string, unknown>;
 
       expect(party).toEqual({
+        type: ['Party'],
         id: 'did:web:example.com:org:1',
         name: 'Test Organisation',
         description: 'A test organisation for unit tests',

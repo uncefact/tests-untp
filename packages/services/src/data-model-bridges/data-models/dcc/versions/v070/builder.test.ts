@@ -64,6 +64,7 @@ describe('buildDccSubject (v0.7.0)', () => {
       const party = subject.issuedToParty as Record<string, unknown>;
 
       expect(party).toEqual({
+        type: ['Party'],
         id: 'did:web:example.com:org:1',
         name: 'Test Organisation',
         description: 'A test organisation for unit tests',
@@ -275,11 +276,11 @@ describe('buildDccSubject (v0.7.0)', () => {
       });
     });
 
-    it('each assessment includes assessedOrganisation when organisation is provided', () => {
+    it('each assessment includes assessedOrganisation narrowed to id and name (matches the published example)', () => {
       const subject = bridge.buildSubject(createBridgeEntities({ conformity: [createConformityInput()] }));
       const assessment = (subject.conformityAssessment as Record<string, unknown>[])[0];
       const assessedOrg = assessment.assessedOrganisation as Record<string, unknown>;
-      expect(assessedOrg).toMatchObject({ registeredId: '9520123456788', name: 'Test Organisation' });
+      expect(assessedOrg).toEqual({ type: ['Party'], id: 'did:web:example.com:org:1', name: 'Test Organisation' });
     });
 
     it('omits assessedProduct when product is not provided', () => {

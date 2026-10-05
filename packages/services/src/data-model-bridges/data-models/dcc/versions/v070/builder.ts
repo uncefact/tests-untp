@@ -1,5 +1,5 @@
 import type { BridgeEntities, CredentialSubject, ConformityInput } from '../../../../types.js';
-import { buildParty } from '../../../../primitives/party.js';
+import { buildParty } from '../../../../primitives/v070/party.js';
 import { buildIdentifierScheme } from '../../../../primitives/identifier.js';
 
 // ── Internal types ─────────────────────────────────────────────────────────────
@@ -47,10 +47,23 @@ type DccConformityAssessment = {
   assessmentCriteria?: { type: ['Criterion']; id: string; name: string; conformityTopic?: string }[];
   assessedProduct?: DccProductVerification[];
   assessedFacility?: DccFacilityVerification[];
-  assessedOrganisation?: ReturnType<typeof buildParty>;
+  assessedOrganisation?: ReturnType<typeof buildAssessedOrganisation>;
 };
 
 // ── Private helpers ────────────────────────────────────────────────────────────
+
+// assessedOrganisation is additionalProperties:true, so idScheme/registeredId/description wouldn't
+// fail validation there either -- but the published v0.7.0 DCC example only ever populates
+// {type, id, name} at this path (unlike issuedToParty, which the same example populates with the
+// full Party shape including idScheme), so narrow to match that convention.
+function buildAssessedOrganisation(organisation: BridgeEntities['organisation']): {
+  type: ['Party'];
+  id: string | undefined;
+  name: string | undefined;
+} {
+  const { type, id, name } = buildParty(organisation);
+  return { type, id, name };
+}
 
 function buildDccProduct(product: NonNullable<BridgeEntities['product']>): DccProduct {
   return {
@@ -118,7 +131,7 @@ function buildAssessment(conformityInput: ConformityInput, entities: BridgeEntit
   }
 
   if (organisation) {
-    assessment.assessedOrganisation = buildParty(organisation);
+    assessment.assessedOrganisation = buildAssessedOrganisation(organisation);
   }
 
   return assessment;
