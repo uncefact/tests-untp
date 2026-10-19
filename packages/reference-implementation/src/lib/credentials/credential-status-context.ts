@@ -88,7 +88,12 @@ export function requireStatusAttribution(record: StatusRecord): string {
 }
 
 /** Uses the canonical stored index even when the original descriptor carried a numeric index. */
-export function managementEntry(entry: CredentialStatusEntry) {
+export function managementEntry(
+  entry: Pick<
+    CredentialStatusEntry,
+    'descriptor' | 'type' | 'statusPurpose' | 'statusListCredential' | 'statusListIndex'
+  >,
+) {
   try {
     const descriptor = entry.descriptor;
     if (descriptor === null || typeof descriptor !== 'object' || Array.isArray(descriptor)) {

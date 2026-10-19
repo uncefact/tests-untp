@@ -1,4 +1,5 @@
 import { readCredentialStatus } from '../../src/lib/credentials/read-credential-status';
+import { attributeCredentialStatusInstance } from '../../src/lib/credentials/attribute-credential-status-instance';
 import { reconcileCredentialStatus } from '../../src/lib/credentials/reconcile-credential-status';
 import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -30,6 +31,7 @@ const recordId = 'status-credential';
 let baseUrl: string;
 let bit: boolean;
 let calls: string[];
+let bodies: unknown[];
 let onRead: ((response: ServerResponse) => Promise<boolean>) | undefined;
 let onSet: ((response: ServerResponse) => Promise<boolean>) | undefined;
 const server = createServer(async (req, res) => {
@@ -37,6 +39,7 @@ const server = createServer(async (req, res) => {
   for await (const chunk of req) chunks.push(chunk);
   const body = JSON.parse(Buffer.concat(chunks).toString());
   calls.push(req.url ?? '');
+  bodies.push(body);
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/agent/checkBitstringStatus') {
     if (onRead && (await onRead(res))) return;
@@ -101,6 +104,7 @@ beforeEach(async () => {
   });
   bit = false;
   calls = [];
+  bodies = [];
   onRead = undefined;
   onSet = undefined;
   process.env.CREDENTIAL_STATUS_MUTATION_ENABLED = 'true';
@@ -731,6 +735,65 @@ it('the config comparison runs after acquiring the instance lock and cannot bypa
     }),
   ).resolves.toMatchObject({ config: JSON.stringify(config()) });
   expect((await stored()).pendingToken).toBe('owned-token');
+});
+it('attribution backfill reads an entry whose stored descriptor carries a numeric index', async () => {
+  // The deployed descriptor shape: VCKit issues statusListIndex as a JSON
+  // number, while the column keeps the canonical decimal string.
+  const descriptor = {
+    id: 'https://issuer.example/status/1#7',
+    type: 'BitstringStatusListEntry',
+    statusPurpose: 'revocation',
+    statusListCredential: 'https://issuer.example/status/1',
+    statusListIndex: 7,
+  };
+  await client.credential.update({
+    where: { id: recordId },
+    data: { vcServiceInstanceId: null, vcServiceAttribution: null },
+  });
+  await client.credentialStatusEntry.update({ where: { id: entryId }, data: { statusListIndex: '7', descriptor } });
+  const options = { tenantId: SYSTEM_TENANT_ID, instanceId, reason: 'historical issuance mapping' };
+
+  const dryRun = await attributeCredentialStatusInstance({ ...options, dryRun: true }, client);
+  expect(dryRun).toMatchObject({
+    scanned: 1,
+    attributed: 1,
+    evidenceFailures: [],
+    writeFailures: [],
+    reports: [{ credentialId: recordId, attributed: true, evidence: { outcome: 'agrees' } }],
+  });
+  expect(calls).toEqual(['/agent/checkBitstringStatus']);
+  expect(bodies).toEqual([
+    {
+      verifiableCredential: {
+        credentialStatus: {
+          id: 'https://issuer.example/status/1#7',
+          type: 'BitstringStatusListEntry',
+          statusPurpose: 'revocation',
+          statusListCredential: 'https://issuer.example/status/1',
+          statusListIndex: 7,
+        },
+        issuer: { id: 'did:web:issuer.example' },
+      },
+    },
+  ]);
+  expect(await client.credential.findUniqueOrThrow({ where: { id: recordId } })).toMatchObject({
+    vcServiceInstanceId: null,
+    vcServiceAttribution: null,
+  });
+
+  const written = await attributeCredentialStatusInstance(options, client);
+  expect(written).toMatchObject({
+    attributed: 1,
+    evidenceFailures: [],
+    writeFailures: [],
+    reports: [{ credentialId: recordId, attributed: true, evidence: { outcome: 'agrees' } }],
+  });
+  expect(await client.credential.findUniqueOrThrow({ where: { id: recordId } })).toMatchObject({
+    vcServiceInstanceId: instanceId,
+    vcServiceAttribution: 'OPERATOR',
+    vcServiceAttributionReason: 'historical issuance mapping',
+  });
+  expect(await stored()).toMatchObject({ statusListIndex: '7', descriptor });
 });
 
 it('maps malformed stored descriptor input to a record error and clears only its own reservation', async () => {

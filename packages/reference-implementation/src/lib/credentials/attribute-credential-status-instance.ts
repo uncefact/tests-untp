@@ -1,11 +1,9 @@
-import type {
-  CredentialStatusEntry as WireCredentialStatusEntry,
-  CredentialStatusObservation,
-} from '@uncefact/untp-ri-services';
+import type { CredentialStatusObservation } from '@uncefact/untp-ri-services';
 import { CredentialStatusCapture, LibraryRecordOrigin, VcServiceAttribution, Prisma } from '../prisma/generated';
 import { resolveVcService } from '../services/resolve-vc-service';
 import { prisma } from '../prisma/prisma';
 import { lockLibraryRecordForUpdate } from '../prisma/repositories/library-record.repository';
+import { managementEntry } from './credential-status-context';
 
 export type CredentialStatusAttributionOptions = {
   tenantId: string;
@@ -50,11 +48,12 @@ type AttributionRow = {
   statusCapture: CredentialStatusCapture;
   statusEntries: Array<{
     id: string;
+    type: string;
     statusPurpose: string;
     statusListCredential: string;
     statusListIndex: string;
     statusListVcIssuer: string;
-    descriptor: unknown;
+    descriptor: Prisma.JsonValue;
     pendingToken: string | null;
   }>;
 };
@@ -141,9 +140,13 @@ export async function attributeCredentialStatusInstance(
     let evidenceUnavailable = false;
     for (const entry of row.statusEntries) {
       try {
+        // The stored descriptor keeps the index as VCKit issued it, a JSON
+        // number, which the provider's input parser refuses. The read uses the
+        // canonical stored coordinates, as the status read, set and reconcile
+        // paths do, and a refusal here is this entry's unavailable evidence.
         const observation = await instance.service.getCredentialStatus({
           statusListIssuer: entry.statusListVcIssuer,
-          entry: entry.descriptor as WireCredentialStatusEntry,
+          entry: managementEntry(entry),
           signal,
         });
         const evidence = assessCredentialStatusAttributionEvidence(entry, observation);
@@ -222,6 +225,7 @@ async function listRows(client: AttributionClient, predicate: Prisma.CredentialW
       statusEntries: {
         select: {
           id: true,
+          type: true,
           statusPurpose: true,
           statusListCredential: true,
           statusListIndex: true,
