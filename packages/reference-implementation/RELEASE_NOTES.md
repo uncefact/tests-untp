@@ -1,12 +1,15 @@
 # UNTP Reference Implementation release notes
 
-## Unreleased
+## 0.7.1 - 2026-10-19
 
-This patch makes the credential status attribution backfill's evidence read work for credentials whose stored status descriptor carries a numeric `statusListIndex`. It changes no setting, database migration or Compose file.
+This patch makes the credential status attribution backfill's evidence read work for credentials whose stored status descriptor carries a numeric `statusListIndex`. It changes no setting, database migration or Compose file. Read [Upgrading from v0.7.0](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v070) before upgrading.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.7.1`, `:latest`)
+- Upgrading from v0.7.0: when no batch is running, deploy the 0.7.1 image, or rebuild the bundled Compose stack, and restart the web process and every worker.
 
 ### The attribution backfill reads status entries with a numeric index
 
-From v0.6.0, `backfill:credential-status-attribution` refused its own evidence read for any credential whose stored status descriptor carries `statusListIndex` as a JSON number, which is how the Reference Implementation issues it. Each such row reported `evidence: unavailable: revocation: Unsupported credential status entry: Status entry index must be a canonical non-negative decimal string`, and the command made no provider read for it. The attribution was still written, because the evidence does not gate the write. The read now sends the entry's stored canonical coordinates, as the status read, change and reconcile routes do, so such a credential reports `evidence: agrees` when the provider read succeeds. A failed provider read is still `evidence: unavailable`. The report lines, the exit codes and the write are unchanged. See [Credential status attribution](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/backfills/credential-status-attribution).
+From v0.6.0, `backfill:credential-status-attribution` refused its own evidence read for any credential whose stored status descriptor carries `statusListIndex` as a JSON number, which is how the Reference Implementation issues it. For a revocation entry, each such row reported `evidence: unavailable: revocation: Unsupported credential status entry: Status entry index must be a canonical non-negative decimal string`, and the command made no provider read for it. The attribution was still written, because the evidence does not gate the write. The read now sends the entry's stored canonical coordinates, as the status read, change and reconcile routes do, so such a credential reports `evidence: agrees` when the provider read succeeds. A failed provider read is still `evidence: unavailable`. The report lines, the exit codes and the write are unchanged. See [Credential status attribution](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/backfills/credential-status-attribution).
 
 To re-check credentials an earlier run attributed, run the command with `--tenant <tenant-id> --instance <the instance they were attributed to> --reason "<reason>" --reassign --dry-run`. `--reassign` takes every `OPERATOR`-attributed row in the tenant and compares them against that one instance. `agrees` shows that the instance can read the entry, not that it issued the credential.
 

@@ -7,7 +7,7 @@ import Disclaimer from '.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-This guide covers upgrading a Reference Implementation deployment from v0.6.2 to v0.7. A deployment on v0.6.0 or v0.6.1 first follows the [v0.6 guide](./ri-v0.6).
+This guide covers upgrading a Reference Implementation deployment from v0.6.2 to v0.7. A deployment on v0.6.0 or v0.6.1 first follows the [v0.6 guide](./ri-v0.6). A deployment already running v0.7.0 needs only [Upgrading from v0.7.0](#upgrading-from-v070).
 
 v0.7 lets a tenant put tags on library records and filter the library list by them. See [Tags](../reference-implementation/api/library#tags) in the Library API.
 
@@ -43,3 +43,9 @@ Every record returned by the library routes gains `tags`, `tagVersion` and `capa
 ## Tagging existing records
 
 Records created before v0.7 start with `tags: []` and `tagVersion: 1`. Tag them with [`PUT /api/v1/library/{id}/tags`](../reference-implementation/api/library#replace-a-records-tags), sending the record's `tagVersion` in `If-Version`.
+
+## Upgrading from v0.7.0
+
+v0.7.1 changes no setting, database migration or Compose file. When no batch is running, deploy the v0.7.1 image, or rebuild the bundled Compose stack, and restart the web process and every worker. [Upgrading from v0.6.0](./ri-v0.6#upgrading-from-v060) explains what a worker restart during a batch does.
+
+`backfill:credential-status-attribution` now reads its evidence with each status entry's stored canonical coordinates. From v0.6.0 through v0.7.0, it reported `evidence: unavailable` for every credential whose stored status descriptor carries a numeric `statusListIndex`, which is how the Reference Implementation issues it, while still writing the attribution. Such a credential now reports `evidence: agrees` when the provider read succeeds. [Credential status attribution](../reference-implementation/operations/backfills/credential-status-attribution) describes the read, and the [release notes](https://github.com/uncefact/tests-untp/blob/next/packages/reference-implementation/RELEASE_NOTES.md) list every change in v0.7.1.
