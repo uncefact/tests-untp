@@ -1,4 +1,4 @@
-import type { UntpLocation } from '../types.js';
+import type { UntpLocation, CountryInput } from '../types.js';
 
 export type LocationInformation = {
   type: ['Location'];
@@ -30,8 +30,16 @@ export function buildLocationInformation(location: UntpLocation | null | undefin
   };
 }
 
+/** Normalises the string-or-object `addressCountry` input to a `{code, name?}` pair. */
+export function resolveCountry(addressCountry: CountryInput | undefined): { code: string; name?: string } | undefined {
+  if (!addressCountry) return undefined;
+  return typeof addressCountry === 'string' ? { code: addressCountry } : addressCountry;
+}
+
 export function buildAddress(address: UntpLocation['address'] | undefined): Address | undefined {
   if (!address) return undefined;
+
+  const country = resolveCountry(address.addressCountry);
 
   return {
     type: ['Address'],
@@ -39,6 +47,6 @@ export function buildAddress(address: UntpLocation['address'] | undefined): Addr
     ...(address.postalCode && { postalCode: address.postalCode }),
     ...(address.addressLocality && { addressLocality: address.addressLocality }),
     ...(address.addressRegion && { addressRegion: address.addressRegion }),
-    ...(address.addressCountry && { addressCountry: address.addressCountry }),
+    ...(country && { addressCountry: country.code }),
   };
 }

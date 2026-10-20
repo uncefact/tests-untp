@@ -39,13 +39,16 @@ export type ProductEntity = {
 
 // ── UntpLocation ──────────────────────────────────────────────────────────────
 
+export type CountryInput = string | { code: string; name?: string };
+
 export interface UntpLocation {
   address?: {
     streetAddress?: string;
     postalCode?: string;
     addressLocality?: string;
     addressRegion?: string;
-    addressCountry?: string;
+    /** A plain ISO-3166 code, or a code/name pair when the name is known (needed for the v0.7.0 Country shape). */
+    addressCountry?: CountryInput;
   };
   plusCode?: string;
   geoLocation?: { type: 'Point'; coordinates: [number, number] };

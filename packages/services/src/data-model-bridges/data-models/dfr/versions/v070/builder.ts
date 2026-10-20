@@ -1,7 +1,7 @@
 import type { BridgeEntities, CredentialSubject, ConformityInput, FacilityEntity } from '../../../../types.js';
-import { buildParty } from '../../../../primitives/party.js';
+import { buildParty } from '../../../../primitives/v070/party.js';
 import { buildIdentifierScheme } from '../../../../primitives/identifier.js';
-import { buildLocationInformation, buildAddress } from '../../../../primitives/location.js';
+import { buildLocationInformation, buildAddress } from '../../../../primitives/v070/location.js';
 
 // ── Internal types ─────────────────────────────────────────────────────────────
 
