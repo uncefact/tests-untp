@@ -54,11 +54,25 @@ export interface UntpLocation {
 
 // ── Conformity input ──────────────────────────────────────────────────────────
 
+// A `ConformityTopic` node reference. Used from 0.7.0 onward, where the
+// JSON-LD context declares `conformityTopic` as `@type: "@id"` with
+// `@container: "@set"` (a set of node references), unlike 0.6.x's
+// `@type: "@vocab"` (a single compacted vocabulary term, see
+// `conformityTopic` below).
+export type ConformityTopicRef = { id: string; name?: string; definition?: string };
+
 export type ConformityInput = {
   scheme?: { id: string; name?: string };
   standard?: { id: string; name?: string };
   regulation?: { id: string; name?: string };
-  criteria?: { id: string; name: string; conformityTopic?: string }[];
+  criteria?: {
+    id: string;
+    name: string;
+    /** Vocabulary code for the topic, e.g. "environment.emissions". Used by builders up to 0.6.x. */
+    conformityTopic?: string;
+    /** Topic node references. Used by 0.7.0+ builders. */
+    conformityTopics?: ConformityTopicRef[];
+  }[];
 };
 
 // ── Bridge entities (input to buildSubject) ──────────────────────────────────

@@ -1,19 +1,24 @@
-import type { BridgeEntities, CredentialSubject, ConformityInput, FacilityEntity } from '../../../../types.js';
+import type {
+  BridgeEntities,
+  CredentialSubject,
+  ConformityInput,
+  ConformityTopicRef,
+  FacilityEntity,
+} from '../../../../types.js';
 import { buildParty } from '../../../../primitives/party.js';
 import { buildIdentifierScheme } from '../../../../primitives/identifier.js';
-import { buildLocationInformation, buildAddress } from '../../../../primitives/location.js';
 
 // ── Internal types ─────────────────────────────────────────────────────────────
 
+// producedAtFacility is a facility *reference*, not the full Facility node: the
+// schema shape at this path is {type, id, name, registeredId} only — no
+// idScheme, location, or description (see DigitalProductPassport.json,
+// Product.producedAtFacility).
 type DppFacility = {
   type: ['Facility'];
   id: string | undefined;
   name: string | undefined;
-  description?: string;
   registeredId?: string;
-  idScheme?: ReturnType<typeof buildIdentifierScheme>;
-  locationInformation?: ReturnType<typeof buildLocationInformation>;
-  address?: ReturnType<typeof buildAddress>;
 };
 
 type PartyRole = {
@@ -24,32 +29,47 @@ type PartyRole = {
 
 type ReferenceItem = { type: [string]; id: string; name: string };
 
+type DppConformityTopic = { type: ['ConformityTopic']; id: string; name?: string; definition?: string };
+
 type PerformanceClaim = {
   type: ['Claim', 'Declaration'];
   referenceStandard?: ReferenceItem[];
   referenceRegulation?: ReferenceItem[];
-  referenceCriteria?: { type: ['Criterion']; id: string; name: string; conformityTopic?: string }[];
+  referenceCriteria?: { type: ['Criterion']; id: string; name: string; conformityTopic?: DppConformityTopic[] }[];
+  // Required by the schema on every Claim (distinct from the undeclared,
+  // permissively-tolerated per-criterion field above).
+  conformityTopic?: DppConformityTopic[];
 };
 
 // ── Private helpers ────────────────────────────────────────────────────────────
 
 function buildFacility(facility: FacilityEntity | undefined): DppFacility {
-  const location = facility?.location;
-  const locationInformation = buildLocationInformation(location);
-  const address = buildAddress(location?.address);
-
   return {
     type: ['Facility'],
     id: facility?.id,
     name: facility?.name,
-    ...(facility?.description && { description: facility.description }),
-    ...(facility?.primaryIdentifier && {
-      registeredId: facility.primaryIdentifier.value,
-      idScheme: buildIdentifierScheme(facility.primaryIdentifier.scheme),
-    }),
-    ...(locationInformation && { locationInformation }),
-    ...(address && { address }),
+    ...(facility?.primaryIdentifier && { registeredId: facility.primaryIdentifier.value }),
   };
+}
+
+// Deduplicates by id, keeping the first occurrence's name/definition, since the
+// same topic is commonly referenced by more than one criterion within a claim.
+function buildClaimConformityTopics(criteria: ConformityInput['criteria']): DppConformityTopic[] | undefined {
+  const byId = new Map<string, ConformityTopicRef>();
+  for (const criterion of criteria ?? []) {
+    for (const topic of criterion.conformityTopics ?? []) {
+      if (!byId.has(topic.id)) byId.set(topic.id, topic);
+    }
+  }
+
+  if (byId.size === 0) return undefined;
+
+  return [...byId.values()].map((t) => ({
+    type: ['ConformityTopic'],
+    id: t.id,
+    ...(t.name && { name: t.name }),
+    ...(t.definition && { definition: t.definition }),
+  }));
 }
 
 function buildPerformanceClaim(input: ConformityInput): PerformanceClaim {
@@ -70,11 +90,23 @@ function buildPerformanceClaim(input: ConformityInput): PerformanceClaim {
         type: ['Criterion'] as ['Criterion'],
         id: c.id,
         name: c.name,
-        ...(c.conformityTopic && { conformityTopic: c.conformityTopic }),
+        ...(c.conformityTopics &&
+          c.conformityTopics.length > 0 && {
+            conformityTopic: c.conformityTopics.map(
+              (t): DppConformityTopic => ({
+                type: ['ConformityTopic'],
+                id: t.id,
+                ...(t.name && { name: t.name }),
+                ...(t.definition && { definition: t.definition }),
+              }),
+            ),
+          }),
       }));
 
     if (filteredCriteria.length > 0) {
       claim.referenceCriteria = filteredCriteria;
+      const conformityTopic = buildClaimConformityTopics(input.criteria);
+      if (conformityTopic) claim.conformityTopic = conformityTopic;
     }
   }
 

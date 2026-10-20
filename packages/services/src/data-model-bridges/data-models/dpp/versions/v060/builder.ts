@@ -1,20 +1,18 @@
 import type { BridgeEntities, CredentialSubject, ConformityInput } from '../../../../types.js';
 import { buildParty } from '../../../../primitives/party.js';
 import { buildIdentifierScheme } from '../../../../primitives/identifier.js';
-import { buildLocationInformation, buildAddress } from '../../../../primitives/location.js';
 import type { FacilityEntity } from '../../../../types.js';
 
 // ── Internal types ─────────────────────────────────────────────────────────────
 
+// producedAtFacility is a facility *reference*, not the full Facility node: the
+// schema shape at this path is {id, name, registeredId} only — no idScheme,
+// location, or description (see DigitalProductPassport.json, Product.producedAtFacility).
 type DppFacility = {
   type: ['Facility'];
   id: string | undefined;
   name: string | undefined;
-  description?: string;
   registeredId?: string;
-  idScheme?: ReturnType<typeof buildIdentifierScheme>;
-  locationInformation?: ReturnType<typeof buildLocationInformation>;
-  address?: ReturnType<typeof buildAddress>;
 };
 
 type ConformityClaim = {
@@ -27,21 +25,11 @@ type ConformityClaim = {
 // ── Private helpers ────────────────────────────────────────────────────────────
 
 function buildFacility(facility: FacilityEntity | undefined): DppFacility {
-  const location = facility?.location;
-  const locationInformation = buildLocationInformation(location);
-  const address = buildAddress(location?.address);
-
   return {
     type: ['Facility'],
     id: facility?.id,
     name: facility?.name,
-    ...(facility?.description && { description: facility.description }),
-    ...(facility?.primaryIdentifier && {
-      registeredId: facility.primaryIdentifier.value,
-      idScheme: buildIdentifierScheme(facility.primaryIdentifier.scheme),
-    }),
-    ...(locationInformation && { locationInformation }),
-    ...(address && { address }),
+    ...(facility?.primaryIdentifier && { registeredId: facility.primaryIdentifier.value }),
   };
 }
 
