@@ -29,10 +29,13 @@ export class DidInputError extends DidError {
   }
 }
 
-/** Failed to create a DID via the upstream provider. */
+/**
+ * Failed to create a DID via the upstream provider. `cause` carries the
+ * underlying error (a timeout or a network failure) when there was one.
+ */
 export class DidCreateError extends DidError {
-  constructor(detail: string, httpStatus?: number) {
-    super(`Failed to create DID: ${detail}`, 'DID_CREATE_FAILED', 502, { httpStatus });
+  constructor(detail: string, httpStatus?: number, cause?: unknown) {
+    super(`Failed to create DID: ${detail}`, 'DID_CREATE_FAILED', 502, { httpStatus }, cause);
   }
 }
 
@@ -50,13 +53,19 @@ export class DidDeleteError extends DidError {
   }
 }
 
-/** Failed to fetch a DID document from the upstream provider. */
+/**
+ * Failed to fetch a DID document from the upstream provider. `cause` carries
+ * the underlying error (a timeout or a network failure) when there was one.
+ */
 export class DidDocumentFetchError extends DidError {
-  constructor(did: string, detail: string, httpStatus?: number) {
-    super(`Failed to fetch DID document for "${did}": ${detail}`, 'DID_DOCUMENT_FETCH_FAILED', 502, {
-      did,
-      httpStatus,
-    });
+  constructor(did: string, detail: string, httpStatus?: number, cause?: unknown) {
+    super(
+      `Failed to fetch DID document for "${did}": ${detail}`,
+      'DID_DOCUMENT_FETCH_FAILED',
+      502,
+      { did, httpStatus },
+      cause,
+    );
   }
 }
 

@@ -48,6 +48,7 @@ import {
   StatusListMutexBusyError,
   StatusListMutexTimeoutError,
 } from '@/lib/services/status-list-mutex';
+import { VCKitVerifiableCredentialService } from '@uncefact/untp-ri-services/server';
 import { setCredentialStatus } from './set-credential-status';
 import { handleRouteError } from '@/lib/api/handle-route-error';
 import { statusConfigDigest } from './credential-status-context';
@@ -95,7 +96,7 @@ let record: {
     statusEntries: ReturnType<typeof makeEntry>[];
   };
 };
-let reserved: { token: string; configDigest: string };
+let reserved: { token: string; configDigest: string; pendingSince: Date; pendingDeadline: Date };
 beforeEach(() => {
   jest.resetAllMocks();
   record = {
@@ -106,8 +107,10 @@ beforeEach(() => {
   mockTx.serviceInstance.findUniqueOrThrow.mockResolvedValue({ id: 'instance-a', serviceType: 'VC' });
   mockTransaction.mockImplementation((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx));
   mockReserve.mockImplementation(async (_tx, value) => {
-    reserved = value;
-    return { outcome: 'reserved', pendingDeadline: new Date(Date.now() + 30_000) };
+    const pendingSince = new Date();
+    const pendingDeadline = new Date(pendingSince.getTime() + 30_000);
+    reserved = { ...value, pendingSince, pendingDeadline };
+    return { outcome: 'reserved', pendingSince, pendingDeadline };
   });
   mockReadToken.mockImplementation(async () => reserved.token);
   mockGetEntry.mockImplementation(async () => ({
@@ -130,6 +133,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 it('returns the committed read-back observation and shares one signal across all provider calls', async () => {
+  const before = Date.now();
   expect(await setCredentialStatus(input)).toEqual({
     entryId: 'entry-a',
     statusPurpose: 'revocation',
@@ -140,6 +144,12 @@ it('returns the committed read-back observation and shares one signal across all
   const signal = mockRead.mock.calls[0][0].signal;
   expect(mockSet.mock.calls[0][0]).toMatchObject({ entry: { statusListIndex: '23' }, signal, value: true });
   expect(mockRead.mock.calls[1][0].signal).toBe(signal);
+  // Both reads run outside the status-list lock and may retry. The pre-read
+  // stops starting new retry waits at the budget's midpoint; the read-back
+  // may retry to the reservation's deadline (30 s in the fixture).
+  expect(reserved.pendingSince.getTime()).toBeGreaterThanOrEqual(before);
+  expect(mockRead.mock.calls[0][0].deadline).toBe(reserved.pendingSince.getTime() + 15_000);
+  expect(mockRead.mock.calls[1][0].deadline).toBe(reserved.pendingDeadline.getTime());
   expect(mockMutex.mock.calls[0][2].signal).toBe(signal);
   expect(mockFinalise.mock.calls[0][1]).toMatchObject({ token: reserved.token, expectedVersion: 4, value: true });
   expect(mockClear).not.toHaveBeenCalled();
@@ -262,7 +272,11 @@ it('refuses dispatch after a changed reservation token', async () => {
   expect(mockClear).not.toHaveBeenCalled();
 });
 it('clears intent when the deadline expires before dispatch', async () => {
-  mockReserve.mockResolvedValue({ outcome: 'reserved', pendingDeadline: new Date(Date.now() - 1) });
+  mockReserve.mockResolvedValue({
+    outcome: 'reserved',
+    pendingSince: new Date(Date.now() - 30_001),
+    pendingDeadline: new Date(Date.now() - 1),
+  });
   await expect(setCredentialStatus(input)).rejects.toMatchObject({ code: 'VC_SERVICE_UNAVAILABLE' });
   expect(mockRead).not.toHaveBeenCalled();
   expect(mockClear).toHaveBeenCalled();
@@ -468,4 +482,100 @@ it('retains intent when reservation ownership cannot be read before dispatch', a
   expect(mockRead).not.toHaveBeenCalled();
   expect(mockSet).not.toHaveBeenCalled();
   expect(mockClear).not.toHaveBeenCalled();
+});
+
+describe('pre-read retries through the VCKit adapter', () => {
+  const originalFetch = global.fetch;
+  const transport = jest.fn();
+  const answer = (status: number, body: unknown, headers: Record<string, string> = {}) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
+  const refused = () => answer(503, { message: 'gateway busy' }, { 'Retry-After': '6' });
+  /** Routes the provider reads through the real adapter, so httpFetch's retry loop honours each read's deadline. */
+  const useRealStatusReads = () => {
+    const logger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined };
+    const service = new VCKitVerifiableCredentialService(
+      { baseUrl: 'https://vckit.example.test', apiKey: 'key', apiVersion: '1.0.0' } as never,
+      { ...logger, child: () => logger } as never,
+    );
+    mockRead.mockReset().mockImplementation((request) => service.getCredentialStatus(request));
+  };
+  const settle = (work: Promise<unknown>) =>
+    work.then(
+      (value) => ({ value, error: undefined }),
+      (error: unknown) => ({ value: undefined, error }),
+    );
+
+  beforeEach(() => {
+    transport.mockReset();
+    global.fetch = transport as unknown as typeof fetch;
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    useRealStatusReads();
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.useRealTimers();
+  });
+
+  it('ends a pre-read refused past the budget midpoint as a clean read failure with no set dispatched', async () => {
+    // Fails if the pre-read retries to the full budget: its fourth attempt at
+    // 18 s would succeed and dispatch a set with too little time left, which
+    // under a slow provider ends as STATUS_OUTCOME_UNKNOWN for the tenant.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+    transport.mockImplementation(async () =>
+      Date.now() < reserved.pendingSince.getTime() + 15_000 ? refused() : answer(200, { revoked: false, errors: [] }),
+    );
+
+    const outcome = settle(setCredentialStatus(input));
+    await jest.advanceTimersByTimeAsync(31_000);
+    const { error } = await outcome;
+
+    // Attempts at 0, 6 and 12 s; a 6 s wait from 12 s would end after the 15 s midpoint.
+    expect(transport).toHaveBeenCalledTimes(3);
+    expect(error).toMatchObject({ code: 'VC_SERVICE_UNAVAILABLE', statusCode: 503 });
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(mockClear).toHaveBeenCalled();
+  });
+
+  it('proceeds to the set when a refused pre-read succeeds before the midpoint', async () => {
+    // Fails if the pre-read loses its retry, or its deadline falls before the first wait ends.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+    transport
+      .mockResolvedValueOnce(refused())
+      .mockResolvedValueOnce(answer(200, { revoked: false, errors: [] }))
+      .mockResolvedValueOnce(answer(200, { revoked: true, errors: [] }));
+
+    const outcome = settle(setCredentialStatus(input));
+    await jest.advanceTimersByTimeAsync(31_000);
+    const { value, error } = await outcome;
+
+    expect(error).toBeUndefined();
+    expect(value).toMatchObject({ value: true, version: 5 });
+    expect(transport).toHaveBeenCalledTimes(3);
+    expect(mockSet).toHaveBeenCalledTimes(1);
+    expect(mockClear).not.toHaveBeenCalled();
+  });
+
+  it('ends a pre-read that never answers at the budget signal, with no set dispatched', async () => {
+    // Fails if the pre-read loses the budget signal, which is its only bound
+    // now that the status read has no per-attempt limit: it would hang.
+    mockReserve.mockImplementation(async (_tx, value) => {
+      const pendingSince = new Date();
+      const pendingDeadline = new Date(pendingSince.getTime() + 200);
+      reserved = { ...value, pendingSince, pendingDeadline };
+      return { outcome: 'reserved', pendingSince, pendingDeadline };
+    });
+    transport.mockImplementation(
+      (_input: unknown, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+        }),
+    );
+
+    const { error } = await settle(setCredentialStatus(input));
+
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(error).toMatchObject({ code: 'VC_SERVICE_UNAVAILABLE', statusCode: 503 });
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(mockClear).toHaveBeenCalled();
+  });
 });

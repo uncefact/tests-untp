@@ -43,4 +43,6 @@ A failed row is reported with one of these classes:
 | `PURPOSE_MISSING`     | The credential carries no entry for a purpose it was issued with | no        |
 | `WRITE_RACE`          | Another process changed the row between the read and the write   | no        |
 
+A stored copy read refused with `429` or `503`, or with no response headers within 10 seconds, is sent again within a 30 second allowance before the row is reported as `STORAGE_UNAVAILABLE`, as [Outbound request retries](../outbound-retries) describes.
+
 Fix the reported cause, then use `--retry-failed` for a retryable class. A `WRITE_RACE` is never written to the row, because another process had already moved it, so an ordinary re-run picks the row up again if it is still pending and leaves it alone if that other process captured it. The remaining classes describe the credential itself and need it inspected before the row can be resolved.

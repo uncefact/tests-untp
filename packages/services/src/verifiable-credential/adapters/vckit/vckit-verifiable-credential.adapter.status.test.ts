@@ -17,7 +17,10 @@ import {
   VcStatusSetError,
 } from '../../errors';
 
-jest.mock('../../../http/client.js', () => ({ httpFetch: jest.fn() }));
+jest.mock('../../../http/client.js', () => ({
+  ...jest.requireActual('../../../http/client.js'),
+  httpFetch: jest.fn(),
+}));
 
 const mockedHttpFetch = jest.mocked(httpFetch);
 const mockWarn = jest.fn();

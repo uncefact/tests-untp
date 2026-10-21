@@ -252,6 +252,27 @@ async function completeIssuanceIdempotencyKeyOrReplay(input: {
  *                 value:
  *                   error: This Idempotency-Key was already used with a different request body.
  *                   code: IDEMPOTENCY_KEY_MISMATCH
+ *       429:
+ *         description: >-
+ *           A dependency kept answering 429 and the response carries that
+ *           status. `VC_SIGN_FAILED` means VCKit refused the signing request
+ *           and `STORAGE_PAYLOAD_REJECTED` means the storage service refused
+ *           the store request. Both requests are resent, up to four attempts
+ *           in all, before this is returned. `VC_STATUS_FAILED` means VCKit
+ *           refused the status entry mint, which makes one attempt. A refused
+ *           store request comes after signing, so no credential ID is
+ *           returned although VCKit has already signed the credential.
+ *           Retry shortly.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               signingRefused:
+ *                 summary: VCKit kept refusing the signing request
+ *                 value:
+ *                   error: 'Failed to sign credential: HTTP 429: Too Many Requests'
+ *                   code: VC_SIGN_FAILED
  *       503:
  *         description: >-
  *           Status-list coordination could not complete, so nothing was

@@ -1,4 +1,5 @@
-import { httpFetch } from '../../../http/client.js';
+import { httpFetch, warnOnRetry } from '../../../http/client.js';
+import { READ_ATTEMPT_TIMEOUT_MS } from '../../../http/retry-policy.js';
 import type { AdapterRegistryEntry } from '../../../registry/types.js';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
@@ -51,9 +52,11 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
   private readonly defaultIanaLanguage: string;
   private readonly defaultContext: string;
   private readonly defaultFwqs: boolean;
+  private readonly onRetry: ReturnType<typeof warnOnRetry>;
 
   constructor(config: PyxIdrConfig, logger: LoggerService) {
     super(logger.child({ service: 'IDR - PyxIdentityResolver', apiVersion: config.apiVersion }));
+    this.onRetry = warnOnRetry(this.logger);
     this.baseURL = config.baseUrl;
     this.headers = {
       Authorization: `Bearer ${config.apiKey}`,
@@ -121,6 +124,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(payload),
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -156,6 +160,8 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     this.logger.info(`Getting link ${linkId}`);
     const response = await httpFetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       headers: this.headers,
+      retry: { repeatable: true, attemptTimeoutMs: READ_ATTEMPT_TIMEOUT_MS },
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -199,6 +205,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
       method: 'PUT',
       headers: this.headers,
       body: JSON.stringify(payload),
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -230,6 +237,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     const response = await httpFetch(`${this.apiBasePath}/resolver/links/${linkId}`, {
       method: 'DELETE',
       headers: this.headers,
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -245,6 +253,8 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     this.logger.info('Fetching resolver description');
     const response = await httpFetch(`${this.baseURL}/.well-known/resolver`, {
       headers: this.headers,
+      retry: { repeatable: true, attemptTimeoutMs: READ_ATTEMPT_TIMEOUT_MS },
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -259,6 +269,8 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
     this.logger.info('Fetching link types');
     const response = await httpFetch(`${this.apiBasePath}/voc?show=linktypes`, {
       headers: this.headers,
+      retry: { repeatable: true, attemptTimeoutMs: READ_ATTEMPT_TIMEOUT_MS },
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -307,6 +319,7 @@ export class PyxIdentityResolverAdapter extends BaseServiceAdapter implements II
         method: 'POST',
         headers: this.headers,
         body: JSON.stringify(scheme),
+        onRetry: this.onRetry,
       });
 
       if (!response.ok) {

@@ -138,10 +138,18 @@ export async function setCredentialStatus(input: SetCredentialStatusRequest) {
         'The status reservation could not be made. No set was dispatched.',
       );
     }
-    return { ...prepared, provider, deadline: result.pendingDeadline };
+    return { ...prepared, provider, since: result.pendingSince, deadline: result.pendingDeadline };
   });
   const { entry, version, provider } = reservation;
   const budget = statusDeadline(reservation.deadline);
+  // The pre-read stops starting new retry waits at the budget's midpoint. A
+  // read already in flight at the midpoint still runs, bounded only by its
+  // signal, which spans the whole budget. A pre-read refused until the
+  // midpoint fails cleanly with no set dispatched, rather than succeeding
+  // late and leaving a set too little time, which ends as
+  // STATUS_OUTCOME_UNKNOWN. The read-back retries to the end of the budget.
+  const since = reservation.since.getTime();
+  const preReadDeadlineAt = since + (budget.deadlineAt - since) / 2;
   const identity = { entryId: entry.id, credentialId: input.recordId, tenantId: input.tenantId, token };
   const clearOwnedIntent = async (operationError: unknown): Promise<unknown | undefined> => {
     try {
@@ -161,7 +169,7 @@ export async function setCredentialStatus(input: SetCredentialStatusRequest) {
     await assertPendingToken(entry.id, input.tenantId, token);
     budget.assertTime();
   };
-  const read = async () => {
+  const read = async (deadline: number) => {
     await beforeCall();
     const observation = checkedStatusObservation(
       entry,
@@ -169,13 +177,14 @@ export async function setCredentialStatus(input: SetCredentialStatusRequest) {
         statusListIssuer: entry.statusListVcIssuer,
         entry: managementEntry(entry),
         signal: budget.signal,
+        deadline,
       }),
     );
     return { ...observation, observedAt: applicationObservationAt(input.now) };
   };
   let observation;
   try {
-    observation = await read();
+    observation = await read(preReadDeadlineAt);
   } catch (error) {
     if (error instanceof CredentialStatusError && error.code === 'STATUS_PERSISTENCE_FAILED') throw error;
     const clearFailure = await clearOwnedIntent(error);
@@ -271,7 +280,7 @@ export async function setCredentialStatus(input: SetCredentialStatusRequest) {
       );
     }
     try {
-      observation = await read();
+      observation = await read(budget.deadlineAt);
     } catch (error) {
       if (error instanceof CredentialStatusError && error.code === 'STATUS_PERSISTENCE_FAILED') throw error;
       throw new CredentialStatusError(

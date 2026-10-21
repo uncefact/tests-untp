@@ -1,4 +1,5 @@
 /** @jest-environment node */
+import { readStatusOperationBudgetMs } from '@/lib/config/credential-status.config';
 const mockRecordFindFirst = jest.fn();
 const mockInstanceFindUniqueOrThrow = jest.fn();
 const mockQueryRaw = jest.fn();
@@ -204,4 +205,15 @@ it.each([true, false])('keeps an already translated CredentialStatusError class 
     code: 'VC_SERVICE_UNAVAILABLE',
     statusCode: 503,
   });
+});
+
+it('bounds the provider read, retries included, by the reconciliation budget', async () => {
+  setPendingState(false);
+  const before = Date.now();
+  await reconcileCredentialStatus(input).catch(() => undefined);
+
+  const [{ deadline, signal }] = mockRead.mock.calls[0] as [{ deadline: number; signal: AbortSignal }];
+  expect(deadline).toBeGreaterThanOrEqual(before + readStatusOperationBudgetMs());
+  expect(deadline).toBeLessThanOrEqual(Date.now() + readStatusOperationBudgetMs());
+  expect(signal).toBeInstanceOf(AbortSignal);
 });

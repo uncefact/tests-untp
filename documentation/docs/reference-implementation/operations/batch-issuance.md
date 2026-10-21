@@ -55,7 +55,9 @@ A post-commit cancellation can still answer `202` when its item rows commit but 
 
 ## `NEEDS_ATTENTION`
 
-`NEEDS_ATTENTION` means nothing is left to run, but at least one item is `OUTCOME_UNKNOWN`. The state is deliberately cautious. A worker may have signed and published a credential and then crashed before it could record that outcome, so the system will not guess either way. An item whose attempt was interrupted, such as when a worker stopped or a job timed out, is also recorded as `OUTCOME_UNKNOWN` by the takeover whether or not the request had been sent.
+`NEEDS_ATTENTION` means nothing is left to run, but at least one item is `OUTCOME_UNKNOWN`. The state is deliberately cautious. A worker may have signed and published a credential and then crashed before it could record that outcome, so the system will not guess either way. An item whose attempt was interrupted, such as when a worker stopped or a job timed out, is also recorded as `OUTCOME_UNKNOWN` by the takeover whether or not the request had been sent. An issue request or a document store request that a dependency still refuses with `429` after the request retries also leaves its item `OUTCOME_UNKNOWN`, because nothing issues the item again after dispatch. The refusal most likely means the refused call took no effect, but an earlier call of the same item may have. See [Outbound request retries](./outbound-retries#batch-items).
+
+An identity resolver publish still refused with `429` after the request retries is different. The issuance returns the credential with an `IDR_PUBLISH_FAILED` warning, so the item is `ISSUED` and the batch can end `COMPLETED`, but the credential's links were most likely not registered. Such an item does not appear under `NEEDS_ATTENTION`. To find it, read the items in `GET /api/v1/credentials/batches/{id}`: an `ISSUED` item carries the issuance warnings in its `warning` field, so look for an entry whose `code` is `IDR_PUBLISH_FAILED`. Its `remediation` says how to register the links. The batch API has no filter for warnings.
 
 The operator commands use these arguments:
 

@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import {
   PyxIdentityResolverAdapter,
   PYX_IDR_ADAPTER_TYPE,
@@ -964,17 +967,21 @@ describe('PyxIdentityResolverAdapter', () => {
       );
     });
 
-    it('should throw on HTTP error', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 503,
-        statusText: 'Service Unavailable',
-        text: jest.fn().mockResolvedValue('Resolver down'),
-      });
+    it('should throw on an HTTP error that persists through every attempt', async () => {
+      // The description is a repeatable read, so a 503 is retried before it surfaces.
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+      try {
+        mockFetch.mockImplementation(async () => new Response('Resolver down', { status: 503 }));
+        const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
 
-      const adapter = new PyxIdentityResolverAdapter(mockConfig, mockLogger);
+        const outcome = adapter.getResolverDescription().catch((error: unknown) => error);
+        await jest.advanceTimersByTimeAsync(30_000);
 
-      await expect(adapter.getResolverDescription()).rejects.toThrow(IdrResolverFetchError);
+        expect(await outcome).toBeInstanceOf(IdrResolverFetchError);
+        expect(mockFetch).toHaveBeenCalledTimes(4);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 
@@ -1227,5 +1234,193 @@ describe('PyxIdentityResolverAdapter', () => {
       const adapter = pyxIdrRegistryEntry.factory(parsed, mockLogger);
       expect(adapter).toBeInstanceOf(PyxIdentityResolverAdapter);
     });
+  });
+});
+
+describe('PyxIdentityResolverAdapter outbound retry', () => {
+  const warn = jest.fn();
+  const logger: LoggerService = {
+    info: jest.fn(),
+    warn,
+    error: jest.fn(),
+    debug: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+  };
+  const config: PyxIdrConfig = {
+    baseUrl: 'https://resolver.example.com',
+    apiKey: 'test-api-key',
+    apiVersion: '4.0',
+    defaultLinkType: 'untp:dpp',
+    defaultMimeType: 'text/html',
+    defaultIanaLanguage: 'en',
+    defaultContext: 'au',
+    defaultFwqs: false,
+  };
+  const link: Link = {
+    href: 'https://storage.example.com/dpp.json',
+    rel: 'untp:dpp',
+    type: 'application/json',
+    title: 'DPP',
+  };
+  const storedLink = { targetUrl: link.href, linkType: link.rel, mimeType: link.type, title: link.title };
+  const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
+  const fetchMock = jest.fn();
+  const drive = async <T>(call: () => Promise<T>, ms = 60_000): Promise<{ value?: T; error?: unknown }> => {
+    const settled = call().then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    await jest.advanceTimersByTimeAsync(ms);
+    return settled;
+  };
+  const adapter = (): PyxIdentityResolverAdapter => new PyxIdentityResolverAdapter(config, logger);
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    fetchMock.mockReset();
+    warn.mockReset();
+    global.fetch = fetchMock;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('reads a link after a 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValueOnce(json(200, storedLink));
+
+    const { value } = await drive(() => adapter().getLinkById('link-1'));
+
+    expect(value).toEqual(expect.objectContaining({ href: link.href }));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads link types after a 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValueOnce(json(200, [{ type: 'dpp' }]));
+
+    const { value } = await drive(() => adapter().getLinkTypes());
+
+    expect(value).toEqual([{ type: 'dpp' }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a link registration answered 429', async () => {
+    fetchMock
+      .mockResolvedValueOnce(json(429, {}, { 'Retry-After': '2' }))
+      .mockResolvedValueOnce(json(200, { linkResponses: [{ id: 'link-1' }] }));
+
+    const { value } = await drive(() =>
+      adapter().publishLinks('abn', '51824753556', [link], undefined, { namespace: 'ato' }),
+    );
+
+    expect(value?.links).toEqual([{ idrLinkId: 'link-1', link }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ target: 'https://resolver.example.com/api/v4/resolver', cause: 429, delayMs: 2_000 }),
+      'Outbound request refused; retrying after a wait',
+    );
+  });
+
+  it('never resends a link registration answered 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValue(json(200, { linkResponses: [] }));
+
+    const { error } = await drive(() =>
+      adapter().publishLinks('abn', '51824753556', [link], undefined, { namespace: 'ato' }),
+    );
+
+    expect(error).toBeInstanceOf(IdrPublishError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never resends a link update answered 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValue(json(200, storedLink));
+
+    const { error } = await drive(() => adapter().updateLink('link-1', { title: 'New' }));
+
+    expect(error).toBeInstanceOf(IdrLinkUpdateError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never resends a link deletion answered 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValue(json(200, {}));
+
+    const { error } = await drive(() => adapter().deleteLink('link-1'));
+
+    expect(error).toBeInstanceOf(IdrLinkDeleteError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never resends a scheme registration answered 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValue(json(200, {}));
+
+    const { error } = await drive(() => adapter().registerSchemes([{ namespace: 'gs1', applicationIdentifiers: [] }]));
+
+    expect(error).toBeInstanceOf(IdrSchemeRegistrationError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a link after an attempt that gave no headers within 10 s', async () => {
+    // Fails if resolver reads lose their 10 s limit, leaving a caller hung on a silent resolver.
+    fetchMock
+      .mockImplementationOnce(
+        (_input: unknown, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            const signal = init.signal as AbortSignal;
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+          }),
+      )
+      .mockResolvedValueOnce(json(200, storedLink));
+
+    const { value } = await drive(() => adapter().getLinkById('link-1'), 10_100);
+
+    expect(value).toEqual(expect.objectContaining({ href: link.href }));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('completes a link update answered 429 and then accepted', async () => {
+    // Fails if a rate-limited link update is not resent, failing an update that would have succeeded.
+    fetchMock
+      .mockResolvedValueOnce(json(429, {}, { 'Retry-After': '1' }))
+      .mockResolvedValueOnce(json(200, { message: 'Link updated successfully' }))
+      .mockResolvedValueOnce(json(200, storedLink));
+
+    const { value, error } = await drive(() => adapter().updateLink('link-1', { title: link.title }));
+
+    expect(error).toBeUndefined();
+    expect(value).toEqual(link);
+    // Two update attempts, then the read-back the update always makes.
+    const methods = fetchMock.mock.calls.map(([, init]) => (init as RequestInit).method ?? 'GET');
+    expect(methods).toEqual(['PUT', 'PUT', 'GET']);
+  });
+
+  it('completes a link deletion answered 429 and then accepted', async () => {
+    // Fails if a rate-limited link deletion is not resent, failing a deletion that would have succeeded.
+    fetchMock
+      .mockResolvedValueOnce(json(429, {}, { 'Retry-After': '1' }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const { value, error } = await drive(() => adapter().deleteLink('link-1'));
+
+    expect(error).toBeUndefined();
+    expect(value).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('completes a scheme registration answered 429 and then accepted', async () => {
+    // Fails if a rate-limited scheme registration is not resent, failing a registration that would have succeeded.
+    const scheme = { namespace: 'gs1', applicationIdentifiers: [] };
+    fetchMock.mockResolvedValueOnce(json(429, {}, { 'Retry-After': '1' })).mockResolvedValueOnce(json(201, {}));
+
+    const { value, error } = await drive(() => adapter().registerSchemes([scheme]));
+
+    expect(error).toBeUndefined();
+    expect(value).toBeUndefined();
+    expect(fetchMock.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string))).toEqual([
+      scheme,
+      scheme,
+    ]);
   });
 });

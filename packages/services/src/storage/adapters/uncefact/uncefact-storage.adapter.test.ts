@@ -985,6 +985,8 @@ describe('UncefactStorageAdapter', () => {
         const adapter = new UncefactStorageAdapter(mockConfig, mockLogger);
 
         await expect(adapter.store(mockCredential)).rejects.toThrow(StorageStoreError);
+        // A store is effectful: a 503 is never resent, because the first attempt may have stored the object.
+        expect(mockFetch).toHaveBeenCalledTimes(1);
       });
 
       it('should set statusCode to upstream HTTP status on StorageStoreError', async () => {
@@ -1802,5 +1804,137 @@ describe('UncefactStorageAdapter', () => {
       // Verify it implements IStorageService by checking for store method
       expect(typeof (adapter as UncefactStorageAdapter).store).toBe('function');
     });
+  });
+});
+
+describe('UncefactStorageAdapter outbound retry', () => {
+  const warn = jest.fn();
+  const logger: LoggerService = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn,
+    error: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+  };
+  const config: UncefactStorageConfig = {
+    baseUrl: 'https://storage.example.com',
+    apiKey: 'test-api-key',
+    apiVersion: '4.0',
+    publicBucket: 'public-data',
+    privateBucket: 'private-data',
+  };
+  const credential: EnvelopedVerifiableCredential = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    id: 'data:application/vc+jwt,eyJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6d2ViOmV4YW1wbGUuY29tIn0.signature',
+    type: 'EnvelopedVerifiableCredential',
+  };
+  // This file runs under jsdom, which has no Response; these carry exactly
+  // the members httpFetch and the adapter read.
+  const refused = (status: number) => ({
+    ok: false,
+    status,
+    statusText: 'Too Many Requests',
+    headers: new Headers({ 'Retry-After': '1' }),
+    body: null,
+    json: jest.fn().mockResolvedValue({}),
+  });
+  const stored = () => ({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: new Headers(),
+    body: null,
+    json: jest.fn().mockResolvedValue({ uri: 'https://storage.example.com/documents/abc', hash: HEX_A }),
+  });
+  const unavailable = () => ({
+    ok: false,
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: new Headers(),
+    body: null,
+    json: jest.fn().mockResolvedValue({}),
+  });
+  const fetchMock = jest.fn();
+  const drive = async <T>(call: () => Promise<T>): Promise<T> => {
+    const settled = call();
+    await jest.advanceTimersByTimeAsync(5_000);
+    return settled;
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    fetchMock.mockReset();
+    warn.mockReset();
+    global.fetch = fetchMock;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('resends a store answered 429 with the same object id and reports the retry', async () => {
+    fetchMock.mockResolvedValueOnce(refused(429)).mockResolvedValueOnce(stored());
+
+    const record = await drive(() => new UncefactStorageAdapter(config, logger).store(credential));
+
+    expect(record.uri).toBe('https://storage.example.com/documents/abc');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [first, second] = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body as string));
+    expect(second.id).toBe(first.id);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ target: 'https://storage.example.com/api/v4/public', cause: 429 }),
+      'Outbound request refused; retrying after a wait',
+    );
+  });
+
+  it('resends a binary upload answered 429 with the same form data', async () => {
+    fetchMock.mockResolvedValueOnce(refused(429)).mockResolvedValueOnce(stored());
+
+    await drive(() => new UncefactStorageAdapter(config, logger).storeBinary('<html></html>', 'a.html', 'text/html'));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].body).toBe(fetchMock.mock.calls[0][1].body);
+  });
+
+  it('resends a deletion answered 429', async () => {
+    fetchMock.mockResolvedValueOnce(refused(429)).mockResolvedValueOnce({ ...stored(), json: jest.fn() });
+
+    await drive(() => new UncefactStorageAdapter(config, logger).delete('abc', 'public-data'));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('never resends a binary upload answered 503 and reports the refusal', async () => {
+    // Fails if a binary upload is resent after a 503, which could store the object twice.
+    fetchMock.mockResolvedValueOnce(unavailable()).mockResolvedValue(stored());
+
+    const error = await drive(() =>
+      new UncefactStorageAdapter(config, logger)
+        .storeBinary('<html></html>', 'a.html', 'text/html')
+        .catch((caught: unknown) => caught),
+    );
+
+    expect(error).toBeInstanceOf(StorageStoreError);
+    expect((error as StorageStoreError).message).toBe('Failed to store credential: HTTP 503: Service Unavailable');
+    expect((error as StorageStoreError).statusCode).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never resends a deletion answered 503 and reports the refusal', async () => {
+    // Fails if a deletion is resent after a 503, repeating a call whose first attempt may have applied.
+    fetchMock.mockResolvedValueOnce(unavailable()).mockResolvedValue({ ...stored(), json: jest.fn() });
+
+    const error = await drive(() =>
+      new UncefactStorageAdapter(config, logger).delete('abc', 'public-data').catch((caught: unknown) => caught),
+    );
+
+    expect(error).toBeInstanceOf(StorageDeleteError);
+    expect((error as StorageDeleteError).message).toBe(
+      'Failed to delete stored content: HTTP 503: Service Unavailable',
+    );
+    expect((error as StorageDeleteError).statusCode).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

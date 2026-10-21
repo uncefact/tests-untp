@@ -1,5 +1,21 @@
 # UNTP Reference Implementation release notes
 
+## Unreleased
+
+A request to VCKit, the storage service or the identity resolver that is refused for a moment is now sent again with backoff, instead of failing. This includes the operator backfills' storage and status reads, so a run during a short burst of refusals no longer reports those rows as failed or their evidence as `unavailable`. It changes no setting, database migration or Compose file. Read [Outbound request retries](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/outbound-retries) before upgrading if a gateway in front of VCKit, storage or the identity resolver can answer `429` for a request it has already forwarded.
+
+### Refused outbound requests are retried
+
+A `429` is retried for every call, on the understanding that the request was not processed. A `503` is retried only for reads and status checks: verification, status reads, DID resolution and key lookup, identity resolver reads, and reads of the deployment's own stored copies. An attempt that receives no response headers within 10 seconds is retried for DID key lookup, identity resolver reads and stored copy reads. Verification, status reads and DID resolution have no per-attempt limit. Credential issuance, document storage, link registration and DID creation are never resent after a `503` or a timeout. A call makes at most four attempts, waits a random time of up to 0.5, 1 and 2 seconds between them, honours `Retry-After`, and sends no retry after its caller's deadline, or 30 seconds after its first attempt when the caller has none.
+
+While a dependency is refusing requests, issuance, verification and status requests can take longer to answer because the Reference Implementation retries the refused calls, so a client that resubmits an issuance after its own timeout should send an `Idempotency-Key`.
+
+When the identity resolver still refuses the link registration of a published credential with `429` after the retries, the `IDR_PUBLISH_FAILED` warning now says the resolver was limiting requests and that the links were most likely not registered, instead of advising a check of the scheme registration. The credential is still issued and returned with the warning.
+
+Some requests keep a single attempt. Status-list mints and status changes run under the status-list lock and never wait. Inside a batch item, a request made before the item's credential request is sent makes one attempt, because the batch job already retries the item through `BATCH_JOB_RETRY_LIMIT` for those faults. From the credential request on, the issue request, the document store and the link registration are resent after a `429` like any other call, so an issue request that gets through settles the item as `ISSUED` instead of `OUTCOME_UNKNOWN`.
+
+The verification worker passes what is left of the job attempt to its verifier calls, so their retries stop when the job attempt's time runs out. `backfill:credential-status-attribution` gives each credential's evidence reads 30 seconds instead of 10. `backfill:credential-status-entries` and `backfill:credential-details` give each stored copy read 30 seconds instead of 10. Each retry logs the warning "Outbound request refused; retrying after a wait". See [Outbound request retries](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/outbound-retries).
+
 ## 0.7.1 - 2026-10-19
 
 This patch makes the credential status attribution backfill's evidence read work for credentials whose stored status descriptor carries a numeric `statusListIndex`. It changes no setting, database migration or Compose file. Read [Upgrading from v0.7.0](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v070) before upgrading.

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
+import { httpFetch, READ_ATTEMPT_TIMEOUT_MS, warnOnRetry } from '@uncefact/untp-ri-services/server';
 import {
   checkValidityWindow,
   decryptCredentialToBytes,
@@ -7,6 +8,7 @@ import {
   isEncryptedEnvelope,
   type EnvelopedVerifiableCredential,
   type IVerifiableCredentialService,
+  type VerifyOptions,
   type VerifyResult,
 } from '@uncefact/untp-ri-services';
 import {
@@ -545,12 +547,15 @@ async function runStoredCopyChecks(
   let verifierResults: Pick<CheckResults, 'proof' | 'status' | 'temporal'>;
   try {
     // Resolving the tenant's verifier and calling it are one unavailability
-    // for the caller: neither ran a check. The calls have no signal of their
-    // own, so each is bounded by what is left of the attempt; a hung request
-    // must not hold a worker slot past the attempt's expiry or keep the
-    // final attempt from settling.
+    // for the caller: neither ran a check. Each is bounded by what is left of
+    // the attempt; a hung request must not hold a worker slot past the
+    // attempt's expiry or keep the final attempt from settling. The verify
+    // calls also take a signal over the same budget, so the verifier stops
+    // sending, retries included, once the attempt is over.
     const verifier = await withTimeout(deps.resolveVerifier(record.record.tenantId), remaining(), 'the verifier');
-    const first = verifierChecks(await withTimeout(verifier.verify(credential), remaining(), 'the verifier call'));
+    const first = verifierChecks(
+      await verifyWithinBudget(verifier, credential, {}, context, remaining(), 'the verifier call'),
+    );
     // What the first answer established survives a failed second call: the
     // failure handler publishes this progress with the unavailability.
     progress.checks = { ...conformanceChecks, ...first };
@@ -564,7 +569,14 @@ async function runStoredCopyChecks(
       const budget = remaining();
       if (budget <= 0) throw new Error('the second verifier call had no budget left');
       const second = verifierChecks(
-        await withTimeout(verifier.verify(credential, { validityWindow: false }), budget, 'the second verifier call'),
+        await verifyWithinBudget(
+          verifier,
+          credential,
+          { validityWindow: false },
+          context,
+          budget,
+          'the second verifier call',
+        ),
       );
       if (second.temporal === CheckResult.FAIL) {
         // The verifier ignored the request to skip the window, so proof and
@@ -580,6 +592,9 @@ async function runStoredCopyChecks(
     }
   } catch (error) {
     if (error instanceof TransientVerificationError) throw error;
+    // The verify calls carry the job's signal, so an attempt the queue
+    // abandoned mid-call lands here; it was interrupted, not refused.
+    throwIfAborted(context);
     throw new TransientVerificationError(
       {
         code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
@@ -588,9 +603,9 @@ async function runStoredCopyChecks(
       error,
     );
   }
-  // The verifier takes no signal, so an attempt the queue has abandoned is
-  // caught here, after the call, rather than settling a result the queue
-  // already counts as failed.
+  // An attempt the queue abandoned while the verifier answered is caught
+  // here, after the call, rather than settling a result the queue already
+  // counts as failed.
   throwIfAborted(context);
   // The temporal check is owned here as well as by the verifier: a provider
   // that does not enforce the validity window for this envelope format
@@ -868,15 +883,22 @@ function verifierChecks(result: VerifyResult): Pick<CheckResults, 'proof' | 'sta
 }
 
 /**
- * Reads this deployment's own stored copy. A plain fetch rather than the
- * guarded resolver, for the reason the details backfill gives: the URI was
- * written by our storage adapter, not supplied by a caller, and a
- * deployment's storage service legitimately lives on a private address.
+ * Reads this deployment's own stored copy. Not the guarded resolver, for the
+ * reason the details backfill gives: the URI was written by our storage
+ * adapter, not supplied by a caller, and a deployment's storage service
+ * legitimately lives on a private address.
  */
 export async function fetchStoredCopyBytes(uri: string, timeoutMs: number): Promise<Uint8Array> {
   let response: Response;
   try {
-    response = await fetch(uri, { signal: AbortSignal.timeout(timeoutMs) });
+    // Repeatable read; retry policy in ADR-062. timeoutMs bounds the whole
+    // read, body included, and is also the retry deadline.
+    response = await httpFetch(uri, {
+      signal: AbortSignal.timeout(timeoutMs),
+      correlate: false,
+      retry: { repeatable: true, attemptTimeoutMs: READ_ATTEMPT_TIMEOUT_MS, deadline: Date.now() + timeoutMs },
+      onRetry: warnOnRetry(logger),
+    });
   } catch (error) {
     throw new StoredCopyReadError('transient', 'storage could not be reached', error);
   }
@@ -951,6 +973,46 @@ function decodeBase64(text: string): Uint8Array | null {
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 !== 0) return null;
   const bytes = new Uint8Array(Buffer.from(encoded, 'base64'));
   return Buffer.from(bytes).toString('base64') === encoded ? bytes : null;
+}
+
+/**
+ * One verifier call bounded twice by the remaining budget: `withTimeout`
+ * frees the job slot even if the verifier ignores its signal, and the signal
+ * (the job's own, or the budget running out) with the matching deadline
+ * stops the verifier's request and any retry. The signal is aborted once the
+ * call settles, so a verifier still running when `withTimeout` gave up stops
+ * too. The two signals are combined by hand because the Reference
+ * Implementation's unit tests run under jsdom, which has no
+ * `AbortSignal.any`.
+ */
+async function verifyWithinBudget(
+  verifier: IVerifiableCredentialService,
+  credential: EnvelopedVerifiableCredential,
+  options: VerifyOptions,
+  context: JobContext,
+  budgetMs: number,
+  what: string,
+): Promise<VerifyResult> {
+  const controller = new AbortController();
+  const forwardAbort = (): void => controller.abort(context.signal.reason);
+  if (context.signal.aborted) forwardAbort();
+  else context.signal.addEventListener('abort', forwardAbort, { once: true });
+  const timer = setTimeout(
+    () => controller.abort(new DOMException(`${what} ran out of the job budget`, 'TimeoutError')),
+    Math.max(0, Math.floor(budgetMs)),
+  );
+  const deadline = Date.now() + budgetMs;
+  try {
+    return await withTimeout(
+      verifier.verify(credential, { ...options, signal: controller.signal, deadline }),
+      budgetMs,
+      what,
+    );
+  } finally {
+    clearTimeout(timer);
+    context.signal.removeEventListener('abort', forwardAbort);
+    controller.abort(new DOMException(`${what} has settled`, 'AbortError'));
+  }
 }
 
 async function withTimeout<T>(

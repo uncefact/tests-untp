@@ -185,6 +185,135 @@ describe('backfillCredentialDetails', () => {
     );
   });
 
+  it('extracts a row whose stored copy was refused once, through the default artefact reader', async () => {
+    // Regression: a momentary 503 from storage marked as UNREADABLE_ENVELOPE instead of being retried (#1117).
+    const originalFetch = global.fetch;
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const body = JSON.stringify(enveloped(dppPayload()));
+    const transport = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, headers: { get: () => null }, body: null })
+      .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null }, text: async () => body });
+    global.fetch = transport as unknown as typeof fetch;
+    try {
+      const result = await backfillCredentialDetails(createFakeClient([pendingRow()]));
+
+      expect(result).toMatchObject({ scanned: 1, updated: 1, failed: 0, failures: [] });
+      expect(transport).toHaveBeenCalledTimes(2);
+      const [uri, init] = transport.mock.calls[1] as [string, RequestInit];
+      expect(uri).toBe('https://storage.test/cred-1');
+      expect(new Headers(init.headers).get('x-correlation-id')).toBeNull();
+    } finally {
+      global.fetch = originalFetch;
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('reports a stored copy refused on every attempt as unreadable, naming the status', async () => {
+    const originalFetch = global.fetch;
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const transport = jest.fn(async () => ({ ok: false, status: 503, headers: { get: () => null }, body: null }));
+    global.fetch = transport as unknown as typeof fetch;
+    try {
+      const result = await backfillCredentialDetails(createFakeClient([pendingRow()]));
+
+      expect(result.failures).toEqual([
+        {
+          id: 'cred-1',
+          errorClass: CredentialDetailsError.UNREADABLE_ENVELOPE,
+          message: 'Failed to fetch credential: storage returned 503',
+        },
+      ]);
+      expect(transport).toHaveBeenCalledTimes(4);
+    } finally {
+      global.fetch = originalFetch;
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('bounds each artefact read, body and retries included, by 30 seconds', async () => {
+    // Fails if the read bound falls back to 10 s: a refused read would have
+    // no time left to be retried before the row is reported as unreadable.
+    const originalFetch = global.fetch;
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    const body = JSON.stringify(enveloped(dppPayload()));
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => body,
+    })) as unknown as typeof fetch;
+    try {
+      await backfillCredentialDetails(createFakeClient([pendingRow()]));
+
+      expect(timeout).toHaveBeenCalledWith(30_000);
+    } finally {
+      global.fetch = originalFetch;
+      jest.restoreAllMocks();
+    }
+  });
+
+  describe('an artefact read that gives no response headers', () => {
+    /** An attempt that never answers; it ends only when its signal aborts. */
+    const hang = (_uri: string, init: RequestInit): Promise<never> =>
+      new Promise((_resolve, reject) => {
+        const signal = init.signal as AbortSignal;
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    const originalFetch = global.fetch;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    });
+
+    it('is resent after 10 seconds and the row is extracted', async () => {
+      // Fails if the read loses its per-attempt limit: the hung attempt
+      // would hold the row until the 30 s bound and report it unreadable.
+      const body = JSON.stringify(enveloped(dppPayload()));
+      const transport = jest
+        .fn()
+        .mockImplementationOnce(hang)
+        .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null }, text: async () => body });
+      global.fetch = transport as unknown as typeof fetch;
+
+      const pending = backfillCredentialDetails(createFakeClient([pendingRow()]));
+      await jest.advanceTimersByTimeAsync(9_999);
+      expect(transport).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(2);
+      const result = await pending;
+
+      expect(result).toMatchObject({ scanned: 1, updated: 1, failed: 0, failures: [] });
+      expect(transport).toHaveBeenCalledTimes(2);
+    });
+
+    it('is reported as timed out once every attempt has hung', async () => {
+      // Fails if the timeout is no longer recognised after retries: the row
+      // would be reported as a network error instead of a timeout.
+      const transport = jest.fn().mockImplementation(hang);
+      global.fetch = transport as unknown as typeof fetch;
+
+      const pending = backfillCredentialDetails(createFakeClient([pendingRow()]));
+      await jest.advanceTimersByTimeAsync(31_000);
+      const result = await pending;
+
+      expect(result.failures).toEqual([
+        {
+          id: 'cred-1',
+          errorClass: CredentialDetailsError.UNREADABLE_ENVELOPE,
+          message: 'Failed to fetch credential: request timed out',
+        },
+      ]);
+      expect(transport).toHaveBeenCalledTimes(3);
+    });
+  });
+
   it('transitions a pending row to EXTRACTED with details and the derived version', async () => {
     const rows = [pendingRow()];
     const client = createFakeClient(rows);

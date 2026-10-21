@@ -1,4 +1,5 @@
-import { httpFetch } from '../../../http/client.js';
+import { httpFetch, warnOnRetry } from '../../../http/client.js';
+import { READ_ATTEMPT_TIMEOUT_MS } from '../../../http/retry-policy.js';
 import type { IDidService, CreateDidOptions, DidRecord, DidDocument, DidVerificationResult } from '../../types.js';
 import { DidMethod, DidType, DidVerificationCheckName, SUPPORTED_DID_METHODS } from '../../types.js';
 import { verifyDid } from '../../common/verify.js';
@@ -38,6 +39,7 @@ export class VCKitDidAdapter implements IDidService {
   readonly headers: Record<string, string>;
   readonly keyType: 'Ed25519';
   private logger: LoggerService;
+  private readonly onRetry: ReturnType<typeof warnOnRetry>;
 
   constructor(
     baseURL: string,
@@ -55,6 +57,7 @@ export class VCKitDidAdapter implements IDidService {
     this.headers = headers;
     this.keyType = keyType;
     this.logger = logger || createLogger().child({ service: 'DID - VCKitDid' });
+    this.onRetry = warnOnRetry(this.logger);
   }
 
   private getHostPrefix(): string {
@@ -98,6 +101,7 @@ export class VCKitDidAdapter implements IDidService {
           ...this.headers,
         },
         body: JSON.stringify(payload),
+        onRetry: this.onRetry,
       });
 
       if (!response.ok) {
@@ -132,7 +136,7 @@ export class VCKitDidAdapter implements IDidService {
       if (error instanceof ServiceError) throw error;
       this.logger.error({ error }, 'Failed to create DID');
       const detail = error instanceof Error ? error.message : 'Unknown error';
-      throw new DidCreateError(detail);
+      throw new DidCreateError(detail, undefined, error);
     }
   }
 
@@ -151,6 +155,7 @@ export class VCKitDidAdapter implements IDidService {
           ...this.headers,
         },
         body: JSON.stringify({ did }),
+        onRetry: this.onRetry,
       });
 
       if (!response.ok) {
@@ -186,6 +191,11 @@ export class VCKitDidAdapter implements IDidService {
           Origin: `https://${decodeURIComponent(domain)}`,
         },
         body: JSON.stringify({ didUrl: did }),
+        // No per-attempt limit: VCKit resolves remote did:web documents here,
+        // which can be slow, and this call had no time limit before retries
+        // were added.
+        retry: { repeatable: true },
+        onRetry: this.onRetry,
       });
 
       if (!response.ok) {
@@ -203,7 +213,7 @@ export class VCKitDidAdapter implements IDidService {
       if (error instanceof ServiceError) throw error;
       this.logger.error({ error, did }, 'Failed to get DID document');
       const detail = error instanceof Error ? error.message : 'Unknown error';
-      throw new DidDocumentFetchError(did, detail);
+      throw new DidDocumentFetchError(did, detail, undefined, error);
     }
   }
 
@@ -222,6 +232,8 @@ export class VCKitDidAdapter implements IDidService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...this.headers },
         body: JSON.stringify({ did }),
+        retry: { repeatable: true, attemptTimeoutMs: READ_ATTEMPT_TIMEOUT_MS },
+        onRetry: this.onRetry,
       });
       if (response.ok) {
         const vckitDid = await response.json();

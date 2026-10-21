@@ -4,6 +4,9 @@ import {
   isEncryptedEnvelope,
   type EnvelopedVerifiableCredential,
 } from '@uncefact/untp-ri-services';
+// The stored-copy read bound is the services default retry budget, so a
+// change to that default moves this bound with it.
+import { DEFAULT_RETRY_BUDGET_MS } from '@uncefact/untp-ri-services/server';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { CredentialStatusCapture, CredentialStatusProvenance, LibraryRecordOrigin, Prisma } from '../prisma/generated';
 import { createCredentialStatusEntries } from '../prisma/repositories/credential-status-entry.repository';
@@ -123,7 +126,8 @@ async function readEntries(
 
   let bytes: Uint8Array;
   try {
-    bytes = await fetchCopy(row.credential.storageUri, 10_000);
+    // One budget bounds the read, body included, and its retries (ADR-062).
+    bytes = await fetchCopy(row.credential.storageUri, DEFAULT_RETRY_BUDGET_MS);
   } catch (error) {
     throw new CredentialStatusBackfillRowError('STORAGE_UNAVAILABLE', 'The stored copy could not be read', {
       cause: error,

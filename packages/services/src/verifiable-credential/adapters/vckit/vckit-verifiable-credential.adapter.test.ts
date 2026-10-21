@@ -1,9 +1,12 @@
+/**
+ * @jest-environment node
+ */
 import {
   VCKitVerifiableCredentialService,
   VCKIT_VC_ADAPTER_TYPE,
   vckitVerifiableCredentialRegistryEntry,
 } from './vckit-verifiable-credential.adapter';
-import { VcSignError, VcVerifyError, VcCredentialStatusError } from '../../errors';
+import { VcSignError, VcVerifyError, VcCredentialStatusError, VcStatusReadError, VcStatusSetError } from '../../errors';
 import { VerificationErrorCode } from '../../types';
 import type { VCKitVerifiableCredentialConfig } from './vckit-verifiable-credential.schema';
 import type { LoggerService } from '../../../logging/types';
@@ -431,21 +434,22 @@ describe('VCKitVerifiableCredentialService', () => {
       );
     });
 
-    it('should throw VcVerifyError when verify endpoint returns non-ok', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 503,
-        statusText: 'Service Unavailable',
-      });
-
-      const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
-
+    it('should throw VcVerifyError when verify endpoint keeps returning non-ok', async () => {
+      // A verification is a repeatable read: a 503 that persists through every attempt still surfaces as the error.
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
       try {
-        await adapter.verify(mockEnvelopedCredential);
-        fail('Expected VcVerifyError to be thrown');
-      } catch (error) {
+        mockFetch.mockImplementation(async () => new Response('', { status: 503, statusText: 'Service Unavailable' }));
+        const adapter = new VCKitVerifiableCredentialService(mockConfig, mockLogger);
+
+        const outcome = adapter.verify(mockEnvelopedCredential).catch((error: unknown) => error);
+        await jest.advanceTimersByTimeAsync(30_000);
+        const error = await outcome;
+
         expect(error).toBeInstanceOf(VcVerifyError);
         expect((error as VcVerifyError).message).toContain('HTTP 503');
+        expect(mockFetch).toHaveBeenCalledTimes(4);
+      } finally {
+        jest.useRealTimers();
       }
     });
   });
@@ -597,6 +601,259 @@ describe('VCKitVerifiableCredentialService', () => {
       expect(adapter).toBeDefined();
       expect(typeof adapter.sign).toBe('function');
       expect(typeof adapter.verify).toBe('function');
+    });
+  });
+});
+
+describe('VCKitVerifiableCredentialService outbound retry', () => {
+  const warn = jest.fn();
+  const logger: LoggerService = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn,
+    error: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+  };
+  const config: VCKitVerifiableCredentialConfig = {
+    baseUrl: 'https://vckit.example.com',
+    apiKey: 'test-api-key',
+    apiVersion: '1.0.0',
+  };
+  const envelope: EnvelopedVerifiableCredential = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    id: 'data:application/vc+jwt,eyJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6d2ViOmV4YW1wbGUuY29tIn0.signature',
+    type: 'EnvelopedVerifiableCredential',
+  };
+  const payload: CredentialPayload = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiableCredential'],
+    issuer: { type: ['CredentialIssuer'], id: 'did:web:example.com', name: 'Issuer' },
+    credentialSubject: { type: ['Product'], id: 'https://example.com/product/1' },
+  };
+  const entry = {
+    type: 'BitstringStatusListEntry' as const,
+    statusPurpose: 'revocation',
+    statusListIndex: '7',
+    statusListCredential: 'https://vckit.example.com/status/1',
+  };
+  const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
+  /** An attempt that answers after `ms` unless its signal fires first. */
+  const answerAfter =
+    (ms: number, response: Response) =>
+    (_input: unknown, init: RequestInit): Promise<Response> =>
+      new Promise((resolve, reject) => {
+        const signal = init.signal as AbortSignal;
+        const handle = setTimeout(() => resolve(response), ms);
+        signal.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(handle);
+            reject(signal.reason);
+          },
+          { once: true },
+        );
+      });
+  const mockFetch = jest.fn();
+  const paths = (): string[] => mockFetch.mock.calls.map(([input]) => new URL(String(input)).pathname);
+  /** Starts the call, runs the fake clock forward, and settles it either way. */
+  const drive = async <T>(call: () => Promise<T>, ms = 60_000): Promise<{ value?: T; error?: unknown }> => {
+    const settled = call().then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    await jest.advanceTimersByTimeAsync(ms);
+    return settled;
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    mockFetch.mockReset();
+    warn.mockReset();
+    global.fetch = mockFetch;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('retries a verification answered 503 and reports the retry at warn', async () => {
+    mockFetch.mockResolvedValueOnce(json(503, {})).mockResolvedValueOnce(json(200, { verified: true }));
+
+    const { value } = await drive(() => new VCKitVerifiableCredentialService(config, logger).verify(envelope));
+
+    expect(value).toEqual({ verified: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ target: 'https://vckit.example.com/agent/routeVerificationCredential', cause: 503 }),
+      'Outbound request refused; retrying after a wait',
+    );
+  });
+
+  it('stops a refused verification when the caller signal fires during the wait', async () => {
+    mockFetch
+      .mockResolvedValueOnce(json(503, {}, { 'Retry-After': '5' }))
+      .mockResolvedValue(json(200, { verified: true }));
+    const controller = new AbortController();
+
+    const outcome = new VCKitVerifiableCredentialService(config, logger)
+      .verify(envelope, { signal: controller.signal })
+      .catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(1_000);
+    controller.abort();
+    const error = await outcome;
+
+    expect(error).toBeInstanceOf(VcVerifyError);
+    expect((error as VcVerifyError).context).toEqual({ httpStatus: 503 });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // The refusal's body was read before the wait, and its attempt then
+    // released from the caller's signal.
+    expect((mockFetch.mock.calls[0][1].signal as AbortSignal).aborted).toBe(false);
+  });
+
+  it('stops retrying a refused verification at the caller deadline', async () => {
+    // Fails if the adapter drops VerifyOptions.deadline: the 30 s default
+    // would let the verifier resend after the job's budget had run out.
+    mockFetch
+      .mockResolvedValueOnce(json(429, {}, { 'Retry-After': '5' }))
+      .mockResolvedValue(json(200, { verified: true }));
+
+    const { error } = await drive(() =>
+      new VCKitVerifiableCredentialService(config, logger).verify(envelope, { deadline: Date.now() + 2_000 }),
+    );
+
+    expect(error).toBeInstanceOf(VcVerifyError);
+    expect((error as VcVerifyError).context).toEqual({ httpStatus: 429 });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes one status-set attempt on a 429 and reports it as not applied', async () => {
+    mockFetch.mockResolvedValueOnce(json(429, { message: 'slow down' })).mockResolvedValue(json(200, { status: true }));
+
+    const { error } = await drive(() =>
+      new VCKitVerifiableCredentialService(config, logger).setCredentialStatus({
+        statusListIssuer: 'did:web:example.com',
+        entry,
+        value: true,
+        signal: new AbortController().signal,
+      }),
+    );
+
+    expect(error).toBeInstanceOf(VcStatusSetError);
+    expect((error as VcStatusSetError).mayHaveApplied).toBe(false);
+    expect((error as VcStatusSetError).context).toEqual(expect.objectContaining({ httpStatus: 429 }));
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes one status-set attempt on a 503 and keeps it possibly applied', async () => {
+    mockFetch.mockResolvedValueOnce(json(503, {})).mockResolvedValue(json(200, { status: true }));
+
+    const { error } = await drive(() =>
+      new VCKitVerifiableCredentialService(config, logger).setCredentialStatus({
+        statusListIssuer: 'did:web:example.com',
+        entry,
+        value: true,
+        signal: new AbortController().signal,
+      }),
+    );
+
+    expect((error as VcStatusSetError).mayHaveApplied).toBe(true);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes one status-mint attempt on a 429', async () => {
+    mockFetch.mockResolvedValueOnce(json(429, {})).mockResolvedValue(json(200, entry));
+
+    const { error } = await drive(() => new VCKitVerifiableCredentialService(config, logger).sign(payload));
+
+    expect(error).toBeInstanceOf(VcCredentialStatusError);
+    expect((error as VcCredentialStatusError).context).toEqual({ httpStatus: 429 });
+    expect(paths()).toEqual(['/agent/issueBitstringStatusList']);
+  });
+
+  it('retries the issue request on a 429 but never on a 503', async () => {
+    const issued = {
+      verifiableCredential: {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        id: envelope.id,
+        type: 'EnvelopedVerifiableCredential',
+      },
+    };
+    mockFetch.mockResolvedValueOnce(json(429, {})).mockResolvedValueOnce(json(200, issued));
+    const adapter = new VCKitVerifiableCredentialService(config, logger);
+
+    const retried = await drive(() => adapter.sign(payload, { statusPurposes: [] }));
+    expect(retried.value).toEqual(issued.verifiableCredential);
+    expect(paths()).toEqual(['/v2/credentials/issue', '/v2/credentials/issue']);
+
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(json(503, {})).mockResolvedValue(json(200, issued));
+    const refused = await drive(() => adapter.sign(payload, { statusPurposes: [] }));
+    expect(refused.error).toBeInstanceOf(VcSignError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  describe('status read', () => {
+    const read = (
+      adapter: VCKitVerifiableCredentialService,
+      signal = new AbortController().signal,
+      deadline?: number,
+    ) => adapter.getCredentialStatus({ statusListIssuer: 'did:web:example.com', entry, signal, deadline });
+
+    it('reads after a 503', async () => {
+      mockFetch.mockResolvedValueOnce(json(503, {})).mockResolvedValueOnce(json(200, { revoked: false, errors: [] }));
+
+      const { value } = await drive(() => read(new VCKitVerifiableCredentialService(config, logger)));
+
+      expect(value).toEqual(expect.objectContaining({ value: false, statusListIndex: '7' }));
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('waits for a status read that answers after 12 s rather than aborting it', async () => {
+      // Fails if the status read regains a per-attempt limit: VCKit fetches the
+      // status list while it answers, and a 12 s read that used to succeed
+      // inside the 30 s status budget would be cut off and sent again.
+      mockFetch.mockImplementationOnce(answerAfter(12_000, json(200, { revoked: true, errors: [] })));
+
+      const { value, error } = await drive(() => read(new VCKitVerifiableCredentialService(config, logger)), 12_100);
+
+      expect(error).toBeUndefined();
+      expect(value).toEqual(expect.objectContaining({ value: true }));
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('classifies the last refusal from its readable body when the signal ends the wait', async () => {
+      mockFetch
+        .mockResolvedValueOnce(json(503, { message: 'gateway busy' }, { 'Retry-After': '5' }))
+        .mockResolvedValue(json(200, { revoked: false, errors: [] }));
+      const controller = new AbortController();
+
+      const outcome = read(new VCKitVerifiableCredentialService(config, logger), controller.signal).catch(
+        (error: unknown) => error,
+      );
+      await jest.advanceTimersByTimeAsync(1_000);
+      controller.abort();
+      const error = await outcome;
+
+      expect(error).toBeInstanceOf(VcStatusReadError);
+      expect((error as VcStatusReadError).message).toContain('gateway busy');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not wait past the read deadline', async () => {
+      mockFetch
+        .mockResolvedValueOnce(json(429, {}, { 'Retry-After': '5' }))
+        .mockResolvedValue(json(200, { revoked: false, errors: [] }));
+
+      const { error } = await drive(() =>
+        read(new VCKitVerifiableCredentialService(config, logger), undefined, Date.now() + 2_000),
+      );
+
+      expect(error).toBeInstanceOf(VcStatusReadError);
+      expect((error as VcStatusReadError).context).toEqual(expect.objectContaining({ httpStatus: 429 }));
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -585,7 +585,10 @@ describe('verifyGenerationHandler on native records', () => {
       'https://storage.example/native/credential-a',
       expect.any(Number),
     );
-    expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+    expect(verifier.verify).toHaveBeenCalledWith(
+      CREDENTIAL,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
@@ -705,7 +708,10 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
 
     expect(deps.fetchStoredCopy).toHaveBeenCalledWith(STORAGE_URI, expect.any(Number));
     expect(deps.resolveVerifier).toHaveBeenCalledWith(TENANT_ID);
-    expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+    expect(verifier.verify).toHaveBeenCalledWith(
+      CREDENTIAL,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
@@ -753,7 +759,11 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     await verifyGenerationHandler(deps)(JOB, context());
 
     expect(verifier.verify).toHaveBeenCalledTimes(2);
-    expect(verifier.verify).toHaveBeenNthCalledWith(2, expect.anything(), { validityWindow: false });
+    expect(verifier.verify).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ validityWindow: false, signal: expect.any(AbortSignal) }),
+    );
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
@@ -947,7 +957,10 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     await verifyGenerationHandler(deps)(JOB, context());
 
     expect(deps.revealStoredKey).toHaveBeenCalledWith(PROTECTED_KEY);
-    expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+    expect(verifier.verify).toHaveBeenCalledWith(
+      CREDENTIAL,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(deps.settleComplete).toHaveBeenCalledWith({
       id: RUN_ID,
       tenantId: TENANT_ID,
@@ -977,7 +990,10 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
       await verifyGenerationHandler(deps)(JOB, context({ expireSeconds: 300 }));
 
       expect(deps.checkSchemaConformance).not.toHaveBeenCalled();
-      expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+      expect(verifier.verify).toHaveBeenCalledWith(
+        CREDENTIAL,
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
       expect(loggerCalls.warn).toHaveBeenCalledWith(
         {
           recordId: RECORD_ID,
@@ -991,12 +1007,97 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
     }
   });
 
+  it('aborts the verifier request when the job is abandoned mid-call', async () => {
+    // Fails if the verify call loses its signal: the verifier would keep sending, retries included, after the queue gave up.
+    const job = new AbortController();
+    let seen: AbortSignal | undefined;
+    verifier.verify.mockImplementation(
+      (_credential: unknown, options: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          seen = options.signal;
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+          job.abort(new Error('the queue abandoned the attempt'));
+        }),
+    );
+
+    await verifyGenerationHandler(dependencies())(JOB, context({ signal: job.signal, isFinalAttempt: true }));
+
+    expect(seen?.aborted).toBe(true);
+    expect((seen?.reason as Error).message).toBe('the queue abandoned the attempt');
+  });
+
+  it('reports a verifier call the queue abandoned as interrupted, not as an unavailable verifier', async () => {
+    // Fails if the abort the job's signal caused is wrapped as an outage:
+    // the run would blame the verification service for the queue giving up.
+    const job = new AbortController();
+    verifier.verify.mockImplementation(
+      (_credential: unknown, options: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+          job.abort(new Error('the queue abandoned the attempt'));
+        }),
+    );
+    const deps = dependencies();
+
+    await verifyGenerationHandler(deps)(JOB, context({ signal: job.signal, isFinalAttempt: true }));
+
+    expect(deps.settleFailed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: {
+          code: CheckRunFailureCode.VERIFICATION_UNAVAILABLE,
+          message: 'Verification was interrupted before it finished; re-verify to run it again.',
+          retryable: true,
+        },
+      }),
+    );
+  });
+
+  it('ends the verify call signal once the call has settled', async () => {
+    // Fails if the signal is left live after the call: a verifier still
+    // retrying when the slot's own timeout won would keep sending.
+    let seen: AbortSignal | undefined;
+    verifier.verify.mockImplementation(async (_credential: unknown, options: { signal: AbortSignal }) => {
+      seen = options.signal;
+      return verified();
+    });
+
+    await verifyGenerationHandler(dependencies())(JOB, context({ isFinalAttempt: true }));
+
+    expect(seen?.aborted).toBe(true);
+  });
+
+  it('aborts the verifier request when the attempt budget runs out', async () => {
+    // Fails if the signal is not bounded by the remaining budget, so a refused verify keeps retrying past the attempt.
+    jest.useFakeTimers();
+    let seen: AbortSignal | undefined;
+    try {
+      verifier.verify.mockImplementation(
+        (_credential: unknown, options: { signal: AbortSignal }) =>
+          new Promise(() => {
+            seen = options.signal;
+          }),
+      );
+      const settled = verifyGenerationHandler(dependencies())(
+        JOB,
+        context({ expireSeconds: 60, isFinalAttempt: true }),
+      );
+      await jest.advanceTimersByTimeAsync(60_000);
+      await settled;
+
+      expect(seen?.aborted).toBe(true);
+      expect((seen?.reason as DOMException).name).toBe('TimeoutError');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('passes exact remaining budgets to the copy, schema stage and verifier', async () => {
     // Fails if the settlement margin is dropped, if the attempt starts after
     // findRun, or if a stage is given the raw expiry instead of the remaining
     // allowance. At t=20 s the copy gets 270 s; after it consumes 10 s, the
     // schema deadline is the t=290 s settlement deadline and the verifier
-    // resolution and its call each race the 260 s balance.
+    // resolution and its call each race the 260 s balance, which also bounds
+    // the verify call's own signal and retry deadline.
     jest.useFakeTimers();
     let now = 0;
     const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
@@ -1021,8 +1122,12 @@ describe('verifyGenerationHandler settlement from the verifier', () => {
 
       await verifyGenerationHandler(deps)(JOB, context({ expireSeconds: 300 }));
 
-      expect(timeoutSpy.mock.calls.map((call) => call[1])).toEqual([260_000, 260_000, 260_000]);
-      expect(verifier.verify).toHaveBeenCalledWith(CREDENTIAL);
+      expect(timeoutSpy.mock.calls.map((call) => call[1])).toEqual([260_000, 260_000, 260_000, 260_000]);
+      // The verifier's retries stop at the same balance: t=30 s plus 260 s.
+      expect(verifier.verify).toHaveBeenCalledWith(
+        CREDENTIAL,
+        expect.objectContaining({ signal: expect.any(AbortSignal), deadline: 290_000 }),
+      );
     } finally {
       timeoutSpy.mockRestore();
       nowSpy.mockRestore();
@@ -1151,10 +1256,10 @@ describe('verifyGenerationHandler on a transient failure', () => {
   });
 
   it('settles as VERIFICATION_UNAVAILABLE when the attempt is aborted during the verifier call', async () => {
-    // The verifier takes no signal, so an attempt the queue has already
-    // abandoned is caught after the call. Fails if the post-call abort check
-    // is removed: a result the queue counts as failed would then be settled
-    // as though it had completed in time.
+    // A verifier that answers although the queue abandoned the attempt is
+    // caught after the call. Fails if the post-call abort check is removed:
+    // a result the queue counts as failed would then be settled as though it
+    // had completed in time.
     const controller = new AbortController();
     verifier.verify.mockImplementation(async () => {
       controller.abort();
@@ -1547,16 +1652,86 @@ describe('the default stored-copy read', () => {
     expect(streaming.cancel).toHaveBeenCalled();
   });
 
-  it.each([408, 429, 500, 502, 503, 504])('classifies HTTP %s as transient', async (status) => {
+  it.each([408, 500, 502, 504])('classifies HTTP %s as transient after one attempt', async (status) => {
     // A later attempt may get the copy. Fails if these are lumped in with the
-    // statuses that no retry changes, which would settle the run terminally.
-    global.fetch = jest
-      .fn()
-      .mockResolvedValue({ ok: false, status, headers: { get: () => null }, body: null }) as never;
+    // statuses that no retry changes, which would settle the run terminally,
+    // or if the read starts resending a status it must not.
+    const transport = jest.fn().mockResolvedValue({ ok: false, status, headers: { get: () => null }, body: null });
+    global.fetch = transport as never;
 
     const error = await rejection();
     expect(error.kind).toBe('transient');
     expect(error.message).toBe(`storage returned HTTP ${status}`);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([429, 503])('classifies HTTP %s as transient once every attempt is refused', async (status) => {
+    // The read is repeatable, so these are retried first; there is no wait
+    // here because the jitter draw is pinned at zero. Fails if the refusal
+    // is not retried, or is reported as anything but transient afterwards.
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const transport = jest.fn().mockResolvedValue({ ok: false, status, headers: { get: () => null }, body: null });
+      global.fetch = transport as never;
+
+      const error = await rejection();
+      expect(error.kind).toBe('transient');
+      expect(error.message).toBe(`storage returned HTTP ${status}`);
+      expect(transport).toHaveBeenCalledTimes(4);
+    } finally {
+      jest.mocked(Math.random).mockRestore();
+    }
+  });
+
+  it('reads the copy when storage answers 503 once', async () => {
+    // Regression: a momentary 503 settling the run as unavailable instead of being retried (#1117).
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const body = Buffer.from(JSON.stringify(CREDENTIAL), 'utf8');
+      const transport = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 503, headers: { get: () => null }, body: null })
+        .mockResolvedValueOnce(streamed(body).response);
+      global.fetch = transport as never;
+
+      await expect(read()).resolves.toEqual(new Uint8Array(body));
+      expect(transport).toHaveBeenCalledTimes(2);
+      expect(new Headers((transport.mock.calls[1][1] as RequestInit).headers).get('x-correlation-id')).toBeNull();
+    } finally {
+      jest.mocked(Math.random).mockRestore();
+    }
+  });
+
+  it('resends a read whose first attempt gives no headers within the attempt limit', async () => {
+    // Fails if the read loses its per-attempt limit: a hung first attempt
+    // would hold the read until the overall bound and fail it as transient.
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const body = Buffer.from(JSON.stringify(CREDENTIAL), 'utf8');
+      const transport = jest
+        .fn()
+        .mockImplementationOnce(
+          (_uri: string, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              const signal = init.signal as AbortSignal;
+              signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+            }),
+        )
+        .mockResolvedValueOnce(streamed(body).response);
+      global.fetch = transport as never;
+
+      const pending = defaultVerifyGenerationDependencies().fetchStoredCopy(STORAGE_URI, 30_000);
+      await jest.advanceTimersByTimeAsync(9_999);
+      expect(transport).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(2);
+
+      await expect(pending).resolves.toEqual(new Uint8Array(body));
+      expect(transport).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.mocked(Math.random).mockRestore();
+      jest.useRealTimers();
+    }
   });
 
   it.each([403, 404, 410])('classifies HTTP %s as terminal', async (status) => {

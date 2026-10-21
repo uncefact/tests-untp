@@ -1,4 +1,4 @@
-import { httpFetch } from '../../../http/client.js';
+import { httpFetch, warnOnRetry } from '../../../http/client.js';
 import type { IVerifyResult } from '@vckit/core-types';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
@@ -254,9 +254,11 @@ function parseIssuedCredentialResponse(body: unknown): EnvelopedVerifiableCreden
 export class VCKitVerifiableCredentialService extends BaseServiceAdapter implements IVerifiableCredentialService {
   private readonly baseOrigin: string;
   private readonly headers: Record<string, string>;
+  private readonly onRetry: ReturnType<typeof warnOnRetry>;
 
   constructor(config: VCKitVerifiableCredentialConfig, logger: LoggerService) {
     super(logger.child({ service: 'VC - VCKitVerifiableCredential' }));
+    this.onRetry = warnOnRetry(this.logger);
     this.baseOrigin = new URL(config.baseUrl).origin;
     this.headers = {
       'Content-Type': 'application/json',
@@ -284,6 +286,8 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
       for (const purpose of purposes) {
         const mint = () => this.issueCredentialStatus(issuerId, purpose, options?.signal);
         const key = this.statusSerialisationKey(issuerId);
+        // Any request made inside the serialised callback must pass
+        // `retry: false`, because it runs under the status-list lock.
         credentialStatuses.push(await (options?.serialise ? options.serialise(key, mint, options.signal) : mint()));
       }
       const vc = this.constructVerifiableCredential(
@@ -342,10 +346,15 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
     };
 
     this.logger.debug('Verifying credential');
+    // A verification reads and changes nothing, so a 503 is retried too. No
+    // attempt timeout: VCKit fetches remote contexts while it verifies.
     const response = await httpFetch(`${this.baseOrigin}/agent/routeVerificationCredential`, {
       method: 'POST',
       headers: this.headers,
+      signal: options?.signal,
       body: JSON.stringify(verifyParams),
+      retry: { repeatable: true, deadline: options?.deadline },
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -381,10 +390,13 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
     const set = async (): Promise<void> => {
       let response: Response;
       try {
+        // One attempt: this runs inside the caller's status-list serialiser,
+        // and a wait there would hold the list's lock.
         response = await httpFetch(`${this.baseOrigin}/agent/setBitstringStatus`, {
           method: 'POST',
           headers: this.headers,
           signal: input.signal,
+          retry: false,
           body: JSON.stringify({
             statusListCredential: entry.statusListCredential,
             statusListVCIssuer: statusListIssuer,
@@ -426,6 +438,8 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
       }
     };
 
+    // Any request made inside the serialised callback must pass
+    // `retry: false`, because it runs under the status-list lock.
     await (input.serialise ? input.serialise(this.statusSerialisationKey(statusListIssuer), set, input.signal) : set());
   }
 
@@ -442,6 +456,11 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
         method: 'POST',
         headers: this.headers,
         signal: input.signal,
+        // A status check reads and changes nothing, so a 503 is retried too.
+        // No attempt timeout: VCKit fetches the status list credential from
+        // its URL while it answers, and the caller's signal bounds the read.
+        retry: { repeatable: true, deadline: input.deadline },
+        onRetry: this.onRetry,
         body: JSON.stringify({
           verifiableCredential: {
             credentialStatus: providerEntry,
@@ -496,6 +515,7 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
         method: 'POST',
         headers: this.headers,
         signal,
+        onRetry: this.onRetry,
         body: JSON.stringify({ credential: vc, options: { proofFormat: PROOF_FORMAT } }),
       });
     } catch (error) {
@@ -533,10 +553,13 @@ export class VCKitVerifiableCredentialService extends BaseServiceAdapter impleme
 
     let response: Response;
     try {
+      // One attempt, as for setBitstringStatus: the mint runs inside the
+      // caller's status-list serialiser.
       response = await httpFetch(`${this.baseOrigin}/agent/issueBitstringStatusList`, {
         method: 'POST',
         headers: this.headers,
         signal,
+        retry: false,
         body: JSON.stringify({ statusPurpose, bitstringStatusIssuer: issuerId }),
       });
     } catch (error) {

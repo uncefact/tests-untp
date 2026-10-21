@@ -295,7 +295,10 @@ describe('register an external credential, end to end', () => {
     verify.mockResolvedValueOnce({ verified: true });
     await handler(jobs[0], context());
 
-    expect(verify).toHaveBeenCalledWith(DPP);
+    expect(verify).toHaveBeenCalledWith(
+      DPP,
+      expect.objectContaining({ signal: expect.any(AbortSignal), deadline: expect.any(Number) }),
+    );
     const settled = await getExternalCredentialById(record.record.id, SYSTEM_TENANT_ID);
     expect(settled?.checkRun).toMatchObject({
       state: CheckRunState.COMPLETE,
@@ -341,7 +344,11 @@ describe('register an external credential, end to end', () => {
     await handler((await jobsFor(record.record.id))[0], context());
 
     expect(verify).toHaveBeenCalledTimes(2);
-    expect(verify).toHaveBeenNthCalledWith(2, expect.anything(), { validityWindow: false });
+    expect(verify).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ validityWindow: false, signal: expect.any(AbortSignal), deadline: expect.any(Number) }),
+    );
     const settled = await getExternalCredentialById(record.record.id, SYSTEM_TENANT_ID);
     expect(settled?.checkRun).toMatchObject({
       state: CheckRunState.COMPLETE,
@@ -382,7 +389,10 @@ describe('register an external credential, end to end', () => {
 
     verify.mockResolvedValueOnce({ verified: true });
     await handler((await jobsFor(record.record.id))[0], context());
-    expect(verify).toHaveBeenCalledWith(DPP);
+    expect(verify).toHaveBeenCalledWith(
+      DPP,
+      expect.objectContaining({ signal: expect.any(AbortSignal), deadline: expect.any(Number) }),
+    );
   });
 
   it('keeps an encrypted source with no key as the unopened ciphertext, failed DECRYPTION_REQUIRED, with no job', async () => {
