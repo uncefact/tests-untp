@@ -12,6 +12,15 @@ import {
   hasValidEnvelopeStructure,
   isEncryptedEnvelope,
 } from '@uncefact/untp-ri-services/encryption';
+// The read bounds are the services retry constants, so a change to the
+// default retry budget or the read attempt limit moves these reads with it.
+import {
+  DEFAULT_RETRY_BUDGET_MS,
+  READ_ATTEMPT_TIMEOUT_MS,
+  httpFetch,
+  warnOnRetry,
+} from '@uncefact/untp-ri-services/server';
+import { appLogger } from '@/lib/api/logger';
 import {
   CredentialDetailsError,
   CredentialDetailsStatus,
@@ -24,6 +33,7 @@ import { revealDecryptionKey } from './decryption-key-protection';
 import { versionsMatchingContext } from './bridge-version';
 
 const BATCH_SIZE = 100;
+const logger = appLogger.child({ module: 'backfill-credential-details' });
 
 export type BackfillFailure = {
   id: string;
@@ -506,9 +516,17 @@ function resolveVersion(row: PendingRecordRow, bridgeType: string, decoded: UNTP
 const MAX_ARTIFACT_BYTES = 16 * 1024 * 1024;
 
 async function defaultFetchArtifact(uri: string): Promise<string> {
+  // One budget bounds the whole read, body included, and its retries.
+  const budgetMs = DEFAULT_RETRY_BUDGET_MS;
   let response: Response;
   try {
-    response = await fetch(uri, { signal: AbortSignal.timeout(10_000) });
+    // Repeatable read; retry policy in ADR-062.
+    response = await httpFetch(uri, {
+      signal: AbortSignal.timeout(budgetMs),
+      correlate: false,
+      retry: { repeatable: true, attemptTimeoutMs: READ_ATTEMPT_TIMEOUT_MS, deadline: Date.now() + budgetMs },
+      onRetry: warnOnRetry(logger),
+    });
   } catch (error) {
     const message =
       error instanceof Error && error.name === 'TimeoutError'

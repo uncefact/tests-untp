@@ -149,6 +149,21 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: >-
+ *           The storage service kept answering 429 after the upload was
+ *           resent, up to four attempts in all, so the upload was refused. The
+ *           body carries `STORAGE_PAYLOAD_REJECTED`. Retry shortly.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               storageRefused:
+ *                 summary: The storage service kept refusing the upload
+ *                 value:
+ *                   error: 'Storage service rejected payload: HTTP 429: Too Many Requests'
+ *                   code: STORAGE_PAYLOAD_REJECTED
  *       500:
  *         description: Server error
  *         content:

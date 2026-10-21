@@ -290,7 +290,10 @@ export type SignOptions = {
   /**
    * Serialises the status-list rewrite performed by the callback. The key
    * identifies the service-side list the callback will rewrite, is opaque to
-   * the caller, and is suitable only as a lock name.
+   * the caller, and is suitable only as a lock name. A request made inside
+   * the callback must not wait to retry a refusal, because the wait would
+   * hold the lock and stall every other change to that list; with
+   * `httpFetch` that means `retry: false`.
    */
   serialise?: (
     key: string,
@@ -315,7 +318,11 @@ export type SetCredentialStatusInput = {
   entry: CredentialStatusEntry;
   /** true sets the bit. */
   value: boolean;
-  /** Serialises the service-side list rewrite performed by the request. */
+  /**
+   * Serialises the service-side list rewrite performed by the request. As
+   * for SignOptions.serialise, a request made inside the callback must not
+   * wait to retry a refusal; with `httpFetch` that means `retry: false`.
+   */
   serialise?: (key: string, fn: () => Promise<void>, signal?: AbortSignal) => Promise<void>;
   signal: AbortSignal;
 };
@@ -328,6 +335,15 @@ export type GetCredentialStatusInput = {
   entry: CredentialStatusEntry;
   /** See SetCredentialStatusInput.signal. */
   signal: AbortSignal;
+  /**
+   * Absolute epoch-millisecond time by which a provider that retries a
+   * refused read stops retrying: no retry is dispatched and no wait ends
+   * after it. An attempt already sent is bounded by the provider's attempt
+   * limit, where it has one, and by `signal`. This value bounds it only
+   * while the provider reads a refused response's body before a wait.
+   * Without it the provider applies its own default retry budget.
+   */
+  deadline?: number;
 };
 
 /**
@@ -384,6 +400,17 @@ export type VerifyOptions = {
    * status verification remain enabled.
    */
   validityWindow?: boolean;
+  /** Aborts the verification request, including any wait before a retry. */
+  signal?: AbortSignal;
+  /**
+   * Absolute epoch-millisecond time by which a provider that retries a
+   * refused verification stops retrying: no retry is dispatched and no wait
+   * ends after it. An attempt already sent is bounded by `signal`. This
+   * value bounds it only while the provider reads a refused response's body
+   * before a wait. Without it the provider applies its own default retry
+   * budget.
+   */
+  deadline?: number;
 };
 
 export const VC_SERVICE_TYPE = 'VC' as const;

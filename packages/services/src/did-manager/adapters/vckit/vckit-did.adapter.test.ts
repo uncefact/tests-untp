@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { VCKitDidAdapter, vckitDidRegistryEntry } from './vckit-did.adapter';
 import { vckitDidConfigSchema } from './vckit-did.schema';
 import { DidMethod, DidType, DidVerificationCheckName } from '../../types';
@@ -581,5 +584,173 @@ describe('VCKitDidAdapter', () => {
       const adapter = vckitDidRegistryEntry.factory(config, mockLogger);
       expect(adapter).toBeInstanceOf(VCKitDidAdapter);
     });
+  });
+});
+
+describe('VCKitDidAdapter outbound retry', () => {
+  const warn = jest.fn();
+  const logger: LoggerService = { ...mockLogger, warn };
+  const did = 'did:web:localhost%3A3332:org';
+  const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
+  const fetchMock = jest.fn();
+  const paths = (): string[] => fetchMock.mock.calls.map(([input]) => new URL(String(input)).pathname);
+  const drive = async <T>(call: () => Promise<T>, ms = 60_000): Promise<{ value?: T; error?: unknown }> => {
+    const settled = call().then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    await jest.advanceTimersByTimeAsync(ms);
+    return settled;
+  };
+  const adapter = (): VCKitDidAdapter => new VCKitDidAdapter(BASE_URL, HEADERS, 'Ed25519', logger);
+
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    fetchMock.mockReset();
+    warn.mockReset();
+    global.fetch = fetchMock;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it('completes a DID creation answered 429 and then accepted', async () => {
+    fetchMock
+      .mockResolvedValueOnce(json(429, {}, { 'Retry-After': '1' }))
+      .mockResolvedValueOnce(json(200, { did, controllerKeyId: 'key-1' }))
+      .mockResolvedValueOnce(json(200, { didDocument: { id: did } }));
+
+    const { value } = await drive(() =>
+      adapter().create({ method: DidMethod.DID_WEB, type: DidType.MANAGED, alias: 'org' }),
+    );
+
+    expect(value).toEqual({ did, keyId: 'key-1', document: { id: did } });
+    expect(paths()).toEqual(['/agent/didManagerCreate', '/agent/didManagerCreate', '/agent/resolveDid']);
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ cause: 429 }), expect.any(String));
+  });
+
+  it('never resends a DID creation answered 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValue(json(200, { did }));
+
+    const { error } = await drive(() =>
+      adapter().create({ method: DidMethod.DID_WEB, type: DidType.MANAGED, alias: 'org' }),
+    );
+
+    expect(error).toBeInstanceOf(DidCreateError);
+    expect(paths()).toEqual(['/agent/didManagerCreate']);
+  });
+
+  it('never resends a DID deletion answered 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValue(json(200, {}));
+
+    const { error } = await drive(() => adapter().delete(did));
+
+    expect(error).toBeInstanceOf(DidDeleteError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a DID document after a 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValueOnce(json(200, { didDocument: { id: did } }));
+
+    const { value } = await drive(() => adapter().getDocument(did));
+
+    expect(value).toEqual({ id: did });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for a DID resolution that answers after 12 s rather than aborting it', async () => {
+    // Fails if resolveDid regains a per-attempt limit, aborting slow did:web resolutions that used to succeed.
+    fetchMock.mockImplementationOnce(
+      (_input: unknown, init: RequestInit) =>
+        new Promise((resolve, reject) => {
+          const handle = setTimeout(() => resolve(json(200, { didDocument: { id: did } })), 12_000);
+          init.signal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(handle);
+              reject(init.signal?.reason);
+            },
+            { once: true },
+          );
+        }),
+    );
+
+    const { value, error } = await drive(() => adapter().getDocument(did), 12_100);
+
+    expect(error).toBeUndefined();
+    expect(value).toEqual({ id: did });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('fetches provider keys for verification after an attempt that gave no headers within 10 s', async () => {
+    // Fails if the provider key read loses its 10 s limit, leaving verification hung on a silent VCKit.
+    fetchMock
+      .mockImplementationOnce(
+        (_input: unknown, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            const signal = init.signal as AbortSignal;
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+          }),
+      )
+      .mockResolvedValueOnce(json(200, { keys: [{ kid: 'key-1' }] }));
+    (verifyDid as jest.Mock).mockResolvedValue({ verified: true, checks: [] });
+
+    await drive(() => adapter().verify(did), 10_100);
+
+    expect(paths()).toEqual(['/agent/didManagerGet', '/agent/didManagerGet']);
+    expect(verifyDid).toHaveBeenCalledWith(did, expect.objectContaining({ providerKeys: [{ kid: 'key-1' }] }));
+  });
+
+  it('fetches provider keys for verification after a 503', async () => {
+    fetchMock.mockResolvedValueOnce(json(503, {})).mockResolvedValueOnce(json(200, { keys: [{ kid: 'key-1' }] }));
+    (verifyDid as jest.Mock).mockResolvedValue({ verified: true, checks: [] });
+
+    await drive(() => adapter().verify(did));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(verifyDid).toHaveBeenCalledWith(did, expect.objectContaining({ providerKeys: [{ kid: 'key-1' }] }));
+  });
+
+  it('completes a DID deletion answered 429 and then accepted', async () => {
+    // Fails if a rate-limited DID deletion is not resent, failing a deletion that would have succeeded.
+    fetchMock.mockResolvedValueOnce(json(429, {}, { 'Retry-After': '1' })).mockResolvedValueOnce(json(200, true));
+
+    const { value, error } = await drive(() => adapter().delete(did));
+
+    expect(error).toBeUndefined();
+    expect(value).toBeUndefined();
+    expect(paths()).toEqual(['/agent/didManagerDelete', '/agent/didManagerDelete']);
+  });
+
+  it('keeps a network failure as the cause of the DidCreateError', async () => {
+    // Fails if the create wrapper drops the error fetch threw, and with it the
+    // reason the connection failed, which Node's fetch puts on its own cause.
+    const networkError = new TypeError('fetch failed');
+    fetchMock.mockRejectedValueOnce(networkError);
+
+    const { error } = await drive(() =>
+      adapter().create({ method: DidMethod.DID_WEB, type: DidType.MANAGED, alias: 'org' }),
+    );
+
+    expect(error).toBeInstanceOf(DidCreateError);
+    expect((error as DidCreateError).cause).toBe(networkError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a network failure as the cause of the DidDocumentFetchError', async () => {
+    // Fails if the document wrapper drops the error fetch threw, and with it the
+    // reason the connection failed, which Node's fetch puts on its own cause.
+    const networkError = new TypeError('fetch failed');
+    fetchMock.mockRejectedValueOnce(networkError);
+
+    const { error } = await drive(() => adapter().getDocument(did));
+
+    expect(error).toBeInstanceOf(DidDocumentFetchError);
+    expect((error as DidDocumentFetchError).cause).toBe(networkError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

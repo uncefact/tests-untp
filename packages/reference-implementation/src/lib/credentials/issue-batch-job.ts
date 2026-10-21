@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRequestContext, isValidCorrelationId, runWithRequestContext } from '@uncefact/untp-ri-services/logging';
+import { runWithoutRequestRetry } from '@uncefact/untp-ri-services/server';
 import { appLogger } from '@/lib/api/logger';
 import {
   ConflictError,
@@ -430,13 +431,21 @@ export function credentialBatchIssueHandler(
           let issuedCredentialId: string | undefined;
           try {
             const body = deps.decryptRequest(request);
-            const result = await deps.issue({
-              tenantId: payload.tenantId,
-              body,
-              onDispatch: () => {
-                issueDispatched = true;
-              },
-            });
+            // The item ladder (BATCH_JOB_RETRY_*) retries the faults before
+            // dispatch, so each request made before it gets one attempt and
+            // the two never multiply. From dispatch on, a fault settles
+            // OUTCOME_UNKNOWN and no ladder retries it, so requests follow
+            // the ordinary request retry rules (ADR-060, ADR-062).
+            const result = await runWithoutRequestRetry((resumeRequestRetry) =>
+              deps.issue({
+                tenantId: payload.tenantId,
+                body,
+                onDispatch: () => {
+                  issueDispatched = true;
+                  resumeRequestRetry();
+                },
+              }),
+            );
             issuedCredentialId = result.body.credentialId;
             const duration = deps.now().getTime() - itemStartedAt.getTime();
             costs.push(duration);

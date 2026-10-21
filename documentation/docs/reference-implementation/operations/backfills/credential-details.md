@@ -57,6 +57,8 @@ Three error classes name a problem reading the credential:
 - **DECRYPT_FAILED.** The stored decryption key could not unwrap the artefact, or the at-rest key envelope could not be opened. Confirm `DATA_ENCRYPTION_KEY` matches the running application, and that the row's key is the one that stored the artefact.
 - **BRIDGE_ERROR.** No unique registered bridge version matched the credential's `@context`, or a stored `coreDataModelVersion` has no bridge, or the extractor threw, or the credential's type array names no core credential type, or names two of them. Do not guess a version.
 
+A storage read refused with `429` or `503`, or with no response headers within 10 seconds, is sent again within a 30 second allowance before the row is reported as `UNREADABLE_ENVELOPE`, as [Outbound request retries](../outbound-retries) describes.
+
 Once the cause is fixed, a record whose descriptive fields failed to extract is retried by setting its `detailsStatus` back to `EXTRACTION_PENDING` and re-running. See [Re-running](#re-running).
 
 Two failure messages, reported under the class `WRITE_FAILED`, name no problem with the credential at all. One says the row's outcome could not be written, and the other says the record changed after it was read. Both mean this pass did not land that row, and a re-run picks it up.

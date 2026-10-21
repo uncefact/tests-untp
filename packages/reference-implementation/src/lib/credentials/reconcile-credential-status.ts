@@ -97,6 +97,7 @@ export async function reconcileCredentialStatus(input: ReconcileCredentialStatus
         statusListIssuer: entry.statusListVcIssuer,
         entry: managementEntry(entry),
         signal: budget.signal,
+        deadline: budget.deadlineAt,
       }),
     );
     observation = { ...checked, observedAt: applicationObservationAt(input.now) };

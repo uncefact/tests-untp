@@ -234,21 +234,34 @@ async function publishIssuedCredential({
       // fails the build instead of silently reclassifying every failure.
       const status = error instanceof IdrPublishError ? error.context?.httpStatus : undefined;
       const rejected = typeof status === 'number' && status >= 400 && status < 500;
+      // A 429 arrives here only after the HTTP client's own retries. It is
+      // read as a refusal made before the resolver acted (ADR-062 decision
+      // 2), so the links were most likely not registered and the scheme is
+      // not the cause.
+      const rateLimited = status === 429;
       warnings.push(
-        rejected
+        rateLimited
           ? {
               code: 'IDR_PUBLISH_FAILED',
-              message: 'The identity resolver rejected the credential links, so the credential is not discoverable.',
-              remediation:
-                'Check that the identifier scheme is registered with the identity resolver, then issue the credential again once it is.',
-            }
-          : {
-              code: 'IDR_PUBLISH_UNCONFIRMED',
               message:
-                'The identity resolver could not be reached or did not answer, so whether the credential links were registered is unknown.',
+                'The identity resolver was limiting requests and refused the credential links, so the credential is most likely not discoverable.',
               remediation:
-                'Ask your operator to check the resolver for these links before issuing again: a second publish of the same links is rejected as a duplicate.',
-            },
+                'The credential was issued and stored, and its links were most likely not registered. Nothing republishes them automatically. Wait a few minutes, then either register the links yourself through POST /api/v1/identifiers/{id}/links with a description, or issue the credential again with publishing requested and a new Idempotency-Key, which creates a second credential and leaves this one unpublished. If the resolver keeps limiting requests, ask your operator to check it.',
+            }
+          : rejected
+            ? {
+                code: 'IDR_PUBLISH_FAILED',
+                message: 'The identity resolver rejected the credential links, so the credential is not discoverable.',
+                remediation:
+                  'Check that the identifier scheme is registered with the identity resolver, then issue the credential again once it is.',
+              }
+            : {
+                code: 'IDR_PUBLISH_UNCONFIRMED',
+                message:
+                  'The identity resolver could not be reached or did not answer, so whether the credential links were registered is unknown.',
+                remediation:
+                  'Ask your operator to check the resolver for these links before issuing again: a second publish of the same links is rejected as a duplicate.',
+              },
       );
     }
 

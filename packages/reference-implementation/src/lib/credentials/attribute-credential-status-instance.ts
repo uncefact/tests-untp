@@ -1,4 +1,7 @@
 import type { CredentialStatusObservation } from '@uncefact/untp-ri-services';
+// The evidence budget is the services default retry budget, so a change to
+// that default moves this budget with it.
+import { DEFAULT_RETRY_BUDGET_MS } from '@uncefact/untp-ri-services/server';
 import { CredentialStatusCapture, LibraryRecordOrigin, VcServiceAttribution, Prisma } from '../prisma/generated';
 import { resolveVcService } from '../services/resolve-vc-service';
 import { prisma } from '../prisma/prisma';
@@ -134,7 +137,13 @@ export async function attributeCredentialStatusInstance(
   for (const row of await listRows(client, predicate)) {
     result.scanned += 1;
 
-    const signal = AbortSignal.timeout(10_000);
+    // One evidence budget per credential, so a refused read is retried
+    // (ADR-062) before it is reported as unavailable. Built here rather than
+    // with statusDeadline(), which derives its pair from a reservation's
+    // deadline; an evidence read holds no reservation.
+    const budgetMs = DEFAULT_RETRY_BUDGET_MS;
+    const deadline = Date.now() + budgetMs;
+    const signal = AbortSignal.timeout(budgetMs);
     const evidenceMessages: string[] = [];
     let evidenceDisagreed = false;
     let evidenceUnavailable = false;
@@ -148,6 +157,7 @@ export async function attributeCredentialStatusInstance(
           statusListIssuer: entry.statusListVcIssuer,
           entry: managementEntry(entry),
           signal,
+          deadline,
         });
         const evidence = assessCredentialStatusAttributionEvidence(entry, observation);
         if (evidence.outcome === 'disagrees') {

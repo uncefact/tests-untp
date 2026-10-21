@@ -46,6 +46,7 @@ jest.mock('./capture-credential-status-entries', () => {
 import { ValidationError } from '@/lib/api/validation';
 import { ServiceInstanceNotFoundError } from '@/lib/api/errors';
 import { StorageStoreError, VcCredentialStatusError, VcSignError } from '@uncefact/untp-ri-services';
+import { httpFetch } from '@uncefact/untp-ri-services/server';
 import {
   getOrMintCorrelationId,
   isValidCorrelationId,
@@ -282,6 +283,261 @@ describe('credential batch issue handler', () => {
     });
     await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toThrow('lost response');
     expect(events).toEqual(['unknown', 'settle', 'release']);
+  });
+
+  describe('request retry inside a batch item', () => {
+    const ISSUE_URL = 'https://vckit.example.test/v2/credentials/issue';
+    const STORE_URL = 'https://storage.example.test/api/1.0.0/private';
+    const PUBLISH_URL = 'https://idr.example.test/api/resolver';
+    const READ_URL = 'https://vckit.example.test/agent/read';
+    /**
+     * A response-shaped object with no body. Under jsdom, `Response` is the
+     * minimal stand-in from setupTests.ts, which has no headers; the
+     * client's own suite covers real `Response` objects.
+     */
+    const answer = (status: number): Response =>
+      ({ ok: status >= 200 && status < 300, status, statusText: '', headers: new Headers(), body: null }) as Response;
+    const originalFetch = global.fetch;
+    let transport: jest.Mock<Promise<Response>, [string | URL, RequestInit?]>;
+    const callsTo = (url: string): number => transport.mock.calls.filter(([input]) => String(input) === url).length;
+    /** Answers each URL from its own queue of statuses, then 200. */
+    const answerFrom = (queues: Record<string, number[]>) => async (input: string | URL) => {
+      const queue = queues[String(input)];
+      return answer(queue !== undefined && queue.length > 0 ? queue.shift()! : 200);
+    };
+
+    beforeEach(() => {
+      // A zero jitter keeps each retry wait at 0 ms on the real clock.
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      transport = jest.fn();
+      global.fetch = transport as unknown as typeof fetch;
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      jest.restoreAllMocks();
+    });
+
+    it('gives each request before dispatch one attempt and retries a refused request after it, under nested request contexts', async () => {
+      // Regression: request retry stacking on the item ladder before dispatch (ADR-060), or staying off after
+      // dispatch so a refused issue request is not resent; fails if suppression is removed or never ends.
+      transport.mockImplementation(
+        answerFrom({ [READ_URL]: [429, 429, 429, 429, 429, 429, 429, 429], [ISSUE_URL]: [429, 200, 429, 200] }),
+      );
+      const statuses: Array<[number, number]> = [];
+      const deps = dependencies({
+        issue: jest.fn(async ({ onDispatch }: { onDispatch?: () => void }) => {
+          // A nested request context inside the item must not switch suppression off before dispatch, or back on after it.
+          const read = await runWithRequestContext('nested-before-dispatch', () =>
+            httpFetch(READ_URL, { method: 'POST', body: '{}', retry: { repeatable: true } }),
+          );
+          onDispatch?.();
+          const issued = await runWithRequestContext('nested-after-dispatch', () =>
+            httpFetch(ISSUE_URL, { method: 'POST', body: '{}' }),
+          );
+          statuses.push([read.status, issued.status]);
+          return { status: 201 as const, body: { credentialId: `credential-${statuses.length}` } };
+        }),
+      });
+
+      await credentialBatchIssueHandler(deps)(payload, context());
+
+      expect(statuses).toEqual([
+        [429, 200],
+        [429, 200],
+      ]);
+      expect(callsTo(READ_URL)).toBe(2);
+      expect(callsTo(ISSUE_URL)).toBe(4);
+
+      transport.mockReset();
+      transport.mockImplementation(answerFrom({ [ISSUE_URL]: [429] }));
+      const outside = await httpFetch(ISSUE_URL, { method: 'POST', body: '{}' });
+      expect(outside.status).toBe(200);
+      expect(callsTo(ISSUE_URL)).toBe(2);
+    });
+
+    it('starts the next item suppressed after the previous item dispatched', async () => {
+      // Regression: the resume leaking from one item to the next, so a later item's pre-dispatch fault is resent on top of the ladder.
+      transport.mockImplementation(async () => answer(429));
+      const deps = dependencies({
+        issue: jest.fn(async ({ onDispatch }: { onDispatch?: () => void }) => {
+          await httpFetch(READ_URL, { retry: { repeatable: true } });
+          onDispatch?.();
+          return { status: 201 as const, body: { credentialId: 'credential' } };
+        }),
+      });
+
+      await credentialBatchIssueHandler(deps)(payload, context());
+
+      expect(callsTo(READ_URL)).toBe(2);
+    });
+
+    it('resends a storage store and an identity resolver publish after dispatch on a 429 but never on a 503', async () => {
+      // Regression: the resume switching on the repeatable rules for effectful calls, or leaving their 429 unresent.
+      transport.mockImplementation(answerFrom({ [STORE_URL]: [429, 200, 503], [PUBLISH_URL]: [429, 200, 503] }));
+      const outcomes: Array<[number, number]> = [];
+      const deps = dependencies({
+        issue: jest.fn(async ({ onDispatch }: { onDispatch?: () => void }) => {
+          onDispatch?.();
+          const stored = await httpFetch(STORE_URL, { method: 'POST', body: '{}' });
+          const published = await httpFetch(PUBLISH_URL, { method: 'POST', body: '{}' });
+          outcomes.push([stored.status, published.status]);
+          return { status: 201 as const, body: { credentialId: `credential-${outcomes.length}` } };
+        }),
+      });
+
+      await credentialBatchIssueHandler(deps)(payload, context());
+
+      expect(outcomes).toEqual([
+        [200, 200],
+        [503, 503],
+      ]);
+      expect(callsTo(STORE_URL)).toBe(3);
+      expect(callsTo(PUBLISH_URL)).toBe(3);
+    });
+
+    it('leaves work running concurrently outside the item retrying while the item is suppressed', async () => {
+      // Regression: suppression held as a process-wide flag, which would stop every other caller's retries during a batch.
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let entered!: () => void;
+      const itemStarted = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      transport.mockImplementation(answerFrom({ [READ_URL]: [429], [ISSUE_URL]: [429] }));
+      const deps = dependencies({
+        claimNextItem: jest
+          .fn()
+          .mockResolvedValueOnce({ outcome: 'claimed', item: { index: 0, request: JSON.stringify(request) } })
+          .mockResolvedValueOnce({ outcome: 'empty' }),
+        issue: jest.fn(async ({ onDispatch }: { onDispatch?: () => void }) => {
+          entered();
+          await gate;
+          const read = await httpFetch(READ_URL, { retry: { repeatable: true } });
+          onDispatch?.();
+          return { status: 201 as const, body: { credentialId: `credential-${read.status}` } };
+        }),
+      });
+
+      const running = credentialBatchIssueHandler(deps)(payload, context());
+      await itemStarted;
+      const outside = await httpFetch(ISSUE_URL, { method: 'POST', body: '{}' });
+      release();
+      await running;
+
+      expect(outside.status).toBe(200);
+      expect(callsTo(ISSUE_URL)).toBe(2);
+      expect(callsTo(READ_URL)).toBe(1);
+      expect(deps.markIssued).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ credentialId: 'credential-429' }),
+      );
+    });
+
+    describe('through the issuance use case', () => {
+      const signedCredential = {
+        '@context': ['https://www.w3.org/ns/credentials/v2'],
+        id: 'data:application/vc+jwt,signed',
+        type: 'EnvelopedVerifiableCredential',
+      };
+
+      /** A VC service whose sign calls the dispatch hook and then sends the issue request, as the VCKit adapter does. */
+      const dispatchingVcService = () => ({
+        instanceId: 'vc-retry-1',
+        service: {
+          sign: jest.fn(async (_payload: unknown, options: { onDispatch?: () => void }) => {
+            options.onDispatch?.();
+            const response = await httpFetch(ISSUE_URL, { method: 'POST', body: '{}' });
+            if (!response.ok) throw new VcSignError(`HTTP ${response.status}`, response.status);
+            return signedCredential;
+          }),
+        },
+      });
+
+      beforeEach(() => {
+        const bridge = {
+          extractRefs: jest.fn(() => ({ organisations: [], facilities: [], products: [] })),
+          extractConformityClaimWithProvenance: jest.fn(() => null),
+        };
+        mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-retry-1' });
+        mockResolveDataModel.mockResolvedValue({
+          dataModel: { name: 'Retry model' },
+          bridge,
+          schemaUrls: [],
+          coreDataModelVersion: '0.7.0',
+          coreDataModelType: 'DigitalProductPassport',
+        });
+        mockValidateCredentialPayload.mockResolvedValue(undefined);
+        mockResolveVcService.mockResolvedValue(dispatchingVcService());
+        mockResolveStorageService.mockResolvedValue({
+          instanceId: 'storage-retry-1',
+          service: {
+            store: jest.fn().mockResolvedValue({ uri: 'https://storage.example/retry', digestMultibase: 'zretry' }),
+          },
+        });
+        mockResolvePrimaryEntity.mockResolvedValue({});
+        mockCaptureCredentialStatusEntries.mockReturnValue({ entries: [] });
+        mockCreateCredential.mockResolvedValue({ credential: { id: 'credential-retried' }, entityLinkFailed: false });
+      });
+
+      afterEach(() => {
+        // Later tests in this file count calls on these shared module mocks.
+        for (const mock of [
+          mockGetDidByDid,
+          mockResolveDataModel,
+          mockValidateCredentialPayload,
+          mockResolveVcService,
+          mockResolveStorageService,
+          mockResolvePrimaryEntity,
+          mockCaptureCredentialStatusEntries,
+          mockCreateCredential,
+        ]) {
+          mock.mockReset();
+        }
+      });
+
+      const oneItem = () =>
+        dependencies({
+          claimNextItem: jest
+            .fn()
+            .mockResolvedValueOnce({ outcome: 'claimed', item: { index: 0, request: JSON.stringify(statusRequest) } })
+            .mockResolvedValueOnce({ outcome: 'empty' }),
+          decryptRequest: jest.fn(() => statusRequest as never),
+          issue: ({ tenantId, body, onDispatch }) => issueCredentialRequest({ tenantId, body, onDispatch }),
+        });
+
+      it('settles the item ISSUED when the issue request is refused once with 429 and the resend succeeds', async () => {
+        // Regression: the dispatch hook not ending suppression, which leaves a refused issue request as OUTCOME_UNKNOWN.
+        transport.mockImplementation(answerFrom({ [ISSUE_URL]: [429] }));
+        const deps = oneItem();
+
+        await credentialBatchIssueHandler(deps)(payload, context());
+
+        expect(callsTo(ISSUE_URL)).toBe(2);
+        expect(deps.markIssued).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ index: 0, credentialId: 'credential-retried' }),
+        );
+        expect(deps.markOutcomeUnknown).not.toHaveBeenCalled();
+      });
+
+      it('still settles OUTCOME_UNKNOWN when the issue request is refused with 429 after its retries', async () => {
+        // Regression: outcome mapping changing with the retry scope; a fault after dispatch must stay uncertain.
+        transport.mockImplementation(async () => answer(429));
+        const deps = oneItem();
+
+        await expect(credentialBatchIssueHandler(deps)(payload, context())).rejects.toBeInstanceOf(VcSignError);
+
+        expect(callsTo(ISSUE_URL)).toBe(4);
+        expect(deps.markOutcomeUnknown).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ index: 0, errorClass: 'OUTCOME_UNKNOWN' }),
+        );
+        expect(deps.markIssued).not.toHaveBeenCalled();
+      });
+    });
   });
 
   it('issues items sequentially by index and settles after the queue is empty', async () => {

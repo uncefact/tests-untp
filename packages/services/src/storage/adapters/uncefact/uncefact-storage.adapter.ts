@@ -1,4 +1,4 @@
-import { httpFetch } from '../../../http/client.js';
+import { httpFetch, warnOnRetry } from '../../../http/client.js';
 import { MultibaseDigest } from '@uncefact/untp-utils/multibase-digest';
 import { BaseServiceAdapter } from '../../../registry/base-adapter.js';
 import type { LoggerService } from '../../../logging/types.js';
@@ -224,9 +224,11 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
   private readonly apiPathSegment: string;
   private readonly publicBucket: string;
   private readonly privateBucket: string;
+  private readonly onRetry: ReturnType<typeof warnOnRetry>;
 
   constructor(config: UncefactStorageConfig, logger: LoggerService) {
     super(logger.child({ service: 'Storage - UncefactStorage' }));
+    this.onRetry = warnOnRetry(this.logger);
     this.baseUrl = config.baseUrl;
     this.apiPathSegment = apiVersionToPathSegment(config.apiVersion);
     this.publicBucket = config.publicBucket;
@@ -251,6 +253,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       method: 'POST',
       headers: this.headers,
       body: JSON.stringify(payload),
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -392,6 +395,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
       method: 'POST',
       headers: multipartHeaders,
       body: formData,
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {
@@ -519,6 +523,7 @@ export class UncefactStorageAdapter extends BaseServiceAdapter implements IStora
     const response = await httpFetch(url, {
       method: 'DELETE',
       headers: deleteHeaders,
+      onRetry: this.onRetry,
     });
 
     if (!response.ok) {

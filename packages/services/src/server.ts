@@ -7,6 +7,12 @@
  * and scripts — never in client components.
  */
 
+// Outbound HTTP with correlation and retry (the retry scope uses async_hooks)
+export { httpFetch, warnOnRetry } from './http/client.js';
+export type { HttpClientOptions, HttpRetryOptions, HttpRetryEvent } from './http/client.js';
+export { DEFAULT_RETRY_BUDGET_MS, READ_ATTEMPT_TIMEOUT_MS } from './http/retry-policy.js';
+export { runWithoutRequestRetry } from './http/retry-scope.js';
+
 // DID adapter + verification (jsonld depends on rdf-canonize-native)
 export { VCKitDidAdapter } from './did-manager/adapters/vckit/vckit-did.adapter.js';
 export { verifyDid } from './did-manager/common/verify.js';

@@ -162,6 +162,78 @@ describe('credential status backfill failure classification', () => {
     );
   });
 
+  it('captures a row whose stored copy was refused once, through the default stored-copy reader', async () => {
+    // Regression: a momentary 503 from storage reported as STORAGE_UNAVAILABLE instead of being retried (#1117).
+    const digest = await bodyDigest();
+    const originalFetch = global.fetch;
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    let served = false;
+    const copy = {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (served) return { done: true as const, value: undefined };
+            served = true;
+            return { done: false as const, value: BODY };
+          },
+          cancel: async () => undefined,
+        }),
+      },
+    };
+    const transport = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, headers: { get: () => null }, body: null })
+      .mockResolvedValueOnce(copy);
+    global.fetch = transport as unknown as typeof fetch;
+    try {
+      const result = await backfillCredentialStatusEntries(client(pendingRow(digest)) as never, { dryRun: true });
+
+      expect(result.failures).toEqual([]);
+      expect(result.capturedRows).toHaveLength(1);
+      expect(transport).toHaveBeenCalledTimes(2);
+      expect(transport.mock.calls[1][0]).toBe('https://storage.test/cred-backfill-unit');
+    } finally {
+      global.fetch = originalFetch;
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('bounds each stored copy read, body and retries included, by 30 seconds', async () => {
+    // Fails if the read bound falls back to 10 s: a refused read would have
+    // no time left to be retried before the row is reported STORAGE_UNAVAILABLE.
+    const digest = await bodyDigest();
+    const originalFetch = global.fetch;
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    let served = false;
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (served) return { done: true as const, value: undefined };
+            served = true;
+            return { done: false as const, value: BODY };
+          },
+          cancel: async () => undefined,
+        }),
+      },
+    })) as unknown as typeof fetch;
+    try {
+      const result = await backfillCredentialStatusEntries(client(pendingRow(digest)) as never, { dryRun: true });
+
+      expect(result.failures).toEqual([]);
+      expect(timeout).toHaveBeenCalledWith(30_000);
+    } finally {
+      global.fetch = originalFetch;
+      jest.restoreAllMocks();
+    }
+  });
+
   it('reports WRITE_RACE only when the capture state update does not update a row', async () => {
     const digest = await bodyDigest();
     mockUpdateCredentialStatusCapture.mockResolvedValue('status_conflict');

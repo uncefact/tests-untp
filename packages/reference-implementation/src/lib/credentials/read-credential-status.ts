@@ -61,6 +61,7 @@ export async function readCredentialStatus(input: { recordId: string; tenantId: 
           statusListIssuer: entry.statusListVcIssuer,
           entry: managementEntry(entry),
           signal: budget.signal,
+          deadline: budget.deadlineAt,
         }),
       );
       observed.push({

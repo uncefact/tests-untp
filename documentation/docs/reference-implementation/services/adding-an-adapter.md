@@ -49,11 +49,14 @@ DID-capable adapters, such as the VCKit DID adapter under `did-manager/adapters/
 1. **Create the adapter directory** under the relevant service type's `adapters/` folder (e.g., `packages/services/src/storage/adapters/my-storage/`)
 
 2. **Implement the service interface** — each service type has a defined interface that the adapter must implement:
+
    - Verifiable Credential: `IVerifiableCredentialService`
    - Storage: `IStorageService`
    - Identity Resolver: `IIdentityResolverService`
 
    Refer to the existing adapters as a reference for what each method is expected to do.
+
+   Send every outbound request through `httpFetch` in `packages/services/src/http/client.ts`, which retries a refused request as [Outbound request retries](../operations/outbound-retries) describes. Mark a call whose repetition cannot add an effect with `retry: { repeatable: true }`, and leave an effectful call unmarked. A request made inside a `serialise` callback runs while the caller holds that status list's lock, so it must not wait for a retry: pass `retry: false`.
 
 3. **Define the configuration schema** — create a Zod schema that describes the configuration your adapter requires. This schema is used to validate configuration when a tenant registers a service instance.
 
