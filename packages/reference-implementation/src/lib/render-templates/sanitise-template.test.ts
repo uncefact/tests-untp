@@ -173,8 +173,20 @@ describe('sanitiseTemplate', () => {
     );
   });
 
-  // A stored template is the sanitiser's earlier output. Saving it again must
-  // not change it, so the bundled templates' stored form is a clean template.
+  // sanitize-html 2.18 checks each srcset candidate against the img scheme
+  // allowance. Before it, srcset fell back to the default schemes, which let
+  // ftp:, mailto: and tel: candidates through.
+  it('keeps only the http, https or data: candidates of an image srcset', () => {
+    const html =
+      '<img src="https://e.example/a.png" srcset="https://e.example/a.png 1x, ftp://e.example/b.png 2x, mailto:x@e.example 3x, tel:+61000 4x" />';
+
+    expect(sanitiseTemplate(html)).toBe('<img src="https://e.example/a.png" srcset="https://e.example/a.png 1x" />');
+  });
+
+  // Storing a bundled template sanitises it, and the template must still render
+  // after that: its Handlebars expressions, its CSS and its data: images all
+  // survive. A stored template is the sanitiser's earlier output, so saving it
+  // again must not change it either.
   it.each(
     [
       'digital_conformity_credential',
@@ -183,9 +195,24 @@ describe('sanitiseTemplate', () => {
       'digital_product_passport',
       'digital_traceability_event',
     ].map((name) => [name]),
-  )('leaves the stored form of the bundled v0.7.0 %s template unchanged', (name) => {
+  )('keeps the content of the bundled v0.7.0 %s template and leaves its stored form unchanged', (name) => {
     const bundled = readFileSync(join(__dirname, '../../templates/v0.7.0', name, 'template.hbs'), 'utf8');
     const stored = sanitiseTemplate(bundled);
+    const countOf = (text: string, pattern: RegExp) => text.match(pattern)?.length ?? 0;
+
+    expect(countOf(stored, /\{\{/g)).toBe(countOf(bundled, /\{\{/g));
+
+    const styleBodies = [...bundled.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((match) => match[1]);
+    expect(countOf(stored, /<style\b/gi)).toBe(countOf(bundled, /<style\b/gi));
+    for (const css of styleBodies) {
+      expect(stored).toContain(css);
+    }
+
+    const dataImageSources = bundled.match(/src="data:\{\{[^}]+\}\};base64,\{\{[^}]+\}\}"/g) ?? [];
+    expect(dataImageSources).toHaveLength(countOf(bundled, /data:\{\{/g));
+    for (const src of dataImageSources) {
+      expect(stored).toContain(src);
+    }
 
     expect(sanitiseTemplate(stored)).toBe(stored);
   });
