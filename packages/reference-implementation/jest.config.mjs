@@ -8,9 +8,12 @@ const jestConfig = {
   // Integration-layer files run only via jest.integration.config.mjs; the
   // unit run must never collect them (they expect the rig's database).
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '\\.integration\\.test\\.'],
-  // `multiformats` ships ES modules only. It is let through so the transform
-  // below can rewrite it, in both the pnpm store layout and a hoisted one.
-  transformIgnorePatterns: ['node_modules/(?!@reference-implementation|uuid|\\.pnpm/multiformats|multiformats/)'],
+  // `multiformats` and sanitize-html's htmlparser2 family ship ES modules
+  // only. They are let through so the transform below can rewrite them, in
+  // both the pnpm store layout and a hoisted one.
+  transformIgnorePatterns: [
+    'node_modules/(?!@reference-implementation|uuid|\\.pnpm/multiformats|multiformats/|(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|dom-serializer|domelementtype|entities)[@/])',
+  ],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
@@ -58,6 +61,8 @@ const jestConfig = {
     // goes through the same rewrite the integration rig uses for its own
     // ESM-only dependencies.
     'node_modules/(?:\\.pnpm/)?multiformats@?.*\\.js$':
+      '<rootDir>/__tests__/integration/rig/esm-to-cjs-transformer.mjs',
+    'node_modules/(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|dom-serializer|domelementtype|entities)@?.*\\.js$':
       '<rootDir>/__tests__/integration/rig/esm-to-cjs-transformer.mjs',
     '^.+\\.m?[tj]sx?$': [
       'ts-jest',

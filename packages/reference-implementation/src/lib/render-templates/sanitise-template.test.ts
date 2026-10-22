@@ -1,6 +1,8 @@
 jest.mock('@/lib/api/logger');
 const mockWarn = (jest.requireMock('@/lib/api/logger').appLogger as Record<string, jest.Mock>).warn;
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { sanitiseTemplate } from './sanitise-template';
 
 describe('sanitiseTemplate', () => {
@@ -130,6 +132,62 @@ describe('sanitiseTemplate', () => {
     expect(result).not.toContain('<button');
     expect(result).not.toContain('<select');
     expect(result).not.toContain('<textarea');
+  });
+
+  // Raw-text payloads from GHSA-rpr9-rxv7-x643. Our nonTextTags list leaves out
+  // `textarea`, which sanitize-html 2.17.4 alone did not cover: these came back
+  // as live markup until 2.17.5.
+  it.each([
+    ['<xmp><script>alert(1)</script></xmp>', '&lt;script&gt;alert(1)&lt;/script&gt;'],
+    ['<xmp><img src=x onerror=alert(1)></xmp>', '&lt;img src=x onerror=alert(1)&gt;'],
+    ['<xmp><svg><script>alert(1)</script></svg></xmp>', '&lt;svg&gt;&lt;script&gt;alert(1)&lt;/script&gt;&lt;/svg&gt;'],
+    ['<textarea><script>alert(1)</script></textarea>', '&lt;script&gt;alert(1)&lt;/script&gt;'],
+  ])('keeps raw-text content inert: %s', (html, expected) => {
+    const result = sanitiseTemplate(html);
+
+    expect(result).not.toMatch(/<(script|img|svg)\b/i);
+    expect(result).toBe(expected);
+  });
+
+  it('keeps http and https image srcset candidates', () => {
+    const html =
+      '<img src="https://example.com/a.png" srcset="https://example.com/a.png 1x, http://example.com/b.png 2x" />';
+
+    expect(sanitiseTemplate(html)).toBe(html);
+  });
+
+  // sanitize-html 2.18 applies the img scheme allowance (http, https, data) to
+  // srcset. Before it, a data: srcset was dropped whole; now it is kept.
+  it('keeps a data: image srcset candidate', () => {
+    const html = '<img srcset="data:image/png;base64,iVBORw0KGgo= 1x" />';
+
+    expect(sanitiseTemplate(html)).toBe(html);
+  });
+
+  it('drops a javascript: srcset candidate', () => {
+    const html =
+      '<img src="https://example.com/a.png" srcset="https://example.com/a.png 1x, javascript:alert(1) 2x" />';
+
+    expect(sanitiseTemplate(html)).toBe(
+      '<img src="https://example.com/a.png" srcset="https://example.com/a.png 1x" />',
+    );
+  });
+
+  // A stored template is the sanitiser's earlier output. Saving it again must
+  // not change it, so the bundled templates' stored form is a clean template.
+  it.each(
+    [
+      'digital_conformity_credential',
+      'digital_facility_record',
+      'digital_identity_anchor',
+      'digital_product_passport',
+      'digital_traceability_event',
+    ].map((name) => [name]),
+  )('leaves the stored form of the bundled v0.7.0 %s template unchanged', (name) => {
+    const bundled = readFileSync(join(__dirname, '../../templates/v0.7.0', name, 'template.hbs'), 'utf8');
+    const stored = sanitiseTemplate(bundled);
+
+    expect(sanitiseTemplate(stored)).toBe(stored);
   });
 
   // ── Logging tests ───────────────────────────────────────────────────────────

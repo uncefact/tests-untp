@@ -75,7 +75,9 @@ export default auth(async (req) => {
 
   return runWithRequestContext(correlationId, async () => {
     const { pathname } = req.nextUrl;
-    const isSessionAuthenticated = !!req.auth;
+    // Test for a user, not for the object: on a configuration error Auth.js
+    // populates req.auth with an error body rather than null (GHSA-8fpg-xm3f-6cx3).
+    const isSessionAuthenticated = !!req.auth?.user;
 
     // For API routes, check authentication
     if (pathname.startsWith('/api/v1/')) {

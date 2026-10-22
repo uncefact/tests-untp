@@ -22,7 +22,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const { data: session, status } = useSession();
 
   const isLoading = status === 'loading';
-  const isAuthenticated = status === 'authenticated' && !!session;
+  const isAuthenticated = status === 'authenticated' && !!session?.user;
 
   const user: User | null = isAuthenticated
     ? {

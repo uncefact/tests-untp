@@ -124,7 +124,7 @@
     "ipaddr.js": "^2.4.0",
     "jsonld": "^8.3.3",
     "multiformats": "^13.3.1",
-    "undici": "^6.25.0"
+    "undici": "^6.29.1"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",

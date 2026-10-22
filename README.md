@@ -17,8 +17,8 @@ A comprehensive suite of tools for implementing and demonstrating the [UN Transp
 We recommend using [Node Version Manager (NVM)](https://github.com/nvm-sh/nvm) to manage Node.js versions:
 
 ```bash
-nvm install 22.22.2
-nvm use 22.22.2
+nvm install 22
+nvm use 22
 corepack enable
 pnpm install
 ```
