@@ -4,6 +4,24 @@ These are the user-facing release notes for the UNTP Playground. They focus
 on what's new for you, the person using the playground, not on the internal
 mechanics. For a technical, per-change log see [CHANGELOG.md](./CHANGELOG.md).
 
+## 0.4.3 - 2026-10-24
+
+A security patch. The image now builds on the Node 22 major line, so it
+carries the Node 22 release that is current when it is built, and it moves to
+Next.js 15.5.28 with the other dependency updates for published advisories
+listed in the changelog. The image also declares a Docker health check that
+probes the Playground's root page, under its base path when the image is
+built with one, so Docker and orchestrators can see whether it is serving.
+The checks the Playground runs and the reports it produces are unchanged,
+apart from the version they name.
+
+The 0.4.3 image is published for `linux/amd64` only for now. The `:0.4.2`
+image keeps its `linux/arm64` variant, and `:latest` has none once it moves
+to 0.4.3.
+
+- Technical changelog: [CHANGELOG.md § 0.4.3](./CHANGELOG.md#043---2026-10-24)
+- Container image: [ghcr.io/uncefact/tests-untp/untp-playground](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Funtp-playground) (`:0.4.3`, `:latest`)
+
 ## 0.4.2 - 2026-09-22
 
 A patch for the sample Digital Product Passport that the Playground offers

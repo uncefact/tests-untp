@@ -5,6 +5,18 @@ format is loosely based on [Keep a Changelog](https://keepachangelog.com/)
 and the version numbers follow semantic versioning. Production releases are
 shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 
+## [0.4.3] - 2026-10-24
+
+### Changed
+
+- **Node 22 major line.** The image builds from `node:22-alpine` instead of the exact `22.22.2` pin, so it carries the Node 22 release that is current when it is built. ([#1124](https://github.com/uncefact/tests-untp/pull/1124)) ([a635523](https://github.com/uncefact/tests-untp/commit/a6355230d8ed36bfd511350166a0ac76704863a5))
+- **Image health check.** The image declares a Docker health check that probes the root page over `127.0.0.1`, under `NEXT_PUBLIC_BASE_PATH` when the image is built with one. ([#1122](https://github.com/uncefact/tests-untp/pull/1122)) ([e91eeee](https://github.com/uncefact/tests-untp/commit/e91eeee3bf0003726d82353163876ca80cc07302))
+- **`linux/amd64` images only, for now.** The arm64 build stops with an illegal instruction under QEMU in the Next.js 15.5.28 build, so release images are published for `linux/amd64` until arm64 builds on a native runner. ([#1129](https://github.com/uncefact/tests-untp/pull/1129)) ([57e00e4](https://github.com/uncefact/tests-untp/commit/57e00e464addbb1c85e21de5af8b4a8697107fce))
+
+### Security
+
+- **Dependency advisories.** next 15.5.28 ([GHSA-p3m5-59mp-jv5r](https://github.com/advisories/GHSA-p3m5-59mp-jv5r)) with sharp 0.35.5 for its image optimiser ([GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw)), handlebars 4.7.10, and undici 6.29.1 through `@uncefact/untp-utils`. undici 5.29.0 remains in the lockfile through jsonld 8.3.3; its advisories are fixed only in undici 6.29.1 or later, and the Playground does not fetch through it, because `@uncefact/untp-utils` gives jsonld its own document loader. ([#1124](https://github.com/uncefact/tests-untp/pull/1124)) ([a635523](https://github.com/uncefact/tests-untp/commit/a6355230d8ed36bfd511350166a0ac76704863a5))
+
 ## [0.4.2] - 2026-09-22
 
 ### Fixed
@@ -121,6 +133,7 @@ shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 - Dedupe concurrent schema fetches for the same URL.
 - JSON-LD and schema validation errors render with actionable context.
 
+[0.4.3]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.3
 [0.4.2]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.2
 [0.4.1]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.1
 [0.4.0]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.4.0
