@@ -70,7 +70,7 @@ The sanitiser allows:
 
 Script content is removed. If the sanitiser strips any content, a warning is logged.
 
-A template whose `<style>` element still contains markup or a `<` character after sanitisation is refused with a 400 on both create and update, and nothing is stored. Inside inline SVG a browser reads `<style>` content as HTML rather than CSS, so such content could run. CSS never needs the character. Remove it from the stylesheet and submit the template again.
+A template whose `<style>` element still contains markup or a `<` character after sanitisation is refused with a 400 on both create and update, and nothing is stored. Inside inline SVG a browser reads `<style>` content as HTML rather than CSS, so such content could run. The rule applies to every `<` inside a `<style>` element, including one inside a CSS comment, one inside a `content` string and the legacy `<!-- ... -->` wrapper around a stylesheet. Remove the character from the stylesheet and submit the template again.
 
 ### Storage Integration
 
