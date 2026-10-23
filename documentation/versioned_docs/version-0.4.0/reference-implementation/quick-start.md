@@ -21,6 +21,16 @@ Before diving in, we strongly recommend reading the [System Architecture](./syst
 The object store keeps its data in `./minio_data` on the host. The Compose files now run it from the `pgsty/minio` image, and a checkout whose Compose file uses the `quay.io/minio/minio` image cannot read object store data that the new image has written. If you may need to go back to such a checkout, stop the running stack with `docker compose down` and copy `./minio_data` somewhere safe before you start the upgraded stack.
 :::
 
+:::warning[Upgrading a checkout whose storage service ran as root]
+The storage service now runs as uid 1000 rather than root, and keeps uploads in the `storage_service_data` Docker volume. A volume that an earlier version of the stack wrote to stays owned by root, and uploads fail until you change its owner once. Before you start the upgraded stack, stop the running stack with `docker compose down` and find the volume's full name with `docker volume ls`. Compose prefixes it with the project name, which defaults to the checkout's directory name, so a checkout in `tests-untp` has `tests-untp_storage_service_data`. Then change its owner:
+
+```bash
+docker run --rm -v tests-untp_storage_service_data:/data alpine chown -R 1000:1000 /data
+```
+
+A wrong volume name creates a new, empty volume and changes that one instead. A fresh checkout needs no step.
+:::
+
 Clone the repository and start all services:
 
 ```bash
