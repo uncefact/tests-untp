@@ -76,4 +76,15 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# The root page is a static client page, so probing it is a liveness check. An
+# image built with NEXT_PUBLIC_BASE_PATH serves it under that path, so the
+# probe takes the same build argument.
+ARG NEXT_PUBLIC_BASE_PATH
+ENV HEALTHCHECK_PATH=${NEXT_PUBLIC_BASE_PATH:-/}
+
+# Probe 127.0.0.1, not localhost. HOSTNAME above makes the server listen on IPv4
+# only, while BusyBox wget resolves localhost to ::1 first.
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=20s \
+  CMD wget --quiet --spider "http://127.0.0.1:${PORT:-3000}${HEALTHCHECK_PATH}" || exit 1
+
 CMD ["node", "packages/untp-playground/server.js"]
