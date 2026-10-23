@@ -70,6 +70,8 @@ The sanitiser allows:
 
 Script content is removed. If the sanitiser strips any content, a warning is logged.
 
+A template whose `<style>` element still contains markup or a `<` character after sanitisation is refused with a 400 on both create and update, and nothing is stored. Inside inline SVG a browser reads `<style>` content as HTML rather than CSS, so such content could run. CSS never needs the character. Remove it from the stylesheet and submit the template again.
+
 ### Storage Integration
 
 Render template HTML content is not stored in the database — it is uploaded to the [storage service](../services/storage-service) and the resulting URL, content digest, and storage metadata are recorded in the database. When a template is updated with new content, the old content is deleted from storage (best-effort) and the new content is uploaded.

@@ -70,6 +70,7 @@ export const GET = withTenantAuth(async (_req, { tenantId, params }) => {
  *       Updates one or more fields of a tenant-owned render template.
  *       The fields storageUrl, digestMultibase, the legacy hash, and renderMethodType are rejected with a 400 when present: the first three are managed by the server, and the render method type is fixed once the template exists.
  *       When template content is provided, the server re-uploads it to storage and updates storageUrl and digestMultibase automatically.
+ *       A template whose style element still contains markup or a "<" character after sanitisation is rejected with a 400, and the stored template is left unchanged.
  *       When setting isDefault to true, any existing default template for the same data model will be unset.
  *     tags:
  *       - Render Templates

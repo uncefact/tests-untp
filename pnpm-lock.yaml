@@ -422,6 +422,9 @@ importers:
       html5-qrcode:
         specifier: ^2.3.8
         version: 2.3.8
+      htmlparser2:
+        specifier: ^12.0.0
+        version: 12.0.0
       identity-obj-proxy:
         specifier: ^3.0.0
         version: 3.0.0

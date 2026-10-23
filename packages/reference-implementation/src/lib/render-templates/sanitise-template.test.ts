@@ -3,7 +3,31 @@ const mockWarn = (jest.requireMock('@/lib/api/logger').appLogger as Record<strin
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { ValidationError } from '@/lib/api/validation';
 import { sanitiseTemplate } from './sanitise-template';
+
+/**
+ * Sanitises the template and parses the result the way a browser does (the
+ * jsdom test environment), returning the elements that would run: those with
+ * an on* attribute, and scripts. A refused template returns 'refused'.
+ */
+function runnableAfterSanitising(html: string): string[] | 'refused' {
+  let output: string;
+  try {
+    output = sanitiseTemplate(html);
+  } catch (error) {
+    if (error instanceof ValidationError) return 'refused';
+    throw error;
+  }
+  const doc = new DOMParser().parseFromString(output, 'text/html');
+  return [...doc.querySelectorAll('*')]
+    .filter(
+      (el) =>
+        el.tagName.toLowerCase() === 'script' ||
+        [...el.attributes].some((attribute) => attribute.name.toLowerCase().startsWith('on')),
+    )
+    .map((el) => el.tagName.toLowerCase());
+}
 
 describe('sanitiseTemplate', () => {
   beforeEach(() => {
@@ -165,10 +189,39 @@ describe('sanitiseTemplate', () => {
     );
   });
 
+  // ── Markup inside <style> ───────────────────────────────────────────────────
+
+  // Inside inline SVG a browser parses <style> content as markup, while the
+  // sanitiser treats it as raw text. Without the refusal, the first row comes
+  // back as an element with a live event handler, and the second is accepted.
+  it.each([
+    ['escaped markup inside an SVG style element', '<svg><style>&lt;img src=x onerror=alert(1)&gt;</style></svg>'],
+    ['markup inside an SVG style element', '<svg><style><img src=x onerror=alert(1)></style></svg>'],
+    ['markup inside a plain style element', '<style><img src=x onerror=alert(1)></style>'],
+  ])('refuses %s', (_label, html) => {
+    expect(runnableAfterSanitising(html)).toBe('refused');
+  });
+
+  it('names the reason for a refusal without repeating the template', () => {
+    const html = '<svg><style><img src=x onerror=alert(1)></style></svg>';
+
+    expect(() => sanitiseTemplate(html)).toThrow(/style> element contains markup/);
+    expect(() => sanitiseTemplate(html)).not.toThrow(/onerror|img/);
+  });
+
+  it.each([
+    ['plain CSS inside an SVG style element', '<svg><style>.mark { fill: #003366; }</style></svg>'],
+    ['escaped markup inside a plain style element', '<style>&lt;img src=x onerror=alert(1)&gt;</style>'],
+  ])('accepts %s unchanged and leaves nothing runnable', (_label, html) => {
+    expect(runnableAfterSanitising(html)).toEqual([]);
+    expect(sanitiseTemplate(html)).toBe(html);
+  });
+
   // Seeding uploads the bundled templates without sanitising them. The sanitiser
   // only sees a copy that someone submits through the create or update routes.
-  // Such a copy must keep its Handlebars expressions, its CSS and its data:
-  // images when sanitised, and sanitising that output again must not change it.
+  // Such a copy must be accepted, keep its Handlebars expressions, its CSS and
+  // its data: images when sanitised, and leave nothing runnable, and sanitising
+  // that output again must not change it.
   it.each(
     [
       'digital_conformity_credential',
@@ -196,6 +249,7 @@ describe('sanitiseTemplate', () => {
       expect(stored).toContain(src);
     }
 
+    expect(runnableAfterSanitising(bundled)).toEqual([]);
     expect(sanitiseTemplate(stored)).toBe(stored);
   });
 

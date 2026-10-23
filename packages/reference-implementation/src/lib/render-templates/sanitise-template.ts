@@ -1,5 +1,7 @@
 import sanitizeHtml from 'sanitize-html';
+import { Parser } from 'htmlparser2';
 import { appLogger } from '@/lib/api/logger';
+import { ValidationError } from '@/lib/api/validation';
 
 const logger = appLogger.child({ module: 'sanitise-template' });
 
@@ -75,8 +77,47 @@ const SANITISE_OPTIONS: sanitizeHtml.IOptions = {
 };
 
 /**
+ * Whether any `<style>` element in the given HTML carries markup: a `<` in its
+ * text, or an element opened inside it.
+ *
+ * sanitize-html treats every `<style>` as raw text and never inspects what it
+ * holds. A browser does the same in the HTML body, but inside inline SVG it
+ * parses `<style>` content as markup, so a `<` there can start a live element
+ * with event handlers that the sanitiser let through. The parser reports
+ * either form: as text where it treats `<style>` as raw text, and as an opened
+ * element where it follows the SVG parsing rules. CSS has no need of the
+ * character, so neither form is accepted.
+ */
+function styleCarriesMarkup(html: string): boolean {
+  let styleDepth = 0;
+  let found = false;
+  const parser = new Parser(
+    {
+      onopentag(name) {
+        if (styleDepth > 0) found = true;
+        if (name === 'style') styleDepth += 1;
+      },
+      ontext(text) {
+        if (styleDepth > 0 && text.includes('<')) found = true;
+      },
+      onclosetag(name) {
+        if (name === 'style' && styleDepth > 0) styleDepth -= 1;
+      },
+    },
+    { decodeEntities: false },
+  );
+  parser.write(html);
+  parser.end();
+  return found;
+}
+
+/**
  * Sanitise an HTML template string, stripping dangerous elements and attributes
  * while preserving the feature set that render templates require.
+ *
+ * @throws ValidationError when the sanitised template has markup inside a
+ *   `<style>` element (see {@link styleCarriesMarkup}). The template is refused
+ *   rather than altered, and the message does not repeat its content.
  */
 export function sanitiseTemplate(html: string): string {
   const result = sanitizeHtml(html, SANITISE_OPTIONS);
@@ -84,6 +125,13 @@ export function sanitiseTemplate(html: string): string {
   const delta = html.length - result.length;
   if (delta > 0) {
     logger.warn({ charsDelta: delta }, 'Template content was sanitised: %d characters stripped');
+  }
+
+  if (styleCarriesMarkup(result)) {
+    logger.warn('Template refused: a style element carries markup');
+    throw new ValidationError(
+      'Template refused: a <style> element contains markup or a "<" character, which a browser can run as HTML inside inline SVG. Remove it from the CSS.',
+    );
   }
 
   return result;
