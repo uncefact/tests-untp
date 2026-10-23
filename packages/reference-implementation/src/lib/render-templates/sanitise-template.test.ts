@@ -7,10 +7,25 @@ import { ValidationError } from '@/lib/api/validation';
 import { sanitiseTemplate } from './sanitise-template';
 
 /**
- * Sanitises the template and parses the result the way a browser does (the
- * jsdom test environment), returning the elements that would run: those with
- * an on* attribute, and scripts. A refused template returns 'refused'.
+ * What would run if the HTML were inserted into a div, as the credential
+ * renderer does, read from the jsdom test environment: elements carrying an
+ * on* attribute, scripts, foreignObject, and links with a javascript: URL.
  */
+function runnableInDiv(html: string): string[] {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return [...div.querySelectorAll('*')]
+    .filter(
+      (el) =>
+        ['script', 'foreignobject'].includes(el.localName.toLowerCase()) ||
+        [...el.attributes].some(
+          (attribute) => attribute.name.toLowerCase().startsWith('on') || /^\s*javascript:/i.test(attribute.value),
+        ),
+    )
+    .map((el) => el.localName.toLowerCase());
+}
+
+/** Sanitises the template and returns what would run in a div, or 'refused'. */
 function runnableAfterSanitising(html: string): string[] | 'refused' {
   let output: string;
   try {
@@ -19,14 +34,27 @@ function runnableAfterSanitising(html: string): string[] | 'refused' {
     if (error instanceof ValidationError) return 'refused';
     throw error;
   }
-  const doc = new DOMParser().parseFromString(output, 'text/html');
-  return [...doc.querySelectorAll('*')]
-    .filter(
-      (el) =>
-        el.tagName.toLowerCase() === 'script' ||
-        [...el.attributes].some((attribute) => attribute.name.toLowerCase().startsWith('on')),
-    )
-    .map((el) => el.tagName.toLowerCase());
+  return runnableInDiv(output);
+}
+
+/**
+ * The sanitiser's output with the browser-view check switched off: the real
+ * module, loaded on its own with parse5 answering every parse made against a
+ * context element with an empty fragment, so nothing is ever refused.
+ */
+function sanitisedWithCheckOff(html: string): string {
+  let sanitise: (input: string) => string = () => '';
+  jest.isolateModules(() => {
+    const actual = jest.requireActual<typeof import('parse5')>('parse5');
+    jest.doMock('parse5', () => ({
+      ...actual,
+      parseFragment: (first: unknown) =>
+        typeof first === 'string' ? actual.parseFragment(first) : actual.parseFragment(''),
+    }));
+    sanitise = jest.requireActual<typeof import('./sanitise-template')>('./sanitise-template').sanitiseTemplate;
+  });
+  jest.dontMock('parse5');
+  return sanitise(html);
 }
 
 describe('sanitiseTemplate', () => {
@@ -192,29 +220,77 @@ describe('sanitiseTemplate', () => {
   // ── Markup inside <style> ───────────────────────────────────────────────────
 
   // Inside inline SVG a browser parses <style> content as markup, while the
-  // sanitiser treats it as raw text. Without the refusal, the first row comes
-  // back as an element with a live event handler, and the second is accepted.
+  // sanitiser treats it as raw text. Text the sanitiser decodes or carries
+  // through can then become an element, or close the <style> early so that
+  // what follows is built as elements. Each row builds something runnable when
+  // the browser-view check is off, and is refused with it on.
   it.each([
     ['escaped markup inside an SVG style element', '<svg><style>&lt;img src=x onerror=alert(1)&gt;</style></svg>'],
-    ['markup inside an SVG style element', '<svg><style><img src=x onerror=alert(1)></style></svg>'],
-    ['markup inside a plain style element', '<style><img src=x onerror=alert(1)></style>'],
+    [
+      'an entity-encoded closing boundary in SVG',
+      '<svg><style>&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;</style></svg>',
+    ],
+    [
+      'an entity-encoded closing boundary in SVG nested in SVG',
+      '<svg><svg><style>&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;</style></svg></svg>',
+    ],
+    ['a CDATA closing boundary in SVG', '<svg><style><![CDATA[</style><img src=x onerror=alert(1)>]]></style></svg>'],
+    [
+      'a CDATA closing boundary in SVG nested in SVG',
+      '<svg><svg><style><![CDATA[</style><img src=x onerror=alert(1)>]]></style></svg></svg>',
+    ],
+    [
+      'a foreignObject built inside an SVG style element',
+      '<svg><style>&lt;foreignObject&gt;&lt;img src=x onerror=alert(1)&gt;&lt;/foreignObject&gt;</style></svg>',
+    ],
+    [
+      'a mixed-case SVG style closing boundary',
+      '<Svg><STYLE>&lt;/STYLE&gt;&lt;img src=x onerror=alert(1)&gt;</STYLE></Svg>',
+    ],
+    [
+      'a link with a disallowed scheme built through a closing boundary',
+      '<svg><style>&lt;/style&gt;&lt;a href="javascript:alert(1)"&gt;x&lt;/a&gt;</style></svg>',
+    ],
   ])('refuses %s', (_label, html) => {
+    expect(runnableInDiv(sanitisedWithCheckOff(html))).not.toEqual([]);
     expect(runnableAfterSanitising(html)).toBe('refused');
   });
 
   it('names the reason for a refusal without repeating the template', () => {
+    const html = '<svg><style>&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;</style></svg>';
+
+    expect(() => sanitiseTemplate(html)).toThrow(/would build an element, attribute or link/);
+    expect(() => sanitiseTemplate(html)).not.toThrow(/onerror|alert/);
+  });
+
+  it('accepts markup in an SVG style element when the browser builds only allowed elements and attributes', () => {
     const html = '<svg><style><img src=x onerror=alert(1)></style></svg>';
 
-    expect(() => sanitiseTemplate(html)).toThrow(/style> element contains markup/);
-    expect(() => sanitiseTemplate(html)).not.toThrow(/onerror|img/);
+    expect(runnableAfterSanitising(html)).toEqual([]);
   });
 
   it.each([
+    ['a range media query', '<style>@media (width < 600px) { p { color: red; } }</style>'],
+    ['a CSS comment holding "<"', '<style>/* a < b */ p { color: red; }</style>'],
+    ['a content string holding "<"', '<style>p::before { content: "<"; }</style>'],
+    ['the legacy comment wrapper', '<style><!-- p { color: red; } --></style>'],
     ['plain CSS inside an SVG style element', '<svg><style>.mark { fill: #003366; }</style></svg>'],
     ['escaped markup inside a plain style element', '<style>&lt;img src=x onerror=alert(1)&gt;</style>'],
+    ['markup inside a plain style element', '<style><img src=x onerror=alert(1)></style>'],
   ])('accepts %s unchanged and leaves nothing runnable', (_label, html) => {
     expect(runnableAfterSanitising(html)).toEqual([]);
     expect(sanitiseTemplate(html)).toBe(html);
+  });
+
+  it('keeps an SVG clipPath and the elements that use it', () => {
+    const html =
+      '<svg viewBox="0 0 10 10"><defs><clipPath id="c"><rect width="5" height="5"></rect></clipPath></defs>' +
+      '<path d="M0 0" clip-path="url(#c)"></path></svg>';
+
+    const result = sanitiseTemplate(html);
+
+    expect(result).toContain('<clipPath id="c"><rect width="5" height="5"></rect></clipPath>');
+    expect(result).toContain('clip-path="url(#c)"');
   });
 
   // Seeding uploads the bundled templates without sanitising them. The sanitiser
