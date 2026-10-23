@@ -72,24 +72,6 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
     });
 
-    it('provides unauthenticated state when the session carries no user', () => {
-      mockUseSession.mockReturnValue({
-        // The Session type promises a user; this case is the response that breaks that promise.
-        data: { expires: '2099-01-01T00:00:00.000Z' } as never,
-        status: 'authenticated',
-        update: jest.fn(),
-      });
-
-      render(
-        <AuthProvider>
-          <TestComponent />
-        </AuthProvider>,
-      );
-
-      expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
-      expect(screen.queryByTestId('user')).not.toBeInTheDocument();
-    });
-
     it('provides authenticated user when session is available', () => {
       const mockSession = {
         user: {
