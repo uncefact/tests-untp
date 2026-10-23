@@ -64,13 +64,15 @@ The sanitiser allows:
 - Inline SVG elements (`<svg>`, `<path>`, `<circle>`, `<rect>`, `<g>`, `<defs>`, `<clippath>`, `<text>`)
 - CSS via `<style>` tags
 - External stylesheets via `<link>` tags
-- Images with `http`, `https`, and `data` URL schemes
+- Images with `http`, `https`, and `data` URL schemes, including each candidate in a `srcset`
 - Accessibility and data attributes (`aria-*`, `data-*`)
 - Handlebars syntax (passed through as text, not stripped)
 
 Script content is removed. If the sanitiser strips any content, a warning is logged.
 
-After sanitising, the server reads the result the way a browser does when it inserts HTML into a page. If that would build an element the sanitiser does not allow, an attribute it does not allow on that element, or a link or image URL with a scheme it does not allow, the template is refused with a 400 on both create and update, and nothing is stored. This matters for `<style>` inside inline SVG, where a browser reads the content as markup rather than CSS. CSS text itself is not restricted: a stylesheet may contain `<`, for example in a range media query, a comment or a `content` string, as long as it builds no disallowed element or attribute.
+After sanitising, the server reads the result the way a browser does when it inserts HTML into a page. If that would build an element the sanitiser does not allow, an attribute it does not allow on that element, or a link or image URL with a scheme it does not allow, the template is refused with a 400 on both create and update, and nothing is stored. This matters for `<style>` inside inline SVG, where a browser reads the content as markup rather than CSS. CSS text itself is not restricted: a stylesheet may contain `<`, for example in a range media query, a comment or a `content` string, as long as it builds no disallowed element or attribute. The response names the reason without repeating the template. The check covers the stored template text, not the HTML that Handlebars produces when a credential is rendered with it.
+
+Templates stored before this check existed are not checked again, and the credential renderer shows them as stored. Replacing a template's content runs the check, and updating only its name or other fields does not.
 
 ### Storage Integration
 
