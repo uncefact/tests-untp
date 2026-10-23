@@ -1,5 +1,39 @@
 # UNTP Reference Implementation release notes
 
+## 0.4.2 - 2026-10-24
+
+This patch moves the bundled Compose stacks to the patched releases of the three services the Reference Implementation depends on: VCKit 1.2.2, storage service 4.0.2 and Pyx Identity Resolver 4.0.1. Each of their images runs on Node.js 22.23.4, and each release updates dependencies that had published security advisories. The Reference Implementation's own code is unchanged from v0.4.1, and so are its API, settings and database migrations.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.4.2`). From 0.4.1 onwards, images on the 0.4 line are published for linux/amd64 only, so an arm64 host stays on the 0.4.0 image or moves to the newer release line.
+- Before upgrading the bundled Compose stack: the storage service now runs as uid 1000 rather than root, and the uploads volume an earlier stack wrote to stays owned by root. Change its owner once before you start the upgraded stack, as described under [The storage service runs as uid 1000](#the-storage-service-runs-as-uid-1000).
+- Upgrading from v0.4.1: deploy the 0.4.2 image and restart the application. If you run the bundled Compose stack, stop it with `docker compose down`, change the owner of the uploads volume, then pull the 0.4.2 release and start the stack again with `docker compose up -d --build`.
+
+### Service versions in the bundled Compose stacks
+
+`docker-compose.yml` and `docker-compose.e2e.yml` now pull these images, each pinned by tag and digest:
+
+- VCKit `ghcr.io/uncefact/project-vckit:1.2.2`, from 1.2.1 (`docker-compose.e2e.yml` previously pinned the `sha-325b7e3` build). It moves from Node.js 20 to Node.js 22 and updates dependencies with security advisories. See the [VCKit 1.2.2 release](https://github.com/uncefact/project-vckit/releases/tag/1.2.2).
+- Storage service `ghcr.io/uncefact/project-storage-service:4.0.2`, from 4.0.0. 4.0.1 updates dependencies with published advisories and limits upload field names. 4.0.2 runs the container as uid 1000 and adds a Docker health check. See the [storage service release notes](https://github.com/uncefact/project-storage-service/blob/v4.0.2/RELEASE_NOTES.md).
+- Pyx Identity Resolver `ghcr.io/pyx-industries/pyx-identity-resolver:4.0.1`, from 4.0.0. It clears critical advisories, and high advisories that are not only denial of service, in its runtime dependencies. Its API and stored data are unchanged, and its link URL validation differs in two edge cases described in its notes. See the [Pyx Identity Resolver release notes](https://github.com/pyx-industries/pyx-identity-resolver/blob/v4.0.1/RELEASE_NOTES.md).
+
+The Reference Implementation talks to them over the same API versions as before: VCKit 1.0.0, storage 4.0 and identity resolver 4.0.
+
+### The storage service runs as uid 1000
+
+`docker-compose.yml` keeps the storage service's uploads in the `storage_service_data` Docker volume. Storage service 4.0.2 creates its uploads directory owned by uid 1000, so a fresh checkout's new volume takes that owner and needs no step. A volume that an earlier stack wrote to stays owned by root, and storing a credential fails until you change its owner once:
+
+1. Stop the running stack with `docker compose down`. Do not add `-v`, which removes the volume.
+2. Find the volume's full name with `docker volume ls`. Compose prefixes it with the project name, which defaults to the checkout's directory name, so a checkout in `tests-untp` has `tests-untp_storage_service_data`. A wrong name creates a new, empty volume and changes that one instead.
+3. Change its owner, using the name from step 2:
+
+```bash
+docker run --rm -v tests-untp_storage_service_data:/data alpine chown -R 1000:1000 /data
+```
+
+If you later go back to 0.4.1, its storage service runs as root again and can write root-owned files, so repeat these steps before you upgrade again.
+
+`docker-compose.e2e.yml` keeps no uploads volume, so it needs no step.
+
 ## 0.4.1 - 2026-10-24
 
 This patch moves the container image to the current Node.js 22 release and updates the runtime dependencies that had published critical advisories, or high advisories whose impact is not only denial of service. undici is the exception, as described under Dependency updates. High advisories whose only impact is denial of service remain in other dependencies. The patch also moves the bundled Compose stacks' object store to an image that can still be pulled. It changes no API, setting or database migration.
