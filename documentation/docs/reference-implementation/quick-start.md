@@ -18,7 +18,7 @@ Before diving in, we strongly recommend reading the [System Architecture](./syst
 ## Start the Stack
 
 :::warning[Upgrading a checkout that used quay.io/minio/minio]
-The object store keeps its data in `./minio_data` on the host. The Compose files now run it from the `pgsty/minio` image, and a checkout whose Compose file uses the `quay.io/minio/minio` image cannot read object store data that the new image has written. If you may need to go back to such a checkout, copy `./minio_data` somewhere safe before you start the upgraded stack.
+The object store keeps its data in `./minio_data` on the host. The Compose files now run it from the `pgsty/minio` image, and a checkout whose Compose file uses the `quay.io/minio/minio` image cannot read object store data that the new image has written. If you may need to go back to such a checkout, stop the running stack with `docker compose down` and copy `./minio_data` somewhere safe before you start the upgraded stack.
 :::
 
 Clone the repository and start all services:
