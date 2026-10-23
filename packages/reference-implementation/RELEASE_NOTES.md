@@ -1,5 +1,35 @@
 # UNTP Reference Implementation release notes
 
+## 0.4.1 - 2026-10-23
+
+This patch moves the container image to the current Node.js 22 release and updates runtime dependencies that had published critical or high security advisories. undici is the exception, as described under Dependency updates. It also moves the bundled Compose stacks' object store to an image that can still be pulled. It changes no API, setting or database migration.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.4.1`)
+- Upgrading from v0.4.0: deploy the 0.4.1 image and restart the application. If you run the bundled Compose stack, pull the 0.4.1 release, rebuild the stack and start it again. A deployment that runs from a source checkout needs Node.js 22.23.4 or later.
+
+### Node.js 22.23.4
+
+The image is now built on `node:22-alpine` rather than `node:22.22.2-alpine`, so it runs Node.js 22.23.4 or later and picks up the upstream security fixes in that line.
+
+### Dependency updates
+
+These dependencies move to releases that fix published critical or high advisories:
+
+- next 15.5.18 to 15.5.28, with sharp 0.34.5 to 0.35.5 for its image optimisation
+- next-auth 5.0.0-beta.31 to 5.0.0-beta.32, @auth/core 0.41.2 to 0.41.3 and @auth/prisma-adapter 2.11.2 to 2.11.3
+- sanitize-html 2.17.3 to 2.17.4
+- handlebars 4.7.9 to 4.7.10
+- fast-uri 3.1.2 to 3.1.9
+- postcss 8.5.14 to 8.5.31
+- @grpc/grpc-js 1.14.3 to 1.14.6, used by the OpenTelemetry trace exporter
+- dompurify 3.4.3 to 3.4.17, axios 1.16.0 to 1.20.0, follow-redirects 1.16.0 to 1.16.1 and form-data 4.0.5 to 4.0.6, used by the API documentation page
+
+undici stays at its current versions in this release. undici 5.29.0, which the JSON-LD document loader reaches through `@digitalbazaar/http-client`, has published high advisories whose fixes are only in undici 6 or later. undici 6.25.0, used by `@uncefact/untp-utils`, has published high advisories fixed in later 6.x releases. Both will move in a later release.
+
+### The bundled Compose stacks pull their object store from pgsty/minio
+
+`docker-compose.yml` and `docker-compose.e2e.yml` ran the identity resolver's object store from `quay.io/minio/minio:RELEASE.2024-08-17T01-24-54Z-cpuv1`, which can no longer be pulled, so neither stack could start from a fresh machine. Both now use `pgsty/minio:RELEASE.2026-08-04T00-00-00Z`, pinned by digest. The object store keeps its data in `./minio_data` on the host. A v0.4.0 checkout cannot read object store data that the new image has written, so to go back to v0.4.0 restore a copy of `./minio_data` taken before you upgraded, or remove the directory. See [Quick start](https://uncefact.github.io/tests-untp/docs/reference-implementation/quick-start).
+
 ## 0.4.0 - 2026-08-17
 
 v0.3 made the Reference Implementation an API-first, multi-tenant application. v0.4 is about making it safe to run in front of real data and predictable to integrate against.
