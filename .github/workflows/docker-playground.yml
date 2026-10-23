@@ -4,7 +4,9 @@ name: Docker — UNTP Playground
 #   - push to `next` rebuilds the rolling `:next` image on every merge.
 #   - pushing an `untp-playground-v<X.Y.Z>` git tag (e.g.
 #     `untp-playground-v0.3.0`) builds a release image tagged with the
-#     semver tag and `:latest`.
+#     semver tag only. This is a maintenance line: `:latest` belongs to
+#     the newest playground release, so a run from this line must not
+#     move it.
 #   - workflow_dispatch lets a maintainer rebuild a release on demand
 #     without re-tagging git.
 
@@ -21,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Semver version to tag this build with (e.g. 0.3.0). Omit to push only :next.'
+        description: 'Exact X.Y.Z version to republish, equal to the playground package version (e.g. 0.3.0). Omit when running on an untp-playground-v tag.'
         required: false
         type: string
 
@@ -55,18 +57,51 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # This line publishes exact version tags only. A floating name such
+      # as `latest`, `next` or `0.3` from the tag or the manual input would
+      # move a tag the newest release line owns, and another release's
+      # version would overwrite that release's image, so refuse both here.
+      # Each version must also equal the playground's package version.
+      - name: Check the release version
+        env:
+          REF: ${{ github.ref }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          versions=()
+          if [[ "$REF" == refs/tags/untp-playground-v* ]]; then
+            versions+=("${REF#refs/tags/untp-playground-v}")
+          fi
+          if [[ -n "$INPUT_VERSION" ]]; then
+            versions+=("$INPUT_VERSION")
+          fi
+          if [[ ${#versions[@]} -eq 0 ]]; then
+            echo "::error::No release version. Push an untp-playground-vX.Y.Z tag or pass an X.Y.Z version input."
+            exit 1
+          fi
+          for v in "${versions[@]}"; do
+            if [[ ! "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              printf 'Rejected version: %q\n' "$v"
+              echo "::error::The version is not an exact X.Y.Z version, so nothing is published."
+              exit 1
+            fi
+            GITHUB_REF_NAME="untp-playground-v$v" node scripts/check-tag-version-match.mjs untp-playground-v packages/untp-playground
+          done
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}/untp-playground
-          # Tag strategy mirrors docker-ri.yml.
+          # Tag strategy mirrors docker-ri.yml, without `:latest`.
+          # `latest=false` stops the `type=match` rule adding `:latest`
+          # on its own.
+          flavor: |
+            latest=false
           tags: |
             type=raw,value=next,enable=${{ github.ref == 'refs/heads/next' }}
             type=match,pattern=untp-playground-v(.*),group=1,enable=${{ startsWith(github.ref, 'refs/tags/untp-playground-v') }}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/untp-playground-v') && !contains(github.ref_name, '-rc') && !contains(github.ref_name, '-alpha') && !contains(github.ref_name, '-beta') && !contains(github.ref_name, '-pre') }}
             type=raw,value=${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.version != '' }}
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && inputs.version != '' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6

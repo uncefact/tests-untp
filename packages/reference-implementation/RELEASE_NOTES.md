@@ -1,5 +1,40 @@
 # UNTP Reference Implementation release notes
 
+## 0.4.1 - 2026-10-24
+
+This patch moves the container image to the current Node.js 22 release and updates the runtime dependencies that had published critical advisories, or high advisories whose impact is not only denial of service. undici is the exception, as described under Dependency updates. High advisories whose only impact is denial of service remain in other dependencies. The patch also moves the bundled Compose stacks' object store to an image that can still be pulled. It changes no API, setting or database migration.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.4.1`)
+- Before upgrading the bundled Compose stack: the object store's data in `./minio_data` is written in a form a v0.4.0 checkout cannot read once the new object store image has run. If you may need to go back to v0.4.0, stop the running stack with `docker compose down` and copy `./minio_data` before you start the upgraded stack. See [The bundled Compose stacks pull their object store from pgsty/minio](#the-bundled-compose-stacks-pull-their-object-store-from-pgstyminio).
+- Upgrading from v0.4.0: deploy the 0.4.1 image and restart the application. If you run the bundled Compose stack, take the copy above if you need it, then pull the 0.4.1 release, rebuild the stack and start it again. A deployment that runs from a source checkout needs Node.js 22.23.4 or later for the Node.js security fixes.
+
+### Node.js 22.23.4
+
+The image is now built on `node:22-alpine` rather than `node:22.22.2-alpine`, so it runs Node.js 22.23.4 or later and picks up the upstream security fixes in that line. The README's `nvm` commands now install the current Node.js 22 release.
+
+### Dependency updates
+
+These dependencies move to releases that fix published critical advisories, or high advisories whose impact is not only denial of service:
+
+- next 15.5.18 to 15.5.28, with sharp 0.34.5 to 0.35.5 for its image optimisation
+- next-auth 5.0.0-beta.31 to 5.0.0-beta.32, @auth/core 0.41.2 to 0.41.3 and @auth/prisma-adapter 2.11.2 to 2.11.3
+- sanitize-html 2.17.3 to 2.17.4
+- handlebars 4.7.9 to 4.7.10
+- fast-uri 3.1.2 to 3.1.9
+- postcss 8.5.14 to 8.5.31
+- @grpc/grpc-js 1.14.3 to 1.14.6, used by the OpenTelemetry trace exporter
+- dompurify 3.4.3 to 3.4.17, axios 1.16.0 to 1.20.0, follow-redirects 1.16.0 to 1.16.1 and form-data 4.0.5 to 4.0.6, used by the API documentation page
+
+undici stays at its current versions in this release: 5.29.0, which the JSON-LD document loader reaches through `@digitalbazaar/http-client`, and 6.25.0, used by `@uncefact/untp-utils`. Both are affected by GHSA-2m5v-pch6-74hx, a high advisory that is not only denial of service, and by high denial-of-service advisories. Their fixes are in undici 6.29.1 or later, and undici will move in a later release.
+
+Other dependencies still carry high advisories whose only impact is denial of service. This release does not change them.
+
+### The bundled Compose stacks pull their object store from pgsty/minio
+
+`docker-compose.yml` and `docker-compose.e2e.yml` ran the identity resolver's object store from `quay.io/minio/minio:RELEASE.2024-08-17T01-24-54Z-cpuv1`, which can no longer be pulled, so neither stack could start from a fresh machine. Both now use `pgsty/minio:RELEASE.2026-08-04T00-00-00Z`, pinned by digest.
+
+The object store keeps its data in `./minio_data`, a directory on the host, so `docker compose down` and `docker compose down -v` both leave it in place. A v0.4.0 checkout cannot read object store data that the new image has written. To go back to v0.4.0, stop the stack and replace `./minio_data` with the copy you took before upgrading. Without that copy, remove `./minio_data`, and the identity resolver starts with no stored data. To reset the stack completely, run `docker compose down -v` and remove `./minio_data`. See [Quick start](https://uncefact.github.io/tests-untp/docs/reference-implementation/quick-start).
+
 ## 0.4.0 - 2026-08-17
 
 v0.3 made the Reference Implementation an API-first, multi-tenant application. v0.4 is about making it safe to run in front of real data and predictable to integrate against.
