@@ -76,4 +76,12 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# Probe 127.0.0.1, not localhost. HOSTNAME above makes the server listen on IPv4
+# only, while BusyBox wget resolves localhost to ::1 first. The root page is a
+# static client page, so this is a liveness check. An image built with
+# NEXT_PUBLIC_BASE_PATH serves it under that path instead, and needs this check
+# overridden where it runs under Docker.
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=20s \
+  CMD wget --quiet --spider "http://127.0.0.1:${PORT:-3000}/" || exit 1
+
 CMD ["node", "packages/untp-playground/server.js"]
