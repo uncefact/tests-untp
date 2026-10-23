@@ -118,7 +118,9 @@ jobs:
           context: .
           file: ./packages/reference-implementation/Dockerfile
           target: build
-          platforms: linux/amd64,linux/arm64
+          # amd64 only on this maintenance line: the arm64 build runs under QEMU, which
+          # stops with an illegal instruction in the Next.js 15.5.28 build.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
