@@ -33,7 +33,7 @@ This is a monorepo for the UNTP (UN Transparency Protocol) test suite and refere
 ### Initial Setup
 ```bash
 # Install Node via NVM; pnpm via Corepack
-nvm install 22.22.2 && nvm use 22.22.2
+nvm install 22 && nvm use 22
 corepack enable
 
 # Environment file

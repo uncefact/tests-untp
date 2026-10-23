@@ -21,6 +21,7 @@ jest.mock('@uncefact/untp-ri-services', () => ({}));
 jest.mock('@/lib/services/resolve-service', () => ({}));
 
 import { NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 import { updateRenderTemplate } from './update-render-template';
 import type { UpdateRenderTemplateInput } from './update-render-template';
 
@@ -209,6 +210,25 @@ describe('updateRenderTemplate', () => {
     );
 
     expect(mockSanitiseTemplate).toHaveBeenCalledWith('<p>new content</p>');
+  });
+
+  it('stores nothing and keeps the old content when the sanitiser refuses the template', async () => {
+    const refusal = new ValidationError('Template refused');
+    mockSanitiseTemplate.mockImplementationOnce(() => {
+      throw refusal;
+    });
+
+    await expect(
+      updateRenderTemplate(
+        buildInput({
+          template: '<p>new content</p>',
+          storageService: mockStorageService as unknown as UpdateRenderTemplateInput['storageService'],
+        }),
+      ),
+    ).rejects.toBe(refusal);
+    expect(mockStoreBinary).not.toHaveBeenCalled();
+    expect(mockDelete).not.toHaveBeenCalled();
+    expect(mockUpdateRenderTemplateRepo).not.toHaveBeenCalled();
   });
 
   it('skips old content deletion when storageExternalId is null', async () => {

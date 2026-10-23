@@ -23,6 +23,7 @@ jest.mock('@/lib/services/resolve-service', () => ({}));
 import { createRenderTemplate } from './create-render-template';
 import type { CreateRenderTemplateInput } from './create-render-template';
 import { NotFoundError } from '@/lib/api/errors';
+import { ValidationError } from '@/lib/api/validation';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -160,6 +161,17 @@ describe('createRenderTemplate', () => {
     const input = buildInput({ template: '<p>content</p>' });
     await createRenderTemplate(input);
     expect(mockSanitiseTemplate).toHaveBeenCalledWith('<p>content</p>');
+  });
+
+  it('stores nothing when the sanitiser refuses the template', async () => {
+    const refusal = new ValidationError('Template refused');
+    mockSanitiseTemplate.mockImplementationOnce(() => {
+      throw refusal;
+    });
+
+    await expect(createRenderTemplate(buildInput())).rejects.toBe(refusal);
+    expect(mockStoreBinary).not.toHaveBeenCalled();
+    expect(mockCreateRenderTemplateRepo).not.toHaveBeenCalled();
   });
 
   it('applies defaults from validation module', async () => {

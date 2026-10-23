@@ -76,7 +76,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-storage-service:4.0.0
+    image: ghcr.io/uncefact/project-storage-service:4.0.1
     profiles: ['ri']
     ports:
       - 3334:3334

@@ -95,7 +95,7 @@ export const GET = withTenantAuth(async (req, { tenantId }) => {
  *       - Render Templates
  *     requestBody:
  *       required: true
- *       description: Unrecognised keys are ignored. The server-managed fields storageUrl and digestMultibase, and the legacy field hash, are rejected with a 400 when present.
+ *       description: Unrecognised keys are ignored. The server-managed fields storageUrl and digestMultibase, and the legacy field hash, are rejected with a 400 when present. A template is rejected with a 400 and not stored when a browser reading the sanitised template would build an element, attribute or URL scheme that the sanitiser does not allow, for example from markup inside a style element in inline SVG.
  *       content:
  *         application/json:
  *           schema:

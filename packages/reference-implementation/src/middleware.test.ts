@@ -61,7 +61,7 @@ function fakeRequest(
   pathname: string,
   options?: {
     headers?: Record<string, string>;
-    auth?: { user?: Record<string, string> } | null;
+    auth?: Record<string, unknown> | null;
   },
 ): any {
   const headers = new Headers(options?.headers ?? {});
@@ -248,6 +248,43 @@ describe('middleware', () => {
 
       expect(mockNextResponseNext).toHaveBeenCalledTimes(1);
       expect(mockNextResponseJson).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      // Auth.js puts its error body on req.auth when its configuration is broken (GHSA-8fpg-xm3f-6cx3).
+      [
+        'an Auth.js configuration error body',
+        { message: 'There was a problem with the server configuration. Check the server logs for more information.' },
+      ],
+      ['a session object without a user', { expires: '2099-01-01T00:00:00.000Z' }],
+    ])('returns 401 when req.auth is %s', async (_label, auth) => {
+      const req = fakeRequest('/api/v1/dids', { auth });
+
+      await (middleware as any)(req);
+
+      expect(mockNextResponseNext).not.toHaveBeenCalled();
+      expect(mockNextResponseJson).toHaveBeenCalledWith(
+        { error: 'Unauthorised', message: 'Authentication required' },
+        expect.objectContaining({ status: 401 }),
+      );
+    });
+
+    it('falls through to bearer auth when req.auth carries no user', async () => {
+      const req = fakeRequest('/api/v1/dids', {
+        headers: { authorization: 'Bearer valid-token' },
+        auth: { message: 'There was a problem with the server configuration.' },
+      });
+
+      mockExtractBearerToken.mockReturnValueOnce('valid-token');
+      mockValidateServiceAccountToken.mockResolvedValueOnce({
+        valid: true,
+        payload: { sub: 'service-account-1' },
+      });
+
+      await (middleware as any)(req);
+
+      const forwarded = (mockNextResponseNext.mock.calls[0][0] as { request: { headers: Headers } }).request.headers;
+      expect(forwarded.get('x-auth-sub')).toBe('service-account-1');
     });
 
     it('allows valid bearer token requests through', async () => {
