@@ -94,6 +94,13 @@ For a detailed overview of how these components connect, see [System Architectur
 
 The documentation site is included in the Docker Compose stack at [http://localhost:3002](http://localhost:3002), or view the deployed version at [https://uncefact.github.io/tests-untp/](https://uncefact.github.io/tests-untp/).
 
+The documentation container runs as uid 1000 and mounts `./documentation`, so on a native Linux Docker engine that directory must be writable by uid 1000. If an earlier version of the stack ran the documentation container as root, remove the root-owned build cache and recreate the container's dependency volume once:
+
+```bash
+sudo rm -rf documentation/.docusaurus
+docker compose up -d --build -V documentation
+```
+
 Key pages:
 
 - [Overview](https://uncefact.github.io/tests-untp/docs/next/reference-implementation/overview) — what the Reference Implementation does and why
