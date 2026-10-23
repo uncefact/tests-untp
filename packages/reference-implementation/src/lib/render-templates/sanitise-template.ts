@@ -222,7 +222,10 @@ export function sanitiseTemplate(html: string): string {
 
   const disallowed = disallowedInBrowserView(result);
   if (disallowed !== null) {
-    logger.warn({ disallowed }, 'Template refused: the browser view of the sanitised template is outside the allowlist');
+    logger.warn(
+      { disallowed },
+      'Template refused: the browser view of the sanitised template is outside the allowlist',
+    );
     throw new ValidationError(
       'Template refused: a browser reading the sanitised template would build an element, attribute or link that render templates do not allow. Check the markup inside <style> elements, especially in inline SVG.',
     );
