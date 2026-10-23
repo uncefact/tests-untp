@@ -1,4 +1,5 @@
 import sanitizeHtml from 'sanitize-html';
+import parseSrcset from 'parse-srcset';
 import { parseFragment } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
 import { appLogger } from '@/lib/api/logger';
@@ -134,6 +135,15 @@ function hasAllowedScheme(tag: string, value: string): boolean {
   return allowed.includes(scheme);
 }
 
+/**
+ * Whether every candidate URL in a srcset value has a scheme allowed for the
+ * tag. sanitize-html checks srcset candidates one by one, with the same parser
+ * (parse-srcset) and the same per-tag schemes as `src`, so this does too.
+ */
+function hasAllowedSrcsetSchemes(tag: string, value: string): boolean {
+  return parseSrcset(value).every((candidate) => hasAllowedScheme(tag, candidate.url));
+}
+
 /** A div element for parse5 to parse the template as that element's content. */
 const DIV_CONTEXT = parseFragment('<div></div>').childNodes[0] as DefaultTreeAdapterMap['element'];
 
@@ -152,6 +162,9 @@ const DIV_CONTEXT = parseFragment('<div></div>').childNodes[0] as DefaultTreeAda
  * `<template>` content, against the same tag, attribute and URL scheme
  * allowlist the sanitiser applies. CSS text is not inspected: a `<` in a
  * stylesheet is accepted when it builds nothing outside the allowlist.
+ *
+ * This checks the template string that is stored. It does not see the HTML
+ * Handlebars produces when a credential is rendered with the template.
  */
 function disallowedInBrowserView(html: string): string | null {
   const pending: DefaultTreeAdapterMap['childNode'][] = [...parseFragment(DIV_CONTEXT, html, {}).childNodes];
@@ -163,12 +176,22 @@ function disallowedInBrowserView(html: string): string | null {
     for (const attribute of node.attrs) {
       const name = (attribute.prefix ? `${attribute.prefix}:${attribute.name}` : attribute.name).toLowerCase();
       if (!isAllowedAttribute(tag, name)) return `attribute ${name} on ${tag}`;
-      if (SCHEME_CHECKED_ATTRIBUTES.has(name) && !hasAllowedScheme(tag, attribute.value)) {
+      // Schemes are checked by the attribute's local name, so `xlink:href`
+      // is held to the same rule as `href`.
+      const localName = attribute.name.toLowerCase();
+      if (SCHEME_CHECKED_ATTRIBUTES.has(localName) && !hasAllowedScheme(tag, attribute.value)) {
+        return `URL scheme in ${name} on ${tag}`;
+      }
+      if (localName === 'srcset' && !hasAllowedSrcsetSchemes(tag, attribute.value)) {
         return `URL scheme in ${name} on ${tag}`;
       }
     }
-    pending.push(...node.childNodes);
-    if ('content' in node) pending.push(...node.content.childNodes);
+    // One at a time: spreading a very wide element's children into push()
+    // exceeds the engine's argument limit and throws a RangeError.
+    for (const child of node.childNodes) pending.push(child);
+    if ('content' in node) {
+      for (const child of node.content.childNodes) pending.push(child);
+    }
   }
   return null;
 }

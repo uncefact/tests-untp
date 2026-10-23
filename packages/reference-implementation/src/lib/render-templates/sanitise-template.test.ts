@@ -251,10 +251,48 @@ describe('sanitiseTemplate', () => {
       'a link with a disallowed scheme built through a closing boundary',
       '<svg><style>&lt;/style&gt;&lt;a href="javascript:alert(1)"&gt;x&lt;/a&gt;</style></svg>',
     ],
+    [
+      'an xlink:href with a disallowed scheme built through a closing boundary',
+      '<svg><style>&lt;/style&gt;&lt;a xlink:href="javascript:alert(1)"&gt;x&lt;/a&gt;</style></svg>',
+    ],
   ])('refuses %s', (_label, html) => {
     expect(runnableInDiv(sanitisedWithCheckOff(html))).not.toEqual([]);
     expect(runnableAfterSanitising(html)).toBe('refused');
   });
+
+  // An img that only exists in the browser's parse keeps whatever srcset the
+  // template gave it, so each candidate's scheme is checked as `src` would be.
+  it.each([
+    [
+      'an ftp srcset candidate on an img built through an entity-encoded closing boundary',
+      '<svg><style>&lt;/style&gt;&lt;img src="https://e.example/a.png" srcset="https://e.example/a.png 1x, data:image/png;base64,iVBORw0KGgo= 2x, ftp://e.example/b.png 3x"&gt;</style></svg>',
+    ],
+    [
+      'an ftp srcset candidate on an img built through a CDATA closing boundary',
+      '<svg><style><![CDATA[</style><img src="https://e.example/a.png" srcset="https://e.example/a.png 1x, data:image/png;base64,iVBORw0KGgo= 2x, ftp://e.example/b.png 3x">]]></style></svg>',
+    ],
+  ])('refuses %s', (_label, html) => {
+    const div = document.createElement('div');
+    div.innerHTML = sanitisedWithCheckOff(html);
+    expect(div.querySelector('img')?.getAttribute('srcset')).toContain('ftp://e.example/b.png');
+
+    expect(runnableAfterSanitising(html)).toBe('refused');
+  });
+
+  it('accepts an img whose srcset candidates all use allowed schemes', () => {
+    const html =
+      '<img src="https://e.example/a.png" srcset="https://e.example/a.png 1x, data:image/png;base64,iVBORw0KGgo= 2x" />';
+
+    expect(sanitiseTemplate(html)).toBe(html);
+  });
+
+  // 150,000 children is past the engine's limit for spreading an array into a
+  // function call's arguments, which the check must not depend on.
+  it('accepts a wide, shallow template of allowed elements', () => {
+    const html = `<div>${'<br />'.repeat(150_000)}</div>`;
+
+    expect(sanitiseTemplate(html)).toBe(html);
+  }, 60_000);
 
   it('names the reason for a refusal without repeating the template', () => {
     const html = '<svg><style>&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;</style></svg>';
