@@ -5,6 +5,21 @@ format is loosely based on [Keep a Changelog](https://keepachangelog.com/)
 and the version numbers follow semantic versioning. Production releases are
 shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 
+## [0.3.1] - 2026-10-23
+
+### Security
+
+- **Node.js 22.** The container image builds on `node:22-alpine`, so it runs Node.js 22.23.4 or later instead of 22.22.2. `.nvmrc` follows the Node 22 line.
+- **Next.js 15.5.28.** `next` moves from 15.5.18 to 15.5.28. This fixes unauthenticated remote code execution in the Image Optimization API (GHSA-2xp9-vwfh-vxw4, GHSA-2464-fhr4-w9xw) and on Windows-hosted servers (GHSA-p293-qw3h-jr36), and server-side request forgery in Server Actions and rewrites (GHSA-89xv-2m56-2m9x, GHSA-p9j2-gv94-2wf4).
+- **sharp 0.35.5.** The image optimiser's `sharp` moves from 0.34.5 to 0.35.5, which bundles fixed libvips, libheif and librsvg builds (GHSA-f88m-g3jw-g9cj, GHSA-rgj7-g3m4-5g8c, GHSA-wq5f-xc86-pv6w).
+- **Handlebars 4.7.10.** `handlebars` moves from 4.7.9 to 4.7.10. This fixes JavaScript injection through AST type confusion when templates are compiled (GHSA-8r5x-fm3f-whwj) and through a bypass of the prototype-access check when templates are rendered (GHSA-p8wg-vrv2-v86f).
+- **Transitive dependencies.** fast-uri moves from 3.1.2 to 3.1.9 for host confusion (GHSA-v2hh-gcrm-f6hx, GHSA-7p8r-x3mc-p8w7, GHSA-jqff-g426-hqxp, GHSA-4c8g-83qw-93j6), server-side request forgery (GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf) and authority injection through an unvalidated port (GHSA-qw65-cvwx-89v3). PostCSS moves from 8.5.14 to 8.5.31 for source map path traversal (GHSA-r28c-9q8g-f849), and Browserslist from 4.28.2 to 4.29.4 for a prototype write (GHSA-73wf-gq98-2v4g).
+- **Not changed: undici 5.29.0.** `jsonld` still brings in undici 5.29.0 through `@digitalbazaar/http-client`. Its open high advisories (GHSA-2m5v-pch6-74hx, GHSA-vrm6-8vpv-qv8q, GHSA-v9p9-hfj2-hcw8, GHSA-vxpw-j846-p89q) are fixed only in undici 6 or later, so this release leaves it at 5.29.0.
+
+### Changed
+
+- The image workflow publishes this line's releases under the exact version tag only, and refuses a release tag or manual version that is not an exact `X.Y.Z` version. `:latest` stays with the newest playground release.
+
 ## [0.3.0] - 2026-05-15
 
 ### Added
@@ -69,4 +84,5 @@ shipped as Docker images tagged from the `untp-playground-v<X.Y.Z>` git tag.
 - Dedupe concurrent schema fetches for the same URL.
 - JSON-LD and schema validation errors render with actionable context.
 
+[0.3.1]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.3.1
 [0.3.0]: https://github.com/uncefact/tests-untp/releases/tag/untp-playground-v0.3.0

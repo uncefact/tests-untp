@@ -4,6 +4,31 @@ These are the user-facing release notes for the UNTP Playground. They focus
 on what's new for you, the person using the playground, not on the internal
 mechanics. For a technical, per-change log see [CHANGELOG.md](./CHANGELOG.md).
 
+## 0.3.1 - 2026-10-23
+
+A security patch for deployments that run the 0.3 line of the Playground.
+It changes nothing you see or do in the Playground. The container image now
+runs on Node.js 22.23.4 or later, and it takes the fixed releases of Next.js
+(15.5.28), the sharp image library (0.35.5) and Handlebars (4.7.10). Those
+close critical advisories for remote code execution in Next.js's image
+optimisation endpoint and for JavaScript injection in Handlebars, through
+crafted templates at compile time and through a bypass of its
+prototype-access check at render time. Several high severity issues are
+fixed as well, and a few smaller dependencies in the image move to fixed
+releases.
+
+One dependency stays where it was: undici 5.29.0, which the JSON-LD library
+uses to fetch documents. Its open high severity advisories are fixed only in
+undici 6 or later, which this release does not take.
+
+To upgrade, pull `ghcr.io/uncefact/tests-untp/untp-playground:0.3.1` and
+restart the container. No configuration changes are needed. This release is
+published under its version tag only, so `:latest` still points at the
+newest Playground release.
+
+- Technical changelog: [CHANGELOG.md § 0.3.1](./CHANGELOG.md#031---2026-10-23)
+- Container image: [ghcr.io/uncefact/tests-untp/untp-playground](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Funtp-playground) (`:0.3.1`)
+
 ## 0.3.0 — 2026-05-15
 
 This release brings the playground up to

@@ -1,6 +1,6 @@
 {
   "name": "untp-playground",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -22,11 +22,11 @@
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "handlebars": "^4.7.9",
+    "handlebars": "^4.7.10",
     "jsonld": "^8.3.3",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.475.0",
-    "next": "15.5.18",
+    "next": "15.5.28",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-dropzone": "^14.3.5",
