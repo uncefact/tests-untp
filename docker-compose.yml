@@ -332,7 +332,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-storage-service:4.0.0
+    image: ghcr.io/uncefact/project-storage-service:4.0.1
     ports:
       - 3334:3334
     environment:
