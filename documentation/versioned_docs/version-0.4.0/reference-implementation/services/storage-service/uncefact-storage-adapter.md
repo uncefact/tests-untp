@@ -17,7 +17,7 @@ When using the Docker Compose configuration from the [Reference Implementation r
 
 ## Supported Version
 
-The supported version of the UNCEFACT Storage Service is `4.0.0`. The adapter also retains compatibility with the previous `3.x` deployments via the `apiVersion` configuration option.
+The supported version of the UNCEFACT Storage Service is `4.0.2`. The adapter also retains compatibility with the previous `3.x` deployments via the `apiVersion` configuration option.
 
 ## Environment Variables
 

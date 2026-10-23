@@ -17,7 +17,7 @@ When using the Docker Compose configuration from the [Reference Implementation r
 
 ## Supported Version
 
-The supported version of VCKit is `1.2.1`.
+The supported version of VCKit is `1.2.2`.
 
 ## Multi-Tenancy
 
