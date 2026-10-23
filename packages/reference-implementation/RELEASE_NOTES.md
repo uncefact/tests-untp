@@ -1,5 +1,45 @@
 # UNTP Reference Implementation release notes
 
+## 0.7.2 - 2026-10-24
+
+This patch rebuilds the image on the Node 22 major line and updates the dependencies that carry published security advisories. It refuses a render template whose sanitised HTML a browser would turn into markup the sanitiser does not allow, and it moves the bundled Compose files to storage service 4.0.1. It changes no setting or database migration. Read [Upgrading from v0.7.1](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v071) before upgrading.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.7.2`, `:latest`), published for `linux/amd64` only for now. The `:0.7.1` image keeps its `linux/arm64` variant.
+- Upgrading from v0.7.1: when no batch is running, deploy the 0.7.2 image, or rebuild the bundled Compose stack, and restart the web process and every worker. A sign-in started before the deploy and finished after it may need to be started again.
+
+### The image follows the Node 22 major line
+
+The image is built from `node:22-alpine` instead of the exact `22.22.2` pin, so it carries the Node 22 release that is current when it is built, with that release's security fixes. The `>= 22.22.2` minimum for local development is unchanged, and `.nvmrc` now names the Node 22 major line.
+
+### Sign-in and sessions
+
+The middleware's session check now requires a user, not only a session object. With the earlier next-auth, a server configuration error left an error object where the session should be ([GHSA-8fpg-xm3f-6cx3](https://github.com/advisories/GHSA-8fpg-xm3f-6cx3)). Every authenticated `/api/v1` route handler already required a user id, so those routes were not open during such an error. While Auth.js is misconfigured, a request with only a session cookie now gets a `401`, and a request with a bearer token keeps working.
+
+next-auth moves to 5.0.0-beta.32 and `@auth/prisma-adapter` to 2.11.3, which bring @auth/core 0.41.3. That release binds the sign-in check cookies to their provider, so a sign-in started before a deploy and finished after it may need to be started again.
+
+### Render templates
+
+Creating or updating a render template is now refused with a `400` when the sanitised template, read the way a browser reads HTML inserted into a page, would build an element, an attribute, or a link or image URL scheme that the sanitiser does not allow. This mostly concerns markup inside a `<style>` element in inline SVG, which a browser reads as HTML rather than CSS. CSS that contains `<`, such as a range media query, a comment or a `content` string, is accepted. The error names the reason without repeating the template, and nothing is stored. None of the bundled templates is affected.
+
+Templates stored before this release are not checked again, and the credential renderer shows them as stored. Replacing a template's content runs the check, and updating only its name or other fields does not. See [Template Content and Sanitisation](https://uncefact.github.io/tests-untp/docs/reference-implementation/api/render-templates#template-content-and-sanitisation).
+
+sanitize-html moves to 2.18.1 for [GHSA-rpr9-rxv7-x643](https://github.com/advisories/GHSA-rpr9-rxv7-x643), which affected the render-template sanitiser's configuration. The sanitiser now applies its image schemes (`http`, `https` and `data`) to each candidate in a `srcset`, so a `data:` image in a `srcset` is kept and `ftp:`, `mailto:` and `tel:` entries are removed. Inline SVG clip paths are kept as before.
+
+### Dependency updates
+
+- next 15.5.28 ([GHSA-p3m5-59mp-jv5r](https://github.com/advisories/GHSA-p3m5-59mp-jv5r)), with sharp 0.35.5 for its image optimiser ([GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw)).
+- dompurify 3.4.17, which swagger-ui-react serves to browsers on the `/api-docs` page ([GHSA-mrv2-3pqr-j5jr](https://github.com/advisories/GHSA-mrv2-3pqr-j5jr)).
+- follow-redirects 1.16.1 ([GHSA-q3jh-wrc6-jgq8](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [GHSA-8r9p-f939-6h3c](https://github.com/advisories/GHSA-8r9p-f939-6h3c)).
+- @grpc/grpc-js 1.14.6, used by the OpenTelemetry gRPC exporters ([GHSA-m9gg-hp2v-232j](https://github.com/advisories/GHSA-m9gg-hp2v-232j)).
+- form-data 4.0.6 ([GHSA-hmw2-7cc7-3qxx](https://github.com/advisories/GHSA-hmw2-7cc7-3qxx)) and browserslist 4.29.4 ([GHSA-73wf-gq98-2v4g](https://github.com/advisories/GHSA-73wf-gq98-2v4g)).
+- handlebars 4.7.10, undici 6.29.1, axios 1.20.0 and fast-uri 3.1.9.
+
+undici 5.29.0 remains in the lockfile through jsonld 8.3.3, which `@uncefact/untp-utils` and `@uncefact/untp-test-suite` declare. Its advisories are fixed only in undici 6.29.1 or later. The Reference Implementation does not fetch through it, because `@uncefact/untp-utils` gives jsonld its own document loader.
+
+### Storage service 4.0.1 in the bundled Compose files
+
+The bundled Compose files pin storage service 4.0.1, which carries its own security fixes. It refuses an upload whose field name is nested two or more levels deep or carries an array index above 0, and a `MAX_UPLOAD_SIZE` that is not a valid size now stops it earlier in start-up. The Reference Implementation uploads with the plain field names `file`, `id` and `bucket` and stores credentials as JSON, so the stricter field-name parsing does not apply to it. The bundled Compose files do not set `MAX_UPLOAD_SIZE`.
+
 ## 0.7.1 - 2026-10-19
 
 This patch makes the credential status attribution backfill's evidence read work for credentials whose stored status descriptor carries a numeric `statusListIndex`. It changes no setting, database migration or Compose file. Read [Upgrading from v0.7.0](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v070) before upgrading.
