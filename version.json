@@ -1,5 +1,5 @@
 {
-  "version": "0.7.1",
+  "version": "0.7.2",
   "docVersion": "0.7.0",
   "dependencies": {
     "vckit": {
@@ -8,7 +8,7 @@
     },
     "storage-service": {
       "repoUrl": "https://github.com/uncefact/project-storage-service.git",
-      "versions": ["4.0.0"]
+      "versions": ["4.0.1"]
     },
     "idr": {
       "repoUrl": "https://github.com/pyx-industries/pyx-identity-resolver.git",

@@ -7,7 +7,7 @@ import Disclaimer from '.././\_disclaimer.mdx';
 
 <Disclaimer />
 
-This guide covers upgrading a Reference Implementation deployment from v0.6.2 to v0.7. A deployment on v0.6.0 or v0.6.1 first follows the [v0.6 guide](./ri-v0.6). A deployment already running v0.7.0 needs only [Upgrading from v0.7.0](#upgrading-from-v070).
+This guide covers upgrading a Reference Implementation deployment from v0.6.2 to v0.7. A deployment on v0.6.0 or v0.6.1 first follows the [v0.6 guide](./ri-v0.6). A deployment already running v0.7.0 needs only [Upgrading from v0.7.0](#upgrading-from-v070) and [Upgrading from v0.7.1](#upgrading-from-v071), and one running v0.7.1 needs only the second.
 
 v0.7 lets a tenant put tags on library records and filter the library list by them. See [Tags](../reference-implementation/api/library#tags) in the Library API.
 
@@ -49,3 +49,15 @@ Records created before v0.7 start with `tags: []` and `tagVersion: 1`. Tag them 
 v0.7.1 changes no setting, database migration or Compose file. When no batch is running, deploy the v0.7.1 image, or rebuild the bundled Compose stack, and restart the web process and every worker. [Upgrading from v0.6.0](./ri-v0.6#upgrading-from-v060) explains what a worker restart during a batch does.
 
 `backfill:credential-status-attribution` now reads its evidence with each status entry's stored canonical coordinates. From v0.6.0 through v0.7.0, it reported `evidence: unavailable` for every credential whose stored status descriptor carries a numeric `statusListIndex`, which is how the Reference Implementation issues it, while still writing the attribution. Such a credential now reports `evidence: agrees` when the provider read succeeds. [Credential status attribution](../reference-implementation/operations/backfills/credential-status-attribution) describes the read, and the [release notes](https://github.com/uncefact/tests-untp/blob/next/packages/reference-implementation/RELEASE_NOTES.md) list every change in v0.7.1.
+
+## Upgrading from v0.7.1
+
+v0.7.2 changes no setting or database migration. The bundled Compose files move from storage service 4.0.0 to 4.0.1. When no batch is running, deploy the v0.7.2 image, or rebuild the bundled Compose stack with `docker compose up -d --build`, and restart the web process and every worker. [Upgrading from v0.6.0](./ri-v0.6#upgrading-from-v060) explains what a worker restart during a batch does.
+
+The v0.7.2 image is published for `linux/amd64` only. The `:0.7.1` image keeps its `linux/arm64` variant, and `:latest` has none once it moves to v0.7.2.
+
+The sign-in check cookies are now bound to their provider, so a sign-in started before the deploy and finished after it may need to be started again.
+
+Creating a render template, or replacing a template's content, is now refused with a `400` when the sanitised template, read the way a browser reads HTML inserted into a page, would build an element, an attribute or a URL scheme that the sanitiser does not allow. Templates stored before v0.7.2 are not checked again, and the credential renderer shows them as stored. [Template Content and Sanitisation](../reference-implementation/api/render-templates#template-content-and-sanitisation) describes the rule.
+
+Storage service 4.0.1 refuses an upload whose field name is nested two or more levels deep or carries an array index above 0. The Reference Implementation uploads with the plain field names `file`, `id` and `bucket`, so its uploads are unaffected. The [release notes](https://github.com/uncefact/tests-untp/blob/next/packages/reference-implementation/RELEASE_NOTES.md) list every change in v0.7.2.
