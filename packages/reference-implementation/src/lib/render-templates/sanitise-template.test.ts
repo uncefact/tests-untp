@@ -271,6 +271,10 @@ describe('sanitiseTemplate', () => {
       'an ftp srcset candidate on an img built through a CDATA closing boundary',
       '<svg><style><![CDATA[</style><img src="https://e.example/a.png" srcset="https://e.example/a.png 1x, data:image/png;base64,iVBORw0KGgo= 2x, ftp://e.example/b.png 3x">]]></style></svg>',
     ],
+    [
+      'a srcset whose every candidate has an invalid descriptor, on an img built through an entity-encoded closing boundary',
+      '<svg><style>&lt;/style&gt;&lt;img src="https://e.example/a.png" srcset="ftp://e.example/b.png 2q, ftp://e.example/c.png 3z"&gt;</style></svg>',
+    ],
   ])('refuses %s', (_label, html) => {
     const div = document.createElement('div');
     div.innerHTML = sanitisedWithCheckOff(html);

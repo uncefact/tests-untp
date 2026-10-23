@@ -139,9 +139,16 @@ function hasAllowedScheme(tag: string, value: string): boolean {
  * Whether every candidate URL in a srcset value has a scheme allowed for the
  * tag. sanitize-html checks srcset candidates one by one, with the same parser
  * (parse-srcset) and the same per-tag schemes as `src`, so this does too.
+ *
+ * parse-srcset leaves out a candidate it cannot parse rather than failing, so
+ * a value whose every candidate is invalid comes back empty. That value is
+ * refused, because its URLs were never checked. A blank or whitespace-only
+ * value has no candidates to check and is accepted, as before.
  */
 function hasAllowedSrcsetSchemes(tag: string, value: string): boolean {
-  return parseSrcset(value).every((candidate) => hasAllowedScheme(tag, candidate.url));
+  const candidates = parseSrcset(value);
+  if (candidates.length === 0 && value.replace(/[\t\n\f\r ]+/g, '') !== '') return false;
+  return candidates.every((candidate) => hasAllowedScheme(tag, candidate.url));
 }
 
 /** A div element for parse5 to parse the template as that element's content. */
