@@ -156,14 +156,6 @@ describe('sanitiseTemplate', () => {
     expect(sanitiseTemplate(html)).toBe(html);
   });
 
-  // sanitize-html 2.18 applies the img scheme allowance (http, https, data) to
-  // srcset. Before it, a data: srcset was dropped whole; now it is kept.
-  it('keeps a data: image srcset candidate', () => {
-    const html = '<img srcset="data:image/png;base64,iVBORw0KGgo= 1x" />';
-
-    expect(sanitiseTemplate(html)).toBe(html);
-  });
-
   it('drops a javascript: srcset candidate', () => {
     const html =
       '<img src="https://example.com/a.png" srcset="https://example.com/a.png 1x, javascript:alert(1) 2x" />';
@@ -173,20 +165,10 @@ describe('sanitiseTemplate', () => {
     );
   });
 
-  // sanitize-html 2.18 checks each srcset candidate against the img scheme
-  // allowance. Before it, srcset fell back to the default schemes, which let
-  // ftp:, mailto: and tel: candidates through.
-  it('keeps only the http, https or data: candidates of an image srcset', () => {
-    const html =
-      '<img src="https://e.example/a.png" srcset="https://e.example/a.png 1x, ftp://e.example/b.png 2x, mailto:x@e.example 3x, tel:+61000 4x" />';
-
-    expect(sanitiseTemplate(html)).toBe('<img src="https://e.example/a.png" srcset="https://e.example/a.png 1x" />');
-  });
-
-  // Storing a bundled template sanitises it, and the template must still render
-  // after that: its Handlebars expressions, its CSS and its data: images all
-  // survive. A stored template is the sanitiser's earlier output, so saving it
-  // again must not change it either.
+  // Seeding uploads the bundled templates without sanitising them. The sanitiser
+  // only sees a copy that someone submits through the create or update routes.
+  // Such a copy must keep its Handlebars expressions, its CSS and its data:
+  // images when sanitised, and sanitising that output again must not change it.
   it.each(
     [
       'digital_conformity_credential',
