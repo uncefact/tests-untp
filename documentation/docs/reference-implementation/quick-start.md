@@ -17,6 +17,10 @@ Before diving in, we strongly recommend reading the [System Architecture](./syst
 
 ## Start the Stack
 
+:::warning[Upgrading a checkout that used quay.io/minio/minio]
+The object store keeps its data in `./minio_data` on the host. The Compose files now run it from the `pgsty/minio` image, and a checkout whose Compose file uses the `quay.io/minio/minio` image cannot read object store data that the new image has written. If you may need to go back to such a checkout, copy `./minio_data` somewhere safe before you start the upgraded stack.
+:::
+
 Clone the repository and start all services:
 
 ```bash
@@ -59,10 +63,12 @@ The Docker Compose stack starts the following services. Each is an independent c
 docker compose down
 ```
 
-To remove all data and start fresh, remove the named volumes and the object store's data. The object store keeps its data in `./minio_data` on the host, which `docker compose down -v` does not remove. On a native Linux Docker engine those files belong to root, so use `sudo rm -rf ./minio_data` there.
+This stops the containers and keeps all data, both the named volumes and the object store's data in `./minio_data`.
+
+To remove all data and start fresh, remove the named volumes and the object store's data. `docker compose down -v` removes the named volumes but not `./minio_data`, which is a directory on the host. On a native Linux Docker engine those files belong to root, so use `sudo rm -rf ./minio_data` there.
 
 :::warning
-The `-v` flag removes all named volumes. This deletes all database data and forces Keycloak to re-import its realm configuration on the next start. Only use this when you need a clean slate.
+The `-v` flag removes all named volumes. This deletes all database data and forces Keycloak to re-import its realm configuration on the next start. Removing `./minio_data` deletes the identity resolver's stored data. Only use this when you need a clean slate.
 :::
 
 ```bash
@@ -70,7 +76,7 @@ docker compose down -v
 rm -rf ./minio_data
 ```
 
-An older checkout whose Compose file uses the `quay.io/minio/minio` image cannot read object store data that the current image has written. To go back to such a checkout, restore a copy of `./minio_data` taken before you upgraded, or remove the directory as above.
+To go back to a checkout whose Compose file uses the `quay.io/minio/minio` image, stop the stack and replace `./minio_data` with the copy you took before upgrading. Without that copy, remove `./minio_data` instead, and the identity resolver starts with no stored data.
 
 To reset a specific service's data without affecting others, remove its volume individually. For example, to reset Keycloak so it re-imports the latest realm configuration:
 
