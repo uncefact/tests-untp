@@ -143,7 +143,7 @@ export const credentialBatchItemErrorSchema = z.object({
   code: z
     .string()
     .describe(
-      `Error code. ${OPERATOR_CONFIRMED_FAILURE_CODE} means an operator confirmed that no credential was issued; ITEM_ATTEMPTS_EXHAUSTED means the bounded pre-dispatch retry limit was reached.`,
+      `Error code. ${OPERATOR_CONFIRMED_FAILURE_CODE} means an operator confirmed that no credential was issued; ITEM_ATTEMPTS_EXHAUSTED means the bounded pre-dispatch retry limit was reached. A refused item carries the issuance refusal code, for example ISSUER_DID_NOT_REGISTERED or ISSUER_DID_NOT_ISSUABLE.`,
     ),
   message: z
     .string()

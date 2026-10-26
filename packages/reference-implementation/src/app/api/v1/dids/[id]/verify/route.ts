@@ -18,7 +18,8 @@ const logger = apiLogger.child({ route: '/api/v1/dids/[id]/verify' });
  *     description: |
  *       Verifies that a DID can be resolved and updates its status accordingly.
  *       If verification succeeds, the DID status is set to VERIFIED.
- *       If verification fails, the DID status is set to VERIFICATION_FAILED.
+ *       If verification fails, the DID status is set to VERIFICATION_FAILED, including for a DID that was VERIFIED.
+ *       Only ACTIVE and VERIFIED DIDs can issue credentials.
  *       Status changes only when verification runs to completion and returns a result; a pre-verification
  *       failure (the DEFAULT-type guard, or a DID whose format or method cannot be parsed) leaves the DID's
  *       current status unchanged.

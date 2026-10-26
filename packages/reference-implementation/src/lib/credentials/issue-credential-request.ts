@@ -15,7 +15,7 @@ import { resolveIdrService } from '@/lib/services/resolve-idr-service';
 import { resolvePublishTarget } from '@/lib/credentials/resolve-publish-target';
 import { apiLogger } from '@/lib/api/logger';
 import { getOrMintCorrelationId } from '@uncefact/untp-ri-services/logging';
-import { buildPublishLinks, IdrPublishError } from '@uncefact/untp-ri-services';
+import { buildPublishLinks, IdrPublishError, ISSUABLE_DID_STATUSES } from '@uncefact/untp-ri-services';
 import type { CredentialPayload, ExtractedRefs, StorageRecord } from '@uncefact/untp-ri-services';
 import type { CredentialIssueRequest } from '@/lib/api/request-schemas/credential';
 import { readStatusMultiplePurposesEnabled } from '@/lib/config/credential-status.config';
@@ -373,6 +373,16 @@ export async function issueCredentialRequest(
     throw new ValidationError(
       `Issuer DID "${issuerDid}" is not registered to your tenant. You can only issue credentials with a DID that belongs to your tenant or the system default DID.`,
       { code: 'ISSUER_DID_NOT_REGISTERED' },
+    );
+  }
+  // A DID outside these statuses may have no DID document a verifier can
+  // resolve (a self-managed DID not yet verified, or one whose verification
+  // failed), so a credential it signed could fail verification.
+  if (!(ISSUABLE_DID_STATUSES as readonly string[]).includes(didRecord.status)) {
+    const issuable = ISSUABLE_DID_STATUSES.join(' or ');
+    throw new ValidationError(
+      `Issuer DID "${issuerDid}" has status ${didRecord.status} and cannot issue credentials. A DID can issue only when its status is ${issuable}. For a self-managed DID, host its DID document and verify the DID with POST /api/v1/dids/{id}/verify.`,
+      { code: 'ISSUER_DID_NOT_ISSUABLE' },
     );
   }
   if (!didRecord.serviceInstanceId) {

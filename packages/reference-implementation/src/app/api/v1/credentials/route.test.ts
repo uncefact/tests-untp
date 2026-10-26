@@ -88,6 +88,8 @@ jest.mock('@uncefact/untp-ri-services', () => ({
   // The real class for the same reason: handleRouteError classifies by
   // instanceof, and an undefined stand-in makes that check throw.
   ServiceError: jest.requireActual('@uncefact/untp-ri-services').ServiceError,
+  // The real list, so the issuer DID status check uses the issuable statuses.
+  ISSUABLE_DID_STATUSES: jest.requireActual('@uncefact/untp-ri-services').ISSUABLE_DID_STATUSES,
 }));
 
 const { IdrPublishError: RealIdrPublishError } = jest.requireActual('@uncefact/untp-ri-services');
@@ -277,6 +279,7 @@ function setupHappyPath() {
     did: 'did:web:vckit.example.com:tenant-1',
     tenantId: 'tenant-1',
     serviceInstanceId: 'vc-1',
+    status: 'ACTIVE',
   });
   mockResolveVcService.mockResolvedValue({ service: {}, instanceId: 'vc-1' });
   mockResolveStorageService.mockResolvedValue({ service: {}, instanceId: 'storage-1' });
@@ -718,6 +721,7 @@ describe('POST /api/v1/credentials', () => {
         type: 'DEFAULT',
         tenantId: 'system-tenant',
         serviceInstanceId: 'system-vc-instance',
+        status: 'ACTIVE',
       });
 
       const payload = {
@@ -816,6 +820,7 @@ describe('POST /api/v1/credentials', () => {
         type: 'DEFAULT',
         tenantId: 'system-tenant',
         serviceInstanceId: 'system-vc-instance',
+        status: 'ACTIVE',
       });
 
       const payload = {
@@ -834,6 +839,7 @@ describe('POST /api/v1/credentials', () => {
         did: 'did:web:vckit.example.com:tenant-1',
         tenantId: 'tenant-1',
         serviceInstanceId: null,
+        status: 'ACTIVE',
       });
 
       const req = createFakeRequest(validBody());
