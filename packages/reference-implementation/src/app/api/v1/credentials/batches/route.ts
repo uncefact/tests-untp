@@ -72,7 +72,7 @@ function validateUniqueBatchReferences(items: readonly { reference?: string }[])
  *     description: |
  *       Validates the batch envelope and each ordinary credential request shape,
  *       stores the encrypted item requests and queues worker processing in one
- *       transaction. DID ownership, service resolution, JSON-LD and schema
+ *       transaction. DID ownership and status, service resolution, JSON-LD and schema
  *       conformance run per item. The response contains the relative status URL.
  *     tags: [Credentials]
  *     parameters:

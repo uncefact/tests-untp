@@ -85,7 +85,7 @@ describe('issueCredentialRequest policy refusals', () => {
       coreDataModelType: 'DigitalProductPassport',
     });
     mockValidateCredentialPayload.mockResolvedValue(undefined);
-    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1' });
+    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1', status: 'ACTIVE' });
     mockResolveVcService.mockResolvedValue({ instanceId: 'vc-1', service: {} });
     mockResolveStorageService.mockResolvedValue({ instanceId: 'storage-1', service: {} });
     mockIssueCredential.mockResolvedValue({
@@ -107,6 +107,61 @@ describe('issueCredentialRequest policy refusals', () => {
     expect(onDispatch).not.toHaveBeenCalled();
     expect(mockIssueCredential).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-1', onDispatch }));
   });
+
+  function arrangeIssuerDid(status: string): void {
+    mockResolveDataModel.mockResolvedValue({
+      dataModel: { name: 'Digital Product Passport' },
+      bridge: {
+        extractRefs: jest.fn(() => ({ organisations: [], facilities: [], products: [] })),
+        extractConformityClaimWithProvenance: jest.fn(() => null),
+      },
+      schemaUrls: [],
+      coreDataModelVersion: '0.7.0',
+      coreDataModelType: 'DigitalProductPassport',
+    });
+    mockValidateCredentialPayload.mockResolvedValue(undefined);
+    mockGetDidByDid.mockResolvedValue({ did: 'did:web:issuer.example', serviceInstanceId: 'vc-1', status });
+    mockResolveVcService.mockResolvedValue({ instanceId: 'vc-1', service: {} });
+    mockResolveStorageService.mockResolvedValue({ instanceId: 'storage-1', service: {} });
+    mockIssueCredential.mockResolvedValue({
+      credentialId: 'credential-1',
+      storageResponse: {},
+      primaryEntity: {},
+      entityLinkFailed: false,
+      detailsExtractionFailed: false,
+      statusCaptureFailed: false,
+    });
+  }
+
+  it.each(['UNVERIFIED', 'VERIFICATION_FAILED'])(
+    'refuses an issuer DID with status %s before any service is resolved or anything is signed',
+    async (status) => {
+      // Regression: a DID the RI has not verified must not sign a credential,
+      // and a refused request must leave no credential behind.
+      arrangeIssuerDid(status);
+
+      await expect(
+        issueCredentialRequest({ tenantId: 'tenant-1', body: request({ version: '0.7.0' }) }),
+      ).rejects.toMatchObject({
+        code: 'ISSUER_DID_NOT_ISSUABLE',
+        message: expect.stringContaining(`"did:web:issuer.example" has status ${status}`),
+      });
+      expect(mockResolveVcService).not.toHaveBeenCalled();
+      expect(mockResolveStorageService).not.toHaveBeenCalled();
+      expect(mockIssueCredential).not.toHaveBeenCalled();
+    },
+  );
+
+  it('issues with a VERIFIED issuer DID', async () => {
+    // Regression: a verified self-managed DID must keep issuing.
+    arrangeIssuerDid('VERIFIED');
+
+    const result = await issueCredentialRequest({ tenantId: 'tenant-1', body: request({ version: '0.7.0' }) });
+
+    expect(result.status).toBe(201);
+    expect(mockResolveVcService).toHaveBeenCalledWith('tenant-1', 'vc-1');
+    expect(mockIssueCredential).toHaveBeenCalled();
+  });
 });
 
 describe('issueCredentialRequest library tags', () => {
@@ -122,7 +177,7 @@ describe('issueCredentialRequest library tags', () => {
       coreDataModelType: 'DigitalProductPassport',
     });
     mockValidateCredentialPayload.mockResolvedValue(undefined);
-    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1' });
+    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1', status: 'ACTIVE' });
     mockResolveVcService.mockResolvedValue({ instanceId: 'vc-1', service: {} });
     mockResolveStorageService.mockResolvedValue({ instanceId: 'storage-1', service: {} });
     mockIssueCredential.mockResolvedValue({

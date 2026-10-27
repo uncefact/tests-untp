@@ -41,7 +41,7 @@ A self-managed DID gives the tenant more control. There are two paths:
 
 2. **Import an existing DID** (`POST /api/v1/dids/import`). The tenant has provisioned their own verifiable credential service instance (registered via the [Services API](./services)), which already has a DID created in it. The tenant imports that DID into the Reference Implementation for tracking. The key material and DID document live entirely within the tenant's own infrastructure. The tenant must have added their VC service instance to their tenant before importing. When importing, the full DID identifier is provided via the `did` field (e.g., `did:web:example.com`). Initial status: `UNVERIFIED`.
 
-In both cases, self-managed DIDs start as `UNVERIFIED` and should be confirmed via the [verify endpoint](#verify-a-did).
+In both cases, self-managed DIDs start as `UNVERIFIED` and must be verified with the [verify endpoint](#verify-a-did) before they can issue credentials. A DID can sign credentials only while its status is `ACTIVE` or `VERIFIED`. [Issuance](./credentials#stage-4-issuer-did-ownership-validation) with a DID in any other status is refused with `400 ISSUER_DID_NOT_ISSUABLE`.
 
 #### Hosting the DID Document (`did:web`)
 
@@ -77,6 +77,8 @@ The `method` field identifies which [DID method](https://www.w3.org/TR/did-core/
 | `VERIFIED` | The DID document has been successfully resolved via the [verify endpoint](#verify-a-did) |
 | `VERIFICATION_FAILED` | The verification check failed; the DID document could not be resolved |
 | `INACTIVE` | Reserved for future use; deactivation of DIDs is not yet implemented |
+
+Only `ACTIVE` and `VERIFIED` DIDs can issue credentials. See [Issuer DID Ownership Validation](./credentials#stage-4-issuer-did-ownership-validation).
 
 ### Verification Checks
 
@@ -297,9 +299,9 @@ Retrieving the document can fail with a 502. For managed DIDs, this happens when
 POST /api/v1/dids/{id}/verify
 ```
 
-Verifies that a DID can be resolved and that its DID document is valid. When verification runs to completion, the DID's status is updated based on the result: `VERIFIED` if all checks pass, `VERIFICATION_FAILED` otherwise. Some inputs fail before verification runs and return a 400 without changing the status: a system default DID (see below), a stored DID that does not parse as `did:method:identifier`, or a DID that uses an unsupported method.
+Verifies that a DID can be resolved and that its DID document is valid. When verification runs to completion, the DID's status is updated based on the result: `VERIFIED` if all checks pass, `VERIFICATION_FAILED` otherwise. A `VERIFIED` DID that fails a later verification becomes `VERIFICATION_FAILED` and cannot issue credentials until a verification passes. Some inputs fail before verification runs and return a 400 without changing the status: a system default DID (see below), a stored DID that does not parse as `did:method:identifier`, or a DID that uses an unsupported method.
 
-This endpoint is used for **self-managed** DIDs, both those [created via the API](#create-a-did) and those [imported](#import-a-did), which start with status `UNVERIFIED`. It confirms that the DID document is publicly resolvable and structurally valid.
+This endpoint is used for **self-managed** DIDs, both those [created via the API](#create-a-did) and those [imported](#import-a-did), which start with status `UNVERIFIED`. It confirms that the DID document is publicly resolvable and structurally valid. It also accepts managed DIDs, and the same status rules apply to them.
 
 System default DIDs (`type: DEFAULT`) cannot be verified through this endpoint. See [Verification Checks](#verification-checks) for the full list of checks performed.
 
@@ -342,7 +344,7 @@ POST /api/v1/dids/import
 
 Registers an existing, externally managed DID in the Reference Implementation without calling the upstream VC service's create method. The DID is stored as `SELF_MANAGED` with status `UNVERIFIED`.
 
-Use this endpoint when you have a DID that was created outside the Reference Implementation (e.g., in a separate verifiable credential service instance) and you want to use it for credential signing within the Reference Implementation. After importing, use the [verify endpoint](#verify-a-did) to confirm that the DID document is resolvable.
+Use this endpoint when you have a DID that was created outside the Reference Implementation (e.g., in a separate verifiable credential service instance) and you want to use it for credential signing within the Reference Implementation. After importing, run the [verify endpoint](#verify-a-did). The DID cannot issue credentials until its status is `VERIFIED`.
 
 Before importing, the tenant must have registered the verifiable credential service instance that holds the DID via the [Services API](./services#create-a-service-instance). The `serviceInstanceId` is required; this is how the Reference Implementation knows which VC service to use when signing credentials with this DID. It is verified to belong to the authenticated tenant (or be the system default verifiable credential service) before the record is saved; a nonexistent id, or one belonging to another tenant, is rejected with a 404.
 

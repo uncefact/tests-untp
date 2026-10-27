@@ -124,7 +124,7 @@ async function completeIssuanceIdempotencyKeyOrReplay(input: {
  *     description: |
  *       Validates a credential payload via JSON Schema and JSON-LD expansion,
  *       verifies that the issuer DID belongs to the authenticated tenant or is
- *       a system default DID, signs it, stores the enveloped credential
+ *       a system default DID and that its status is ACTIVE or VERIFIED, signs it, stores the enveloped credential
  *       (optionally encrypted), optionally publishes it to the Identity
  *       Resolver, links it to its primary entity, and returns the credential ID.
  *       When statusPurposes is omitted, the deployment's CREDENTIAL_STATUS_DEFAULT_PURPOSES
@@ -181,7 +181,11 @@ async function completeIssuanceIdempotencyKeyOrReplay(input: {
  *           255 characters after trimming, or containing a character outside
  *           printable ASCII) is a 400 that names the header. An unknown data
  *           model (credentialType and version pair)
- *           and an issuer DID not registered to the tenant are also 400s.
+ *           and an issuer DID not registered to the tenant
+ *           (ISSUER_DID_NOT_REGISTERED) are also 400s. So is an issuer DID
+ *           whose status is not ACTIVE or VERIFIED (ISSUER_DID_NOT_ISSUABLE),
+ *           such as a self-managed DID that has not been verified; verify it
+ *           with POST /dids/{id}/verify.
  *           More than one statusPurposes entry is refused by default because
  *           UNTP v0.7.0 schemas accept one credentialStatus object. Set
  *           CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED=true to enable multiple purposes.
@@ -205,6 +209,11 @@ async function completeIssuanceIdempotencyKeyOrReplay(input: {
  *                 value:
  *                   error: 'statusPurposes: only one status purpose can be issued while CREDENTIAL_STATUS_MULTIPLE_PURPOSES_ENABLED is false'
  *                   code: VALIDATION_FAILED
+ *               issuerDidNotIssuable:
+ *                 summary: The issuer DID is not ACTIVE or VERIFIED
+ *                 value:
+ *                   error: 'Issuer DID "did:web:example.com" has status UNVERIFIED and cannot issue credentials. A DID can issue only when its status is ACTIVE or VERIFIED. For a self-managed DID, host its DID document and verify the DID with POST /api/v1/dids/{id}/verify.'
+ *                   code: ISSUER_DID_NOT_ISSUABLE
  *       401:
  *         $ref: '#/components/responses/UnauthorisedResponse'
  *       403:

@@ -1,4 +1,5 @@
 import { config, runTag } from '../../../support/config';
+import { readV070CredentialPayload } from '../../../support/v0.7-credential-payload';
 
 describe('DID API', { testIsolation: false }, () => {
   const RUN_ID = runTag();
@@ -285,6 +286,32 @@ describe('DID API', { testIsolation: false }, () => {
 
   describe('Self-managed DID flow', () => {
     let selfManagedDidId: string;
+    let selfManagedDid: string;
+
+    // Issues a v0.7.0 DPP whose issuer is the self-managed DID. The payload is
+    // valid, so the request reaches the issuer DID checks.
+    function issueWithSelfManagedDid(label: string) {
+      return readV070CredentialPayload({
+        templateDir: 'digital_product_passport',
+        credentialId: `urn:uuid:e2e-did-not-issuable-${label}-${RUN_ID}`,
+        credentialName: `E2E not issuable ${label} ${RUN_ID}`,
+        issuerDid: selfManagedDid,
+        validFrom: new Date().toISOString(),
+        validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      }).then((credentialPayload) =>
+        cy.request({
+          method: 'POST',
+          url: '/api/v1/credentials',
+          body: {
+            credentialPayload,
+            credentialType: 'DigitalProductPassport',
+            version: '0.7.0',
+            storageOptions: { encrypt: false },
+          },
+          failOnStatusCode: false,
+        }),
+      );
+    }
 
     it('creates a self-managed DID with UNVERIFIED status', () => {
       cy.request({
@@ -302,6 +329,17 @@ describe('DID API', { testIsolation: false }, () => {
         expect(response.body.status).to.eq('UNVERIFIED');
 
         selfManagedDidId = response.body.id;
+        selfManagedDid = response.body.did;
+      });
+    });
+
+    it('POST /api/v1/credentials  -  refuses to issue with the UNVERIFIED DID', () => {
+      issueWithSelfManagedDid('unverified').then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.code).to.eq('ISSUER_DID_NOT_ISSUABLE');
+        expect(response.body.error).to.include(selfManagedDid);
+        expect(response.body.error).to.include('UNVERIFIED');
+        expect(response.body).to.not.have.property('credentialId');
       });
     });
 
@@ -313,6 +351,19 @@ describe('DID API', { testIsolation: false }, () => {
         expect(response.status).to.eq(200);
         expect(response.body.verification).to.exist;
         expect(response.body.did.status).to.be.oneOf(['VERIFIED', 'UNVERIFIED', 'VERIFICATION_FAILED']);
+      });
+    });
+
+    it('POST /api/v1/credentials  -  still refuses to issue after the DID fails verification', () => {
+      // No DID document is hosted at this DID's address, so verification fails.
+      cy.request(`/api/v1/dids/${selfManagedDidId}`).then((didResponse) => {
+        expect(didResponse.status).to.eq(200);
+        expect(didResponse.body.status).to.eq('VERIFICATION_FAILED');
+      });
+      issueWithSelfManagedDid('verification-failed').then((response) => {
+        expect(response.status).to.eq(400);
+        expect(response.body.code).to.eq('ISSUER_DID_NOT_ISSUABLE');
+        expect(response.body.error).to.include('VERIFICATION_FAILED');
       });
     });
 

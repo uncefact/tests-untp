@@ -430,7 +430,7 @@ describe('credential batch issue handler', () => {
         store: jest.fn().mockResolvedValue({ uri: 'https://storage.example/status', digestMultibase: 'zstatus' }),
       },
     };
-    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: vcService.instanceId });
+    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: vcService.instanceId, status: 'ACTIVE' });
     mockResolveDataModel.mockResolvedValue({
       dataModel: { name: 'Status model' },
       bridge,
@@ -489,7 +489,7 @@ describe('credential batch issue handler', () => {
       extractConformityClaimWithProvenance: jest.fn(() => null),
     };
     for (const missing of ['vc-1', 'storage-1']) {
-      mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1' });
+      mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1', status: 'ACTIVE' });
       mockResolveDataModel.mockResolvedValue({
         dataModel: { name: 'Service model' },
         bridge,
@@ -532,7 +532,7 @@ describe('credential batch issue handler', () => {
       extractRefs: jest.fn(() => ({ organisations: [], facilities: [], products: [] })),
       extractConformityClaimWithProvenance: jest.fn(() => null),
     };
-    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1' });
+    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1', status: 'ACTIVE' });
     mockResolveDataModel.mockResolvedValue({
       dataModel: { name: 'Validation model' },
       bridge,
@@ -603,7 +603,7 @@ describe('credential batch issue handler', () => {
       extractRefs: jest.fn(() => ({ organisations: [], facilities: [], products: [] })),
       extractConformityClaimWithProvenance: jest.fn(() => null),
     };
-    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1' });
+    mockGetDidByDid.mockResolvedValue({ serviceInstanceId: 'vc-1', status: 'ACTIVE' });
     mockResolveDataModel.mockResolvedValue({
       dataModel: { name: 'Dispatch model' },
       bridge,
