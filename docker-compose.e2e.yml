@@ -41,7 +41,7 @@ services:
           - vckit.e2e.internal
 
   vckit-api:
-    image: ghcr.io/uncefact/project-vckit:sha-325b7e3@sha256:3623cd45cdb971ba16c6016a1e3ba153fe6920c2053275cd430e76ab75d5a563
+    image: ghcr.io/uncefact/project-vckit:1.2.2@sha256:2efc4c7074fc0013075d5d11cfcec9d26a65326ff89728a778930beee41a6df6
     profiles: ['ri', 'playground']
     env_file:
       - local.env
@@ -76,7 +76,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-storage-service:4.0.1
+    image: ghcr.io/uncefact/project-storage-service:4.0.2@sha256:3ada23d3e44308e91e0812bb8afeb7882123786c4bc29b930123dce1c65b286c
     profiles: ['ri']
     ports:
       - 3334:3334
@@ -91,7 +91,7 @@ services:
       - ALLOWED_UPLOAD_TYPES=image/png,image/jpeg,image/webp,application/pdf,text/html,application/json,application/octet-stream,text/plain
 
   identity-resolver-service:
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:4.0.0
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:4.0.1@sha256:40b2b40c8c8e55d9b9cc9cf26062b54309b389f71e13c0795af40ef0223ba5cb
     profiles: ['ri']
     ports:
       - '3000:3000'
@@ -309,7 +309,7 @@ services:
       retries: 5
 
   e2e-keycloak:
-    image: quay.io/keycloak/keycloak:26.7
+    image: quay.io/keycloak/keycloak:26.7.5@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85
     profiles: ['ri']
     command:
       - start-dev

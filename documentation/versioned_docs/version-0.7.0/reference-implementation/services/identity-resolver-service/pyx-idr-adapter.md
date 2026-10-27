@@ -17,7 +17,7 @@ When using the Docker Compose configuration from the [Reference Implementation r
 
 ## Supported Version
 
-The supported version of the Pyx Identity Resolver is `4.0.0`, served over its `4.0` API.
+The supported version of the Pyx Identity Resolver is `4.0.1`, served over its `4.0` API.
 
 ## Environment Variables
 

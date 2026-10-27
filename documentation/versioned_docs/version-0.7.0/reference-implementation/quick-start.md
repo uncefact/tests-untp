@@ -17,6 +17,16 @@ Before diving in, we strongly recommend reading the [System Architecture](./syst
 
 ## Start the Stack
 
+:::warning[Upgrading a checkout whose storage service ran as root]
+The storage service now runs as uid 1000 rather than root, and keeps uploads in the `storage_service_data` Docker volume. A volume that an earlier version of the stack wrote to stays owned by root, and uploads fail until you change its owner once. Before you start the upgraded stack, stop the running stack with `docker compose down`. Do not add `-v`, which deletes the volume. Find the volume's full name with `docker volume ls`. Compose prefixes it with the project name, which defaults to the checkout's directory name, so a checkout in `tests-untp` has `tests-untp_storage_service_data`. A wrong volume name creates a new, empty volume and changes that one instead. Then change its owner:
+
+```bash
+docker run --rm -v tests-untp_storage_service_data:/data alpine chown -R 1000:1000 /data
+```
+
+A fresh checkout needs no step. [Container Users and Writable Paths](./operations/container-users) lists the user each service runs as, and covers rootless Docker and Kubernetes.
+:::
+
 Clone the repository and start all services:
 
 ```bash

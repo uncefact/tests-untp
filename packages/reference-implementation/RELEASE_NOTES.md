@@ -1,5 +1,34 @@
 # UNTP Reference Implementation release notes
 
+## 0.7.3 - 2026-10-28
+
+This patch moves the bundled Compose stacks to the patched releases of the services the Reference Implementation depends on: VCKit 1.2.2, storage service 4.0.2, Pyx Identity Resolver 4.0.1 and Keycloak 26.7.5. VCKit 1.2.2 and Pyx Identity Resolver 4.0.1 update dependencies with published security advisories, storage service 4.0.2 runs as a non-root user, and Keycloak 26.7.5 is a patch release that includes the fix for a critical Keycloak advisory. It also refuses credential issuance with an issuer DID that is not `ACTIVE` or `VERIFIED`, which API clients can see. The Reference Implementation's own settings and database migrations are unchanged from v0.7.2. Read [Upgrading from v0.7.2](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v072) before upgrading.
+
+- Container image: [ghcr.io/uncefact/tests-untp/reference-implementation](https://github.com/uncefact/tests-untp/pkgs/container/tests-untp%2Freference-implementation) (`:0.7.3`, `:latest`), published for `linux/amd64` only.
+- Upgrading from v0.7.2: when no batch is running, deploy the 0.7.3 image and restart the web process and every worker. If you run the bundled Compose stack, stop it with `docker compose down`, change the owner of the uploads volume, pull the 0.7.3 release and start the stack again with `docker compose up -d --build`.
+- API clients: issuing with a self-managed DID that has not been verified now fails with `400 ISSUER_DID_NOT_ISSUABLE`. Verify the DID before issuing with it.
+
+### Issuing with a DID that is not active or verified
+
+`POST /api/v1/credentials` and each batch item now refuse an issuer DID whose status is not `ACTIVE` or `VERIFIED`, with `400 ISSUER_DID_NOT_ISSUABLE`. Nothing is signed or stored. Before v0.7.3 such a DID signed the credential and the response was `201`, even though the RI had not confirmed its DID document resolves, so the credential could fail verification. A refused batch item ends `FAILED` with that code, and the rest of the batch carries on.
+
+This mostly affects self-managed DIDs. One created through `POST /api/v1/dids` or imported through `POST /api/v1/dids/import` starts as `UNVERIFIED`, and a failed `POST /api/v1/dids/{id}/verify` leaves it `VERIFICATION_FAILED`. To issue with it, host its DID document and run `POST /api/v1/dids/{id}/verify` until the DID is `VERIFIED`. Managed DIDs and the system default DID start as `ACTIVE` and issue as before while they stay `ACTIVE` or `VERIFIED`. A managed DID whose verification failed is refused too, until a verification passes. See [Issuer DID ownership validation](https://uncefact.github.io/tests-untp/docs/reference-implementation/api/credentials#stage-4-issuer-did-ownership-validation).
+
+### Service versions in the bundled Compose stacks
+
+`docker-compose.yml` and `docker-compose.e2e.yml` now pull these images, each pinned by tag and digest:
+
+- VCKit `ghcr.io/uncefact/project-vckit:1.2.2`, from 1.2.1 (`docker-compose.e2e.yml` previously pinned the `sha-325b7e3` build). It moves from Node.js 20 to Node.js 22 and updates dependencies with security advisories. See the [VCKit 1.2.2 release](https://github.com/uncefact/project-vckit/releases/tag/1.2.2).
+- Storage service `ghcr.io/uncefact/project-storage-service:4.0.2`, from 4.0.1. It runs the container as uid 1000 and adds a Docker health check. See the [storage service release notes](https://github.com/uncefact/project-storage-service/blob/v4.0.2/RELEASE_NOTES.md).
+- Pyx Identity Resolver `ghcr.io/pyx-industries/pyx-identity-resolver:4.0.1`, from 4.0.0. It clears critical advisories, and high advisories that are not only denial of service, in its runtime dependencies. Its API and stored data are unchanged, and its link URL validation differs in the edge cases its notes describe. See the [Pyx Identity Resolver release notes](https://github.com/pyx-industries/pyx-identity-resolver/blob/v4.0.1/RELEASE_NOTES.md).
+- Keycloak `quay.io/keycloak/keycloak:26.7.5`, from the `26.7` tag. The bundled files named the minor line only, so a machine that pulled `26.7` before a later patch was published kept the older patch. Patches before 26.7.2 are affected by [CVE-2026-18963](https://github.com/advisories/GHSA-4gv3-mc9p-5wqc), a critical account takeover through the reset-credentials flow. 26.7.5 is the latest 26.7 patch. See the [Keycloak 26.7.5 release](https://github.com/keycloak/keycloak/releases/tag/26.7.5).
+
+The Reference Implementation talks to them over the same API versions as before: VCKit 1.0.0, storage 4.0 and identity resolver 4.0.
+
+### The storage service runs as uid 1000
+
+Storage service 4.0.2 creates its uploads directory owned by uid 1000, so a fresh checkout needs no step. A `storage_service_data` volume that an earlier stack wrote to stays owned by root, and storing a credential fails until you change its owner once. The warning under [Start the Stack](https://uncefact.github.io/tests-untp/docs/reference-implementation/quick-start#start-the-stack) in the quick start gives the steps.
+
 ## 0.7.2 - 2026-10-24
 
 This patch rebuilds the image on the Node 22 major line and updates the dependencies that carry published security advisories. It refuses a render template whose sanitised HTML a browser would turn into markup the sanitiser does not allow, and it moves the bundled Compose files to storage service 4.0.1. It changes no setting or database migration. Read [Upgrading from v0.7.1](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v071) before upgrading.
