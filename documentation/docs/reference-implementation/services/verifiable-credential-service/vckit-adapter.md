@@ -17,7 +17,7 @@ VCKit is a standalone service that exposes a set of REST APIs for working with W
 
 ## Supported Version
 
-The supported version of VCKit is `1.2.1`.
+The supported version of VCKit is `1.2.2`.
 
 ## Status issuance and serialisation
 

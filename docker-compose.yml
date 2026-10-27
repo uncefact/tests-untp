@@ -17,7 +17,7 @@ services:
       retries: 5
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7
+    image: quay.io/keycloak/keycloak:26.7.5@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85
     command:
       - start-dev
       - --import-realm
@@ -64,7 +64,7 @@ services:
       - FETCH_ALLOW_PRIVATE_URLS
 
   vckit-api:
-    image: ghcr.io/uncefact/project-vckit:1.2.1@sha256:9c6f305ee7834e311dbcc7d6fec98bdf350d6064bfbc71781b11088020fc0ae0
+    image: ghcr.io/uncefact/project-vckit:1.2.2@sha256:2efc4c7074fc0013075d5d11cfcec9d26a65326ff89728a778930beee41a6df6
     env_file:
       - local.env
     ports:
@@ -332,7 +332,7 @@ services:
     restart: always
 
   storage-service:
-    image: ghcr.io/uncefact/project-storage-service:4.0.1
+    image: ghcr.io/uncefact/project-storage-service:4.0.2@sha256:3ada23d3e44308e91e0812bb8afeb7882123786c4bc29b930123dce1c65b286c
     ports:
       - 3334:3334
     environment:
@@ -349,7 +349,7 @@ services:
 
   identity-resolver-service:
     # Replace with local or deployed image
-    image: ghcr.io/pyx-industries/pyx-identity-resolver:4.0.0
+    image: ghcr.io/pyx-industries/pyx-identity-resolver:4.0.1@sha256:40b2b40c8c8e55d9b9cc9cf26062b54309b389f71e13c0795af40ef0223ba5cb
     ports:
       - '3000:3000'
     environment:
