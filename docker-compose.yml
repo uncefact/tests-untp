@@ -27,6 +27,8 @@ services:
       KC_HEALTH_ENABLED: 'true'
       KC_HOSTNAME: http://keycloak:8080
       KC_HOSTNAME_STRICT: 'false'
+      # Mitigation for CVE-2026-114938. Remove once Keycloak ships the fixed JDK.
+      JAVA_OPTS_APPEND: '-XX:-UseBASE64Intrinsics'
     ports:
       - '127.0.0.1:${KEYCLOAK_PORT:-8080}:8080' # See https://github.com/quarkusio/quarkus/discussions/48905#discussioncomment-14213858
       - '9990:9000' # Port for health checks
