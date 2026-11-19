@@ -317,6 +317,8 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Mitigation for CVE-2026-114938. Remove once Keycloak ships the fixed JDK.
+      JAVA_OPTS_APPEND: '-XX:-UseBASE64Intrinsics'
       KC_HEALTH_ENABLED: 'true'
     ports:
       - '8081:8080'
