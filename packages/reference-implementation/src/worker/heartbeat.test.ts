@@ -2,11 +2,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { QueueProbe } from '@/lib/jobs/types';
+import { createLogger } from '@uncefact/untp-ri-services/logging';
 import { startHeartbeat } from './heartbeat';
 
 const logger = () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() });
+// Enough microtask turns for a beat to settle both probes (each wrapped in an
+// async call, and a thenable adds turns of its own), judge and publish.
 const flush = async () => {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
 };
 const consumer = (fields: Partial<import('@/lib/jobs/types').ConsumerProbe>) => ({
   lastFetchedOn: null,
@@ -30,6 +33,7 @@ describe('startHeartbeat', () => {
   const start = (probe: () => Promise<QueueProbe>, extra: Record<string, unknown> = {}, log = logger()) =>
     startHeartbeat({
       probe,
+      databaseProbe: async () => undefined,
       logger: log as never,
       path: file,
       intervalMs: 1_000,
@@ -267,5 +271,242 @@ describe('startHeartbeat', () => {
     expect(fs.statSync(file).mtimeMs).toBe(first);
     await tick(5_000);
     expect(calls).toBe(2);
+  });
+  describe('the database probe beside the queue probe', () => {
+    // The worker's handlers use the application's Prisma pool, which the
+    // queue probe never touches. These cases protect the operator's signal
+    // that a worker whose Prisma pool cannot answer reads unhealthy, and the
+    // log line that says which pool failed.
+    const after = <T>(ms: number, value: () => T): Promise<T> =>
+      new Promise((resolve) => setTimeout(() => resolve(value()), ms));
+    const failAfter = (ms: number, message: string): Promise<never> =>
+      new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms));
+    const warnedWith = (log: ReturnType<typeof logger>) => log.warn.mock.calls.map(([fields]) => fields.err as Error);
+
+    it('a working queue and a database probe that rejects: no refresh, a warning naming the database, then recovery', async () => {
+      // Fails if the heartbeat publishes on the queue probe alone.
+      const log = logger();
+      let databaseDown = false;
+      const refused = new Error('connection refused');
+      const beat = start(
+        async () => working(clock),
+        {
+          databaseProbe: async () => {
+            if (databaseDown) throw refused;
+          },
+        },
+        log,
+      );
+      await flush();
+      const first = fs.statSync(file).mtimeMs;
+      databaseDown = true;
+      await tick(2_000);
+      expect(fs.statSync(file).mtimeMs).toBe(first);
+      expect(log.warn).toHaveBeenCalledTimes(2);
+      expect(log.warn).toHaveBeenLastCalledWith(
+        expect.objectContaining({ consecutiveFailures: 2, path: file }),
+        'Health probe failed; the heartbeat is not refreshed',
+      );
+      const err = warnedWith(log)[1];
+      expect(err.message).toBe('the database probe failed');
+      expect(err.cause).toBe(refused);
+      databaseDown = false;
+      await tick(1_000);
+      expect(fs.statSync(file).mtimeMs).toBeGreaterThan(first);
+      expect(log.info).toHaveBeenCalledWith(expect.objectContaining({ path: file }), 'Health probe succeeding again');
+      beat.stop();
+    });
+
+    it('holds the next beat until both probes settle when the database probe fails fast and the queue probe is slow', async () => {
+      // Fails if the guard is released by the first probe to settle
+      // (Promise.all or Promise.race), which would pile probes on the slow pool.
+      const log = logger();
+      let queueCalls = 0;
+      let databaseCalls = 0;
+      const beat = start(
+        () => {
+          queueCalls += 1;
+          return after(4_000, () => working(clock));
+        },
+        {
+          databaseProbe: () => {
+            databaseCalls += 1;
+            return failAfter(100, 'connection refused');
+          },
+        },
+        log,
+      );
+      await tick(3_900);
+      expect(queueCalls).toBe(1);
+      expect(databaseCalls).toBe(1);
+      expect(log.warn).not.toHaveBeenCalled();
+      await tick(100);
+      await flush();
+      expect(warnedWith(log)[0].message).toBe('the database probe failed');
+      expect(fs.existsSync(file)).toBe(false);
+      await tick(1_000);
+      expect(queueCalls).toBe(2);
+      expect(databaseCalls).toBe(2);
+      beat.stop();
+    });
+
+    it('holds the next beat until both probes settle when the queue probe fails fast and the database probe is slow', async () => {
+      const log = logger();
+      let queueCalls = 0;
+      let databaseCalls = 0;
+      const beat = start(
+        () => {
+          queueCalls += 1;
+          return failAfter(100, 'pool gone');
+        },
+        {
+          databaseProbe: () => {
+            databaseCalls += 1;
+            return after(4_000, () => undefined);
+          },
+        },
+        log,
+      );
+      await tick(3_900);
+      expect(queueCalls).toBe(1);
+      expect(databaseCalls).toBe(1);
+      await tick(100);
+      await flush();
+      expect(warnedWith(log)[0].message).toBe('the job queue probe failed');
+      await tick(1_000);
+      expect(queueCalls).toBe(2);
+      expect(databaseCalls).toBe(2);
+      beat.stop();
+    });
+
+    it('runs both probes at once under one limit, so two 3 second probes publish', async () => {
+      // Run one after the other they would take 6 seconds and miss the
+      // 5 second limit. Fails if the probes are made sequential.
+      const log = logger();
+      const beat = start(
+        () => after(3_000, () => working(clock)),
+        { databaseProbe: () => after(3_000, () => undefined) },
+        log,
+      );
+      await tick(3_000);
+      await flush();
+      expect(fs.existsSync(file)).toBe(true);
+      expect(log.warn).not.toHaveBeenCalled();
+      beat.stop();
+    });
+
+    it('a database answer that arrives after the limit does not publish', async () => {
+      // Fails if a late settlement certifies a beat that has already failed.
+      const log = logger();
+      const beat = start(async () => working(clock), { databaseProbe: () => after(6_000, () => undefined) }, log);
+      await tick(5_000);
+      await flush();
+      expect(log.warn).toHaveBeenCalledTimes(1);
+      await tick(1_000);
+      await flush();
+      await tick(500);
+      expect(fs.existsSync(file)).toBe(false);
+      beat.stop();
+    });
+
+    it.each(['job queue', 'database'] as const)(
+      'a %s probe that throws before returning a promise fails the beat, and the next beat still runs',
+      async (pool) => {
+        // Fails if a probe is called raw: the throw escapes the beat with the
+        // guard held, so nothing is logged and no beat ever runs again.
+        const log = logger();
+        const thrown = new Error('client not connected');
+        let calls = 0;
+        const throwing = (): never => {
+          calls += 1;
+          throw thrown;
+        };
+        const beat =
+          pool === 'database'
+            ? start(async () => working(clock), { databaseProbe: throwing }, log)
+            : start(throwing, {}, log);
+        await flush();
+        expect(fs.existsSync(file)).toBe(false);
+        expect(warnedWith(log)[0].message).toBe(`the ${pool} probe failed`);
+        expect(warnedWith(log)[0].cause).toBe(thrown);
+        await tick(1_000);
+        expect(calls).toBe(2);
+        beat.stop();
+      },
+    );
+  });
+
+  describe('the warning as the log renders it', () => {
+    // The operator reads the rendered line, not the error object. The log
+    // serialiser appends each cause's message to the error's own, so these
+    // cases run the real logger and protect the operator's reading that each
+    // failure's reason appears once and each pool is named.
+    const hangs = () => new Promise<never>(() => undefined);
+    const rejects = (message: string) => async () => {
+      throw new Error(message);
+    };
+    it.each([
+      {
+        name: 'the database probe rejects',
+        probe: async () => working(clock),
+        databaseProbe: rejects('connection refused'),
+        rendered: 'the database probe failed: connection refused',
+      },
+      {
+        name: 'the job queue probe rejects',
+        probe: rejects('pool gone'),
+        databaseProbe: async () => undefined,
+        rendered: 'the job queue probe failed: pool gone',
+      },
+      {
+        name: 'both probes reject',
+        probe: rejects('pool gone'),
+        databaseProbe: rejects('connection refused'),
+        rendered: 'the job queue probe failed: pool gone; the database probe failed: connection refused',
+      },
+      {
+        name: 'the database probe never answers',
+        probe: async () => working(clock),
+        databaseProbe: hangs,
+        rendered: 'health probe did not answer within 5000 ms (job queue: answered; database: no answer)',
+      },
+      {
+        name: 'the job queue probe rejects and the database probe never answers',
+        probe: rejects('pool gone'),
+        databaseProbe: hangs,
+        rendered: 'health probe did not answer within 5000 ms (job queue: failed; database: no answer): pool gone',
+      },
+      {
+        name: 'the job queue probe never answers',
+        probe: hangs,
+        databaseProbe: async () => undefined,
+        rendered: 'health probe did not answer within 5000 ms (job queue: no answer; database: answered)',
+      },
+      {
+        name: 'neither probe answers',
+        probe: hangs,
+        databaseProbe: hangs,
+        rendered: 'health probe did not answer within 5000 ms (job queue: no answer; database: no answer)',
+      },
+      {
+        name: 'the job queue probe never answers and the database probe rejects',
+        probe: hangs,
+        databaseProbe: rejects('connection refused'),
+        rendered:
+          'health probe did not answer within 5000 ms (job queue: no answer; database: failed): connection refused',
+      },
+    ])('$name', async ({ probe, databaseProbe, rendered }) => {
+      const lines: string[] = [];
+      const log = createLogger({ level: 'debug', destination: { write: (line: string) => lines.push(line) } });
+      const beat = start(probe as () => Promise<QueueProbe>, { databaseProbe }, log as never);
+      await flush();
+      await tick(5_000);
+      await flush();
+      beat.stop();
+      const warned = lines
+        .map((line) => JSON.parse(line) as { msg: string; err?: { message: string } })
+        .filter((entry) => entry.msg === 'Health probe failed; the heartbeat is not refreshed');
+      expect(warned[0]?.err?.message).toBe(rendered);
+    });
   });
 });

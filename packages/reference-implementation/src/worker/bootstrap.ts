@@ -177,6 +177,11 @@ export async function runWorker(options: RunWorkerOptions): Promise<void> {
     heartbeat = startHeartbeat({
       logger,
       probe: () => queue.probe(),
+      // The handlers' own pool, which the queue probe does not touch. Awaited,
+      // because a Prisma query does not run until it is awaited.
+      databaseProbe: async () => {
+        await prisma.$queryRaw`SELECT 1`;
+      },
       // The health window must outlast the longest legitimate job by the
       // heartbeat sampling interval, with slack.
       maxJobMs: jobTimeoutSeconds * 1_000 + 60_000,

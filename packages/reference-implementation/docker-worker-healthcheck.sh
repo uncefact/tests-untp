@@ -1,9 +1,10 @@
 #!/bin/sh
 # The worker's container health check (#985). The worker publishes
-# /tmp/worker-heartbeat each time its own probe succeeds (the queue's pool
-# answers and a consumer has fetched recently or holds a job), so a stale
-# file means the process is up but not proving it can work. The age limit is
-# three of the worker's 10 s intervals. Both sides read WORKER_HEARTBEAT_PATH.
+# /tmp/worker-heartbeat each time its own probes succeed (the queue's pool
+# and the application's Prisma pool both answer, and a consumer has fetched
+# recently or holds a job), so a stale file means the process is up but not
+# proving it can work. The age limit is three of the worker's 10 s intervals.
+# Both sides read WORKER_HEARTBEAT_PATH.
 # Every step that can fail is checked, and a future timestamp (a clock that
 # stepped back) is not taken as fresh. Exit codes: 0 healthy, 1 unhealthy.
 set -u

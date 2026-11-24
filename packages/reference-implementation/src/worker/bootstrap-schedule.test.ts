@@ -39,7 +39,11 @@ jest.mock('@/lib/credentials/reconcile-batches-job', () => ({
   registerCredentialBatchReconciliation: jest.fn(),
 }));
 jest.mock('@/lib/prisma/prisma', () => ({
-  prisma: { $queryRawUnsafe: jest.fn(async () => []), $disconnect: jest.fn(async () => undefined) },
+  prisma: {
+    $queryRawUnsafe: jest.fn(async () => []),
+    $queryRaw: jest.fn(async () => []),
+    $disconnect: jest.fn(async () => undefined),
+  },
 }));
 
 const fakeQueue = {
@@ -63,6 +67,7 @@ import {
   LIBRARY_RECONCILE_PENDING_RUNS_JOB,
 } from '@/lib/jobs/queue-names';
 import { registerCredentialBatchIssue } from '@/lib/credentials/issue-batch-job';
+import { prisma } from '@/lib/prisma/prisma';
 import { runWorker } from './bootstrap';
 import { WorkerBootError } from './errors';
 
@@ -242,5 +247,66 @@ describe('the reconciliation schedule at worker boot', () => {
     expect((failure as WorkerBootError).code).toBe('worker.reconciliation-schedule-failed');
     expect((failure as WorkerBootError).message).toContain(LIBRARY_RECONCILE_PENDING_RUNS_JOB);
     expect(startHeartbeat).not.toHaveBeenCalled();
+  });
+});
+
+describe('the heartbeat probes the worker is wired with', () => {
+  // The heartbeat is the operator's signal that this worker can work, so it
+  // must probe the worker's own Prisma client. Fails if the database probe is
+  // left out, reaches another client, or returns before its query has
+  // answered.
+  type Probes = { databaseProbe: () => Promise<unknown> };
+  const wiredProbes = async (): Promise<Probes> => {
+    await runWorker(OPTIONS);
+    const calls = startHeartbeat.mock.calls as unknown as [Probes][];
+    expect(calls).toHaveLength(1);
+    return calls[0][0];
+  };
+  const deferredQuery = () => {
+    let resolve!: (rows: unknown[]) => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<unknown[]>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    (prisma.$queryRaw as unknown as jest.Mock).mockReturnValueOnce(promise);
+    return { resolve, reject };
+  };
+  const state = (promise: Promise<unknown>) => {
+    const seen: { settled: 'pending' | 'resolved' | 'rejected'; reason?: unknown } = { settled: 'pending' };
+    void promise.then(
+      () => (seen.settled = 'resolved'),
+      (reason: unknown) => {
+        seen.settled = 'rejected';
+        seen.reason = reason;
+      },
+    );
+    return seen;
+  };
+  const flush = async () => {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  };
+
+  it('the database probe stays pending while its query is pending, and resolves when the query answers', async () => {
+    const { databaseProbe } = await wiredProbes();
+    const query = deferredQuery();
+    const seen = state(databaseProbe());
+    await flush();
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(seen.settled).toBe('pending');
+    query.resolve([{ '?column?': 1 }]);
+    await flush();
+    expect(seen.settled).toBe('resolved');
+  });
+
+  it('the database probe rejects with the query error', async () => {
+    const { databaseProbe } = await wiredProbes();
+    const query = deferredQuery();
+    const seen = state(databaseProbe());
+    const refused = new Error('connection refused');
+    query.reject(refused);
+    await flush();
+    expect(seen.settled).toBe('rejected');
+    expect(seen.reason).toBe(refused);
   });
 });
