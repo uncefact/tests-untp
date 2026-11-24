@@ -1,5 +1,9 @@
 # UNTP Reference Implementation release notes
 
+## Unreleased
+
+- The web process has a new readiness route, `GET /api/health/ready`. It answers 200 when the database client the API routes use answers `SELECT 1` within 2 seconds, and 503 otherwise. It needs no session or token. Point a load balancer's or orchestrator's traffic check at it, and keep anything that restarts on failure on `/api/health`. Nothing existing changes. See [Health Checks](https://uncefact.github.io/tests-untp/docs/reference-implementation/operations/health-checks).
+
 ## 0.7.3 - 2026-10-28
 
 This patch moves the bundled Compose stacks to the patched releases of the services the Reference Implementation depends on: VCKit 1.2.2, storage service 4.0.2, Pyx Identity Resolver 4.0.1 and Keycloak 26.7.5. VCKit 1.2.2 and Pyx Identity Resolver 4.0.1 update dependencies with published security advisories, storage service 4.0.2 runs as a non-root user, and Keycloak 26.7.5 is a patch release that includes the fix for a critical Keycloak advisory. It also refuses credential issuance with an issuer DID that is not `ACTIVE` or `VERIFIED`, which API clients can see. The Reference Implementation's own settings and database migrations are unchanged from v0.7.2. Read [Upgrading from v0.7.2](https://uncefact.github.io/tests-untp/docs/migration-guides/ri-v0.7#upgrading-from-v072) before upgrading.
