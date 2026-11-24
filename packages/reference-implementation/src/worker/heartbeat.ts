@@ -19,6 +19,13 @@ export const HEARTBEAT_STALE_FETCH_MS = 30_000;
 export interface HeartbeatOptions {
   /** Proves the queue can still work; rejects when it cannot. */
   probe: () => Promise<QueueProbe>;
+  /**
+   * Proves the worker's application database pool (the Prisma client its
+   * handlers use) can still run a query; rejects when it cannot. Runs beside
+   * `probe` under the same time limit, and a beat publishes only when both
+   * answer.
+   */
+  databaseProbe: () => Promise<unknown>;
   logger: Logger;
   path?: string;
   intervalMs?: number;
@@ -30,6 +37,42 @@ export interface HeartbeatOptions {
   now?: () => number;
 }
 
+/** What one probe of a beat has done so far: nothing yet, or its settlement. */
+interface Observed {
+  result?: PromiseSettledResult<unknown>;
+}
+
+/** Records a probe's settlement as it happens, so a timeout can say which probe answered. */
+function observe(attempt: Promise<unknown>): Observed {
+  const seen: Observed = {};
+  void attempt.then(
+    (value) => {
+      seen.result = { status: 'fulfilled', value };
+    },
+    (reason: unknown) => {
+      seen.result = { status: 'rejected', reason };
+    },
+  );
+  return seen;
+}
+
+function messageOf(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason);
+}
+
+/**
+ * One probe's state for a timeout message. A failure's reason is not repeated
+ * here: it rides as the error's cause, which the log serialiser appends.
+ */
+function stateOf(seen: Observed): string {
+  if (seen.result === undefined) return 'no answer';
+  return seen.result.status === 'fulfilled' ? 'answered' : 'failed';
+}
+
+function isRejected(result: PromiseSettledResult<unknown> | undefined): result is PromiseRejectedResult {
+  return result?.status === 'rejected';
+}
+
 export interface Heartbeat {
   /** Stops proving. The last proof stays on disk so a draining worker keeps reading healthy for its bounded shutdown. */
   stop(): void;
@@ -39,12 +82,19 @@ export interface Heartbeat {
  * The worker's health signal (#985). A worker binds no port, so the container
  * cannot probe it over HTTP, and an idle worker looks like a dead one to any
  * check of queue activity. Instead the worker proves itself: every interval
- * it runs the probe (a trivial query through the queue's own pool, and what
- * its consumers have done lately) and, when the pool answers and a consumer
- * has fetched recently or is inside a job, publishes a fresh heartbeat file.
- * The container health check fails when that file is older than a few
- * intervals, which catches a wedged event loop, a queue pool that is down or
- * exhausted, and a consumer that has stopped fetching.
+ * it runs two probes together, the queue probe (a trivial query through the
+ * queue's own pool, and what its consumers have done lately) and the
+ * database probe (a trivial query through the application's Prisma pool).
+ * When both pools answer and a consumer has fetched recently or is inside a
+ * job, it publishes a fresh heartbeat file. The container health check fails
+ * when that file is older than a few intervals, which catches a wedged event
+ * loop, either pool being down or exhausted, and a consumer that has stopped
+ * fetching. A failed beat's log names the pool that failed, or on a timeout
+ * each pool's state.
+ *
+ * The two probes share one time limit, and the next beat waits until both
+ * have settled, so a probe that never settles keeps the worker unhealthy
+ * until it does, whichever pool it is on.
  *
  * The worker does not exit on a failed probe. Both database pools recover a
  * lost connection on their own, so exiting would restart every worker on a
@@ -117,16 +167,27 @@ export function startHeartbeat(options: HeartbeatOptions): Heartbeat {
     );
   };
 
-  /** Rejects when the probe has not answered in time. The probe itself keeps running; nothing cancels it. */
-  const bounded = (attempt: Promise<QueueProbe>): Promise<QueueProbe> => {
+  /**
+   * Rejects when the two probes have not both settled in time, naming what
+   * each had done by then; a probe that had already failed is the cause. The
+   * probes keep running; nothing cancels them.
+   */
+  const bounded = <T>(attempt: Promise<T>, queue: Observed, database: Observed): Promise<T> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     return Promise.race([
       attempt,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`health probe did not answer within ${probeTimeoutMs} ms`)),
-          probeTimeoutMs,
-        );
+        timer = setTimeout(() => {
+          const rejected = [queue.result, database.result].find(isRejected);
+          reject(
+            new Error(
+              `health probe did not answer within ${probeTimeoutMs} ms (job queue: ${stateOf(
+                queue,
+              )}; database: ${stateOf(database)})`,
+              rejected === undefined ? undefined : { cause: rejected.reason },
+            ),
+          );
+        }, probeTimeoutMs);
       }),
     ]).finally(() => {
       if (timer !== undefined) clearTimeout(timer);
@@ -136,18 +197,39 @@ export function startHeartbeat(options: HeartbeatOptions): Heartbeat {
   const beat = async (): Promise<void> => {
     if (stopped || inFlight) return;
     inFlight = true;
-    // inFlight is cleared by the probe itself, not by the bounded wait below,
-    // so a probe that outlives its timeout still blocks the next one and
-    // unanswered probes never pile up on the pool.
-    const attempt = options.probe();
-    const settled = () => {
+    // inFlight is cleared when both probes have settled, not by the bounded
+    // wait below and not by the first to settle, so a probe that outlives its
+    // timeout still blocks the next beat and unanswered probes never pile up
+    // on either pool. Each probe is called inside an async function, so a
+    // probe that throws before returning still settles (and frees the guard).
+    const queueAttempt = (async () => options.probe())();
+    const databaseAttempt = (async () => options.databaseProbe())();
+    const queueSeen = observe(queueAttempt);
+    const databaseSeen = observe(databaseAttempt);
+    const both = Promise.allSettled([queueAttempt, databaseAttempt]);
+    void both.then(() => {
       inFlight = false;
-    };
-    void attempt.then(settled, settled);
+    });
     try {
-      const result = await bounded(attempt);
+      const [queueResult, databaseResult] = await bounded(both, queueSeen, databaseSeen);
       if (stopped) return;
-      if (judge(result) === 'pending') {
+      // The reason rides as the cause, and the log serialiser appends a
+      // cause's message to the error's own, so the message stops at "failed"
+      // and the logged line reads "the database probe failed: <reason>" once.
+      // When both fail, the queue's reason is written into the message and
+      // the database's is the cause.
+      if (queueResult.status === 'rejected' && databaseResult.status === 'rejected') {
+        throw new Error(`the job queue probe failed: ${messageOf(queueResult.reason)}; the database probe failed`, {
+          cause: databaseResult.reason,
+        });
+      }
+      if (queueResult.status === 'rejected') {
+        throw new Error('the job queue probe failed', { cause: queueResult.reason });
+      }
+      if (databaseResult.status === 'rejected') {
+        throw new Error('the database probe failed', { cause: databaseResult.reason });
+      }
+      if (judge(queueResult.value) === 'pending') {
         // Not failed and not proven: no warning, and no proof either. The
         // container's start period covers the missing file meanwhile.
         return;

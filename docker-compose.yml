@@ -239,11 +239,12 @@ services:
   # the web container at all: the dependencies below only order start after
   # the services a job talks to. It refuses to start without
   # DATA_ENCRYPTION_KEY. The image's HTTP healthcheck is replaced by the
-  # worker's own: it publishes a heartbeat file each time its queue pool
-  # answers and a consumer has fetched recently, and the check reads the
-  # file's age. Unhealthy is the signal, not a restart trigger: the worker
-  # does not exit on a failed probe (both pools recover a lost connection),
-  # so under Compose an unhealthy worker is what `docker compose ps` shows.
+  # worker's own: it publishes a heartbeat file each time both its job queue
+  # pool and its application database pool answer and a consumer has fetched
+  # recently, and the check reads the file's age. Unhealthy is the signal,
+  # not a restart trigger: the worker does not exit on a failed probe (both
+  # pools recover a lost connection), so under Compose an unhealthy worker is
+  # what `docker compose ps` shows.
   # The grace period sits above the worker's own shutdown deadline (see the
   # operations page for the budget).
   ri-worker:
