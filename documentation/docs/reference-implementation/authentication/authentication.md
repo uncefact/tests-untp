@@ -77,6 +77,7 @@ In [open mode](./tenant-modes#open-mode), a service account that has not previou
 Not all routes require authentication. The following are publicly accessible without a session or token:
 
 - **Health check** (`/api/health`) — used by load balancers and monitoring tools to confirm the application is running. It sits outside `/api/v1`, which is authenticated
+- **Readiness check** (`/api/health/ready`): used by load balancers and orchestrators to decide whether an instance should receive traffic. It answers 503 when it cannot get an answer from its database within 2 seconds. See [Health Checks](../operations/health-checks) for details.
 - **Credential verification API** (`/api/v1/credentials/verify`) — accepts a credential URL and returns the verification result
 - **Verify page** (`/verify`) — a web UI for verifying credentials, intended for end users and specification readers following links to example credentials. See [Verify Page](../verify-page) for details.
 
